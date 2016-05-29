@@ -373,7 +373,7 @@ namespace CoreLib
 				return length;
 			}
 
-			int IndexOf(wchar_t * str, int id) const // String str
+			int IndexOf(const wchar_t * str, int id) const // String str
 			{
 #if _DEBUG
 				if (id < 0 || id >= length)
@@ -394,7 +394,7 @@ namespace CoreLib
 				return IndexOf(str.buffer.Ptr(), id);
 			}
 
-			int IndexOf(wchar_t * str) const
+			int IndexOf(const wchar_t * str) const
 			{
 				return IndexOf(str, 0);
 			}
@@ -467,7 +467,7 @@ namespace CoreLib
 				return EndsWith(str.buffer.Ptr());
 			}
 
-			bool Contains(wchar_t * str) const // String str
+			bool Contains(const wchar_t * str) const // String str
 			{
 				if(!buffer)
 					return false;

@@ -116,10 +116,6 @@ namespace CoreLib
 			}
 			handle = _wfsopen(fileName.Buffer(), mode, shFlag);
 #else
-			if (share != CoreLib::IO::FileShare::None)
-			{
-				throw ArgumentException(L"Share mode not supported on non-Windows platform.");
-			}
 			handle = fopen(fileName.ToMultiByteString(), modeMBCS);
 #endif
 			if (!handle)

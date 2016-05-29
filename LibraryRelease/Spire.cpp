@@ -821,10 +821,6 @@ namespace CoreLib
 			}
 			handle = _wfsopen(fileName.Buffer(), mode, shFlag);
 #else
-			if (share != CoreLib::IO::FileShare::None)
-			{
-				throw ArgumentException(L"Share mode not supported on non-Windows platform.");
-			}
 			handle = fopen(fileName.ToMultiByteString(), modeMBCS);
 #endif
 			if (!handle)
@@ -920,7 +916,6 @@ namespace CoreLib
 CORELIB\TEXTIO.CPP
 ***********************************************************************/
 #include <ctype.h>
-
 #ifdef _WIN32
 #include <Windows.h>
 #define CONVERT_END_OF_LINE
@@ -932,59 +927,48 @@ namespace CoreLib
 	{
 		using namespace CoreLib::Basic;
 
-		class UnicodeEncoding : public Encoding
+		class UnicodeEncoding : public Encoding //UTF8
 		{
 		public:
 			virtual List<char> GetBytes(const String & str)
 			{
-				List<char> rs;
-				rs.Reserve(str.Length());
-				rs.AddRange((char*)str.Buffer(), str.Length()*2);
-				return rs;
+				std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+				const std::string rs = converter.to_bytes(str.Buffer(), str.Buffer() + str.Length());
+				List<char> result;
+				result.Reserve(rs.length());
+				result.AddRange(rs.data(), rs.length());
+				return result;
 			}
 
 			virtual String GetString(char * buffer, int length)
 			{
-#ifdef _WIN32
-				int unicodeFlag;
-				int startPos = 0;
-				IsTextUnicode(buffer, length, &unicodeFlag);
-				if (unicodeFlag & IS_TEXT_UNICODE_UNICODE_MASK)
-				{
-					if (unicodeFlag & IS_TEXT_UNICODE_SIGNATURE)
-					{
-						startPos += 2;
-					}
-					length = (int)wcsnlen_s((wchar_t*)buffer+startPos, length-startPos);
-					wchar_t * rbuffer = new wchar_t[length+1];
-					memcpy(rbuffer, buffer, length*sizeof(wchar_t));
-					return String::FromBuffer(rbuffer, length);
-				}
-				else if (unicodeFlag & IS_TEXT_UNICODE_REVERSE_MASK)
-				{
-					if (unicodeFlag & IS_TEXT_UNICODE_REVERSE_SIGNATURE)
-					{
-						startPos += 2;
-					}
-					length = (int)wcsnlen_s((wchar_t*)buffer+startPos, length-startPos);
-					wchar_t * rbuffer = new wchar_t[length+1];
-					for (int i = 0; i<length; i++)
-					{
-						((char*)rbuffer)[i*2] = buffer[i*2+1];
-						((char*)rbuffer)[i*2+1] = buffer[i*2];
-					}
-					rbuffer[length] = 0;
-					return String::FromBuffer(rbuffer, length);
-				}
-				else
-				{
-					throw ArgumentException(L"Invalid unicode text format.");
-				}
-#else
-				throw NotImplementedException(L"UnicodeEncoding::GetString() not implemented for current platform.");
-#endif
+				std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+				const std::wstring rs = converter.from_bytes(buffer, buffer + length);
+				return String(rs.c_str());
 			}
 		};
+
+		class Utf16Encoding : public Encoding //UTF16
+		{
+		public:
+			virtual List<char> GetBytes(const String & str)
+			{
+				std::wstring_convert<std::codecvt_utf16<wchar_t>> converter;
+				const std::string rs = converter.to_bytes(str.Buffer(), str.Buffer() + str.Length());
+				List<char> result;
+				result.Reserve(rs.length());
+				result.AddRange(rs.data(), rs.length());
+				return result;
+			}
+
+			virtual String GetString(char * buffer, int length)
+			{
+				std::wstring_convert<std::codecvt_utf16<wchar_t>> converter;
+				const std::wstring rs = converter.from_bytes(buffer, buffer + length);
+				return String(rs.c_str());
+			}
+		};
+
 
 		class AnsiEncoding : public Encoding
 		{
@@ -1012,12 +996,17 @@ namespace CoreLib
 		};
 
 		UnicodeEncoding __unicodeEncoding;
+		Utf16Encoding __utf16Encoding;
 		AnsiEncoding __ansiEncoding;
 
 		Encoding * Encoding::Unicode = &__unicodeEncoding;
+		Encoding * Encoding::UTF16 = &__utf16Encoding;
+
 		Encoding * Encoding::Ansi = &__ansiEncoding;
 
-		const unsigned char UnicodeHeader[] = {0xFF, 0xFE};
+		const unsigned char Utf16Header[] = { 0xFE,0xFF };
+
+		const unsigned char Utf8Header[] = { 0xEF,0xBB,0xBF };
 
 		StreamWriter::StreamWriter(const String & path, Encoding * encoding)
 		{
@@ -1025,7 +1014,11 @@ namespace CoreLib
 			this->encoding = encoding;
 			if (encoding == Encoding::Unicode)
 			{
-				this->stream->Write(UnicodeHeader, 2);
+				//this->stream->Write(Utf8Header, 3);
+			}
+			else if (encoding == Encoding::UTF16)
+			{
+				this->stream->Write(Utf16Header, 2);
 			}
 		}
 		StreamWriter::StreamWriter(RefPtr<Stream> stream, Encoding * encoding)
@@ -1034,72 +1027,27 @@ namespace CoreLib
 			this->encoding = encoding;
 			if (encoding == Encoding::Unicode)
 			{
-				this->stream->Write(UnicodeHeader, 2);
+				//this->stream->Write(Utf8Header, 3);
+			}
+			else if (encoding == Encoding::UTF16)
+			{
+				this->stream->Write(Utf16Header, 2);
 			}
 		}
 		void StreamWriter::Write(const String & str)
 		{
-			if (encoding == Encoding::Unicode)
-			{
-				Write(str.Buffer(), str.Length());
-			}
-			else
-			{
-				auto bytes = encoding->GetBytes(String(str));
-				Write(bytes.Buffer(), bytes.Count());
-			}
+			auto bytes = encoding->GetBytes(str);
+			stream->Write(bytes.Buffer(), bytes.Count());
 		}
-		void StreamWriter::Write(const wchar_t * str, int length)
+		void StreamWriter::Write(const wchar_t * str)
 		{
-			if (encoding == Encoding::Unicode)
-			{
-				if (length == 0)
-					length = (int)wcslen(str);
-#ifdef CONVERT_END_OF_LINE
-				for (int i = 0; i < length; i++)
-				{
-					if (str[i] == L'\r' && (i == length - 1 || str[i + 1] != L'\n'))
-						stream->Write(L"\r\n", sizeof(wchar_t)*2);
-					else if (str[i] == L'\n' && (i == 0 || str[i - 1] != L'\r'))
-						stream->Write(L"\r\n", sizeof(wchar_t) * 2);
-					else
-						stream->Write(str+i, sizeof(wchar_t));
-				}
-#else
-				stream->Write(str, length*sizeof(wchar_t));
-#endif
-			}
-			else
-			{
-				auto bytes = encoding->GetBytes(String(str));
-				stream->Write(bytes.Buffer(), bytes.Count());
-			}
+			auto bytes = encoding->GetBytes(String(str));
+			stream->Write(bytes.Buffer(), bytes.Count());
 		}
-		void StreamWriter::Write(const char * str, int length)
+		void StreamWriter::Write(const char * str)
 		{
-			if (encoding == Encoding::Ansi)
-			{
-				if (length == 0)
-					length = (int)strlen(str);
-#ifdef CONVERT_END_OF_LINE
-				for (int i = 0; i < length; i++)
-				{
-					if (str[i] == '\r' && (i == length - 1 || str[i + 1] != '\n'))
-						stream->Write("\r\n", sizeof(char) * 2);
-					else if (str[i] == '\n' && (i == 0 || str[i - 1] != '\r'))
-						stream->Write("\r\n", sizeof(char) * 2);
-					else
-						stream->Write(str + i, sizeof(char));
-				}
-#else
-				stream->Write(str, length*sizeof(char));
-#endif
-			}
-			else
-			{
-				String cpy(str);
-				stream->Write(cpy.Buffer(), sizeof(wchar_t) * cpy.Length());
-			}
+			auto bytes = encoding->GetBytes(String(str));
+			stream->Write(bytes.Buffer(), bytes.Count());
 		}
 
 		StreamReader::StreamReader(const String & path)
@@ -1122,24 +1070,31 @@ namespace CoreLib
 
 		Encoding * StreamReader::DetermineEncoding()
 		{
-			if ((unsigned char)(buffer[0]) == 0xFE && (unsigned char)(buffer[1]) == 0xFF ||
-				(unsigned char)(buffer[1]) == 0xFE && (unsigned char)(buffer[0]) == 0xFF)
+			if ((unsigned char)(buffer[0]) == 0xEF && (unsigned char)(buffer[1]) == 0xBB)
 			{
-				ptr += 2;
+				ptr += 3;
 				return Encoding::Unicode;
 			}
-#ifdef _WIN32
-			int flag = IS_TEXT_UNICODE_SIGNATURE | IS_TEXT_UNICODE_REVERSE_SIGNATURE | IS_TEXT_UNICODE_STATISTICS;
-			int rs = IsTextUnicode(buffer.Buffer(), buffer.Count(), &flag);
-			if (flag & (IS_TEXT_UNICODE_SIGNATURE | IS_TEXT_UNICODE_REVERSE_SIGNATURE | IS_TEXT_UNICODE_STATISTICS))
-				return Encoding::Unicode;
-			else if (rs)
-				return Encoding::Ansi;
+			else if (*((unsigned short*)(buffer.Buffer())) == 0xFEFF || *((unsigned short*)(buffer.Buffer())) == 0xFFFE)
+			{
+				ptr += 2;
+				return Encoding::UTF16;
+			}
 			else
-				return 0;
+			{
+#ifdef _WIN32
+				int flag = IS_TEXT_UNICODE_SIGNATURE | IS_TEXT_UNICODE_REVERSE_SIGNATURE | IS_TEXT_UNICODE_STATISTICS;
+				int rs = IsTextUnicode(buffer.Buffer(), buffer.Count(), &flag);
+				if (flag & (IS_TEXT_UNICODE_SIGNATURE | IS_TEXT_UNICODE_REVERSE_SIGNATURE | IS_TEXT_UNICODE_STATISTICS))
+					return Encoding::Unicode;
+				else if (rs)
+					return Encoding::Ansi;
+				else
+					return Encoding::Unicode;
 #else
-			return Encoding::Ansi;
+				return Encoding::Unicode;
 #endif
+			}
 		}
 		
 		void StreamReader::ReadBuffer()
@@ -1710,9 +1665,9 @@ namespace VectorMath
 /***********************************************************************
 CORELIB\WIDECHAR.CPP
 ***********************************************************************/
-#ifdef WINDOWS_PLATFORM
-#endif
 #include <locale.h>
+
+#define _CRT_SECUIRE_NO_WARNINGS
 
 class DefaultLocaleSetter
 {
@@ -1723,65 +1678,65 @@ public:
 	};
 };
 
+
 char * WideCharToMByte(const wchar_t * buffer, int length)
 {
-#ifdef _WIN32
 	size_t requiredBufferSize;
-	requiredBufferSize = WideCharToMultiByte(CP_OEMCP, NULL, buffer, length, 0, 0, NULL, NULL)+1;
-	if (requiredBufferSize)
+#ifdef _MSC_VER
+	wcstombs_s(&requiredBufferSize, nullptr, 0, buffer, length);
+#else
+	requiredBufferSize = std::wcstombs(nullptr, buffer, 0);
+#endif
+	if (requiredBufferSize > 0)
 	{
-		char * multiByteBuffer = new char[requiredBufferSize];
-		WideCharToMultiByte(CP_OEMCP, NULL, buffer, length, multiByteBuffer, (int)requiredBufferSize, NULL, NULL);
-		multiByteBuffer[requiredBufferSize-1] = 0;
+		char * multiByteBuffer = new char[requiredBufferSize + 1];
+#ifdef _MSC_VER
+		wcstombs_s(&requiredBufferSize, multiByteBuffer, requiredBufferSize, buffer, length);
+		int pos = (int)requiredBufferSize;
+#else
+		int pos = (int)std::wcstombs(multiByteBuffer, buffer, requiredBufferSize + 1);
+#endif
+		if (pos <= (int)requiredBufferSize && pos >= 0)
+			multiByteBuffer[pos] = 0;
 		return multiByteBuffer;
 	}
 	else
 		return 0;
-	
-#else
-	static DefaultLocaleSetter setter;
-	size_t ret;
-	char * dest = new char[length*2 + 1];
-	memset(dest, 0, sizeof(char)*(length*2+1));
-	wcstombs_s(&ret, dest, length*2+1, buffer, _TRUNCATE);
-	return dest;
-#endif
 }
 
 wchar_t * MByteToWideChar(const char * buffer, int length)
 {
-#ifdef _WIN32
 	// regard as ansi
-	MultiByteToWideChar(CP_ACP, 0, buffer, length, NULL, 0);
-	if (length < 0) length = 0;
-	if (length != 0)
+#ifdef _MSC_VER
+	int bufferSize;
+	mbstowcs_s((size_t*)&bufferSize, nullptr, 0, buffer, length);
+#else
+	int bufferSize = (int)std::mbstowcs(nullptr, buffer, 0);
+#endif
+	if (bufferSize > 0)
 	{
-		wchar_t * rbuffer = new wchar_t[length+1];
-		MultiByteToWideChar(CP_ACP, NULL, buffer, length, rbuffer, length+1);
-		rbuffer[length] = 0;
+		wchar_t * rbuffer = new wchar_t[bufferSize +1];
+		int pos;
+#ifdef _MSC_VER
+		mbstowcs_s((size_t*)&pos, rbuffer, bufferSize, buffer, length);
+#else
+		pos = (int)std::mbstowcs(rbuffer, buffer, bufferSize + 1);
+#endif
+		if (pos <= (int)bufferSize && pos >= 0)
+			rbuffer[pos] = 0;
 		return rbuffer;
 	}
 	else
 		return 0;
-#else
-	size_t ret;
-	static DefaultLocaleSetter setter;
-	wchar_t * dest = new wchar_t[length+1];
-	memset(dest, 0, sizeof(wchar_t)*(length+1));
-	mbstowcs_s(&ret, dest, length+1, buffer, _TRUNCATE);
-	return dest;
-#endif
 }
 
 void MByteToWideChar(wchar_t * buffer, int bufferSize, const char * str, int length)
 {
-#ifdef _WIN32
-	// regard as ansi
-	MultiByteToWideChar(CP_ACP, NULL, str, length, buffer, bufferSize);
+#ifdef _MSC_VER
+	int pos;
+	mbstowcs_s((size_t*)&pos, buffer, bufferSize, str, length);
 #else
-	size_t ret;
-	static DefaultLocaleSetter setter;
-	mbstowcs_s(&ret, buffer, bufferSize, str, _TRUNCATE);
+	std::mbstowcs(buffer, str, bufferSize);
 #endif
 }
 

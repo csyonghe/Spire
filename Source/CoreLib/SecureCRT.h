@@ -51,8 +51,8 @@ inline int _itow_s(int value, wchar_t * buffer, size_t sizeInCharacters, int rad
 	std::wstringstream s;
 	s<<value;
 	auto str = s.str();
-	memset(buffer, 0, sizeInCharacters);
-	memcpy(buffer, str.c_str(), str.length());
+	memset(buffer, 0, sizeInCharacters * sizeof(wchar_t));
+	memcpy(buffer, str.c_str(), str.length() * sizeof(wchar_t));
 	return 0;
 }
 
@@ -61,8 +61,8 @@ inline int _i64tow_s(long long value, wchar_t * buffer, size_t sizeInCharacters,
 	std::wstringstream s;
 	s<<value;
 	auto str = s.str();
-	memset(buffer, 0, sizeInCharacters);
-	memcpy(buffer, str.c_str(), str.length());
+	memset(buffer, 0, sizeInCharacters * sizeof(wchar_t));
+	memcpy(buffer, str.c_str(), str.length() * sizeof(wchar_t));
 	return 0;
 }
 

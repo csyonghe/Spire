@@ -377,8 +377,8 @@ inline int _itow_s(int value, wchar_t * buffer, size_t sizeInCharacters, int rad
 	std::wstringstream s;
 	s<<value;
 	auto str = s.str();
-	memset(buffer, 0, sizeInCharacters);
-	memcpy(buffer, str.c_str(), str.length());
+	memset(buffer, 0, sizeInCharacters * sizeof(wchar_t));
+	memcpy(buffer, str.c_str(), str.length() * sizeof(wchar_t));
 	return 0;
 }
 
@@ -387,8 +387,8 @@ inline int _i64tow_s(long long value, wchar_t * buffer, size_t sizeInCharacters,
 	std::wstringstream s;
 	s<<value;
 	auto str = s.str();
-	memset(buffer, 0, sizeInCharacters);
-	memcpy(buffer, str.c_str(), str.length());
+	memset(buffer, 0, sizeInCharacters * sizeof(wchar_t));
+	memcpy(buffer, str.c_str(), str.length() * sizeof(wchar_t));
 	return 0;
 }
 
@@ -799,7 +799,7 @@ namespace CoreLib
 				return length;
 			}
 
-			int IndexOf(wchar_t * str, int id) const // String str
+			int IndexOf(const wchar_t * str, int id) const // String str
 			{
 #if _DEBUG
 				if (id < 0 || id >= length)
@@ -820,7 +820,7 @@ namespace CoreLib
 				return IndexOf(str.buffer.Ptr(), id);
 			}
 
-			int IndexOf(wchar_t * str) const
+			int IndexOf(const wchar_t * str) const
 			{
 				return IndexOf(str, 0);
 			}
@@ -893,7 +893,7 @@ namespace CoreLib
 				return EndsWith(str.buffer.Ptr());
 			}
 
-			bool Contains(wchar_t * str) const // String str
+			bool Contains(const wchar_t * str) const // String str
 			{
 				if(!buffer)
 					return false;
@@ -3110,7 +3110,7 @@ namespace CoreLib
 			};
 			inline int GetHashPos(TKey & key) const
 			{
-				return (GetHashCode(key)*2654435761) >> shiftBits;
+				return ((unsigned int)(GetHashCode(key)*2654435761)) >> shiftBits;
 			}
 			FindPositionResult FindPosition(const TKey & key) const
 			{
@@ -3522,7 +3522,7 @@ namespace CoreLib
 			};
 			inline int GetHashPos(TKey & key) const
 			{
-				return (GetHashCode(key) * 2654435761) >> shiftBits;
+				return ((unsigned int)(GetHashCode(key) * 2654435761)) >> shiftBits;
 			}
 			FindPositionResult FindPosition(const TKey & key) const
 			{
@@ -4863,6 +4863,8 @@ CORELIB\TEXTIO.H
 #ifndef CORE_LIB_TEXT_IO_H
 #define CORE_LIB_TEXT_IO_H
 
+#include <locale>
+#include <codecvt>
 #ifdef _MSC_VER
 #include <mbstring.h>
 #endif
@@ -4897,8 +4899,8 @@ namespace CoreLib
 				Close();
 			}
 			virtual void Write(const String & str)=0;
-			virtual void Write(const wchar_t * str, int length=0)=0;
-			virtual void Write(const char * str, int length=0)=0;
+			virtual void Write(const wchar_t * str)=0;
+			virtual void Write(const char * str)=0;
 			virtual void Close(){}
 			template<typename T>
 			TextWriter & operator << (const T& val)
@@ -4928,20 +4930,19 @@ namespace CoreLib
 			}
 			TextWriter & operator << (const char* value)
 			{
-				Write(value, (int)strlen(value));
+				Write(value);
 				return *this;
 			}
 			TextWriter & operator << (const wchar_t * const val)
 			{
-				Write(val, (int)wcslen(val));
+				Write(val);
 				return *this;
 			}
 			TextWriter & operator << (wchar_t * const val)
 			{
-				Write(val, (int)wcslen(val));
+				Write(val);
 				return *this;
 			}
-
 			TextWriter & operator << (const String & val)
 			{
 				Write(val);
@@ -4950,9 +4951,9 @@ namespace CoreLib
 			TextWriter & operator << (const _EndLine &)
 			{
 #ifdef _WIN32
-				Write(L"\r\n", 2);
+				Write(L"\r\n");
 #else
-				Write(L"\n", 1);
+				Write(L"\n");
 #endif
 				return *this;
 			}
@@ -4961,7 +4962,7 @@ namespace CoreLib
 		class Encoding
 		{
 		public:
-			static Encoding * Unicode, * Ansi;
+			static Encoding * Unicode, * Ansi, * UTF16;
 			virtual List<char> GetBytes(const String & str)=0;
 			virtual String GetString(char * buffer, int length)=0;
 			virtual ~Encoding()
@@ -4981,8 +4982,8 @@ namespace CoreLib
 			StreamWriter(const String & path, Encoding * encoding = Encoding::Unicode);
 			StreamWriter(RefPtr<Stream> stream, Encoding * encoding = Encoding::Unicode);
 			virtual void Write(const String & str);
-			virtual void Write(const wchar_t * str, int length=0);
-			virtual void Write(const char * str, int length=0);
+			virtual void Write(const wchar_t * str);
+			virtual void Write(const char * str);
 			virtual void Close()
 			{
 				stream->Close();
@@ -5002,28 +5003,54 @@ namespace CoreLib
 			template<typename GetFunc>
 			wchar_t GetChar(GetFunc get)
 			{
-				wchar_t rs = 0;
+				wchar_t decoded = 0;
+				char charBuffer[5] = {0, 0, 0, 0, 0};
 				if (encoding == Encoding::Unicode)
 				{
-					((char*)&rs)[0] = get(0);
-					((char*)&rs)[1] = get(1);
+					int leading = get(0);
+					charBuffer[0] = (char)leading;
+					if (leading < 0)
+					{
+						int c = get(1);
+						charBuffer[1] = (char)c;
+						if (leading & 0b00100000)
+						{
+							c = get(2);
+							charBuffer[2] = (char)c;
+							if (leading & 0b00010000)
+								charBuffer[3] = (char)get(3);
+								// ignore decoding beyond 0xFFFF
+						}
+					}
+					std::wstring_convert<std::codecvt_utf8<wchar_t>> cvt;
+					auto str = cvt.from_bytes(charBuffer);
+					if (str.length() > 0)
+						return str.at(0);
+					else
+						return 0;
+				}
+				else if (encoding == Encoding::UTF16)
+				{
+					((char*)&decoded)[0] = get(0);
+					((char*)&decoded)[1] = get(1);
+					return decoded;
 				}
 				else
 				{
+				
 					char mb[2];
 					mb[0] = get(0);
 					if (_ismbblead(mb[0]))
 					{
 						mb[1] = get(1);
-						MByteToWideChar(&rs, 1, mb, 2);
+						MByteToWideChar(&decoded, 1, mb, 2);
 					}
 					else
 					{
-						rs = mb[0];
+						decoded = mb[0];
 					}
-					return rs;
+					return decoded;
 				}
-				return rs;
 			}
 			Encoding * DetermineEncoding();
 		public:

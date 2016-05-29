@@ -1,12 +1,12 @@
 #include "WideChar.h"
-#ifdef WINDOWS_PLATFORM
-#include <Windows.h>
-#endif
 #include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <memory.h>
+#include <cstdlib>
 #include "SecureCRT.h"
+
+#define _CRT_SECUIRE_NO_WARNINGS
 
 class DefaultLocaleSetter
 {
@@ -17,64 +17,64 @@ public:
 	};
 };
 
+
 char * WideCharToMByte(const wchar_t * buffer, int length)
 {
-#ifdef _WIN32
 	size_t requiredBufferSize;
-	requiredBufferSize = WideCharToMultiByte(CP_OEMCP, NULL, buffer, length, 0, 0, NULL, NULL)+1;
-	if (requiredBufferSize)
+#ifdef _MSC_VER
+	wcstombs_s(&requiredBufferSize, nullptr, 0, buffer, length);
+#else
+	requiredBufferSize = std::wcstombs(nullptr, buffer, 0);
+#endif
+	if (requiredBufferSize > 0)
 	{
-		char * multiByteBuffer = new char[requiredBufferSize];
-		WideCharToMultiByte(CP_OEMCP, NULL, buffer, length, multiByteBuffer, (int)requiredBufferSize, NULL, NULL);
-		multiByteBuffer[requiredBufferSize-1] = 0;
+		char * multiByteBuffer = new char[requiredBufferSize + 1];
+#ifdef _MSC_VER
+		wcstombs_s(&requiredBufferSize, multiByteBuffer, requiredBufferSize, buffer, length);
+		int pos = (int)requiredBufferSize;
+#else
+		int pos = (int)std::wcstombs(multiByteBuffer, buffer, requiredBufferSize + 1);
+#endif
+		if (pos <= (int)requiredBufferSize && pos >= 0)
+			multiByteBuffer[pos] = 0;
 		return multiByteBuffer;
 	}
 	else
 		return 0;
-	
-#else
-	static DefaultLocaleSetter setter;
-	size_t ret;
-	char * dest = new char[length*2 + 1];
-	memset(dest, 0, sizeof(char)*(length*2+1));
-	wcstombs_s(&ret, dest, length*2+1, buffer, _TRUNCATE);
-	return dest;
-#endif
 }
 
 wchar_t * MByteToWideChar(const char * buffer, int length)
 {
-#ifdef _WIN32
 	// regard as ansi
-	MultiByteToWideChar(CP_ACP, 0, buffer, length, NULL, 0);
-	if (length < 0) length = 0;
-	if (length != 0)
+#ifdef _MSC_VER
+	int bufferSize;
+	mbstowcs_s((size_t*)&bufferSize, nullptr, 0, buffer, length);
+#else
+	int bufferSize = (int)std::mbstowcs(nullptr, buffer, 0);
+#endif
+	if (bufferSize > 0)
 	{
-		wchar_t * rbuffer = new wchar_t[length+1];
-		MultiByteToWideChar(CP_ACP, NULL, buffer, length, rbuffer, length+1);
-		rbuffer[length] = 0;
+		wchar_t * rbuffer = new wchar_t[bufferSize +1];
+		int pos;
+#ifdef _MSC_VER
+		mbstowcs_s((size_t*)&pos, rbuffer, bufferSize, buffer, length);
+#else
+		pos = (int)std::mbstowcs(rbuffer, buffer, bufferSize + 1);
+#endif
+		if (pos <= (int)bufferSize && pos >= 0)
+			rbuffer[pos] = 0;
 		return rbuffer;
 	}
 	else
 		return 0;
-#else
-	size_t ret;
-	static DefaultLocaleSetter setter;
-	wchar_t * dest = new wchar_t[length+1];
-	memset(dest, 0, sizeof(wchar_t)*(length+1));
-	mbstowcs_s(&ret, dest, length+1, buffer, _TRUNCATE);
-	return dest;
-#endif
 }
 
 void MByteToWideChar(wchar_t * buffer, int bufferSize, const char * str, int length)
 {
-#ifdef _WIN32
-	// regard as ansi
-	MultiByteToWideChar(CP_ACP, NULL, str, length, buffer, bufferSize);
+#ifdef _MSC_VER
+	int pos;
+	mbstowcs_s((size_t*)&pos, buffer, bufferSize, str, length);
 #else
-	size_t ret;
-	static DefaultLocaleSetter setter;
-	mbstowcs_s(&ret, buffer, bufferSize, str, _TRUNCATE);
+	std::mbstowcs(buffer, str, bufferSize);
 #endif
 }

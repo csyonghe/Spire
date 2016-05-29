@@ -194,7 +194,7 @@ namespace CoreLib
 			};
 			inline int GetHashPos(TKey & key) const
 			{
-				return (GetHashCode(key)*2654435761) >> shiftBits;
+				return ((unsigned int)(GetHashCode(key)*2654435761)) >> shiftBits;
 			}
 			FindPositionResult FindPosition(const TKey & key) const
 			{
@@ -606,7 +606,7 @@ namespace CoreLib
 			};
 			inline int GetHashPos(TKey & key) const
 			{
-				return (GetHashCode(key) * 2654435761) >> shiftBits;
+				return ((unsigned int)(GetHashCode(key) * 2654435761)) >> shiftBits;
 			}
 			FindPositionResult FindPosition(const TKey & key) const
 			{
