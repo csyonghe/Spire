@@ -115,7 +115,7 @@ int main(int argc, char** args)
 	{
 		Spire::Compiler::CompileOptions options;
 		Spire::Compiler::CompileResult result;
-		auto & compiledShaders = SpireLib::CompileShaderSource(result, args[1], options);
+		auto compiledShaders = SpireLib::CompileShaderSource(result, args[1], options);
 		if (compiledShaders.Count())
 			compiledShaders.First().SaveToFile("d:\\test.cse");
 	}
