@@ -65,7 +65,7 @@ If the default behavior is not desired, you can always manually specify the rate
 @vs vec3 Albedo = texture(baseMap, uvCoord).xyz 
 	              * texture(baseMap2, uvCoord  * 1.2).xyz;
 ```
-This forces `Albedo` to be computed at `vs` world. One goal of Spire is to make writing mult-rate shaders easy. Imagine a pipeline that features prebaking, screen-space half resolution rendering and per-pixel rendering passes, the shading of an asset may contain logic that spans all these stages. Spire allows you to define all these logic in one place, and you can generate very different shaders that computes the shading logic at different rates by simply changing the rate specifier. Instead of knowing only a fixed set of stages such as vertex and fragment shaders, Spire lets the user to define the pipeline and provide a code generation service that takes care of stage dependency and proper interface generation.
+This forces `Albedo` to be computed at `vs` world. One goal of Spire is to make writing mult-rate shaders easy. Imagine a pipeline that features prebaking, screen-space half resolution rendering and per-pixel rendering passes, the shading of an asset may contain logic that spans all these stages. Spire allows you to define all these logic in one place, and you can generate very different shaders that computes the shading logic at different rates by simply changing the rate specifier. Instead of knowing only a fixed set of stages such as vertex and fragment shaders, Spire lets the user define the pipeline and provides a code generation service that takes care of stage dependency and proper interface generation.
 
 
 ## Using Spire
