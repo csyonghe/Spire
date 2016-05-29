@@ -1,9 +1,9 @@
 # Spire
 Spire is a shader compiler that generates optimized shader code that spans the entire pre-baking and rendering pipeline. A shader written in Spire exposes the optimization space of compute rate assignments and algorithm alternatives, and the compiler generates the lower level shader code (e.g. GLSL) that implements the desired optimization choice for all stages of your engine's renderer.  Spire is designed to facilitate rapid exploration of optimization choices and code generation for various platforms and purposes from a single shader definition.
-
+## Using Spire
 The Spire compiler is distributed as a single-source-file C++ library under "LibraryRelease" directory with no external dependencies. To integrate the compiler into your engine, simply grab "Spire.h" "Spire.cpp" and place them into your project.
 ## Getting Started
-To experience Spire, compile `"Source/Spire.sln"` and run the `SceneViewer` project. In `SceneViewer`, select "File"->"Open", and open "TestShaders/couch/couch.world". This loads up a couch scene. The couch is rendered using "TestShaders/couch/couch.shader"
+To experience Spire, compile `"Source/Spire.sln"` and run the `SceneViewer` project. In `SceneViewer`, select "File"->"Open", and open "TestShaders/couch/couch.world". This loads up a couch scene. The couch is rendered using "TestShaders/couch/couch.shader".
 ## Understanding Spire
 The following is a Spire shader that computes the albedo color by blending two textures.
 ```
