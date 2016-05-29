@@ -5,6 +5,40 @@ Paper: http://graphics.cs.cmu.edu/projects/spire/
 ## Using Spire
 ### As Library
 The Spire compiler is distributed as a single-source-file C++ library under "LibraryRelease" directory with no external dependencies. To integrate the compiler into your engine, simply grab "Spire.h" "Spire.cpp" and place them into your project.
+To invoke the compiler, call:
+```c++
+CoreLib::List<SpireLib::ShaderLibFile> CompileShaderSource(Spire::Compiler::CompileResult & result,
+	CoreLib::String sourceFileName,
+	Spire::Compiler::CompileOptions &options);
+```
+Compiles shader from given filename. Each compiled shader correspond to one `SpireLib::ShaderLibFile` object in the returned the list.
+Alternatively,
+```c++
+CoreLib::List<SpireLib::ShaderLibFile> CompileShaderSource(Spire::Compiler::CompileResult & result,
+	const CoreLib::String &source, const CoreLib::String &sourceFileName,
+	Spire::Compiler::CompileOptions &options);
+```
+
+```c++
+namespace SpireLib
+{
+	class ShaderLibFile : public CoreLib::Basic::Object
+	{
+	public:
+		// compiled sources for each world
+		CoreLib::Basic::EnumerableDictionary<CoreLib::Basic::String, Spire::Compiler::CompiledShaderSource> Sources; 
+		Spire::Compiler::ShaderMetaData MetaData;
+		void AddSource(CoreLib::Basic::String source, CoreLib::Text::Parser & parser);
+		void FromString(const CoreLib::String & str);
+		CoreLib::String ToString();
+		void SaveToFile(CoreLib::Basic::String fileName);
+		ShaderLibFile() = default;
+		void Clear();
+		void Load(CoreLib::Basic::String fileName);
+	};
+}
+```
+compiles shader from given source string. `sourceFileName` argument can be any identifier.
 ### As Stand-alone Compiler
 Build "Source/Spire.sln" and use "SpireCompiler.exe". The command line format is:
 ```
