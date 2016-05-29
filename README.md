@@ -50,7 +50,6 @@ shader AlbedoMappedSurface
   vec4 outputColor = vec4(Albedo * lighting, 1.0);
 }
 ```
-Here, `Lighting` is a predefined shader modules in `"EnginePipeline.shader"` that computes lighting effects. 
 ### What does `@mesh` etc. mean?
 This is a rate specifier telling the compiler that `vert_pos` is defined at the `mesh` world, which corresponds to the vertex attributes. Similarly, the component `viewProjectionMatrix` is defined at `viewUniforms`, which hold all uniform shader inputs per view. `mesh`,`viewUniform` and `perInstnaceUniform` are defined by the pipeline in `"EnginePipeline.shader"`.
 
