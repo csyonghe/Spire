@@ -1,7 +1,4 @@
 #include "PerformanceCounter.h"
-#ifdef WIN32
-#include <Windows.h>
-#endif
 
 using namespace std::chrono;
 

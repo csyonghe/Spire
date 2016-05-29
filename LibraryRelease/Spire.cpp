@@ -671,9 +671,6 @@ namespace CoreLib
 /***********************************************************************
 CORELIB\PERFORMANCECOUNTER.CPP
 ***********************************************************************/
-#ifdef WIN32
-#include <Windows.h>
-#endif
 
 using namespace std::chrono;
 
@@ -923,6 +920,7 @@ CORELIB\TEXTIO.CPP
 ***********************************************************************/
 #include <ctype.h>
 #ifdef WINDOWS_PLATFORM
+#include <Windows.h>
 #define CONVERT_END_OF_LINE
 #endif
 
