@@ -1,1 +1,2 @@
 # Spire
+Spire is a shader compiler that generates optimized shader code that spans the entire pre-baking and rendering pipeline. Spire is designed to facilitate rapid exploration of rate and algorithmic shader optimization choices. A shader written in Spire exposes the optimization space of compute rate assignments and implementation alternatives, and the compiler generates the lower level shader code (e.g. GLSL) that implements the desired optimization choice for all stages of your engine's renderer.
