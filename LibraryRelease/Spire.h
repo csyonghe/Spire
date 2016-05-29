@@ -8745,7 +8745,6 @@ SPIRECORE\IL.H
 #ifndef RASTER_RENDERER_IL_H
 #define RASTER_RENDERER_IL_H
 
-#include <crtdbg.h>
 
 namespace Spire
 {

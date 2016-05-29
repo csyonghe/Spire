@@ -2,7 +2,6 @@
 #define RASTER_RENDERER_IL_H
 
 #include "CoreLib/Basic.h"
-#include <crtdbg.h>
 
 namespace Spire
 {
