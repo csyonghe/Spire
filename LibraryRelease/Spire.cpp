@@ -32,8 +32,9 @@ WARNING: This is an automatically generated file.
 CORELIB\LIBIO.CPP
 ***********************************************************************/
 #include <sys/stat.h>
+#ifdef _WIN32
 #include <direct.h>
-
+#endif
 namespace CoreLib
 {
 	namespace IO

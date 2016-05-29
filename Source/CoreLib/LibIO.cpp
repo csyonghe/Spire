@@ -1,8 +1,9 @@
 #include "LibIO.h"
 #include "Exception.h"
 #include <sys/stat.h>
+#ifdef _WIN32
 #include <direct.h>
-
+#endif
 namespace CoreLib
 {
 	namespace IO
