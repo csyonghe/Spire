@@ -10,56 +10,6 @@ To experience Spire, compile `"Source/Spire.sln"` and run the `SceneViewer` proj
 
 The Choice Explorer window allows you to dynamically recompile the modified shader and explore different rate placement choices in real-time.
 
-## Using Spire
-### As Library
-The Spire compiler is distributed as a single-source-file C++ library under "LibraryRelease" directory with no external dependencies. To integrate the compiler into your engine, simply grab "Spire.h" "Spire.cpp" and place them into your project.
-To invoke the compiler, call:
-```c++
-CoreLib::List<SpireLib::ShaderLibFile> CompileShaderSource(Spire::Compiler::CompileResult & result,
-	CoreLib::String sourceFileName,
-	Spire::Compiler::CompileOptions &options);
-```
-Compiles shader from given filename. Each compiled shader correspond to one `SpireLib::ShaderLibFile` object in the returned the list.
-Alternatively,
-```c++
-CoreLib::List<SpireLib::ShaderLibFile> CompileShaderSource(Spire::Compiler::CompileResult & result,
-	const CoreLib::String &source, const CoreLib::String &sourceFileName,
-	Spire::Compiler::CompileOptions &options);
-```
-compiles shader from given source string. `sourceFileName` argument can be any identifier.
-You can then access the compiled shader code for each world using the returned `ShaderLibFile` objects. The following is the definition of `ShaderLibFile`.
-```c++
-namespace SpireLib
-{
-	class ShaderLibFile : public CoreLib::Basic::Object
-	{
-	public:
-		// compiled sources for each world
-		CoreLib::Basic::EnumerableDictionary<CoreLib::Basic::String, Spire::Compiler::CompiledShaderSource> Sources; 
-		Spire::Compiler::ShaderMetaData MetaData;
-		void AddSource(CoreLib::Basic::String source, CoreLib::Text::Parser & parser);
-		void FromString(const CoreLib::String & str);
-		CoreLib::String ToString();
-		void SaveToFile(CoreLib::Basic::String fileName);
-		ShaderLibFile() = default;
-		void Clear();
-		void Load(CoreLib::Basic::String fileName);
-	};
-}
-```
-
-### As Stand-alone Compiler
-Build "Source/Spire.sln" and use "SpireCompiler.exe". The command line format is:
-```
-SpireCompiler filename [-out output_filename] [-symbol shader_to_compile] [-schedule schedule_file] [-genchoice]
-```
-`filename` specifies the source filename.
-Optionally, you can use:
-`-out`: specifies the output filename.
-`-symbol`: instructs the compiler to only generate code for the specified shader.
-`-schedule`: instructs the compiler to apply the specified schedule file. A schedule file contains rate placement or algorithmic choice decisions for the given shader.
-`-genchoice`: instructs the compiler to generate a choice file, which contains all the optimization options (including rate placement or algorithimic choices) exposed by the input shader.
-
 ## Understanding Spire
 The following is a Spire shader that computes the albedo color by blending two textures.
 ```
@@ -113,3 +63,54 @@ If the default behavior is not desired, you can always manually specify the rate
 	              * texture(baseMap2, uvCoord  * 1.2).xyz;
 ```
 This forces `Albedo` to be computed at `vs` world. One goal of Spire is to make writing mult-rate shaders easy. Imagine a pipeline that features prebaking, screen-space half resolution rendering and per-pixel rendering passes, the shading of an asset may contain logic that spans all these stages. Spire allows you to define all these logic in one place, and you can generate very different shaders that computes the shading logic at different rates by simply changing the rate specifier. Instead of knowing only a fixed set of stages such as vertex and fragment shaders, Spire lets the user to define the pipeline and provide a code generation service that takes care of stage dependency and proper interface generation.
+
+
+## Using Spire
+### As Library
+The Spire compiler is distributed as a single-source-file C++ library under "LibraryRelease" directory with no external dependencies. To integrate the compiler into your engine, simply grab "Spire.h" "Spire.cpp" and place them into your project.
+To invoke the compiler, call:
+```c++
+CoreLib::List<SpireLib::ShaderLibFile> CompileShaderSource(Spire::Compiler::CompileResult & result,
+	CoreLib::String sourceFileName,
+	Spire::Compiler::CompileOptions &options);
+```
+Compiles shader from given filename. Each compiled shader correspond to one `SpireLib::ShaderLibFile` object in the returned the list.
+Alternatively,
+```c++
+CoreLib::List<SpireLib::ShaderLibFile> CompileShaderSource(Spire::Compiler::CompileResult & result,
+	const CoreLib::String &source, const CoreLib::String &sourceFileName,
+	Spire::Compiler::CompileOptions &options);
+```
+compiles shader from given source string. `sourceFileName` argument can be any identifier.
+You can then access the compiled shader code for each world using the returned `ShaderLibFile` objects. The following is the definition of `ShaderLibFile`.
+```c++
+namespace SpireLib
+{
+	class ShaderLibFile : public CoreLib::Basic::Object
+	{
+	public:
+		// compiled sources for each world
+		CoreLib::Basic::EnumerableDictionary<CoreLib::Basic::String, Spire::Compiler::CompiledShaderSource> Sources; 
+		Spire::Compiler::ShaderMetaData MetaData;
+		void AddSource(CoreLib::Basic::String source, CoreLib::Text::Parser & parser);
+		void FromString(const CoreLib::String & str);
+		CoreLib::String ToString();
+		void SaveToFile(CoreLib::Basic::String fileName);
+		ShaderLibFile() = default;
+		void Clear();
+		void Load(CoreLib::Basic::String fileName);
+	};
+}
+```
+
+### As Stand-alone Compiler
+Build "Source/Spire.sln" and use "SpireCompiler.exe". The command line format is:
+```
+SpireCompiler filename [-out output_filename] [-symbol shader_to_compile] [-schedule schedule_file] [-genchoice]
+```
+`filename` specifies the source filename.
+Optionally, you can use:
+`-out`: specifies the output filename.
+`-symbol`: instructs the compiler to only generate code for the specified shader.
+`-schedule`: instructs the compiler to apply the specified schedule file. A schedule file contains rate placement or algorithmic choice decisions for the given shader.
+`-genchoice`: instructs the compiler to generate a choice file, which contains all the optimization options (including rate placement or algorithimic choices) exposed by the input shader.
