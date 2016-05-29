@@ -38,7 +38,7 @@ shader AlbedoMappedSurface
   @perInstanceUniform sampler2D baseMap;
   @perInstanceUniform sampler2D baseMap2;
 	
-	vec4 projPos = viewProjectionMatrix * vec4(vert_pos, 1.0);
+  vec4 projPos = viewProjectionMatrix * vec4(vert_pos, 1.0);
   vec2 uvCoord = vert_uv * 3.0;
   vec3 Normal = vert_normal;
   vec3 Albedo = texture(baseMap, uvCoord).xyz 
