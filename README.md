@@ -18,7 +18,8 @@ CoreLib::List<SpireLib::ShaderLibFile> CompileShaderSource(Spire::Compiler::Comp
 	const CoreLib::String &source, const CoreLib::String &sourceFileName,
 	Spire::Compiler::CompileOptions &options);
 ```
-
+compiles shader from given source string. `sourceFileName` argument can be any identifier.
+You can then access the compiled shader code for each world using the returned `ShaderLibFile` objects. The following is the definition of `ShaderLibFile`.
 ```c++
 namespace SpireLib
 {
@@ -38,7 +39,7 @@ namespace SpireLib
 	};
 }
 ```
-compiles shader from given source string. `sourceFileName` argument can be any identifier.
+
 ### As Stand-alone Compiler
 Build "Source/Spire.sln" and use "SpireCompiler.exe". The command line format is:
 ```
