@@ -2,65 +2,65 @@ pipeline EnginePipeline
 {
     [Pinned]
     [Packed]
-	abstract world rootVert;
+    abstract world rootVert;
     
     [InterfaceBlockIndex: "4"]
-	abstract world rootTex;
-	[Pinned]
+    abstract world rootTex;
+    [Pinned]
     [InterfaceBlockIndex: "1"]
-	abstract world viewUniform;
-	[InterfaceBlock: "perInstanceUniform:2"]
-	abstract world perInstanceUniform;
+    abstract world viewUniform;
+    [InterfaceBlock: "perInstanceUniform:2"]
+    abstract world perInstanceUniform;
     [InterfaceBlock: "modelTransform:0"]
-	abstract world modelTransform;
+    abstract world modelTransform;
     [Packed]
-	world precomputeVert : "glsl" export bufferExport;
+    world precomputeVert : "glsl" export bufferExport;
     [InterfaceBlockIndex: "7"]
     world precomputeUniform : "glsl" export bufferExport;
-	world precomputeTexVs : "glsl(vertex:texSpaceVert)" using texSpaceVert export standardExport;
-	[InterfaceBlock: "PrebakedAssets:3"]
-	world precomputeTex : "glsl" export fragmentExport;
+    world precomputeTexVs : "glsl(vertex:texSpaceVert)" using texSpaceVert export standardExport;
+    [InterfaceBlock: "PrebakedAssets:3"]
+    world precomputeTex : "glsl" export fragmentExport;
     world shadowVs : "glsl(vertex:projCoord;command_list)" using projCoord export standardExport;
     world shadowFs : "glsl(command_list)" using opacity, projCoord export fragmentExport;
-	world vs : "glsl(vertex:projCoord;command_list)" using projCoord export standardExport;
-	world lqfs : "glsl(command_list)" using opacity export fragmentExport;
-	world fs : "glsl(command_list)" using opacity export fragmentExport;
+    world vs : "glsl(vertex:projCoord;command_list)" using projCoord export standardExport;
+    world lqfs : "glsl(command_list)" using opacity export fragmentExport;
+    world fs : "glsl(command_list)" using opacity export fragmentExport;
     
     // * means compute the component at the specified world
-	require @(vs*, shadowVs*) vec4 projCoord; 
+    require @(vs*, shadowVs*) vec4 projCoord; 
     require @(lqfs*, fs*, shadowFs*) float opacity;
-	require @precomputeTexVs vec4 texSpaceVert;
+    require @precomputeTexVs vec4 texSpaceVert;
     // out - defines pipeline output (for dead code elimination)
-	require out @(fs*, lqfs*) vec4 outputColor;
+    require out @(fs*, lqfs*) vec4 outputColor;
     require @(vs, shadowVs, precomputeTexVs) vec2 vert_uv;
-	
-	import uniformImport(perInstanceUniform->precomputeVert);
-	import uniformImport(perInstanceUniform->precomputeTexVs);
-	import uniformImport(perInstanceUniform->precomputeTex);
-	import uniformImport(perInstanceUniform->vs);
-	import uniformImport(perInstanceUniform->fs);
-	import uniformImport(perInstanceUniform->lqfs);
     
-	import uniformImport(perInstanceUniform->shadowVs);
-	import uniformImport(perInstanceUniform->shadowFs);    
+    import uniformImport(perInstanceUniform->precomputeVert);
+    import uniformImport(perInstanceUniform->precomputeTexVs);
+    import uniformImport(perInstanceUniform->precomputeTex);
+    import uniformImport(perInstanceUniform->vs);
+    import uniformImport(perInstanceUniform->fs);
+    import uniformImport(perInstanceUniform->lqfs);
+    
+    import uniformImport(perInstanceUniform->shadowVs);
+    import uniformImport(perInstanceUniform->shadowFs);    
         
 
-	import uniformImport(viewUniform->vs);
-	import uniformImport(viewUniform->fs);
-	import uniformImport(viewUniform->lqfs);
+    import uniformImport(viewUniform->vs);
+    import uniformImport(viewUniform->fs);
+    import uniformImport(viewUniform->lqfs);
     
     import uniformImport(viewUniform->shadowVs);
-	import uniformImport(viewUniform->shadowFs);
+    import uniformImport(viewUniform->shadowFs);
     import uniformImport(modelTransform->vs);
     import uniformImport(modelTransform->fs);
     import uniformImport(modelTransform->lqfs);
     
     import uniformImport(modelTransform->shadowVs);
-	import uniformImport(modelTransform->shadowFs);
-	import bufferImport(rootVert->precomputeVert);
-	import vertexImport(precomputeVert->precomputeTexVs);
-	import vertexImport(precomputeVert->vs);
-	import vertexImport(precomputeVert->shadowVs);
+    import uniformImport(modelTransform->shadowFs);
+    import bufferImport(rootVert->precomputeVert);
+    import vertexImport(precomputeVert->precomputeTexVs);
+    import vertexImport(precomputeVert->vs);
+    import vertexImport(precomputeVert->shadowVs);
     
     import uniformImport(viewUniform->precomputeUniform);
     import uniformImport(perInstanceUniform->precomputeUniform);
@@ -72,54 +72,54 @@ pipeline EnginePipeline
     import uniformImport(precomputeUniform->shadowVs);
     import uniformImport(precomputeUniform->shadowFs);
     
-	import standardImport(precomputeTexVs->precomputeTex);
-	import standardImport(vs->fs);
-	import standardImport(vs->lqfs);
+    import standardImport(precomputeTexVs->precomputeTex);
+    import standardImport(vs->fs);
+    import standardImport(vs->lqfs);
     
     import standardImport(shadowVs->shadowFs);
     
-	import textureImport(precomputeTex->vs) using vert_uv;
-	import textureImport(precomputeTex->fs) using vert_uv;
-	import textureImport(precomputeTex->lqfs) using vert_uv;
+    import textureImport(precomputeTex->vs) using vert_uv;
+    import textureImport(precomputeTex->fs) using vert_uv;
+    import textureImport(precomputeTex->lqfs) using vert_uv;
     
     import textureImport(precomputeTex->shadowVs) using vert_uv;
-	import textureImport(precomputeTex->shadowFs) using vert_uv;
- 	import textureImport(rootTex->precomputeTex) using vert_uv;
+    import textureImport(precomputeTex->shadowFs) using vert_uv;
+    import textureImport(rootTex->precomputeTex) using vert_uv;
 }
 
 module ViewUniforms
 {
     public @viewUniform mat4 viewProjectionMatrix;
-	public @viewUniform mat4 viewMatrix;
-	public @viewUniform mat4 projectionMatrix;
-	public @viewUniform mat4 invViewMatrix;
-	public @viewUniform mat4 invViewProjectionMatrix;
-	public @viewUniform vec3 cameraPos;
-	public @viewUniform vec3 lightColor;
-	public @viewUniform vec3 lightDir;
-	public @viewUniform vec3 lightParams;
-	public @viewUniform sampler2D texGGX_D;
-	public @viewUniform sampler2D texGGX_FV;
-	public @viewUniform float time;
+    public @viewUniform mat4 viewMatrix;
+    public @viewUniform mat4 projectionMatrix;
+    public @viewUniform mat4 invViewMatrix;
+    public @viewUniform mat4 invViewProjectionMatrix;
+    public @viewUniform vec3 cameraPos;
+    public @viewUniform vec3 lightColor;
+    public @viewUniform vec3 lightDir;
+    public @viewUniform vec3 lightParams;
+    public @viewUniform sampler2D texGGX_D;
+    public @viewUniform sampler2D texGGX_FV;
+    public @viewUniform float time;
 }
 
 module StandardVertexFormat
 {
     public @rootVert vec3 vert_pos;
-	public @rootVert vec3 vert_normal;
-	public @rootVert vec3 vert_tangent;
-	public @rootVert vec2 vert_uv; 
+    public @rootVert vec3 vert_normal;
+    public @rootVert vec3 vert_tangent;
+    public @rootVert vec2 vert_uv; 
 }
 
 module VertexTransform
 {
     require vec3 vert_pos;
-	require vec2 vert_uv; 
+    require vec2 vert_uv; 
     require vec3 vert_tangent;
     require vec3 vert_normal;
     require mat4 viewProjectionMatrix;
     @modelTransform mat4 modelMatrix; 
-	@modelTransform mat4 normalMatrix;
+    @modelTransform mat4 normalMatrix;
     
     vec4 position = modelMatrix * vec4(vert_pos, 1.0); 
     public vec4 projCoord = viewProjectionMatrix * position;
@@ -145,38 +145,38 @@ extern float computeShadow(vec3 worldPos);
 
 float Pow4(float x)
 {
-	return (x*x)*(x*x);
+    return (x*x)*(x*x);
 }
 
 vec2 LightingFuncGGX_FV(float dotLH, float roughness)
 {
-	float alpha = roughness*roughness;/*sf*/
+    float alpha = roughness*roughness;/*sf*/
 
-	// F
-	float F_a, F_b;
-	float dotLH5 = Pow4(1.0-dotLH) * (1.0 - dotLH);
-	F_a = 1.0;
-	F_b = dotLH5;
+    // F
+    float F_a, F_b;
+    float dotLH5 = Pow4(1.0-dotLH) * (1.0 - dotLH);
+    F_a = 1.0;
+    F_b = dotLH5;
 
-	// V
-	float vis;
-	float k = alpha/2.0;
-	float k2 = k*k;
-	float invK2 = 1.0-k2;
-	vis = 1.0/(dotLH*dotLH*invK2 + k2);
+    // V
+    float vis;
+    float k = alpha/2.0;
+    float k2 = k*k;
+    float invK2 = 1.0-k2;
+    vis = 1.0/(dotLH*dotLH*invK2 + k2);
 
-	return vec2(F_a*vis, F_b*vis);
+    return vec2(F_a*vis, F_b*vis);
 }
 
 float LightingFuncGGX_D(float dotNH, float roughness)
 {
-	float alpha = roughness*roughness;
-	float alphaSqr = alpha*alpha;
-	float pi = 3.14159;
-	float denom = dotNH * dotNH *(alphaSqr-1.0) + 1.0;
+    float alpha = roughness*roughness;
+    float alphaSqr = alpha*alpha;
+    float pi = 3.14159;
+    float denom = dotNH * dotNH *(alphaSqr-1.0) + 1.0;
 
-	float D = alphaSqr/(pi * denom * denom);
-	return D;
+    float D = alphaSqr/(pi * denom * denom);
+    return D;
 }
 
 module Lighting
@@ -184,12 +184,12 @@ module Lighting
     require vec3 normal;   
     require vec3 albedo;
     require vec3 lightParam;
-	require vec3 pos;
+    require vec3 pos;
     require vec3 lightDir;
     require vec3 lightColor;
     require vec3 cameraPos;
     float shadow = computeShadow(pos);
-	float brightness = clamp(dot(lightDir, normal), 0.0, 1.0) * shadow;
+    float brightness = clamp(dot(lightDir, normal), 0.0, 1.0) * shadow;
     vec3 view = normalize(cameraPos - pos);
     inline float roughness_in = lightParam.x;
     inline float metallic_in = lightParam.y;
@@ -215,8 +215,8 @@ module Lighting
         return specular;
     }
     public vec3 result = lightColor * 
-						(albedo * (brightness + 0.7)*(1.0-metallic_in) + 
-						mix(albedo, vec3(1.0), 1.0 - metallic_in) * (highlight * shadow));
+                        (albedo * (brightness + 0.7)*(1.0-metallic_in) + 
+                        mix(albedo, vec3(1.0), 1.0 - metallic_in) * (highlight * shadow));
 }
 
 module Fog
@@ -236,13 +236,13 @@ module Fog
 
 float ComputeLuminance(vec3 color)
 {
-	return color.x * 0.3 + color.y * 0.59 + color.z * 0.11;
+    return color.x * 0.3 + color.y * 0.59 + color.z * 0.11;
 }
 
 vec3 desaturate(vec3 color, float factor)
 {
-	float lum = ComputeLuminance(color);
-	return mix(color, vec3(lum, lum, lum), factor);
+    float lum = ComputeLuminance(color);
+    return mix(color, vec3(lum, lum, lum), factor);
 }
 
 module Header

@@ -9,7 +9,7 @@ pipeline Pipe
     
     import vertexImport(vertex->vs);
     import uniformImport(uniform->vs);
-	import uniformImport(uniform->fs);
+    import uniformImport(uniform->fs);
     import standardImport(vs->fs);
 }
 
@@ -87,63 +87,63 @@ pipeline EnginePipeline
 {
     [Pinned]
     [Packed]
-	abstract world rootVert;
+    abstract world rootVert;
     
     [InterfaceBlockIndex: "4"]
-	abstract world rootTex;
-	[Pinned]
+    abstract world rootTex;
+    [Pinned]
     [InterfaceBlockIndex: "1"]
-	abstract world viewUniform;
-	[InterfaceBlock: "perInstanceUniform:2"]
-	abstract world perInstanceUniform;
+    abstract world viewUniform;
+    [InterfaceBlock: "perInstanceUniform:2"]
+    abstract world perInstanceUniform;
     [InterfaceBlock: "modelTransform:0"]
-	abstract world modelTransform;
+    abstract world modelTransform;
     [Packed]
-	world precomputeVert : "glsl" export bufferExport;
+    world precomputeVert : "glsl" export bufferExport;
     [InterfaceBlockIndex: "7"]
     world precomputeUniform : "glsl" export bufferExport;
-	world precomputeTexVs : "glsl(vertex:texSpaceVert)" using texSpaceVert export standardExport;
-	[InterfaceBlock: "PrebakedAssets:3"]
-	world precomputeTex : "glsl" export fragmentExport;
+    world precomputeTexVs : "glsl(vertex:texSpaceVert)" using texSpaceVert export standardExport;
+    [InterfaceBlock: "PrebakedAssets:3"]
+    world precomputeTex : "glsl" export fragmentExport;
     world shadowVs : "glsl(vertex:projCoord;command_list)" using projCoord export standardExport;
     world shadowFs : "glsl(command_list)" using opacity, projCoord export fragmentExport;
-	world vs : "glsl(vertex:projCoord;command_list)" using projCoord export standardExport;
-	world lqfs : "glsl(command_list)" using opacity export fragmentExport;
-	world fs : "glsl(command_list)" using opacity export fragmentExport;
+    world vs : "glsl(vertex:projCoord;command_list)" using projCoord export standardExport;
+    world lqfs : "glsl(command_list)" using opacity export fragmentExport;
+    world fs : "glsl(command_list)" using opacity export fragmentExport;
     
-	require @(vs*, shadowVs*) vec4 projCoord; 
+    require @(vs*, shadowVs*) vec4 projCoord; 
     require @(lqfs*, fs*, shadowFs*) float opacity;
-	require @precomputeTexVs vec4 texSpaceVert;
-	require out @(fs*, lqfs*) vec4 outputColor;
-	require @(vs,fs,lqfs, shadowFs, shadowVs, precomputeTex) vec2 vert_uv;
-	
-	import uniformImport(perInstanceUniform->precomputeVert);
-	import uniformImport(perInstanceUniform->precomputeTexVs);
-	import uniformImport(perInstanceUniform->precomputeTex);
-	import uniformImport(perInstanceUniform->vs);
-	import uniformImport(perInstanceUniform->fs);
-	import uniformImport(perInstanceUniform->lqfs);
+    require @precomputeTexVs vec4 texSpaceVert;
+    require out @(fs*, lqfs*) vec4 outputColor;
+    require @(vs,fs,lqfs, shadowFs, shadowVs, precomputeTex) vec2 vert_uv;
     
-	import uniformImport(perInstanceUniform->shadowVs);
-	import uniformImport(perInstanceUniform->shadowFs);    
+    import uniformImport(perInstanceUniform->precomputeVert);
+    import uniformImport(perInstanceUniform->precomputeTexVs);
+    import uniformImport(perInstanceUniform->precomputeTex);
+    import uniformImport(perInstanceUniform->vs);
+    import uniformImport(perInstanceUniform->fs);
+    import uniformImport(perInstanceUniform->lqfs);
+    
+    import uniformImport(perInstanceUniform->shadowVs);
+    import uniformImport(perInstanceUniform->shadowFs);    
         
 
-	import uniformImport(viewUniform->vs);
-	import uniformImport(viewUniform->fs);
-	import uniformImport(viewUniform->lqfs);
+    import uniformImport(viewUniform->vs);
+    import uniformImport(viewUniform->fs);
+    import uniformImport(viewUniform->lqfs);
     
     import uniformImport(viewUniform->shadowVs);
-	import uniformImport(viewUniform->shadowFs);
+    import uniformImport(viewUniform->shadowFs);
     import uniformImport(modelTransform->vs);
     import uniformImport(modelTransform->fs);
     import uniformImport(modelTransform->lqfs);
     
     import uniformImport(modelTransform->shadowVs);
-	import uniformImport(modelTransform->shadowFs);
-	import bufferImport(rootVert->precomputeVert);
-	import vertexImport(precomputeVert->precomputeTexVs);
-	import vertexImport(precomputeVert->vs);
-	import vertexImport(precomputeVert->shadowVs);
+    import uniformImport(modelTransform->shadowFs);
+    import bufferImport(rootVert->precomputeVert);
+    import vertexImport(precomputeVert->precomputeTexVs);
+    import vertexImport(precomputeVert->vs);
+    import vertexImport(precomputeVert->shadowVs);
     
     import uniformImport(viewUniform->precomputeUniform);
     import uniformImport(perInstanceUniform->precomputeUniform);
@@ -155,33 +155,33 @@ pipeline EnginePipeline
     import uniformImport(precomputeUniform->shadowVs);
     import uniformImport(precomputeUniform->shadowFs);
     
-	import standardImport(precomputeTexVs->precomputeTex);
-	import standardImport(vs->fs);
-	import standardImport(vs->lqfs);
+    import standardImport(precomputeTexVs->precomputeTex);
+    import standardImport(vs->fs);
+    import standardImport(vs->lqfs);
     
     import standardImport(shadowVs->shadowFs);
     
-	import textureImport(precomputeTex->vs) using vert_uv;
-	import textureImport(precomputeTex->fs) using vert_uv;
-	import textureImport(precomputeTex->lqfs) using vert_uv;
+    import textureImport(precomputeTex->vs) using vert_uv;
+    import textureImport(precomputeTex->fs) using vert_uv;
+    import textureImport(precomputeTex->lqfs) using vert_uv;
     
     import textureImport(precomputeTex->shadowVs) using vert_uv;
-	import textureImport(precomputeTex->shadowFs) using vert_uv;
- 	import textureImport(rootTex->precomputeTex) using vert_uv;
+    import textureImport(precomputeTex->shadowFs) using vert_uv;
+    import textureImport(rootTex->precomputeTex) using vert_uv;
 }
 
 shader TestShader
 {
     @modelTransform mat4 modelMatrix; 
     @viewUniform mat4 viewProjectionMatrix;
-	@viewUniform mat4 projectionMatrix;
-	@rootVert vec3 vert_pos;
-	@rootVert vec3 vert_normal;
-	@rootVert vec3 vert_tangent;
-	@rootVert vec2 vert_uv; 
+    @viewUniform mat4 projectionMatrix;
+    @rootVert vec3 vert_pos;
+    @rootVert vec3 vert_normal;
+    @rootVert vec3 vert_tangent;
+    @rootVert vec2 vert_uv; 
     
     vec3 positionOffset = vec3(0.0);
-	inline vec4 position = modelMatrix * vec4(vert_pos + positionOffset, 1.0);
+    inline vec4 position = modelMatrix * vec4(vert_pos + positionOffset, 1.0);
     vec4 projCoord = viewProjectionMatrix * position;
     vec4 texSpaceVert = vec4(vert_uv*2.0 - vec2(1.0), 0.0, 1.0);
     float opacity = 1.0;
