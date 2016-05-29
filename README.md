@@ -102,7 +102,23 @@ namespace SpireLib
 	};
 }
 ```
+An example of using Spire Compiler:
+```c++
+#include "Spire.h"
 
+int main(int argc, char** args)
+{
+	if (argc > 1)
+	{
+		Spire::Compiler::CompileOptions options;
+		Spire::Compiler::CompileResult result;
+		auto & compiledShaders = SpireLib::CompileShaderSource(result, CoreLib::String(args[1]), options);
+		if (compiledShaders.Count())
+			compiledShaders.First().SaveToFile("d:\\test.cse");
+	}
+    return 0;
+}
+```
 ### As Stand-alone Compiler
 Build "Source/Spire.sln" and use "SpireCompiler.exe". The command line format is:
 ```
