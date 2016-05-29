@@ -78,7 +78,7 @@ namespace RealtimeEngine
 			if (File::Exists(shaderFileName))
 				shaderLib->Reload(shaderFileName);
 			else if (File::Exists(sourceFileName))
-				shaderLib->CompileFrom(shaderName, sourceFileName, L"", Path::GetDirectoryName(shaderFileName));
+				shaderLib->CompileFrom(shaderName, sourceFileName, L"");
 			else
 				throw InvalidOperationException(L"cannot find compiled or source shader \'" + shaderName + L"\'.");
 			ReloadShader(gpuShaders[shaderId], *shaderLib);
@@ -260,8 +260,7 @@ namespace RealtimeEngine
 	{
 		engine->GetHardwareRenderer()->Finish();
 		int shaderId = shaderIds[shaderName];
-		shaderLibs[shaderId]->CompileFrom(shaderName, Path::ReplaceExt(shaderFileNames[shaderName].GetValue(), L"shader"), schedule,
-			Path::GetDirectoryName(shaderFileNames[shaderName].GetValue()));
+		shaderLibs[shaderId]->CompileFrom(shaderName, Path::ReplaceExt(shaderFileNames[shaderName].GetValue(), L"shader"), schedule);
 		ReloadShader(gpuShaders[shaderId], *shaderLibs[shaderId]);
 		InitializeShader(shaderId);
 	}

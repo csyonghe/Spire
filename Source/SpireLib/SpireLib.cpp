@@ -53,7 +53,7 @@ namespace SpireLib
 	{
 		Load(fileName);
 	}
-	bool ShaderLib::CompileFrom(String symbolName, String sourceFileName, String schedule, String outputDir)
+	bool ShaderLib::CompileFrom(String symbolName, String sourceFileName, String schedule)
 	{
 		CompileResult result;
 		CompileOptions options;
@@ -67,10 +67,7 @@ namespace SpireLib
 			{
 				if (lib.MetaData.ShaderName == symbolName)
 				{
-					ProduceBinary(outputDir);
-					auto fileName = Path::Combine(outputDir, symbolName + L".cse");
-					shaderLibs[0].SaveToFile(fileName);
-					Reload(fileName);
+					FromString(shaderLibs[0].ToString());
 					return true;
 				}
 			}
@@ -78,46 +75,12 @@ namespace SpireLib
 		result.PrintError(true);
 		return false;
 	}
-	List<ShaderLibFile> CompileShaderSource(Spire::Compiler::CompileResult & compileResult, 
-		CoreLib::Basic::String sourceFileName,
+
+	List<ShaderLibFile> CompileUnits(Spire::Compiler::CompileResult & compileResult,
+		ShaderCompiler * compiler, List<CompileUnit> & units,
 		Spire::Compiler::CompileOptions & options)
 	{
-		Spire::Compiler::NamingCounter = 0;
 		List<ShaderLibFile> resultFiles;
-		String sourceDir = Path::GetDirectoryName(sourceFileName);
-		RefPtr<ShaderCompiler> compiler = CreateShaderCompiler();
-		List<CompileUnit> units;
-		HashSet<String> processedUnits;
-		List<String> unitsToInclude;
-		unitsToInclude.Add(sourceFileName);
-		processedUnits.Add(sourceFileName);
-		auto predefUnit = compiler->Parse(compileResult, LibIncludeString, L"stdlib");
-		for (int i = 0; i < unitsToInclude.Count(); i++)
-		{
-			auto inputFileName = unitsToInclude[i];
-			try
-			{
-				auto source = File::ReadAllText(inputFileName);
-				auto unit = compiler->Parse(compileResult, source, Path::GetFileName(inputFileName));
-				units.Add(unit);
-				if (unit.SyntaxNode)
-				{
-					for (auto inc : unit.SyntaxNode->Usings)
-					{
-						String includeFile = Path::Combine(Path::GetDirectoryName(inputFileName), inc.Content);
-						if (processedUnits.Add(includeFile))
-						{
-							unitsToInclude.Add(includeFile);
-						}
-					}
-				}
-			}
-			catch (IOException)
-			{
-				compileResult.GetErrorWriter()->Error(1, L"cannot open file '" + Path::GetFileName(inputFileName) + L"'.", CodePosition(0, 0, sourceFileName));
-			}
-		}
-		units.Add(predefUnit);
 		List<ImportOperatorHandler*> importHandlers, cppImportHandlers;
 		List<ExportOperatorHandler*> exportHandlers;
 		CreateGLSLImportOperatorHandlers(importHandlers);
@@ -177,21 +140,96 @@ namespace SpireLib
 		}
 		return resultFiles;
 	}
+
+	List<ShaderLibFile> CompileShaderSource(Spire::Compiler::CompileResult & compileResult,
+		const CoreLib::String & src, const CoreLib::Basic::String& sourceDir,
+		Spire::Compiler::CompileOptions & options)
+	{
+		Spire::Compiler::NamingCounter = 0;
+		RefPtr<ShaderCompiler> compiler = CreateShaderCompiler();
+		List<CompileUnit> units;
+		HashSet<String> processedUnits;
+		List<String> unitsToInclude;
+		unitsToInclude.Add(L"");
+		processedUnits.Add(L"");
+		auto predefUnit = compiler->Parse(compileResult, LibIncludeString, L"stdlib");
+		for (int i = 0; i < unitsToInclude.Count(); i++)
+		{
+			auto inputFileName = unitsToInclude[i];
+			try
+			{
+				String source = src;
+				if (i > 0)
+					source = File::ReadAllText(inputFileName);
+				auto unit = compiler->Parse(compileResult, source, Path::GetFileName(inputFileName));
+				units.Add(unit);
+				if (unit.SyntaxNode)
+				{
+					for (auto inc : unit.SyntaxNode->Usings)
+					{
+						String includeFile = Path::Combine(Path::GetDirectoryName(inputFileName), inc.Content);
+						if (processedUnits.Add(includeFile))
+						{
+							unitsToInclude.Add(includeFile);
+						}
+					}
+				}
+			}
+			catch (IOException)
+			{
+				compileResult.GetErrorWriter()->Error(1, L"cannot open file '" + Path::GetFileName(inputFileName) + L"'.", CodePosition(0, 0, L""));
+			}
+		}
+		units.Add(predefUnit);
+		return CompileUnits(compileResult, compiler.Ptr(), units, options);
+	}
+
+	List<ShaderLibFile> CompileShaderSource(Spire::Compiler::CompileResult & compileResult, 
+		CoreLib::Basic::String sourceFileName,
+		Spire::Compiler::CompileOptions & options)
+	{
+		Spire::Compiler::NamingCounter = 0;
+		RefPtr<ShaderCompiler> compiler = CreateShaderCompiler();
+		List<CompileUnit> units;
+		HashSet<String> processedUnits;
+		List<String> unitsToInclude;
+		unitsToInclude.Add(sourceFileName);
+		processedUnits.Add(sourceFileName);
+		auto predefUnit = compiler->Parse(compileResult, LibIncludeString, L"stdlib");
+		for (int i = 0; i < unitsToInclude.Count(); i++)
+		{
+			auto inputFileName = unitsToInclude[i];
+			try
+			{
+				String source = File::ReadAllText(inputFileName);
+				auto unit = compiler->Parse(compileResult, source, Path::GetFileName(inputFileName));
+				units.Add(unit);
+				if (unit.SyntaxNode)
+				{
+					for (auto inc : unit.SyntaxNode->Usings)
+					{
+						String includeFile = Path::Combine(Path::GetDirectoryName(inputFileName), inc.Content);
+						if (processedUnits.Add(includeFile))
+						{
+							unitsToInclude.Add(includeFile);
+						}
+					}
+				}
+			}
+			catch (IOException)
+			{
+				compileResult.GetErrorWriter()->Error(1, L"cannot open file '" + Path::GetFileName(inputFileName) + L"'.", CodePosition(0, 0, sourceFileName));
+			}
+		}
+		units.Add(predefUnit);
+		return CompileUnits(compileResult, compiler.Ptr(), units, options);
+	}
 	void ShaderLibFile::AddSource(CoreLib::Basic::String source, CoreLib::Text::Parser & parser)
 	{
 		ReadSource(Sources, parser, source);
 	}
-	
-	void ShaderLibFile::Clear()
-	{
-		BinaryFileName = L"";
-		BinarySourceName = L"";
-		Sources.Clear();
-		MetaData.Worlds.Clear();
-		Sources.Clear();
-	}
 
-	void ShaderLibFile::SaveToFile(CoreLib::Basic::String fileName)
+	CoreLib::String ShaderLibFile::ToString()
 	{
 		StringBuilder writer;
 		writer << L"name " << MetaData.ShaderName << EndLine;
@@ -227,8 +265,6 @@ namespace SpireLib
 			}
 			writer << L"}\n";
 		}
-		if (BinaryFileName.Length())
-			writer << L"binary \"" << Path::GetFileName(BinaryFileName) << L"\"" << EndLine;
 		writer << L"source" << EndLine << L"{" << EndLine;
 		for (auto & src : Sources)
 		{
@@ -240,15 +276,25 @@ namespace SpireLib
 		writer << L"}" << EndLine;
 		StringBuilder formatSB;
 		IndentString(formatSB, writer.ProduceString());
-		StreamWriter fwriter(fileName);
-		fwriter.Write(formatSB.ProduceString());
+		return formatSB.ProduceString();
+	}
+	
+	void ShaderLibFile::Clear()
+	{
+		Sources.Clear();
+		MetaData.Worlds.Clear();
+		Sources.Clear();
 	}
 
-	void ShaderLibFile::Load(String fileName)
+	void ShaderLibFile::SaveToFile(CoreLib::Basic::String fileName)
+	{
+		StreamWriter fwriter(fileName);
+		fwriter.Write(ToString());
+	}
+
+	void ShaderLibFile::FromString(const String & src)
 	{
 		Clear();
-		String path = Path::GetDirectoryName(fileName);
-		String src = File::ReadAllText(fileName);
 		CoreLib::Text::Parser parser(src);
 		while (!parser.IsEnd())
 		{
@@ -265,7 +311,6 @@ namespace SpireLib
 			}
 			else if (fieldName == L"binary")
 			{
-				BinaryFileName = Path::Combine(path, parser.ReadStringLiteral());
 			}
 			else if (fieldName == L"world")
 			{
@@ -350,18 +395,10 @@ namespace SpireLib
 			}
 		}
 	}
-	bool ShaderLibFile::ProduceBinary(CoreLib::Basic::String outputDir)
-	{
-		if (BinaryFileName.Length())
-		{
-			auto sourceFileName = Path::Combine(outputDir, BinarySourceName);
-			File::WriteAllText(sourceFileName, BinarySource);
-			auto outputDLLName = Path::Combine(outputDir, BinaryFileName);
-			String cppCompilerCmd = L"runVC.bat \"" + sourceFileName + L"\" \"" + outputDLLName + L"\"";
-			if (system(cppCompilerCmd.ToMultiByteString()) != 0)
-				return false;
-		}
-		return true;
-	}
 
+	void ShaderLibFile::Load(String fileName)
+	{
+		String src = File::ReadAllText(fileName);
+		FromString(src);
+	}
 }

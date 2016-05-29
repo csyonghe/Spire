@@ -20,7 +20,7 @@ namespace CoreLib
 		class Path
 		{
 		public:
-#ifdef WIN32
+#ifdef _WIN32
 			static const wchar_t PathDelimiter = L'\\';
 #else
 			static const wchar_t PathDelimiter = L'/';

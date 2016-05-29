@@ -1,5 +1,5 @@
 #include "Stream.h"
-#ifdef WIN32
+#ifdef _WIN32
 #include <share.h>
 #endif
 #include "LibIO.h"

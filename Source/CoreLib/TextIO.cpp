@@ -1,6 +1,7 @@
 #include "TextIO.h"
 #include <ctype.h>
-#ifdef WINDOWS_PLATFORM
+
+#ifdef _WIN32
 #include <Windows.h>
 #define CONVERT_END_OF_LINE
 #endif
@@ -24,7 +25,7 @@ namespace CoreLib
 
 			virtual String GetString(char * buffer, int length)
 			{
-#ifdef WINDOWS_PLATFORM
+#ifdef _WIN32
 				int unicodeFlag;
 				int startPos = 0;
 				IsTextUnicode(buffer, length, &unicodeFlag);
@@ -207,8 +208,8 @@ namespace CoreLib
 				ptr += 2;
 				return Encoding::Unicode;
 			}
+#ifdef _WIN32
 			int flag = IS_TEXT_UNICODE_SIGNATURE | IS_TEXT_UNICODE_REVERSE_SIGNATURE | IS_TEXT_UNICODE_STATISTICS;
-#ifdef WINDOWS_PLATFORM
 			int rs = IsTextUnicode(buffer.Buffer(), buffer.Count(), &flag);
 			if (flag & (IS_TEXT_UNICODE_SIGNATURE | IS_TEXT_UNICODE_REVERSE_SIGNATURE | IS_TEXT_UNICODE_STATISTICS))
 				return Encoding::Unicode;

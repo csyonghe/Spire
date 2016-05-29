@@ -6,7 +6,6 @@
 #include <xmmintrin.h>
 #include "Basic.h"
 #include "Events.h"
-
 namespace CoreLib
 {
 	namespace Threading

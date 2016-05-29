@@ -24,7 +24,7 @@ namespace CoreLib
 			void GetInverseRotationMatrix(float rot[9]);
 		};
 
-#ifdef WIN32
+#ifdef _WIN32
 		class CameraController
 		{
 		public:

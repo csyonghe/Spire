@@ -43,13 +43,7 @@ int wmain(int argc, wchar_t* argv[])
 	CompileResult result;
 	auto files = SpireLib::CompileShaderSource(result, fileName, options);
 	for (auto & f : files)
-	{
-		if (f.BinaryFileName.Length())
-		{
-			if (!f.ProduceBinary(outputDir))
-				result.GetErrorWriter()->Error(3, L"cannot compile generated c++ source '" + f.BinarySourceName + L"'.",
-					CodePosition(0, 0, L""));
-		}
+	{		
 		try
 		{
 			f.SaveToFile(Path::Combine(outputDir, f.MetaData.ShaderName + L".cse"));

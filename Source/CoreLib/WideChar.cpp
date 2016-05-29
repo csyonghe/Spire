@@ -19,7 +19,7 @@ public:
 
 char * WideCharToMByte(const wchar_t * buffer, int length)
 {
-#ifdef WINDOWS_PLATFORM
+#ifdef _WIN32
 	size_t requiredBufferSize;
 	requiredBufferSize = WideCharToMultiByte(CP_OEMCP, NULL, buffer, length, 0, 0, NULL, NULL)+1;
 	if (requiredBufferSize)
@@ -44,7 +44,7 @@ char * WideCharToMByte(const wchar_t * buffer, int length)
 
 wchar_t * MByteToWideChar(const char * buffer, int length)
 {
-#ifdef WINDOWS_PLATFORM
+#ifdef _WIN32
 	// regard as ansi
 	MultiByteToWideChar(CP_ACP, 0, buffer, length, NULL, 0);
 	if (length < 0) length = 0;
@@ -69,7 +69,7 @@ wchar_t * MByteToWideChar(const char * buffer, int length)
 
 void MByteToWideChar(wchar_t * buffer, int bufferSize, const char * str, int length)
 {
-#ifdef WINDOWS_PLATFORM
+#ifdef _WIN32
 	// regard as ansi
 	MultiByteToWideChar(CP_ACP, NULL, str, length, buffer, bufferSize);
 #else

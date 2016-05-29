@@ -4949,7 +4949,7 @@ namespace CoreLib
 			}
 			TextWriter & operator << (const _EndLine &)
 			{
-#ifdef WINDOWS_PLATFORM
+#ifdef _WIN32
 				Write(L"\r\n", 2);
 #else
 				Write(L"\n", 1);
@@ -7389,7 +7389,7 @@ namespace CoreLib
 		class Path
 		{
 		public:
-#ifdef WIN32
+#ifdef _WIN32
 			static const wchar_t PathDelimiter = L'\\';
 #else
 			static const wchar_t PathDelimiter = L'/';
@@ -11621,7 +11621,6 @@ CORELIB\THREADING.H
 #include <atomic>
 #include <thread>
 #include <mutex>
-
 namespace CoreLib
 {
 	namespace Threading
@@ -11783,19 +11782,23 @@ namespace SpireLib
 	class ShaderLibFile : public CoreLib::Basic::Object
 	{
 	public:
-		CoreLib::Basic::String BinaryFileName, BinarySourceName, BinarySource;
 		CoreLib::Basic::EnumerableDictionary<CoreLib::Basic::String, Spire::Compiler::CompiledShaderSource> Sources; // indexed by world
 		Spire::Compiler::ShaderMetaData MetaData;
 		void AddSource(CoreLib::Basic::String source, CoreLib::Text::Parser & parser);
+		void FromString(const CoreLib::String & str);
+		CoreLib::String ToString();
 		void SaveToFile(CoreLib::Basic::String fileName);
 		ShaderLibFile() = default;
 		void Clear();
 		void Load(CoreLib::Basic::String fileName);
-		bool ProduceBinary(CoreLib::Basic::String outputDir);
 	};
 	
 	CoreLib::Basic::List<ShaderLibFile> CompileShaderSource(Spire::Compiler::CompileResult & result,
 		CoreLib::Basic::String sourceFileName,
+		Spire::Compiler::CompileOptions &options);
+
+	CoreLib::Basic::List<ShaderLibFile> CompileShaderSource(Spire::Compiler::CompileResult & result,
+		const CoreLib::Basic::String &source, const CoreLib::Basic::String &sourceFileName,
 		Spire::Compiler::CompileOptions &options);
 
 	class ShaderLib : public ShaderLibFile
@@ -11805,7 +11808,7 @@ namespace SpireLib
 		ShaderLib() = default;
 		ShaderLib(CoreLib::Basic::String fileName);
 		void Reload(CoreLib::Basic::String fileName);
-		bool CompileFrom(CoreLib::Basic::String symbolName, CoreLib::Basic::String sourceFileName, CoreLib::Basic::String schedule, CoreLib::Basic::String outputDir);
+		bool CompileFrom(CoreLib::Basic::String symbolName, CoreLib::Basic::String sourceFileName, CoreLib::Basic::String schedule);
 	};
 }
 

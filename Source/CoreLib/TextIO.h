@@ -90,7 +90,7 @@ namespace CoreLib
 			}
 			TextWriter & operator << (const _EndLine &)
 			{
-#ifdef WINDOWS_PLATFORM
+#ifdef _WIN32
 				Write(L"\r\n", 2);
 #else
 				Write(L"\n", 1);
