@@ -49,7 +49,7 @@ namespace CoreLib
 			}
 			inline int GetCapacity() const
 			{
-				return size;
+				return _count;
 			}
 			inline int Count() const
 			{
@@ -75,7 +75,7 @@ namespace CoreLib
 			{
 				for (int i = 0; i < _count; i++)
 				{
-					if (*(T*)((char*)_buffer + id*stride) == val)
+					if (*(T*)((char*)_buffer + i*stride) == val)
 						return i;
 				}
 				return -1;
@@ -86,7 +86,7 @@ namespace CoreLib
 			{
 				for (int i = _count - 1; i >= 0; i--)
 				{
-					if (*(T*)((char*)_buffer + id*stride) == val)
+					if (*(T*)((char*)_buffer + i*stride) == val)
 						return i;
 				}
 				return -1;
@@ -97,7 +97,7 @@ namespace CoreLib
 			{
 				for (int i = 0; i < _count; i++)
 				{
-					if (predicate(buffer[i]))
+					if (predicate(_buffer[i]))
 						return i;
 				}
 				return -1;
@@ -108,7 +108,7 @@ namespace CoreLib
 			{
 				for (int i = _count - 1; i >= 0; i--)
 				{
-					if (predicate(buffer[i]))
+					if (predicate(_buffer[i]))
 						return i;
 				}
 				return -1;

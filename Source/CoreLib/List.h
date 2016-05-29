@@ -45,7 +45,7 @@ namespace CoreLib
 			static inline void Free(T * ptr, int bufferSize)
 			{
 				TAllocator allocator;
-				if (!std::has_trivial_destructor<T>::value)
+				if (!std::is_trivially_destructible<T>::value)
 				{
 					for (int i = 0; i<bufferSize; i++)
 						ptr[i].~T();

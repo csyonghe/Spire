@@ -13,6 +13,15 @@ namespace CoreLib
 {
 	namespace Threading
 	{
+		unsigned int __stdcall ThreadProcedure(const ThreadParam& param)
+		{
+			if (param.thread->paramedThreadProc)
+				param.thread->paramedThreadProc->Invoke(param.threadParam);
+			else
+				param.thread->threadProc->Invoke();
+			return 0;
+		}
+
 		int ParallelSystemInfo::GetProcessorCount()
 		{
 		#ifdef _WIN32

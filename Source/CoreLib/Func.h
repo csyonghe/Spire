@@ -12,7 +12,7 @@ namespace CoreLib
 		{
 		public:
 			virtual TResult operator()(Arguments...) = 0;
-			virtual bool operator == (const FuncPtr *)
+			virtual bool operator == (const FuncPtr<TResult, Arguments...> *)
 			{
 				return false;
 			}
@@ -65,7 +65,7 @@ namespace CoreLib
 				return (object->*funcPtr)(params...);
 			}
 
-			virtual bool operator == (const FuncPtr * ptr) override
+			virtual bool operator == (const FuncPtr<TResult, Arguments...> * ptr) override
 			{
 				auto cptr = dynamic_cast<const MemberFuncPtr<Class, TResult, Arguments...>*>(ptr);
 				if (cptr)
@@ -88,7 +88,7 @@ namespace CoreLib
 			{
 				return func(params...);
 			}
-			virtual bool operator == (const FuncPtr * /*ptr*/) override
+			virtual bool operator == (const FuncPtr<TResult, Arguments...> * /*ptr*/) override
 			{
 				return false;
 			}
@@ -129,7 +129,7 @@ namespace CoreLib
 			template<typename TFuncObj>
 			Func & operator = (const TFuncObj & func)
 			{
-				funcPtr = new LambdaFuncPtr<TFuncObj, TResult, Arguments>(func);
+				funcPtr = new LambdaFuncPtr<TFuncObj, TResult, Arguments...>(func);
 				return *this;
 			}
 			TResult operator()(Arguments... params)

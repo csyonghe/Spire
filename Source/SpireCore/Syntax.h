@@ -126,7 +126,7 @@ namespace Spire
 			}
 			ExpressionType()
 			{
-				BaseType = BaseType::Int;
+				BaseType = Compiler::BaseType::Int;
 				ArrayLength = 0;
 				IsArray = false;
 				Func = 0;
@@ -135,13 +135,13 @@ namespace Spire
 			}
 			bool IsTextureType()
 			{
-				return !IsArray && (BaseType == BaseType::Texture2D || BaseType == BaseType::TextureCube || BaseType == BaseType::TextureCubeShadow || BaseType == BaseType::TextureShadow);
+				return !IsArray && (BaseType == Compiler::BaseType::Texture2D || BaseType == Compiler::BaseType::TextureCube || BaseType == Compiler::BaseType::TextureCubeShadow || BaseType == Compiler::BaseType::TextureShadow);
 			}
 			int GetSize()
 			{
 				int baseSize = GetVectorSize(BaseType);
-				if (BaseType == BaseType::Texture2D || BaseType == BaseType::TextureCube ||
-					BaseType == BaseType::TextureCubeShadow || BaseType == BaseType::TextureShadow)
+				if (BaseType == Compiler::BaseType::Texture2D || BaseType == Compiler::BaseType::TextureCube ||
+					BaseType == Compiler::BaseType::TextureCubeShadow || BaseType == Compiler::BaseType::TextureShadow)
 					baseSize = sizeof(void*) / sizeof(int);
 				if (ArrayLength == 0)
 					return baseSize;

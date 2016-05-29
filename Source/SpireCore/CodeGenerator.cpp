@@ -98,7 +98,7 @@ namespace Spire
 				List<KeyValuePair<String, ComponentDefinition>> entries;
 				for (auto & kv : block->Entries)
 					entries.Add(kv);
-				entries.Sort([](auto & v0, auto & v1) {return v0.Value.OrderingStr < v1.Value.OrderingStr; });
+				entries.Sort([](const auto & v0, const auto & v1) {return v0.Value.OrderingStr < v1.Value.OrderingStr; });
 				block->Entries.Clear();
 				for (auto & kv : entries)
 					block->Entries.Add(kv.Key, kv.Value);

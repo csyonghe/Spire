@@ -1099,7 +1099,7 @@ namespace Spire
 			virtual void Accept(InstructionVisitor * visitor) override;
 		};
 
-		class UnaryInstruction abstract : public ILInstruction
+		class UnaryInstruction : public ILInstruction
 		{
 		public:
 			UseReference Operand;
@@ -1159,7 +1159,7 @@ namespace Spire
 			virtual void Accept(InstructionVisitor * visitor) override;
 		};
 
-		class BinaryInstruction abstract : public ILInstruction
+		class BinaryInstruction : public ILInstruction
 		{
 		public:
 			Array<UseReference, 2> Operands;

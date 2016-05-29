@@ -1289,7 +1289,7 @@ namespace CoreLib
 			}
 			inline int GetCapacity() const
 			{
-				return size;
+				return _count;
 			}
 			inline int Count() const
 			{
@@ -1315,7 +1315,7 @@ namespace CoreLib
 			{
 				for (int i = 0; i < _count; i++)
 				{
-					if (*(T*)((char*)_buffer + id*stride) == val)
+					if (*(T*)((char*)_buffer + i*stride) == val)
 						return i;
 				}
 				return -1;
@@ -1326,7 +1326,7 @@ namespace CoreLib
 			{
 				for (int i = _count - 1; i >= 0; i--)
 				{
-					if (*(T*)((char*)_buffer + id*stride) == val)
+					if (*(T*)((char*)_buffer + i*stride) == val)
 						return i;
 				}
 				return -1;
@@ -1337,7 +1337,7 @@ namespace CoreLib
 			{
 				for (int i = 0; i < _count; i++)
 				{
-					if (predicate(buffer[i]))
+					if (predicate(_buffer[i]))
 						return i;
 				}
 				return -1;
@@ -1348,7 +1348,7 @@ namespace CoreLib
 			{
 				for (int i = _count - 1; i >= 0; i--)
 				{
-					if (predicate(buffer[i]))
+					if (predicate(_buffer[i]))
 						return i;
 				}
 				return -1;
@@ -1824,7 +1824,7 @@ namespace CoreLib
 			static inline void Free(T * ptr, int bufferSize)
 			{
 				TAllocator allocator;
-				if (!std::has_trivial_destructor<T>::value)
+				if (!std::is_trivially_destructible<T>::value)
 				{
 					for (int i = 0; i<bufferSize; i++)
 						ptr[i].~T();
@@ -3945,7 +3945,7 @@ namespace CoreLib
 		{
 		public:
 			virtual TResult operator()(Arguments...) = 0;
-			virtual bool operator == (const FuncPtr *)
+			virtual bool operator == (const FuncPtr<TResult, Arguments...> *)
 			{
 				return false;
 			}
@@ -3998,7 +3998,7 @@ namespace CoreLib
 				return (object->*funcPtr)(params...);
 			}
 
-			virtual bool operator == (const FuncPtr * ptr) override
+			virtual bool operator == (const FuncPtr<TResult, Arguments...> * ptr) override
 			{
 				auto cptr = dynamic_cast<const MemberFuncPtr<Class, TResult, Arguments...>*>(ptr);
 				if (cptr)
@@ -4021,7 +4021,7 @@ namespace CoreLib
 			{
 				return func(params...);
 			}
-			virtual bool operator == (const FuncPtr * /*ptr*/) override
+			virtual bool operator == (const FuncPtr<TResult, Arguments...> * /*ptr*/) override
 			{
 				return false;
 			}
@@ -4062,7 +4062,7 @@ namespace CoreLib
 			template<typename TFuncObj>
 			Func & operator = (const TFuncObj & func)
 			{
-				funcPtr = new LambdaFuncPtr<TFuncObj, TResult, Arguments>(func);
+				funcPtr = new LambdaFuncPtr<TFuncObj, TResult, Arguments...>(func);
 				return *this;
 			}
 			TResult operator()(Arguments... params)
@@ -7031,7 +7031,7 @@ namespace VectorMath
 			(p0 * 2.0f - p1 * 5.0f + p2 * 4.0f - p3) * t2 +
 			(-p0 + p1 * 3.0f - p2 * 3.0f + p3) * t3) * 0.5f;
 	}
-
+#ifdef _MSC_VER
 #ifndef M128_OPERATOR_OVERLOADS
 #define M128_OPERATOR_OVERLOADS
 	inline __m128 & operator += (__m128 & v0, const __m128 &v1)
@@ -7108,7 +7108,7 @@ namespace VectorMath
 	{
 		return _mm_xor_si128(v0, _mm_set1_epi32(0xFFFFFFFF));
 	}
-
+#endif
 	_declspec(align(16))
 	class SSEVec3
 	{
@@ -7692,7 +7692,7 @@ namespace Spire
 			}
 			ExpressionType()
 			{
-				BaseType = BaseType::Int;
+				BaseType = Compiler::BaseType::Int;
 				ArrayLength = 0;
 				IsArray = false;
 				Func = 0;
@@ -7701,13 +7701,13 @@ namespace Spire
 			}
 			bool IsTextureType()
 			{
-				return !IsArray && (BaseType == BaseType::Texture2D || BaseType == BaseType::TextureCube || BaseType == BaseType::TextureCubeShadow || BaseType == BaseType::TextureShadow);
+				return !IsArray && (BaseType == Compiler::BaseType::Texture2D || BaseType == Compiler::BaseType::TextureCube || BaseType == Compiler::BaseType::TextureCubeShadow || BaseType == Compiler::BaseType::TextureShadow);
 			}
 			int GetSize()
 			{
 				int baseSize = GetVectorSize(BaseType);
-				if (BaseType == BaseType::Texture2D || BaseType == BaseType::TextureCube ||
-					BaseType == BaseType::TextureCubeShadow || BaseType == BaseType::TextureShadow)
+				if (BaseType == Compiler::BaseType::Texture2D || BaseType == Compiler::BaseType::TextureCube ||
+					BaseType == Compiler::BaseType::TextureCubeShadow || BaseType == Compiler::BaseType::TextureShadow)
 					baseSize = sizeof(void*) / sizeof(int);
 				if (ArrayLength == 0)
 					return baseSize;
@@ -9842,7 +9842,7 @@ namespace Spire
 			virtual void Accept(InstructionVisitor * visitor) override;
 		};
 
-		class UnaryInstruction abstract : public ILInstruction
+		class UnaryInstruction : public ILInstruction
 		{
 		public:
 			UseReference Operand;
@@ -9902,7 +9902,7 @@ namespace Spire
 			virtual void Accept(InstructionVisitor * visitor) override;
 		};
 
-		class BinaryInstruction abstract : public ILInstruction
+		class BinaryInstruction : public ILInstruction
 		{
 		public:
 			Array<UseReference, 2> Operands;
@@ -11620,6 +11620,11 @@ CORELIB\THREADING.H
 #include <atomic>
 #include <thread>
 #include <mutex>
+
+#ifndef _WIN32
+#define __stdcall
+#endif
+
 namespace CoreLib
 {
 	namespace Threading
@@ -11681,10 +11686,10 @@ namespace CoreLib
 			Lowest,
 			Idle
 		};
-
+		unsigned int __stdcall ThreadProcedure(const ThreadParam& param);
 		class Thread : public CoreLib::Basic::Object
 		{
-			friend unsigned int __stdcall ThreadProcedure(ThreadParam& param);
+			friend unsigned int __stdcall ThreadProcedure(const ThreadParam& param);
 		private:
 			 ThreadParam internalParam;
 		public:
@@ -11755,15 +11760,6 @@ namespace CoreLib
 				return handle.unlock();
 			}
 		};
-
-		inline unsigned int __stdcall ThreadProcedure(ThreadParam& param)
-		{
-			if (param.thread->paramedThreadProc)
-				param.thread->paramedThreadProc->Invoke(param.threadParam);
-			else
-				param.thread->threadProc->Invoke();
-			return 0;
-		}
 	}
 }
 

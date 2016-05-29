@@ -5,17 +5,17 @@ namespace Spire
 {
 	namespace Compiler
 	{
-		ExpressionType ExpressionType::Bool(BaseType::Bool);
-		ExpressionType ExpressionType::Int(BaseType::Int);
-		ExpressionType ExpressionType::Float(BaseType::Float);
-		ExpressionType ExpressionType::Int2(BaseType::Int2);
-		ExpressionType ExpressionType::Float2(BaseType::Float2);
-		ExpressionType ExpressionType::Int3(BaseType::Int3);
-		ExpressionType ExpressionType::Float3(BaseType::Float3);
-		ExpressionType ExpressionType::Int4(BaseType::Int4);
-		ExpressionType ExpressionType::Float4(BaseType::Float4);
-		ExpressionType ExpressionType::Void(BaseType::Void);
-		ExpressionType ExpressionType::Error(BaseType::Error);
+		ExpressionType ExpressionType::Bool(Compiler::BaseType::Bool);
+		ExpressionType ExpressionType::Int(Compiler::BaseType::Int);
+		ExpressionType ExpressionType::Float(Compiler::BaseType::Float);
+		ExpressionType ExpressionType::Int2(Compiler::BaseType::Int2);
+		ExpressionType ExpressionType::Float2(Compiler::BaseType::Float2);
+		ExpressionType ExpressionType::Int3(Compiler::BaseType::Int3);
+		ExpressionType ExpressionType::Float3(Compiler::BaseType::Float3);
+		ExpressionType ExpressionType::Int4(Compiler::BaseType::Int4);
+		ExpressionType ExpressionType::Float4(Compiler::BaseType::Float4);
+		ExpressionType ExpressionType::Void(Compiler::BaseType::Void);
+		ExpressionType ExpressionType::Error(Compiler::BaseType::Error);
 
 		bool Scope::FindVariable(const String & name, VariableEntry & variable)
 		{
@@ -32,49 +32,49 @@ namespace Spire
 
 			switch (BaseType)
 			{
-			case BaseType::Int:
+			case Compiler::BaseType::Int:
 				res.Append(L"int");
 				break;
-			case BaseType::Float:
+			case Compiler::BaseType::Float:
 				res.Append(L"float");
 				break;
-			case BaseType::Int2:
+			case Compiler::BaseType::Int2:
 				res.Append(L"ivec2");
 				break;
-			case BaseType::Float2:
+			case Compiler::BaseType::Float2:
 				res.Append(L"vec2");
 				break;
-			case BaseType::Int3:
+			case Compiler::BaseType::Int3:
 				res.Append(L"ivec3");
 				break;
-			case BaseType::Float3:
+			case Compiler::BaseType::Float3:
 				res.Append(L"vec3");
 				break;
-			case BaseType::Int4:
+			case Compiler::BaseType::Int4:
 				res.Append(L"ivec4");
 				break;
-			case BaseType::Float4:
+			case Compiler::BaseType::Float4:
 				res.Append(L"vec4");
 				break;
-			case BaseType::Float3x3:
+			case Compiler::BaseType::Float3x3:
 				res.Append(L"mat3");
 				break;
-			case BaseType::Float4x4:
+			case Compiler::BaseType::Float4x4:
 				res.Append(L"mat4");
 				break;
-			case BaseType::Texture2D:
+			case Compiler::BaseType::Texture2D:
 				res.Append(L"sampler2D");
 				break;
-			case BaseType::TextureCube:
+			case Compiler::BaseType::TextureCube:
 				res.Append(L"samplerCube");
 				break;
-			case BaseType::TextureShadow:
+			case Compiler::BaseType::TextureShadow:
 				res.Append(L"samplerShadow");
 				break;
-			case BaseType::TextureCubeShadow:
+			case Compiler::BaseType::TextureCubeShadow:
 				res.Append(L"samplerCubeShadow");
 				break;
-			case BaseType::Function:
+			case Compiler::BaseType::Function:
 				res.Append(L"(");
 				for (int i = 0; i < Func->Parameters.Count(); i++)
 				{
@@ -85,10 +85,10 @@ namespace Spire
 				res.Append(L") => ");
 				res.Append(Func->ReturnType->ToExpressionType().ToString());
 				break;
-			case BaseType::Shader:
+			case Compiler::BaseType::Shader:
 				res.Append(Shader->SyntaxNode->Name.Content);
 				break;
-			case BaseType::Void:
+			case Compiler::BaseType::Void:
 				res.Append("void");
 				break;
 			default:

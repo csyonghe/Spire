@@ -6,6 +6,11 @@
 #include <xmmintrin.h>
 #include "Basic.h"
 #include "Events.h"
+
+#ifndef _WIN32
+#define __stdcall
+#endif
+
 namespace CoreLib
 {
 	namespace Threading
@@ -67,10 +72,10 @@ namespace CoreLib
 			Lowest,
 			Idle
 		};
-
+		unsigned int __stdcall ThreadProcedure(const ThreadParam& param);
 		class Thread : public CoreLib::Basic::Object
 		{
-			friend unsigned int __stdcall ThreadProcedure(ThreadParam& param);
+			friend unsigned int __stdcall ThreadProcedure(const ThreadParam& param);
 		private:
 			 ThreadParam internalParam;
 		public:
@@ -141,15 +146,6 @@ namespace CoreLib
 				return handle.unlock();
 			}
 		};
-
-		inline unsigned int __stdcall ThreadProcedure(ThreadParam& param)
-		{
-			if (param.thread->paramedThreadProc)
-				param.thread->paramedThreadProc->Invoke(param.threadParam);
-			else
-				param.thread->threadProc->Invoke();
-			return 0;
-		}
 	}
 }
 

@@ -1295,7 +1295,7 @@ namespace VectorMath
 			(p0 * 2.0f - p1 * 5.0f + p2 * 4.0f - p3) * t2 +
 			(-p0 + p1 * 3.0f - p2 * 3.0f + p3) * t3) * 0.5f;
 	}
-
+#ifdef _MSC_VER
 #ifndef M128_OPERATOR_OVERLOADS
 #define M128_OPERATOR_OVERLOADS
 	inline __m128 & operator += (__m128 & v0, const __m128 &v1)
@@ -1372,7 +1372,7 @@ namespace VectorMath
 	{
 		return _mm_xor_si128(v0, _mm_set1_epi32(0xFFFFFFFF));
 	}
-
+#endif
 	_declspec(align(16))
 	class SSEVec3
 	{

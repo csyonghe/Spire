@@ -202,7 +202,7 @@ namespace Spire
 							}
 						if (removedDefs.Count())
 						{
-							result->RemoveDefinitions([&](auto def) {return removedDefs.Contains(def); });
+							result->RemoveDefinitions([&](ComponentDefinitionIR* def) {return removedDefs.Contains(def); });
 							changed = true;
 						}
 					}
