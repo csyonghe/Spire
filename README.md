@@ -11,7 +11,7 @@ To experience Spire, compile `"Source/Spire.sln"` and run the `SceneViewer` proj
 The Choice Explorer window allows you to dynamically recompile the modified shader and explore different rate placement choices in real-time.
 
 Currently the demo engine runs only on Windows with an NVIDIA Kepler or later GPU. AMD and Intel GPUs are not supported. 
-However, the compiler is platform independent and currently supports generating GLSL compute, vertex and fragment shaders. 
+However, the compiler is platform independent and is compatible with both msvc and g++ 5.0 (with `-fpermissive -std=c++14 -msse2` flag). Spire currently supports generating GLSL compute, vertex and fragment shaders. 
 
 ## Understanding Spire
 The following is a Spire shader that computes the albedo color by blending two textures.
