@@ -125,8 +125,13 @@ Build "Source/Spire.sln" and use "SpireCompiler.exe". The command line format is
 SpireCompiler filename [-out output_filename] [-symbol shader_to_compile] [-schedule schedule_file] [-genchoice]
 ```
 `filename` specifies the source filename.
+
 Optionally, you can use:
+
 `-out`: specifies the output filename.
+
 `-symbol`: instructs the compiler to only generate code for the specified shader.
+
 `-schedule`: instructs the compiler to apply the specified schedule file. A schedule file contains rate placement or algorithmic choice decisions for the given shader.
+
 `-genchoice`: instructs the compiler to generate a choice file, which contains all the optimization options (including rate placement or algorithimic choices) exposed by the input shader.
