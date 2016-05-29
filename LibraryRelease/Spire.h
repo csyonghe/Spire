@@ -11777,7 +11777,6 @@ SPIRELIB\SPIRELIB.H
 #ifndef LIB_BAKER_SL_H
 #define LIB_BAKER_SL_H
 
-#include <Windows.h>
 
 namespace SpireLib
 {

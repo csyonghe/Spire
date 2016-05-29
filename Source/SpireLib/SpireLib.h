@@ -1,7 +1,6 @@
 #ifndef LIB_BAKER_SL_H
 #define LIB_BAKER_SL_H
 
-#include <Windows.h>
 #include "CoreLib/Basic.h"
 #include "CoreLib/Parser.h"
 #include "../SpireCore/ShaderCompiler.h"

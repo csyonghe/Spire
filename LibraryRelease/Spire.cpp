@@ -672,6 +672,7 @@ namespace CoreLib
 CORELIB\PERFORMANCECOUNTER.CPP
 ***********************************************************************/
 #ifdef WIN32
+#include <Windows.h>
 #endif
 
 using namespace std::chrono;
