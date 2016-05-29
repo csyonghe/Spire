@@ -10,6 +10,8 @@ To experience Spire, compile `"Source/Spire.sln"` and run the `SceneViewer` proj
 
 The Choice Explorer window allows you to dynamically recompile the modified shader and explore different rate placement choices in real-time.
 
+Currently the demo engine runs only on Windows with an NVIDIA Kepler or later GPU. AMD and Intel GPUs are not supported. 
+
 ## Understanding Spire
 The following is a Spire shader that computes the albedo color by blending two textures.
 ```
