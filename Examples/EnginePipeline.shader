@@ -121,9 +121,9 @@ module VertexTransform
     @modelTransform mat4 modelMatrix; 
     @modelTransform mat4 normalMatrix;
     
-    vec4 position = modelMatrix * vec4(vert_pos, 1.0); 
+    vec4 position = modelMatrix * vec4(vert_pos, 1); 
     public vec4 projCoord = viewProjectionMatrix * position;
-    public vec4 texSpaceVert = vec4(vert_uv*2.0 - vec2(1.0), 0.0, 1.0);
+    public vec4 texSpaceVert = vec4(vert_uv*2.0 - vec2(1.0), 0.0, 1);
     public vec3 pos = position.xyz;
     public vec3 vNormal = (normalMatrix * vec4(vert_normal, 1.0)).xyz;
     public vec3 vTangent = (normalMatrix * vec4(vert_tangent, 1.0)).xyz;

@@ -59,6 +59,8 @@ namespace Spire
 				typeNames.Add(L"vec4");
 				typeNames.Add(L"mat3");
 				typeNames.Add(L"mat4");
+				typeNames.Add(L"mat4x4");
+				typeNames.Add(L"mat3x3");
 				typeNames.Add(L"sampler2D");
 				typeNames.Add(L"sampler2DShadow");
 				typeNames.Add(L"samplerCube");

@@ -108,7 +108,7 @@ __intrinsic vec3 reflect(vec3 I, vec3 N, float eta);
 __intrinsic float length(vec2 v);
 __intrinsic float length(vec3 v);
 __intrinsic float length(vec4 v);
-__intrinsic mat4 CreateShadowMapMatrix(vec3 pos, vec3 dir, vec3 up, float zFar);
+
 __intrinsic void alphaTest(float alpha, float threshold);
 __intrinsic vec3 mix(vec3 v0, vec3 v1, float t);
 __intrinsic vec4 mix(vec4 v0, vec4 v1, float t);
@@ -137,5 +137,7 @@ __intrinsic ivec4 ivec4(int x, int y, int z, int w);
 __intrinsic ivec4 ivec4(ivec3 v, int w);
 __intrinsic ivec4 ivec4(ivec2 v, int z, int w);
 __intrinsic ivec4 ivec4(ivec2 v, ivec2 w);
+__intrinsic mat3 transpose(mat3 in);
+__intrinsic mat4 transpose(mat4 in);
 #line_reset#
 )";

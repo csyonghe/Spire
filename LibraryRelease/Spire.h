@@ -7889,9 +7889,9 @@ namespace Spire
 					expType.BaseType = BaseType::Float3;
 				else if (TypeName == "vec4")
 					expType.BaseType = BaseType::Float4;
-				else if (TypeName == "mat3")
+				else if (TypeName == "mat3" || TypeName == L"mat3x3")
 					expType.BaseType = BaseType::Float3x3;
-				else if (TypeName == "mat4")
+				else if (TypeName == "mat4" || TypeName == L"mat4x4")
 					expType.BaseType = BaseType::Float4x4;
 				else if (TypeName == L"sampler2D")
 					expType.BaseType = BaseType::Texture2D;
@@ -12234,6 +12234,8 @@ namespace Spire
 				typeNames.Add(L"vec4");
 				typeNames.Add(L"mat3");
 				typeNames.Add(L"mat4");
+				typeNames.Add(L"mat4x4");
+				typeNames.Add(L"mat3x3");
 				typeNames.Add(L"sampler2D");
 				typeNames.Add(L"sampler2DShadow");
 				typeNames.Add(L"samplerCube");

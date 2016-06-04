@@ -760,9 +760,11 @@ namespace Spire
 					{
 						if (leftType == rightType && !leftType.IsTextureType())
 							expr->Type = leftType;
-						else if (leftType.BaseType == BaseType::Float3x3 && rightType == ExpressionType::Float3)
+						else if (leftType.BaseType == BaseType::Float3x3 && rightType == ExpressionType::Float3 ||
+							leftType.BaseType == BaseType::Float3 && rightType.BaseType == BaseType::Float3x3)
 							expr->Type = ExpressionType::Float3;
-						else if (leftType.BaseType == BaseType::Float4x4 && rightType == ExpressionType::Float4)
+						else if (leftType.BaseType == BaseType::Float4x4 && rightType == ExpressionType::Float4 ||
+							leftType.BaseType == BaseType::Float4 && rightType.BaseType == BaseType::Float4x4)
 							expr->Type = ExpressionType::Float4;
 						else if (leftType.IsVectorType() && rightType == GetVectorBaseType(leftType.BaseType))
 							expr->Type = leftType;
@@ -915,7 +917,46 @@ namespace Spire
 				argList << L")";
 				String funcName = internalName.ProduceString();
 				RefPtr<FunctionSymbol> func;
-				if (!symbolTable->Functions.TryGetValue(funcName, func))
+				bool found = symbolTable->Functions.TryGetValue(funcName, func);
+				if (!found)
+				{
+					// find function overload with explicit conversions from int -> float
+					auto namePrefix = expr->FunctionExpr->Variable + L"@";
+					for (auto & f : symbolTable->Functions)
+					{
+						if (f.Key.StartsWith(namePrefix))
+						{
+							if (f.Value->SyntaxNode->Parameters.Count() == expr->Arguments.Count())
+							{
+								bool match = true;
+								for (int i = 0; i < expr->Arguments.Count(); i++)
+								{
+									auto argType = expr->Arguments[i]->Type;
+									auto paramType = f.Value->SyntaxNode->Parameters[i]->Type->ToExpressionType();
+									if (argType == paramType)
+										continue;
+									else if (argType.ArrayLength == paramType.ArrayLength
+										&& GetVectorBaseType(argType.BaseType) == BaseType::Int && GetVectorBaseType(paramType.BaseType) == BaseType::Float &&
+										GetVectorSize(argType.BaseType) == GetVectorSize(argType.BaseType))
+										continue;
+									else
+									{
+										match = false;
+										break;
+									}
+								}
+								if (match)
+								{
+									func = f.Value;
+									funcName = f.Key;
+									found = true;
+								}
+							}
+						}
+					}
+				}
+
+				if (!found)
 				{
 					expr->Type = ExpressionType::Error;
 					Error(30021, expr->FunctionExpr->Variable + L": no overload takes arguments " + argList.ProduceString(), expr);
