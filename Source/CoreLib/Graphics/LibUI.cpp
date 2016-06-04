@@ -20,6 +20,8 @@ namespace GraphicsUI
 	int Global::EventGUID = 0;
 	int Global::CursorPosX = 0;
 	int Global::CursorPosY = 0;
+	int Global::SCROLLBAR_BUTTON_SIZE = 17;
+	int Global::SCROLLBAR_MIN_PAGESIZE = 8;
 
 	Control * Global::PointedComponent = nullptr;
 	Control * Global::MouseCaptureControl = nullptr;
@@ -280,7 +282,7 @@ namespace GraphicsUI
 	{
 	}
 
-	Control::Control(Container * parent)
+	Control::Control(Container * parent, bool addToParent)
 	{
 		ID = 0;
 		EventID = -1;
@@ -293,23 +295,29 @@ namespace GraphicsUI
 		Focused = false;
 		LastInClient = false;
 		BackgroundShadow = false;
-		FontColor = Color(0,0,0,255);
+		FontColor = Color(0, 0, 0, 255);
 		Parent = parent;
 		if (parent)
 		{
 			font = parent->GetFont();
-			parent->AddChild(this);
+			if (addToParent)
+				parent->AddChild(this);
 		}
 		TabStop = false;
 		GenerateMouseHoverEvent = false;
 		BorderStyle = BS_RAISED;
 		Type = CT_CONTROL;
-		AbsolutePosX= AbsolutePosY=0;
+		AbsolutePosX = AbsolutePosY = 0;
 		BackColor = Global::ColorTable.ControlBackColor;
 		BorderColor = Global::ColorTable.ControlBorderColor;
 		tmrHover.Interval = Global::HoverTimeThreshold;
 		tmrHover.OnTick.Bind(this, &Control::HoverTimerTick);
 		DockStyle = dsNone;
+	}
+
+	Control::Control(Container * parent)
+		: Control(parent, true)
+	{
 	}
 
 	Control::~Control()
@@ -957,12 +965,17 @@ namespace GraphicsUI
 		return nullptr;
 	}
 
-	Container::Container(Container * parent)
-		: Control(parent)
+	Container::Container(Container * parent, bool addToParent)
+		: Control(parent, addToParent)
 	{
 		Type = CT_CONTAINER;
 		TabStop = false;
 		Margin = 0;
+	}
+
+	Container::Container(Container * parent)
+		: Container(parent, true)
+	{
 	}
 
 	Container::~Container()
@@ -999,10 +1012,6 @@ namespace GraphicsUI
 	{
 		Controls.Add(nControl);
 		nControl->Parent = this;
-		if (nControl->TabStop)
-		{
-			TabList.Add(nControl); 
-		}
 	}
 
 	void Container::RemoveChild(Control *AControl)
@@ -1515,6 +1524,7 @@ namespace GraphicsUI
 		CheckmarkLabel->SetFont(pSystem->LoadDefaultFont(DefaultFontType::Symbol));
 		CheckmarkLabel->SetText(L"a");
 		FIMEHandler->IMEWindow->Visible = false;
+		Global::SCROLLBAR_BUTTON_SIZE = (int)(GetLineHeight() * 1.5f);
 	}
 
 	SHIFTSTATE UIEntry::GetCurrentShiftState()
@@ -3144,8 +3154,8 @@ namespace GraphicsUI
 		return rs;
 	}
 
-	ScrollBar::ScrollBar(Container * parent)
-		: Container(parent)
+	ScrollBar::ScrollBar(Container * parent, bool addToParent)
+		: Container(parent, addToParent)
 	{
 		Type = CT_SCROLLBAR;
 		BorderStyle = BS_NONE;
@@ -3168,6 +3178,11 @@ namespace GraphicsUI
 		LargeChange = 10;
 		DownInSlider = false;
 		tmrTick.OnTick.Bind(this, &ScrollBar::tmrTick_Tick);
+	}
+
+	ScrollBar::ScrollBar(Container * parent)
+		: ScrollBar(parent, true)
+	{
 	}
 
 	ScrollBar::~ScrollBar()
@@ -3207,15 +3222,15 @@ namespace GraphicsUI
 		Control::SizeChanged();
 		if (Orientation == SO_HORIZONTAL)
 		{
-			btnDec->Posit(0,0,SCROLLBAR_BUTTON_SIZE,Height);
-			btnInc->Posit(Width-SCROLLBAR_BUTTON_SIZE,0,SCROLLBAR_BUTTON_SIZE,Height);
-			Slider->Posit(SCROLLBAR_BUTTON_SIZE,0,PageSize,Height);
+			btnDec->Posit(0,0,Global::SCROLLBAR_BUTTON_SIZE,Height);
+			btnInc->Posit(Width- Global::SCROLLBAR_BUTTON_SIZE,0, Global::SCROLLBAR_BUTTON_SIZE,Height);
+			Slider->Posit(Global::SCROLLBAR_BUTTON_SIZE,0,PageSize,Height);
 		}
 		else
 		{
-			btnDec->Posit(0,0,Width,SCROLLBAR_BUTTON_SIZE);
-			btnInc->Posit(0,Height-SCROLLBAR_BUTTON_SIZE,Width,SCROLLBAR_BUTTON_SIZE);
-			Slider->Posit(0,SCROLLBAR_BUTTON_SIZE,Width,PageSize);
+			btnDec->Posit(0,0,Width, Global::SCROLLBAR_BUTTON_SIZE);
+			btnInc->Posit(0,Height- Global::SCROLLBAR_BUTTON_SIZE,Width, Global::SCROLLBAR_BUTTON_SIZE);
+			Slider->Posit(0, Global::SCROLLBAR_BUTTON_SIZE,Width,PageSize);
 		}
 		SetValue(Min,Max,Position, PageSize);
 	}
@@ -3257,8 +3272,8 @@ namespace GraphicsUI
 
 	void ScrollBar::SetValue(int AMin, int AMax, int APos, int pageSize)
 	{
-		int FreeSlide = (Orientation==SO_HORIZONTAL)?Width-(SCROLLBAR_BUTTON_SIZE+1)*2:
-														Height-(SCROLLBAR_BUTTON_SIZE+1)*2;
+		int FreeSlide = (Orientation==SO_HORIZONTAL)?Width-(Global::SCROLLBAR_BUTTON_SIZE+1)*2:
+														Height-(Global::SCROLLBAR_BUTTON_SIZE+1)*2;
 		if (AMin>=0 && AMax>AMin && APos>=AMin && APos<=AMax)
 		{
 			bool Changed = (AMin != Min || AMax !=Max || APos !=Position);
@@ -3277,7 +3292,7 @@ namespace GraphicsUI
 			PageSize = pageSize;
 			float p = PageSize/(float)(PageSize+AMax-AMin);
 			int slideSize = Math::Max((int)(p*FreeSlide), GetEntry()->GetLineHeight());
-			int spos = (int)((FreeSlide - slideSize)*(APos/(float)(AMax-AMin))) + SCROLLBAR_BUTTON_SIZE + 1;
+			int spos = (int)((FreeSlide - slideSize)*(APos/(float)(AMax-AMin))) + Global::SCROLLBAR_BUTTON_SIZE + 1;
 			if (Orientation == SO_HORIZONTAL)
 			{	
 				Slider->Left = spos;
@@ -3345,7 +3360,7 @@ namespace GraphicsUI
 		{
 			Range = Max-Min;
 			int slideSize = (Orientation == SO_HORIZONTAL?Slider->GetWidth():Slider->GetHeight());
-			FreeSpace = (Orientation == SO_HORIZONTAL?Width:Height)-(SCROLLBAR_BUTTON_SIZE+1)*2-slideSize;
+			FreeSpace = (Orientation == SO_HORIZONTAL?Width:Height)-(Global::SCROLLBAR_BUTTON_SIZE+1)*2-slideSize;
 			if (Orientation == SO_HORIZONTAL)
 			{
 				Delta = X-DownPosX;
@@ -3452,11 +3467,11 @@ namespace GraphicsUI
 			return false;
 		if (Orientation == SO_HORIZONTAL)
 		{
-			return (Y>0 && Y<Height && X>SCROLLBAR_BUTTON_SIZE && X<Width-SCROLLBAR_BUTTON_SIZE);
+			return (Y>0 && Y<Height && X>Global::SCROLLBAR_BUTTON_SIZE && X<Width- Global::SCROLLBAR_BUTTON_SIZE);
 		}
 		else
 		{
-			return (X>0 && X<Width && Y>SCROLLBAR_BUTTON_SIZE && Y<Height-SCROLLBAR_BUTTON_SIZE);
+			return (X>0 && X<Width && Y>Global::SCROLLBAR_BUTTON_SIZE && Y<Height- Global::SCROLLBAR_BUTTON_SIZE);
 		}
 	}
 
@@ -3554,7 +3569,7 @@ namespace GraphicsUI
 
 	void ListBox::SizeChanged()
 	{
-		ScrollBar->Posit(Width-18,1,17,Height-2);
+		ScrollBar->Posit(Width - Global::SCROLLBAR_BUTTON_SIZE - BorderWidth, BorderWidth, Global::SCROLLBAR_BUTTON_SIZE, Height - BorderWidth*2);
 		ListChanged();
 	}
 
@@ -3883,7 +3898,7 @@ namespace GraphicsUI
 		SelectionColor = BackColor;
 		SelectionForeColor = FontColor;
 		UnfocusedSelectionColor = BackColor;
-		ButtonSize = 17;
+		ButtonSize = Global::SCROLLBAR_BUTTON_SIZE;
 		BorderWidth = 1;
 
 	}
@@ -6174,5 +6189,43 @@ namespace GraphicsUI
 		if (parent)
 			return parent->GetEntry();
 		return nullptr;
+	}
+	VScrollPanel::VScrollPanel(Container * parent)
+		: Container(parent)
+	{
+		vscrollBar = new ScrollBar(this, false);
+	}
+	void VScrollPanel::SizeChanged()
+	{
+		Container::SizeChanged();
+		int maxY = 0;
+		for (auto & ctrl : Controls)
+			maxY = Math::Max(ctrl->Top + ctrl->GetHeight(), maxY);
+		auto entry = GetEntry();
+		maxY += entry->GetLineHeight() * 3;
+		if (maxY > Height)
+		{
+			if (!vscrollBar->Visible)
+			{
+				vscrollBar->Visible = true;
+				SizeChanged();
+				return;
+			}
+			int vmax = maxY - Height;
+			vscrollBar->SetValue(0, vmax, Math::Clamp(vscrollBar->GetPosition(), 0, vmax), Height);
+		}
+		else
+		{
+			vscrollBar->SetPosition(0);
+		}
+		vscrollBar->Posit(0, 0, Global::SCROLLBAR_BUTTON_SIZE, Height - 2);
+	}
+	void VScrollPanel::AddChild(Control * ctrl)
+	{
+		Container::AddChild(ctrl);
+	}
+	void VScrollPanel::RemoveChild(Control * ctrl)
+	{
+		Container::RemoveChild(ctrl);
 	}
 }

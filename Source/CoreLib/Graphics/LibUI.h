@@ -73,9 +73,6 @@ namespace GraphicsUI
 	const int SO_VERTICAL = 0;
 	const int SO_HORIZONTAL = 1;
 
-	const int SCROLLBAR_BUTTON_SIZE = 17;
-	const int SCROLLBAR_MIN_PAGESIZE = 8;
-
 	//Message Type defination
 	const int MSG_UI_NOTIFY = 0;
 	const int MSG_UI_CLICK = 1;
@@ -220,6 +217,8 @@ namespace GraphicsUI
 		static int CursorPosX;
 		static int CursorPosY;
 		static ColorTable ColorTable;
+		static int SCROLLBAR_BUTTON_SIZE;
+		static int SCROLLBAR_MIN_PAGESIZE;
 	};
 
 	class UI_Base : public CoreLib::Object
@@ -252,6 +251,7 @@ namespace GraphicsUI
 		void LocalPosToAbsolutePos(int x, int y, int & ax, int & ay);
 	public:
 		Control(Container * parent);
+		Control(Container * parent, bool addToParent);
 		~Control();
 	public:
 		GraphicsUI::Cursor Cursor;
@@ -328,15 +328,16 @@ namespace GraphicsUI
 	protected:
 		bool drawChildren = true;
 		virtual Control * FindControlAtPosition(int x, int y);
+
 	public:
 		Container(Container * parent);
+		Container(Container * parent, bool addToParent);
 		~Container();
 	public:
 		CoreLib::List<CoreLib::RefPtr<Control>> Controls;
-		CoreLib::List<Control *> TabList;
 		int Margin;
-		void AddChild(Control *nControl);
-		void RemoveChild(Control *AControl);
+		virtual void AddChild(Control *nControl);
+		virtual void RemoveChild(Control *AControl);
 		virtual bool ContainsFocus();
 		virtual void ArrangeControls(Rect initalClientRect);
 		virtual void SetAlpha(unsigned char Alpha);
@@ -649,6 +650,7 @@ namespace GraphicsUI
 		}
 	public:
 		ScrollBar(Container * parent);
+		ScrollBar(Container * parent, bool addToParent);
 		~ScrollBar();
 	public:
 		int SmallChange,LargeChange;
@@ -886,6 +888,17 @@ namespace GraphicsUI
 		IImage * GetImage();
 		void Draw(int absX, int absY);
 		ImageDisplay(Container * parent);
+	};
+
+	class VScrollPanel : public Container
+	{
+	private:
+		CoreLib::RefPtr<ScrollBar> vscrollBar;
+	public:
+		VScrollPanel(Container * parent);
+		virtual void SizeChanged() override;
+		virtual void AddChild(Control *nControl) override;
+		virtual void RemoveChild(Control *AControl) override;
 	};
 
 	class ToolStrip;

@@ -20,8 +20,8 @@ namespace CoreLib
 				std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
 				const std::string rs = converter.to_bytes(str.Buffer(), str.Buffer() + str.Length());
 				List<char> result;
-				result.Reserve(rs.length());
-				result.AddRange(rs.data(), rs.length());
+				result.Reserve((int)rs.length());
+				result.AddRange(rs.data(), (int)rs.length());
 				return result;
 			}
 
@@ -41,8 +41,8 @@ namespace CoreLib
 				std::wstring_convert<std::codecvt_utf16<wchar_t>> converter;
 				const std::string rs = converter.to_bytes(str.Buffer(), str.Buffer() + str.Length());
 				List<char> result;
-				result.Reserve(rs.length());
-				result.AddRange(rs.data(), rs.length());
+				result.Reserve((int)rs.length());
+				result.AddRange(rs.data(), (int)rs.length());
 				return result;
 			}
 

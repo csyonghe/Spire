@@ -935,8 +935,8 @@ namespace CoreLib
 				std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
 				const std::string rs = converter.to_bytes(str.Buffer(), str.Buffer() + str.Length());
 				List<char> result;
-				result.Reserve(rs.length());
-				result.AddRange(rs.data(), rs.length());
+				result.Reserve((int)rs.length());
+				result.AddRange(rs.data(), (int)rs.length());
 				return result;
 			}
 
@@ -956,8 +956,8 @@ namespace CoreLib
 				std::wstring_convert<std::codecvt_utf16<wchar_t>> converter;
 				const std::string rs = converter.to_bytes(str.Buffer(), str.Buffer() + str.Length());
 				List<char> result;
-				result.Reserve(rs.length());
-				result.AddRange(rs.data(), rs.length());
+				result.Reserve((int)rs.length());
+				result.AddRange(rs.data(), (int)rs.length());
 				return result;
 			}
 
@@ -1692,11 +1692,11 @@ char * WideCharToMByte(const wchar_t * buffer, int length)
 		char * multiByteBuffer = new char[requiredBufferSize + 1];
 #ifdef _MSC_VER
 		wcstombs_s(&requiredBufferSize, multiByteBuffer, requiredBufferSize, buffer, length);
-		int pos = (int)requiredBufferSize;
+		auto pos = requiredBufferSize;
 #else
-		int pos = (int)std::wcstombs(multiByteBuffer, buffer, requiredBufferSize + 1);
+		auto pos = std::wcstombs(multiByteBuffer, buffer, requiredBufferSize + 1);
 #endif
-		if (pos <= (int)requiredBufferSize && pos >= 0)
+		if (pos <= requiredBufferSize && pos >= 0)
 			multiByteBuffer[pos] = 0;
 		return multiByteBuffer;
 	}
@@ -1708,21 +1708,21 @@ wchar_t * MByteToWideChar(const char * buffer, int length)
 {
 	// regard as ansi
 #ifdef _MSC_VER
-	int bufferSize;
+	size_t bufferSize;
 	mbstowcs_s((size_t*)&bufferSize, nullptr, 0, buffer, length);
 #else
-	int bufferSize = (int)std::mbstowcs(nullptr, buffer, 0);
+	size_t bufferSize = std::mbstowcs(nullptr, buffer, 0);
 #endif
 	if (bufferSize > 0)
 	{
 		wchar_t * rbuffer = new wchar_t[bufferSize +1];
-		int pos;
+		size_t pos;
 #ifdef _MSC_VER
-		mbstowcs_s((size_t*)&pos, rbuffer, bufferSize, buffer, length);
+		mbstowcs_s(&pos, rbuffer, bufferSize, buffer, length);
 #else
-		pos = (int)std::mbstowcs(rbuffer, buffer, bufferSize + 1);
+		pos = std::mbstowcs(rbuffer, buffer, bufferSize + 1);
 #endif
-		if (pos <= (int)bufferSize && pos >= 0)
+		if (pos <= bufferSize && pos >= 0)
 			rbuffer[pos] = 0;
 		return rbuffer;
 	}
@@ -1733,8 +1733,8 @@ wchar_t * MByteToWideChar(const char * buffer, int length)
 void MByteToWideChar(wchar_t * buffer, int bufferSize, const char * str, int length)
 {
 #ifdef _MSC_VER
-	int pos;
-	mbstowcs_s((size_t*)&pos, buffer, bufferSize, str, length);
+	size_t pos;
+	mbstowcs_s(&pos, buffer, bufferSize, str, length);
 #else
 	std::mbstowcs(buffer, str, bufferSize);
 #endif
