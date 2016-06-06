@@ -149,11 +149,31 @@ namespace GraphicsUI
 		static void DrawLine(ISystemInterface * sys, int x1, int y1, int x2, int y2);
 	};
 
+
+	struct FormStyle
+	{
+		Color TitleBarColors[4];
+		Color TitleBarDeactiveColors[4];
+		Color TitleBarFontColor;
+		Color BackColor, BorderColor;
+		bool ShowIcon;
+		Color CtrlButtonBackColor;
+		IFont * TitleFont = nullptr;
+		int CtrlButtonBorderStyle;
+		int TitleBarHeight;
+		bool TopMost;
+		bool Sizeable = true;
+		FormStyle();
+	};
+
+
 	class ColorTable
 	{
 	public:
-		Color ControlBackColor;
+		Color ControlBackColor, ControlFontColor;
 		Color ControlBorderColor;
+		Color EditableAreaBackColor;
+		Color ScrollBarBackColor;
 		Color ToolButtonBorderHighLight;
 		Color ToolButtonBorderSelected;
 		Color ToolButtonBackColor1;
@@ -181,9 +201,12 @@ namespace GraphicsUI
 		Color TabPageItemBackColor1, TabPageItemBackColor2;
 		Color TabPageItemSelectedBackColor1, TabPageItemSelectedBackColor2;
 		Color TabPageItemHighlightBackColor1, TabPageItemHighlightBackColor2;
+		Color SelectionColor, SelectionForeColor, HighlightColor, HighlightForeColor, UnfocusedSelectionColor;
+		FormStyle DefaultFormStyle;
 	};
 
 	ColorTable CreateDefaultColorTable();
+	ColorTable CreateDarkColorTable();
 
 	class ClipRectStack
 	{
@@ -360,21 +383,6 @@ namespace GraphicsUI
 		virtual void SizeChanged();
 		virtual bool DoClosePopup();
 		virtual void KillFocus();
-	};
-
-	struct FormStyle
-	{
-		Color TitleBarColors[4];
-		Color TitleBarDeactiveColors[4];
-		Color TitleBarFontColor;
-		bool ShowIcon;
-		Color CtrlButtonBackColor;
-		IFont * TitleFont = nullptr;
-		int CtrlButtonBorderStyle;
-		int TitleBarHeight;
-		bool TopMost;
-		bool Sizeable = true;
-		FormStyle();
 	};
 
 	class Label;

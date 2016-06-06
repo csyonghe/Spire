@@ -66,7 +66,7 @@ namespace SceneViewer
 #ifdef ENABLE_AUTO_TUNE
 		timeBudgetTextBox = new GraphicsUI::TextBox(this);
 		timeBudgetTextBox->SetText(L"10");
-		timeBudgetTextBox->Posit(140, 52, 80, 25);
+		timeBudgetTextBox->Posit(140, 49, 80, 30);
 		autoTuneButton = new GraphicsUI::Button(this);
 		autoTuneButton->Posit(230, 50, 100, 30);
 		autoTuneButton->SetText(L"Autotune");

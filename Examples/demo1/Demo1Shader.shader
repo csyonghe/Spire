@@ -40,7 +40,10 @@ shader Demo1Shader
     float roughness = 0.5;
     float specular = 0.5;
     float metallic = 0.4;
-    float highlight = ComputeHighlightPhong(lightDir, normal, view, roughness, specular, metallic);
+    
+    float highlight:phong = ComputeHighlightPhong(lightDir, normal, view, roughness, specular, metallic);
+    float highlight:ggx = ComputeHighlightGGX(lightDir, normal, view, roughness, specular, metallic);
+    
     float lambert = clamp(dot(lightDir, normal), 0.0, 1.0);
     vec4 outputColor = vec4(lightColor * 
 						(albedo * (lambert*0.7 + 0.5)*(1.0-metallic) + 
