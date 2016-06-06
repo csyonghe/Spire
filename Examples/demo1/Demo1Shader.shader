@@ -32,9 +32,9 @@ shader Demo1Shader
     vec3 vNormal = (normalMatrix * vec4(vert_normal, 1.0)).xyz;
     vec3 vTangent = (normalMatrix * vec4(vert_tangent, 1.0)).xyz;
     vec3 vBiTangent = cross(vTangent, vNormal);
-    vec3 normal = (normalMatrix * vec4(normalize(normalTex.x * vTangent 
+    vec3 normal = normalize(normalTex.x * vTangent 
                     + normalTex.y * vBiTangent 
-                    + normalTex.z * vNormal), 1)).xyz;
+                    + normalTex.z * vNormal);
                     
     vec3 view = normalize(cameraPos - position.xyz);
     float roughness = 0.5;
