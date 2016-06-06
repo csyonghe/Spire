@@ -266,7 +266,7 @@ namespace GraphicsUI
 		BORDERSTYLE BorderStyle;
 		int AbsolutePosX; int AbsolutePosY;
 		void SetName(CoreLib::String pName);
-		void Posit(int pLeft, int pTop, int pWidth, int pHeight);
+		virtual void Posit(int pLeft, int pTop, int pWidth, int pHeight);
 		void SetHeight(int val);
 		void SetWidth(int val);
 		int GetHeight();
@@ -308,6 +308,7 @@ namespace GraphicsUI
 		//Event Reactions
 		virtual bool DoMouseMove(int X, int Y);
 		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift);
+		virtual bool DoMouseWheel(int /*delta*/) { return false; }
 		virtual bool DoMouseEnter();
 		virtual bool DoMouseLeave();
 		virtual bool DoMouseUp(int X, int Y, SHIFTSTATE Shift);
@@ -321,6 +322,13 @@ namespace GraphicsUI
 		virtual bool ContainsFocus();
 		virtual void LostFocus(Control * newFocus);
 		virtual bool DoClosePopup();
+	};
+
+	class Line : public Control
+	{
+	public:
+		Line(Container * owner);
+		virtual void Draw(int absX, int absY);
 	};
 
 	class Container : public Control
@@ -608,7 +616,7 @@ namespace GraphicsUI
 		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift);
 		virtual bool DoMouseUp(int X, int Y, SHIFTSTATE Shift);
 		virtual bool DoMouseMove(int X, int Y);
-		virtual bool DoMouseWeel(int delta);
+		virtual bool DoMouseWheel(int delta);
 		virtual void HandleMessage(const UI_MsgArgs *Args);
 		void MoveFocusBackward();
 		void MoveFocusForward();
@@ -716,10 +724,10 @@ namespace GraphicsUI
 	public:
 		virtual void Draw(int absX, int absY);
 		virtual void SizeChanged();
-		virtual void HandleMessage(const UI_MsgArgs *Args);
 		virtual bool DoMouseDown(int x, int Y, SHIFTSTATE Shift);
 		virtual bool DoMouseUp(int x, int Y, SHIFTSTATE Shift);
 		virtual bool DoMouseMove(int x, int Y);
+		virtual bool DoMouseWheel(int delta) override;
 		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift);
 	};
 
@@ -750,16 +758,19 @@ namespace GraphicsUI
 		{
 			return TextBox->GetText();
 		}
-		virtual void Draw(int absX, int absY);
+		virtual void Posit(int left, int top, int width, int height) override;
+		virtual void Draw(int absX, int absY) override;
 		virtual void SizeChanged();
 		virtual void HandleMessage(const UI_MsgArgs *Args);
 		virtual bool DoMouseDown(int x, int Y, SHIFTSTATE Shift);
 		virtual bool DoMouseUp(int x, int Y, SHIFTSTATE Shift);
 		virtual bool DoMouseMove(int x, int Y);
+		virtual bool DoMouseWheel(int delta);
 		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift);
 		virtual void SetFocus();
 		virtual void LostFocus(Control * newFocus);
 		virtual bool DoClosePopup();
+		void SetSelectedIndex(int id);
 	};
 
 	class ProgressBar : public Control
@@ -893,12 +904,22 @@ namespace GraphicsUI
 	class VScrollPanel : public Container
 	{
 	private:
-		CoreLib::RefPtr<ScrollBar> vscrollBar;
+		ScrollBar * vscrollBar = nullptr;
+		Container * content = nullptr;
+		void ScrollBar_Changed(UI_Base * sender);
 	public:
 		VScrollPanel(Container * parent);
+		CoreLib::List<CoreLib::RefPtr<Control>> & GetChildren()
+		{
+			return content->Controls;
+		}
 		virtual void SizeChanged() override;
 		virtual void AddChild(Control *nControl) override;
 		virtual void RemoveChild(Control *AControl) override;
+		virtual bool DoMouseWheel(int delta) override;
+		void ClearChildren();
+		int GetClientWidth();
+		int GetClientHeight();
 	};
 
 	class ToolStrip;

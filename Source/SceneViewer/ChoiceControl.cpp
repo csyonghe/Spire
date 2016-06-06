@@ -10,14 +10,13 @@ using namespace RealtimeEngine;
 #define ENABLE_AUTO_TUNE
 namespace SceneViewer
 {
-	ChoiceForm::ChoiceForm(IChoiceControl * pChoiceControl)
+	ChoiceForm::ChoiceForm(IChoiceControl * pChoiceControl, WinForm::GLForm * pOwnerForm, GraphicsUI::UIEntry * entry)
+		: GraphicsUI::Form(entry)
 	{
+		this->ownerForm = pOwnerForm;
 		this->choiceControl = pChoiceControl;
 		SetText("Choice Control");
-		SetClientWidth(430);
-		SetClientHeight(640);
 		InitUI();
-		OnResized.Bind(this, &ChoiceForm::ChoiceForm_OnResize);
 		availableChoices[0].Add(L"vs");
 		availableChoices[0].Add(L"fs");
 		availableChoices[1].Add(L"precomputeUniform");
@@ -32,6 +31,8 @@ namespace SceneViewer
 		availableChoices[3].Add(L"objSurface");
 		availableChoices[3].Add(L"lowRes");
 		availableChoices[3].Add(L"fs");
+
+		OnResize.Bind(this, &ChoiceForm::ChoiceForm_OnResize);
 	}
 	List<Vec4> ChoiceForm::ReadFrameData(GL::Texture2D tex)
 	{
@@ -62,52 +63,51 @@ namespace SceneViewer
 	}
 	void ChoiceForm::InitUI()
 	{
-		pipelineBox = new ComboBox(this);
-		pipelineBox->AddItem(L"Standard");
-		pipelineBox->AddItem(L"Precompute");
-		pipelineBox->AddItem(L"MultiRate");
-		pipelineBox->AddItem(L"MultiRateObjSpace");
-		pipelineBox->SetSelectionIndex(0);
-		pipelineBox->SelectionChanged.Bind(this, &ChoiceForm::PipelineBox_Changed);
-		shaderBox = new ListBox(this);
-		shaderBox->SetPosition(10, 50, 100, GetClientHeight() - 60);
-		shaderBox->SelectionChanged.Bind(this, &ChoiceForm::SelectedShaderChanged);
-		applyButton = new Button(this);
-		applyButton->SetPosition(120, 10, 80, 30);
-		applyButton->SetText(L"Re&compile");
+		pipelineBox = new GraphicsUI::ComboBox(this);
+		pipelineBox->AddTextItem(L"Standard");
+		pipelineBox->AddTextItem(L"Precompute");
+		pipelineBox->AddTextItem(L"MultiRate");
+		pipelineBox->AddTextItem(L"MultiRateObjSpace");
+		pipelineBox->SetSelectedIndex(0);
+		pipelineBox->Posit(10, 10, 120, 25);
+		pipelineBox->OnChanged.Bind(this, &ChoiceForm::PipelineBox_Changed);
+		shaderBox = new GraphicsUI::ListBox(this);
+		shaderBox->Posit(10, 50, 120, GetClientHeight() - 60);
+		shaderBox->OnChanged.Bind(this, &ChoiceForm::SelectedShaderChanged);
+		applyButton = new GraphicsUI::Button(this);
+		applyButton->Posit(140, 10, 100, 30);
+		applyButton->SetText(L"Recompile");
 		applyButton->OnClick.Bind(this, &ChoiceForm::ApplyButton_Clicked);
-		resetButton = new Button(this);
-		resetButton->SetPosition(210, 10, 80, 30);
-		resetButton->SetText(L"&Reset");
+		resetButton = new GraphicsUI::Button(this);
+		resetButton->Posit(250, 10, 100, 30);
+		resetButton->SetText(L"Reset");
 		resetButton->OnClick.Bind(this, &ChoiceForm::ResetButton_Clicked);
-		autoRecompileCheckBox = new CheckBox(this);
-		autoRecompileCheckBox->SetText(L"&Auto Recompile");
-		autoRecompileCheckBox->SetPosition(310, 14, 110, 25);
-		autoRecompileCheckBox->SetChecked(true);
+		autoRecompileCheckBox = new GraphicsUI::CheckBox(this);
+		autoRecompileCheckBox->SetText(L"Auto Recompile");
+		autoRecompileCheckBox->Posit(360, 14, 150, 25);
+		autoRecompileCheckBox->Checked = true;
 #ifdef ENABLE_AUTO_TUNE
-		timeBudgetTextBox = new TextBox(this);
+		timeBudgetTextBox = new GraphicsUI::TextBox(this);
 		timeBudgetTextBox->SetText(L"10");
-		timeBudgetTextBox->SetPosition(120, 52, 80, 25);
-		autoTuneButton = new Button(this);
-		autoTuneButton->SetPosition(210, 50, 80, 30);
-		autoTuneButton->SetText(L"Auto&tune");
+		timeBudgetTextBox->Posit(140, 52, 80, 25);
+		autoTuneButton = new GraphicsUI::Button(this);
+		autoTuneButton->Posit(230, 50, 100, 30);
+		autoTuneButton->SetText(L"Autotune");
 		autoTuneButton->OnClick.Bind(this, &ChoiceForm::AutotuneButton_Clicked);
-		autoTuneTexButton = new Button(this);
-		autoTuneTexButton->SetPosition(300, 50, 80, 30);
-		autoTuneTexButton->SetText(L"Tune Te&xture");
+		autoTuneTexButton = new GraphicsUI::Button(this);
+		autoTuneTexButton->Posit(340, 50, 140, 30);
+		autoTuneTexButton->SetText(L"Tune Texture");
 		autoTuneTexButton->OnClick.Bind(this, &ChoiceForm::AutotuneTexButton_Clicked);
-		saveScheduleButton = new Button(this);
-		saveScheduleButton->SetPosition(390, 50, 80, 30);
+		saveScheduleButton = new GraphicsUI::Button(this);
+		saveScheduleButton->Posit(490, 50, 100, 30);
 		saveScheduleButton->SetText(L"&Save");
 		saveScheduleButton->OnClick.Bind(this, &ChoiceForm::SaveScheduleButton_Clicked);
 #endif
-		scrollPanel = new ScrollPanel(this);
-		scrollPanel->SetPosition(120, 90, GetClientWidth() - 120, GetClientHeight() - 100);
-		scrollPanel->SetScrollBar(ScrollBars::Vertical);
+		scrollPanel = new GraphicsUI::VScrollPanel(this);
+		scrollPanel->Posit(140, 90, GetClientWidth() - 120, GetClientHeight() - 100);
 	}
 	void ChoiceForm::UpdateChoicePanel(String shaderName)
 	{
-		scrollPanel->DisableRedraw();
 		if (shaderName.Length())
 			SetText(L"Choice Control - " + shaderName);
 		currentShaderName = shaderName;
@@ -127,36 +127,37 @@ namespace SceneViewer
 			if (choice.Options.Count() == 1)
 				continue;
 			int cmbLeft = scWidth - 140;
-			auto lbl = new CheckBox(scrollPanel.Ptr());
+			auto lbl = new GraphicsUI::CheckBox(scrollPanel);
 			lbl->SetText(choice.ChoiceName);
-			lbl->BringToTop();
-			lbl->SetPosition(0, line * 30, cmbLeft - 5, 25);
-			scrollPanel->AddChild(lbl);
+			lbl->Posit(0, line * 30, cmbLeft - 5, 25);
 			choiceCheckBoxes.Add(choice.ChoiceName, lbl);
-			auto cmb = new ComboBox(scrollPanel.Ptr());
-			cmb->AddItem(L"(auto) " + choice.DefaultValue);
+			auto cmb = new GraphicsUI::ComboBox(scrollPanel);
+			cmb->AddTextItem(L"(auto) " + choice.DefaultValue);
 			for (auto & opt : choice.Options)
 			{
-				if (availableChoices[pipelineBox->GetSelectionIndex()].Contains(opt.WorldName))
-					cmb->AddItem(opt.ToString());
+				if (availableChoices[Math::Clamp(pipelineBox->SelectedIndex,0,pipelineBox->Items.Count()-1)].Contains(opt.WorldName))
+					cmb->AddTextItem(opt.ToString());
 			}
-			cmb->BringToTop();
 			comboBoxChoiceNames[cmb] = choice.ChoiceName;
 			choiceComboBoxes[choice.ChoiceName] = cmb;
-			cmb->SetSelectionIndex(0);
-			cmb->SelectionChanged.Bind(this, &ChoiceForm::ChoiceComboBox_Changed);
-			cmb->SetPosition(cmbLeft, line * 30, 130, 25);
-			scrollPanel->AddChild(cmb);
+			cmb->SetSelectedIndex(0);
+			cmb->OnChanged.Bind(this, &ChoiceForm::ChoiceComboBox_Changed);
+			cmb->Posit(cmbLeft, line * 30, 130, 25);
 			line++;
 		}
-		scrollPanel->EnableRedraw();
-		ChoiceForm_OnResize(this, EventArgs());
+		ChoiceForm_OnResize(this);
 	}
-	void ChoiceForm::UpdateChoiceOptions(ComboBox * cmb)
+	int GetSelIdx(GraphicsUI::ListBox * cmb)
+	{
+		if (cmb->SelectedIndex == -1)
+			return 0;
+		return cmb->SelectedIndex;
+	}
+	void ChoiceForm::UpdateChoiceOptions(GraphicsUI::ComboBox * cmb)
 	{
 		for (auto & choiceCtrl : comboBoxChoiceNames)
 		{
-			String option = choiceCtrl.Key->GetItem(choiceCtrl.Key->GetSelectionIndex());
+			String option = choiceCtrl.Key->GetTextItem(GetSelIdx(choiceCtrl.Key))->GetText();
 			if (option.StartsWith(L"(auto)"))
 			{
 				existingChoices.Remove(choiceCtrl.Value);
@@ -166,14 +167,14 @@ namespace SceneViewer
 		if (comboBoxChoiceNames.TryGetValue(cmb, choiceName))
 		{
 			existingChoices.Remove(choiceName);
-			auto selText = cmb->GetItem(cmb->GetSelectionIndex());
+			auto selText = cmb->GetTextItem(GetSelIdx(cmb))->GetText();
 			if (!selText.StartsWith(L"(auto)"))
 				existingChoices[choiceName] = Spire::Compiler::ShaderChoiceValue::Parse(selText);
 		}
 		auto choices = choiceControl->GetChoices(currentShaderName, existingChoices);
 		for (auto & choice : choices)
 		{
-			ComboBox * cmbCtrl = nullptr;
+			GraphicsUI::ComboBox * cmbCtrl = nullptr;
 			if (choiceComboBoxes.TryGetValue(choice.ChoiceName, cmbCtrl))
 			{
 				Spire::Compiler::ShaderChoiceValue currentSelection;
@@ -181,7 +182,7 @@ namespace SceneViewer
 				if (!choice.Options.Contains(currentSelection))
 				{
 					existingChoices.Remove(choice.ChoiceName);
-					cmbCtrl->SetSelectionIndex(0);
+					cmbCtrl->SetSelectedIndex(0);
 				}
 			}
 		}
@@ -268,18 +269,18 @@ namespace SceneViewer
 	void ChoiceForm::Autotune(float timeBudget)
 	{
 		bool countOnly = false;
-		ResetButton_Clicked(nullptr, EventArgs());
+		ResetButton_Clicked(nullptr);
 		referenceFrame = ReadFrameData(choiceControl->RenderFrame());
 		EnumerableDictionary<String, Spire::Compiler::ShaderChoiceValue> currentChoices;
 		currentBestValue = 1e30f;
 		currentBestChoices = currentChoices;
 		HashSet<String> selectedChoices;
 		for (auto & chk : choiceCheckBoxes)
-			if (chk.Value->GetChecked())
+			if (chk.Value->Checked)
 				selectedChoices.Add(chk.Key);
 		autotuningLog.Clear();
 		auto startTimePoint = PerformanceCounter::Start();
-		int count = AutotuneHelper(selectedChoices, currentChoices, timeBudget, pipelineBox->GetSelectionIndex(), countOnly);
+		int count = AutotuneHelper(selectedChoices, currentChoices, timeBudget, GetSelIdx(pipelineBox), countOnly);
 		float time = PerformanceCounter::EndSeconds(startTimePoint);
 		autotuningLog << L"time: " << time << EndLine;
 		printf("variant count: %d\ntime: %f\n", count, time);
@@ -292,13 +293,13 @@ namespace SceneViewer
 			{
 				auto cmb = choiceComboBoxes[choice.Key].GetValue();
 				int idxToSelect = 0;
-				for (int i = 0; i < cmb->Count(); i++)
-					if (cmb->GetItem(i) == choice.Value.ToString())
+				for (int i = 0; i < cmb->Items.Count(); i++)
+					if (cmb->GetTextItem(i)->GetText() == choice.Value.ToString())
 					{
 						idxToSelect = i;
 						break;
 					}
-				cmb->SetSelectionIndex(idxToSelect);
+				cmb->SetSelectedIndex(idxToSelect);
 			}
 			disableChoiceChangeCapture = false;
 			Recompile();
@@ -363,7 +364,7 @@ namespace SceneViewer
 		}
 		Recompile();
 	}
-	void ChoiceForm::AutotuneTexButton_Clicked(Object *, EventArgs e)
+	void ChoiceForm::AutotuneTexButton_Clicked(GraphicsUI::UI_Base *)
 	{
 		if (currentShaderName.Length())
 		{
@@ -371,10 +372,10 @@ namespace SceneViewer
 		}
 	}
 
-	void ChoiceForm::SaveScheduleButton_Clicked(Object *, EventArgs e)
+	void ChoiceForm::SaveScheduleButton_Clicked(GraphicsUI::UI_Base *)
 	{
 		auto schedule = GenerateSchedule(existingChoices, additionalAttribs);
-		FileDialog saveDlg(this);
+		FileDialog saveDlg(this->ownerForm);
 		saveDlg.DefaultEXT = L"txt";
 		saveDlg.Filter = L"Text File|*.txt";
 		if (saveDlg.ShowSave())
@@ -382,65 +383,64 @@ namespace SceneViewer
 			File::WriteAllText(saveDlg.FileName, schedule);
 		}
 	}
-	void ChoiceForm::AutotuneButton_Clicked(Object *, EventArgs e)
+	void ChoiceForm::AutotuneButton_Clicked(GraphicsUI::UI_Base *)
 	{
 		if (currentShaderName.Length())
 		{
 			Autotune((float)StringToDouble(timeBudgetTextBox->GetText()));
 		}
 	}
-	void ChoiceForm::ResetButton_Clicked(Object * , EventArgs e)
+	void ChoiceForm::ResetButton_Clicked(GraphicsUI::UI_Base *)
 	{
 		disableChoiceChangeCapture = true;
 		for (auto & box : choiceComboBoxes)
-			box.Value->SetSelectionIndex(0);
+			box.Value->SetSelectedIndex(0);
 		disableChoiceChangeCapture = false;
 		existingChoices.Clear();
-		if (autoRecompileCheckBox->GetChecked())
+		if (autoRecompileCheckBox->Checked)
 			Recompile();
 	}
-	void ChoiceForm::SelectedShaderChanged(Object *, EventArgs)
+	void ChoiceForm::SelectedShaderChanged(GraphicsUI::UI_Base *)
 	{
 		SetCursor(LoadCursor(NULL, IDC_WAIT));
-		int idx = shaderBox->GetSelectionIndex();
+		int idx = GetSelIdx(shaderBox);
 		if (idx != -1)
 		{
-			UpdateChoicePanel(shaderBox->GetItem(idx));
-			ShaderChanged(shaderBox->GetItem(idx));
+			UpdateChoicePanel(shaderBox->GetTextItem(idx)->GetText());
+			ShaderChanged(shaderBox->GetTextItem(idx)->GetText());
 		}
 		SetCursor(LoadCursor(NULL, IDC_ARROW));
 	}
-	void ChoiceForm::ChoiceComboBox_Changed(Object * obj, EventArgs)
+	void ChoiceForm::ChoiceComboBox_Changed(GraphicsUI::UI_Base *obj)
 	{
 		if (!disableChoiceChangeCapture)
 		{
 			disableChoiceChangeCapture = true;
-			UpdateChoiceOptions((ComboBox*)obj);
+			UpdateChoiceOptions((GraphicsUI::ComboBox*)obj);
 			disableChoiceChangeCapture = false;
-			if (autoRecompileCheckBox->GetChecked())
+			if (autoRecompileCheckBox->Checked)
 			{
 				Recompile();
 			}
 		}
 	}
-	void ChoiceForm::PipelineBox_Changed(Object *, EventArgs)
+	void ChoiceForm::PipelineBox_Changed(GraphicsUI::UI_Base *)
 	{
-		SelectedShaderChanged(nullptr, EventArgs());
-		if (autoRecompileCheckBox->GetChecked())
+		SelectedShaderChanged(nullptr);
+		if (autoRecompileCheckBox->Checked)
 			Recompile();
 	}
-	void ChoiceForm::ApplyButton_Clicked(Object *, EventArgs)
+	void ChoiceForm::ApplyButton_Clicked(GraphicsUI::UI_Base *)
 	{
 		Recompile();
 	}
-	void ChoiceForm::ChoiceForm_OnResize(Object *, EventArgs)
+	void ChoiceForm::ChoiceForm_OnResize(GraphicsUI::UI_Base *)
 	{
-		shaderBox->SetPosition(10, 50, 100, GetClientHeight() - 60);
-		scrollPanel->DisableRedraw();
+		shaderBox->Posit(10, 50, 100, GetClientHeight() - 60);
 #ifdef ENABLE_AUTO_TUNE
-		scrollPanel->SetPosition(120, 90, GetClientWidth() - 120, GetClientHeight() - 100);
+		scrollPanel->Posit(120, 90, GetClientWidth() - 120, GetClientHeight() - 100);
 #else
-		scrollPanel->SetPosition(120, 50, GetClientWidth() - 120, GetClientHeight() - 60);
+		scrollPanel->Posit(120, 50, GetClientWidth() - 120, GetClientHeight() - 60);
 #endif
 		int scWidth = scrollPanel->GetClientWidth();
 		int cmbLeft = scWidth;
@@ -448,25 +448,23 @@ namespace SceneViewer
 		{
 			int cmbW = cmb.Value->GetWidth();
 			cmbLeft = scWidth - 10 - cmbW;
-			cmb.Value->SetLeft(scWidth - 10 - cmbW);
+			cmb.Value->Left = scWidth - 10 - cmbW;
 		}
-		for (int i = 0; i < scrollPanel->GetChildrenCount(); i++)
+		for (int i = 0; i < scrollPanel->GetChildren().Count(); i++)
 		{
-			auto child = scrollPanel->GetChildren(i);
-			if (auto lbl = dynamic_cast<CheckBox*>(child))
+			auto child = scrollPanel->GetChildren()[i];
+			if (auto lbl = dynamic_cast<GraphicsUI::CheckBox*>(child.Ptr()))
 			{
 				lbl->SetWidth(cmbLeft - 5);
 			}
 		}
-		scrollPanel->EnableRedraw();
-		scrollPanel->Invalidate();
 	}
 	void ChoiceForm::Update()
 	{
 		shaderBox->Clear();
 		auto shaders = choiceControl->GetShaders();
 		for (auto & shader : shaders)
-			shaderBox->AddItem(shader);
+			shaderBox->AddTextItem(shader);
 		if (shaders.Count())
 			UpdateChoicePanel(shaders.First());
 		else

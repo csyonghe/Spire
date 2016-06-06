@@ -34,7 +34,7 @@ namespace CoreLib
 			bool PathMustExist;
 			bool ShowOpen();
 			bool ShowSave();
-			FileDialog(Component * _owner);
+			FileDialog(const Component * _owner);
 			~FileDialog();
 		};
 

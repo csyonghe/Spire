@@ -24,9 +24,9 @@ namespace CoreLib
 			return 0;
 		}
 
-		FileDialog::FileDialog(Component * _owner)
+		FileDialog::FileDialog(const Component * _owner)
 		{
-			owner = _owner;
+			owner = const_cast<Component*>(_owner);
 			memset(&fn, 0, sizeof(OPENFILENAME));
 			memset(fileBuf,0,sizeof(fileBuf));
 			memset(filterBuf,0,sizeof(filterBuf));

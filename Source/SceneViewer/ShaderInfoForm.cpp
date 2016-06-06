@@ -4,43 +4,42 @@ namespace SceneViewer
 {
 	const int columnWidth = 200;
 
-	ShaderInfoForm::ShaderInfoForm()
+	ShaderInfoForm::ShaderInfoForm(GraphicsUI::UIEntry * entry)
+		: GraphicsUI::Form(entry)
 	{
 		this->SetText(L"Shader Componenets");
-		this->OnPaint.Bind(this, &ShaderInfoForm::Form_Paint);
-		this->OnMouseDown.Bind(this, &ShaderInfoForm::Form_MouseDown);
-		this->OnMouseUp.Bind(this, &ShaderInfoForm::Form_MouseUp);
-		this->OnMouseMove.Bind(this, &ShaderInfoForm::Form_MouseMove);
+		contentBox = new Container(this);
+		contentBox->Posit(0, 0, 100, 100);
+		contentBox->BackColor.A = 0;
+		contentBox->BorderStyle = GraphicsUI::BS_NONE;
+		this->BackColor = GraphicsUI::Color(0, 0, 0, 180);
+		this->BorderColor = GraphicsUI::Color(255, 255, 255, 120);
+		this->BorderStyle = GraphicsUI::BS_FLAT_;
 	}
 
-	void ShaderInfoForm::Form_Paint(Object *, PaintEventArgs e)
+	void ShaderInfoForm::Update(const Spire::Compiler::ShaderMetaData & pMetaData)
 	{
-		int wid = 0;
-		Gdiplus::Font titleFont(L"Segoe UI", 14.0f, Gdiplus::FontStyleBold);
-		Gdiplus::Font compFont(L"Segoe UI", 11.0f);
-		e.Graphics->Clear(Gdiplus::Color(255, 255, 255));
-		Gdiplus::SolidBrush blackBrush(Gdiplus::Color(0, 0, 0));
-		Gdiplus::Pen blackPen(&blackBrush);
-
-		Gdiplus::SolidBrush blueBrush(Gdiplus::Color(0, 0, 255));
-		Gdiplus::Pen bluePen(&blueBrush);
-		int compFontHeight = (int)compFont.GetHeight(e.Graphics.Ptr());
-		int lineHeight = compFontHeight + 16;
-		Gdiplus::Matrix transformMat(1.0f, 0.0f, 0.0f, 1.0f, (float)offsetX, (float)offsetY);
-		Gdiplus::Matrix lineTransformMat(1.0f, 0.0f, 0.0f, 1.0f, (float)offsetX, 0.0f);
-		e.Graphics->SetTransform(&lineTransformMat);
-
-		for (int i = 1; i < metaData.Worlds.Count(); i++)
-		{
-			e.Graphics->DrawLine(&blackPen, i * columnWidth + 10, 0, i * columnWidth + 10, this->GetClientHeight());
-		}
-
-		e.Graphics->SetTransform(&transformMat);
-		maxY = 0;
+		this->metaData = pMetaData;
+		contentBox->Enabled = false;
+		for (auto & child : contentBox->Controls)
+			child = nullptr;
+		contentBox->Controls.Clear();
 		const int leftMargin = 20;
+		auto titleFont = GetEntry()->System->LoadDefaultFont(GraphicsUI::DefaultFontType::Title);
+		
+		int wid = 0;
+		int lineHeight = (int)(GetEntry()->GetLineHeight() * 1.2f);
+		int maxX = 0;
+		maxY = 0;
 		for (auto & w : metaData.Worlds)
 		{
-			e.Graphics->DrawString(w.Key.Buffer(), w.Key.Length(), &titleFont, Gdiplus::PointF(wid * columnWidth + 20.0f, 10.0f), &blackBrush);
+			auto worldLbl = new GraphicsUI::Label(contentBox);
+			worldLbl->AutoSize = true;
+			worldLbl->Posit(wid * columnWidth + 20, 10, 100, 30);
+			worldLbl->SetText(w.Key);
+			worldLbl->SetWidth(worldLbl->GetWidth() + 8);
+			worldLbl->FontColor = GraphicsUI::Color(255, 255, 255);
+			worldLbl->SetFont(titleFont);
 			int curRow = 0;
 			int curX = leftMargin;
 			for (auto & comp : w.Value.Components)
@@ -56,11 +55,13 @@ namespace SceneViewer
 							break;
 						}
 				}
-				Gdiplus::RectF bbox;
-				e.Graphics->MeasureString(comp.Buffer(), comp.Length(), &compFont, PointF(0.0f, 0.0f), &bbox);
-				int width = (int)bbox.Width;
+				auto compLbl = new GraphicsUI::Label(contentBox);
+				compLbl->AutoSize = true;
+				compLbl->BorderStyle = GraphicsUI::BS_FLAT_;
+				compLbl->Posit(0, 0, 100, 30);
+				compLbl->SetText(comp);
 				int x, y;
-				if (curX + width + 8 < columnWidth)
+				if (curX + compLbl->GetWidth() + 8 < columnWidth)
 				{
 					x = curX;
 				}
@@ -70,38 +71,37 @@ namespace SceneViewer
 					x = curX = leftMargin;
 				}
 				y = curRow * lineHeight + 50;
-				Pen * pen = isInInterface ? &bluePen : &blackPen;
-				Brush * brush = isInInterface ? &blueBrush : &blackBrush;
-				e.Graphics->DrawRectangle(pen, curX + wid * columnWidth, y, width + 8, (int)bbox.Height + 8);
-				e.Graphics->DrawString(comp.Buffer(), comp.Length(), &compFont, Gdiplus::PointF((float)(curX + wid * columnWidth + 4), (float)(y + 4)), brush);
-				curX += width + 12;
+				compLbl->BorderColor = isInInterface ? GraphicsUI::Color(255, 220, 128) : GraphicsUI::Color(255, 255, 255);
+				compLbl->FontColor = compLbl->BorderColor;
+				compLbl->Left = curX + wid * columnWidth;
+				compLbl->Top = y;
+				compLbl->SetWidth(Math::Min(compLbl->GetWidth(), (wid + 1) * columnWidth - 10 - compLbl->Left));
+				compLbl->BorderStyle = GraphicsUI::BS_FLAT_;
+				curX += compLbl->GetWidth() + 12;
 				maxY = Math::Max(y + lineHeight, maxY);
+				maxX = Math::Max(compLbl->Left + compLbl->GetWidth(), maxX);
 			}
 			wid++;
 		}
+		for (int i = 1; i < metaData.Worlds.Count(); i++)
+		{
+			auto line = new GraphicsUI::Line(contentBox);
+			line->Posit(i * columnWidth + 10, 0, 0, maxY);
+		}
+		contentBox->SetWidth(maxX);
+		contentBox->SetHeight(maxY);
 	}
-	void ShaderInfoForm::Form_MouseDown(Object *, MouseEventArgs e)
+	bool ShaderInfoForm::DoMouseMove(int x, int y)
 	{
-		SetCapture(this->GetHandle());
-		isMouseDown = true;
-		lastX = e.X;
-		lastY = e.Y;
-	}
-	void ShaderInfoForm::Form_MouseUp(Object *, MouseEventArgs e)
-	{
-		ReleaseCapture();
-		isMouseDown = false;
-	}
-	void ShaderInfoForm::Form_MouseMove(Object *, MouseEventArgs e)
-	{
+		Form::DoMouseMove(x, y);
 		if (isMouseDown)
 		{
-			int dx = e.X - lastX;
-			int dy = e.Y - lastY;
+			int dx = x - lastX;
+			int dy = y - lastY;
 			offsetX += dx;
 			offsetY += dy;
-			lastX = e.X;
-			lastY = e.Y;
+			lastX = x;
+			lastY = y;
 			int xBound = -Math::Max(0, (metaData.Worlds.Count() - 1)) * columnWidth;
 			if (offsetX < xBound)
 				offsetX = xBound;
@@ -109,12 +109,31 @@ namespace SceneViewer
 				offsetY = -maxY + this->GetClientHeight();
 			if (offsetX > 0) offsetX = 0;
 			if (offsetY > 0) offsetY = 0;
-			Refresh();
+			contentBox->Left = offsetX;
+			contentBox->Top = offsetY;
 		}
+		return true;
 	}
-	void ShaderInfoForm::Update(const Spire::Compiler::ShaderMetaData & pMetaData)
+	bool ShaderInfoForm::DoMouseDown(int x, int y, GraphicsUI::SHIFTSTATE shift)
 	{
-		this->metaData = pMetaData;
-		Refresh();
+		Form::DoMouseDown(x, y, shift);
+		if (resizeMode == GraphicsUI::ResizeMode::None && !this->DownInTitleBar && !this->DownInButton)
+		{
+			GraphicsUI::Global::MouseCaptureControl = this;
+			isMouseDown = true;
+			lastX = x;
+			lastY = y;
+		}
+		return true;
+	}
+	bool ShaderInfoForm::DoMouseUp(int x, int y, GraphicsUI::SHIFTSTATE shift)
+	{
+		Form::DoMouseUp(x, y, shift);
+		if (isMouseDown)
+		{
+			ReleaseMouse();
+			isMouseDown = false;
+		}
+		return true;
 	}
 }

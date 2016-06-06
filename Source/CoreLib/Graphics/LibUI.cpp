@@ -669,8 +669,11 @@ namespace GraphicsUI
 		}
 		//Draw Background
 		auto sys = GetEntry()->System;
-		Graphics::SolidBrushColor = BackColor;
-		Graphics::FillRectangle(sys, absX, absY, absX + Width, absY + Height);
+		if (BackColor.A)
+		{
+			Graphics::SolidBrushColor = BackColor;
+			Graphics::FillRectangle(sys, absX, absY, absX + Width, absY + Height);
+		}
 		//Draw Border
 		Color LightColor, DarkColor;
 		LightColor.R = (unsigned char)ClampInt(BorderColor.R + COLOR_LIGHTEN,0,255);
@@ -701,7 +704,7 @@ namespace GraphicsUI
 			Graphics::DrawLine(sys, absX + Width, absY, absX + Width, absY + Height);
 			Graphics::DrawLine(sys, absX + Width, absY + Height, absX, absY + Height - 1);
 		}
-		else if (BorderStyle == BS_FLAT)
+		else if (BorderStyle == BS_FLAT_)
 		{
 			Graphics::PenColor = BorderColor;
 			Graphics::DrawRectangle(sys, absX, absY, absX + Width, absY + Height);
@@ -943,6 +946,8 @@ namespace GraphicsUI
 	{
 		if (Visible && IsPointInClient(x, y))
 		{
+			if (x <= Margin || y <= Margin || x >= Width - Margin || y >= Height - Margin)
+				return this;
 			for (int i = Controls.Count() - 1; i >= 0; i--)
 			{
 				if (Controls[i]->EventID != Global::EventGUID)
@@ -1067,8 +1072,8 @@ namespace GraphicsUI
 		clientRect = initalClientRect;
 		clientRect.x = initalClientRect.x + Margin;
 		clientRect.y = initalClientRect.y + Margin;
-		clientRect.h = Height - Margin*2;
-		clientRect.w = Width - Margin*2;
+		clientRect.w -= Margin * 2;
+		clientRect.h -= Margin * 2;
 		for (int i=0; i<Controls.Count(); i++)
 		{
 			if (!Controls[i]->Visible)
@@ -1235,7 +1240,9 @@ namespace GraphicsUI
 		formStyle.TopMost = false;
 		formStyle.TitleBarHeight = (int)(parent->GetEntry()->GetLineHeight() * 1.2f);
 
-			
+		Left = Top = 20;
+		Height = Width = 200;
+		Margin = 5;
 		FormStyleChanged();
 		SetText(Text);
 	}
@@ -1271,12 +1278,12 @@ namespace GraphicsUI
 
 	int Form::GetClientHeight()
 	{
-		return Height-2-formStyle.TitleBarHeight;
+		return Height-Margin * 2-formStyle.TitleBarHeight;
 	}
 
 	int Form::GetClientWidth()
 	{
-		return Width -2;
+		return Width - Margin * 2;
 	}
 
 	ResizeMode Form::GetResizeHandleType(int x, int y)
@@ -1340,7 +1347,7 @@ namespace GraphicsUI
 		}
 
 		//Draw Controls
-		entry->ClipRects->AddRect(Rect(absX + 2, absY + 2, Width - 4, Height - 4));
+		entry->ClipRects->AddRect(Rect(absX + Margin, absY + Margin + formStyle.TitleBarHeight, Width - Margin * 2, Height - Margin * 2 - formStyle.TitleBarHeight));
 		DrawChildren(absX, absY);
 		entry->ClipRects->PopRect();
 	}
@@ -1476,6 +1483,7 @@ namespace GraphicsUI
 				Height += dHeight;
 			}
 			SizeChanged();
+			return true;
 		}
 		else
 		{
@@ -1486,6 +1494,7 @@ namespace GraphicsUI
 				int dx, dy;
 				dx = X - DownPosX; dy = Y - DownPosY;
 				Left += dx; Top += dy;
+				return true;
 			}
 		}
 		return false;
@@ -1524,7 +1533,7 @@ namespace GraphicsUI
 		CheckmarkLabel->SetFont(pSystem->LoadDefaultFont(DefaultFontType::Symbol));
 		CheckmarkLabel->SetText(L"a");
 		FIMEHandler->IMEWindow->Visible = false;
-		Global::SCROLLBAR_BUTTON_SIZE = (int)(GetLineHeight() * 1.5f);
+		Global::SCROLLBAR_BUTTON_SIZE = (int)(GetLineHeight());
 	}
 
 	SHIFTSTATE UIEntry::GetCurrentShiftState()
@@ -1678,7 +1687,8 @@ namespace GraphicsUI
 				UIMouseEventArgs e;
 				TranslateMouseMessage(e, wParam, lParam);
 				a.Data = &e;
-				InternalBroadcastMessage(&a);
+				//InternalBroadcastMessage(&a);
+				DoMouseWheel(e.Delta);
 			}
 			break;
 		case WM_SIZE:
@@ -1799,6 +1809,7 @@ namespace GraphicsUI
 			Control* parent = stack.Last();
 			int cx = X;
 			int cy = Y;
+			
 			for (int i = stack.Count() - 2; i >= 0; i--)
 			{
 				auto ctrl = stack[i];
@@ -1820,33 +1831,49 @@ namespace GraphicsUI
 		// Detect new active Form.
 		Form *nForm=0;
 		Global::PointedComponent = FindControlAtPosition(X, Y);
-		DeactivateAllForms();
-		int cx = X - clientRect.x;
-		int cy = Y - clientRect.y;
-		for (int i = Forms.Count()-1; i >= 0; i--)
+		if (Global::MouseCaptureControl == nullptr)
 		{
-			Form *curForm = Forms[i];
-			if (curForm->Visible && curForm->Enabled && cx>=curForm->Left && cx<=curForm->Left+curForm->GetWidth() &&
-				cy>=curForm->Top && cy <=curForm->Top+curForm->GetHeight())
+			DeactivateAllForms();
+			int cx = X - clientRect.x;
+			int cy = Y - clientRect.y;
+			for (int i = Forms.Count() - 1; i >= 0; i--)
 			{
-				ShowWindow(curForm);
-				nForm = curForm;
-				break;
+				Form *curForm = Forms[i];
+				if (curForm->Visible && curForm->Enabled && cx >= curForm->Left && cx <= curForm->Left + curForm->GetWidth() &&
+					cy >= curForm->Top && cy <= curForm->Top + curForm->GetHeight())
+				{
+					ShowWindow(curForm);
+					nForm = curForm;
+					break;
+				}
 			}
-		}
-		if (nForm == 0)
-		{
-			if (ActiveForm)
+			if (nForm == 0)
 			{
-				SetFocusedControl(nullptr);
+				if (ActiveForm)
+				{
+					SetFocusedControl(nullptr);
+				}
+				ActiveForm = 0;
 			}
-			ActiveForm = 0;
 		}
 		Global::EventGUID ++;
+		bool processed = false;
 		BroadcastMouseMessage(controlStack, X, Y, [&](Control* ctrl, int x, int y)
 		{
-			return ctrl->DoMouseDown(x, y, Shift);
+			bool rs = ctrl->DoMouseDown(x, y, Shift);
+			processed = processed || rs;
+			return rs;
 		});
+		if (!processed && !Global::MouseCaptureControl && Global::PointedComponent == this)
+		{
+			UIMouseEventArgs e;
+			e.Delta = 0;
+			e.Shift = Shift;
+			e.X = X;
+			e.Y = Y;
+			Global::MouseCaptureControl = this;
+			OnMouseDown.Invoke(this, e);
+		}
 		return false;
 	}
 
@@ -1854,10 +1881,23 @@ namespace GraphicsUI
 	{
 		Global::PointedComponent = FindControlAtPosition(X, Y);
 		Global::EventGUID++;
+		bool processed = false;
 		BroadcastMouseMessage(controlStack, X, Y, [&](Control* ctrl, int x, int y)
 		{
-			return ctrl->DoMouseUp(x, y, Shift);
+			bool rs = ctrl->DoMouseUp(x, y, Shift);
+			processed = processed || rs;
+			return rs;
 		});
+		if (Global::MouseCaptureControl == this)
+		{
+			UIMouseEventArgs e;
+			e.Delta = 0;
+			e.Shift = Shift;
+			e.X = X;
+			e.Y = Y;
+			OnMouseUp.Invoke(this, e);
+			ReleaseMouse();
+		}
 		return false;
 	}
 
@@ -1883,23 +1923,49 @@ namespace GraphicsUI
 		Global::CursorPosX = X;
 		Global::CursorPosY = Y;
 		Global::EventGUID++;
+		bool processed = false;
 		BroadcastMouseMessage(controlStack, X, Y, [&](Control* ctrl, int x, int y)
 		{
-			return ctrl->DoMouseMove(x, y);
+			bool rs = ctrl->DoMouseMove(x, y);
+			processed = processed || rs;
+			return rs;
 		});
-		return false;
+		if (Global::MouseCaptureControl == this)
+		{
+			UIMouseEventArgs e;
+			e.Delta = 0;
+			e.Shift = 0;
+			e.X = X;
+			e.Y = Y;
+			OnMouseMove.Invoke(this, e);
+		}
+		return processed;
 	}
 
-	bool GraphicsUI::UIEntry::DoMouseWeel(int delta)
+	bool GraphicsUI::UIEntry::DoMouseWheel(int delta)
 	{
-		UI_MsgArgs a;
+		auto ctrlToBroadcast = Global::MouseCaptureControl ? Global::MouseCaptureControl : Global::PointedComponent;
+		while (ctrlToBroadcast && ctrlToBroadcast != this)
+		{
+			if (ctrlToBroadcast->DoMouseWheel(delta))
+				return true;
+			ctrlToBroadcast = ctrlToBroadcast->Parent;
+		}
+		UIMouseEventArgs e;
+		e.Delta = delta;
+		e.Shift = 0;
+		e.X = Global::CursorPosX;
+		e.Y = Global::CursorPosY;
+		OnMouseWheel.Invoke(this, e);
+		return false;
+		/*UI_MsgArgs a;
 		a.Sender = this;
 		a.Type = MSG_UI_MOUSEWHEEL;
 		UIMouseEventArgs e;
 		e.Delta = delta;
 		a.Data = &e;
 		InternalBroadcastMessage(&a);
-		return false;
+		return false;*/
 	}
 
 	void UIEntry::DeactivateAllForms()
@@ -2235,6 +2301,7 @@ namespace GraphicsUI
 		TabStop = true;
 		Type = CT_CHECKBOX;
 		BorderStyle = BS_NONE;
+		BackColor.A = 0;
 		Checked = false;
 	}
 
@@ -3326,23 +3393,23 @@ namespace GraphicsUI
 		}
 		else if (PointInFreeSpace(X,Y))
 		{
+			int nPos = Position;
 			if (Orientation == SO_HORIZONTAL)
 			{
 				if (X>Slider->Left)
-					Position += LargeChange;
+					nPos += LargeChange;
 				else
-					Position -= LargeChange;
+					nPos -= LargeChange;
 			}
 			else
 			{
 				if (Y>Slider->Top)
-					Position += LargeChange;
+					nPos += LargeChange;
 				else
-					Position -= LargeChange;
+					nPos -= LargeChange;
 			}
-			Position = min(Max,Position);
-			Position = max(Min,Position);
-			SetPosition(Position);
+			nPos = Math::Clamp(nPos, Min, Max);
+			SetPosition(nPos);
 		}
 		auto hitTest = Container::FindControlAtPosition(X, Y);
 		if (hitTest == btnDec || hitTest == btnInc)
@@ -3723,6 +3790,15 @@ namespace GraphicsUI
 		return false;
 	}
 
+	bool ListBox::DoMouseWheel(int delta)
+	{
+		if (Visible && Enabled)
+		{
+			ScrollBar->SetPosition(Math::Clamp(ScrollBar->GetPosition() + (delta > 0 ? -1 : 1) * 3, 0, ScrollBar->GetMax()));
+		}
+		return false;
+	}
+
 	bool ListBox::DoMouseUp(int X, int Y, SHIFTSTATE Shift)
 	{
 		Control::DoMouseUp(X,Y,Shift);
@@ -3872,14 +3948,6 @@ namespace GraphicsUI
 			return NULL;
 	}
 
-	void ListBox::HandleMessage(const UI_MsgArgs *Args)
-	{
-		if (Focused && Args->Sender == GetEntry() && Args->Type == MSG_UI_MOUSEWHEEL)
-		{	
-			ScrollBar->SetPosition(ClampInt(ScrollBar->GetPosition()-((*(UIMouseEventArgs *)Args->Data).Delta/40),0,ScrollBar->GetMax()));
-		}
-	}
-
 	ComboBox::ComboBox(Container * parent)
 		: ListBox(parent)
 	{
@@ -3909,11 +3977,22 @@ namespace GraphicsUI
 		return false;
 	}
 
+	void ComboBox::SetSelectedIndex(int id)
+	{
+		ChangeSelectedItem(id);
+	}
+
 	void ComboBox::SizeChanged()
 	{
-		ButtonSize = Height - 2;
+		ButtonSize = Height - BorderWidth * 2;
 		TextBox->Posit(BorderWidth,BorderWidth,Width-ButtonSize-BorderWidth*2,Height);
 		btnDrop->Posit(Width-ButtonSize-BorderWidth,BorderWidth,ButtonSize,ButtonSize);
+	}
+
+	void ComboBox::Posit(int left, int top, int width, int height)
+	{
+		height = Global::SCROLLBAR_BUTTON_SIZE + BorderWidth * 4;
+		Control::Posit(left, top, width, height);
 	}
 
 	void ComboBox::Draw(int absX, int absY)
@@ -3968,6 +4047,7 @@ namespace GraphicsUI
 		else
 			TextBox->SetText(L"");
 		TextBox->SetFocus();
+		SelectedIndex = id;
 		//TextBox->SelectAll();
 		//OnChanged.Invoke(this);
 	}
@@ -4041,6 +4121,31 @@ namespace GraphicsUI
 		return false;
 	}
 
+	bool ComboBox::DoMouseWheel(int delta)
+	{
+		if (Visible && Enabled)
+		{
+			if (ShowList)
+				return ListBox::DoMouseWheel(delta);
+			else
+			{
+				int nselId = SelectedIndex;
+				if (delta > 0)
+					nselId--;
+				else
+					nselId++;
+				nselId = Math::Clamp(nselId, 0, Items.Count() - 1);
+				if (nselId != SelectedIndex)
+				{
+					ChangeSelectedItem(nselId);
+					OnChanged.Invoke(this);
+				}
+				return true;
+			}
+		}
+		return false;
+	}
+
 	bool ComboBox::DoMouseUp(int X, int Y, SHIFTSTATE Shift)
 	{
 		Control::DoMouseUp(X,Y,Shift);
@@ -4049,7 +4154,6 @@ namespace GraphicsUI
 		if (ShowList)
 		{
 			BeginListBoxFunctions();
-			ListBox::DoMouseUp(X - ListLeft, Y - ListTop, Shift);
 			bool PosInItem;
 			int bdr = ScrollBar->Visible ? ScrollBar->GetWidth() : 0;
 			PosInItem = X<ListLeft + Width - bdr && X>ListLeft && Y > ListTop && Y < ListTop + ListHeight;
@@ -4057,10 +4161,14 @@ namespace GraphicsUI
 			{
 				ToggleList(false);
 				ChangeSelectedItem(SelectedIndex);
+				ListBox::DoMouseUp(X - ListLeft, Y - ListTop, Shift);
 				ReleaseMouse();
 			}
 			else
+			{
+				ListBox::DoMouseUp(X - ListLeft, Y - ListTop, Shift);
 				Global::MouseCaptureControl = this;
+			}
 			EndListBoxFunctions();
 		}
 		else
@@ -4107,7 +4215,7 @@ namespace GraphicsUI
 				int lstB = BorderStyle;
 				Color lstBC= BorderColor;
 				BorderColor = Color(0,0,0,255);
-				BorderStyle = BS_FLAT;
+				BorderStyle = BS_FLAT_;
 				ListBox::Draw(AbsolutePosX,AbsolutePosY);
 				BorderStyle = lstB;
 				BorderColor = lstBC;
@@ -5164,6 +5272,7 @@ namespace GraphicsUI
 					if (mn->Parent)
 						mn = dynamic_cast<Menu*>(mn->Parent->Parent);
 				}
+				OnClick(this);
 			}
 			return true;
 		}
@@ -5172,6 +5281,7 @@ namespace GraphicsUI
 	bool MenuItem::DoMouseUp(int X, int Y, SHIFTSTATE Shift)
 	{
 		Control::DoMouseUp(X, Y, Shift);
+
 		return false;
 	}
 	bool MenuItem::DoKeyDown(unsigned short Key, SHIFTSTATE Shift)
@@ -6190,21 +6300,36 @@ namespace GraphicsUI
 			return parent->GetEntry();
 		return nullptr;
 	}
+	void VScrollPanel::ScrollBar_Changed(UI_Base * /*sender*/)
+	{
+		content->Top = -vscrollBar->GetPosition();
+	}
+
 	VScrollPanel::VScrollPanel(Container * parent)
 		: Container(parent)
 	{
 		vscrollBar = new ScrollBar(this, false);
+		content = new Container(this, false);
+		Container::AddChild(vscrollBar);
+		Container::AddChild(content);
+		vscrollBar->SetOrientation(SO_VERTICAL);
+		vscrollBar->Posit(0, 0, Global::SCROLLBAR_BUTTON_SIZE, 50);
+		vscrollBar->DockStyle = dsRight;
+		vscrollBar->SmallChange = 30;
+		vscrollBar->OnChanged.Bind(this, &VScrollPanel::ScrollBar_Changed);
+		BorderStyle = content->BorderStyle = BS_NONE;
+		BackColor.A = content->BackColor.A = 0;
 	}
 	void VScrollPanel::SizeChanged()
 	{
-		Container::SizeChanged();
 		int maxY = 0;
-		for (auto & ctrl : Controls)
+		for (auto & ctrl : content->Controls)
 			maxY = Math::Max(ctrl->Top + ctrl->GetHeight(), maxY);
 		auto entry = GetEntry();
-		maxY += entry->GetLineHeight() * 3;
+		vscrollBar->LargeChange = Math::Max(Height - 30, 10);
 		if (maxY > Height)
 		{
+			maxY += entry->GetLineHeight() * 3;
 			if (!vscrollBar->Visible)
 			{
 				vscrollBar->Visible = true;
@@ -6213,19 +6338,59 @@ namespace GraphicsUI
 			}
 			int vmax = maxY - Height;
 			vscrollBar->SetValue(0, vmax, Math::Clamp(vscrollBar->GetPosition(), 0, vmax), Height);
+			vscrollBar->Visible = true;
 		}
 		else
 		{
 			vscrollBar->SetPosition(0);
+			vscrollBar->Visible = false;
 		}
 		vscrollBar->Posit(0, 0, Global::SCROLLBAR_BUTTON_SIZE, Height - 2);
+		content->Posit(0, -vscrollBar->GetPosition(), vscrollBar->Visible ? Width - vscrollBar->GetWidth() : Width, maxY);
+		Container::SizeChanged();
 	}
 	void VScrollPanel::AddChild(Control * ctrl)
 	{
-		Container::AddChild(ctrl);
+		content->AddChild(ctrl);
+		SizeChanged();
 	}
 	void VScrollPanel::RemoveChild(Control * ctrl)
 	{
-		Container::RemoveChild(ctrl);
+		content->RemoveChild(ctrl);
+		SizeChanged();
+	}
+	bool VScrollPanel::DoMouseWheel(int delta)
+	{
+		if (vscrollBar->Visible)
+		{
+			int nPos = vscrollBar->GetPosition() + (delta < 0 ? 1 : -1) * GetEntry()->GetLineHeight() * 3;
+			nPos = Math::Clamp(nPos, vscrollBar->GetMin(), vscrollBar->GetMax());
+			vscrollBar->SetPosition(nPos);
+			return true;
+		}
+		return false;
+	}
+	void VScrollPanel::ClearChildren()
+	{
+		for (auto & child : content->Controls)
+			child = nullptr;
+		content->Controls.Clear();
+	}
+	int VScrollPanel::GetClientWidth()
+	{
+		return content->GetWidth();
+	}
+	int VScrollPanel::GetClientHeight()
+	{
+		return content->GetHeight();
+	}
+	Line::Line(Container * owner)
+		: Control(owner)
+	{
+	}
+	void Line::Draw(int absX, int absY)
+	{
+		Graphics::PenColor = BorderColor;
+		Graphics::DrawLine(GetEntry()->System, absX + Left, absY + Top, absX + Left + Width, absY + Top + Height);
 	}
 }

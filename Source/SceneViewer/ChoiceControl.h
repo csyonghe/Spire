@@ -1,14 +1,11 @@
 #pragma once
 
-#include "CoreLib/WinForm/WinForm.h"
-#include "CoreLib/WinForm/WinButtons.h"
-#include "CoreLib/WinForm/WinApp.h"
 #include "CoreLib/WinForm/WinCommonDlg.h"
-#include "CoreLib/WinForm/WinTextBox.h"
-#include "CoreLib/WinForm/WinListBox.h"
 #include "LibGL/OpenGLHardwareRenderer.h"
+#include "LibGL/GLForm.h"
 #include "ShaderCompiler.h"
 #include "Schedule.h"
+#include "CoreLib/Graphics/LibUI.h"
 
 namespace SceneViewer
 {
@@ -25,9 +22,10 @@ namespace SceneViewer
 		virtual EnumerableDictionary<String, GL::Texture2D> GetPrecomputedTextures(String shader) = 0;
 	};
 
-	class ChoiceForm : public Form
+	class ChoiceForm : public GraphicsUI::Form
 	{
 	private:
+		WinForm::GLForm * ownerForm = nullptr;
 		HashSet<String> availableChoices[4];
 		List<Vec4> referenceFrame;
 		List<Vec4> ReadFrameData(GL::Texture2D tex);
@@ -37,38 +35,38 @@ namespace SceneViewer
 	private:
 		bool disableChoiceChangeCapture = false;
 		IChoiceControl * choiceControl;
-		RefPtr<Button> applyButton, resetButton, autoTuneButton, autoTuneTexButton, saveScheduleButton;
-		RefPtr<TextBox> timeBudgetTextBox;
-		RefPtr<ScrollPanel> scrollPanel;
-		RefPtr<ListBox> shaderBox;
-		RefPtr<ComboBox> pipelineBox;
-		RefPtr<CheckBox> autoRecompileCheckBox;
-		EnumerableDictionary<ComboBox*, String> comboBoxChoiceNames;
-		EnumerableDictionary<String, ComboBox*> choiceComboBoxes;
-		EnumerableDictionary<String, CheckBox*> choiceCheckBoxes;
+		GraphicsUI::Button *applyButton, *resetButton, *autoTuneButton, *autoTuneTexButton, *saveScheduleButton;
+		GraphicsUI::TextBox *timeBudgetTextBox;
+		GraphicsUI::VScrollPanel *scrollPanel;
+		GraphicsUI::ListBox *shaderBox;
+		GraphicsUI::ComboBox *pipelineBox;
+		GraphicsUI::CheckBox *autoRecompileCheckBox;
+		EnumerableDictionary<GraphicsUI::ComboBox*, String> comboBoxChoiceNames;
+		EnumerableDictionary<String, GraphicsUI::ComboBox*> choiceComboBoxes;
+		EnumerableDictionary<String, GraphicsUI::CheckBox*> choiceCheckBoxes;
 		StringBuilder autotuningLog;
 		String currentShaderName;
 		EnumerableDictionary<String, Spire::Compiler::ShaderChoiceValue> existingChoices;
 		EnumerableDictionary<String, EnumerableDictionary<String, String>> additionalAttribs;
 		void InitUI();
 		void UpdateChoicePanel(String shaderName);
-		void UpdateChoiceOptions(ComboBox * cmb);
+		void UpdateChoiceOptions(GraphicsUI::ComboBox * cmb);
 		void Recompile();
 		int AutotuneHelper(HashSet<String> & selectedChoices, EnumerableDictionary<String, Spire::Compiler::ShaderChoiceValue>& currentChoices, float timeBudget, int pipeline, bool countOnly = false);
 		void Autotune(float timeBudget);
 		void AutotuneTex();
-		void ResetButton_Clicked(Object * obj, EventArgs e);
-		void AutotuneButton_Clicked(Object * obj, EventArgs e);
-		void AutotuneTexButton_Clicked(Object * obj, EventArgs e);
-		void SaveScheduleButton_Clicked(Object * obj, EventArgs e);
-		void ApplyButton_Clicked(Object * obj, EventArgs e);
-		void ChoiceForm_OnResize(Object * obj, EventArgs e);
-		void SelectedShaderChanged(Object * obj, EventArgs e);
-		void ChoiceComboBox_Changed(Object * obj, EventArgs e);
-		void PipelineBox_Changed(Object *, EventArgs);
+		void ResetButton_Clicked(GraphicsUI::UI_Base *);
+		void AutotuneButton_Clicked(GraphicsUI::UI_Base *);
+		void AutotuneTexButton_Clicked(GraphicsUI::UI_Base *);
+		void SaveScheduleButton_Clicked(GraphicsUI::UI_Base *);
+		void ApplyButton_Clicked(GraphicsUI::UI_Base *);
+		void ChoiceForm_OnResize(GraphicsUI::UI_Base *);
+		void SelectedShaderChanged(GraphicsUI::UI_Base *);
+		void ChoiceComboBox_Changed(GraphicsUI::UI_Base *);
+		void PipelineBox_Changed(GraphicsUI::UI_Base *);
 	public:
 		Event<String> ShaderChanged;
-		ChoiceForm(IChoiceControl * pChoiceControl);
+		ChoiceForm(IChoiceControl * pChoiceControl, WinForm::GLForm * ownerForm, GraphicsUI::UIEntry * entry);
 		void Update();
 
 	};

@@ -1332,6 +1332,7 @@ namespace GL
 		{
 			if (hrc)
 			{
+				glFinish();
 				wglMakeCurrent(hdc, 0); // Remove the rendering context from our device context
 				wglDeleteContext(hrc); // Delete our rendering context
 			}

@@ -34,27 +34,26 @@ using namespace RealtimeEngine;
 
 namespace SceneViewer
 {
-	class CommandForm : public Form
+	class CommandForm : public GraphicsUI::Form
 	{
 	private:
-		RefPtr<TextBox> textBox;
-		RefPtr<Button> acceptButton;
+		GraphicsUI::TextBox* textBox;
+		GraphicsUI::Button* acceptButton;
 		List<String> commandHistories;
 		int cmdPtr;
 	public:
 
-		CommandForm()
+		CommandForm(GraphicsUI::UIEntry * entry)
+			: Form(entry)
 		{
-			SetClientWidth(500);
-			SetClientHeight(25);
-			textBox = new TextBox(this);
-			textBox->SetPosition(0, 0, 500, 25);
+			Posit(0,0,500, 65);
+			textBox = new GraphicsUI::TextBox(this);
+			textBox->Posit(0, 0, 500, 30);
 			SetText(L"Command");
-			SetBorder(fbFixedDialog);
+			formStyle.Sizeable = false;
 			textBox->SetText(L"");
-			textBox->OnKeyPressed.Bind(this, &CommandForm::TextBox_KeyPressed);
+			textBox->OnKeyPress.Bind(this, &CommandForm::TextBox_KeyPressed);
 			textBox->OnKeyDown.Bind(this, &CommandForm::TextBox_KeyDown);
-			this->OnFocus.Bind(this, &CommandForm::FormOnFocus);
 			cmdPtr = 0;
 		}
 
@@ -65,9 +64,9 @@ namespace SceneViewer
 			textBox->SetFocus();
 		}
 
-		void TextBox_KeyDown(Object *, KeyEventArgs e)
+		void TextBox_KeyDown(GraphicsUI::UI_Base *, GraphicsUI::UIKeyEventArgs & e)
 		{
-			if (e.KeyCode == VK_UP)
+			if (e.Key == VK_UP)
 			{
 				cmdPtr--;
 				if (cmdPtr < 0)
@@ -77,7 +76,7 @@ namespace SceneViewer
 					textBox->SetText(commandHistories[cmdPtr]);
 				}
 			}
-			else if (e.KeyCode == VK_DOWN)
+			else if (e.Key == VK_DOWN)
 			{
 				cmdPtr++;
 				if (cmdPtr >= commandHistories.Count())
@@ -89,16 +88,15 @@ namespace SceneViewer
 			}
 		}
 
-		void TextBox_KeyPressed(Object *, KeyEventArgs e)
+		void TextBox_KeyPressed(GraphicsUI::UI_Base *, GraphicsUI::UIKeyEventArgs & e)
 		{
-			if (e.KeyCode == 13)
+			if (e.Key == 13)
 			{
 				auto cmd = textBox->GetText();
 				OnCommand.Invoke(cmd);
 				if (cmd.Length())
 					commandHistories.Add(cmd);
 				textBox->SetText(L"");
-				*e.KeyCodeRef = 0;
 				cmdPtr = commandHistories.Count();
 			}
 		}
@@ -109,9 +107,9 @@ namespace SceneViewer
 	private:
 		RefPtr<DeviceResourcePool> resourcePool;
 		RefPtr<EnginePipeline> scene;
-		RefPtr<CommandForm> cmdForm;
-		RefPtr<ChoiceForm> choiceForm;
-		RefPtr<ShaderInfoForm> shaderInfoForm;
+		CommandForm* cmdForm = nullptr;
+		ChoiceForm * choiceForm = nullptr;
+		ShaderInfoForm * shaderInfoForm = nullptr;
 		RefPtr<CameraCurve> curveRecording;
 		String currentView = L"color";
 		CameraControl camera;
@@ -212,19 +210,15 @@ namespace SceneViewer
 			this->RegisterAccel(Accelerator(Accelerator::Ctrl, L'O'), openMenu);
 			this->OnResized.Bind(this, &MainForm::Form_Resized);
 			this->OnKeyDown.Bind(this, &MainForm::Form_KeyPreseed);
-			this->OnMouseMove.Bind(this, &MainForm::Form_MouseMove);
-			this->OnMouseWheel.Bind(this, &MainForm::Form_MouseWheel);
-			this->OnMouseDown.Bind(this, &MainForm::Form_MouseDown);
-			this->OnMouseUp.Bind(this, &MainForm::Form_MouseUp);
+			uiEntry->OnMouseMove.Bind(this, &MainForm::Form_MouseMove);
+			uiEntry->OnMouseWheel.Bind(this, &MainForm::Form_MouseWheel);
+			uiEntry->OnMouseDown.Bind(this, &MainForm::Form_MouseDown);
+			uiEntry->OnMouseUp.Bind(this, &MainForm::Form_MouseUp);
 
-			cmdForm = new CommandForm();
-			cmdForm->Show();
-			cmdForm->SetControlBox(false);
+			cmdForm = new CommandForm(uiEntry.Ptr());
 			cmdForm->OnCommand.Bind(this, &MainForm::OnCommand);
-			cmdForm->SetPosition(this->GetLeft(), this->GetTop() + this->GetHeight(), 500, 50);
-			cmdForm->SetClientHeight(25);
-			cmdForm->SetWantChars(true);
-
+			cmdForm->Left = 10;
+			cmdForm->Top = GetClientHeight() - 80;
 			//CreateShaderInfoForm();
 			CreateChoiceForm();
 		}
@@ -233,12 +227,10 @@ namespace SceneViewer
 		{
 			if (!shaderInfoForm)
 			{
-				shaderInfoForm = new ShaderInfoForm();
-				shaderInfoForm->Show();
-				shaderInfoForm->SetPosition(this->GetLeft(), this->GetTop() + 50, this->GetWidth(), 250);
-				shaderInfoForm->OnClose.Bind(this, &MainForm::ShaderInfoForm_OnClosed);
-				SetWindowPos(shaderInfoForm->GetHandle(), HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+				shaderInfoForm = new ShaderInfoForm(this->uiEntry.Ptr());
+				shaderInfoForm->Posit(10, 10, this->GetClientWidth()-20, 250);
 			}
+			uiEntry->ShowWindow(shaderInfoForm);
 			ChoiceForm_ShaderChanged(currentShader);
 		}
 
@@ -246,12 +238,12 @@ namespace SceneViewer
 		{
 			if (!choiceForm)
 			{
-				choiceForm = new ChoiceForm(this);
-				choiceForm->OnClose.Bind(this, &MainForm::ChoiceForm_OnClosed);
+				choiceForm = new ChoiceForm(this, this, this->uiEntry.Ptr());
 				choiceForm->ShaderChanged.Bind(this, &MainForm::ChoiceForm_ShaderChanged);
 				choiceForm->Update();
+				choiceForm->Posit(10, 10, 650, 400);
 			}
-			choiceForm->Show();
+			uiEntry->ShowWindow(choiceForm);
 		}
 		void ToggleShadowMapMenu_Clicked(Object *, EventArgs)
 		{
@@ -270,19 +262,17 @@ namespace SceneViewer
 		}
 		void ConsoleViewMenu_Clicked(Object * , EventArgs )
 		{
-			cmdForm->BringToFront();
+			uiEntry->ShowWindow(cmdForm);
 		}
 
 		void ShaderInfoViewMenu_Clicked(Object *, EventArgs)
 		{
 			CreateShaderInfoForm();
-			shaderInfoForm->BringToFront();
 		}
 
 		void ChoiceExplorerViewMenu_Clicked(Object *, EventArgs)
 		{
 			CreateChoiceForm();
-			choiceForm->BringToFront();
 		}
 
 		String currentShader;
@@ -301,13 +291,8 @@ namespace SceneViewer
 			shaderInfoForm = nullptr;
 		}
 
-		void ChoiceForm_OnClosed(Object *, WindowCloseEventArgs &)
-		{
-			choiceForm = nullptr;
-		}
-
 		float fovRadScale = 0.5f;
-		void Form_MouseWheel(Object *, MouseEventArgs e)
+		void Form_MouseWheel(GraphicsUI::UI_Base *, GraphicsUI::UIMouseEventArgs & e)
 		{
 			if (scene && scene->GetFoveatedRendering())
 			{
@@ -323,9 +308,9 @@ namespace SceneViewer
 		int lastMouseX, lastMouseY;
 		bool isMouseDown = false;
 
-		void Form_MouseDown(Object *, MouseEventArgs e)
+		void Form_MouseDown(GraphicsUI::UI_Base *, GraphicsUI::UIMouseEventArgs & e)
 		{
-			if (scene && e.Button == mbLeft)
+			if (scene && e.Shift == GraphicsUI::SS_BUTTONLEFT)
 			{
 				SetCapture(this->GetHandle());
 				lastMouseX = e.X;
@@ -334,13 +319,13 @@ namespace SceneViewer
 			}
 		}
 
-		void Form_MouseUp(Object *, MouseEventArgs e)
+		void Form_MouseUp(GraphicsUI::UI_Base *, GraphicsUI::UIMouseEventArgs & e)
 		{
 			isMouseDown = false;
 			ReleaseCapture();
 		}
 
-		void Form_MouseMove(Object *, MouseEventArgs e)
+		void Form_MouseMove(GraphicsUI::UI_Base *, GraphicsUI::UIMouseEventArgs & e)
 		{
 			if (scene)
 			{
@@ -820,7 +805,6 @@ namespace SceneViewer
 			scene->UpdateSysUniform(sysUniforms);
 			scene->DrawObjSpace();
 			scene->Draw(stereo);
-			resourcePool->GetHardwareRenderer()->SwapBuffers();
 			return scene->GetColorBuffer();
 		}
 		void MainLoop(Object *, EventArgs e)
@@ -829,13 +813,15 @@ namespace SceneViewer
 			static auto timePoint = PerformanceCounter::Start();
 			dtime = (float)PerformanceCounter::ToSeconds(PerformanceCounter::End(timePoint));
 			timePoint = PerformanceCounter::Start();
-			if (Focused())
+			if (Focused() && uiEntry->FocusedControl == nullptr)
 			{
 				camera.HandleKeys(dtime);
 			}
 			if (scene)
 			{
 				RenderFrame();
+				this->DrawUIOverlay(GL::FrameBuffer());
+				glContext->SwapBuffers();
 				static int frames = 0;
 				frames++;
 				if ((frames & 127) == 0)
