@@ -27,7 +27,7 @@ shader Demo1Shader
     
     vec2 uv = vert_pos.xz*(1.0/30.0);
     vec3 albedo = texture(ground_pebble_map, uv).xyz;
-	vec3 normalTex = (texture(ground_pebble_Nmap, uv).xyz - 0.5) * 2.0;
+    vec3 normalTex = (texture(ground_pebble_Nmap, uv).xyz - 0.5) * 2.0;
    
     vec3 vNormal = (normalMatrix * vec4(vert_normal, 1.0)).xyz;
     vec3 vTangent = (normalMatrix * vec4(vert_tangent, 1.0)).xyz;
@@ -40,9 +40,9 @@ shader Demo1Shader
     float roughness = 0.5;
     float specular = 0.5;
     float metallic = 0.4;
-	float highlight = ComputeHighlightPhong(lightDir, normal, view, roughness, specular, metallic);
-	float lambert = clamp(dot(lightDir, normal), 0.0, 1.0);
-	vec4 outputColor = vec4(lightColor * 
+    float highlight = ComputeHighlightPhong(lightDir, normal, view, roughness, specular, metallic);
+    float lambert = clamp(dot(lightDir, normal), 0.0, 1.0);
+    vec4 outputColor = vec4(lightColor * 
 						(albedo * (lambert*0.7 + 0.5)*(1.0-metallic) + 
 						mix(albedo, vec3(1.0), 1.0 - metallic) * highlight), 1.0);
     float opacity = 1.0;
