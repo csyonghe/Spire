@@ -320,7 +320,7 @@ namespace SceneViewer
 			}
 		}
 
-		void Form_MouseUp(GraphicsUI::UI_Base *, GraphicsUI::UIMouseEventArgs & e)
+		void Form_MouseUp(GraphicsUI::UI_Base *, GraphicsUI::UIMouseEventArgs & /*e*/)
 		{
 			isMouseDown = false;
 			ReleaseCapture();
