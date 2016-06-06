@@ -11,7 +11,9 @@
 #ifndef _MSC_VER
 #define NO_SIMD_ASM
 #endif
-
+#ifndef NO_VECTOR_CONSTRUCTORS
+#define NO_VECTOR_CONSTRUCTORS
+#endif
 namespace VectorMath
 {
 	using namespace CoreLib::Basic;
@@ -78,13 +80,13 @@ namespace VectorMath
 			x = vx; y = vy;
 		}
 #endif
-		static inline Vec2 Create(float f)
+		static Vec2 Create(float f)
 		{
 			Vec2 rs;
 			rs.x = rs.y = f;
 			return rs;
 		}
-		static inline Vec2 Create(float vx, float vy)
+		static Vec2 Create(float vx, float vy)
 		{
 			Vec2 rs;
 			rs.x = vx;	rs.y = vy;

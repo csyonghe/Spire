@@ -24,7 +24,8 @@ namespace RealtimeEngine
 		glFinish();
 
 		Programs.SetSize(Programs.GetCapacity());
-		PrecomputeTexProgram = shaderStore.LoadProgram(shaderLib.Sources[L"precomputeTexVs"]().GetAllCodeGLSL(), shaderLib.Sources[L"precomputeTex"]().GetAllCodeGLSL());
+		if (shaderLib.Sources.ContainsKey(L"precomputeTexVs"))
+			PrecomputeTexProgram = shaderStore.LoadProgram(shaderLib.Sources[L"precomputeTexVs"]().GetAllCodeGLSL(), shaderLib.Sources[L"precomputeTex"]().GetAllCodeGLSL());
 
 		Spire::Compiler::WorldMetaData wmeta;
 		if (shaderLib.MetaData.Worlds.TryGetValue(L"precomputeVert", wmeta))

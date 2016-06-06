@@ -28,9 +28,9 @@ namespace CoreLib
 		{
 			alpha = (float)PI;
 			beta = 0.0f;
-			pos = Vec3(0.0f,0.0f,0.0f);
-			up = Vec3(0.0f,1.0f,0.0f);
-			dir = Vec3(0.0f,0.0f,-1.0f);
+			pos = Vec3::Create(0.0f,0.0f,0.0f);
+			up = Vec3::Create(0.0f,1.0f,0.0f);
+			dir = Vec3::Create(0.0f,0.0f,-1.0f);
 		}
 
 		void Camera::GoForward(float u)
@@ -73,10 +73,10 @@ namespace CoreLib
 
 		void Camera::GetTransform(Matrix4 & rs)
 		{
-			dir = Vec3((float)sin(alpha)*cos(beta),
+			dir = Vec3::Create((float)sin(alpha)*cos(beta),
 					   (float)sin(beta),
 					   (float)cos(alpha)*cos(beta));
-			up = Vec3((float)sin(alpha)*cos(PI/2+beta),
+			up = Vec3::Create((float)sin(alpha)*cos(PI/2+beta),
 					  (float)sin(PI/2+beta),
 					  (float)cos(alpha)*(float)cos(PI/2+beta));
 			ViewFrustum view;
@@ -86,10 +86,10 @@ namespace CoreLib
 
 		void Camera::GetView(ViewFrustum & view)
 		{
-			dir = Vec3((float)sin(alpha)*cos(beta),
+			dir = Vec3::Create((float)sin(alpha)*cos(beta),
 				(float)sin(beta),
 				(float)cos(alpha)*cos(beta));
-			up = Vec3((float)sin(alpha)*cos(PI / 2 + beta),
+			up = Vec3::Create((float)sin(alpha)*cos(PI / 2 + beta),
 				(float)sin(PI / 2 + beta),
 				(float)cos(alpha)*(float)cos(PI / 2 + beta));
 			view.CamPos = pos;
@@ -104,7 +104,7 @@ namespace CoreLib
 			const float CameraAcceleration = CameraMaxSpeed;
 			const float CameraTurnAngle = 3.14159f/4.0f;
 
-			static Vec3 speed(0.0f, 0.0f, 0.0f);
+			static Vec3 speed = Vec3::Create(0.0f, 0.0f, 0.0f);
 			Vec3 force;
 			Vec3 left;
 			force.SetZero();
@@ -134,7 +134,7 @@ namespace CoreLib
 			float spdLen = speed.Length2();
 			if (spdLen < accelLen * accelLen * 16.0f)
 			{
-				speed = Vec3(0.0f,0.0f,0.0f);
+				speed = Vec3::Create(0.0f,0.0f,0.0f);
 			}
 			else if (spdLen>0.0f)
 			{

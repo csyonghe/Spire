@@ -17,21 +17,6 @@ namespace SceneViewer
 		this->choiceControl = pChoiceControl;
 		SetText("Choice Control");
 		InitUI();
-		availableChoices[0].Add(L"vs");
-		availableChoices[0].Add(L"fs");
-		availableChoices[1].Add(L"precomputeUniform");
-		availableChoices[1].Add(L"precomputeTex");
-		availableChoices[1].Add(L"precomputeVert");
-		availableChoices[1].Add(L"vs");
-		availableChoices[1].Add(L"fs");
-		availableChoices[2].Add(L"vs");
-		availableChoices[2].Add(L"lowRes");
-		availableChoices[2].Add(L"fs");
-		availableChoices[3].Add(L"vs");
-		availableChoices[3].Add(L"objSurface");
-		availableChoices[3].Add(L"lowRes");
-		availableChoices[3].Add(L"fs");
-
 		OnResize.Bind(this, &ChoiceForm::ChoiceForm_OnResize);
 	}
 	List<Vec4> ChoiceForm::ReadFrameData(GL::Texture2D tex)
@@ -63,16 +48,8 @@ namespace SceneViewer
 	}
 	void ChoiceForm::InitUI()
 	{
-		pipelineBox = new GraphicsUI::ComboBox(this);
-		pipelineBox->AddTextItem(L"Standard");
-		pipelineBox->AddTextItem(L"Precompute");
-		pipelineBox->AddTextItem(L"MultiRate");
-		pipelineBox->AddTextItem(L"MultiRateObjSpace");
-		pipelineBox->SetSelectedIndex(0);
-		pipelineBox->Posit(10, 10, 120, 25);
-		pipelineBox->OnChanged.Bind(this, &ChoiceForm::PipelineBox_Changed);
 		shaderBox = new GraphicsUI::ListBox(this);
-		shaderBox->Posit(10, 50, 120, GetClientHeight() - 60);
+		shaderBox->Posit(10, 10, 130, GetClientHeight() - 60);
 		shaderBox->OnChanged.Bind(this, &ChoiceForm::SelectedShaderChanged);
 		applyButton = new GraphicsUI::Button(this);
 		applyButton->Posit(140, 10, 100, 30);
@@ -135,8 +112,7 @@ namespace SceneViewer
 			cmb->AddTextItem(L"(auto) " + choice.DefaultValue);
 			for (auto & opt : choice.Options)
 			{
-				if (availableChoices[Math::Clamp(pipelineBox->SelectedIndex,0,pipelineBox->Items.Count()-1)].Contains(opt.WorldName))
-					cmb->AddTextItem(opt.ToString());
+				cmb->AddTextItem(opt.ToString());
 			}
 			comboBoxChoiceNames[cmb] = choice.ChoiceName;
 			choiceComboBoxes[choice.ChoiceName] = cmb;
@@ -197,7 +173,7 @@ namespace SceneViewer
 		SetCursor(LoadCursor(NULL, IDC_ARROW));
 		ShaderChanged.Invoke(currentShaderName);
 	}
-	int ChoiceForm::AutotuneHelper(HashSet<String> & selectedChoices, EnumerableDictionary<String, Spire::Compiler::ShaderChoiceValue>& currentChoices, float timeBudget, int pipeline, bool countOnly)
+	int ChoiceForm::AutotuneHelper(HashSet<String> & selectedChoices, EnumerableDictionary<String, Spire::Compiler::ShaderChoiceValue>& currentChoices, float timeBudget, bool countOnly)
 	{
 		auto choices = choiceControl->GetChoices(currentShaderName, currentChoices);
 		List<Spire::Compiler::ShaderChoice> filteredChoices;
@@ -220,12 +196,9 @@ namespace SceneViewer
 			int count = 0;
 			for (auto & opt : currentChoice->Options)
 			{
-				if (availableChoices[pipeline].Contains(opt.WorldName))
-				{
-					EnumerableDictionary<String, Spire::Compiler::ShaderChoiceValue> newChoices = currentChoices;
-					newChoices[currentChoice->ChoiceName] = opt;
-					count += AutotuneHelper(selectedChoices, newChoices, timeBudget, pipeline, countOnly);
-				}
+				EnumerableDictionary<String, Spire::Compiler::ShaderChoiceValue> newChoices = currentChoices;
+				newChoices[currentChoice->ChoiceName] = opt;
+				count += AutotuneHelper(selectedChoices, newChoices, timeBudget, countOnly);
 			}
 			return count;
 		}
@@ -280,7 +253,7 @@ namespace SceneViewer
 				selectedChoices.Add(chk.Key);
 		autotuningLog.Clear();
 		auto startTimePoint = PerformanceCounter::Start();
-		int count = AutotuneHelper(selectedChoices, currentChoices, timeBudget, GetSelIdx(pipelineBox), countOnly);
+		int count = AutotuneHelper(selectedChoices, currentChoices, timeBudget, countOnly);
 		float time = PerformanceCounter::EndSeconds(startTimePoint);
 		autotuningLog << L"time: " << time << EndLine;
 		printf("variant count: %d\ntime: %f\n", count, time);
@@ -436,11 +409,11 @@ namespace SceneViewer
 	}
 	void ChoiceForm::ChoiceForm_OnResize(GraphicsUI::UI_Base *)
 	{
-		shaderBox->Posit(10, 50, 100, GetClientHeight() - 60);
+		shaderBox->Posit(10, 10, 120, GetClientHeight() - 20);
 #ifdef ENABLE_AUTO_TUNE
-		scrollPanel->Posit(120, 90, GetClientWidth() - 120, GetClientHeight() - 100);
+		scrollPanel->Posit(140, 90, GetClientWidth() - 150, GetClientHeight() - 100);
 #else
-		scrollPanel->Posit(120, 50, GetClientWidth() - 120, GetClientHeight() - 60);
+		scrollPanel->Posit(140, 50, GetClientWidth() - 150, GetClientHeight() - 60);
 #endif
 		int scWidth = scrollPanel->GetClientWidth();
 		int cmbLeft = scWidth;

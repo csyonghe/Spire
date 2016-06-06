@@ -271,3 +271,28 @@ module Footer
     public float opacity = 1.0;
     public vec4 outputColor = vec4(lighting.result, opacity);
 }
+
+float ComputeHighlightPhong(vec3 L, vec3 N, vec3 V, float roughness, float metallic, float specular)
+{
+    vec3 H = normalize(V+L);
+    float dotNL = clamp(dot(N,L), 0.01, 0.99);
+    float dotNH = clamp(dot(N,H), 0.01, 0.99);
+
+    float alpha = roughness*roughness;
+    float p = 6.644/(alpha*alpha) - 6.644;
+    float pi = 3.14159;
+    return dotNL * metallic * exp2(p * dotNH - p) / (pi * (alpha*alpha)) * specular;
+}
+
+float ComputeHighlightGGX(vec3 L, vec3 N, vec3 V, float roughness, float metallic, float specular)
+{
+    vec3 H = normalize(V+L);
+    float dotNL = clamp(dot(N,L), 0.01, 0.99);
+    float dotLH = clamp(dot(L,H), 0.01, 0.99);
+    float dotNH = clamp(dot(N,H), 0.01, 0.99);
+
+    float D = LightingFuncGGX_D(dotNH,roughness);
+    vec2 FV_helper = LightingFuncGGX_FV(dotLH,roughness);
+    float FV = metallic;
+    return dotNL * D * FV * specular;
+}

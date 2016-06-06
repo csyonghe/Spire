@@ -691,7 +691,7 @@ namespace GraphicsUI
 		int SelOriX,SelOriY;
 		int BorderWidth;
 		bool DownInItem;
-		bool selectionHasChanged = false;
+		int lastSelIdx = -1;
 		ScrollBar *ScrollBar;
 		void ListChanged();
 		void SelectionChanged();
@@ -706,7 +706,7 @@ namespace GraphicsUI
 		bool HideSelection, MultiSelect;
 		Color SelectionColor,UnfocusedSelectionColor,SelectionForeColor,FocusRectColor,HighLightColor,HighLightForeColor;
 		CoreLib::List<Control *> Selection;
-		int SelectedIndex;
+		int SelectedIndex = -1;
 		int Margin;
 		int HitTest(int X, int Y);
 		Control *GetSelectedItem();

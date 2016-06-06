@@ -1,4 +1,4 @@
-using "../EnginePipeline.shader";
+using "../MultiRatePipeline.shader";
 
 shader Demo1Shader
 {
@@ -21,6 +21,8 @@ shader Demo1Shader
     
     vec4 position = modelMatrix * vec4(vert_pos, 1.0);
     vec4 projCoord = viewProjectionMatrix * position;
+    vec2 screenCoord = projCoord.xy/vec2(projCoord.w)*0.5 + vec2(0.5);
+    
     vec4 texSpaceVert = vec4(vert_uv*2.0 - vec2(1.0), 0.0, 1.0);                    
     
     vec2 uv = vert_pos.xz*(1.0/30.0);

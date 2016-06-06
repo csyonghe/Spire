@@ -203,7 +203,7 @@ namespace CoreLib
 
 				for (int i = 0; i<mdl.Vertices.Count(); i++)
 				{
-					Vec3 vnormal(0.0f, 0.0f, 0.0f);
+					Vec3 vnormal = Vec3::Create(0.0f, 0.0f, 0.0f);
 					int start = i==0?0:vertFaceListOffset[i-1];
 					for (int j = start; j<vertFaceListOffset[i]; j++)
 					{
@@ -290,8 +290,8 @@ namespace CoreLib
 								if (!vertSet.Contains(vertId))
 								{
 									vertSet.Add(vertId);
-									Vec4 p = mesh.Vertices[vertId];
-									Vec3 vp = p.xyz() - p0;
+									Vec3 p = mesh.Vertices[vertId];
+									Vec3 vp = p - p0;
 									float ax = Vec3::Dot(vp, u);
 									float ay = Vec3::Dot(vp, v);
 									RingVertex rv;
@@ -606,8 +606,8 @@ namespace CoreLib
 
 			for (int i=0; i<4; i++)
 			{
-				Vec3 du(0, 0, 0);
-				Vec3 dv(0, 0, 0);
+				Vec3 du = Vec3::Create(0, 0, 0);
+				Vec3 dv = Vec3::Create(0, 0, 0);
 				int duStart, dvStart;
 
 				int valence = mesh.Valances[mesh.VertIds[patch.VertPtr + i]];

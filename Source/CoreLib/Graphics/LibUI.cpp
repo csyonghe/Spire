@@ -3642,7 +3642,7 @@ namespace GraphicsUI
 
 	bool ListBox::DoMouseDown(int X, int Y, SHIFTSTATE Shift)
 	{
-		selectionHasChanged = false;
+		lastSelIdx = SelectedIndex;
 		Control::DoMouseDown(X,Y,Shift);
 		int bdr=0,ShowCount=Height/ItemHeight;
 		if (!Enabled || !Visible)
@@ -3666,7 +3666,6 @@ namespace GraphicsUI
 		{
 			DownInItem = true;
 			auto newSelIdx = HitTest(X,Y);
-			selectionHasChanged = SelectedIndex != newSelIdx; 
 			SelectedIndex = newSelIdx;
 			if (MultiSelect)
 			{
@@ -3756,14 +3755,12 @@ namespace GraphicsUI
 					Selection.Add(Items[i]);
 				}
 				auto newSelIdx = idEnd;
-				selectionHasChanged = SelectedIndex != newSelIdx;
 				SelectedIndex = newSelIdx;
 			}
 		}
 		else if (DownInItem)
 		{
 			auto newSelIdx = HitTest(X, Y);
-			selectionHasChanged = SelectedIndex != newSelIdx;
 			SelectedIndex = newSelIdx;
 		}
 		if (DownInItem)
@@ -3795,6 +3792,7 @@ namespace GraphicsUI
 		if (Visible && Enabled)
 		{
 			ScrollBar->SetPosition(Math::Clamp(ScrollBar->GetPosition() + (delta > 0 ? -1 : 1) * 3, 0, ScrollBar->GetMax()));
+			return true;
 		}
 		return false;
 	}
@@ -3816,9 +3814,8 @@ namespace GraphicsUI
 		Selecting = false;
 		if (ScrollBar->Visible && hitTest == ScrollBar)
 			ScrollBar->DoMouseUp(X - hitTest->Left, Y - hitTest->Top,Shift);
-		if (selectionHasChanged || Items.Count() && Items[0]->Type == CT_CHECKBOX)
+		if (lastSelIdx != SelectedIndex || Items.Count() && Items[0]->Type == CT_CHECKBOX)
 		{
-			selectionHasChanged = false;
 			SelectionChanged();
 		}
 		ReleaseMouse();
@@ -4084,6 +4081,7 @@ namespace GraphicsUI
 		Control::DoMouseDown(X,Y,Shift);
 		if (!Visible || !Enabled)
 			return false;
+		lastSelIdx = SelectedIndex;
 		if (IsPointInClient(X, Y))
 		{
 			ToggleList(!ShowList);
