@@ -12021,7 +12021,7 @@ namespace Spire
 					expr->Type = variable.Type.DataType;
 					expr->Type.IsLeftValue = !variable.IsComponent;
 				}
-				else if (currentShader->ShaderObjects.TryGetValue(expr->Variable, shaderObj))
+				else if (currentShader && currentShader->ShaderObjects.TryGetValue(expr->Variable, shaderObj))
 				{
 					expr->Type.BaseType = BaseType::Shader;
 					expr->Type.Shader = shaderObj.Shader;
@@ -12029,15 +12029,20 @@ namespace Spire
 				}
 				else
 				{
-					auto compRef = currentShader->ResolveComponentReference(expr->Variable);
-					if (compRef.IsAccessible)
+					if (currentShader)
 					{
-						expr->Type = compRef.Component->Type->DataType;
-						expr->Type.IsLeftValue = false;
-					}
-					else if (compRef.Component)
-					{
-						Error(30017, L"component \'" + expr->Variable + L"\' is not accessible from shader '" + currentShader->SyntaxNode->Name.Content + L"'.", expr);
+						auto compRef = currentShader->ResolveComponentReference(expr->Variable);
+						if (compRef.IsAccessible)
+						{
+							expr->Type = compRef.Component->Type->DataType;
+							expr->Type.IsLeftValue = false;
+						}
+						else if (compRef.Component)
+						{
+							Error(30017, L"component \'" + expr->Variable + L"\' is not accessible from shader '" + currentShader->SyntaxNode->Name.Content + L"'.", expr);
+						}
+						else
+							Error(30015, L"undefined identifier \'" + expr->Variable + L"\'", expr);
 					}
 					else
 						Error(30015, L"undefined identifier \'" + expr->Variable + L"\'", expr);
