@@ -821,7 +821,7 @@ namespace SceneViewer
 			if (scene)
 			{
 				RenderFrame();
-				this->DrawUIOverlay(GL::FrameBuffer());
+				this->DrawUIOverlay();
 				glContext->SwapBuffers();
 				static int frames = 0;
 				frames++;

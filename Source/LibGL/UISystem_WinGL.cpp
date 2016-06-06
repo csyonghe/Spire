@@ -344,9 +344,6 @@ namespace GraphicsUI
 		GL::BufferObject vertexBuffer;
 		GL::VertexArray posUvVertexArray, posVertexArray;
 		GL::TextureSampler linearSampler;
-		GL::FrameBuffer uiFrameBuffer;
-		GL::Texture2D uiSurface;
-		GL::RenderBuffer uiDepth;
 		Vec2 translation;
 		Vec4 clipRect;
 	public:
@@ -384,14 +381,6 @@ namespace GraphicsUI
 
 			linearSampler = glContext->CreateTextureSampler();
 			linearSampler.SetFilter(GL::TextureFilter::Linear);
-
-			uiFrameBuffer = glContext->CreateFrameBuffer();
-			uiSurface = glContext->CreateTexture2D();
-			uiSurface.SetData(GL::StorageFormat::RGBA_I8, 16, 16, 1, GL::DataType::Float, nullptr);
-			uiDepth = glContext->CreateRenderBuffer(GL::StorageFormat::Depth24Stencil8, 16, 16, 1);
-			uiFrameBuffer.SetColorRenderTarget(0, uiSurface);
-			uiFrameBuffer.SetDepthStencilRenderTarget(uiDepth);
-			uiFrameBuffer.EnableRenderTargets(1);
 		}
 		~GLUIRenderer()
 		{
@@ -408,35 +397,21 @@ namespace GraphicsUI
 			glContext->DestroyBuffer(vertexBuffer);
 			glContext->DestroyTextureSampler(linearSampler);
 
-			glContext->DestroyFrameBuffer(uiFrameBuffer);
-			glContext->DestroyTexture(uiSurface);
-			glContext->DestroyRenderBuffer(uiDepth);
 		}
 		void SetScreenResolution(int w, int h)
 		{
 			screenWidth = w;
 			screenHeight = h;
 			Matrix4::CreateOrthoMatrix(orthoMatrix, 0.0f, (float)screenWidth, 0.0f, (float)screenHeight, 1.0f, -1.0f);
-			uiSurface.SetData(GL::StorageFormat::RGBA_I8, w, h, 1, GL::DataType::Float, nullptr);
-			if (uiDepth.Handle)
-				glContext->DestroyRenderBuffer(uiDepth);
-			uiDepth = glContext->CreateRenderBuffer(GL::StorageFormat::Depth24Stencil8, w, h, 1);
-			uiFrameBuffer.SetColorRenderTarget(0, uiSurface);
-			uiFrameBuffer.SetDepthStencilRenderTarget(uiDepth);
 		}
 		void BeginUIDrawing()
 		{
 			glContext->SetBlendMode(GL::BlendMode::AlphaBlend);
-			glContext->SetWriteFrameBuffer(uiFrameBuffer);
-			glContext->Clear(false, true, true);
 			glContext->SetZTestMode(GL::BlendOperator::Disabled);
 			glContext->SetViewport(0, 0, screenWidth, screenHeight);
 		}
-		void EndUIDrawing(GL::FrameBuffer frameBuffer)
+		void EndUIDrawing()
 		{
-			glContext->SetWriteFrameBuffer(frameBuffer);
-			glContext->SetBlendMode(GL::BlendMode::AlphaBlend);
-			DrawTextureQuad(uiSurface, 0, 0, screenWidth, screenHeight);
 			glContext->SetBlendMode(GL::BlendMode::Replace);
 		}
 		void DrawLine(const Vec4 & color, float x0, float y0, float x1, float y1)
@@ -608,9 +583,9 @@ namespace GraphicsUI
 		{
 			uiRenderer->BeginUIDrawing();
 		}
-		virtual void EndUIDrawing(GL::FrameBuffer frameBuffer) override
+		virtual void EndUIDrawing() override
 		{
-			uiRenderer->EndUIDrawing(frameBuffer);
+			uiRenderer->EndUIDrawing();
 		}
 		virtual void SetRenderTransform(int dx, int dy) override
 		{

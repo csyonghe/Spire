@@ -77,7 +77,7 @@ namespace SceneViewer
 		autoTuneTexButton->OnClick.Bind(this, &ChoiceForm::AutotuneTexButton_Clicked);
 		saveScheduleButton = new GraphicsUI::Button(this);
 		saveScheduleButton->Posit(490, 50, 100, 30);
-		saveScheduleButton->SetText(L"&Save");
+		saveScheduleButton->SetText(L"Save");
 		saveScheduleButton->OnClick.Bind(this, &ChoiceForm::SaveScheduleButton_Clicked);
 #endif
 		scrollPanel = new GraphicsUI::VScrollPanel(this);
