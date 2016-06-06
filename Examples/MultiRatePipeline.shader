@@ -2,18 +2,18 @@ pipeline MultiRatePipeline
 {
     [Pinned]
     [Packed]
-	abstract world rootVert;
+    abstract world rootVert;
     
     [InterfaceBlockIndex: "4"]
-	abstract world rootTex;
-	[Pinned]
-    [InterfaceBlockIndex: "1"]
-	abstract world viewUniform;
+    abstract world rootTex;
     [Pinned]
-	[InterfaceBlock: "perInstanceUniform:2"]
-	abstract world perInstanceUniform;
+    [InterfaceBlockIndex: "1"]
+    abstract world viewUniform;
+    [Pinned]
+    [InterfaceBlock: "perInstanceUniform:2"]
+    abstract world perInstanceUniform;
     [InterfaceBlock: "modelTransform:0"]
-	abstract world modelTransform;
+    abstract world modelTransform;
     world objSurfaceVs: "glsl(vertex:texSpaceVert)" using texSpaceVert export standardExport;
     [InterfaceBlock: "ObjSpaceInput:5"]
     world objSurface : "glsl" export fragmentExport;
@@ -21,33 +21,33 @@ pipeline MultiRatePipeline
     world lowResVs : "glsl(vertex:projCoord;command_list)" using projCoord export standardExport;
     [InterfaceBlock : "LowResInput:6"]
     world lowRes : "glsl(command_list)" using opacity export fragmentExport;
-	world vs : "glsl(vertex:projCoord;command_list)" using projCoord export standardExport;
-	world fs : "glsl(command_list)" using opacity export fragmentExport;
-	require @(vs, lowResVs) vec4 projCoord; 
+    world vs : "glsl(vertex:projCoord;command_list)" using projCoord export standardExport;
+    world fs : "glsl(command_list)" using opacity export fragmentExport;
+    require @(vs, lowResVs) vec4 projCoord; 
     require @fs vec2 screenCoord;
-	require @objSurfaceVs* vec4 texSpaceVert;
-	require out @fs vec4 outputColor;
+    require @objSurfaceVs* vec4 texSpaceVert;
+    require out @fs vec4 outputColor;
     require @(lowRes*, fs*) float opacity;
-	require @rootVert vec2 vert_uv;
-	import uniformImport(perInstanceUniform->vs);
-	import uniformImport(perInstanceUniform->fs);
-	import uniformImport(perInstanceUniform->objSurfaceVs);
-	import uniformImport(perInstanceUniform->objSurface);
-	import uniformImport(viewUniform->vs);
-	import uniformImport(viewUniform->fs);
-	import uniformImport(viewUniform->objSurfaceVs);
-	import uniformImport(viewUniform->objSurface);
+    require @rootVert vec2 vert_uv;
+    import uniformImport(perInstanceUniform->vs);
+    import uniformImport(perInstanceUniform->fs);
+    import uniformImport(perInstanceUniform->objSurfaceVs);
+    import uniformImport(perInstanceUniform->objSurface);
+    import uniformImport(viewUniform->vs);
+    import uniformImport(viewUniform->fs);
+    import uniformImport(viewUniform->objSurfaceVs);
+    import uniformImport(viewUniform->objSurface);
     import uniformImport(modelTransform->objSurfaceVs);
     import uniformImport(modelTransform->objSurface);
     import uniformImport(modelTransform->vs);
     import uniformImport(modelTransform->fs);
     import uniformImport(modelTransform->lowResVs);
     import uniformImport(modelTransform->lowRes);
-	import vertexImport(rootVert->vs);
-	import vertexImport(rootVert->objSurfaceVs);
+    import vertexImport(rootVert->vs);
+    import vertexImport(rootVert->objSurfaceVs);
     
-	import standardImport(vs->fs);
-	import standardImport(objSurfaceVs->objSurface);
+    import standardImport(vs->fs);
+    import standardImport(objSurfaceVs->objSurface);
     
     import textureImport(objSurface->fs) using vert_uv;
     import textureImport(objSurface->vs) using vert_uv;
