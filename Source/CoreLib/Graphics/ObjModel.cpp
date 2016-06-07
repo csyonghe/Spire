@@ -488,9 +488,9 @@ namespace CoreLib
 				if (len > 1e-6f)
 					Vec3::Scale(n, n, 1.0f/len);
 				else
-					n = Vec3(1.0f, 0.0f, 0.0f);
+					n = Vec3::Create(1.0f, 0.0f, 0.0f);
 				if (n.Length() > 1.2f || n.Length() < 0.5f)
-					n = Vec3(1.0f, 0.0f, 0.0f);
+					n = Vec3::Create(1.0f, 0.0f, 0.0f);
 				faceNormals[i] = n;
 			}
 			List<int> vertShare;

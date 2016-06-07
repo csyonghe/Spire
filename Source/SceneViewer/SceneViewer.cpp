@@ -46,7 +46,7 @@ namespace SceneViewer
 		CommandForm(GraphicsUI::UIEntry * entry)
 			: Form(entry)
 		{
-			Posit(0,0,500, 65);
+			Posit(0,0,510, 70);
 			textBox = new GraphicsUI::TextBox(this);
 			textBox->Posit(0, 0, 500, 30);
 			SetText(L"Command");
@@ -161,6 +161,7 @@ namespace SceneViewer
 		}
 		void InitUI()
 		{
+			GraphicsUI::Global::ColorTable = GraphicsUI::CreateDarkColorTable();
 			auto mainMenu = new MainMenu();
 
 			auto fileMenu = new MenuItem(mainMenu);
@@ -319,7 +320,7 @@ namespace SceneViewer
 			}
 		}
 
-		void Form_MouseUp(GraphicsUI::UI_Base *, GraphicsUI::UIMouseEventArgs & e)
+		void Form_MouseUp(GraphicsUI::UI_Base *, GraphicsUI::UIMouseEventArgs & /*e*/)
 		{
 			isMouseDown = false;
 			ReleaseCapture();
@@ -820,7 +821,7 @@ namespace SceneViewer
 			if (scene)
 			{
 				RenderFrame();
-				this->DrawUIOverlay(GL::FrameBuffer());
+				this->DrawUIOverlay();
 				glContext->SwapBuffers();
 				static int frames = 0;
 				frames++;

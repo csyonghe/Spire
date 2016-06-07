@@ -16,7 +16,7 @@ namespace GraphicsUI
 		virtual IImage * CreateImage(const CoreLib::Imaging::Bitmap & bmp) = 0;
 		virtual void SetResolution(int w, int h) = 0;
 		virtual void BeginUIDrawing() = 0;
-		virtual void EndUIDrawing(GL::FrameBuffer frameBuffer) = 0;
+		virtual void EndUIDrawing() = 0;
 	};
 	UISystemInterface * CreateWinGLInterface(GL::HardwareRenderer * glContext);
 }

@@ -100,7 +100,7 @@ namespace GraphicsUI
 
 	void Graphics::FillRectangle(ISystemInterface * sys, int x1, int y1, int x2, int y2)
 	{
-		sys->FillRectangle(SolidBrushColor, Rect(x1, y1, x2 - x1, y2 - y1));
+		sys->FillRectangle(SolidBrushColor, Rect(x1, y1, x2 - x1 + 1, y2 - y1 + 1));
 	}
 
 	void Graphics::DrawRoundRect(ISystemInterface * sys, int x1, int y1, int x2, int y2, int rad)
@@ -158,13 +158,82 @@ namespace GraphicsUI
 		sys->DrawLine(pen, (float)x1, (float)y1, (float)x2, (float)y2);
 	}
 
+	ColorTable CreateDarkColorTable()
+	{
+		ColorTable tbl;
+
+		tbl.ControlBackColor = Color(0, 0, 0, 0);
+		tbl.ControlBorderColor = Color(255, 255, 255, 120);
+		tbl.ControlFontColor = Color(255, 255, 255, 255);
+		tbl.EditableAreaBackColor = Color(60, 60, 60, 140);
+		tbl.ScrollBarBackColor = Color(70, 70, 70, 200);
+
+		tbl.MemuIconBackColor = Color(127, 127, 127, 255);
+		tbl.MenuBackColor = Color(80, 80, 80, 255);
+		tbl.MenuBorderColor = Color(127, 127, 127, 255);
+		tbl.MenuSeperatorColor = Color(130, 130, 130, 255);
+		tbl.MenuItemForeColor = Color(255, 255, 255, 255);
+		tbl.MenuItemDisabledForeColor = Color(180, 180, 180, 255);
+		tbl.MenuItemHighlightForeColor = tbl.MenuItemForeColor;
+		tbl.ToolButtonBackColor1 = tbl.ControlBackColor;
+		tbl.ToolButtonBackColor2 = Color(215, 226, 228, 255);
+		tbl.ToolButtonBackColorHighlight1 = Color(255, 250, 210, 255);
+		tbl.ToolButtonBackColorHighlight2 = Color(253, 236, 168, 255);
+		tbl.ToolButtonBackColorPressed1 = Color(249, 217, 132, 255);
+		tbl.ToolButtonBackColorPressed2 = Color(252, 236, 194, 255);
+		tbl.ToolButtonBorderHighLight = Color(254, 193, 92, 255);
+		tbl.ToolButtonBorderSelected = Color(254, 193, 92, 255);
+		tbl.ToolButtonSeperatorColor = Color(170, 170, 160, 255);
+		tbl.ToolButtonBackColorChecked1 = Color(253, 247, 182, 255);
+		tbl.ToolButtonBackColorChecked2 = tbl.ToolButtonBackColorChecked1;
+		tbl.StatusStripBackColor1 = tbl.StatusStripBackColor2 = tbl.ToolButtonBackColor2;
+		tbl.StatusStripBackColor3 = tbl.StatusStripBackColor4 = tbl.ToolButtonBackColor2;
+
+		tbl.TabPageBorderColor = Color(127, 127, 127, 255);
+		tbl.TabPageItemSelectedBackColor1 = Color(210, 227, 255, 255);
+		tbl.TabPageItemSelectedBackColor2 = tbl.ControlBackColor;
+
+		tbl.TabPageItemHighlightBackColor1 = Color(220, 244, 255, 255);
+		tbl.TabPageItemHighlightBackColor2 = Color(220, 244, 255, 255);
+
+		tbl.TabPageItemBackColor1 = tbl.ControlBackColor;
+		tbl.TabPageItemBackColor2 = tbl.TabPageBorderColor;
+
+		tbl.ButtonBackColorChecked = Color(40, 40, 40, 255);
+
+		tbl.DefaultFormStyle.ShowIcon = true;
+		tbl.DefaultFormStyle.CtrlButtonBorderStyle = BS_RAISED;
+		tbl.DefaultFormStyle.TitleBarColors[0] = Color(85, 85, 85, 255);
+		tbl.DefaultFormStyle.TitleBarColors[1] = tbl.DefaultFormStyle.TitleBarColors[0];
+		tbl.DefaultFormStyle.TitleBarColors[2] = Color(166, 202, 240, 255);
+		tbl.DefaultFormStyle.TitleBarColors[3] = tbl.DefaultFormStyle.TitleBarColors[2];
+		tbl.DefaultFormStyle.TitleBarDeactiveColors[0] = Color(128, 128, 128, 255);
+		tbl.DefaultFormStyle.TitleBarDeactiveColors[1] = tbl.DefaultFormStyle.TitleBarDeactiveColors[0];
+		tbl.DefaultFormStyle.TitleBarDeactiveColors[2] = Color(192, 192, 192, 255);
+		tbl.DefaultFormStyle.TitleBarDeactiveColors[3] = tbl.DefaultFormStyle.TitleBarDeactiveColors[2];
+
+		tbl.DefaultFormStyle.TitleBarFontColor = Color(255, 255, 255, 255);
+		tbl.DefaultFormStyle.TopMost = false;
+		tbl.DefaultFormStyle.BackColor = Color(0, 0, 0, 180);
+		tbl.DefaultFormStyle.BorderColor = tbl.ControlBorderColor;
+
+		tbl.SelectionColor = Color(244, 165, 0, 255);
+		tbl.UnfocusedSelectionColor = Color(100, 100, 100, 127);
+		tbl.HighlightColor = Color(100, 100, 100, 127);
+		tbl.HighlightForeColor = Color(255, 255, 255, 255);
+		tbl.SelectionForeColor = Color(255, 255, 255, 255);
+		return tbl;
+	}
+
 	ColorTable CreateDefaultColorTable()
 	{
 		ColorTable tbl;
 
 		tbl.ControlBackColor = Color(235,238,241,255);
 		tbl.ControlBorderColor = Color(211,232,254,255);
-
+		tbl.ControlFontColor = Color(0, 0, 0, 255);
+		tbl.EditableAreaBackColor = Color(255, 255, 255, 255);
+		tbl.ScrollBarBackColor = Color(255, 255, 255, 127);
 		tbl.MemuIconBackColor = Color(232,232,225,255);
 		tbl.MenuBackColor = Color(242,242,238,255);
 		tbl.MenuBorderColor = Color(150,150,150,255);
@@ -197,6 +266,29 @@ namespace GraphicsUI
 		tbl.TabPageItemBackColor2 = tbl.TabPageBorderColor;
 
 		tbl.ButtonBackColorChecked = Color(254,216,152,255);
+
+		tbl.SelectionColor = Color(10, 36, 106, 255);
+		tbl.HighlightColor = Color(200, 200, 200, 255);
+		tbl.HighlightForeColor = Color(0, 0, 0, 255);
+		tbl.SelectionForeColor = Color(255, 255, 255, 255);
+		tbl.UnfocusedSelectionColor = Color(200, 200, 200, 255);
+		tbl.DefaultFormStyle.ShowIcon = true;
+		tbl.DefaultFormStyle.CtrlButtonBorderStyle = BS_RAISED;
+		tbl.DefaultFormStyle.TitleBarColors[0] = Color(10, 36, 106, 255);
+		tbl.DefaultFormStyle.TitleBarColors[1] = tbl.DefaultFormStyle.TitleBarColors[0];
+		tbl.DefaultFormStyle.TitleBarColors[2] = Color(166, 202, 240, 255);
+		tbl.DefaultFormStyle.TitleBarColors[3] = tbl.DefaultFormStyle.TitleBarColors[2];
+		tbl.DefaultFormStyle.TitleBarDeactiveColors[0] = Color(128, 128, 128, 255);
+		tbl.DefaultFormStyle.TitleBarDeactiveColors[1] = tbl.DefaultFormStyle.TitleBarDeactiveColors[0];
+		tbl.DefaultFormStyle.TitleBarDeactiveColors[2] = Color(192, 192, 192, 255);
+		tbl.DefaultFormStyle.TitleBarDeactiveColors[3] = tbl.DefaultFormStyle.TitleBarDeactiveColors[2];
+
+		tbl.DefaultFormStyle.TitleBarFontColor = Color(255, 255, 255, 255);
+		tbl.DefaultFormStyle.TopMost = false;
+		tbl.DefaultFormStyle.BackColor = tbl.ControlBackColor;
+		tbl.DefaultFormStyle.BorderColor = tbl.ControlBorderColor;
+
+		tbl.UnfocusedSelectionColor = Color(127, 127, 127, 255);
 
 		return tbl;
 	}
@@ -322,6 +414,9 @@ namespace GraphicsUI
 
 	Control::~Control()
 	{
+		auto entry = GetEntry();
+		if (entry && entry->FocusedControl == this)
+			entry->FocusedControl = nullptr;
 	}
 
 	bool Control::DoClosePopup()
@@ -654,8 +749,8 @@ namespace GraphicsUI
 			{
 				const int ShadowOffsetX = 8;
 				const int ShadowOffsetY = 8;
-				const int ShadowSize = 5;
-				const int MinShadowAlpha = 10;
+				const int ShadowSize = 8;
+				const int MinShadowAlpha = 22;
 				Color shadowColor(0,0,0,MinShadowAlpha);
 				for (int i=0; i<ShadowSize; i++)
 				{
@@ -672,7 +767,7 @@ namespace GraphicsUI
 		if (BackColor.A)
 		{
 			Graphics::SolidBrushColor = BackColor;
-			Graphics::FillRectangle(sys, absX, absY, absX + Width, absY + Height);
+			Graphics::FillRectangle(sys, absX, absY, absX + Width - 1, absY + Height - 1);
 		}
 		//Draw Border
 		Color LightColor, DarkColor;
@@ -687,27 +782,27 @@ namespace GraphicsUI
 		if (BorderStyle == BS_RAISED)
 		{
 			Graphics::PenColor = LightColor;
-			Graphics::DrawLine(sys, absX, absY, absX + Width, absY);
-			Graphics::DrawLine(sys, absX, absY, absX, absY + Height);
+			Graphics::DrawLine(sys, absX, absY, absX + Width - 1, absY);
+			Graphics::DrawLine(sys, absX, absY, absX, absY + Height - 1);
 
 			Graphics::PenColor = DarkColor;
-			Graphics::DrawLine(sys, absX + Width, absY, absX + Width, absY + Height);
-			Graphics::DrawLine(sys, absX + Width, absY + Height, absX, absY + Height - 1);
+			Graphics::DrawLine(sys, absX + Width - 1, absY, absX + Width - 1, absY + Height - 1);
+			Graphics::DrawLine(sys, absX + Width - 1, absY + Height - 1, absX, absY + Height - 1);
 		}
 		else if (BorderStyle == BS_LOWERED)
 		{
 			Graphics::PenColor = DarkColor;
-			Graphics::DrawLine(sys, absX, absY, absX + Width, absY);
-			Graphics::DrawLine(sys, absX, absY, absX, absY + Height);
+			Graphics::DrawLine(sys, absX, absY, absX + Width - 1, absY);
+			Graphics::DrawLine(sys, absX, absY, absX, absY + Height - 1);
 
 			Graphics::PenColor = LightColor;
-			Graphics::DrawLine(sys, absX + Width, absY, absX + Width, absY + Height);
-			Graphics::DrawLine(sys, absX + Width, absY + Height, absX, absY + Height - 1);
+			Graphics::DrawLine(sys, absX + Width - 1, absY, absX + Width - 1, absY + Height - 1);
+			Graphics::DrawLine(sys, absX + Width - 1, absY + Height - 1, absX, absY + Height - 1);
 		}
 		else if (BorderStyle == BS_FLAT_)
 		{
 			Graphics::PenColor = BorderColor;
-			Graphics::DrawRectangle(sys, absX, absY, absX + Width, absY + Height);
+			Graphics::DrawRectangle(sys, absX, absY, absX + Width - 1, absY + Height - 1);
 		}
 	}
 
@@ -744,8 +839,7 @@ namespace GraphicsUI
 		BorderStyle = BS_NONE;
 		BackColor.A = 0;
 		BackColor.R = 255;  BackColor.G =255; BackColor.B = 255;
-		FontColor.A = 255;
-		FontColor.R = 0;	FontColor.G = 0;  FontColor.B = 0;
+		FontColor = Global::ColorTable.ControlFontColor;
 		FChanged = true;
 		Type = CT_LABEL;
 		AutoSize = true;
@@ -830,6 +924,7 @@ namespace GraphicsUI
 		FocusRectColor.B = FocusRectColor.G = FocusRectColor.R = 0;
 		FocusRectColor.A = 255;
 		BackColor = Global::ColorTable.ControlBackColor;
+		FontColor = Global::ColorTable.ControlFontColor;
 		Checked = false;
 		AutoSize = false;
 	}
@@ -899,7 +994,7 @@ namespace GraphicsUI
 			BorderStyle = BS_LOWERED;
 		}
 		Global::MouseCaptureControl = this;
-		return false;
+		return true;
 	}
 
 	bool Button::DoMouseUp(int X, int Y, SHIFTSTATE Shift)
@@ -908,7 +1003,7 @@ namespace GraphicsUI
 		IsMouseDown = false;
 		BorderStyle = BS_RAISED;
 		ReleaseMouse();
-		return false;
+		return true;
 	}
 
 	bool Button::DoKeyDown(unsigned short Key, SHIFTSTATE Shift)
@@ -1224,22 +1319,10 @@ namespace GraphicsUI
 		lblClose->Visible = false;
 		btnClose->BorderStyle = BS_NONE;
 		btnClose->BackColor.A = 0;
-		formStyle.ShowIcon = true;
-		formStyle.CtrlButtonBorderStyle = BS_RAISED;
-		formStyle.TitleBarColors[0]=Color(10,36,106,255);
-		formStyle.TitleBarColors[1]=formStyle.TitleBarColors[0];
-		formStyle.TitleBarColors[2]=Color(166,202,240,255);
-		formStyle.TitleBarColors[3]=formStyle.TitleBarColors[2];
-
-		formStyle.TitleBarDeactiveColors[0]=Color(128,128,128,255);
-		formStyle.TitleBarDeactiveColors[1]=formStyle.TitleBarDeactiveColors[0];
-		formStyle.TitleBarDeactiveColors[2]=Color(192,192,192,255);
-		formStyle.TitleBarDeactiveColors[3]=formStyle.TitleBarDeactiveColors[2];
+		formStyle = Global::ColorTable.DefaultFormStyle;
 		formStyle.TitleFont = parent->GetEntry()->System->LoadDefaultFont(GraphicsUI::DefaultFontType::Title);
-		formStyle.TitleBarFontColor = Color(255,255,255,255);
-		formStyle.TopMost = false;
 		formStyle.TitleBarHeight = (int)(parent->GetEntry()->GetLineHeight() * 1.2f);
-
+	
 		Left = Top = 20;
 		Height = Width = 200;
 		Margin = 5;
@@ -1310,6 +1393,9 @@ namespace GraphicsUI
 		lblTitle->FontColor = formStyle.TitleBarFontColor;
 		lblClose->FontColor = formStyle.TitleBarFontColor;
 		btnClose->Posit(0,0,formStyle.TitleBarHeight-4,formStyle.TitleBarHeight-4);
+		BackColor = formStyle.BackColor;
+		BorderColor = formStyle.BorderColor;
+		btnClose->BackColor = formStyle.CtrlButtonBackColor;
 		SizeChanged();
 	}
 
@@ -1355,6 +1441,8 @@ namespace GraphicsUI
 	void Form::SetFormStyle(const FormStyle &AFormStyle)
 	{
 		formStyle = AFormStyle;
+		BackColor = formStyle.BackColor;
+		BorderColor = formStyle.BorderColor;
 		FormStyleChanged();
 	}
 
@@ -1794,7 +1882,7 @@ namespace GraphicsUI
 	}
 
 	template<typename Func>
-	void BroadcastMouseMessage(List<Control*> & stack, int X, int Y, const Func & f)
+	void BroadcastMouseMessage(List<MouseMessageStack> & stack, int X, int Y, const Func & f)
 	{ 
 		// mouse messages send to pointed components only
 		auto ctrlToBroadcast = Global::MouseCaptureControl ? Global::MouseCaptureControl : Global::PointedComponent;
@@ -1803,16 +1891,18 @@ namespace GraphicsUI
 			stack.Clear();
 			while (ctrlToBroadcast)
 			{
-				stack.Add(ctrlToBroadcast);
+				MouseMessageStack item;
+				item.Ctrl = ctrlToBroadcast;
+				stack.Add(item);
 				ctrlToBroadcast = ctrlToBroadcast->Parent;
 			}
-			Control* parent = stack.Last();
+			auto parent = stack.Last().Ctrl;
 			int cx = X;
 			int cy = Y;
 			
 			for (int i = stack.Count() - 2; i >= 0; i--)
 			{
-				auto ctrl = stack[i];
+				auto ctrl = stack[i].Ctrl;
 				cx -= ctrl->Left;
 				cy -= ctrl->Top;
 				if (ctrl->DockStyle == Control::dsNone || ctrl->DockStyle == Control::dsFill)
@@ -1820,10 +1910,13 @@ namespace GraphicsUI
 					cx -= parent->ClientRect().x;
 					cy -= parent->ClientRect().y;
 				}
-				if (f(ctrl, cx, cy))
-					break;
+				stack[i].X = cx;
+				stack[i].Y = cy;
 				parent = ctrl;
 			}
+			for (int i = 0; i < stack.Count() - 1; i++)
+				if (f(stack[i].Ctrl, stack[i].X, stack[i].Y))
+					break;
 		}
 	}
 	bool UIEntry::DoMouseDown(int X, int Y, SHIFTSTATE Shift)
@@ -2320,14 +2413,14 @@ namespace GraphicsUI
 		absY = absY + Top;
 		//Draw Check Box
 		Color LightColor, DarkColor;
-		LightColor.R = (unsigned char)ClampInt(BackColor.R + COLOR_LIGHTEN,0,255);
-		LightColor.G = (unsigned char)ClampInt(BackColor.G + COLOR_LIGHTEN,0,255);
-		LightColor.B = (unsigned char)ClampInt(BackColor.B + COLOR_LIGHTEN,0,255);
-		LightColor.A = (unsigned char)ClampInt(BackColor.A+COLOR_LIGHTEN, 0, 255);
-		DarkColor.R = (unsigned char)ClampInt(BackColor.R - COLOR_LIGHTEN, 0, 255);
-		DarkColor.G = (unsigned char)ClampInt(BackColor.G - COLOR_LIGHTEN, 0, 255);
-		DarkColor.B = (unsigned char)ClampInt(BackColor.B - COLOR_LIGHTEN, 0, 255);
-		DarkColor.A = (unsigned char)ClampInt(BackColor.A + COLOR_LIGHTEN, 0, 255);
+		LightColor.R = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.R + COLOR_LIGHTEN,0,255);
+		LightColor.G = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.G + COLOR_LIGHTEN,0,255);
+		LightColor.B = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.B + COLOR_LIGHTEN,0,255);
+		LightColor.A = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.A+COLOR_LIGHTEN, 0, 255);
+		DarkColor.R = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.R - COLOR_LIGHTEN, 0, 255);
+		DarkColor.G = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.G - COLOR_LIGHTEN, 0, 255);
+		DarkColor.B = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.B - COLOR_LIGHTEN, 0, 255);
+		DarkColor.A = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.A + COLOR_LIGHTEN, 0, 255);
 		auto entry = GetEntry();
 		int checkBoxSize = GetEntry()->CheckmarkLabel->TextWidth;
 		int checkBoxTop = (Height - checkBoxSize) >> 1;
@@ -2421,14 +2514,14 @@ namespace GraphicsUI
 		absY = absY + Top;
 		//Draw Check Box
 		Color LightColor, DarkColor;
-		LightColor.R = (unsigned char)ClampInt(BackColor.R + COLOR_LIGHTEN, 0, 255);
-		LightColor.G = (unsigned char)ClampInt(BackColor.G + COLOR_LIGHTEN, 0, 255);
-		LightColor.B = (unsigned char)ClampInt(BackColor.B + COLOR_LIGHTEN, 0, 255);
-		LightColor.A = (unsigned char)ClampInt(BackColor.A + COLOR_LIGHTEN, 0, 255);
-		DarkColor.R = (unsigned char)ClampInt(BackColor.R - COLOR_LIGHTEN, 0, 255);
-		DarkColor.G = (unsigned char)ClampInt(BackColor.G - COLOR_LIGHTEN, 0, 255);
-		DarkColor.B = (unsigned char)ClampInt(BackColor.B - COLOR_LIGHTEN, 0, 255);
-		DarkColor.A = (unsigned char)ClampInt(BackColor.A + COLOR_LIGHTEN, 0, 255);
+		LightColor.R = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.R + COLOR_LIGHTEN, 0, 255);
+		LightColor.G = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.G + COLOR_LIGHTEN, 0, 255);
+		LightColor.B = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.B + COLOR_LIGHTEN, 0, 255);
+		LightColor.A = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.A + COLOR_LIGHTEN, 0, 255);
+		DarkColor.R = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.R - COLOR_LIGHTEN, 0, 255);
+		DarkColor.G = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.G - COLOR_LIGHTEN, 0, 255);
+		DarkColor.B = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.B - COLOR_LIGHTEN, 0, 255);
+		DarkColor.A = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.A + COLOR_LIGHTEN, 0, 255);
 		auto entry = GetEntry();
 		int checkBoxSize = GetEntry()->GetLineHeight();
 		int rad = checkBoxSize / 2;
@@ -2499,10 +2592,11 @@ namespace GraphicsUI
 		TabStop = true;
 		Locked = false; Changed = true;
 		SelStart = SelLength = SelOrigin = 0;
-		SelectionColor = Color(10,36,106,255);
-		SelectedTextColor = Color(255,255,255,255);
+		SelectionColor = Global::ColorTable.SelectionColor;
+		SelectedTextColor = Global::ColorTable.SelectionForeColor;
 		BorderStyle = BS_LOWERED;
-		BackColor = Color(255,255,255,255);
+		BackColor = Global::ColorTable.EditableAreaBackColor;
+		FontColor = Global::ColorTable.ControlFontColor;
 		TextBorderX =2; TextBorderY = 4;
 		LabelOffset = TextBorderX;
 		QueryPerformanceFrequency((LARGE_INTEGER *)&Freq);
@@ -2571,6 +2665,7 @@ namespace GraphicsUI
 			SelOrigin = CursorPos;
 			CursorPosChanged();
 			Global::MouseCaptureControl = this;
+			return true;
 		}
 		else
 			SelectMode=false;
@@ -2863,6 +2958,7 @@ namespace GraphicsUI
 			}
 			CursorPos = cp;
 			CursorPosChanged();
+			return true;
 		}
 		return false;
 	}
@@ -2872,6 +2968,8 @@ namespace GraphicsUI
 		Control::DoMouseUp(X,Y,Shift);
 		SelectMode = false;
 		ReleaseMouse();
+		if (Enabled && Visible)
+			return true;
 		return false;
 	}
 
@@ -3226,7 +3324,7 @@ namespace GraphicsUI
 	{
 		Type = CT_SCROLLBAR;
 		BorderStyle = BS_NONE;
-		BackColor = Color(255,255,255,127);
+		BackColor = Global::ColorTable.ScrollBarBackColor;
 		btnInc = new Button(this);
 		btnDec = new Button(this);
 		Slider = new Control(this);
@@ -3414,7 +3512,7 @@ namespace GraphicsUI
 		auto hitTest = Container::FindControlAtPosition(X, Y);
 		if (hitTest == btnDec || hitTest == btnInc)
 			hitTest->DoMouseDown(X - hitTest->Left, Y - hitTest->Top, Shift);
-		return false;
+		return true;
 	}
 
 	bool ScrollBar::DoMouseMove(int X, int Y)
@@ -3444,7 +3542,7 @@ namespace GraphicsUI
 		auto hitTest = Container::FindControlAtPosition(X, Y);
 		if (hitTest == btnDec || hitTest == btnInc)
 			hitTest->DoMouseMove(X - hitTest->Left, Y - hitTest->Top);
-		return false;
+		return true;
 	}
 
 	bool ScrollBar::DoMouseUp(int X, int Y, SHIFTSTATE Shift)
@@ -3459,7 +3557,7 @@ namespace GraphicsUI
 		if (hitTest == btnDec || hitTest == btnInc)
 			hitTest->DoMouseUp(X - hitTest->Left, Y - hitTest->Top, Shift);
 		ReleaseMouse();
-		return false;
+		return true;
 	}
 
 	void ScrollBar::tmrTick_Tick(Object *, CoreLib::WinForm::EventArgs e)
@@ -3549,7 +3647,7 @@ namespace GraphicsUI
 		Type = CT_LISTBOX;
 		TabStop = true;
 		BorderStyle = BS_LOWERED;
-		BackColor = Color(255,255,255,255);
+		BackColor = Global::ColorTable.EditableAreaBackColor;
 		HideSelection = false;
 		MultiSelect = false;
 		Selecting = false;
@@ -3558,17 +3656,17 @@ namespace GraphicsUI
 		SelectedIndex= -1;
 		ItemHeight = 18;
 		Margin = 2;
-		SelectionColor = Color(10,36,106,255);
-		HighLightColor = SelectionColor;
-		HighLightForeColor =Color(255,255,255,255);
-		SelectionForeColor = Color(255,255,255,255);
+		SelectionColor = Global::ColorTable.SelectionColor;
+		HighLightColor = Global::ColorTable.HighlightColor;
+		HighLightForeColor = Global::ColorTable.HighlightForeColor;
+		SelectionForeColor = Global::ColorTable.SelectionForeColor;
+		FontColor = Global::ColorTable.ControlFontColor;
 		FocusRectColor = Color(0,0,0,255);
-		UnfocusedSelectionColor = Color(200,200,200,255);
-		HighLightColor = Color(255,255,255,0);
+		UnfocusedSelectionColor = Global::ColorTable.UnfocusedSelectionColor;
+		HighLightColor = Global::ColorTable.HighlightColor;
 		ScrollBar = new GraphicsUI::ScrollBar(this);
 		ScrollBar->SetOrientation(SO_VERTICAL);
 		ScrollBar->Visible = false;
-		FontColor = Color(0,0,0,255);
 		BorderWidth = 2;
 	}
 
@@ -3590,7 +3688,7 @@ namespace GraphicsUI
 		int ShowCount = Height / ItemHeight +1;
 		int bdr = (ScrollBar->Visible?ScrollBar->GetWidth():0);
 		auto entry = GetEntry();
-		entry->ClipRects->AddRect(Rect(absX,absY,Width-BorderWidth*2,Height-BorderWidth*2));
+		entry->ClipRects->AddRect(Rect(absX,absY,Width-BorderWidth*2-(ScrollBar->Visible?ScrollBar->GetWidth():0),Height-BorderWidth*2));
 		for (int i=ScrollBar->GetPosition();i<=ScrollBar->GetPosition()+ShowCount && i<Items.Count();i++)
 		{
 			Control *CurItem = Items[i];
@@ -3642,7 +3740,7 @@ namespace GraphicsUI
 
 	bool ListBox::DoMouseDown(int X, int Y, SHIFTSTATE Shift)
 	{
-		selectionHasChanged = false;
+		lastSelIdx = SelectedIndex;
 		Control::DoMouseDown(X,Y,Shift);
 		int bdr=0,ShowCount=Height/ItemHeight;
 		if (!Enabled || !Visible)
@@ -3666,7 +3764,6 @@ namespace GraphicsUI
 		{
 			DownInItem = true;
 			auto newSelIdx = HitTest(X,Y);
-			selectionHasChanged = SelectedIndex != newSelIdx; 
 			SelectedIndex = newSelIdx;
 			if (MultiSelect)
 			{
@@ -3756,14 +3853,12 @@ namespace GraphicsUI
 					Selection.Add(Items[i]);
 				}
 				auto newSelIdx = idEnd;
-				selectionHasChanged = SelectedIndex != newSelIdx;
 				SelectedIndex = newSelIdx;
 			}
 		}
 		else if (DownInItem)
 		{
 			auto newSelIdx = HitTest(X, Y);
-			selectionHasChanged = SelectedIndex != newSelIdx;
 			SelectedIndex = newSelIdx;
 		}
 		if (DownInItem)
@@ -3787,7 +3882,7 @@ namespace GraphicsUI
 		{
 			HighLightID = -1;
 		}
-		return false;
+		return true;
 	}
 
 	bool ListBox::DoMouseWheel(int delta)
@@ -3795,6 +3890,7 @@ namespace GraphicsUI
 		if (Visible && Enabled)
 		{
 			ScrollBar->SetPosition(Math::Clamp(ScrollBar->GetPosition() + (delta > 0 ? -1 : 1) * 3, 0, ScrollBar->GetMax()));
+			return true;
 		}
 		return false;
 	}
@@ -3816,13 +3912,12 @@ namespace GraphicsUI
 		Selecting = false;
 		if (ScrollBar->Visible && hitTest == ScrollBar)
 			ScrollBar->DoMouseUp(X - hitTest->Left, Y - hitTest->Top,Shift);
-		if (selectionHasChanged || Items.Count() && Items[0]->Type == CT_CHECKBOX)
+		if (lastSelIdx != SelectedIndex || Items.Count() && Items[0]->Type == CT_CHECKBOX)
 		{
-			selectionHasChanged = false;
 			SelectionChanged();
 		}
 		ReleaseMouse();
-		return false;
+		return true;
 	}
 
 	void ListBox::SelectionChanged()
@@ -3984,7 +4079,6 @@ namespace GraphicsUI
 
 	void ComboBox::SizeChanged()
 	{
-		ButtonSize = Height - BorderWidth * 2;
 		TextBox->Posit(BorderWidth,BorderWidth,Width-ButtonSize-BorderWidth*2,Height);
 		btnDrop->Posit(Width-ButtonSize-BorderWidth,BorderWidth,ButtonSize,ButtonSize);
 	}
@@ -4003,6 +4097,7 @@ namespace GraphicsUI
 			return;
 		TextBox->Focused = (Focused && !ShowList);
 		TextBox->Draw(absX,absY);
+		btnDrop->Checked = ShowList;
 		btnDrop->Draw(absX,absY);
 	}
 
@@ -4071,12 +4166,14 @@ namespace GraphicsUI
 		R.w = ListWidth+1;
 		R.h = ListHeight+2;
 		GetEntry()->ClipRects->AddRect(R);
+		btnDrop->Visible = false;
 	}
 
 	void ComboBox::EndListBoxFunctions()
 	{
 		GetEntry()->ClipRects->PopRect();
 		ComboBox::Posit(lL,lT,lW,lH);
+		btnDrop->Visible = true;
 	}
 
 	bool ComboBox::DoMouseDown(int X, int Y, SHIFTSTATE Shift)
@@ -4084,6 +4181,7 @@ namespace GraphicsUI
 		Control::DoMouseDown(X,Y,Shift);
 		if (!Visible || !Enabled)
 			return false;
+		lastSelIdx = SelectedIndex;
 		if (IsPointInClient(X, Y))
 		{
 			ToggleList(!ShowList);
@@ -4104,7 +4202,7 @@ namespace GraphicsUI
 				ReleaseMouse();
 			}
 		}
-		return false;
+		return true;
 	}
 
 	bool ComboBox::DoMouseMove(int X, int Y)
@@ -4118,7 +4216,7 @@ namespace GraphicsUI
 			ListBox::DoMouseMove(X - ListLeft, Y - ListTop);
 			EndListBoxFunctions();
 		}
-		return false;
+		return true;
 	}
 
 	bool ComboBox::DoMouseWheel(int delta)
@@ -4173,7 +4271,7 @@ namespace GraphicsUI
 		}
 		else
 			ReleaseMouse();
-		return false;
+		return true;
 	}
 
 	bool ComboBox::DoKeyDown(unsigned short Key, SHIFTSTATE)
@@ -4214,9 +4312,12 @@ namespace GraphicsUI
 				BeginListBoxFunctions();
 				int lstB = BorderStyle;
 				Color lstBC= BorderColor;
-				BorderColor = Color(0,0,0,255);
+				BorderColor = Global::ColorTable.ControlFontColor;
 				BorderStyle = BS_FLAT_;
+				auto oldShadow = BackgroundShadow;
+				BackgroundShadow = true;
 				ListBox::Draw(AbsolutePosX,AbsolutePosY);
+				BackgroundShadow = oldShadow;
 				BorderStyle = lstB;
 				BorderColor = lstBC;
 				EndListBoxFunctions();
@@ -5445,9 +5546,10 @@ namespace GraphicsUI
 		if (Enabled && Visible && IsPointInClient(X-Left, Y-Top))
 		{
 			Pressed = true;
+			return true;
 		}
 		else
-			Pressed =false;
+			Pressed = false;
 		return false;
 	}
 

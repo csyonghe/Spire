@@ -49,7 +49,8 @@ namespace RealtimeEngine
 				heightMapData[i*bmp.GetWidth() + j] = y;
 				VertexData vert;
 				vert.Position = Vec3::Create(x, y, z);
-				vert.UV = Vec2::Create((float)(j%blockSize) / (float)blockSize, (float)(i%blockSize) / (float)blockSize);
+				vert.UV.x = (float)(j%blockSize) / (float)blockSize;
+				vert.UV.y = (float)(i%blockSize) / (float)blockSize;
 				vert.Tangent = Vec3::Create(1.0f, 0.0f, 0.0f);
 				vert.Normal = Vec3::Create(0.0f, 1.0f, 0.0f);
 				vertices.Add(vert);

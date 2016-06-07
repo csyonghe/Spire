@@ -149,11 +149,31 @@ namespace GraphicsUI
 		static void DrawLine(ISystemInterface * sys, int x1, int y1, int x2, int y2);
 	};
 
+
+	struct FormStyle
+	{
+		Color TitleBarColors[4];
+		Color TitleBarDeactiveColors[4];
+		Color TitleBarFontColor;
+		Color BackColor, BorderColor;
+		bool ShowIcon;
+		Color CtrlButtonBackColor;
+		IFont * TitleFont = nullptr;
+		int CtrlButtonBorderStyle;
+		int TitleBarHeight;
+		bool TopMost;
+		bool Sizeable = true;
+		FormStyle();
+	};
+
+
 	class ColorTable
 	{
 	public:
-		Color ControlBackColor;
+		Color ControlBackColor, ControlFontColor;
 		Color ControlBorderColor;
+		Color EditableAreaBackColor;
+		Color ScrollBarBackColor;
 		Color ToolButtonBorderHighLight;
 		Color ToolButtonBorderSelected;
 		Color ToolButtonBackColor1;
@@ -181,9 +201,12 @@ namespace GraphicsUI
 		Color TabPageItemBackColor1, TabPageItemBackColor2;
 		Color TabPageItemSelectedBackColor1, TabPageItemSelectedBackColor2;
 		Color TabPageItemHighlightBackColor1, TabPageItemHighlightBackColor2;
+		Color SelectionColor, SelectionForeColor, HighlightColor, HighlightForeColor, UnfocusedSelectionColor;
+		FormStyle DefaultFormStyle;
 	};
 
 	ColorTable CreateDefaultColorTable();
+	ColorTable CreateDarkColorTable();
 
 	class ClipRectStack
 	{
@@ -360,21 +383,6 @@ namespace GraphicsUI
 		virtual void SizeChanged();
 		virtual bool DoClosePopup();
 		virtual void KillFocus();
-	};
-
-	struct FormStyle
-	{
-		Color TitleBarColors[4];
-		Color TitleBarDeactiveColors[4];
-		Color TitleBarFontColor;
-		bool ShowIcon;
-		Color CtrlButtonBackColor;
-		IFont * TitleFont = nullptr;
-		int CtrlButtonBorderStyle;
-		int TitleBarHeight;
-		bool TopMost;
-		bool Sizeable = true;
-		FormStyle();
 	};
 
 	class Label;
@@ -584,10 +592,17 @@ namespace GraphicsUI
 		void StringInputed(CoreLib::String AString);
 	};
 
+	class MouseMessageStack
+	{
+	public:
+		Control * Ctrl;
+		int X, Y;
+	};
+
 	class UIEntry: public Container
 	{
 	private:
-		CoreLib::List<Control*> controlStack;
+		CoreLib::List<MouseMessageStack> controlStack;
 	protected:
 		SHIFTSTATE GetCurrentShiftState();
 		void TranslateMouseMessage(UIMouseEventArgs &Data,WPARAM wParam, LPARAM lParam);
@@ -691,7 +706,7 @@ namespace GraphicsUI
 		int SelOriX,SelOriY;
 		int BorderWidth;
 		bool DownInItem;
-		bool selectionHasChanged = false;
+		int lastSelIdx = -1;
 		ScrollBar *ScrollBar;
 		void ListChanged();
 		void SelectionChanged();
@@ -706,7 +721,7 @@ namespace GraphicsUI
 		bool HideSelection, MultiSelect;
 		Color SelectionColor,UnfocusedSelectionColor,SelectionForeColor,FocusRectColor,HighLightColor,HighLightForeColor;
 		CoreLib::List<Control *> Selection;
-		int SelectedIndex;
+		int SelectedIndex = -1;
 		int Margin;
 		int HitTest(int X, int Y);
 		Control *GetSelectedItem();

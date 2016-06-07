@@ -7,7 +7,7 @@ namespace SceneViewer
 	ShaderInfoForm::ShaderInfoForm(GraphicsUI::UIEntry * entry)
 		: GraphicsUI::Form(entry)
 	{
-		this->SetText(L"Shader Componenets");
+		this->SetText(L"Shader Components");
 		contentBox = new Container(this);
 		contentBox->Posit(0, 0, 100, 100);
 		contentBox->BackColor.A = 0;
@@ -57,7 +57,7 @@ namespace SceneViewer
 				}
 				auto compLbl = new GraphicsUI::Label(contentBox);
 				compLbl->AutoSize = true;
-				compLbl->BorderStyle = GraphicsUI::BS_FLAT_;
+				compLbl->BorderStyle = GraphicsUI::BS_NONE;
 				compLbl->Posit(0, 0, 100, 30);
 				compLbl->SetText(comp);
 				int x, y;
@@ -71,11 +71,13 @@ namespace SceneViewer
 					x = curX = leftMargin;
 				}
 				y = curRow * lineHeight + 50;
-				compLbl->BorderColor = isInInterface ? GraphicsUI::Color(255, 220, 128) : GraphicsUI::Color(255, 255, 255);
-				compLbl->FontColor = compLbl->BorderColor;
+				compLbl->BorderColor.A = 0;
+				compLbl->BackColor = GraphicsUI::Color(90,90,90,160);
+				compLbl->FontColor = isInInterface ? GraphicsUI::Color(255, 220, 128) : GraphicsUI::Color(255, 255, 255);
 				compLbl->Left = curX + wid * columnWidth;
 				compLbl->Top = y;
-				compLbl->SetWidth(Math::Min(compLbl->GetWidth(), (wid + 1) * columnWidth - 10 - compLbl->Left));
+				
+				compLbl->SetWidth(Math::Min(compLbl->GetWidth() + 4, (wid + 1) * columnWidth - 10 - compLbl->Left));
 				compLbl->BorderStyle = GraphicsUI::BS_FLAT_;
 				curX += compLbl->GetWidth() + 12;
 				maxY = Math::Max(y + lineHeight, maxY);

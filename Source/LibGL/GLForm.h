@@ -64,11 +64,11 @@ namespace CoreLib
 				glContext = nullptr;
 				Application::UnRegisterComponent(this);
 			}
-			void DrawUIOverlay(GL::FrameBuffer frameBuffer)
+			void DrawUIOverlay()
 			{
 				uiSystemInterface->BeginUIDrawing();
 				uiEntry->DrawUI();
-				uiSystemInterface->EndUIDrawing(frameBuffer);
+				uiSystemInterface->EndUIDrawing();
 			}
 		};
 	}

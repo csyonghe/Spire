@@ -26,7 +26,6 @@ namespace SceneViewer
 	{
 	private:
 		WinForm::GLForm * ownerForm = nullptr;
-		HashSet<String> availableChoices[4];
 		List<Vec4> referenceFrame;
 		List<Vec4> ReadFrameData(GL::Texture2D tex);
 		float currentBestValue = 1e30f;
@@ -39,7 +38,6 @@ namespace SceneViewer
 		GraphicsUI::TextBox *timeBudgetTextBox;
 		GraphicsUI::VScrollPanel *scrollPanel;
 		GraphicsUI::ListBox *shaderBox;
-		GraphicsUI::ComboBox *pipelineBox;
 		GraphicsUI::CheckBox *autoRecompileCheckBox;
 		EnumerableDictionary<GraphicsUI::ComboBox*, String> comboBoxChoiceNames;
 		EnumerableDictionary<String, GraphicsUI::ComboBox*> choiceComboBoxes;
@@ -52,7 +50,7 @@ namespace SceneViewer
 		void UpdateChoicePanel(String shaderName);
 		void UpdateChoiceOptions(GraphicsUI::ComboBox * cmb);
 		void Recompile();
-		int AutotuneHelper(HashSet<String> & selectedChoices, EnumerableDictionary<String, Spire::Compiler::ShaderChoiceValue>& currentChoices, float timeBudget, int pipeline, bool countOnly = false);
+		int AutotuneHelper(HashSet<String> & selectedChoices, EnumerableDictionary<String, Spire::Compiler::ShaderChoiceValue>& currentChoices, float timeBudget, bool countOnly = false);
 		void Autotune(float timeBudget);
 		void AutotuneTex();
 		void ResetButton_Clicked(GraphicsUI::UI_Base *);

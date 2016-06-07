@@ -344,9 +344,6 @@ namespace GraphicsUI
 		GL::BufferObject vertexBuffer;
 		GL::VertexArray posUvVertexArray, posVertexArray;
 		GL::TextureSampler linearSampler;
-		GL::FrameBuffer uiFrameBuffer;
-		GL::Texture2D uiSurface;
-		GL::RenderBuffer uiDepth;
 		Vec2 translation;
 		Vec4 clipRect;
 	public:
@@ -384,14 +381,6 @@ namespace GraphicsUI
 
 			linearSampler = glContext->CreateTextureSampler();
 			linearSampler.SetFilter(GL::TextureFilter::Linear);
-
-			uiFrameBuffer = glContext->CreateFrameBuffer();
-			uiSurface = glContext->CreateTexture2D();
-			uiSurface.SetData(GL::StorageFormat::RGBA_I8, 16, 16, 1, GL::DataType::Float, nullptr);
-			uiDepth = glContext->CreateRenderBuffer(GL::StorageFormat::Depth24Stencil8, 16, 16, 1);
-			uiFrameBuffer.SetColorRenderTarget(0, uiSurface);
-			uiFrameBuffer.SetDepthStencilRenderTarget(uiDepth);
-			uiFrameBuffer.EnableRenderTargets(1);
 		}
 		~GLUIRenderer()
 		{
@@ -408,42 +397,29 @@ namespace GraphicsUI
 			glContext->DestroyBuffer(vertexBuffer);
 			glContext->DestroyTextureSampler(linearSampler);
 
-			glContext->DestroyFrameBuffer(uiFrameBuffer);
-			glContext->DestroyTexture(uiSurface);
-			glContext->DestroyRenderBuffer(uiDepth);
 		}
 		void SetScreenResolution(int w, int h)
 		{
 			screenWidth = w;
 			screenHeight = h;
 			Matrix4::CreateOrthoMatrix(orthoMatrix, 0.0f, (float)screenWidth, 0.0f, (float)screenHeight, 1.0f, -1.0f);
-			uiSurface.SetData(GL::StorageFormat::RGBA_I8, w, h, 1, GL::DataType::Float, nullptr);
-			if (uiDepth.Handle)
-				glContext->DestroyRenderBuffer(uiDepth);
-			uiDepth = glContext->CreateRenderBuffer(GL::StorageFormat::Depth24Stencil8, w, h, 1);
-			uiFrameBuffer.SetColorRenderTarget(0, uiSurface);
-			uiFrameBuffer.SetDepthStencilRenderTarget(uiDepth);
 		}
 		void BeginUIDrawing()
 		{
 			glContext->SetBlendMode(GL::BlendMode::AlphaBlend);
-			glContext->SetWriteFrameBuffer(uiFrameBuffer);
-			glContext->Clear(false, true, true);
 			glContext->SetZTestMode(GL::BlendOperator::Disabled);
 			glContext->SetViewport(0, 0, screenWidth, screenHeight);
 		}
-		void EndUIDrawing(GL::FrameBuffer frameBuffer)
+		void EndUIDrawing()
 		{
-			glContext->SetWriteFrameBuffer(frameBuffer);
-			glContext->SetBlendMode(GL::BlendMode::AlphaBlend);
-			DrawTextureQuad(uiSurface, 0, 0, screenWidth, screenHeight);
 			glContext->SetBlendMode(GL::BlendMode::Replace);
+			glContext->BindVertexArray(GL::VertexArray());
 		}
 		void DrawLine(const Vec4 & color, float x0, float y0, float x1, float y1)
 		{
 			Vec2 points[2];
-			points[0] = Vec2::Create(x0, y0);
-			points[1] = Vec2::Create(x1, y1);
+			points[0] = Vec2::Create(x0 + 0.5f, y0 + 0.5f);
+			points[1] = Vec2::Create(x1 + 0.5f, y1 + 0.5f);
 			vertexBuffer.SetData(points, sizeof(float) * 4);
 			solidColorProgram.Use();
 			solidColorProgram.SetUniform(0, orthoMatrix);
@@ -468,11 +444,11 @@ namespace GraphicsUI
 
 		void DrawSolidQuad(const Vec4 & color, int x, int y, int w, int h)
 		{
-			Vec4 vertexData[4];
-			vertexData[0] = Vec4::Create((float)x, (float)y, 0.0f, 0.0f);
-			vertexData[1] = Vec4::Create((float)x, (float)(y + h), 0.0f, 1.0f);
-			vertexData[2] = Vec4::Create((float)(x + w), (float)(y + h), 1.0f, 1.0f);
-			vertexData[3] = Vec4::Create((float)(x + w), (float)y, 1.0f, 0.0f);
+			Vec2 vertexData[4];
+			vertexData[0] = Vec2::Create((float)x, (float)y);
+			vertexData[1] = Vec2::Create((float)x, (float)(y + h));
+			vertexData[2] = Vec2::Create((float)(x + w), (float)(y + h));
+			vertexData[3] = Vec2::Create((float)(x + w), (float)y);
 			vertexBuffer.SetData(vertexData, sizeof(float) * 16);
 			solidColorProgram.Use();
 			solidColorProgram.SetUniform(0, orthoMatrix);
@@ -480,7 +456,7 @@ namespace GraphicsUI
 			solidColorProgram.SetUniform(2, color);
 			solidColorProgram.SetUniform(3, clipRect);
 
-			glContext->BindVertexArray(posUvVertexArray);
+			glContext->BindVertexArray(posVertexArray);
 			glContext->DrawArray(GL::PrimitiveType::TriangleFans, 0, 4);
 		}
 		void DrawTextureQuad(GL::Texture2D texture, int x, int y, int w, int h)
@@ -608,9 +584,9 @@ namespace GraphicsUI
 		{
 			uiRenderer->BeginUIDrawing();
 		}
-		virtual void EndUIDrawing(GL::FrameBuffer frameBuffer) override
+		virtual void EndUIDrawing() override
 		{
-			uiRenderer->EndUIDrawing(frameBuffer);
+			uiRenderer->EndUIDrawing();
 		}
 		virtual void SetRenderTransform(int dx, int dy) override
 		{

@@ -1,0 +1,125 @@
+pipeline MultiRatePipeline
+{
+    [Pinned]
+    [Packed]
+    abstract world rootVert;
+    
+    [InterfaceBlockIndex: "4"]
+    abstract world rootTex;
+    [Pinned]
+    [InterfaceBlockIndex: "1"]
+    abstract world viewUniform;
+    [Pinned]
+    [InterfaceBlock: "perInstanceUniform:2"]
+    abstract world perInstanceUniform;
+    [InterfaceBlock: "modelTransform:0"]
+    abstract world modelTransform;
+    world objSurfaceVs: "glsl(vertex:texSpaceVert)" using texSpaceVert export standardExport;
+    [InterfaceBlock: "ObjSpaceInput:5"]
+    world objSurface : "glsl" export fragmentExport;
+    
+    world lowResVs : "glsl(vertex:projCoord;command_list)" using projCoord export standardExport;
+    [InterfaceBlock : "LowResInput:6"]
+    world lowRes : "glsl(command_list)" using opacity export fragmentExport;
+    world vs : "glsl(vertex:projCoord;command_list)" using projCoord export standardExport;
+    world fs : "glsl(command_list)" using opacity export fragmentExport;
+    require @(vs, lowResVs) vec4 projCoord; 
+    require @fs vec2 screenCoord;
+    require @objSurfaceVs* vec4 texSpaceVert;
+    require out @fs vec4 outputColor;
+    require @(lowRes*, fs*) float opacity;
+    require @rootVert vec2 vert_uv;
+    import uniformImport(perInstanceUniform->vs);
+    import uniformImport(perInstanceUniform->fs);
+    import uniformImport(perInstanceUniform->objSurfaceVs);
+    import uniformImport(perInstanceUniform->objSurface);
+    import uniformImport(viewUniform->vs);
+    import uniformImport(viewUniform->fs);
+    import uniformImport(viewUniform->objSurfaceVs);
+    import uniformImport(viewUniform->objSurface);
+    import uniformImport(modelTransform->objSurfaceVs);
+    import uniformImport(modelTransform->objSurface);
+    import uniformImport(modelTransform->vs);
+    import uniformImport(modelTransform->fs);
+    import uniformImport(modelTransform->lowResVs);
+    import uniformImport(modelTransform->lowRes);
+    import vertexImport(rootVert->vs);
+    import vertexImport(rootVert->objSurfaceVs);
+    
+    import standardImport(vs->fs);
+    import standardImport(objSurfaceVs->objSurface);
+    
+    import textureImport(objSurface->fs) using vert_uv;
+    import textureImport(objSurface->vs) using vert_uv;
+    
+    import vertexImport(rootVert->lowResVs);
+    import standardImport(lowResVs->lowRes);
+    import uniformImport(perInstanceUniform->lowResVs);
+    import uniformImport(perInstanceUniform->lowRes);
+    import uniformImport(viewUniform->lowResVs);
+    import uniformImport(viewUniform->lowRes);
+    import textureImport(objSurface->lowRes) using vert_uv;
+    import textureImport(objSurface->lowResVs) using vert_uv;
+    import textureImport(lowRes->fs) using screenCoord;
+}
+
+float Pow4(float x)
+{
+    return (x*x)*(x*x);
+}
+
+vec2 LightingFuncGGX_FV(float dotLH, float roughness)
+{
+    float alpha = roughness*roughness;/*sf*/
+
+    // F
+    float F_a, F_b;
+    float dotLH5 = Pow4(1.0-dotLH) * (1.0 - dotLH);
+    F_a = 1.0;
+    F_b = dotLH5;
+
+    // V
+    float vis;
+    float k = alpha/2.0;
+    float k2 = k*k;
+    float invK2 = 1.0-k2;
+    vis = 1.0/(dotLH*dotLH*invK2 + k2);
+
+    return vec2(F_a*vis, F_b*vis);
+}
+
+float LightingFuncGGX_D(float dotNH, float roughness)
+{
+    float alpha = roughness*roughness;
+    float alphaSqr = alpha*alpha;
+    float pi = 3.14159;
+    float denom = dotNH * dotNH *(alphaSqr-1.0) + 1.0;
+
+    float D = alphaSqr/(pi * denom * denom);
+    return D;
+}
+
+float ComputeHighlightPhong(vec3 L, vec3 N, vec3 V, float roughness, float metallic, float specular)
+{
+    vec3 H = normalize(V+L);
+    float dotNL = clamp(dot(N,L), 0.01, 0.99);
+    float dotNH = clamp(dot(N,H), 0.01, 0.99);
+
+    float alpha = roughness*roughness;
+    float p = 6.644/(alpha*alpha) - 6.644;
+    float pi = 3.14159;
+    return dotNL * metallic * exp2(p * dotNH - p) / (pi * (alpha*alpha)) * specular;
+}
+
+float ComputeHighlightGGX(vec3 L, vec3 N, vec3 V, float roughness, float metallic, float specular)
+{
+    vec3 H = normalize(V+L);
+    float dotNL = clamp(dot(N,L), 0.01, 0.99);
+    float dotLH = clamp(dot(L,H), 0.01, 0.99);
+    float dotNH = clamp(dot(N,H), 0.01, 0.99);
+
+    float D = LightingFuncGGX_D(dotNH,roughness);
+    vec2 FV_helper = LightingFuncGGX_FV(dotLH,roughness);
+    float FV = metallic;
+    return dotNL * D * FV * specular;
+}

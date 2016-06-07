@@ -231,11 +231,11 @@ namespace CoreLib
 					int id = i+j*width;
 					if ((bits[id>>5] & (1<<(id&31))) != 0)
 					{
-						imageData[id] = VectorMath::Vec4(1.0f, 1.0f, 1.0f, 1.0f);
+						imageData[id] = VectorMath::Vec4::Create(1.0f, 1.0f, 1.0f, 1.0f);
 					}
 					else
 					{
-						imageData[id] = VectorMath::Vec4(0.0f, 0.0f, 0.0f, 1.0f);
+						imageData[id] = VectorMath::Vec4::Create(0.0f, 0.0f, 0.0f, 1.0f);
 					}
 				}
 			}
