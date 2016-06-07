@@ -1,8 +1,8 @@
 // import pipeline definition
-using "../ObjSpace.pipeline";
+using "../MultiRate.pipeline";
 
 // define the shader for our demo
-shader Demo1Shader
+shader Demo2Shader
 {
     // define vertex inputs
     @rootVert vec3 vert_pos;
@@ -35,6 +35,10 @@ shader Demo1Shader
     // pipeline requires a texture space vertex for object space rendering
     // here we require the mesh provides a unique parameterization stored in vert_uv
     vec4 texSpaceVert = vec4(vert_uv*2.0 - vec2(1.0), 0.0, 1.0);                    
+    
+    // provide a screen space coordinate for fs world so the Spire knows how to access
+    // component computed in lowRes world.
+    vec2 screenCoord = projCoord.xy/vec2(projCoord.w)*0.5 + vec2(0.5);
     
     vec2 uv = vert_uv * 10.0; // tile the texture
     vec3 albedo = texture(ground_pebble_map, uv).xyz;

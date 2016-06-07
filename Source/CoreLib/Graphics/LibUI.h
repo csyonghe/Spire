@@ -132,8 +132,6 @@ namespace GraphicsUI
 	typedef CoreLib::Event<UI_Base *, UIMouseEventArgs &> MouseEvent;
 	typedef CoreLib::Event<UI_Base *, UIKeyEventArgs &> KeyEvent;
 
-
-
 	class Graphics
 	{
 	public:

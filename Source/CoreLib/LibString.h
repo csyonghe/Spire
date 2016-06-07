@@ -375,11 +375,9 @@ namespace CoreLib
 
 			int IndexOf(const wchar_t * str, int id) const // String str
 			{
-#if _DEBUG
-				if (id < 0 || id >= length)
-					throw "SubString: index out of range.";
-#endif
 				if(!buffer)
+					return -1;
+				if (id < 0 || id >= length)
 					return -1;
 				auto findRs = wcsstr(buffer + id, str);
 				int res = findRs ? (int)(findRs - buffer.Ptr()) : -1;

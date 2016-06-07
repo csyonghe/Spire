@@ -1,4 +1,4 @@
-pipeline MultiRatePipeline
+pipeline ObjSpacePipeline
 {
     [Pinned]
     [Packed]
@@ -17,18 +17,14 @@ pipeline MultiRatePipeline
     world objSurfaceVs: "glsl(vertex:texSpaceVert)" using texSpaceVert export standardExport;
     [InterfaceBlock: "ObjSpaceInput:5"]
     world objSurface : "glsl" export fragmentExport;
-    
-    world lowResVs : "glsl(vertex:projCoord;command_list)" using projCoord export standardExport;
-    [InterfaceBlock : "LowResInput:6"]
-    world lowRes : "glsl(command_list)" using opacity export fragmentExport;
     world vs : "glsl(vertex:projCoord;command_list)" using projCoord export standardExport;
-    world fs : "glsl(command_list)" using opacity export fragmentExport;
-    require @(vs, lowResVs) vec4 projCoord; 
-    require @fs vec2 screenCoord;
+    world fs : "glsl(command_list)" export fragmentExport;
+    
+    require @vs vec4 projCoord; 
     require @objSurfaceVs* vec4 texSpaceVert;
     require out @fs vec4 outputColor;
-    require @(lowRes*, fs*) float opacity;
     require @rootVert vec2 vert_uv;
+    
     import uniformImport(perInstanceUniform->vs);
     import uniformImport(perInstanceUniform->fs);
     import uniformImport(perInstanceUniform->objSurfaceVs);
@@ -41,26 +37,12 @@ pipeline MultiRatePipeline
     import uniformImport(modelTransform->objSurface);
     import uniformImport(modelTransform->vs);
     import uniformImport(modelTransform->fs);
-    import uniformImport(modelTransform->lowResVs);
-    import uniformImport(modelTransform->lowRes);
     import vertexImport(rootVert->vs);
     import vertexImport(rootVert->objSurfaceVs);
-    
     import standardImport(vs->fs);
     import standardImport(objSurfaceVs->objSurface);
-    
     import textureImport(objSurface->fs) using vert_uv;
     import textureImport(objSurface->vs) using vert_uv;
-    
-    import vertexImport(rootVert->lowResVs);
-    import standardImport(lowResVs->lowRes);
-    import uniformImport(perInstanceUniform->lowResVs);
-    import uniformImport(perInstanceUniform->lowRes);
-    import uniformImport(viewUniform->lowResVs);
-    import uniformImport(viewUniform->lowRes);
-    import textureImport(objSurface->lowRes) using vert_uv;
-    import textureImport(objSurface->lowResVs) using vert_uv;
-    import textureImport(lowRes->fs) using screenCoord;
 }
 
 float Pow4(float x)

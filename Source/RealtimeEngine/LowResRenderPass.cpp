@@ -33,7 +33,13 @@ namespace RealtimeEngine
 				auto additionalFS = shadowMap->GetShaderDefinition();
 				if (!shaderLib.Sources[L"lowRes"]().MainCode.Contains(L"computeShadow"))
 					additionalFS = L"";
-				return shaderStore.LoadProgram(shaderLib.Sources[L"lowResVs"]().GetAllCodeGLSL(), shaderLib.Sources[L"lowRes"]().GetAllCodeGLSL(L"", additionalFS, L"", fsEpilog));
+				String fsSrc;
+				auto & fs = shaderLib.Sources[L"lowRes"]();
+				if (fs.ComponentAccessNames.ContainsKey(L"opacity"))
+					fsSrc = shaderLib.Sources[L"lowRes"]().GetAllCodeGLSL(L"", additionalFS, L"", fsEpilog);
+				else
+					fsSrc = shaderLib.Sources[L"lowRes"]().GetAllCodeGLSL(L"", additionalFS, L"", L"");
+				return shaderStore.LoadProgram(shaderLib.Sources[L"lowResVs"]().GetAllCodeGLSL(), fsSrc);
 			}
 			else
 				return GL::Program();

@@ -29,7 +29,13 @@ namespace RealtimeEngine
 		virtual GL::Program LoadProgram(GpuShaderStore & shaderStore, const SpireLib::ShaderLib & shaderLib) override
 		{
 			auto additionalFS = shadowMap->GetShaderDefinition();
-			return shaderStore.LoadProgram(shaderLib.Sources[L"vs"]().GetAllCodeGLSL(), shaderLib.Sources[L"fs"]().GetAllCodeGLSL(L"", additionalFS, L"", fsEpilog));
+			auto & fs = shaderLib.Sources[L"fs"]();
+			String fsSrc;
+			if (fs.ComponentAccessNames.ContainsKey(L"opacity"))
+				fsSrc = fs.GetAllCodeGLSL(L"", additionalFS, L"", fsEpilog);
+			else
+				fsSrc = fs.GetAllCodeGLSL(L"", additionalFS, L"", L"");
+			return shaderStore.LoadProgram(shaderLib.Sources[L"vs"]().GetAllCodeGLSL(), fsSrc);
 		}
 		virtual GL::FrameBuffer GetFramebuffer() override
 		{

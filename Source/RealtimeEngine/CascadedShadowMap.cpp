@@ -278,8 +278,13 @@ namespace RealtimeEngine
 			Spire::Compiler::WorldMetaData wmeta;
 			if (shaderLib.MetaData.Worlds.TryGetValue(L"shadowVs", wmeta))
 			{
-				return shaderStore.LoadProgram(shaderLib.Sources[L"shadowVs"]().GetAllCodeGLSL(), shaderLib.Sources[L"shadowFs"]().GetAllCodeGLSL(L"", GetShadowPassShaderDefinition(),
-					L"", String(fsEpilog) + shadowPassShaderCode));
+				auto & fs = shaderLib.Sources[L"shadowFs"]();
+				StringBuilder epilog;
+				if (fs.ComponentAccessNames.ContainsKey(L"opacity"))
+					epilog << fsEpilog;
+				epilog << shadowPassShaderCode;
+				return shaderStore.LoadProgram(shaderLib.Sources[L"shadowVs"]().GetAllCodeGLSL(), fs.GetAllCodeGLSL(L"", GetShadowPassShaderDefinition(),
+					L"", epilog.ProduceString()));
 			}
 			else
 				return GL::Program();
