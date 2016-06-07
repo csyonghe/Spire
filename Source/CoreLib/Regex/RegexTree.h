@@ -84,8 +84,8 @@ namespace CoreLib
 			{
 				rtOptional, rtArbitary, rtMoreThanOnce, rtSpecified
 			};
-			_RepeatType RepeatType;
-			int MinRepeat, MaxRepeat;
+			_RepeatType RepeatType = rtOptional;
+			int MinRepeat = -1, MaxRepeat = -1;
 			RefPtr<RegexNode> Child;
 		public:
 			String Reinterpret();

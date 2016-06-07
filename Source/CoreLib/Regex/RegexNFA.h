@@ -28,9 +28,9 @@ namespace CoreLib
 		private:
 			static int HandleCount;
 		public:
-			int ID;
-			bool Flag;
-			bool IsFinal;
+			int ID = -1;
+			bool Flag = 0;
+			bool IsFinal = false;
 			int TerminalIdentifier;
 			List<NFA_Translation *> Translations;
 			List<NFA_Translation *> PrevTranslations;
@@ -43,10 +43,10 @@ namespace CoreLib
 		{
 			friend class DFA_Graph;
 		private:
-			NFA_Node * start, * end;
+			NFA_Node * start = nullptr, * end = nullptr;
 			struct NFA_StatePair
 			{
-				NFA_Node * start, * end;
+				NFA_Node * start = nullptr, * end = nullptr;
 			};
 			List<NFA_StatePair> stateStack;
 			NFA_StatePair PopState();

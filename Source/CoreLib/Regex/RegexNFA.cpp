@@ -74,10 +74,12 @@ namespace Text
 		start = s.start;
 		end = s.end;
 		end->IsFinal = true;
+
 		if (elimEpsilon)
 		{
 			PostGenerationProcess();
 		}
+
 	}
 
 	void NFA_Graph::PostGenerationProcess()

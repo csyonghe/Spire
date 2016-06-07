@@ -5167,8 +5167,8 @@ namespace CoreLib
 			{
 				rtOptional, rtArbitary, rtMoreThanOnce, rtSpecified
 			};
-			_RepeatType RepeatType;
-			int MinRepeat, MaxRepeat;
+			_RepeatType RepeatType = rtOptional;
+			int MinRepeat = -1, MaxRepeat = -1;
 			RefPtr<RegexNode> Child;
 		public:
 			String Reinterpret();
@@ -5251,9 +5251,9 @@ namespace CoreLib
 		private:
 			static int HandleCount;
 		public:
-			int ID;
-			bool Flag;
-			bool IsFinal;
+			int ID = -1;
+			bool Flag = 0;
+			bool IsFinal = false;
 			int TerminalIdentifier;
 			List<NFA_Translation *> Translations;
 			List<NFA_Translation *> PrevTranslations;
@@ -5266,10 +5266,10 @@ namespace CoreLib
 		{
 			friend class DFA_Graph;
 		private:
-			NFA_Node * start, * end;
+			NFA_Node * start = nullptr, * end = nullptr;
 			struct NFA_StatePair
 			{
-				NFA_Node * start, * end;
+				NFA_Node * start = nullptr, * end = nullptr;
 			};
 			List<NFA_StatePair> stateStack;
 			NFA_StatePair PopState();
@@ -5333,7 +5333,7 @@ namespace CoreLib
 		class DFA_Table_Tag
 		{
 		public:
-			bool IsFinal;
+			bool IsFinal = false;
 			List<int> TerminalIdentifiers; // sorted
 			DFA_Table_Tag();
 		};
@@ -5354,8 +5354,8 @@ namespace CoreLib
 		class DFA_Node : public Object
 		{
 		public:
-			int ID;
-			bool IsFinal;
+			int ID = -1;
+			bool IsFinal = false;
 			List<int> TerminalIdentifiers; // sorted
 			List<NFA_Node*> Nodes;  // sorted
 			List<DFA_Node *> Translations;

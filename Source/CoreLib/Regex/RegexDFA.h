@@ -26,7 +26,7 @@ namespace CoreLib
 		class DFA_Table_Tag
 		{
 		public:
-			bool IsFinal;
+			bool IsFinal = false;
 			List<int> TerminalIdentifiers; // sorted
 			DFA_Table_Tag();
 		};
@@ -47,8 +47,8 @@ namespace CoreLib
 		class DFA_Node : public Object
 		{
 		public:
-			int ID;
-			bool IsFinal;
+			int ID = -1;
+			bool IsFinal = false;
 			List<int> TerminalIdentifiers; // sorted
 			List<NFA_Node*> Nodes;  // sorted
 			List<DFA_Node *> Translations;
