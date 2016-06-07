@@ -199,11 +199,19 @@ namespace GraphicsUI
 		tbl.TabPageItemBackColor1 = tbl.ControlBackColor;
 		tbl.TabPageItemBackColor2 = tbl.TabPageBorderColor;
 
+<<<<<<< HEAD
 		tbl.ButtonBackColorChecked = Color(40, 40, 40, 255);
 
 		tbl.DefaultFormStyle.ShowIcon = true;
 		tbl.DefaultFormStyle.CtrlButtonBorderStyle = BS_RAISED;
 		tbl.DefaultFormStyle.TitleBarColors[0] = Color(85, 85, 85, 255);
+=======
+		tbl.ButtonBackColorChecked = Color(80, 80, 80, 255);
+
+		tbl.DefaultFormStyle.ShowIcon = true;
+		tbl.DefaultFormStyle.CtrlButtonBorderStyle = BS_RAISED;
+		tbl.DefaultFormStyle.TitleBarColors[0] = Color(10, 36, 106, 255);
+>>>>>>> af2f8bdfafd318ca894eff77e55e268c7943f803
 		tbl.DefaultFormStyle.TitleBarColors[1] = tbl.DefaultFormStyle.TitleBarColors[0];
 		tbl.DefaultFormStyle.TitleBarColors[2] = Color(166, 202, 240, 255);
 		tbl.DefaultFormStyle.TitleBarColors[3] = tbl.DefaultFormStyle.TitleBarColors[2];
