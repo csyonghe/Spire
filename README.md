@@ -6,7 +6,7 @@ Paper: http://graphics.cs.cmu.edu/projects/spire/
 ## Getting Started
 To experience Spire, compile `"Source/Spire.sln"` and run the `SceneViewer` project. In `SceneViewer`, select "File"->"Open", and open "TestShaders/couch/couch.world". This loads up a couch scene. The couch is rendered using "TestShaders/couch/couch.shader".
 
-![](https://github.com/csyonghe/Spire/blob/master/Docs/sceneViewer.png)
+![](https://github.com/csyonghe/Spire/blob/master/Docs/sceneViewer.jpg)
 
 The Choice Control window allows you to dynamically recompile the modified shader and explore different rate placement choices in real-time.
 
