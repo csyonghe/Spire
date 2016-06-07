@@ -414,6 +414,9 @@ namespace GraphicsUI
 
 	Control::~Control()
 	{
+		auto entry = GetEntry();
+		if (entry && entry->FocusedControl == this)
+			entry->FocusedControl = nullptr;
 	}
 
 	bool Control::DoClosePopup()

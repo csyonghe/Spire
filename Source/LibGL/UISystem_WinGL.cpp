@@ -413,6 +413,7 @@ namespace GraphicsUI
 		void EndUIDrawing()
 		{
 			glContext->SetBlendMode(GL::BlendMode::Replace);
+			glContext->BindVertexArray(GL::VertexArray());
 		}
 		void DrawLine(const Vec4 & color, float x0, float y0, float x1, float y1)
 		{
@@ -443,11 +444,11 @@ namespace GraphicsUI
 
 		void DrawSolidQuad(const Vec4 & color, int x, int y, int w, int h)
 		{
-			Vec4 vertexData[4];
-			vertexData[0] = Vec4::Create((float)x, (float)y, 0.0f, 0.0f);
-			vertexData[1] = Vec4::Create((float)x, (float)(y + h), 0.0f, 1.0f);
-			vertexData[2] = Vec4::Create((float)(x + w), (float)(y + h), 1.0f, 1.0f);
-			vertexData[3] = Vec4::Create((float)(x + w), (float)y, 1.0f, 0.0f);
+			Vec2 vertexData[4];
+			vertexData[0] = Vec2::Create((float)x, (float)y);
+			vertexData[1] = Vec2::Create((float)x, (float)(y + h));
+			vertexData[2] = Vec2::Create((float)(x + w), (float)(y + h));
+			vertexData[3] = Vec2::Create((float)(x + w), (float)y);
 			vertexBuffer.SetData(vertexData, sizeof(float) * 16);
 			solidColorProgram.Use();
 			solidColorProgram.SetUniform(0, orthoMatrix);
@@ -455,7 +456,7 @@ namespace GraphicsUI
 			solidColorProgram.SetUniform(2, color);
 			solidColorProgram.SetUniform(3, clipRect);
 
-			glContext->BindVertexArray(posUvVertexArray);
+			glContext->BindVertexArray(posVertexArray);
 			glContext->DrawArray(GL::PrimitiveType::TriangleFans, 0, 4);
 		}
 		void DrawTextureQuad(GL::Texture2D texture, int x, int y, int w, int h)

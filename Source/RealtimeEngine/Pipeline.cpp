@@ -15,7 +15,7 @@ using namespace GL;
 using namespace Spire::Compiler;
 using namespace SpireLib;
 
-#define USE_COMMAND_LIST
+//#define USE_COMMAND_LIST
 
 namespace RealtimeEngine
 {
