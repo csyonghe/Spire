@@ -250,7 +250,7 @@ float specular = ComputeHighlightPhong(lightDir, normal, view, roughness, specul
 ```
 To the following:
 ```glsl
-@objSurface  float specular = ComputeHighlightPhong(lightDir, normal, view, roughness, specular, metallic);
+@objSurface float specular = ComputeHighlightPhong(lightDir, normal, view, roughness, specular, metallic);
 ```
 This forces specular to be computed in objSurface world, which results in the shader variant shown in Figure 5.
 
