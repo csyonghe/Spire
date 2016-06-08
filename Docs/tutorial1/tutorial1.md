@@ -2,22 +2,22 @@
 
 In this tutorial, we are going to walk through a basic Spire shader and cover the basics of Spire. You will learn how Spire shaders can be compiled into different GLSL shader implementations for use by a simple rendering engine. The different implementations reflect different performance-quality trade-offs.
 ##The Demo Engine
-To start with the tutorial, we have created a demo rendering engine that consists of three rendering phases: object space rendering, half resolution rendering and full resolution rendering.
+To start with the tutorial, we have created a demo rendering engine that consists of two rendering phases: object space shading and full screen resolution (per fragment) shading.
 
 <img src="https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/1.png" width="500px"/><br/>
 Figure 1. Rendering phases supported by the Demo Engine
 
-At each frame, the engine renders object-space textures for each object, and these textures are made available to subsequent phases. The half resolution rendering phase produces a set of textures at half-screen-resolution, which can also be used in the final full resolution rendering phase.
-Since all rendering phases are done on the GPU, each of them includes a vertex shading stage and fragment shading stage, hence the rendering pipeline has four rendering stages in total, as illustrated below. The object spacing rendering phase would use texture coordinate as the projected vertex coordinate, so the rendered results are stored in object space textures.
+At each frame, the engine renders object-space textures for each object, and these textures are made available to subsequent phases. The engine implements object space shading by rasterizing the mesh using its texture coordinate (assuming the texture coordinates represent an unique parameterization of the mesh surface), and storing each object space shading output in a separate texture.
+Since all rendering phases are done on the GPU, each of them includes a vertex shading stage and fragment shading stage, hence the rendering pipeline has four rendering stages in total, as illustrated in Figure 2. 
 
 <img src="https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/2.png" width="500px"/><br/>
 Figure 2. Rendering stages of our Demo Engine
 
-In Spire’s terminology, a shading stage in a rendering pipeline corresponds to a world. Spire sees a pipeline as a set of worlds and the dependency between the worlds. When compiling a Spire shader, the compiler generates one GPU shader for each world. In this example pipeline, four GLSL shaders will be produced from compilation of one Spire shader.
+In Spire’s terminology, a shading stage in a rendering pipeline corresponds to a `world`. Spire sees a pipeline as a set of worlds and the dependency between the worlds. When compiling a Spire shader, the compiler generates one GPU shader for each world. In this example pipeline, four GLSL shaders will be produced from compilation of one Spire shader.
 
-If we write GLSL shaders directly for this pipeline, in most cases we need to create four shaders for each type of material and carefully define the input/output interfaces for each stage. If we want to try computing some terms in a different shading stage, for example computing high frequency specular highlight at object space to reduce aliasing, all four shaders would need to change.
+If we write GLSL shaders directly for this pipeline, in most cases we need to create four shaders for each type of material and carefully define the input/output interfaces for each stage. If we want to try computing some terms in a different shading stage (world), for example computing high frequency specular highlight at object space to reduce aliasing, all four shaders would need to change.
 
-Spire allows you to define the shading logic across the entire pipeline and quickly explore different placement decisions without altering the shader code. In the rest of the tutorial, we will go through the process of writing a simple shader that fetches normal map and computes Phong lighting, and learn how Spire makes it easy to explore different choices such as moving specular lighting to object space.
+Spire allows you to define the shading logic across the entire pipeline and quickly explore different placement decisions without altering the shader code. In the rest of the tutorial, we will go through a simple Spire shader that fetches normal map and computes Phong lighting, and learn how Spire makes it easy to explore different choices such as moving specular lighting to object space.
 
 To use Spire to compile shaders for our pipeline, we need to do two things. First, we need to delcare the rendering pipeline so the compiler knows how to generate code. Then, we can write Spire shaders containing logic for all these worlds. The Spire declaration of the above pipeline can be found at https://github.com/csyonghe/Spire/blob/master/Examples/ObjSpace.pipeline
 We will cover the details of pipeline declaration in later tutorials. For now you only need to know that a pipeline declaration tells Spire the set of worlds as well as the dependency between the worlds. ObjSpace.pipeline declares a pipeline with four worlds: objSurfaceVs, objSurface, vs, and fs, which correspond to the rendering stages illustrated in Figure 2. In addition, we also defined four input worlds: rootVert, viewUniform, modelTransform and perInstanceUniform. Input worlds do not correspond to a shading stage, but are instead used as sources of shader inputs. For example, rootVert is for holding vertex inputs and viewUniform for passing in per-frame uniforms. 
@@ -77,12 +77,12 @@ After defining all the inputs, we can start to define our shading logic. First w
     vec4 position = modelMatrix * vec4(vert_pos, 1.0);
     vec4 projCoord = viewProjectionMatrix * position;
 ```
-Note that instead of writing gl_Position = …, we are only defining a shader component called projCoord. The compiler is able to generate the correct vertex shader from this because the pipeline declaration has required every Spire shader to provide a component named projCoord, and also specified that projCoord is the projected vertex coordinate, thus the GLSL backend has everything needed to produce a valid vertex shader.
+Note that instead of writing `gl_Position = ...`, we are only defining a shader component called `projCoord`. The compiler is able to generate the correct vertex shader from this because the pipeline declaration has required every Spire shader to provide a component named `projCoord`, and also specified that `projCoord` is the projected vertex output for `vs`, thus the GLSL backend has everything needed to produce a valid vertex shader.
 Next we have:
 ```glsl
     vec4 texSpaceVert = vec4(vert_uv*2.0 - vec2(1.0), 0.0, 1.0); 
 ```
-This defined the texSpaceVert component, which is used by the pipeline as the projected vertex position for object space rendering phase. The pipeline declaration has told the GLSL backend to look for texSpaceVert as the gl_Position value for the vertex shader of object space shading phase.
+This defined the `texSpaceVert` component, which is used by the pipeline as the projected vertex position for object space rendering phase. The pipeline declaration has told the GLSL backend to look for `texSpaceVert` as the `gl_Position` value for the vertex shader of object space shading phase.
 Next comes some simple pattern generation logic that fetches albedo and normal textures:
 ```glsl
     vec2 uv = vert_uv * 10.0; // tile the texture
@@ -102,7 +102,7 @@ Next comes some simple pattern generation logic that fetches albedo and normal t
                     + normalTex.z * vNormal);
     }
 ```
-Here, the normal component involves more complex tangent frame transformations, so instead of expressing it as an expression, we write it in a code block.
+Here, the normal component involves more complex tangent frame transformations, so instead of writing it as an expression, we write it in a code block.
 Next, we define the lighting logic:
 ```glsl
     vec3 view = normalize(cameraPos - position.xyz);
@@ -118,15 +118,15 @@ And finally, we combine everything into the final fragment output and completes 
          mix(albedo, vec3(1.0), 0.6) * specular), 1.0);
 }
 ```
-Note that we didn’t provide any specifier marking outputColor as output, as this has already been stated in the pipeline declaration.
+Note that we didn’t provide any specifier marking `outputColor` as output, as this has already been stated in the pipeline declaration.
 
 ##Shader Variants
 
-In Demo1Shader, we defined a set of shading terms, e.g. position, normal, highlight etc., which are called shader components. Note that in the shader definition, we have not specified at which world to place each shader component - the shader definition is simply a DAG of components. The compiled shaders could be different if we decide to compute a component (e.g. highlight) at different worlds. The set of compiled shaders after applying world placement decisions is called a shader variant. 
+In Demo1Shader, we defined a set of shading terms, e.g. `position`, `normal`, `specular` etc., which are called shader components. Note that in the shader definition, we have not specified at which world to place each shader component - the shader definition is simply a DAG of components. The compiled shaders could be different if we decide to compute a component (e.g. `specular`) at different worlds. The set of compiled shaders after applying world placement decisions is called a shader variant. 
 
 ###The Default Variant
 
-By default, the Spire compiler will prefer to compute a shader component at latest possible world (e.g. fs in this pipeline) if the world to compute the component is not explictly specified. In most cases, this is the most expensive but highest quality choice (compute everyting at fragment shader). For example, directly compiling the above Spire shader yields the following shader variant visualized in Figure 4.
+By default, the Spire compiler will prefer to compute a shader component at latest possible world (e.g. `fs` in this pipeline) if the world to compute the component is not explictly specified. In most cases, this is the most expensive but highest quality choice (compute everyting at fragment shader). For example, directly compiling the above Spire shader yields the following shader variant visualized in Figure 4.
 
 <img src="https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/4.png" width="650px"/><br/>
 Figure 4. The default shader variant result from compiling Demo1Shader directly. 
@@ -178,7 +178,7 @@ Then compile the shader using the following command will produce the same shader
 ```
 SpireCompiler “Demo1Shader.shader” -schedule “schedule.txt”
 ```
-##Exploring Different Choices via Real-time Tools
+##Exploring Different Choices via Interactive Tools
 A more intuitive way of exploring different placement choices is to visualize all choices afforded by a shader and change them graphically. The Spire compiler can enumerates all world placement choices exposed by the shader. With this data, you can build GUI tools to explore different choices. The demo engine implements such a tool as shown below. To play with it, run SceneViewer and open “Examples/demo1/demo1.world”, then try selecting different worlds for some components in the Choice Control window.
 
 <img src="https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/7.png" width="500px"/><br/>
