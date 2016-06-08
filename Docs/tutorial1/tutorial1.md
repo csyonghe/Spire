@@ -139,7 +139,7 @@ The shader variant shown in Figure 4 is equivalent to the following GLSL shaders
 // vs:
 /**************************************************************************/
 #version 450
-layout(std140, binding = 1, commandBindableNV) uniform viewUniform
+layout(std140, binding = 1) uniform viewUniform
 {
 	mat4 viewProjectionMatrix;
 	mat4 viewMatrix;
@@ -151,7 +151,7 @@ layout(std140, binding = 1, commandBindableNV) uniform viewUniform
 	vec3 lightDir;
 } blkviewUniform;
 
-layout(std140, binding = 0, commandBindableNV) uniform modelTransform
+layout(std140, binding = 0) uniform modelTransform
 {
 	mat4 modelMatrix;
 	mat4 normalMatrix;
@@ -185,13 +185,13 @@ void main()
 // fs:
 /********************************************************************************/
 #version 450
-layout(std140, binding = 2, commandBindableNV) uniform perInstanceUniform
+layout(std140, binding = 2) uniform perInstanceUniform
 {
 	sampler2D ground_pebble_map;
 	sampler2D ground_pebble_Nmap;
 } blkperInstanceUniform;
 
-layout(std140, binding = 1, commandBindableNV) uniform viewUniform
+layout(std140, binding = 1) uniform viewUniform
 {
 	mat4 viewProjectionMatrix;
 	mat4 viewMatrix;
@@ -203,7 +203,7 @@ layout(std140, binding = 1, commandBindableNV) uniform viewUniform
 	vec3 lightDir;
 } blkviewUniform;
 
-layout(std140, binding = 0, commandBindableNV) uniform modelTransform
+layout(std140, binding = 0) uniform modelTransform
 {
 	mat4 modelMatrix;
 	mat4 normalMatrix;
