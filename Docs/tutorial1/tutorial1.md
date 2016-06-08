@@ -133,6 +133,114 @@ Figure 4. The default shader variant result from compiling Demo1Shader directly.
 
 In Figure 4, each column correspond to a world, and each box in the column correspond to a shader component. The shader component in yellow text are components appear in inter-world interfaces, for example, position is computed in vs and passed to fs.  
 
+The shader variant shown in Figure 4 is equivalent to the following GLSL shaders:
+
+```glsl
+// vs:
+/**************************************************************************/
+#version 450
+layout(std140, binding = 1, commandBindableNV) uniform viewUniform
+{
+	mat4 viewProjectionMatrix;
+	mat4 viewMatrix;
+	mat4 projectionMatrix;
+	mat4 invViewMatrix;
+	mat4 invViewProjectionMatrix;
+	vec3 cameraPos;
+	vec3 lightColor;
+	vec3 lightDir;
+} blkviewUniform;
+
+layout(std140, binding = 0, commandBindableNV) uniform modelTransform
+{
+	mat4 modelMatrix;
+	mat4 normalMatrix;
+} blkmodelTransform;
+
+layout(location = 0) in vec3 vert_pos;
+layout(location = 1) in vec3 vert_normal;
+layout(location = 2) in vec3 vert_tangent;
+layout(location = 3) in vec2 vert_uv;
+
+out vs
+{
+	vec3 vert_normal;
+	vec3 vert_tangent;
+	vec2 vert_uv;
+	vec4 position;
+} blkvs;
+
+void main()
+{
+	blkvs.vert_normal = vert_normal;
+	blkvs.vert_tangent = vert_tangent;
+	blkvs.vert_uv = vert_uv;
+	vec4  = (blkmodelTransform.modelMatrix * vec4(vert_pos, 1.0));
+	blkvs.position = _vcmpposition;
+	vec4 _vcmpprojCoord = (blkviewUniform.viewProjectionMatrix * _vcmpposition);
+	gl_Position = _vcmpprojCoord;
+}
+/*********************************************************************************/
+
+// fs:
+/********************************************************************************/
+#version 450
+layout(std140, binding = 2, commandBindableNV) uniform perInstanceUniform
+{
+	sampler2D ground_pebble_map;
+	sampler2D ground_pebble_Nmap;
+} blkperInstanceUniform;
+
+layout(std140, binding = 1, commandBindableNV) uniform viewUniform
+{
+	mat4 viewProjectionMatrix;
+	mat4 viewMatrix;
+	mat4 projectionMatrix;
+	mat4 invViewMatrix;
+	mat4 invViewProjectionMatrix;
+	vec3 cameraPos;
+	vec3 lightColor;
+	vec3 lightDir;
+} blkviewUniform;
+
+layout(std140, binding = 0, commandBindableNV) uniform modelTransform
+{
+	mat4 modelMatrix;
+	mat4 normalMatrix;
+} blkmodelTransform;
+
+in vs
+{
+	vec3 vert_normal;
+	vec3 vert_tangent;
+	vec2 vert_uv;
+	vec4 position;
+} blkvs;
+
+layout(location = 0) out vec4 outputColor;
+
+float ComputeHighlightPhong(vec3 p_L, vec3 p_N, vec3 p_V, float p_roughness, float p_metallic, float p_specular);
+
+void main()
+{
+	vec2 _vcmpuv = (blkvs.vert_uv * 10.0);
+	vec3 _vcmpalbedo = texture(blkperInstanceUniform.ground_pebble_map, _vcmpuv).xyz;
+	vec3 v0_vNormal = (blkmodelTransform.normalMatrix * vec4(blkvs.vert_normal, 1.0)).xyz;
+	vec3 v1_vTangent = (blkmodelTransform.normalMatrix * vec4(blkvs.vert_tangent, 1.0)).xyz;
+	vec3 v2_vBiTangent = cross(v1_vTangent, v0_vNormal);
+	vec3 t2a = texture(blkperInstanceUniform.ground_pebble_Nmap, _vcmpuv).xyz;
+	vec3 v3_normalTex = (t2a - 0.5) * 2.0;
+	vec3 _vcmpnormal = normalize((((v3_normalTex.x * v1_vTangent) + (v3_normalTex.y * v2_vBiTangent)) + (v3_normalTex.z * v0_vNormal)));
+	vec3 _vcmpview = normalize((blkviewUniform.cameraPos - blkvs.position.xyz));
+	float _vcmpdiffuse = clamp(dot(blkviewUniform.lightDir, _vcmpnormal), 0.0, 1.0);
+	float _vcmpspecular = ComputeHighlightPhong(blkviewUniform.lightDir, _vcmpnormal, _vcmpview, 0.5, 0.5, 0.4);
+	vec4 _vcmpoutputColor = vec4((blkviewUniform.lightColor * (((_vcmpalbedo * ((_vcmpdiffuse * 0.7) + 0.5)) * 0.6) + (mix(_vcmpalbedo, vec3(1.0), 0.6) * _vcmpspecular))), 1.0);
+	outputColor = _vcmpoutputColor;
+}
+
+/********************************************************************************/
+```
+
 ###Specifying Other Variants
 
 To change the default schedule, you can add explicit world specifiers to the component definition by changing the line
