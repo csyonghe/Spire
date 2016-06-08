@@ -35,7 +35,12 @@ namespace CoreLib
 
 		class Utf16Encoding : public Encoding //UTF16
 		{
+		private:
+			bool reverseOrder = false;
 		public:
+			Utf16Encoding(bool pReverseOrder)
+				: reverseOrder(pReverseOrder)
+			{}
 			virtual List<char> GetBytes(const String & str)
 			{
 				std::wstring_convert<std::codecvt_utf16<wchar_t>> converter;
@@ -81,15 +86,18 @@ namespace CoreLib
 		};
 
 		UnicodeEncoding __unicodeEncoding;
-		Utf16Encoding __utf16Encoding;
+		Utf16Encoding __utf16Encoding(false);
+		Utf16Encoding __utf16EncodingReversed(true);
 		AnsiEncoding __ansiEncoding;
 
 		Encoding * Encoding::Unicode = &__unicodeEncoding;
 		Encoding * Encoding::UTF16 = &__utf16Encoding;
-
+		Encoding * Encoding::UTF16Reversed = &__utf16EncodingReversed;
 		Encoding * Encoding::Ansi = &__ansiEncoding;
 
-		const unsigned char Utf16Header[] = { 0xFE,0xFF };
+		const unsigned short Utf16Header = 0xFEFF;
+		const unsigned short Utf16ReversedHeader = 0xFFFE;
+
 
 		const unsigned char Utf8Header[] = { 0xEF,0xBB,0xBF };
 
@@ -97,26 +105,26 @@ namespace CoreLib
 		{
 			this->stream = new FileStream(path, FileMode::Create);
 			this->encoding = encoding;
-			if (encoding == Encoding::Unicode)
+			if (encoding == Encoding::UTF16)
 			{
-				//this->stream->Write(Utf8Header, 3);
+				this->stream->Write(&Utf16Header, 2);
 			}
-			else if (encoding == Encoding::UTF16)
+			else if (encoding == Encoding::UTF16Reversed)
 			{
-				this->stream->Write(Utf16Header, 2);
+				this->stream->Write(&Utf16ReversedHeader, 2);
 			}
 		}
 		StreamWriter::StreamWriter(RefPtr<Stream> stream, Encoding * encoding)
 		{
 			this->stream = stream;
 			this->encoding = encoding;
-			if (encoding == Encoding::Unicode)
+			if (encoding == Encoding::UTF16)
 			{
-				//this->stream->Write(Utf8Header, 3);
+				this->stream->Write(&Utf16Header, 2);
 			}
-			else if (encoding == Encoding::UTF16)
+			else if (encoding == Encoding::UTF16Reversed)
 			{
-				this->stream->Write(Utf16Header, 2);
+				this->stream->Write(&Utf16ReversedHeader, 2);
 			}
 		}
 		void StreamWriter::Write(const String & str)
@@ -160,25 +168,32 @@ namespace CoreLib
 				ptr += 3;
 				return Encoding::Unicode;
 			}
-			else if (*((unsigned short*)(buffer.Buffer())) == 0xFEFF || *((unsigned short*)(buffer.Buffer())) == 0xFFFE)
+			else if (*((unsigned short*)(buffer.Buffer())) == 0xFEFF)
 			{
 				ptr += 2;
 				return Encoding::UTF16;
 			}
+			else if (*((unsigned short*)(buffer.Buffer())) == 0xFFFE)
+			{
+				ptr += 2;
+				return Encoding::UTF16Reversed;
+			}
 			else
 			{
 #ifdef _WIN32
-				int flag = IS_TEXT_UNICODE_SIGNATURE | IS_TEXT_UNICODE_REVERSE_SIGNATURE | IS_TEXT_UNICODE_STATISTICS;
+				int flag = IS_TEXT_UNICODE_SIGNATURE | IS_TEXT_UNICODE_REVERSE_SIGNATURE | IS_TEXT_UNICODE_STATISTICS | IS_TEXT_UNICODE_ASCII16;
 				int rs = IsTextUnicode(buffer.Buffer(), buffer.Count(), &flag);
-				if (flag & (IS_TEXT_UNICODE_SIGNATURE | IS_TEXT_UNICODE_REVERSE_SIGNATURE | IS_TEXT_UNICODE_STATISTICS))
-					return Encoding::Unicode;
-				else if (rs)
-					return Encoding::Ansi;
-				else
-					return Encoding::Unicode;
-#else
+				if (rs)
+				{
+					if (flag & (IS_TEXT_UNICODE_SIGNATURE | IS_TEXT_UNICODE_STATISTICS))
+						return Encoding::UTF16;
+					else if (flag & (IS_TEXT_UNICODE_SIGNATURE | IS_TEXT_UNICODE_STATISTICS))
+						return Encoding::UTF16Reversed;
+					else if (flag & IS_TEXT_UNICODE_ASCII16)
+						return Encoding::Ansi;
+				}
+#endif 
 				return Encoding::Unicode;
-#endif
 			}
 		}
 		
@@ -196,36 +211,15 @@ namespace CoreLib
 			{
 				return buffer[ptr++];
 			}
-			ReadBuffer();
+			if (!stream->IsEnd())
+				ReadBuffer();
 			if (ptr<buffer.Count())
 			{
 				return buffer[ptr++];
 			}
 			return 0;
 		}
-
-		char StreamReader::PeakBufferChar(int offset)
-		{
-			if (ptr + offset < buffer.Count())
-			{
-				return buffer[ptr + offset];
-			}
-			try
-			{
-				ReadBuffer();
-			}
-			catch (EndOfStreamException)
-			{
-				buffer.Clear();
-				ptr = 0;
-			}
-			if (ptr + offset<buffer.Count())
-			{
-				return buffer[ptr + offset];
-			}
-			return 0;
-		}
-		int StreamReader::Read(wchar_t * destBuffer, int length)
+		int TextReader::Read(wchar_t * destBuffer, int length)
 		{
 			int i = 0;
 			for (i = 0; i<length; i++)
@@ -233,6 +227,8 @@ namespace CoreLib
 				try
 				{
 					auto ch = Read();
+					if (IsEnd())
+						break;
 					if (ch == L'\r')
 					{
 						if (Peak() == L'\n')
@@ -255,12 +251,13 @@ namespace CoreLib
 		String StreamReader::ReadLine()
 		{
 			StringBuilder sb(256);
-#pragma warning (suppress : 4127)
-			while (true)
+			while (!IsEnd())
 			{
 				try
 				{
 					auto ch = Read();
+					if (IsEnd())
+						break;
 					if (ch == L'\r')
 					{
 						if (Peak() == L'\n')
@@ -283,12 +280,13 @@ namespace CoreLib
 		String StreamReader::ReadToEnd()
 		{
 			StringBuilder sb(16384);
-#pragma warning (suppress : 4127)
-			while (true)
+			while (!IsEnd())
 			{
 				try
 				{
 					auto ch = Read();
+					if (IsEnd())
+						break;
 					if (ch == L'\r')
 					{
 						sb.Append(L'\n');

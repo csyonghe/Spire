@@ -432,9 +432,6 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <Text Include="ReadMe.txt" />
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="Allocator.h" />
     <ClInclude Include="Array.h" />
     <ClInclude Include="ArrayView.h" />

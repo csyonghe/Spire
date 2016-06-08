@@ -1,4 +1,4 @@
-using "../EnginePipeline.shader";
+﻿using "../EnginePipeline.shader";
 
 shader Couch
 {

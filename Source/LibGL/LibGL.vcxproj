@@ -135,9 +135,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <Text Include="ReadMe.txt" />
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="glew\glew.c" />
     <ClCompile Include="NVCommandList.cpp" />
     <ClCompile Include="OpenGLHardwareRenderer.cpp" />

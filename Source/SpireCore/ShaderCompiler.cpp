@@ -180,6 +180,7 @@ namespace Spire
 							return nullptr;
 						}
 					}
+					/*
 					// eliminate redundant (downstream) definitions, one at a time
 					auto comps = result->GetComponentDependencyOrder();
 					for (int i = comps.Count() - 1; i >= 0; i--)
@@ -206,6 +207,7 @@ namespace Spire
 							changed = true;
 						}
 					}
+					*/
 				}
 				return result;
 			}

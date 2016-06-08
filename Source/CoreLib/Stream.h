@@ -45,9 +45,10 @@ namespace CoreLib
 			virtual void Seek(SeekOrigin origin, Int64 offset)=0;
 			virtual Int64 Read(void * buffer, Int64 length) = 0;
 			virtual Int64 Write(const void * buffer, Int64 length) = 0;
-			virtual bool CanRead()=0;
-			virtual bool CanWrite()=0;
-			virtual void Close()=0;
+			virtual bool IsEnd() = 0;
+			virtual bool CanRead() = 0;
+			virtual bool CanWrite() = 0;
+			virtual void Close() = 0;
 		};
 
 		class BinaryReader
@@ -184,6 +185,7 @@ namespace CoreLib
 		private:
 			FILE * handle;
 			FileAccess fileAccess;
+			bool endReached = false;
 			void Init(const CoreLib::Basic::String & fileName, FileMode fileMode, FileAccess access, FileShare share);
 		public:
 			FileStream(const CoreLib::Basic::String & fileName, FileMode fileMode = FileMode::Open);
@@ -197,6 +199,7 @@ namespace CoreLib
 			virtual bool CanRead();
 			virtual bool CanWrite();
 			virtual void Close();
+			virtual bool IsEnd();
 		};
 	}
 }

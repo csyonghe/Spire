@@ -4,8 +4,6 @@
 #include "SecureCRT.h"
 #include "Stream.h"
 #include "WideChar.h"
-#include <locale>
-#include <codecvt>
 #ifdef _MSC_VER
 #include <mbstring.h>
 #endif
@@ -19,17 +17,39 @@ namespace CoreLib
 
 		class TextReader : public CoreLib::Basic::Object
 		{
+		private:
+			wchar_t lookAhead = 0;
+			bool hasLookAhead = false;
+		protected:
+			virtual wchar_t ReadChar() = 0;
 		public:
 			~TextReader()
 			{
 				Close();
 			}
 			virtual void Close(){}
-			virtual wchar_t Read()=0;
-			virtual wchar_t Peak()=0;
-			virtual int Read(wchar_t * buffer, int count)=0;
 			virtual String ReadLine()=0;
 			virtual String ReadToEnd()=0;
+			virtual bool IsEnd() = 0;
+			int Read(wchar_t * buffer, int count);
+			wchar_t Read()
+			{
+				if (!hasLookAhead)
+					return ReadChar();
+				else
+				{
+					hasLookAhead = false;
+					return lookAhead;
+				}
+			}
+			wchar_t Peak()
+			{
+				if (hasLookAhead)
+					return lookAhead;
+				lookAhead = Read();
+				hasLookAhead = true;
+				return lookAhead;
+			}
 		};
 
 		class TextWriter : public CoreLib::Basic::Object
@@ -103,7 +123,7 @@ namespace CoreLib
 		class Encoding
 		{
 		public:
-			static Encoding * Unicode, * Ansi, * UTF16;
+			static Encoding * Unicode, * Ansi, * UTF16, *UTF16Reversed;
 			virtual List<char> GetBytes(const String & str)=0;
 			virtual String GetString(char * buffer, int length)=0;
 			virtual ~Encoding()
@@ -134,41 +154,51 @@ namespace CoreLib
 		class StreamReader : public TextReader
 		{
 		private:
+			wchar_t lowSurrogate = 0;
+			bool hasLowSurrogate = false;
 			RefPtr<Stream> stream;
 			List<char> buffer;
 			Encoding * encoding;
 			int ptr;
 			char ReadBufferChar();
-			char PeakBufferChar(int offset);
 			void ReadBuffer();
 			template<typename GetFunc>
 			wchar_t GetChar(GetFunc get)
 			{
 				wchar_t decoded = 0;
-				char charBuffer[5] = {0, 0, 0, 0, 0};
 				if (encoding == Encoding::Unicode)
 				{
-					int leading = get(0);
-					charBuffer[0] = (char)leading;
-					if (leading < 0)
+					if (hasLowSurrogate)
 					{
-						int c = get(1);
-						charBuffer[1] = (char)c;
-						if (leading & 0b00100000)
-						{
-							c = get(2);
-							charBuffer[2] = (char)c;
-							if (leading & 0b00010000)
-								charBuffer[3] = (char)get(3);
-								// ignore decoding beyond 0xFFFF
-						}
+						hasLowSurrogate = false;
+						return lowSurrogate;
 					}
-					std::wstring_convert<std::codecvt_utf8<wchar_t>> cvt;
-					auto str = cvt.from_bytes(charBuffer);
-					if (str.length() > 0)
-						return str.at(0);
+					int codePoint = 0;
+					int leading = get(0);
+					int mask = 0b10000000;
+					int count = 0;
+					while (leading & mask)
+					{
+						count++;
+						mask >>= 1;
+					}
+					codePoint = (leading & (mask - 1));
+					for (int i = 1; i <= count - 1; i++)
+					{
+						codePoint <<= 6;
+						codePoint += (get(i) & 0b111111);
+					}
+					if (codePoint <= 0xD7FF || codePoint >= 0xE000 && codePoint <= 0xFFFF)
+						return (wchar_t)codePoint;
 					else
-						return 0;
+					{
+						int sub = codePoint - 0x10000;
+						int high = (sub >> 10) + 0xD800;
+						int low = (sub & 0x3FF) + 0xDC00;
+						hasLowSurrogate = true;
+						lowSurrogate = (wchar_t)low;
+						return (wchar_t)high;
+					}
 				}
 				else if (encoding == Encoding::UTF16)
 				{
@@ -176,9 +206,14 @@ namespace CoreLib
 					((char*)&decoded)[1] = get(1);
 					return decoded;
 				}
+				else if (encoding == Encoding::UTF16Reversed)
+				{
+					((char*)&decoded)[1] = get(0);
+					((char*)&decoded)[0] = get(1);
+					return decoded;
+				}
 				else
 				{
-				
 					char mb[2];
 					mb[0] = get(0);
 					if (_ismbblead(mb[0]))
@@ -194,22 +229,20 @@ namespace CoreLib
 				}
 			}
 			Encoding * DetermineEncoding();
+		protected:
+			virtual wchar_t ReadChar()
+			{
+				return GetChar([&](int) {return ReadBufferChar(); });
+			}
 		public:
 			StreamReader(const String & path);
 			StreamReader(RefPtr<Stream> stream, Encoding * encoding = Encoding::Ansi);
-			
-			virtual wchar_t Read()
-			{
-				return GetChar([&](int){return ReadBufferChar();});
-			}
-			virtual wchar_t Peak()
-			{
-				return GetChar([&](int offset){return PeakBufferChar(offset); });
-			}
-			virtual int Read(wchar_t * buffer, int count);
 			virtual String ReadLine();
 			virtual String ReadToEnd();
-
+			virtual bool IsEnd()
+			{
+				return ptr == buffer.Count() && stream->IsEnd();
+			}
 			virtual void Close()
 			{
 				stream->Close();
