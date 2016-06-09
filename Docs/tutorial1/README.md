@@ -20,7 +20,7 @@ If we write GLSL shaders directly for this pipeline, in most cases we need to cr
 Spire allows you to define the shading logic across the entire pipeline and quickly explore different placement decisions without altering the shader code. In the rest of the tutorial, we will go through a simple Spire shader that fetches normal map and computes Phong lighting, and learn how Spire makes it easy to explore different choices such as moving specular lighting to object space.
 
 To use Spire to compile shaders for our pipeline, we need to do two things. First, we need to delcare the rendering pipeline so the compiler knows how to generate code. Then, we can write Spire shaders containing logic for all these worlds. The Spire declaration of the above pipeline can be found at [Docs/tutorial1/ObjSpace.pipeline](https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/ObjSpace.pipeline).
-We will cover the details of pipeline declaration in later tutorials. For now you only need to know that a pipeline declaration tells Spire the set of worlds as well as the dependency between the worlds. ObjSpace.pipeline declares a pipeline with four worlds: objSurfaceVs, objSurface, vs, and fs, which correspond to the rendering stages illustrated in Figure 2. In addition, we also defined four input worlds: rootVert, viewUniform, modelTransform and perInstanceUniform. Input worlds do not correspond to a shading stage, but are instead used as sources of shader inputs. For example, rootVert is for holding vertex inputs and viewUniform for passing in per-frame uniforms. 
+We will cover the details of pipeline declaration in later tutorials. For now you only need to know that a pipeline declaration tells Spire the set of worlds as well as the dependency between the worlds. ObjSpace.pipeline declares a pipeline with four worlds: `objSurfaceVs`, `objSurface`, `vs`, and `fs`, which correspond to the rendering stages illustrated in Figure 2. In addition, we also defined four input worlds: `rootVert`, `viewUniform`, `modelTransform` and `perInstanceUniform`. Input worlds do not correspond to a shading stage, but are instead used as sources of shader inputs. For example, `rootVert` is for holding vertex inputs and `viewUniform` for passing in per-frame uniforms. 
 
 
 ##The First Spire Shader
@@ -122,7 +122,7 @@ Note that we didn’t provide any specifier marking `outputColor` as output, as 
 
 ##Shader Variants
 
-In Demo1Shader, we defined a set of shading terms, e.g. `position`, `normal`, `specular` etc., which are called shader components. Note that in the shader definition, we have not specified at which world to place each shader component - the shader definition is simply a DAG of components. The compiled shaders could be different if we decide to compute a component (e.g. `specular`) at different worlds. The set of compiled shaders after applying world placement decisions is called a shader variant. 
+In `Demo1Shader`, we defined a set of shading terms, e.g. `position`, `normal`, `specular` etc., which are called shader components. Note that in the shader definition, we have not specified at which world to place each shader component - the shader definition is simply a DAG of components. The compiled shaders could be different if we decide to compute a component (e.g. `specular`) at different worlds. The set of compiled shaders after applying world placement decisions is called a shader variant. 
 
 ###The Default Variant
 
@@ -131,7 +131,7 @@ By default, the Spire compiler will prefer to compute a shader component at late
 <img src="https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/img/4.png" width="650px"/><br/>
 Figure 4. The default shader variant result from compiling Demo1Shader directly. 
 
-In Figure 4, each column correspond to a world, and each box in the column correspond to a shader component. The shader component in yellow text are components appear in inter-world interfaces, for example, position is computed in vs and passed to fs.  
+In Figure 4, each column correspond to a world, and each box in the column correspond to a shader component. The shader component in yellow text are components appear in inter-world interfaces, for example, position is computed in `vs` and passed to `fs`.  
 
 The shader variant shown in Figure 4 is equivalent to the following GLSL shaders:
 
@@ -252,14 +252,14 @@ To the following:
 ```glsl
 @objSurface float specular = ComputeHighlightPhong(lightDir, normal, view, roughness, specular, metallic);
 ```
-This forces specular to be computed in objSurface world, which results in the shader variant shown in Figure 5.
+This forces `specular` to be computed in objSurface world, which results in the shader variant shown in Figure 5.
 
 <img src="https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/img/6.png" width="650px"/><br/>
 Figure 5. Shader variant after placing specular at objSurface world. Note that only specular appears as the output of objSurface world.
 
 ###Create Different Variants via Schedule File
 
-You have already learnt how to use world specifiers to control the world placement decisions of shader components. However, when exploring different choices, frequently changing the shader code can be inconvenient. Spire allows you to specify world placements in a separate schedule file. For example, you can create a file named “schedule.txt” that contains the following line:
+You have already learnt how to use world specifiers to control the world placement decisions of shader components. However, when exploring different choices, frequently changing the shader code can be inconvenient. Spire allows you to specify world placements in a separate schedule file. For example, you can create a file named `“schedule.txt”` that contains the following line:
 ```
 specular = objSurface;
 ```
@@ -278,28 +278,28 @@ With the knowledge of the choice space, it is even possible to build an autotune
 ##Exposing Additional Choices via Component Overloading
 
 Spire supports expressing more choices than just world placements. A shader may expose additional choices of algorithmic approximations or simplifications by providing component overloads.
-For example, you can add the following line to Demo1Shader:
+For example, you can add the following line to `Demo1Shader`:
 ```glsl
 @vs vec3 normal = vNormal;
 ```
-This results Demo1Shader containing two definitions of normal, one without an explicit world specifier, one with the @vs specifier. 
-This means that if “normal” is scheduled to “vs” world, then the compiler should pick the overloaded implementation that uses vertex normal only and not fetching the normal map. Compiling the new shader with the schedule 
+This results Demo1Shader containing two definitions of normal, one without an explicit world specifier, one with the `@vs` specifier. 
+This means that if `normal` is scheduled to `vs` world, then the compiler should pick the overloaded implementation that uses vertex normal only and not fetching the normal map. Compiling the new shader with the schedule 
 ```
 normal = vs;
 ```
 yields the following shader variant:
 
 <img src="https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/img/8.png"  width="650px"/><br/>
-Figure 7. Shader variant result from using the @vs overload of normal component. This shader uses only vertex normal for lighting.
+Figure 7. Shader variant result from using the `@vs` overload of `normal` component. This shader uses only vertex normal for lighting.
 
 ##Component Overloading for Algorithmic Choices
 
-A component can be overloaded with different algorithmic alternatives. For example, you can change the definition of the specular component to the following:
+A component can be overloaded with different algorithmic alternatives. For example, you can change the definition of the `specular` component to the following:
 ```glsl
 float specular:phong = ComputeHighlightPhong(lightDir, normal, view, roughness, specular, metallic);
 float specular:ggx = ComputeHighlightGGX(lightDir, normal, view, roughness, specular, metallic);
 ```
-This exposes two named alternatives of the specular component that compute lighting using phong and ggx model respectively.
+This exposes two named alternatives of the `specular` component that compute lighting using `phong` and `ggx` model respectively.
 The actual choice can be provided at compile time. In “schedule.txt”, add the following line:
 ```
 specular = fs:ggx;
@@ -317,14 +317,14 @@ Figure 8. The multi-rate rendering pipeline featuring object space and screen sp
 
 Similar to the object space rendering phase that computes and stores shading result in object space textures, half resolution rendering phase performs another rendering pass but stores the shading results in half resolution screen-space textures. These screen-space textures can then be used by full resolution rendering phase. In practice, low frequency shader components such as diffuse lighting and fog can usually be sampled at sparser than once per pixel rate, making half resolution rendering an ideal trade-off for performance.
 
-Same as the previous object space shading pipeline, we need to declare the multi-rate pipeline in Spire before the compiler can generate shaders for us. The declaration of the new multi-rate pipeline is mostly similar to the previous object spacing shading pipeline, except the addition of two new worlds: lowResVs and lowRes, that correspond to the vertex and fragment shading stages of the half resolution rendering phase. The full declaration of the pipeline can be found at https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/MultiRate.pipeline 
+Same as the previous object space shading pipeline, we need to declare the multi-rate pipeline in Spire before the compiler can generate shaders for us. The declaration of the new multi-rate pipeline is mostly similar to the previous object spacing shading pipeline, except the addition of two new worlds: `lowResVs` and `lowRes`, that correspond to the vertex and fragment shading stages of the half resolution rendering phase. The full declaration of the pipeline can be found at [Docs/tutorial1/MultiRate.pipeline](https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/MultiRate.pipeline).
 
 Since the shading results from half resolution rendering phase is stored in screen space textures, they need to be fetched with the correct texture coordinates (in this case, screen space coordinates) in the full resolution fragment shader. In a Spire shader, if you write:
 ```glsl
 @lowRes vec3 color = ...;
 @fs vec3 result = color * 2;
 ```
-The compiler will inject the necessary texture fetch operation in the fragment shader to access color computed at lowRes world. The generated shader for lowRes and fs world are like the following:
+The compiler will inject the necessary texture fetch operation in the fragment shader to access color computed at `lowRes` world. The generated shader for `lowRes` and `fs` world are like the following:
 ```glsl
 // generated lowRes shader:
 out vec3 color;
@@ -345,13 +345,13 @@ void main()
     vec3 result = color * 2; 
 }
 ```
-As you can see, the compiler need the extra screenCoord to complete the texture fetch operation. In Spire, the compiler provides the capability to inject the texture fetch operation automatically, but it remains your responsibility to provide proper texture coordinate definition.  In the pipeline definition, we have told the compiler that when accessing a component computed at lowRes world from fs world, it need to inject a texture fetch operation using screenCoord as the texture coordinate, and every shader written against the multi-rate pipeline must provide a definition of screenCoord.
+As you can see, the compiler need the extra `screenCoord` to complete the texture fetch operation. In Spire, the compiler provides the capability to inject the texture fetch operation automatically, but it remains your responsibility to provide proper texture coordinate definition.  In the pipeline definition, we have told the compiler that when accessing a component computed at `lowRes` world from `fs` world, it need to inject a texture fetch operation using `screenCoord` as the texture coordinate, and every shader written against the multi-rate pipeline must provide a definition of `screenCoord`.
 
-With this pipeline declaration, our previous Demo1Shader can be ported to the new multi-rate pipeline without much change in code, except that it should provide a definition of screenCoord, as follows:
+With this pipeline declaration, our previous Demo1Shader can be ported to the new multi-rate pipeline without much change in code, except that it should provide a definition of `screenCoord`, as follows:
 ```glsl
 vec2 screenCoord = projCoord.xy / projCoord.w * 0.5 + 0.5;
 ```
-This is the only change needed to make Demo1Shader run on the new multi-rate pipeline. You can find the ported shader at https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/Demo2Shader.shader . To play with it, run SceneViewer and open “Examples/demo2/demo2.world”. Notice the extra choices available from the Choice Control window. Figure 9 shows the shader variant that computes both diffuse and specular lighting at half resolution.
+This is the only change needed to make Demo1Shader run on the new multi-rate pipeline. You can find the ported shader at [Docs/tutorial1/Demo2.shader](https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/Demo2.shader). To play with it, run SceneViewer and open `“Examples/demo2/Demo2.world”`. Notice the extra choices available from the Choice Control window. Figure 9 shows the shader variant that computes both diffuse and specular lighting at half resolution.
 
 <img src="https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/img/10.png"/><br/>
 Figure 9. Rendering result of the ported shader with both diffuse and specular computed at half screen resolution.
