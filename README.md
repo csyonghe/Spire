@@ -1,10 +1,10 @@
 # Spire
-Spire is a shader compiler that generates optimized shader code that spans the entire pre-baking and rendering pipeline. A shader written in Spire exposes the optimization space of compute rate assignments and algorithm alternatives, and the compiler generates the lower level shader code (e.g. GLSL) that implements the desired optimization choice for all stages of your engine's renderer.  Spire is designed to facilitate rapid exploration of optimization choices and code generation for various platforms and purposes from a single shader definition.
+Spire is a shading language and compiler framework that facilitates rapid exploration of shader optimization choices (such as frequency reduction and algorithmic approximation) afforded by modern real-time graphics engines.
 
 Paper: http://graphics.cs.cmu.edu/projects/spire/
 
 ## Getting Started
-To experience Spire, compile `"Source/Spire.sln"` and run the `SceneViewer` project. In `SceneViewer`, select "File"->"Open", and open "TestShaders/couch/couch.world". This loads up a couch scene. The couch is rendered using "TestShaders/couch/couch.shader".
+To experience the benefit of using Spire as your engine's shading language, we have build a rendering engine that supports offline  texture prebaking, object space shading, screen space multi-resolution shading and shadow map generation. The engine uses the Spire compiler to generate GPU compute, vertex and fragment shaders for all these rendering stages. To see it working, compile the demo engine from `"Examples/DemoEngine/DemoEngine.sln"` and run the `SceneViewer` project. In `SceneViewer`, select "File"->"Open", and open "Examples/Scenes/couch/couch.world". This loads up a couch scene. The couch is rendered using [Examples/Scenes/couch/couch.shader](https://github.com/csyonghe/Spire/blob/master/Examples/Scenes/couch/couch.shader).
 
 ![](https://github.com/csyonghe/Spire/blob/master/Docs/sceneViewer.jpg)
 
@@ -18,7 +18,7 @@ However, the compiler is platform independent and is compatible with both msvc a
 
 ## Using Spire
 ### As Library
-The Spire compiler is distributed as a single-file C++ library with no external dependencies. To integrate the compiler into your engine, simply grab "Spire.h" "Spire.cpp" from "LibraryRelease" directory and place them into your project.
+The Spire compiler is distributed directly as four C++ source files with no external dependencies. To integrate the compiler into your engine, simply grab "Spire.h" "Spire.cpp" "Basic.h" "Basic.cpp" from "LibraryRelease" directory and place them into your project.
 To invoke the compiler, call:
 ```c++
 CoreLib::List<SpireLib::ShaderLibFile> CompileShaderSource(Spire::Compiler::CompileResult & result,
