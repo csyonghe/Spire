@@ -13,7 +13,7 @@ Since all rendering phases are done on the GPU, each of them includes a vertex s
 <img src="https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/img/2.png" width="500px"/><br/>
 Figure 2. Rendering stages of our Demo Engine
 
-In Spire’s terminology, a shading stage in a rendering pipeline corresponds to a `world`. Spire sees a pipeline as a set of worlds and the dependency between the worlds. When compiling a Spire shader, the compiler generates one GPU shader for each world. In this example pipeline, four GLSL shaders will be produced from compilation of one Spire shader.
+In Spire’s terminology, a shading stage in a rendering pipeline corresponds to a `world`. Spire sees a pipeline as a set of worlds and the dependency between the worlds. A world is Spire's abstraction for a place in the engine where shader code can run.  (All expressions in a Spire shader execute in some world.) When compiling a Spire shader, the compiler generates one GPU shader for each world. In this example pipeline, four GLSL shaders will be produced from compilation of one Spire shader.
 
 If we write GLSL shaders directly for this pipeline, in most cases we need to create four shaders for each type of material and carefully define the input/output interfaces for each stage. If we want to try computing some terms in a different shading stage (world), for example computing high frequency specular highlight at object space to reduce aliasing, all four shaders would need to change.
 
