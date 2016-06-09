@@ -1,27 +1,82 @@
+// declaring the object space shading pipeline
 pipeline ObjSpacePipeline
 {
-    [Pinned]
-    [Packed]
+    // rootVert world is used to define vertex attribute inputs.
+    // "Pinned" attribute informs the compiler not to eliminate unused components defined in this world.
+    // "Packed" attribute informs the compiler that components in this world come from a packed buffer
+    //  where no alignment padding are added between components.
+    [Pinned][Packed]  
     input world rootVert;
-    [Pinned]
-    [InterfaceBlockIndex: "1"]
+
+    // "InterfaceBlockIndex" attribute results all components in the world defined in a uniform buffer
+    // bound at specific binding location.
+    // viewUniform world is used to hold per-frame uniform inputs
+    [Pinned][InterfaceBlockIndex: "1"]
     input world viewUniform;
-    [Pinned]
-    [InterfaceBlock: "perInstanceUniform:2"]
+    
+    // perInstanceUniform is used to hold per-object-instance uniform inputs
+    [Pinned][InterfaceBlock: "perInstanceUniform:2"]
     input world perInstanceUniform;
+    
+    // modelTransform is used to hold model transform matrices for each instance
     [InterfaceBlock: "modelTransform:0"]
     input world modelTransform;
+    
+    // objSurfaceVs world: corresponds to the vertex shader of object space shading phase.
+    // the string literal "glsl(vertex:texSpaceVert)" informs that this world should be
+    // compiled into a glsl vertex shader, and use texSpaceVert component as gl_Position
+    // the "export standardExport" clause means that the output of this world should be
+    // defined as standard "out" terms in the generated shader.
     world objSurfaceVs: "glsl(vertex:texSpaceVert)" using texSpaceVert export standardExport;
+    
+    // objSurface world: corresponds to the fragment shader of object space shading phase.
+    // the clause "export fragmentExport" means that the output of this world should be
+    // declared as standard "out" terms in the generated shader, and informs the compiler
+    // that the output of this world would be stored in textures.
     [InterfaceBlock: "ObjSpaceInput:5"]
     world objSurface : "glsl" export fragmentExport;
+    
+    // vs world: correpond to vertex shader for the full resolution shading phase.
+    // the "command_list" option informs the compiler that the shader will be used along with
+    //  the NV_COMMAND_LIST OpenGL extension.
     world vs : "glsl(vertex:projCoord;command_list)" using projCoord export standardExport;
+    
+    // fs world: correspond to the fragment shader for the full resolution shading phase.
     world fs : "glsl(command_list)" export fragmentExport;
     
-    require @vs vec4 projCoord; 
-    require @objSurfaceVs* vec4 texSpaceVert;
+    // require all shaders written against this pipeline to provide a component named projCoord
+    //    at vs world. This will be used as the gl_Position output.
+    require @vs vec4 projCoord;
+    
+    // require all shaders written against this pipeline to provide a component named texSpaceVert
+    //    at objSurfaceVs world. This will be used as the gl_Position output.
+    require @objSurfaceVs vec4 texSpaceVert;
+    
+    // require all shaders written against this pipeline to provide outputColor.
+    // and marks outputColor as the final pipeline output.
     require out @fs vec4 outputColor;
+    
+    // require all shaders to provide vert_uv at rootVert world.
+    // this is equivalent of saying: all shaders written against the pipeline requires the vertex buffer
+    // to contain uv coordinates.
     require @rootVert vec2 vert_uv;
     
+    // Declaring import operators. 
+    /* Import operators are used to define the dependency relationship between worlds.
+       Spire supports five types of dependencies:
+          - uniformImport is used to define dependency between an uniform input world and a normal world.
+            the source world of an uniformImport dependency will be compiled to an uniform buffer definition.
+          - vertexImport is used to define dependency between an vertex buffer input world and a normal world.
+            the source world of an vertexImport dependency will be regarded as the vertex attribute definition.
+            the destination world must be used as a vertex shader.
+          - standardImport is used to define dependency between GPU pipeline stages, 
+            such as from vertex shader to fragment shader
+          - textureImport is used to define dependency on a fragment shading world.
+            Spire compiler will inject texture fetch operations in the user world to fetch the textures produced
+            by the source world.
+          - bufferImport is used to inform the compiler that the output of source world is stored in a general
+            buffer. Spire will inject buffer fetch instruction to load the value at gl_InvocationIndex.
+    */      
     import uniformImport(perInstanceUniform->vs);
     import uniformImport(perInstanceUniform->fs);
     import uniformImport(perInstanceUniform->objSurfaceVs);
@@ -38,9 +93,14 @@ pipeline ObjSpacePipeline
     import vertexImport(rootVert->objSurfaceVs);
     import standardImport(vs->fs);
     import standardImport(objSurfaceVs->objSurface);
+    
+    // a texture import dependency must use the "using" clause to specify 
+    // the texture coordinate used to fetch the textures.
     import textureImport(objSurface->fs) using vert_uv;
     import textureImport(objSurface->vs) using vert_uv;
 }
+
+// auxilary lighting functions
 
 float Pow4(float x)
 {
