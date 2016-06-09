@@ -54,7 +54,7 @@ shader Demo1Shader
     }
     
     // uncomment the following line to add an @vs overload for normal
-    //@vs vec3 normal = (normalMatrix * vec4(vert_normal, 1.0)).xyz;
+    @vs vec3 normal = (normalMatrix * vec4(vert_normal, 1.0)).xyz;
 
     vec3 view = normalize(cameraPos - position.xyz);
     
