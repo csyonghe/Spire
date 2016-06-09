@@ -1146,7 +1146,9 @@ namespace GraphicsUI
 						dy = clientRect.y;
 					}
 					entry->ClipRects->AddRect(Rect(ctrl->Left + absX + dx, ctrl->Top + absY + dy, ctrl->GetWidth() + 1, ctrl->GetHeight() + 1));
-					ctrl->Draw(absX + dx, absY + dy);
+					auto clipRect = entry->ClipRects->GetTop();
+					if (ctrl->Visible && clipRect.Intersects(Rect(absX + dx + ctrl->Left, absY + dy + ctrl->Top, ctrl->GetWidth(), ctrl->GetHeight())))
+						ctrl->Draw(absX + dx, absY + dy);
 					entry->ClipRects->PopRect();
 				}
 			}
@@ -2943,21 +2945,24 @@ namespace GraphicsUI
 	bool CustomTextBox::DoMouseMove(int X , int Y)
 	{
 		Control::DoMouseMove(X,Y);
-		if (Enabled && Visible && SelectMode)
+		if (Enabled && Visible)
 		{
-			int cp = HitTest(X);
-			if (cp<SelOrigin)
+			if (SelectMode)
 			{
-				SelStart = cp;
-				SelLength = SelOrigin-cp;
+				int cp = HitTest(X);
+				if (cp < SelOrigin)
+				{
+					SelStart = cp;
+					SelLength = SelOrigin - cp;
+				}
+				else if (cp >= SelOrigin)
+				{
+					SelStart = SelOrigin;
+					SelLength = cp - SelOrigin;
+				}
+				CursorPos = cp;
+				CursorPosChanged();
 			}
-			else if (cp>=SelOrigin)
-			{
-				SelStart = SelOrigin;
-				SelLength = cp-SelOrigin;
-			}
-			CursorPos = cp;
-			CursorPosChanged();
 			return true;
 		}
 		return false;

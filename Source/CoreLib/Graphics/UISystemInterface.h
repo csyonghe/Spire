@@ -17,6 +17,18 @@ namespace GraphicsUI
 		{
 			x = ax; y = ay; h = ah; w = aw;
 		}
+		bool Intersects(const Rect & other)
+		{
+			if (x > other.x + other.w)
+				return false;
+			if (x + w < other.x)
+				return false;
+			if (y > other.y + other.h)
+				return false;
+			if (y + h < other.y)
+				return false;
+			return true;
+		}
 	};
 
 

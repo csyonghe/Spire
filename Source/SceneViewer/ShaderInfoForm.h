@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SHADER_INFO_FORM_H
+#define SHADER_INFO_FORM_H
 
 #include "LibGL/GLForm.h"
 #include "CoreLib/Graphics/LibUI.h"
@@ -28,3 +29,4 @@ namespace SceneViewer
 		virtual bool DoMouseUp(int x, int y, GraphicsUI::SHIFTSTATE shift) override;
 	};
 }
+#endif

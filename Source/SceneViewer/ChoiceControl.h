@@ -1,4 +1,5 @@
-#pragma once
+#ifndef CHOICE_CONTROL_H
+#define CHOICE_CONTROL_H
 
 #include "CoreLib/WinForm/WinCommonDlg.h"
 #include "LibGL/OpenGLHardwareRenderer.h"
@@ -69,3 +70,5 @@ namespace SceneViewer
 
 	};
 }
+
+#endif

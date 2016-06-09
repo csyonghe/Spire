@@ -146,12 +146,15 @@ namespace CoreLib
 			{
 			case CoreLib::IO::SeekOrigin::Start:
 				_origin = SEEK_SET;
+				endReached = false;
 				break;
 			case CoreLib::IO::SeekOrigin::End:
 				_origin = SEEK_END;
+				endReached = true;
 				break;
 			case CoreLib::IO::SeekOrigin::Current:
 				_origin = SEEK_CUR;
+				endReached = false;
 				break;
 			default:
 				throw NotSupportedException(L"Unsupported seek origin.");
@@ -172,10 +175,11 @@ namespace CoreLib
 			auto bytes = fread_s(buffer, (size_t)length, 1, (size_t)length, handle);
 			if (bytes == 0 && length > 0)
 			{
-				if (feof(handle))
-					throw EndOfStreamException(L"End of stream reached when reading.");
-				else
+				if (!feof(handle))
 					throw IOException(L"FileStream read failed.");
+				else if (endReached)
+					throw EndOfStreamException(L"End of file is reached.");
+				endReached = true;
 			}
 			return (int)bytes;
 		}
@@ -203,6 +207,10 @@ namespace CoreLib
 				fclose(handle);
 				handle = 0;
 			}
+		}
+		bool FileStream::IsEnd()
+		{
+			return endReached;
 		}
 	}
 }

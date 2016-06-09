@@ -153,7 +153,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <Text Include="..\TestShader\AutoDeduce.shader" />
-    <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ShaderCompilerShell.cpp" />
