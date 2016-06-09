@@ -262,11 +262,8 @@ Figure 5. Shader variant after placing specular at objSurface world. Note that o
 You have already learnt how to use world specifiers to control the world placement decisions of shader components. However, when exploring different choices, frequently changing the shader code can be inconvenient. Spire allows you to specify world placements in a separate schedule file. For example, you can create a file named “schedule.txt” that contains the following line:
 ```
 specular = objSurface;
-position = objSurface,fs;
-uv = objSurface,vs;
-normal = objSurface,fs;
 ```
-Then compile the shader using the following command will produce the same shader variant as Figure 6.
+Then compile the shader using the following command will produce the same shader variant as Figure 5.
 ```
 SpireCompiler “Demo1Shader.shader” -schedule “schedule.txt”
 ```
@@ -307,7 +304,7 @@ The actual choice can be provided at compile time. In “schedule.txt”, add th
 ```
 specular = fs:ggx;
 ```
-Tells the compiler to compute specular using the ggx model and compute it at fs world.
+Tells the compiler to compute specular using the `ggx` model and compute it at `fs` world.
 
 
 ##Targeting a More Complex Pipeline
