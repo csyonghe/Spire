@@ -9,7 +9,6 @@
 #include "StdInclude.h"
 #include "Schedule.h"
 #include "CodeGenBackend.h"
-#include "CppCodeGenInclude.h"
 #include "../CoreLib/Parser.h"
 #include "Closure.h"
 
@@ -302,8 +301,6 @@ namespace Spire
 								|| options.SymbolToCompile == shader->MetaData.ShaderName)
 							{
 								StringBuilder glslBuilder;
-								StringBuilder cppBuilder;
-								cppBuilder << CppCodeIncludeString1 << CppCodeIncludeString2;
 								Dictionary<String, String> targetCode;
 								result.CompiledSource[shader->MetaData.ShaderName + L".glsl"] = EnumerableDictionary<String, CompiledShaderSource>();
 								auto & worldSources = result.CompiledSource[shader->MetaData.ShaderName + L".glsl"]();

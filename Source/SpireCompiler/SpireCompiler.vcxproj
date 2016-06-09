@@ -152,9 +152,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <Text Include="..\TestShader\AutoDeduce.shader" />
-  </ItemGroup>
-  <ItemGroup>
     <ClCompile Include="ShaderCompilerShell.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -167,11 +164,6 @@
     <ProjectReference Include="..\SpireLib\SpireLib.vcxproj">
       <Project>{1168c449-66a5-4d23-80e2-2c1a07e58f83}</Project>
     </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\TestShader\InheritanceTest.shader" />
-    <None Include="..\TestShader\TerrainBlend.shader" />
-    <None Include="runVC.bat" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

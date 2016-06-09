@@ -51,10 +51,6 @@
     <ClInclude Include="CodeGenBackend.h">
       <Filter>Back End</Filter>
     </ClInclude>
-    <ClInclude Include="ShaderInterface.h" />
-    <ClInclude Include="CppCodeGenInclude.h">
-      <Filter>Back End</Filter>
-    </ClInclude>
     <ClInclude Include="Closure.h">
       <Filter>Front End</Filter>
     </ClInclude>
@@ -97,9 +93,6 @@
       <Filter>Back End</Filter>
     </ClCompile>
     <ClCompile Include="CodeGenerator.cpp">
-      <Filter>Back End</Filter>
-    </ClCompile>
-    <ClCompile Include="CppCodeGenInclude.cpp">
       <Filter>Back End</Filter>
     </ClCompile>
     <ClCompile Include="CompiledProgram.cpp">

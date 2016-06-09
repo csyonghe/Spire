@@ -2,22 +2,19 @@ pipeline MultiRatePipeline
 {
     [Pinned]
     [Packed]
-    abstract world rootVert;
-    
-    [InterfaceBlockIndex: "4"]
-    abstract world rootTex;
+    input world rootVert;
     [Pinned]
     [InterfaceBlockIndex: "1"]
-    abstract world viewUniform;
+    input world viewUniform;
     [Pinned]
     [InterfaceBlock: "perInstanceUniform:2"]
-    abstract world perInstanceUniform;
+    input world perInstanceUniform;
     [InterfaceBlock: "modelTransform:0"]
-    abstract world modelTransform;
+    input world modelTransform;
+    
     world objSurfaceVs: "glsl(vertex:texSpaceVert)" using texSpaceVert export standardExport;
     [InterfaceBlock: "ObjSpaceInput:5"]
     world objSurface : "glsl" export fragmentExport;
-    
     world lowResVs : "glsl(vertex:projCoord;command_list)" using projCoord export standardExport;
     [InterfaceBlock : "LowResInput:6"]
     world lowRes : "glsl(command_list)" export fragmentExport;

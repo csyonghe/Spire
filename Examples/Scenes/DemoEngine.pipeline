@@ -2,17 +2,14 @@ pipeline EnginePipeline
 {
     [Pinned]
     [Packed]
-    abstract world rootVert;
-    
-    [InterfaceBlockIndex: "4"]
-    abstract world rootTex;
+    input world rootVert;
     [Pinned]
     [InterfaceBlockIndex: "1"]
-    abstract world viewUniform;
+    input world viewUniform;
     [InterfaceBlock: "perInstanceUniform:2"]
-    abstract world perInstanceUniform;
+    input world perInstanceUniform;
     [InterfaceBlock: "modelTransform:0"]
-    abstract world modelTransform;
+    input world modelTransform;
     [Packed]
     world precomputeVert : "glsl" export bufferExport;
     [InterfaceBlockIndex: "7"]
@@ -84,7 +81,6 @@ pipeline EnginePipeline
     
     import textureImport(precomputeTex->shadowVs) using vert_uv;
     import textureImport(precomputeTex->shadowFs) using vert_uv;
-    import textureImport(rootTex->precomputeTex) using vert_uv;
 }
 
 module ViewUniforms

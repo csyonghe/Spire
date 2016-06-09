@@ -235,25 +235,7 @@ namespace Spire
 			while (!LookAheadToken(TokenType::RBrace))
 			{
 				auto attribs = ParseAttribute();
-				if (LookAheadToken(L"abstract"))
-				{
-					pos++;
-					bool isWorld = LookAheadToken(L"world");
-					pos--;
-					if (isWorld)
-					{
-						auto w = ParseWorld();
-						w->LayoutAttributes = attribs;
-						pipeline->Worlds.Add(w);
-					}
-					else
-					{
-						auto comp = ParseComponent();
-						comp->LayoutAttributes = attribs;
-						pipeline->AbstractComponents.Add(comp);
-					}
-				}
-				else if (LookAheadToken(L"world"))
+				if (LookAheadToken(L"input") || LookAheadToken(L"world"))
 				{
 					auto w = ParseWorld();
 					w->LayoutAttributes = attribs;
@@ -334,9 +316,9 @@ namespace Spire
 		{
 			RefPtr<WorldSyntaxNode> world = new WorldSyntaxNode();
 			world->LayoutAttributes = ParseAttribute();
-			world->IsAbstract = LookAheadToken(L"abstract");
+			world->IsAbstract = LookAheadToken(L"input");
 			if (world->IsAbstract)
-				ReadToken(L"abstract");
+				ReadToken(L"input");
 			ReadToken(L"world");
 			FillPosition(world.Ptr());
 			world->Name = ReadToken(TokenType::Identifier);

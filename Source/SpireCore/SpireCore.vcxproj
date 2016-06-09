@@ -161,14 +161,12 @@
     <ClInclude Include="CodeWriter.h" />
     <ClInclude Include="CompiledProgram.h" />
     <ClInclude Include="CompileError.h" />
-    <ClInclude Include="CppCodeGenInclude.h" />
     <ClInclude Include="Schedule.h" />
     <ClInclude Include="IL.h" />
     <ClInclude Include="Lexer.h" />
     <ClInclude Include="Parser.h" />
     <ClInclude Include="ScopeDictionary.h" />
     <ClInclude Include="ShaderCompiler.h" />
-    <ClInclude Include="ShaderInterface.h" />
     <ClInclude Include="SymbolTable.h" />
     <ClInclude Include="StdInclude.h" />
     <ClInclude Include="Syntax.h" />
@@ -179,7 +177,6 @@
     <ClCompile Include="CodeGenerator.cpp" />
     <ClCompile Include="CompiledProgram.cpp" />
     <ClCompile Include="ConstantPool.cpp" />
-    <ClCompile Include="CppCodeGenInclude.cpp" />
     <ClCompile Include="GLSLCodeGen.cpp" />
     <ClCompile Include="KeyHoleMatching.cpp" />
     <ClCompile Include="Schedule.cpp" />
