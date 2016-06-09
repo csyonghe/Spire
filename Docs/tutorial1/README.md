@@ -254,26 +254,9 @@ To the following:
 ```
 This forces specular to be computed in objSurface world, which results in the shader variant shown in Figure 5.
 
-<img src="https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/img/5.png" width="650px"/><br/>
-Figure 5. Shader variant after placing specular at objSurface world.
-
-However, the shader variant in Figure 5 is not very efficient, because to compute specular at objSurface world, its dependent components (position, uv, normal) would also need to be placed at objSurface world. By default, Spire compiler prefers reusing components computed at previous stages, therefore position, uv and normal computed at objSurface are also passed to fs via object space textures in order to compute diffuse and albedo. What we actually want is to duplicate the computation of position, uv and normal at both objSurface and fs world, so they need not to be passed via textures. Spire supports placing a component at more than one worlds. To to so, modify the definition of position, uv and normal to the following:
-```glsl
- @(objSurface*, vs*) vec4 position = ...;
- @(objSurface*, fs*) vec2 uv = ...;
- @(objSurface*, fs*) vec3 normal = ...;
-```
-The `*` tells Spire to duplicate the component at the marked world. This results the shader variant shown in Figure 6, which computes position, uv and normal at objSurface and fs worlds, so they do not appear as the output of objSurface world (and therefore no textures need to be allocated).
-
 <img src="https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/img/6.png" width="650px"/><br/>
-Figure 6. Shader variant result from modifying the world specifiers. Note that only specular appears as the output of objSurface world.
+Figure 5. Shader variant after placing specular at objSurface world. Note that only specular appears as the output of objSurface world.
 
-Spire also supports the inline keyword. A component marked as inline will be duplicated at each world that uses the component. In this case, marking position, uv, and normal with inline will also result in the same shader variant as Figure 6.
-```c++
-  inline vec4 position = . . .;
-  inline vec2 uv = . . .;
-  inline vec3 normal = . . .;
-```
 ###Create Different Variants via Schedule File
 
 You have already learnt how to use world specifiers to control the world placement decisions of shader components. However, when exploring different choices, frequently changing the shader code can be inconvenient. Spire allows you to specify world placements in a separate schedule file. For example, you can create a file named “schedule.txt” that contains the following line:
@@ -291,7 +274,7 @@ SpireCompiler “Demo1Shader.shader” -schedule “schedule.txt”
 A more intuitive way of exploring different placement choices is to visualize all choices afforded by a shader and change them graphically. The Spire compiler can enumerates all world placement choices exposed by the shader. With this data, you can build GUI tools to explore different choices. The demo engine implements such a tool as shown below. To play with it, run SceneViewer and open “Examples/demo1/demo1.world”, then try selecting different worlds for some components in the Choice Control window.
 
 <img src="https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/img/7.png" width="500px"/><br/>
-Figure 7. The choice exploration tool included in the demo engine. All components of the selected shader is listed, with ComboBoxes displaying allowed placement choices for each component.  Clicking Save button will save the currently selected choices to a schedule file.
+Figure 6. The choice exploration tool included in the demo engine. All components of the selected shader is listed, with ComboBoxes displaying allowed placement choices for each component.  Clicking Save button will save the currently selected choices to a schedule file.
 
 With the knowledge of the choice space, it is even possible to build an autotuner that automatically searches the space for the most performant choice. We have implemented a prototype autotuner that enumerates the entire choice space to find the combination of world placement choices that yields the highest render quality under desired time budget. To experiement with the tool, you can select the components you wish to explore in the choice control window, then change the time budget (default is 10ms) and click Autotune button.
 
@@ -310,7 +293,7 @@ normal = vs;
 yields the following shader variant:
 
 <img src="https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/img/8.png"  width="650px"/><br/>
-Figure 8. Shader variant result from using the @vs overload of normal component. This shader uses only vertex normal for lighting.
+Figure 7. Shader variant result from using the @vs overload of normal component. This shader uses only vertex normal for lighting.
 
 ##Component Overloading for Algorithmic Choices
 
@@ -330,10 +313,10 @@ Tells the compiler to compute specular using the ggx model and compute it at fs 
 ##Targeting a More Complex Pipeline
 
 The choice of world placements can be used to carry out many interesting optimizations other than object space shading.
-We have also implemented a more complex multi-rate rendering pipeline that features screen space half resolution (coarse pixel) shading, as shown in Figure 9.
+We have also implemented a more complex multi-rate rendering pipeline that features screen space half resolution (coarse pixel) shading, as shown in Figure 8.
 
 <img src="https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/img/9.png" width="700px"/><br/>
-Figure 9. The multi-rate rendering pipeline featuring object space and screen space half resolution rendering phases.
+Figure 8. The multi-rate rendering pipeline featuring object space and screen space half resolution rendering phases.
 
 Similar to the object space rendering phase that computes and stores shading result in object space textures, half resolution rendering phase performs another rendering pass but stores the shading results in half resolution screen-space textures. These screen-space textures can then be used by full resolution rendering phase. In practice, low frequency shader components such as diffuse lighting and fog can usually be sampled at sparser than once per pixel rate, making half resolution rendering an ideal trade-off for performance.
 
@@ -371,9 +354,9 @@ With this pipeline declaration, our previous Demo1Shader can be ported to the ne
 ```glsl
 vec2 screenCoord = projCoord.xy/vec2(projCoord.w)*0.5 + vec2(0.5);
 ```
-This is the only change needed to make Demo1Shader run on the new multi-rate pipeline. You can find the ported shader at https://github.com/csyonghe/Spire/blob/master/Examples/demo2/Demo2Shader.shader . To play with it, run SceneViewer and open “Examples/demo2/demo2.world”. Notice the extra choices available from the Choice Control window. Figure 10 shows the shader variant that computes both diffuse and specular lighting at half resolution.
+This is the only change needed to make Demo1Shader run on the new multi-rate pipeline. You can find the ported shader at https://github.com/csyonghe/Spire/blob/master/Examples/demo2/Demo2Shader.shader . To play with it, run SceneViewer and open “Examples/demo2/demo2.world”. Notice the extra choices available from the Choice Control window. Figure 9 shows the shader variant that computes both diffuse and specular lighting at half resolution.
 
 <img src="https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/img/10.png"/><br/>
-Figure 10. Rendering result of the ported shader with both diffuse and specular computed at half screen resolution.
+Figure 9. Rendering result of the ported shader with both diffuse and specular computed at half screen resolution.
 
 
