@@ -56,7 +56,7 @@ shader Demo2Shader
                     + normalTex.y * vBiTangent 
                     + normalTex.z * vNormal);
     }
-    
+  
     // uncomment the following line to add an @vs overload for normal
     //@vs vec3 normal = (normalMatrix * vec4(vert_normal, 1.0)).xyz;
 
