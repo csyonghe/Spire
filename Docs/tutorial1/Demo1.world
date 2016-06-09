@@ -1,6 +1,6 @@
 terrain  "assets/height.png" 1.0 250
 {
-    shader "Demo1.cse" src "Demo1.shader", 0.0
+    shader "Demo1Shader.cse" src "Demo1.shader", 0.0
 
     uniform texture2D ground_pebble_map = "assets/SM_ground_gravel_a_d.TGA";
     uniform texture2D ground_pebble_Nmap = "assets/SM_ground_gravel_a_n.TGA";

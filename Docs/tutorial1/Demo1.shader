@@ -10,7 +10,7 @@ shader Demo1Shader
     @rootVert vec3 vert_tangent;
     @rootVert vec2 vert_uv;
     
-    // define transofrm matrix inputs 
+    // define transform matrix inputs 
     @modelTransform mat4 modelMatrix; 
     @modelTransform mat4 normalMatrix;
     
