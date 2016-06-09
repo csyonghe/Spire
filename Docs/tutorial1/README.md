@@ -351,7 +351,7 @@ With this pipeline declaration, our previous Demo1Shader can be ported to the ne
 ```glsl
 vec2 screenCoord = projCoord.xy / projCoord.w * 0.5 + 0.5;
 ```
-This is the only change needed to make Demo1Shader run on the new multi-rate pipeline. You can find the ported shader at [Docs/tutorial1/Demo2.shader](https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/Demo2.shader). To play with it, run SceneViewer and open [Docs/tutorial1/Demo2.world](https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/demo2.world). Notice the extra choices available from the Choice Control window. Figure 9 shows the shader variant that computes both diffuse and specular lighting at half resolution.
+This is the only change needed to make Demo1Shader run on the new multi-rate pipeline. You can find the ported shader at [Docs/tutorial1/Demo2.shader](https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/Demo2.shader). To play with it, run SceneViewer and open [Docs/tutorial1/Demo2.world](https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/Demo2.world). Notice the extra choices available from the Choice Control window. Figure 9 shows the shader variant that computes both diffuse and specular lighting at half resolution.
 
 <img src="https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/img/10.png"/><br/>
 Figure 9. Rendering result of the ported shader with both diffuse and specular computed at half screen resolution.
