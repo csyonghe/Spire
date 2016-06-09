@@ -3,7 +3,7 @@
 
 #include "CoreLib/Graphics.h"
 
-namespace RealtimeEngine
+namespace DemoEngine
 {
 	using namespace VectorMath;
 

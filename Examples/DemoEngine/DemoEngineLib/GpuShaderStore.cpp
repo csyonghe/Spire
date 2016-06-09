@@ -1,7 +1,7 @@
 #include "GpuShaderStore.h"
 using namespace GL;
 
-namespace RealtimeEngine
+namespace DemoEngine
 {
 	GL::Program GpuShaderStore::LoadProgram(String vs, List<String>& outputs)
 	{

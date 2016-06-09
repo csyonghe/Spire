@@ -5,7 +5,7 @@
 #include "DeviceResourcePool.h"
 using namespace GL;
 
-namespace RealtimeEngine
+namespace DemoEngine
 {
 	extern const wchar_t * fsEpilog;
 	class LowQualityRenderPassProvider : public RenderPassProvider

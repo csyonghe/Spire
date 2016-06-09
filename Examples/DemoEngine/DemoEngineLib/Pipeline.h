@@ -13,7 +13,7 @@
 #include "MaterialContext.h"
 #include "RenderPassProvider.h"
 
-namespace RealtimeEngine
+namespace DemoEngine
 {
 	class ViewUniformBufferContent
 	{

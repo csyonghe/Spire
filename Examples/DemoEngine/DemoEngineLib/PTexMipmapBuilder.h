@@ -3,7 +3,7 @@
 
 #include "DeviceResourcePool.h"
 
-namespace RealtimeEngine
+namespace DemoEngine
 {
 	class PTexMipmapBuilder
 	{

@@ -5,7 +5,7 @@
 #include "CoreLib/LibGL.h"
 #include "DeviceMarshalling.h"
 
-namespace RealtimeEngine
+namespace DemoEngine
 {
 	struct ShadingTechnique : public Object
 	{

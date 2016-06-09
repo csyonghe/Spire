@@ -9,7 +9,7 @@ using namespace CoreLib::Diagnostics;
 using namespace CoreLib::Graphics;
 using namespace GL;
 
-namespace RealtimeEngine
+namespace DemoEngine
 {
 
 	const wchar_t * backgroundVertShader = LR"(

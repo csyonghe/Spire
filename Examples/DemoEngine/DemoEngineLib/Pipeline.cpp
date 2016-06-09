@@ -12,7 +12,7 @@ using namespace SpireLib;
 
 //#define USE_COMMAND_LIST
 
-namespace RealtimeEngine
+namespace DemoEngine
 {
 	RefPtr<DeviceMesh> EnginePipeline::AddDrawableMesh(Mesh pMesh, const Matrix4 & matrix)
 	{

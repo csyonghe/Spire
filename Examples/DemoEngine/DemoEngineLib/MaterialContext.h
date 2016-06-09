@@ -6,7 +6,7 @@
 #include "GpuShaderStore.h"
 #include "Spire.h"
 
-namespace RealtimeEngine
+namespace DemoEngine
 {
 	class MaterialContext
 	{

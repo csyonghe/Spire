@@ -4,7 +4,7 @@
 #include "CoreLib/Basic.h"
 #include "CoreLib/LibGL.h"
 
-namespace RealtimeEngine
+namespace DemoEngine
 {
 	class GpuShaderStore
 	{

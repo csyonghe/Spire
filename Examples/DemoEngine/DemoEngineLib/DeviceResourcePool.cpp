@@ -1,8 +1,8 @@
 #include "DeviceResourcePool.h"
 
-namespace RealtimeEngine
+namespace DemoEngine
 {
-	StaticMesh::StaticMesh(RealtimeEngine::DeviceResourcePool * engine)
+	StaticMesh::StaticMesh(DeviceResourcePool * engine)
 	{
 		this->engine = engine;
 		this->verticesBuffer = engine->GetHardwareRenderer()->CreateBuffer(BufferUsage::ArrayBuffer);

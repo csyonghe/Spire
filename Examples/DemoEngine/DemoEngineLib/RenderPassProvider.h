@@ -10,7 +10,7 @@ namespace SpireLib
 	class ShaderLib;
 }
 
-namespace RealtimeEngine
+namespace DemoEngine
 {
 	struct ShadingTechnique;
 	struct SizeI { int Width, Height; };

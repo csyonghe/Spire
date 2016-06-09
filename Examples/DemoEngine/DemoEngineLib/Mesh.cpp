@@ -3,7 +3,7 @@
 using namespace CoreLib::Basic;
 using namespace CoreLib::IO;
 
-namespace RealtimeEngine
+namespace DemoEngine
 {
 	int Mesh::GetVertexSize()
 	{

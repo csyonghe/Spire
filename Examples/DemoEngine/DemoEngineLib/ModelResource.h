@@ -9,7 +9,7 @@ using namespace CoreLib::Basic;
 using namespace VectorMath;
 using namespace CoreLib::Graphics;
 
-namespace RealtimeEngine
+namespace DemoEngine
 {
 	class ModelResource
 	{

@@ -4,7 +4,7 @@
 #include "CoreLib/Basic.h"
 #include "CoreLib/Graphics.h"
 
-namespace RealtimeEngine
+namespace DemoEngine
 {
 	enum class VertexDataType
 	{

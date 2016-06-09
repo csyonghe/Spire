@@ -5,7 +5,7 @@
 
 using namespace CoreLib::IO;
 using namespace CoreLib::Diagnostics;
-using namespace RealtimeEngine;
+using namespace DemoEngine;
 
 #define ENABLE_AUTO_TUNE
 namespace SceneViewer

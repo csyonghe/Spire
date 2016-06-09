@@ -1,6 +1,6 @@
 #include "VRContext.h"
 
-namespace RealtimeEngine
+namespace DemoEngine
 {
 	class VRContext : public IVRContext
 	{
@@ -23,7 +23,7 @@ namespace RealtimeEngine
 		}
 	};
 
-	IVRContext * RealtimeEngine::CreateVRContext()
+	IVRContext * CreateVRContext()
 	{
 		return new VRContext();
 	}

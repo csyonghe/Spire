@@ -6,7 +6,7 @@
 #include "ModelResource.h"
 #include "CoreLib/LibGL.h"
 
-namespace RealtimeEngine
+namespace DemoEngine
 {
 	enum class UniformType
 	{

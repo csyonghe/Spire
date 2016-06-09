@@ -21,7 +21,7 @@ using namespace CoreLib::WinForm;
 using namespace CoreLib::Diagnostics;
 
 using namespace GL;
-using namespace RealtimeEngine;
+using namespace DemoEngine;
 #ifdef CreateDirectory
 #undef CreateDirectory
 #endif

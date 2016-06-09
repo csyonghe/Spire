@@ -1,6 +1,6 @@
 #include "PTexMipmapBuilder.h"
 
-namespace RealtimeEngine
+namespace DemoEngine
 {
 	void PTexMipmapBuilder::Init(DeviceResourcePool * pEngine)
 	{

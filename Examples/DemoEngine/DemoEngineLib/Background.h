@@ -5,7 +5,7 @@
 #include "CoreLib/Graphics.h"
 #include "DeviceResourcePool.h"
 
-namespace RealtimeEngine
+namespace DemoEngine
 {
 	using namespace VectorMath;
 

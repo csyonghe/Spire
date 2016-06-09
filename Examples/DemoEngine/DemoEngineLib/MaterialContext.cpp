@@ -2,7 +2,7 @@
 #include "ShadowMap.h"
 using namespace GL;
 
-namespace RealtimeEngine
+namespace DemoEngine
 {
 	const wchar_t * fsEpilog = LR"(
 		if ($opacity <= 0.0)

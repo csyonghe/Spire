@@ -10,7 +10,7 @@
 using namespace CoreLib::Basic;
 using namespace VectorMath;
 
-namespace RealtimeEngine
+namespace DemoEngine
 {
 	using namespace GL;
 	enum class RenderTargetStorage

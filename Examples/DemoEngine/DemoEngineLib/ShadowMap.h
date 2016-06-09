@@ -5,7 +5,7 @@
 #include "CoreLib/Graphics.h"
 #include "RenderPassProvider.h"
 
-namespace RealtimeEngine
+namespace DemoEngine
 {
 	class ShadowMapAlgorithm : public Object
 	{

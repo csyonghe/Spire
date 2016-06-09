@@ -1,7 +1,7 @@
 #include "DeviceMarshalling.h"
 #include "DeviceResourcePool.h"
 
-namespace RealtimeEngine
+namespace DemoEngine
 {
 	using namespace GL;
 

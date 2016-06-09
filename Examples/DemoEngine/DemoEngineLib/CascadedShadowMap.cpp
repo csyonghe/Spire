@@ -6,7 +6,7 @@ using namespace CoreLib::Diagnostics;
 using namespace CoreLib::Graphics;
 using namespace GL;
 
-namespace RealtimeEngine
+namespace DemoEngine
 {
 	const int numCascades = 2;
 	const float exponentialFactor = 64.0f;

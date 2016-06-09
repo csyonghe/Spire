@@ -1,7 +1,7 @@
 #include "CameraControl.h"
 #include <Windows.h>
 
-namespace RealtimeEngine
+namespace DemoEngine
 {
 	void CameraControl::HandleKeys(float dtime)
 	{

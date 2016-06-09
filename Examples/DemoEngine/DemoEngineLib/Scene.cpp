@@ -4,7 +4,7 @@
 using namespace CoreLib::Imaging;
 using namespace GL;
 
-namespace RealtimeEngine
+namespace DemoEngine
 {
 	float TerrainGeometry::GetAltitude(const Vec3 & v)
 	{
