@@ -40,7 +40,7 @@ shader Demo2Shader
     // component computed in lowRes world.
     vec2 screenCoord = projCoord.xy/vec2(projCoord.w)*0.5 + vec2(0.5);
     
-    vec2 uv = vert_uv * 10.0; // tile the texture
+    vec2 uv = vert_uv * 4.0; // tile the texture
     vec3 albedo = texture(ground_pebble_map, uv).xyz;
     
     // compute normal from normal map
