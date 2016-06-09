@@ -1,7 +1,7 @@
 #include "SyntaxVisitors.h"
 #include "ScopeDictionary.h"
 #include "CodeWriter.h"
-#include "CoreLib/Parser.h"
+#include "../CoreLib/Parser.h"
 #include <assert.h>
 
 namespace Spire

@@ -1,7 +1,7 @@
 #ifndef RASTER_RENDERER_SYNTAX_H
 #define RASTER_RENDERER_SYNTAX_H
 
-#include "CoreLib/Basic.h"
+#include "../CoreLib/Basic.h"
 #include "Lexer.h"
 
 namespace Spire

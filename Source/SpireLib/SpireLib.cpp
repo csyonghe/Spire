@@ -1,6 +1,6 @@
 #include "SpireLib.h"
-#include "CoreLib/LibIO.h"
-#include "CoreLib/Parser.h"
+#include "../CoreLib/LibIO.h"
+#include "../CoreLib/Parser.h"
 #include "../SpireCore/StdInclude.h"
 #include "ImportOperator.h"
 
@@ -34,9 +34,9 @@ namespace SpireLib
 		while (!parser.IsEnd() && !parser.LookAhead(L"}"))
 		{
 			auto worldName = parser.ReadWord();
-			CompiledShaderSource src;
-			src.ParseFromGLSL(getShaderSource());
-			sources[worldName] = src;
+			CompiledShaderSource compiledSrc;
+			compiledSrc.ParseFromGLSL(getShaderSource());
+			sources[worldName] = compiledSrc;
 		}
 	}
 	CompiledShaderSource ShaderLib::GetWorldSource(String world)
@@ -60,7 +60,7 @@ namespace SpireLib
 		options.ScheduleSource = schedule;
 		options.SymbolToCompile = symbolName;
 		options.Mode = CompilerMode::ProduceShader;
-		auto shaderLibs = CompileShaderSource(result, sourceFileName, options);
+		auto shaderLibs = CompileShaderSourceFromFile(result, sourceFileName, options);
 		if (result.Success)
 		{
 			for (auto & lib : shaderLibs)
@@ -81,30 +81,25 @@ namespace SpireLib
 		Spire::Compiler::CompileOptions & options)
 	{
 		List<ShaderLibFile> resultFiles;
-		List<ImportOperatorHandler*> importHandlers, cppImportHandlers;
+		List<ImportOperatorHandler*> importHandlers;
 		List<ExportOperatorHandler*> exportHandlers;
 		CreateGLSLImportOperatorHandlers(importHandlers);
 		CreateGLSLExportOperatorHandlers(exportHandlers);
-		CreateCppImportOperatorHandlers(cppImportHandlers);
 		for (auto handler : exportHandlers)
 			compiler->RegisterExportOperator(L"glsl", handler);
 		for (auto handler : importHandlers)
 			compiler->RegisterImportOperator(L"glsl", handler);
-		for (auto handler : cppImportHandlers)
-			compiler->RegisterImportOperator(L"cpp", handler);
 		try
 		{
 			if (compileResult.ErrorList.Count() == 0)
 				compiler->Compile(compileResult, units, options);
 			DestroyImportOperatorHanlders(importHandlers);
 			DestroyExportOperatorHanlders(exportHandlers);
-			DestroyImportOperatorHanlders(cppImportHandlers);
 		}
 		catch (...)
 		{
 			DestroyImportOperatorHanlders(importHandlers);
 			DestroyExportOperatorHanlders(exportHandlers);
-			DestroyImportOperatorHanlders(cppImportHandlers);
 			throw;
 		}
 		if (compileResult.Success)
@@ -115,8 +110,8 @@ namespace SpireLib
 				for (auto file : compileResult.CompiledSource)
 				{
 					auto shaderName = Path::GetFileNameWithoutEXT(file.Key);
-					ShaderLibFile * libFile = nullptr;
-					if (!(libFile = shaderLibs.TryGetValue(shaderName)))
+					ShaderLibFile * libFile = shaderLibs.TryGetValue(shaderName);
+					if (!libFile)
 					{
 						shaderLibs.Add(shaderName, ShaderLibFile());
 						libFile = shaderLibs.TryGetValue(shaderName);
@@ -142,8 +137,7 @@ namespace SpireLib
 	}
 
 	List<ShaderLibFile> CompileShaderSource(Spire::Compiler::CompileResult & compileResult,
-		const CoreLib::String & src, const CoreLib::Basic::String& sourceDir,
-		Spire::Compiler::CompileOptions & options)
+		const CoreLib::String & src, Spire::Compiler::CompileOptions & options)
 	{
 		Spire::Compiler::NamingCounter = 0;
 		RefPtr<ShaderCompiler> compiler = CreateShaderCompiler();
@@ -184,7 +178,7 @@ namespace SpireLib
 		return CompileUnits(compileResult, compiler.Ptr(), units, options);
 	}
 
-	List<ShaderLibFile> CompileShaderSource(Spire::Compiler::CompileResult & compileResult, 
+	List<ShaderLibFile> CompileShaderSourceFromFile(Spire::Compiler::CompileResult & compileResult, 
 		CoreLib::Basic::String sourceFileName,
 		Spire::Compiler::CompileOptions & options)
 	{
@@ -331,20 +325,20 @@ namespace SpireLib
 						}
 						parser.Read(L"}");
 					};
-					auto fieldName = parser.ReadWord();
-					if (fieldName == L"target")
+					auto subFieldName = parser.ReadWord();
+					if (subFieldName == L"target")
 						world.TargetName = parser.ReadWord();
-					else if (fieldName == L"in")
+					else if (subFieldName == L"in")
 					{
 						world.InputBlocks.Add(parser.ReadWord());
 						parser.Read(L";");
 					}
-					else if (fieldName == L"out")
+					else if (subFieldName == L"out")
 					{
 						world.OutputBlock = parser.ReadWord();
 						parser.Read(L";");
 					}
-					else if (fieldName == L"comp")
+					else if (subFieldName == L"comp")
 					{
 						auto compName = parser.ReadWord();
 						parser.Read(L";");

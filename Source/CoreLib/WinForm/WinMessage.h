@@ -7,7 +7,7 @@
 #pragma warning(disable:4458)
 #pragma comment(lib, "gdiplus.lib")
 #include <Unknwn.h>
-#include "gdiplus.h"
+#include <gdiplus.h>
 #pragma warning(pop)
 #include "../Events.h"
 

@@ -1,7 +1,7 @@
 // Compiler.cpp : Defines the entry point for the console application.
 //
-#include "CoreLib/Basic.h"
-#include "CoreLib/LibIO.h"
+#include "../CoreLib/Basic.h"
+#include "../CoreLib/LibIO.h"
 #include "ShaderCompiler.h"
 #include "Lexer.h"
 #include "Parser.h"
@@ -10,7 +10,7 @@
 #include "Schedule.h"
 #include "CodeGenBackend.h"
 #include "CppCodeGenInclude.h"
-#include "CoreLib/Parser.h"
+#include "../CoreLib/Parser.h"
 #include "Closure.h"
 
 #ifdef CreateDirectory

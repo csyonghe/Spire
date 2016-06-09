@@ -83,7 +83,7 @@
     <ClCompile>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -113,7 +113,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <PrecompiledHeader>
       </PrecompiledHeader>
       <Optimization>MaxSpeed</Optimization>
@@ -160,9 +160,6 @@
   <ItemGroup>
     <ProjectReference Include="..\CoreLib\CoreLib.vcxproj">
       <Project>{f9be7957-8399-899e-0c49-e714fddd4b65}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\RealtimeEngine\RealtimeEngine.vcxproj">
-      <Project>{9be62583-9c07-45d2-9a2f-c531d29f3b23}</Project>
     </ProjectReference>
     <ProjectReference Include="..\SpireCore\SpireCore.vcxproj">
       <Project>{db00da62-0533-4afd-b59f-a67d5b3a0808}</Project>

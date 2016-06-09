@@ -1,7 +1,7 @@
 #ifndef RASTER_RENDERER_LEXER_H
 #define RASTER_RENDERER_LEXER_H
 
-#include "CoreLib/Basic.h"
+#include "../CoreLib/Basic.h"
 #include "CompileError.h"
 
 namespace Spire

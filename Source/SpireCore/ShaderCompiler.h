@@ -1,7 +1,7 @@
 #ifndef RASTER_SHADER_COMPILER_H
 #define RASTER_SHADER_COMPILER_H
 
-#include "CoreLib/Basic.h"
+#include "../CoreLib/Basic.h"
 #include "CompileError.h"
 #include "CompiledProgram.h"
 #include "Syntax.h"

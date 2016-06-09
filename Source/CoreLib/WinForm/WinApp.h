@@ -1,7 +1,7 @@
 #ifndef GX_WIN_APP_H
 #define GX_WIN_APP_H
 
-#include "Windows.h"
+#include <Windows.h>
 #include "../Basic.h"
 #include "WinAccel.h"
 #include "WinMessage.h"

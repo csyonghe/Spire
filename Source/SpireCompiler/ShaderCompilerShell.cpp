@@ -41,7 +41,7 @@ int wmain(int argc, wchar_t* argv[])
 		}
 	}
 	CompileResult result;
-	auto files = SpireLib::CompileShaderSource(result, fileName, options);
+	auto files = SpireLib::CompileShaderSourceFromFile(result, fileName, options);
 	for (auto & f : files)
 	{		
 		try

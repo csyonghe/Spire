@@ -1,7 +1,7 @@
 #ifndef RASTER_RENDERER_SCOPE_DICTIONARY_H
 #define RASTER_RENDERER_SCOPE_DICTIONARY_H
 
-#include "CoreLib/Basic.h"
+#include "../CoreLib/Basic.h"
 
 using namespace CoreLib::Basic;
 

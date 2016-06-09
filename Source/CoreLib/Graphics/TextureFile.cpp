@@ -1,12 +1,12 @@
 #include "TextureFile.h"
 
-using namespace CoreLib::Basic;
-using namespace CoreLib::IO;
-
 namespace CoreLib
 {
 	namespace Graphics
 	{
+		using namespace CoreLib::Basic;
+		using namespace CoreLib::IO;
+
 		TextureFile::TextureFile(String fileName)
 		{
 			FileStream stream(fileName);

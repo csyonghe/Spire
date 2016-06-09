@@ -159,9 +159,6 @@
     <ClInclude Include="Array.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="WinForm\GLForm.h">
-      <Filter>WinForm</Filter>
-    </ClInclude>
     <ClInclude Include="WinForm\WinTextBox.h">
       <Filter>WinForm</Filter>
     </ClInclude>
@@ -200,6 +197,9 @@
     </ClInclude>
     <ClInclude Include="Graphics\LibUI.h">
       <Filter>Graphics\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="Imaging\stb_image.h">
+      <Filter>Imaging</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -255,9 +255,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Imaging\TextureData.cpp">
-      <Filter>Imaging</Filter>
-    </ClCompile>
-    <ClCompile Include="Imaging\stb_image.c">
       <Filter>Imaging</Filter>
     </ClCompile>
     <ClCompile Include="WinForm\WinAccel.cpp">
@@ -325,6 +322,9 @@
     </ClCompile>
     <ClCompile Include="Graphics\LibUI.cpp">
       <Filter>Graphics\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="Imaging\stb_image.cpp">
+      <Filter>Imaging</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

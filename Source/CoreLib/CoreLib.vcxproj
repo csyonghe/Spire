@@ -453,6 +453,7 @@
     <ClInclude Include="Graphics\ViewFrustum.h" />
     <ClInclude Include="Imaging\Bitmap.h" />
     <ClInclude Include="Imaging\lodepng.h" />
+    <ClInclude Include="Imaging\stb_image.h" />
     <ClInclude Include="Imaging\TextureData.h" />
     <ClInclude Include="IntSet.h" />
     <ClInclude Include="LibIO.h" />
@@ -477,7 +478,6 @@
     <ClInclude Include="VectorMath.h" />
     <ClInclude Include="WideChar.h" />
     <ClInclude Include="WinForm\Debug.h" />
-    <ClInclude Include="WinForm\GLForm.h" />
     <ClInclude Include="WinForm\WinAccel.h" />
     <ClInclude Include="WinForm\WinApp.h" />
     <ClInclude Include="WinForm\WinButtons.h" />
@@ -502,7 +502,7 @@
     <ClCompile Include="Graphics\ViewFrustum.cpp" />
     <ClCompile Include="Imaging\Bitmap.cpp" />
     <ClCompile Include="Imaging\lodepng.cpp" />
-    <ClCompile Include="Imaging\stb_image.c" />
+    <ClCompile Include="Imaging\stb_image.cpp" />
     <ClCompile Include="Imaging\TextureData.cpp" />
     <ClCompile Include="LibIO.cpp" />
     <ClCompile Include="LibMath.cpp" />

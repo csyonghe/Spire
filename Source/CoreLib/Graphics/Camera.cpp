@@ -97,7 +97,7 @@ namespace CoreLib
 			view.CamUp = up;
 		}
 
-#ifdef WIN32
+#ifdef _WIN32
 		void CameraController::HandleCameraKeys(Camera & camera, Matrix4 & transform, float dtime, float /*minSpeed*/, float maxSpeed, bool flipYZ)
 		{
 			const float CameraMaxSpeed = maxSpeed;

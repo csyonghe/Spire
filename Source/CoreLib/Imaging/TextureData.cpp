@@ -5,13 +5,12 @@ bool EnableTextureAccessDump;
 TextWriter * TextureAccessDebugWriter;
 #endif
 
-using namespace CoreLib::Basic;
-using namespace CoreLib::Imaging;
-
 namespace CoreLib
 {
 	namespace Imaging
 	{
+		using namespace CoreLib::Basic;
+
 		void CreateDefaultTextureData(TextureData<Color> & tex)
 		{
 			tex.Levels.SetSize(2);

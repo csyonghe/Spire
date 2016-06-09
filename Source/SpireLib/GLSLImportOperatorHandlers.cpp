@@ -30,7 +30,7 @@ class StandardGLSLImportOperatorHandler : public GLSLImportOperatorHandler
 		}
 		sb << L"} blk" << block->Name << L";\n";
 	}
-	virtual void GenerateInterfaceLocalDefinition(StringBuilder & sb, ImportInstruction * instr, const ImportOperatorContext & ctx) override
+	virtual void GenerateInterfaceLocalDefinition(StringBuilder & /*sb*/, ImportInstruction * instr, const ImportOperatorContext & ctx) override
 	{
 		auto block = ctx.SourceWorld->WorldOutput;
 		instr->Name = L"blk" + block->Name + L"." + instr->ComponentName;		
@@ -43,7 +43,7 @@ class VertexGLSLImportOperatorHandler : public GLSLImportOperatorHandler
 	{
 		return L"vertexImport";
 	}
-	virtual void GenerateInterfaceDefinition(StringBuilder & sb, InterfaceBlock * block, const ImportOperatorContext & ctx) override
+	virtual void GenerateInterfaceDefinition(StringBuilder & sb, InterfaceBlock * block, const ImportOperatorContext & /*ctx*/) override
 	{
 		int location = 0;
 		for (auto & ent : block->Entries)
@@ -53,7 +53,7 @@ class VertexGLSLImportOperatorHandler : public GLSLImportOperatorHandler
 			location++;
 		}
 	}
-	virtual void GenerateInterfaceLocalDefinition(StringBuilder &sb, ImportInstruction * instr, const ImportOperatorContext & ctx) override
+	virtual void GenerateInterfaceLocalDefinition(StringBuilder &/*sb*/, ImportInstruction * instr, const ImportOperatorContext & /*ctx*/) override
 	{
 		instr->Name = instr->ComponentName;
 	}
@@ -112,7 +112,7 @@ class BufferGLSLImportOperatorHandler : public GLSLImportOperatorHandler
 		}
 	}
 
-	virtual void GeneratePreamble(StringBuilder & sb, InterfaceBlock * block, const ImportOperatorContext & context) override
+	virtual void GeneratePreamble(StringBuilder & sb, InterfaceBlock * /*block*/, const ImportOperatorContext & /*context*/) override
 	{
 		sb << L"if (gl_GlobalInvocationID.x >= sys_thread_count) return;" << EndLine;
 	}
@@ -188,7 +188,7 @@ class UniformGLSLImportOperatorHandler : public GLSLImportOperatorHandler
 		}
 		sb << L"} blk" << block->Name << L";\n";
 	}
-	virtual void GenerateInterfaceLocalDefinition(StringBuilder & sb, ImportInstruction * instr, const ImportOperatorContext & ctx) override
+	virtual void GenerateInterfaceLocalDefinition(StringBuilder & /*sb*/, ImportInstruction * instr, const ImportOperatorContext & ctx) override
 	{
 		auto block = ctx.SourceWorld->WorldOutput;
 		instr->Name = L"blk" + block->Name + L"." + instr->ComponentName;
@@ -295,7 +295,7 @@ class FragmentGLSLExportOperatorHandler : public ExportOperatorHandler
 			}
 		}
 	}
-	virtual void GenerateExport(StringBuilder & sb, InterfaceBlock * block, CompiledWorld * world, String componentName, String valueVar) override
+	virtual void GenerateExport(StringBuilder & sb, InterfaceBlock * /*block*/, CompiledWorld * world, String componentName, String valueVar) override
 	{
 		CompiledComponent ccomp;
 		bool isNormal = false;

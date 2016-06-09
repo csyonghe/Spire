@@ -1,7 +1,7 @@
 #ifndef BAKER_SL_SCHEDULE_H
 #define BAKER_SL_SCHEDULE_H
 
-#include "CoreLib/Basic.h"
+#include "../CoreLib/Basic.h"
 #include "CompileError.h"
 #include "Syntax.h"
 

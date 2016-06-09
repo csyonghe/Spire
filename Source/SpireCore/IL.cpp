@@ -1,5 +1,5 @@
 #include "IL.h"
-#include "CoreLib/LibIO.h"
+#include "../CoreLib/LibIO.h"
 #include "Syntax.h"
 #include "CompiledProgram.h"
 

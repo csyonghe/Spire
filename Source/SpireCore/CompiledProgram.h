@@ -1,7 +1,7 @@
 #ifndef BAKER_SL_COMPILED_PROGRAM_H
 #define BAKER_SL_COMPILED_PROGRAM_H
 
-#include "CoreLib/Basic.h"
+#include "../CoreLib/Basic.h"
 #include "CompileError.h"
 #include "IL.h"
 #include "Syntax.h"

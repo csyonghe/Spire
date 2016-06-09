@@ -8,8 +8,6 @@ namespace CoreLib
 	namespace Text
 	{
 		using namespace CoreLib::Basic;
-	
-		typedef unsigned short Word;
 
 		class NFA_Node;
 

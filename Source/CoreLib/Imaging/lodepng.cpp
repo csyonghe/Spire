@@ -1377,16 +1377,16 @@ combinations of bytes can give, the higher it is the more memory is needed, but
 if it's too low the advantage of hashing is gone.
 */
 
-typedef struct Hash
+typedef struct LodePNG_Hash
 {
   int* head; /*hash value to head circular pos*/
   int* val; /*circular pos to hash value*/
   /*circular pos to prev circular pos*/
   unsigned short* chain;
   unsigned short* zeros;
-} Hash;
+} LodePNG_Hash;
 
-static unsigned hash_init(Hash* hash, unsigned windowsize)
+static unsigned hash_init(LodePNG_Hash* hash, unsigned windowsize)
 {
   unsigned i;
   hash->head = (int*)lodepng_malloc(sizeof(int) * HASH_NUM_VALUES);
@@ -1404,7 +1404,7 @@ static unsigned hash_init(Hash* hash, unsigned windowsize)
   return 0;
 }
 
-static void hash_cleanup(Hash* hash)
+static void hash_cleanup(LodePNG_Hash* hash)
 {
   lodepng_free(hash->head);
   lodepng_free(hash->val);
@@ -1434,7 +1434,7 @@ static unsigned countZeros(const unsigned char* data, size_t size, size_t pos)
   return (unsigned)(data - start);
 }
 
-static void updateHashChain(Hash* hash, size_t pos, int hashval, unsigned windowsize)
+static void updateHashChain(LodePNG_Hash* hash, size_t pos, int hashval, unsigned windowsize)
 {
   unsigned wpos = pos % windowsize;
   hash->val[wpos] = hashval;
@@ -1451,7 +1451,7 @@ sliding window (of windowsize) is used, and all past bytes in that window can be
 the "dictionary". A brute force search through all possible distances would be slow, and
 this hash technique is one out of several ways to speed this up.
 */
-static unsigned encodeLZ77(uivector* out, Hash* hash,
+static unsigned encodeLZ77(uivector* out, LodePNG_Hash* hash,
                            const unsigned char* in, size_t inpos, size_t insize, unsigned windowsize,
                            unsigned minmatch, unsigned nicematch, unsigned lazymatching)
 {
@@ -1680,7 +1680,7 @@ static void writeLZ77data(size_t* bp, ucvector* out, const uivector* lz77_encode
 }
 
 /*Deflate for a block of type "dynamic", that is, with freely, optimally, created huffman trees*/
-static unsigned deflateDynamic(ucvector* out, size_t* bp, Hash* hash,
+static unsigned deflateDynamic(ucvector* out, size_t* bp, LodePNG_Hash* hash,
                                const unsigned char* data, size_t datapos, size_t dataend,
                                const LodePNGCompressSettings* settings, int final)
 {
@@ -1925,7 +1925,7 @@ static unsigned deflateDynamic(ucvector* out, size_t* bp, Hash* hash,
   return error;
 }
 
-static unsigned deflateFixed(ucvector* out, size_t* bp, Hash* hash,
+static unsigned deflateFixed(ucvector* out, size_t* bp, LodePNG_Hash* hash,
                              const unsigned char* data,
                              size_t datapos, size_t dataend,
                              const LodePNGCompressSettings* settings, int final)
@@ -1979,7 +1979,7 @@ static unsigned lodepng_deflatev(ucvector* out, const unsigned char* in, size_t 
   unsigned error = 0;
   size_t i, blocksize, numdeflateblocks;
   size_t bp = 0; /*the bit pointer*/
-  Hash hash;
+  LodePNG_Hash hash;
 
   if(settings->btype > 2) return 61;
   else if(settings->btype == 0) return deflateNoCompression(out, in, insize);

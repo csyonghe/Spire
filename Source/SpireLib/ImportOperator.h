@@ -3,7 +3,6 @@
 
 #include "../SpireCore/ShaderCompiler.h"
 
-void CreateCppImportOperatorHandlers(CoreLib::Basic::List<Spire::Compiler::ImportOperatorHandler *> & handlers);
 void CreateGLSLImportOperatorHandlers(CoreLib::Basic::List<Spire::Compiler::ImportOperatorHandler *> & handlers);
 void CreateGLSLExportOperatorHandlers(CoreLib::Basic::List<Spire::Compiler::ExportOperatorHandler *> & handlers);
 void DestroyImportOperatorHanlders(CoreLib::Basic::List<Spire::Compiler::ImportOperatorHandler *> & handlers);

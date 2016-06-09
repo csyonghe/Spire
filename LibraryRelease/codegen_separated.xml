@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<codegen>
+  <license name="license.txt"/>
+  <folders>
+    <folder path="..\Source\SpireCore" />
+    <folder path="..\Source\SpireLib" />
+    <folder path="..\Source\CoreLib" />
+  </folders>
+  <categories>
+    <category name="spire" pattern="\Source\" >
+      <except pattern="\Source\SpireCompiler\"/>
+      <except pattern="\Source\CoreLib\"/>
+    </category>
+    <category name="corelib" pattern="\Source\CoreLib\">
+      <except pattern="\CoreLib\Graphics\"/>
+      <except pattern="\CoreLib\Imaging\"/>
+      <except pattern="\CoreLib\WinForm\"/>
+      <except pattern="\CoreLib\LibGL\"/>
+    </category>
+  </categories>
+  <output path=".">
+    <codepair category="spire" filename="Spire" generate="true"/>
+    <codepair category="corelib" filename="Basic" generate="true"/>
+  </output>
+</codegen>

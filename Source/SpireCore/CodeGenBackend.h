@@ -1,7 +1,7 @@
 #ifndef CODE_GEN_BACKEND_H
 #define CODE_GEN_BACKEND_H
 
-#include "CoreLib/Basic.h"
+#include "../CoreLib/Basic.h"
 #include "CompiledProgram.h"
 #include "SymbolTable.h"
 

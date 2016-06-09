@@ -23,9 +23,6 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="CppImportOperatorHandlers.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="GLSLImportOperatorHandlers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

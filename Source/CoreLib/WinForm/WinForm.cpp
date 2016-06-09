@@ -2,7 +2,7 @@
 #include "WinApp.h"
 #include "WinButtons.h"
 #include "WinMessage.h"
-#include "gl/gl.h"
+
 namespace CoreLib
 {
 	const int MSG_INVOKE = WM_USER + 0x5001;

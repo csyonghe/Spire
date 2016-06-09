@@ -1,7 +1,7 @@
 #ifndef RASTER_RENDERER_SYMBOL_TABLE_H
 #define RASTER_RENDERER_SYMBOL_TABLE_H
 
-#include "CoreLib/Basic.h"
+#include "../CoreLib/Basic.h"
 #include "Syntax.h"
 
 namespace Spire

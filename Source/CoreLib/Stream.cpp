@@ -95,7 +95,7 @@ namespace CoreLib
 				break;
 			}
 			int shFlag;
-#ifdef WIN32
+#ifdef _WIN32
 			switch (share)
 			{
 			case CoreLib::IO::FileShare::None:
@@ -129,7 +129,7 @@ namespace CoreLib
 		}
 		Int64 FileStream::GetPosition()
 		{
-#ifdef WIN32
+#ifdef _WIN32
 			fpos_t pos;
 			fgetpos(handle, &pos);
 			return pos;
@@ -160,7 +160,7 @@ namespace CoreLib
 				throw NotSupportedException(L"Unsupported seek origin.");
 				break;
 			}
-#ifdef WIN32
+#ifdef _WIN32
 			int rs = _fseeki64(handle, offset, _origin);
 #else
 			int rs = fseek(handle, (int)offset, _origin);

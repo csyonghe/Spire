@@ -1,8 +1,8 @@
 #ifndef LIB_BAKER_SL_H
 #define LIB_BAKER_SL_H
 
-#include "CoreLib/Basic.h"
-#include "CoreLib/Parser.h"
+#include "../CoreLib/Basic.h"
+#include "../CoreLib/Parser.h"
 #include "../SpireCore/ShaderCompiler.h"
 
 namespace SpireLib
@@ -21,13 +21,12 @@ namespace SpireLib
 		void Load(CoreLib::Basic::String fileName);
 	};
 	
-	CoreLib::Basic::List<ShaderLibFile> CompileShaderSource(Spire::Compiler::CompileResult & result,
+	CoreLib::Basic::List<ShaderLibFile> CompileShaderSourceFromFile(Spire::Compiler::CompileResult & result,
 		CoreLib::Basic::String sourceFileName,
 		Spire::Compiler::CompileOptions &options);
 
 	CoreLib::Basic::List<ShaderLibFile> CompileShaderSource(Spire::Compiler::CompileResult & result,
-		const CoreLib::Basic::String &source, const CoreLib::Basic::String &sourceFileName,
-		Spire::Compiler::CompileOptions &options);
+		const CoreLib::Basic::String &source, Spire::Compiler::CompileOptions &options);
 
 	class ShaderLib : public ShaderLibFile
 	{

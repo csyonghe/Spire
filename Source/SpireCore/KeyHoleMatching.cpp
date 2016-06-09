@@ -1,5 +1,5 @@
 #include "IL.h"
-#include "CoreLib/Parser.h"
+#include "../CoreLib/Parser.h"
 
 namespace Spire
 {

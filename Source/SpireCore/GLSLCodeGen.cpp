@@ -1,5 +1,5 @@
 #include "CodeGenBackend.h"
-#include "CoreLib/Parser.h"
+#include "../CoreLib/Parser.h"
 #include "Syntax.h"
 
 using namespace CoreLib::Basic;
