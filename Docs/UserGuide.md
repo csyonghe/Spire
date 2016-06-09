@@ -1,5 +1,5 @@
 # Using Spire
-If you have read the [Understanding Spire](https://github.com/csyonghe/Spire/tree/master/Docs/tutorial1) tutorial and want to try integrating Spire into your engine, follow this guide to learn the compiler interface.
+If you have read the [Understanding Spire](https://github.com/csyonghe/Spire/tree/master/Docs/tutorial1) tutorial and want to integrate Spire into your engine, follow this guide to learn the compiler interface.
 ### As Library
 The Spire compiler is distributed directly as four C++ source files with no external dependencies. To integrate the compiler into your engine, simply grab "Spire.h" "Spire.cpp" "Basic.h" "Basic.cpp" from "LibraryRelease" directory and place them into your project.
 To invoke the compiler, call:
