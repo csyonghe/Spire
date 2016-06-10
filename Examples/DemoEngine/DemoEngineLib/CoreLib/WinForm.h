@@ -408,7 +408,6 @@ namespace CoreLib
 		{
 			friend LRESULT CALLBACK SubClassWndProc(HWND hWnd,UINT message, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass,
 				DWORD_PTR dwRefData);
-			friend LRESULT CALLBACK LibWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 			friend LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 		protected:
 			List<RefPtr<Component>> children;

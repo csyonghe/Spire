@@ -201,6 +201,7 @@ namespace GraphicsUI
 		Color TabPageItemHighlightBackColor1, TabPageItemHighlightBackColor2;
 		Color SelectionColor, SelectionForeColor, HighlightColor, HighlightForeColor, UnfocusedSelectionColor;
 		FormStyle DefaultFormStyle;
+		Color ShadowColor;
 	};
 
 	ColorTable CreateDefaultColorTable();
@@ -281,7 +282,9 @@ namespace GraphicsUI
 		CONTROLTYPE Type;
 		Container *Parent;
 		int  Left, Top;
-		bool BackgroundShadow;
+		bool BackgroundShadow = false;
+		int ShadowOffset = 8;
+		float ShadowSize = 20.0;
 		bool Enabled, Visible, Focused, TabStop = false, GenerateMouseHoverEvent = false;
 		Color BackColor, FontColor, BorderColor;
 		BORDERSTYLE BorderStyle;
@@ -586,7 +589,7 @@ namespace GraphicsUI
 		bool Enabled;
 		CustomTextBox *TextBox;
 		IMEWindow *IMEWindow;
-		int HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+		int HandleMessage(HWND hWnd, UINT message, WPARAM &wParam, LPARAM &lParam);
 		void StringInputed(CoreLib::String AString);
 	};
 
@@ -619,7 +622,7 @@ namespace GraphicsUI
 		void RemoveForm(Form *Form);
 		void ShowWindow(Form *Form);
 		void CloseWindow(Form *Form);
-		int HandleSystemMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+		int HandleSystemMessage(HWND hWnd, UINT message, WPARAM &wParam, LPARAM &lParam);
 		virtual void InternalBroadcastMessage(UI_MsgArgs *Args);
 		virtual void SizeChanged();
 		virtual void Draw(int absX,int absY);

@@ -277,8 +277,8 @@ namespace GraphicsUI
 				layout(location = 0) uniform mat4 orthoMatrix;
 				layout(location = 1) uniform vec2 translation;
 
-				out vec2 uv;
 				out vec2 pos;
+				out vec2 uv;
 				void main()
 				{
 					pos = vert_pos + translation;
@@ -291,8 +291,8 @@ namespace GraphicsUI
 				layout(location = 2) uniform sampler2D texAlbedo;
 				layout(location = 3) uniform vec4 clipBounds;
 				
-				in vec2 uv;
 				in vec2 pos;
+				in vec2 uv;
 				layout(location = 0) out vec4 color;
 				void main()
 				{
@@ -307,7 +307,6 @@ namespace GraphicsUI
 				#version 440
 				layout(location = 2) uniform vec4 solidColor;
 				layout(location = 3) uniform vec4 clipBounds;
-				in vec2 uv;
 				in vec2 pos;
 				layout(location = 0) out vec4 color;
 				void main()
@@ -324,8 +323,8 @@ namespace GraphicsUI
 				layout(location = 2) uniform sampler2D texAlbedo;
 				layout(location = 3) uniform vec4 clipBounds;
 				layout(location = 4) uniform vec4 fontColor;
-				in vec2 uv;
 				in vec2 pos;
+				in vec2 uv;
 				layout(location = 0) out vec4 color;
 				void main()
 				{
@@ -338,9 +337,48 @@ namespace GraphicsUI
 					color.w *= alpha;
 				}
 			)";
+		const char * shadowFsSrc = R"(
+			#version 440
+			layout(location = 1) uniform vec2 translation;
+			layout(location = 2) uniform vec2 origin;
+			layout(location = 3) uniform vec2 size;
+			layout(location = 4) uniform vec4 shadowColor;
+			layout(location = 5) uniform float shadowSize;
+			layout(location = 6) uniform vec4 rectBounds;
+			layout(location = 7) uniform vec4 clipBounds;
+			in vec2 pos;
+			layout(location = 0) out vec4 color;
+			// This approximates the error function, needed for the gaussian integral
+			vec4 erf(vec4 x)
+			{
+				vec4 s = sign(x), a = abs(x);
+				x = 1.0 + (0.278393 + (0.230389 + 0.078108 * (a * a)) * a) * a;
+				x *= x;
+				return s - s / (x * x);
+			}
+			// Return the mask for the shadow of a box from lower to upper
+			float boxShadow(vec2 lower, vec2 upper, vec2 point, float sigma)
+			{
+				vec4 query = vec4(point - lower, point - upper);
+				vec4 integral = 0.5 + 0.5 * erf(query * (sqrt(0.5) / sigma));
+				return (integral.z - integral.x) * (integral.w - integral.y);
+			}
+
+			void main()
+			{
+				if (pos.x > rectBounds.x && pos.x <rectBounds.z && pos.y > rectBounds.y && pos.y < rectBounds.w)
+					discard;
+				if (pos.x < clipBounds.x) discard;
+				if (pos.y < clipBounds.y) discard;
+				if (pos.x > clipBounds.z) discard;
+				if (pos.y > clipBounds.w) discard;
+				float shadow = boxShadow(origin, origin+size, pos - translation, shadowSize);
+				color = vec4(shadowColor.xyz, shadowColor.w*shadow);
+			}
+			)";
 	private:
-		GL::Shader vs, textureFs, textFs, solidColorFs;
-		GL::Program textureProgram, textProgram, solidColorProgram;
+		GL::Shader vs, textureFs, textFs, solidColorFs, shadowFs;
+		GL::Program textureProgram, textProgram, solidColorProgram, shadowProgram;
 		GL::BufferObject vertexBuffer;
 		GL::VertexArray posUvVertexArray, posVertexArray;
 		GL::TextureSampler linearSampler;
@@ -356,7 +394,7 @@ namespace GraphicsUI
 			textureFs = glContext->CreateShader(GL::ShaderType::FragmentShader, textureFSSrc);
 			textFs = glContext->CreateShader(GL::ShaderType::FragmentShader, textFSSrc);
 			solidColorFs = glContext->CreateShader(GL::ShaderType::FragmentShader, solidColorFSSrc);
-
+			shadowFs = glContext->CreateShader(GL::ShaderType::FragmentShader, shadowFsSrc);
 			textureProgram = glContext->CreateProgram(vs, textureFs);
 			textureProgram.Link();
 
@@ -365,6 +403,9 @@ namespace GraphicsUI
 
 			solidColorProgram = glContext->CreateProgram(vs, solidColorFs);
 			solidColorProgram.Link();
+
+			shadowProgram = glContext->CreateProgram(vs, shadowFs);
+			shadowProgram.Link();
 
 			vertexBuffer = glContext->CreateBuffer(GL::BufferUsage::ArrayBuffer);
 			vertexBuffer.SetData(nullptr, sizeof(float) * 16);
@@ -449,7 +490,7 @@ namespace GraphicsUI
 			vertexData[1] = Vec2::Create((float)x, (float)(y + h));
 			vertexData[2] = Vec2::Create((float)(x + w), (float)(y + h));
 			vertexData[3] = Vec2::Create((float)(x + w), (float)y);
-			vertexBuffer.SetData(vertexData, sizeof(float) * 16);
+			vertexBuffer.SetData(vertexData, sizeof(float) * 8);
 			solidColorProgram.Use();
 			solidColorProgram.SetUniform(0, orthoMatrix);
 			solidColorProgram.SetUniform(1, translation);
@@ -497,7 +538,26 @@ namespace GraphicsUI
 			glContext->BindVertexArray(posUvVertexArray);
 			glContext->DrawArray(GL::PrimitiveType::TriangleFans, 0, 4);
 		}
-
+		void DrawRectangleShadow(const Vec4 & color, float x, float y, float w, float h, float offsetX, float offsetY, float shadowSize)
+		{
+			Vec2 vertexData[4];
+			vertexData[0] = Vec2::Create((float)x + offsetX - shadowSize, (float)y + offsetY - shadowSize);
+			vertexData[1] = Vec2::Create((float)x + offsetX - shadowSize, (float)(y + h + offsetY) + shadowSize * 2.0f);
+			vertexData[2] = Vec2::Create((float)(x + w + offsetX + shadowSize * 2.0f), (float)(y + h + offsetY) + shadowSize * 2.0f);
+			vertexData[3] = Vec2::Create((float)(x + w + offsetX + shadowSize * 2.0f), (float)y + offsetY - shadowSize);
+			vertexBuffer.SetData(vertexData, sizeof(float) * 8);
+			shadowProgram.Use();
+			shadowProgram.SetUniform(0, orthoMatrix);
+			shadowProgram.SetUniform(1, translation);
+			shadowProgram.SetUniform(2, Vec2::Create(x + offsetX, y + offsetY));
+			shadowProgram.SetUniform(3, Vec2::Create(w, h));
+			shadowProgram.SetUniform(4, color);
+			shadowProgram.SetUniform(5, shadowSize * 0.5f);
+			shadowProgram.SetUniform(6, Vec4::Create(x, y, x + w, y + h));
+			shadowProgram.SetUniform(7, clipRect);
+			glContext->BindVertexArray(posVertexArray);
+			glContext->DrawArray(GL::PrimitiveType::TriangleFans, 0, 4);
+		}
 		void SetRenderTransform(int dx, int dy)
 		{
 			translation.x = (float)dx;
@@ -612,6 +672,10 @@ namespace GraphicsUI
 		{
 			auto bt = dynamic_cast<BakedText*>(text);
 			uiRenderer->DrawTextQuad(bt->texture, Vec4::Create(color.R/255.0f, color.G/255.0f, color.B/255.0f, color.A/255.0f), x, y, bt->Width, bt->Height);
+		}
+		virtual void DrawRectangleShadow(const Color & color, float x, float y, float w, float h, float offsetX, float offsetY, float shadowSize) override
+		{
+			uiRenderer->DrawRectangleShadow(ColorToVec(color), x, y, w, h, offsetX, offsetY, shadowSize);
 		}
 		virtual void AdvanceTime(float /*seconds*/) override
 		{

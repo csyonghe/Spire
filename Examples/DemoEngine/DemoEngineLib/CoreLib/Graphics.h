@@ -303,6 +303,7 @@ namespace GraphicsUI
 		virtual void DrawLine(const Pen & pen, float x0, float y0, float x1, float y1) = 0;
 		virtual void FillRectangle(const Color & color, const Rect & rect) = 0;
 		virtual void FillPolygon(const Color & color, CoreLib::ArrayView<VectorMath::Vec2> points) = 0;
+		virtual void DrawRectangleShadow(const Color & color, float x, float y, float w, float h, float offsetX, float offsetY, float shadowSize) = 0;
 		virtual void DrawBakedText(IBakedText * text, const Color & color, int x, int y) = 0;
 		virtual void AdvanceTime(float seconds) = 0;
 		virtual IFont * LoadDefaultFont(DefaultFontType dt = DefaultFontType::Content) = 0;
@@ -512,6 +513,7 @@ namespace GraphicsUI
 		Color TabPageItemHighlightBackColor1, TabPageItemHighlightBackColor2;
 		Color SelectionColor, SelectionForeColor, HighlightColor, HighlightForeColor, UnfocusedSelectionColor;
 		FormStyle DefaultFormStyle;
+		Color ShadowColor;
 	};
 
 	ColorTable CreateDefaultColorTable();
@@ -592,7 +594,9 @@ namespace GraphicsUI
 		CONTROLTYPE Type;
 		Container *Parent;
 		int  Left, Top;
-		bool BackgroundShadow;
+		bool BackgroundShadow = false;
+		int ShadowOffset = 8;
+		float ShadowSize = 20.0;
 		bool Enabled, Visible, Focused, TabStop = false, GenerateMouseHoverEvent = false;
 		Color BackColor, FontColor, BorderColor;
 		BORDERSTYLE BorderStyle;
@@ -897,7 +901,7 @@ namespace GraphicsUI
 		bool Enabled;
 		CustomTextBox *TextBox;
 		IMEWindow *IMEWindow;
-		int HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+		int HandleMessage(HWND hWnd, UINT message, WPARAM &wParam, LPARAM &lParam);
 		void StringInputed(CoreLib::String AString);
 	};
 
@@ -930,7 +934,7 @@ namespace GraphicsUI
 		void RemoveForm(Form *Form);
 		void ShowWindow(Form *Form);
 		void CloseWindow(Form *Form);
-		int HandleSystemMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+		int HandleSystemMessage(HWND hWnd, UINT message, WPARAM &wParam, LPARAM &lParam);
 		virtual void InternalBroadcastMessage(UI_MsgArgs *Args);
 		virtual void SizeChanged();
 		virtual void Draw(int absX,int absY);

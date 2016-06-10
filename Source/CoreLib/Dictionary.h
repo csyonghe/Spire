@@ -381,6 +381,8 @@ namespace CoreLib
 			}
 			void Remove(const TKey & key)
 			{
+				if (_count == 0)
+					return;
 				auto pos = FindPosition(key);
 				if (pos.ObjectPosition != -1)
 				{

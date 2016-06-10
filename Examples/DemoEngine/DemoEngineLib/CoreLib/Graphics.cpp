@@ -1815,8 +1815,9 @@ namespace GraphicsUI
 	{
 		ColorTable tbl;
 
+		tbl.ShadowColor = Color(0, 0, 0, 200);
 		tbl.ControlBackColor = Color(0, 0, 0, 0);
-		tbl.ControlBorderColor = Color(255, 255, 255, 120);
+		tbl.ControlBorderColor = Color(220, 220, 220, 160);
 		tbl.ControlFontColor = Color(255, 255, 255, 255);
 		tbl.EditableAreaBackColor = Color(60, 60, 60, 140);
 		tbl.ScrollBarBackColor = Color(70, 70, 70, 200);
@@ -1881,7 +1882,7 @@ namespace GraphicsUI
 	ColorTable CreateDefaultColorTable()
 	{
 		ColorTable tbl;
-
+		tbl.ShadowColor = Color(0, 0, 0, 120);
 		tbl.ControlBackColor = Color(235,238,241,255);
 		tbl.ControlBorderColor = Color(211,232,254,255);
 		tbl.ControlFontColor = Color(0, 0, 0, 255);
@@ -2400,18 +2401,7 @@ namespace GraphicsUI
 			// Draw background shadow
 			Rect R = clipRects->PopRect();
 			{
-				const int ShadowOffsetX = 8;
-				const int ShadowOffsetY = 8;
-				const int ShadowSize = 8;
-				const int MinShadowAlpha = 22;
-				Color shadowColor(0,0,0,MinShadowAlpha);
-				for (int i=0; i<ShadowSize; i++)
-				{
-					Graphics::SolidBrushColor = shadowColor;
-					Graphics::FillRoundRect(entry->System, absX + ShadowOffsetX+i-1, absY + ShadowOffsetY+i,
-						absX+Width+ShadowSize-i, absY+Height+ShadowSize-i, 5);
-						
-				}
+				entry->System->DrawRectangleShadow(Global::ColorTable.ShadowColor, (float)absX, (float)absY, (float)Width, (float)Height, (float)ShadowOffset, (float)ShadowOffset, ShadowSize);
 			}
 			clipRects->PushRect(R);
 		}
@@ -2959,7 +2949,10 @@ namespace GraphicsUI
 		Activated = false;
 		ButtonClose = true;
 		DownInTitleBar = false;
-		DownInButton =false;
+		DownInButton = false;
+		BackgroundShadow = false;
+		ShadowOffset = 0;
+		ShadowSize = 25.0f;
 		DownPosX = DownPosY = 0;
 		Text = L"Form";
 		parent->Forms.Add(this);
@@ -3050,6 +3043,7 @@ namespace GraphicsUI
 		btnClose->Posit(0,0,formStyle.TitleBarHeight-4,formStyle.TitleBarHeight-4);
 		BackColor = formStyle.BackColor;
 		BorderColor = formStyle.BorderColor;
+		BorderStyle = BS_FLAT_;
 		btnClose->BackColor = formStyle.CtrlButtonBackColor;
 		SizeChanged();
 	}
@@ -3071,6 +3065,8 @@ namespace GraphicsUI
 		int ox=absX, oy=absY;
 		absX+=Left; absY+=Top;
 		drawChildren = false;
+	
+		BackgroundShadow = Activated;
 		Container::Draw(ox,oy);
 		auto entry = GetEntry();
 		//Title bar
@@ -3348,7 +3344,7 @@ namespace GraphicsUI
 		Data.Y = GET_Y_LPARAM(lParam);
 	}
 
-	int UIEntry::HandleSystemMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+	int UIEntry::HandleSystemMessage(HWND hWnd, UINT message, WPARAM &wParam, LPARAM &lParam)
 	{
 		int rs = -1;
 		unsigned short Key;
@@ -4826,6 +4822,8 @@ namespace GraphicsUI
 		}
 		lblCandList.Clear();
 		lblCandList.SetSize(Count);
+		for (int i = 0; i < lblCandList.Count(); i++)
+			lblCandList[i] = nullptr;
 		CandidateList.SetSize(Count);
 		CandidateCount = Count;
 	}
@@ -4848,7 +4846,7 @@ namespace GraphicsUI
 			TextBox->DoInput(AString);
 	}
 
-	int IMEHandler::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+	int IMEHandler::HandleMessage(HWND hWnd, UINT message, WPARAM &wParam, LPARAM &lParam)
 	{
 		int rs = -1;
 		switch (message)
@@ -4858,6 +4856,9 @@ namespace GraphicsUI
 				if (wParam == 9 || (wParam >= 32 && wParam <= 127))
 					StringInputed(String((wchar_t)(wParam)));
 			}
+			break;
+		case WM_IME_SETCONTEXT:
+			lParam = 0;
 			break;
 		case WM_INPUTLANGCHANGE://改变输入法
 			{
@@ -4966,7 +4967,7 @@ namespace GraphicsUI
 			break;
 		case WM_IME_STARTCOMPOSITION://把WM_IME_STARTCOMPOSITION视为已处理以便消除Windows自己打开的输入框
 			IMEWindow->ChangeCompositionString(String(L""));
-			rs = 0;
+			rs = 1;
 			break;
 		case WM_IME_ENDCOMPOSITION:
 			IMEWindow->ChangeCompositionString(String(L""));

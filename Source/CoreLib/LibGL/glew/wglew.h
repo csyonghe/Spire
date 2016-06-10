@@ -57,6 +57,10 @@
 #define __wglew_h__
 #define __WGLEW_H__
 
+#ifndef GLEW_STATIC
+#define GLEW_STATIC
+#endif
+
 #ifdef __wglext_h_
 #error wglext.h included before wglew.h
 #endif

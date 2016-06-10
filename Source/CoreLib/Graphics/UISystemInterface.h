@@ -95,6 +95,7 @@ namespace GraphicsUI
 		virtual void DrawLine(const Pen & pen, float x0, float y0, float x1, float y1) = 0;
 		virtual void FillRectangle(const Color & color, const Rect & rect) = 0;
 		virtual void FillPolygon(const Color & color, CoreLib::ArrayView<VectorMath::Vec2> points) = 0;
+		virtual void DrawRectangleShadow(const Color & color, float x, float y, float w, float h, float offsetX, float offsetY, float shadowSize) = 0;
 		virtual void DrawBakedText(IBakedText * text, const Color & color, int x, int y) = 0;
 		virtual void AdvanceTime(float seconds) = 0;
 		virtual IFont * LoadDefaultFont(DefaultFontType dt = DefaultFontType::Content) = 0;
