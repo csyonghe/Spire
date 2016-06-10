@@ -815,12 +815,15 @@ namespace GraphicsUI
 		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift);
 	};
 
-	class CustomTextBox : public Control
+	class Menu;
+
+	class CustomTextBox : public Container
 	{
 	protected:
 		long long Time,Freq;
 		CoreLib::String FText;
 		IFont * font = nullptr;
+		Menu * menu = nullptr;
 		CoreLib::RefPtr<IBakedText> text;
 		int SelOrigin;
 		bool Changed, KeyDown,SelectMode;

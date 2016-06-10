@@ -164,7 +164,7 @@ namespace GraphicsUI
 
 		tbl.ShadowColor = Color(0, 0, 0, 200);
 		tbl.ControlBackColor = Color(0, 0, 0, 0);
-		tbl.ControlBorderColor = Color(255, 255, 255, 120);
+		tbl.ControlBorderColor = Color(220, 220, 220, 160);
 		tbl.ControlFontColor = Color(255, 255, 255, 255);
 		tbl.EditableAreaBackColor = Color(60, 60, 60, 140);
 		tbl.ScrollBarBackColor = Color(70, 70, 70, 200);
@@ -176,20 +176,7 @@ namespace GraphicsUI
 		tbl.MenuItemForeColor = Color(255, 255, 255, 255);
 		tbl.MenuItemDisabledForeColor = Color(180, 180, 180, 255);
 		tbl.MenuItemHighlightForeColor = tbl.MenuItemForeColor;
-		tbl.ToolButtonBackColor1 = tbl.ControlBackColor;
-		tbl.ToolButtonBackColor2 = Color(215, 226, 228, 255);
-		tbl.ToolButtonBackColorHighlight1 = Color(255, 250, 210, 255);
-		tbl.ToolButtonBackColorHighlight2 = Color(253, 236, 168, 255);
-		tbl.ToolButtonBackColorPressed1 = Color(249, 217, 132, 255);
-		tbl.ToolButtonBackColorPressed2 = Color(252, 236, 194, 255);
-		tbl.ToolButtonBorderHighLight = Color(254, 193, 92, 255);
-		tbl.ToolButtonBorderSelected = Color(254, 193, 92, 255);
-		tbl.ToolButtonSeperatorColor = Color(170, 170, 160, 255);
-		tbl.ToolButtonBackColorChecked1 = Color(253, 247, 182, 255);
-		tbl.ToolButtonBackColorChecked2 = tbl.ToolButtonBackColorChecked1;
-		tbl.StatusStripBackColor1 = tbl.StatusStripBackColor2 = tbl.ToolButtonBackColor2;
-		tbl.StatusStripBackColor3 = tbl.StatusStripBackColor4 = tbl.ToolButtonBackColor2;
-
+	
 		tbl.TabPageBorderColor = Color(127, 127, 127, 255);
 		tbl.TabPageItemSelectedBackColor1 = Color(210, 227, 255, 255);
 		tbl.TabPageItemSelectedBackColor2 = tbl.ControlBackColor;
@@ -218,11 +205,26 @@ namespace GraphicsUI
 		tbl.DefaultFormStyle.BackColor = Color(0, 0, 0, 180);
 		tbl.DefaultFormStyle.BorderColor = tbl.ControlBorderColor;
 
-		tbl.SelectionColor = Color(244, 165, 0, 255);
+		tbl.SelectionColor = Color(224, 135, 0, 255);
 		tbl.UnfocusedSelectionColor = Color(100, 100, 100, 127);
 		tbl.HighlightColor = Color(100, 100, 100, 127);
 		tbl.HighlightForeColor = Color(255, 255, 255, 255);
 		tbl.SelectionForeColor = Color(255, 255, 255, 255);
+
+		tbl.ToolButtonBackColor1 = tbl.ControlBackColor;
+		tbl.ToolButtonBackColor2 = Color(215, 226, 228, 255);
+		tbl.ToolButtonBackColorHighlight1 = tbl.SelectionColor;
+		tbl.ToolButtonBackColorHighlight2 = tbl.SelectionColor;
+		tbl.ToolButtonBackColorPressed1 = Color(184, 75, 0, 255);
+		tbl.ToolButtonBackColorPressed2 = Color(184, 75, 0, 255);
+		tbl.ToolButtonBorderHighLight = Color(254, 193, 92, 0);
+		tbl.ToolButtonBorderSelected = Color(254, 193, 92, 0);
+		tbl.ToolButtonSeperatorColor = Color(130, 130, 130, 255);
+		tbl.ToolButtonBackColorChecked1 = Color(204, 105, 0, 255);
+		tbl.ToolButtonBackColorChecked2 = tbl.ToolButtonBackColorChecked1;
+		tbl.StatusStripBackColor1 = tbl.StatusStripBackColor2 = tbl.ToolButtonBackColor2;
+		tbl.StatusStripBackColor3 = tbl.StatusStripBackColor4 = tbl.ToolButtonBackColor2;
+
 		return tbl;
 	}
 
@@ -1390,6 +1392,7 @@ namespace GraphicsUI
 		btnClose->Posit(0,0,formStyle.TitleBarHeight-4,formStyle.TitleBarHeight-4);
 		BackColor = formStyle.BackColor;
 		BorderColor = formStyle.BorderColor;
+		BorderStyle = BS_FLAT_;
 		btnClose->BackColor = formStyle.CtrlButtonBackColor;
 		SizeChanged();
 	}
@@ -1843,6 +1846,7 @@ namespace GraphicsUI
 				else
 					MoveFocusForward();
 			}
+			return true;
 		}
 		//Key events are broadcasted to the active form only.
 		if (ActiveForm)
@@ -2579,7 +2583,7 @@ namespace GraphicsUI
 	}
 
 	CustomTextBox::CustomTextBox(Container * parent)
-		: Control(parent)
+		: Container(parent)
 	{
 		Cursor = IBeam;
 		Type = CT_TEXTBOX;
@@ -2596,6 +2600,28 @@ namespace GraphicsUI
 		FontColor = Global::ColorTable.ControlFontColor;
 		TextBorderX =2; TextBorderY = 4;
 		LabelOffset = TextBorderX;
+		menu = new Menu(this, Menu::msPopup);
+		auto mnCut = new MenuItem(menu, L"Cut", L"Ctrl+X");
+		auto mnCopy = new MenuItem(menu, L"Copy", L"Ctrl+C");
+		auto mnPaste = new MenuItem(menu, L"Paste", L"Ctrl+V");
+		auto mnSelAll = new MenuItem(menu, L"Select All", L"Ctrl+A");
+		mnCut->OnClick.Bind([this](auto) 
+		{
+			CopyToClipBoard();
+			DeleteSelectionText();
+		});
+		mnCopy->OnClick.Bind([this](auto)
+		{
+			CopyToClipBoard();
+		});
+		mnPaste->OnClick.Bind([this](auto)
+		{
+			PasteFromClipBoard();
+		});
+		mnSelAll->OnClick.Bind([this](auto)
+		{
+			SelectAll();
+		});
 		QueryPerformanceFrequency((LARGE_INTEGER *)&Freq);
 		QueryPerformanceCounter((LARGE_INTEGER *)&Time);
 		CursorPos = 0;
@@ -2649,26 +2675,6 @@ namespace GraphicsUI
 		}
 	}
 
-	bool CustomTextBox::DoMouseDown(int X, int Y, SHIFTSTATE Shift)
-	{
-		Control::DoMouseDown(X,Y,Shift);
-		if (Enabled && Visible && (Shift | SS_BUTTONLEFT))
-		{
-			SetFocus();
-			SelLength = 0;
-			SelStart = HitTest(X);
-			CursorPos = SelStart;
-			SelectMode = true;
-			SelOrigin = CursorPos;
-			CursorPosChanged();
-			Global::MouseCaptureControl = this;
-			return true;
-		}
-		else
-			SelectMode=false;
-		return false;
-	}
-
 	int CustomTextBox::HitTest(int posX)
 	{
 		String curText;
@@ -2704,6 +2710,8 @@ namespace GraphicsUI
 
 	bool CustomTextBox::DoInput(const String & AInput)
 	{
+		if (AInput == L"\t")
+			return false;
 		String nStr;
 		nStr = AInput;
 		if (SelLength !=0)
@@ -2718,7 +2726,7 @@ namespace GraphicsUI
 		CursorPos += nStr.Length();
 		SelStart = CursorPos;
 		CursorPosChanged();
-		return false;
+		return true;
 	}
 
 	void CustomTextBox::CopyToClipBoard()
@@ -2937,6 +2945,29 @@ namespace GraphicsUI
 		return false;
 	}
 
+	bool CustomTextBox::DoMouseDown(int X, int Y, SHIFTSTATE Shift)
+	{
+		Control::DoMouseDown(X, Y, Shift);
+		if (Enabled && Visible)
+		{
+			SetFocus();
+			if (Shift & SS_BUTTONLEFT)
+			{
+				SelLength = 0;
+				SelStart = HitTest(X);
+				CursorPos = SelStart;
+				SelectMode = true;
+				SelOrigin = CursorPos;
+				CursorPosChanged();
+				Global::MouseCaptureControl = this;
+			}
+			return true;
+		}
+		else
+			SelectMode = false;
+		return false;
+	}
+
 	bool CustomTextBox::DoMouseMove(int X , int Y)
 	{
 		Control::DoMouseMove(X,Y);
@@ -2969,7 +3000,13 @@ namespace GraphicsUI
 		SelectMode = false;
 		ReleaseMouse();
 		if (Enabled && Visible)
+		{
+			if (Shift == SS_BUTTONRIGHT)
+			{
+				menu->Popup(X, Y);
+			}
 			return true;
+		}
 		return false;
 	}
 
@@ -3007,7 +3044,7 @@ namespace GraphicsUI
 		csX+=LabelOffset;
 		//Draw Selection Rect
 			
-		if (Focused && SelLength!=0)
+		if ((Focused || menu->Visible) && SelLength!=0)
 		{
 			if (SelStart + SelLength > FText.Length())
 				SelLength = FText.Length() - SelStart;
@@ -4363,10 +4400,6 @@ namespace GraphicsUI
 		Style = PROGRESSBAR_STYLE_NORMAL;
 		Max = 100;
 		Position = 0;
-		ProgressBarColors[0]=Color(60,86,156,255);
-		ProgressBarColors[1]=Color(10,36,106,255);
-		ProgressBarColors[2]=Color(10,36,106,255);
-		ProgressBarColors[3]=Color(60,86,156,255);
 	}
 
 	ProgressBar::~ProgressBar()
@@ -4412,7 +4445,7 @@ namespace GraphicsUI
 			{
 				int cx = i*PW+3+absX;
 				int cy = 2+absY;
-				Graphics::SolidBrushColor = ProgressBarColors[0];
+				Graphics::SolidBrushColor = Global::ColorTable.SelectionColor;
 				Graphics::FillRectangle(entry->System, cx, cy, cx + PW - 2, cy + PH);
 			}
 			entry->ClipRects->PopRect();
@@ -4421,7 +4454,7 @@ namespace GraphicsUI
 		{
 			int cx = absX+3, cy= absY+2;
 			PW = (Width -4)*Position/Max;
-			Graphics::SolidBrushColor = ProgressBarColors[0];
+			Graphics::SolidBrushColor = Global::ColorTable.SelectionColor;
 			Graphics::FillRectangle(entry->System, cx, cy, cx + PW, cy + PH);
 		}
 	}
@@ -4641,6 +4674,12 @@ namespace GraphicsUI
 				Items[i]->Selected = false;
 			Left = x;
 			Top = y;
+			int ax, ay;
+			LocalPosToAbsolutePos(0, 0, ax, ay);
+			if (ax + Width > entry->GetWidth())
+				Left -= Width;
+			if (ay + Height > entry->GetHeight())
+				Top -= Height;
 			Visible = true;
 			SetFocus();
 			Global::MouseCaptureControl = this;
@@ -4752,7 +4791,7 @@ namespace GraphicsUI
 				}
 			}
 		}
-		return false;
+		return true;
 	}
 	bool Menu::DoMouseDown(int X, int Y, SHIFTSTATE Shift)
 	{
@@ -4773,14 +4812,14 @@ namespace GraphicsUI
 				if (X >= item->Left && X <= item->Left + item->Width &&
 					Y >= item->Top && Y <= item->Top + item->Height)
 					item->DoMouseDown(X - item->Left, Y - item->Top, Shift);
-			
+			return true;
 		}
 		return false;
 	}
 	bool Menu::DoMouseUp(int X, int Y, SHIFTSTATE Shift)
 	{
 		Container::DoMouseUp(X, Y, Shift);
-		return false;
+		return true;
 	}
 
 	int Menu::GetSelectedItemID()
