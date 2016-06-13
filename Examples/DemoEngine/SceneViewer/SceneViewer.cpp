@@ -8,20 +8,12 @@
 #include "DemoRecording.h"
 #include "ShaderInfoForm.h"
 
-// create walk-through of features
-// break down of time (time per obj), visualization of buffers, shader variance graph
-// couch ground plane
-// tool - determine tex resolution 
-// compiler - resolving schedule choices to allow duplicates
-// use choice to represent approximation, and use higher order composition to represent visual alternatives
-// model fitting support?
-// advanced auto tuning
-
 using namespace CoreLib::WinForm;
 using namespace CoreLib::Diagnostics;
 
 using namespace GL;
 using namespace DemoEngine;
+
 #ifdef CreateDirectory
 #undef CreateDirectory
 #endif
@@ -32,15 +24,15 @@ namespace SceneViewer
 	{
 	private:
 		GraphicsUI::TextBox* textBox;
-		GraphicsUI::Button* acceptButton;
 		List<String> commandHistories;
-		int cmdPtr;
+		int cmdPtr = 0;
 	public:
+		Event<String> OnCommand;
 
 		CommandForm(GraphicsUI::UIEntry * entry)
 			: Form(entry)
 		{
-			Posit(0,0,510, 70);
+			Posit(0,0,512, 70);
 			textBox = new GraphicsUI::TextBox(this);
 			textBox->Posit(0, 0, 500, 30);
 			SetText(L"Command");
@@ -48,14 +40,6 @@ namespace SceneViewer
 			textBox->SetText(L"");
 			textBox->OnKeyPress.Bind(this, &CommandForm::TextBox_KeyPressed);
 			textBox->OnKeyDown.Bind(this, &CommandForm::TextBox_KeyDown);
-			cmdPtr = 0;
-		}
-
-		Event<String> OnCommand;
-
-		void FormOnFocus(Object *, EventArgs)
-		{
-			textBox->SetFocus();
 		}
 
 		void TextBox_KeyDown(GraphicsUI::UI_Base *, GraphicsUI::UIKeyEventArgs & e)
@@ -155,7 +139,7 @@ namespace SceneViewer
 		}
 		void InitUI()
 		{
-			GraphicsUI::Global::ColorTable = GraphicsUI::CreateDarkColorTable();
+			GraphicsUI::Global::Colors = GraphicsUI::CreateDarkColorTable();
 			auto mainMenu = new MainMenu();
 
 			auto fileMenu = new MenuItem(mainMenu);
@@ -204,7 +188,7 @@ namespace SceneViewer
 
 			this->RegisterAccel(Accelerator(Accelerator::Ctrl, L'O'), openMenu);
 			this->OnResized.Bind(this, &MainForm::Form_Resized);
-			this->OnKeyDown.Bind(this, &MainForm::Form_KeyPreseed);
+			this->OnKeyDown.Bind(this, &MainForm::Form_KeyPressed);
 			uiEntry->OnMouseMove.Bind(this, &MainForm::Form_MouseMove);
 			uiEntry->OnMouseWheel.Bind(this, &MainForm::Form_MouseWheel);
 			uiEntry->OnMouseDown.Bind(this, &MainForm::Form_MouseDown);
@@ -214,7 +198,6 @@ namespace SceneViewer
 			cmdForm->OnCommand.Bind(this, &MainForm::OnCommand);
 			cmdForm->Left = 10;
 			cmdForm->Top = GetClientHeight() - 80;
-			//CreateShaderInfoForm();
 			CreateChoiceForm();
 		}
 
@@ -663,7 +646,7 @@ namespace SceneViewer
 			SaveCurrentViewToFile(fileName, fileName.ToLower().EndsWith(L"png"));
 		}
 			
-		void Form_KeyPreseed(Object *, KeyEventArgs e)
+		void Form_KeyPressed(Object *, KeyEventArgs e)
 		{
 			if (scene)
 			{
@@ -812,20 +795,28 @@ namespace SceneViewer
 			{
 				camera.HandleKeys(dtime);
 			}
-			if (scene)
+			if (glContext)
 			{
-				RenderFrame();
+				if (scene)
+				{
+					RenderFrame();
+					static int frames = 0;
+					frames++;
+					if ((frames & 127) == 0)
+					{
+						static auto timePointP = PerformanceCounter::Start();
+						float dtimeP = (float)PerformanceCounter::ToSeconds(PerformanceCounter::End(timePointP)) * (1.0f / 128);
+						timePointP = PerformanceCounter::Start();
+						SetText(L"Scene Viewer - " + String(dtimeP*1000.0f, L"%.2g").PadLeft(L' ', 7) + L"ms");
+					}
+				}
+				else
+				{
+					glContext->SetClearColor(Vec4::Create(0.5f, 0.75f, 1.0f, 1.0f));
+					glContext->Clear(false, true, false);
+				}
 				this->DrawUIOverlay();
 				glContext->SwapBuffers();
-				static int frames = 0;
-				frames++;
-				if ((frames & 127) == 0)
-				{
-					static auto timePointP = PerformanceCounter::Start();
-					float dtimeP = (float)PerformanceCounter::ToSeconds(PerformanceCounter::End(timePointP)) * (1.0f/128);
-					timePointP = PerformanceCounter::Start();
-					SetText(L"Scene Viewer - " + String(dtimeP*1000.0f, L"%.2g").PadLeft(L' ', 7) + L"ms");
-				}
 			}
 			if (advanceTime)
 			{
@@ -866,7 +857,6 @@ namespace SceneViewer
 int main(int argc, char* argv[])
 {
 	Application::Init();
-
 	try
 	{
 		String sceneName;

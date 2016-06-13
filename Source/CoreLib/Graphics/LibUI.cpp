@@ -1,22 +1,12 @@
 #include "LibUI.h"
 
-
-#pragma comment(lib,"imm32.lib")
-
-#ifndef GET_X_LPARAM
-#define GET_X_LPARAM(lParam)	((int)(short)LOWORD(lParam))
-#endif
-#ifndef GET_Y_LPARAM
-#define GET_Y_LPARAM(lParam)	((int)(short)HIWORD(lParam))
-#endif
-
 namespace GraphicsUI
 {
 	using namespace CoreLib;
 	using namespace VectorMath;
 
-	GraphicsUI::ColorTable Global::ColorTable = CreateDefaultColorTable();
-	int Global::HoverTimeThreshold = 300;
+	GraphicsUI::ColorTable Global::Colors = CreateDefaultColorTable();
+	int Global::HoverTimeThreshold = 200;
 	int Global::EventGUID = 0;
 	int Global::CursorPosX = 0;
 	int Global::CursorPosY = 0;
@@ -26,53 +16,34 @@ namespace GraphicsUI
 	Control * Global::PointedComponent = nullptr;
 	Control * Global::MouseCaptureControl = nullptr;
 
-	int Graphics::DashPattern = -1;
-
-	Color Graphics::PenColor, Graphics::SolidBrushColor;
-	Color Graphics::GradiantBrushColor1, Graphics::GradiantBrushColor2;
-	Color Graphics::GradiantBrushColor3, Graphics::GradiantBrushColor4;
-
 	Control * lastFocusedCtrl = 0;
 
-	void SwitchCursor(Cursor c)
-	{
-		LPTSTR cursorName;
-		switch (c)
-		{
-		case Arrow:
-			cursorName = IDC_ARROW;
-			break;
-		case IBeam:
-			cursorName = IDC_IBEAM;
-			break;
-		case Cross:
-			cursorName = IDC_CROSS;
-			break;
-		case Wait:
-			cursorName = IDC_WAIT;
-			break;
-		case SizeAll:
-			cursorName = IDC_SIZEALL;
-			break;
-		case SizeNS:
-			cursorName = IDC_SIZENS;
-			break;
-		case SizeWE:
-			cursorName = IDC_SIZEWE;
-			break;
-		case SizeNWSE:
-			cursorName = IDC_SIZENWSE;
-			break;
-		case SizeNESW:
-			cursorName = IDC_SIZENESW;
-			break;
-		default:
-			cursorName = IDC_ARROW;
-		}
-		SetCursor(LoadCursor(0, cursorName));
-	}
+	//Message Type defination
+	const int MSG_UI_NOTIFY = 0;
+	const int MSG_UI_CLICK = 1;
+	const int MSG_UI_DBLCLICK = 2;
+	const int MSG_UI_MOUSEDOWN = 3;
+	const int MSG_UI_MOUSEUP = 4;
+	const int MSG_UI_MOUSEMOVE = 5;
+	const int MSG_UI_MOUSEENTER = 6;
+	const int MSG_UI_MOUSELEAVE = 7;
+	const int MSG_UI_MOUSEHOVER = 19;
+	const int MSG_UI_KEYDOWN = 8;
+	const int MSG_UI_KEYUP = 9;
+	const int MSG_UI_KEYPRESS = 10;
+	const int MSG_UI_CHANGED = 11;
+	const int MSG_UI_RESIZE = 12;
 
-	void Graphics::DrawArc(ISystemInterface * sys, int x, int y, int rad, float theta, float theta2)
+	// this message(TopLayer Draw) is sent by Entry to notify controls to do some drawing above any other controls if necessary.
+	const int MSG_UI_TOPLAYER_DRAW = 13;
+	const int MSG_UI_MOUSEWHEEL = 14;
+	// Form Messages
+	const int MSG_UI_FORM_ACTIVATE = 15;
+	const int MSG_UI_FORM_DEACTIVATE = 16;
+	const int MSG_UI_FORM_SHOW = 17;
+	const int MSG_UI_FORM_HIDE = 18;
+
+	void Graphics::DrawArc(int x, int y, int rad, float theta, float theta2)
 	{
 		float lastX = x + rad*cos(theta);
 		float lastY = y - rad*sin(theta);
@@ -82,91 +53,128 @@ namespace GraphicsUI
 		{	
 			float nx = x + rad*cos(theta);
 			float ny = y - rad*sin(theta);
-			sys->DrawLine(Pen(Graphics::PenColor), lastX, lastY, nx, ny);
+			DrawLine(lastX, lastY, nx, ny);
 			theta += deltaPhi;
 			lastX = nx;
 			lastY = ny;
 		}
 	}
 
-	void Graphics::DrawRectangle(ISystemInterface * sys, int x1, int y1, int x2, int y2)
+	void Graphics::FillEllipse(int x1, int y1, int x2, int y2)
 	{
-		auto pen = Pen(Graphics::PenColor);
-		sys->DrawLine(pen, (float)x1, (float)y1, (float)x2, (float)y1);
-		sys->DrawLine(pen, (float)x2, (float)y1, (float)x2, (float)y2);
-		sys->DrawLine(pen, (float)x2, (float)y2, (float)x1, (float)y2);
-		sys->DrawLine(pen, (float)x1, (float)y2, (float)x1, (float)y1);
+		DrawCommand cmd;
+		cmd.Name = DrawCommandName::Ellipse;
+		cmd.SolidColorParams.color = SolidBrushColor;
+		cmd.x0 = (float)x1 + dx; cmd.y0 = (float)y1 + dy;
+		cmd.x1 = (float)x2 + dx; cmd.y1 = (float)y2 + dy;
+		commandBuffer.Add(cmd);
 	}
 
-	void Graphics::FillRectangle(ISystemInterface * sys, int x1, int y1, int x2, int y2)
+	void Graphics::FillTriangle(int x0, int y0, int x1, int y1, int x2, int y2)
 	{
-		sys->FillRectangle(SolidBrushColor, Rect(x1, y1, x2 - x1 + 1, y2 - y1 + 1));
+		DrawCommand cmd;
+		cmd.Name = DrawCommandName::Triangle;
+		cmd.x0 = (float)x0 + dx;
+		cmd.x1 = (float)x1 + dx;
+		cmd.y0 = (float)y0 + dy;
+		cmd.y1 = (float)y1 + dy;
+		cmd.TriangleParams.x2 = (float)x2 + dx;
+		cmd.TriangleParams.y2 = (float)y2 + dy;
+		cmd.TriangleParams.color = SolidBrushColor;
+		commandBuffer.Add(cmd);
 	}
 
-	void Graphics::DrawRoundRect(ISystemInterface * sys, int x1, int y1, int x2, int y2, int rad)
+	void Graphics::DrawRectangle(int x1, int y1, int x2, int y2)
 	{
-		auto pen = Pen(Graphics::PenColor);
-
-		sys->DrawLine(pen, (float)x1 + rad, (float)y1, (float)x2 - rad, (float)y1);
-		sys->DrawLine(pen, (float)x1 + rad, (float)y2, (float)x2 - rad, (float)y2);
-
-		sys->DrawLine(pen, (float)x2, (float)y2 - rad, (float)x2, (float)y1 + rad);
-		sys->DrawLine(pen, (float)x1, (float)y2 - rad, (float)x1, (float)y1 + rad);
-
-
-		DrawArc(sys, x1+rad, y1+rad, rad, Math::Pi/2, Math::Pi);
-		DrawArc(sys, x2-rad, y1+rad, rad, 0, Math::Pi /2);
-		DrawArc(sys, x1+rad, y2-rad, rad, Math::Pi, Math::Pi *3/2);
-		DrawArc(sys, x2-rad, y2-rad, rad, Math::Pi *3/2, Math::Pi *2);
+		DrawLine((float)x1, (float)y1, (float)x2, (float)y1);
+		DrawLine((float)x2, (float)y1, (float)x2, (float)y2);
+		DrawLine((float)x2, (float)y2, (float)x1, (float)y2);
+		DrawLine((float)x1, (float)y2, (float)x1, (float)y1);
 	}
 
-	void Graphics::FillRoundRect(ISystemInterface * sys, int x1, int y1, int x2, int y2, int rad)
+	void Graphics::FillRectangle(int x1, int y1, int x2, int y2)
 	{
-		Array<Vec2, 128> polygon;
-		int edges = Math::Clamp(rad+3, 3, 30);
-		float deltaPhi = Math::Pi/2/ edges;
-		float theta = 0.0f;
-		for (int i=0; i < edges +1; i++)
-		{
-			polygon.Add(Vec2::Create(x2-rad+rad*cos(theta), y1+rad-rad*sin(theta)));
-			theta += deltaPhi;
-		}
-		theta = Math::Pi/2;
-		for (int i = 0; i < edges + 1; i++)
-		{
-			polygon.Add(Vec2::Create(x1+rad+ rad*cos(theta), y1+rad- rad*sin(theta)));
-			theta += deltaPhi;
-		}
-		theta = Math::Pi;
-		for (int i = 0; i < edges + 1; i++)
-		{
-			polygon.Add(Vec2::Create(x1+rad+ rad*cos(theta), y2-rad - rad*sin(theta)));
-			theta += deltaPhi;
-		}
-		theta = Math::Pi * 3 / 2;
-		for (int i = 0; i < edges + 1; i++)
-		{
-			polygon.Add(Vec2::Create(x2-rad + rad*cos(theta), y2-rad-rad*sin(theta)));
-			theta += deltaPhi;
-		}
-		sys->FillPolygon(SolidBrushColor, polygon.GetArrayView());
+		DrawCommand cmd;
+		cmd.Name = DrawCommandName::SolidQuad;
+		cmd.SolidColorParams.color = SolidBrushColor;
+		cmd.x0 = (float)x1 + dx; cmd.y0 = (float)y1 + dy;
+		cmd.x1 = (float)x2 + dx; cmd.y1 = (float)y2 + dy;
+		commandBuffer.Add(cmd);
 	}
 
-	void Graphics::DrawLine(ISystemInterface * sys, int x1, int y1, int x2, int y2)
+	void Graphics::DrawLine(float x1, float y1, float x2, float y2)
 	{
-		auto pen = Pen(Graphics::PenColor);
-		sys->DrawLine(pen, (float)x1, (float)y1, (float)x2, (float)y2);
+		DrawCommand cmd;
+		cmd.Name = DrawCommandName::Line;
+		cmd.x0 = x1 + dx; cmd.y0 = y1 + dy;
+		cmd.x1 = x2 + dx; cmd.y1 = y2 + dy;
+		cmd.SolidColorParams.color = PenColor;
+		commandBuffer.Add(cmd);
+	}
+
+	void Graphics::SetClipRect(int x, int y, int w, int h)
+	{
+		DrawCommand cmd;
+		cmd.Name = DrawCommandName::ClipQuad;
+		cmd.x0 = (float)x + dx;
+		cmd.x1 = (float)x + w + dx;
+		cmd.y0 = (float)y + dy;
+		cmd.y1 = (float)y + h + dy;
+		commandBuffer.Add(cmd);
+	}
+
+	void Graphics::DrawShadowRect(Color shadowColor, int x0, int y0, int w, int h, int offsetX, int offsetY, float size)
+	{
+		DrawCommand cmd;
+		cmd.Name = DrawCommandName::ShadowQuad;
+		cmd.ShadowParams.x = (short)(x0 + dx);
+		cmd.ShadowParams.y = (short)(y0 + dy);
+		cmd.ShadowParams.w = (short)w;
+		cmd.ShadowParams.h = (short)h;
+		cmd.ShadowParams.offsetX = (unsigned char)offsetX;
+		cmd.ShadowParams.offsetY = (unsigned char)offsetY;
+		cmd.ShadowParams.color = shadowColor;
+		cmd.ShadowParams.shadowSize = (unsigned char)size;
+		float shadowSize = size * 1.5f;
+		cmd.x0 = x0 + dx + offsetX - shadowSize; cmd.y0 = y0 + dy + offsetY - shadowSize;
+		cmd.x1 = cmd.x0 + w + shadowSize * 2.0f; cmd.y1 = cmd.y0 + h + shadowSize * 2.0f;
+		commandBuffer.Add(cmd);
+	}
+
+	void Graphics::DrawTextQuad(IBakedText * txt, int x, int y)
+	{
+		DrawCommand cmd;
+		cmd.Name = DrawCommandName::TextQuad;
+		cmd.x0 = (float)x + dx;
+		cmd.y0 = (float)y + dy;
+		cmd.x1 = cmd.x0 + (float)txt->GetWidth();
+		cmd.y1 = cmd.y0 + (float)txt->GetHeight();
+		cmd.TextParams.color = SolidBrushColor;
+		cmd.TextParams.text = txt;
+		commandBuffer.Add(cmd);
+	}
+
+	void Graphics::DrawImage(IImage * img, int x, int y)
+	{
+		DrawCommand cmd;
+		cmd.Name = DrawCommandName::TextQuad;
+		cmd.x0 = (float)x + dx;
+		cmd.y0 = (float)y + dy;
+		cmd.x1 = cmd.x0 + (float)img->GetWidth();
+		cmd.y1 = cmd.y0 + (float)img->GetHeight();
+		cmd.TextureParams.image = img;
+		commandBuffer.Add(cmd);
 	}
 
 	ColorTable CreateDarkColorTable()
 	{
 		ColorTable tbl;
 
+		tbl.ShadowColor = Color(0, 0, 0, 200);
 		tbl.ControlBackColor = Color(0, 0, 0, 0);
-		tbl.ControlBorderColor = Color(255, 255, 255, 120);
+		tbl.ControlBorderColor = Color(220, 220, 220, 160);
 		tbl.ControlFontColor = Color(255, 255, 255, 255);
-		tbl.EditableAreaBackColor = Color(60, 60, 60, 140);
-		tbl.ScrollBarBackColor = Color(70, 70, 70, 200);
+		tbl.EditableAreaBackColor = Color(50, 50, 50, 170);
 
 		tbl.MemuIconBackColor = Color(127, 127, 127, 255);
 		tbl.MenuBackColor = Color(80, 80, 80, 255);
@@ -175,20 +183,7 @@ namespace GraphicsUI
 		tbl.MenuItemForeColor = Color(255, 255, 255, 255);
 		tbl.MenuItemDisabledForeColor = Color(180, 180, 180, 255);
 		tbl.MenuItemHighlightForeColor = tbl.MenuItemForeColor;
-		tbl.ToolButtonBackColor1 = tbl.ControlBackColor;
-		tbl.ToolButtonBackColor2 = Color(215, 226, 228, 255);
-		tbl.ToolButtonBackColorHighlight1 = Color(255, 250, 210, 255);
-		tbl.ToolButtonBackColorHighlight2 = Color(253, 236, 168, 255);
-		tbl.ToolButtonBackColorPressed1 = Color(249, 217, 132, 255);
-		tbl.ToolButtonBackColorPressed2 = Color(252, 236, 194, 255);
-		tbl.ToolButtonBorderHighLight = Color(254, 193, 92, 255);
-		tbl.ToolButtonBorderSelected = Color(254, 193, 92, 255);
-		tbl.ToolButtonSeperatorColor = Color(170, 170, 160, 255);
-		tbl.ToolButtonBackColorChecked1 = Color(253, 247, 182, 255);
-		tbl.ToolButtonBackColorChecked2 = tbl.ToolButtonBackColorChecked1;
-		tbl.StatusStripBackColor1 = tbl.StatusStripBackColor2 = tbl.ToolButtonBackColor2;
-		tbl.StatusStripBackColor3 = tbl.StatusStripBackColor4 = tbl.ToolButtonBackColor2;
-
+	
 		tbl.TabPageBorderColor = Color(127, 127, 127, 255);
 		tbl.TabPageItemSelectedBackColor1 = Color(210, 227, 255, 255);
 		tbl.TabPageItemSelectedBackColor2 = tbl.ControlBackColor;
@@ -217,20 +212,45 @@ namespace GraphicsUI
 		tbl.DefaultFormStyle.BackColor = Color(0, 0, 0, 180);
 		tbl.DefaultFormStyle.BorderColor = tbl.ControlBorderColor;
 
-		tbl.SelectionColor = Color(244, 165, 0, 255);
+		tbl.SelectionColor = Color(224, 135, 0, 255);
 		tbl.UnfocusedSelectionColor = Color(100, 100, 100, 127);
 		tbl.HighlightColor = Color(100, 100, 100, 127);
 		tbl.HighlightForeColor = Color(255, 255, 255, 255);
 		tbl.SelectionForeColor = Color(255, 255, 255, 255);
+		tbl.FocusRectColor = Color(120, 120, 120, 220);
+
+		tbl.ToolButtonBackColor1 = tbl.ControlBackColor;
+		tbl.ToolButtonBackColor2 = Color(215, 226, 228, 255);
+		tbl.ToolButtonBackColorHighlight1 = tbl.SelectionColor;
+		tbl.ToolButtonBackColorHighlight2 = tbl.SelectionColor;
+		tbl.ToolButtonBackColorPressed1 = Color(184, 75, 0, 255);
+		tbl.ToolButtonBackColorPressed2 = Color(184, 75, 0, 255);
+		tbl.ToolButtonBorderHighLight = Color(254, 193, 92, 0);
+		tbl.ToolButtonBorderSelected = Color(254, 193, 92, 0);
+		tbl.ToolButtonSeperatorColor = Color(130, 130, 130, 255);
+		tbl.ToolButtonBackColorChecked1 = Color(204, 105, 0, 255);
+		tbl.ToolButtonBackColorChecked2 = tbl.ToolButtonBackColorChecked1;
+		tbl.StatusStripBackColor1 = tbl.StatusStripBackColor2 = tbl.ToolButtonBackColor2;
+		tbl.StatusStripBackColor3 = tbl.StatusStripBackColor4 = tbl.ToolButtonBackColor2;
+
+		tbl.ScrollBarBackColor = tbl.EditableAreaBackColor;
+		tbl.ScrollBarBackColor.R += 30;
+		tbl.ScrollBarBackColor.G += 30;
+		tbl.ScrollBarBackColor.B += 30;
+
+		tbl.ScrollBarForeColor = Color(180, 180, 180, 255);
+		tbl.ScrollBarHighlightColor = Color(140, 140, 140, 255);
+		tbl.ScrollBarPressedColor = Color(100, 100, 100, 255);
+		tbl.ScrollBarSliderColor = Color(110, 110, 110, 255);
 		return tbl;
 	}
 
 	ColorTable CreateDefaultColorTable()
 	{
 		ColorTable tbl;
-
+		tbl.ShadowColor = Color(0, 0, 0, 120);
 		tbl.ControlBackColor = Color(235,238,241,255);
-		tbl.ControlBorderColor = Color(211,232,254,255);
+		tbl.ControlBorderColor = Color(160, 160, 160, 255);
 		tbl.ControlFontColor = Color(0, 0, 0, 255);
 		tbl.EditableAreaBackColor = Color(255, 255, 255, 255);
 		tbl.ScrollBarBackColor = Color(255, 255, 255, 127);
@@ -289,6 +309,17 @@ namespace GraphicsUI
 		tbl.DefaultFormStyle.BorderColor = tbl.ControlBorderColor;
 
 		tbl.UnfocusedSelectionColor = Color(127, 127, 127, 255);
+		tbl.FocusRectColor = Color(120, 120, 120, 220);
+
+		tbl.ScrollBarBackColor = tbl.EditableAreaBackColor;
+		tbl.ScrollBarBackColor.R -= 15;
+		tbl.ScrollBarBackColor.G -= 15;
+		tbl.ScrollBarBackColor.B -= 15;
+
+		tbl.ScrollBarForeColor = Color(80, 80, 80, 255);
+		tbl.ScrollBarSliderColor = Color(tbl.ScrollBarBackColor.R - 30, tbl.ScrollBarBackColor.R - 30, tbl.ScrollBarBackColor.R - 30, 255);
+		tbl.ScrollBarHighlightColor = Color(tbl.ScrollBarSliderColor.R - 60, tbl.ScrollBarSliderColor.G - 60, tbl.ScrollBarSliderColor.B - 60, 255);
+		tbl.ScrollBarPressedColor = Color(tbl.ScrollBarHighlightColor.R - 20, tbl.ScrollBarHighlightColor.G - 20, tbl.ScrollBarHighlightColor.B - 20, 255);
 
 		return tbl;
 	}
@@ -303,22 +334,17 @@ namespace GraphicsUI
 			return val;
 	}
 
-	ClipRectStack::ClipRectStack(ISystemInterface * pSystem)
+	ClipRectStack::ClipRectStack(Graphics * g)
 	{
 		StackSize = 0;
-		system = pSystem;
-	}
-
-	ClipRectStack::~ClipRectStack()
-	{
-
+		graphics = g;
 	}
 
 	void ClipRectStack::PushRect(Rect nRect)
 	{
 		Buffer[StackSize] = nRect;
 		StackSize ++;
-		system->SetClipRect(nRect);
+		graphics->SetClipRect(nRect.x, nRect.y, nRect.w, nRect.h);
 	}
 
 	Rect ClipRectStack::PopRect()
@@ -327,13 +353,14 @@ namespace GraphicsUI
 			StackSize--;
 		if (StackSize)
 		{
-			system->SetClipRect(Buffer[StackSize - 1]);
+			auto r = Buffer[StackSize - 1];
+			graphics->SetClipRect(r.x, r.y, r.w, r.h);
 			return Buffer[StackSize-1];
 		}
 		else
 		{
 			auto rect = Rect(0,0,WindowWidth,WindowHeight);
-			system->SetClipRect(rect);
+			graphics->SetClipRect(rect.x, rect.y, rect.w, rect.h);
 			return rect;
 		}
 	}
@@ -358,10 +385,10 @@ namespace GraphicsUI
 			nx2 = Buffer[StackSize-1].x + Buffer[StackSize-1].w;
 			ny1 = nRect.y + nRect.h;
 			ny2 = Buffer[StackSize-1].y + Buffer[StackSize-1].h;
-			cRect.x= max(nRect.x,Buffer[StackSize-1].x);
-			cRect.y= max(nRect.y,Buffer[StackSize-1].y);
-			cRect.w = min(nx1,nx2)-cRect.x;
-			cRect.h = min(ny1,ny2)-cRect.y;
+			cRect.x = Math::Max(nRect.x,Buffer[StackSize-1].x);
+			cRect.y = Math::Max(nRect.y,Buffer[StackSize-1].y);
+			cRect.w = Math::Min(nx1,nx2)-cRect.x;
+			cRect.h = Math::Min(ny1,ny2)-cRect.y;
 		}
 		else
 		{
@@ -378,13 +405,12 @@ namespace GraphicsUI
 	{
 		ID = 0;
 		EventID = -1;
-		Cursor = Arrow;
+		Cursor = CursorType::Arrow;
 		Width = Height = Left = Top = 0;
 		Name = "unnamed";
 		Enabled = true;
 		Visible = true;
 		TopMost = false;
-		Focused = false;
 		LastInClient = false;
 		BackgroundShadow = false;
 		FontColor = Color(0, 0, 0, 255);
@@ -396,14 +422,11 @@ namespace GraphicsUI
 				parent->AddChild(this);
 		}
 		TabStop = false;
-		GenerateMouseHoverEvent = false;
 		BorderStyle = BS_RAISED;
 		Type = CT_CONTROL;
 		AbsolutePosX = AbsolutePosY = 0;
-		BackColor = Global::ColorTable.ControlBackColor;
-		BorderColor = Global::ColorTable.ControlBorderColor;
-		tmrHover.Interval = Global::HoverTimeThreshold;
-		tmrHover.OnTick.Bind(this, &Control::HoverTimerTick);
+		BackColor = Global::Colors.ControlBackColor;
+		BorderColor = Global::Colors.ControlBorderColor;
 		DockStyle = dsNone;
 	}
 
@@ -424,11 +447,6 @@ namespace GraphicsUI
 		return false;
 	}
 
-	void Control::HoverTimerTick(Object *, CoreLib::WinForm::EventArgs e)
-	{
-		DoMouseHover();	
-	}
-
 	void Control::LocalPosToAbsolutePos(int x, int y, int & ax, int & ay)
 	{
 		ax = x + Left;
@@ -447,6 +465,18 @@ namespace GraphicsUI
 			current = parent;
 			parent = parent->Parent;
 		}
+	}
+
+	bool Control::IsFocused()
+	{
+		auto focus = GetEntry()->FocusedControl;
+		while (focus)
+		{
+			if (focus == this)
+				return true;
+			focus = focus->Parent;
+		}
+		return false;
 	}
 
 	void Control::BroadcastMessage(const UI_MsgArgs *Args)
@@ -582,17 +612,16 @@ namespace GraphicsUI
 			return false;
 		if (IsPointInClient(X,Y))
 		{
-			SwitchCursor(Cursor);
+			GetEntry()->System->SwitchCursor(Cursor);
 			UI_MsgArgs Args;UIMouseEventArgs Data;
 			Args.Sender = this;	Args.Type = MSG_UI_MOUSEDOWN;
 			Data.Shift = Shift;	Data.X = X;	Data.Y = Y;
 			Args.Data = &Data;
 			BroadcastMessage(&Args);
 				
-			if (TabStop && Parent)
+			if (Parent)
 				SetFocus();
 		}
-		tmrHover.StopTimer();
 		return false;
 	}
 
@@ -624,10 +653,8 @@ namespace GraphicsUI
 		Args.Sender = this;	
 		Data.Shift = 0;	Data.X = X-Left;	Data.Y = Y-Top;
 		Args.Data = &Data;
-		SwitchCursor(Cursor);
+		GetEntry()->System->SwitchCursor(Cursor);
 		Args.Type = MSG_UI_MOUSEMOVE;
-		if (GenerateMouseHoverEvent)
-			tmrHover.StartTimer();
 		BroadcastMessage(&Args);
 		return false;
 	}
@@ -653,22 +680,19 @@ namespace GraphicsUI
 		Args.Data = &Data;
 		Args.Type = MSG_UI_MOUSELEAVE;
 		BroadcastMessage(&Args);
-		SwitchCursor(Arrow);
-		if (GenerateMouseHoverEvent)
-			tmrHover.StopTimer();
+		GetEntry()->System->SwitchCursor(CursorType::Arrow);
 		return false;
 	}
 
 	bool Control::DoMouseHover()
 	{
 		OnMouseHover.Invoke(this);
-		tmrHover.StopTimer();
 		return false;
 	}
 
 	bool Control::DoKeyDown(unsigned short Key, SHIFTSTATE Shift) 
 	{
-		if (!Enabled || !Visible || !ContainsFocus())
+		if (!Enabled || !Visible)
 			return false;
 		UI_MsgArgs Args;UIKeyEventArgs Data;
 		Args.Sender = this;	Args.Type = MSG_UI_KEYDOWN;
@@ -680,7 +704,7 @@ namespace GraphicsUI
 
 	bool Control::DoKeyUp(unsigned short Key, SHIFTSTATE Shift) 
 	{
-		if (!Enabled || !Visible || !ContainsFocus())
+		if (!Enabled || !Visible)
 			return false;
 		UI_MsgArgs Args;UIKeyEventArgs Data;
 		Args.Sender = this;	Args.Type = MSG_UI_KEYUP;
@@ -692,7 +716,7 @@ namespace GraphicsUI
 
 	bool Control::DoKeyPress(unsigned short Key, SHIFTSTATE Shift) 
 	{
-		if (!Enabled || !Visible || !ContainsFocus())
+		if (!Enabled || !Visible)
 			return false;
 		UI_MsgArgs Args;UIKeyEventArgs Data;
 		Args.Sender = this;	Args.Type = MSG_UI_KEYPRESS;
@@ -727,7 +751,6 @@ namespace GraphicsUI
 	void Control::LostFocus(Control * /*newFocus*/)
 	{
 		OnLostFocus.Invoke(this);
-		Focused = false;
 	}
 
 	void Control::SetName(String AName)
@@ -747,27 +770,17 @@ namespace GraphicsUI
 			// Draw background shadow
 			Rect R = clipRects->PopRect();
 			{
-				const int ShadowOffsetX = 8;
-				const int ShadowOffsetY = 8;
-				const int ShadowSize = 8;
-				const int MinShadowAlpha = 22;
-				Color shadowColor(0,0,0,MinShadowAlpha);
-				for (int i=0; i<ShadowSize; i++)
-				{
-					Graphics::SolidBrushColor = shadowColor;
-					Graphics::FillRoundRect(entry->System, absX + ShadowOffsetX+i-1, absY + ShadowOffsetY+i,
-						absX+Width+ShadowSize-i, absY+Height+ShadowSize-i, 5);
-						
-				}
+				Color shadowColor = Global::Colors.ShadowColor;
+				shadowColor.A = ShadowOpacity;
+				entry->DrawCommands.DrawShadowRect(shadowColor, absX, absY, Width, Height, ShadowOffset, ShadowOffset, ShadowSize);
 			}
 			clipRects->PushRect(R);
 		}
 		//Draw Background
-		auto sys = GetEntry()->System;
 		if (BackColor.A)
 		{
-			Graphics::SolidBrushColor = BackColor;
-			Graphics::FillRectangle(sys, absX, absY, absX + Width - 1, absY + Height - 1);
+			entry->DrawCommands.SolidBrushColor = BackColor;
+			entry->DrawCommands.FillRectangle(absX + 1, absY + 1, absX + Width - 1, absY + Height - 1);
 		}
 		//Draw Border
 		Color LightColor, DarkColor;
@@ -781,28 +794,28 @@ namespace GraphicsUI
 		DarkColor.A = BorderColor.A;
 		if (BorderStyle == BS_RAISED)
 		{
-			Graphics::PenColor = LightColor;
-			Graphics::DrawLine(sys, absX, absY, absX + Width - 1, absY);
-			Graphics::DrawLine(sys, absX, absY, absX, absY + Height - 1);
+			entry->DrawCommands.PenColor = LightColor;
+			entry->DrawCommands.DrawLine(absX, absY, absX + Width - 1, absY);
+			entry->DrawCommands.DrawLine(absX, absY, absX, absY + Height - 1);
 
-			Graphics::PenColor = DarkColor;
-			Graphics::DrawLine(sys, absX + Width - 1, absY, absX + Width - 1, absY + Height - 1);
-			Graphics::DrawLine(sys, absX + Width - 1, absY + Height - 1, absX, absY + Height - 1);
+			entry->DrawCommands.PenColor = DarkColor;
+			entry->DrawCommands.DrawLine(absX + Width - 1, absY, absX + Width - 1, absY + Height - 1);
+			entry->DrawCommands.DrawLine(absX + Width - 1, absY + Height - 1, absX, absY + Height - 1);
 		}
 		else if (BorderStyle == BS_LOWERED)
 		{
-			Graphics::PenColor = DarkColor;
-			Graphics::DrawLine(sys, absX, absY, absX + Width - 1, absY);
-			Graphics::DrawLine(sys, absX, absY, absX, absY + Height - 1);
+			entry->DrawCommands.PenColor = DarkColor;
+			entry->DrawCommands.DrawLine(absX, absY, absX + Width - 1, absY);
+			entry->DrawCommands.DrawLine(absX, absY, absX, absY + Height - 1);
 
-			Graphics::PenColor = LightColor;
-			Graphics::DrawLine(sys, absX + Width - 1, absY, absX + Width - 1, absY + Height - 1);
-			Graphics::DrawLine(sys, absX + Width - 1, absY + Height - 1, absX, absY + Height - 1);
+			entry->DrawCommands.PenColor = LightColor;
+			entry->DrawCommands.DrawLine(absX + Width - 1, absY, absX + Width - 1, absY + Height - 1);
+			entry->DrawCommands.DrawLine(absX + Width - 1, absY + Height - 1, absX, absY + Height - 1);
 		}
 		else if (BorderStyle == BS_FLAT_)
 		{
-			Graphics::PenColor = BorderColor;
-			Graphics::DrawRectangle(sys, absX, absY, absX + Width - 1, absY + Height - 1);
+			entry->DrawCommands.PenColor = BorderColor;
+			entry->DrawCommands.DrawRectangle(absX, absY, absX + Width - 1, absY + Height - 1);
 		}
 	}
 
@@ -813,24 +826,14 @@ namespace GraphicsUI
 
 	void Control::KillFocus()
 	{
-		if (this->Focused)
-			OnLostFocus(this);
+		OnLostFocus(this);
 		if (GetEntry()->FocusedControl == this)
 			GetEntry()->FocusedControl = nullptr;
-		this->Focused = false;
 	}
 
 	void Control::SetFocus()
 	{			
-		if (TabStop)
-		{
-			GetEntry()->SetFocusedControl(this);		
-		}
-	}
-
-	bool Control::ContainsFocus()
-	{
-		return Focused;
+		GetEntry()->SetFocusedControl(this);		
 	}
 
 	Label::Label(Container * parent)
@@ -839,7 +842,7 @@ namespace GraphicsUI
 		BorderStyle = BS_NONE;
 		BackColor.A = 0;
 		BackColor.R = 255;  BackColor.G =255; BackColor.B = 255;
-		FontColor = Global::ColorTable.ControlFontColor;
+		FontColor = Global::Colors.ControlFontColor;
 		FChanged = true;
 		Type = CT_LABEL;
 		AutoSize = true;
@@ -909,9 +912,11 @@ namespace GraphicsUI
 			UpdateText();
 		if (DropShadow)
 		{
-			entry->System->DrawBakedText(text.Ptr(), ShadowColor, absX + 1, absY + 1);
+			entry->DrawCommands.SolidBrushColor = ShadowColor;
+			entry->DrawCommands.DrawTextQuad(text.Ptr(), absX + 1, absY + 1);
 		}
-		entry->System->DrawBakedText(text.Ptr(), FontColor, absX, absY);
+		entry->DrawCommands.SolidBrushColor = FontColor;
+		entry->DrawCommands.DrawTextQuad(text.Ptr(), absX, absY);
 	}
 
 	Button::Button(Container * parent)
@@ -921,10 +926,8 @@ namespace GraphicsUI
 		TabStop = true;
 		Type = CT_BUTTON;
 		BorderStyle = BS_RAISED;
-		FocusRectColor.B = FocusRectColor.G = FocusRectColor.R = 0;
-		FocusRectColor.A = 255;
-		BackColor = Global::ColorTable.ControlBackColor;
-		FontColor = Global::ColorTable.ControlFontColor;
+		BackColor = Global::Colors.ControlBackColor;
+		FontColor = Global::Colors.ControlFontColor;
 		Checked = false;
 		AutoSize = false;
 	}
@@ -937,7 +940,7 @@ namespace GraphicsUI
 		Color backColor = BackColor;
 		if (Checked)
 		{
-			BackColor = Global::ColorTable.ButtonBackColorChecked;
+			BackColor = Global::Colors.ButtonBackColorChecked;
 			BorderStyle = BS_LOWERED;
 		}
 		Control::Draw(absX,absY);
@@ -958,28 +961,28 @@ namespace GraphicsUI
 			tx += 1;
 			ty += 1;
 		}
-			
+		auto & graphics = entry->DrawCommands;
 		if (Enabled)
 		{
-			entry->System->DrawBakedText(text.Ptr(), FontColor, absX+tx,absY+ty);
+			graphics.SolidBrushColor = FontColor;
+			graphics.DrawTextQuad(text.Ptr(), absX+tx,absY+ty);
 		}
 		else
 		{
-				
-			entry->System->DrawBakedText(text.Ptr(), Color(255,255,255,FontColor.A), absX + tx + 1, absY + ty + 1);
-			entry->System->DrawBakedText(text.Ptr(), Color((unsigned char)ClampInt(FontColor.R + COLOR_LIGHTEN, 0, 255),
+			graphics.SolidBrushColor = Color(255, 255, 255, FontColor.A);
+			graphics.DrawTextQuad(text.Ptr(), absX + tx + 1, absY + ty + 1);
+			graphics.SolidBrushColor = Color((unsigned char)ClampInt(FontColor.R + COLOR_LIGHTEN, 0, 255),
 				(unsigned char)ClampInt(FontColor.R + COLOR_LIGHTEN, 0, 255),
 				(unsigned char)ClampInt(FontColor.R + COLOR_LIGHTEN, 0, 255),
-				FontColor.A), absX + tx, absY + ty);
+				FontColor.A);
+			graphics.DrawTextQuad(text.Ptr(), absX + tx, absY + ty);
 		}
 		
 		// Draw Focus Rect
-		if (Focused)
+		if (IsFocused())
 		{
-			Graphics::DashPattern = DASH_DOT_PATTERN;
-			Graphics::PenColor = FocusRectColor;
-			Graphics::DrawRectangle(entry->System, absX + 3, absY + 3, absX + Width - 3, absY + Height - 3);
-			Graphics::DashPattern = -1;
+			graphics.PenColor = Global::Colors.FocusRectColor;
+			graphics.DrawRectangle(absX + 3, absY + 3, absX + Width - 3, absY + Height - 3);
 		}
 	}
 
@@ -1009,14 +1012,14 @@ namespace GraphicsUI
 	bool Button::DoKeyDown(unsigned short Key, SHIFTSTATE Shift)
 	{
 		Label::DoKeyDown(Key,Shift);
-		if (!Focused || !Enabled || !Visible)
+		if (!Enabled || !Visible)
 			return false;
-		if (Key == VK_SPACE)
+		if (Key == 0x20) // VK_SPACE
 		{
 			IsMouseDown = true;
 			BorderStyle = BS_LOWERED;
 		}
-		else if (Key == VK_RETURN)
+		else if (Key == 0x0D) // VK_RETURN
 		{
 			Control::DoClick();
 		}
@@ -1026,9 +1029,9 @@ namespace GraphicsUI
 	bool Button::DoKeyUp(unsigned short Key, SHIFTSTATE Shift)
 	{
 		Label::DoKeyUp(Key,Shift);
-		if (!Focused || !Enabled || !Visible)
+		if (!Enabled || !Visible)
 			return false;
-		if (Key == VK_SPACE)
+		if (Key == 0x20) // VK_SPACE
 		{
 			IsMouseDown = false;
 			BorderStyle = BS_RAISED;
@@ -1231,28 +1234,12 @@ namespace GraphicsUI
 			Controls[i]->DoDblClick();
 		return false;
 	}
-
-	bool Container::ContainsFocus()
-	{
-		if (Focused)
-			return true;
-		for (int i=0; i<Controls.Count(); i++)
-		{
-			if (Controls[i]->ContainsFocus())
-				return true;
-		}
-		return false;
-	}
-
+	
 	bool Container::DoKeyDown(unsigned short Key, SHIFTSTATE Shift)
 	{
 		if (!Enabled || !Visible)
 			return false;
 		Control::DoKeyDown(Key,Shift);
-		for (int i=Controls.Count()-1; i>=0; i--)
-		{
-			Controls[i]->DoKeyDown(Key,Shift);
-		}
 		return false;
 	}
 
@@ -1261,10 +1248,6 @@ namespace GraphicsUI
 		if (!Enabled || !Visible)
 			return false;
 		Control::DoKeyUp(Key,Shift);
-		for (int i=Controls.Count()-1; i>=0; i--)
-		{
-			Controls[i]->DoKeyUp(Key,Shift);
-		}
 		return false;
 	}
 
@@ -1273,10 +1256,6 @@ namespace GraphicsUI
 		if (!Enabled || !Visible)
 			return false;
 		Control::DoKeyPress(Key,Shift);
-		for (int i=Controls.Count()-1; i>=0; i--)
-		{
-			Controls[i]->DoKeyPress(Key,Shift);
-		}
 		return false;
 	}
 
@@ -1306,7 +1285,10 @@ namespace GraphicsUI
 		Activated = false;
 		ButtonClose = true;
 		DownInTitleBar = false;
-		DownInButton =false;
+		DownInButton = false;
+		BackgroundShadow = true;
+		ShadowOffset = 0;
+		ShadowSize = 25.0f;
 		DownPosX = DownPosY = 0;
 		Text = L"Form";
 		parent->Forms.Add(this);
@@ -1321,7 +1303,7 @@ namespace GraphicsUI
 		lblClose->Visible = false;
 		btnClose->BorderStyle = BS_NONE;
 		btnClose->BackColor.A = 0;
-		formStyle = Global::ColorTable.DefaultFormStyle;
+		formStyle = Global::Colors.DefaultFormStyle;
 		formStyle.TitleFont = parent->GetEntry()->System->LoadDefaultFont(GraphicsUI::DefaultFontType::Title);
 		formStyle.TitleBarHeight = (int)(parent->GetEntry()->GetLineHeight() * 1.2f);
 	
@@ -1397,6 +1379,7 @@ namespace GraphicsUI
 		btnClose->Posit(0,0,formStyle.TitleBarHeight-4,formStyle.TitleBarHeight-4);
 		BackColor = formStyle.BackColor;
 		BorderColor = formStyle.BorderColor;
+		BorderStyle = BS_FLAT_;
 		btnClose->BackColor = formStyle.CtrlButtonBackColor;
 		SizeChanged();
 	}
@@ -1418,12 +1401,23 @@ namespace GraphicsUI
 		int ox=absX, oy=absY;
 		absX+=Left; absY+=Top;
 		drawChildren = false;
+		if (Activated)
+		{
+			ShadowOpacity = 180;
+			ShadowSize = 30.0f;
+		}
+		else
+		{
+			ShadowOpacity = 90;
+			ShadowSize = 10.0f;
+		}
 		Container::Draw(ox,oy);
 		auto entry = GetEntry();
 		//Title bar
 		Color *Color = Activated?formStyle.TitleBarColors :formStyle.TitleBarDeactiveColors; 
-		Graphics::SolidBrushColor = Color[0];
-		Graphics::FillRectangle(entry->System, absX + 1, absY + 1, absX + Width - 2, absY + 1 + formStyle.TitleBarHeight);
+		auto & graphics = entry->DrawCommands;
+		graphics.SolidBrushColor = Color[0];
+		graphics.FillRectangle(absX + 1, absY + 1, absX + Width - 1, absY + 1 + formStyle.TitleBarHeight);
 		entry->ClipRects->AddRect(Rect(absX,  absY, lblClose->Left - 24, formStyle.TitleBarHeight));
 		lblTitle->Draw(absX+8,absY+1+(formStyle.TitleBarHeight-lblTitle->GetHeight())/2);
 		entry->ClipRects->PopRect();
@@ -1466,31 +1460,26 @@ namespace GraphicsUI
 		if (Left < 0) Left = 0;
 		if (Top < 0) Top = 0;
 		DownInButton = false;
-		return false;
+		return true;
 	}
 
-	void SetResizeCursor(ResizeMode rm)
+	CursorType GetResizeCursor(ResizeMode rm)
 	{
 		switch (rm)
 		{
 		case ResizeMode::None:
-			SetCursor(LoadCursor(0, IDC_ARROW));
-			break;
+			return CursorType::Arrow;
 		case ResizeMode::Left:
 		case ResizeMode::Right:
-			SetCursor(LoadCursor(0, IDC_SIZEWE));
-			break;
+			return CursorType::SizeWE;
 		case ResizeMode::Top:
 		case ResizeMode::Bottom:
-			SetCursor(LoadCursor(0, IDC_SIZENS));
-			break;
+			return CursorType::SizeNS;
 		case ResizeMode::TopLeft:
 		case ResizeMode::BottomRight:
-			SetCursor(LoadCursor(0, IDC_SIZENWSE));
-			break;
+			return CursorType::SizeNWSE;
 		default:
-			SetCursor(LoadCursor(0, IDC_SIZENESW));
-			break;
+			return CursorType::SizeNESW;
 		}
 	}
 
@@ -1521,10 +1510,10 @@ namespace GraphicsUI
 		}
 		else
 		{
-			SetResizeCursor(resizeMode);
+			GetEntry()->System->SwitchCursor(GetResizeCursor(resizeMode));
 			Global::MouseCaptureControl = this;
 		}
-		return false;
+		return true;
 	}
 
 	bool Form::DoMouseMove(int X, int Y)
@@ -1537,7 +1526,8 @@ namespace GraphicsUI
 		Container::DoMouseMove(X-1,Y-1);		
 		if (resizeMode != ResizeMode::None)
 		{
-			SetResizeCursor(resizeMode);
+			GetEntry()->System->SwitchCursor(GetResizeCursor(resizeMode));
+
 			if ((int)resizeMode & (int)ResizeMode::Left)
 			{
 				int dwidth = DownPosX - X;
@@ -1573,21 +1563,20 @@ namespace GraphicsUI
 				Height += dHeight;
 			}
 			SizeChanged();
-			return true;
 		}
 		else
 		{
 			auto rm = GetResizeHandleType(X, Y);
-			SetResizeCursor(rm);
+			GetEntry()->System->SwitchCursor(GetResizeCursor(rm));
+
 			if (DownInTitleBar)
 			{
 				int dx, dy;
 				dx = X - DownPosX; dy = Y - DownPosY;
 				Left += dx; Top += dy;
-				return true;
 			}
 		}
-		return false;
+		return true;
 	}
 
 	bool Form::DoKeyDown(unsigned short Key, SHIFTSTATE Shift)
@@ -1603,16 +1592,13 @@ namespace GraphicsUI
 	{
 		this->System = pSystem;
 		this->font = pSystem->LoadDefaultFont();
-		ClipRects = new ClipRectStack(pSystem);
+		ClipRects = new ClipRectStack(&DrawCommands);
 		Left = Top =0;
 		Global::EventGUID = 0;
 		Height = WndHeight;
 		Width = WndWidth;
 		BorderStyle = BS_NONE;
 		Type = CT_ENTRY;
-		FIMEHandler = new IMEHandler(this);
-		FIMEHandler->IMEWindow->WindowWidth = WndWidth;
-		FIMEHandler->IMEWindow->WindowHeight = WndHeight;
 		FocusedControl = NULL;
 		ClipRects->WindowHeight = WndHeight;
 		ClipRects->WindowWidth = WndWidth;
@@ -1622,20 +1608,11 @@ namespace GraphicsUI
 		CheckmarkLabel->Visible = false;
 		CheckmarkLabel->SetFont(pSystem->LoadDefaultFont(DefaultFontType::Symbol));
 		CheckmarkLabel->SetText(L"a");
-		FIMEHandler->IMEWindow->Visible = false;
 		Global::SCROLLBAR_BUTTON_SIZE = (int)(GetLineHeight());
-	}
-
-	SHIFTSTATE UIEntry::GetCurrentShiftState()
-	{
-		SHIFTSTATE Shift = 0;
-		if (GetAsyncKeyState(VK_SHIFT))
-			Shift = Shift | SS_SHIFT;
-		if (GetAsyncKeyState(VK_CONTROL))
-			Shift = Shift | SS_CONTROL;
-		if (GetAsyncKeyState(VK_MENU ))
-			Shift = Shift | SS_ALT;
-		return Shift;
+		ImeMessageHandler.Init(this);
+		ImeMessageHandler.ImeWindow->Visible = false;
+		ImeMessageHandler.ImeWindow->WindowWidth = WndWidth;
+		ImeMessageHandler.ImeWindow->WindowHeight = WndHeight;
 	}
 
 	void UIEntry::InternalBroadcastMessage(UI_MsgArgs *Args)
@@ -1658,159 +1635,10 @@ namespace GraphicsUI
 	void UIEntry::SizeChanged()
 	{
 		Container::SizeChanged();
-		FIMEHandler->IMEWindow->WindowWidth = Width;
-		FIMEHandler->IMEWindow->WindowHeight = Height;
+		ImeMessageHandler.ImeWindow->WindowWidth = Width;
+		ImeMessageHandler.ImeWindow->WindowHeight = Height;
 		ClipRects->WindowHeight = Height;
 		ClipRects->WindowWidth = Width;
-	}
-
-	void UIEntry::TranslateMouseMessage(UIMouseEventArgs &Data, WPARAM wParam, LPARAM lParam)
-	{
-		Data.Shift = GetCurrentShiftState();
-		bool L,M,R, S, C;
-		L = (wParam&MK_LBUTTON)!=0;
-		M = (wParam&MK_MBUTTON)!=0;
-		R = (wParam&MK_RBUTTON)!=0;
-		S = (wParam & MK_SHIFT)!=0;
-		C = (wParam & MK_CONTROL)!=0;
-		Data.Delta = GET_WHEEL_DELTA_WPARAM(wParam);
-		if (L)
-		{
-			Data.Shift = Data.Shift | SS_BUTTONLEFT;
-		} else{
-			if (M){
-				Data.Shift = Data.Shift | SS_BUTTONMIDDLE;
-			} 
-			else{
-				if (R) {
-					Data.Shift = Data.Shift | SS_BUTTONRIGHT;
-				}
-			}
-		}
-		if (S)
-			Data.Shift = Data.Shift | SS_SHIFT;
-		if (C)
-			Data.Shift = Data.Shift | SS_CONTROL;
-		Data.X = GET_X_LPARAM(lParam);
-		Data.Y = GET_Y_LPARAM(lParam);
-	}
-
-	int UIEntry::HandleSystemMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-	{
-		int rs = -1;
-		unsigned short Key;
-		UIMouseEventArgs Data;
-			
-		switch (message) 
-		{
-		case WM_CHAR:
-			{
-			Key = (unsigned short)(DWORD)wParam;
-			DoKeyPress(Key,GetCurrentShiftState());
-			break;
-			}
-		case WM_KEYUP:
-			{
-			Key = (unsigned short)(DWORD)wParam;
-			DoKeyUp(Key,GetCurrentShiftState());
-			break;
-			}
-		case WM_KEYDOWN:
-			{
-			Key = (unsigned short)(DWORD)wParam;
-			DoKeyDown(Key,GetCurrentShiftState());
-			break;
-			}
-		case WM_SYSKEYDOWN:
-			{
-				Key = (unsigned short)(DWORD)wParam;
-				if ((lParam&(1<<29)))
-				{
-					DoKeyDown(Key, SS_ALT);
-				}
-				else
-					DoKeyDown(Key,0);
-				break;
-			}
-		case WM_MOUSEMOVE:
-			{
-			TranslateMouseMessage(Data,wParam,lParam);
-			DoMouseMove(Data.X,Data.Y);
-			break;
-			}
-		case WM_LBUTTONDOWN:
-		case WM_MBUTTONDOWN:
-		case WM_RBUTTONDOWN:
-			{
-			TranslateMouseMessage(Data,wParam,lParam);
-			DoMouseDown(Data.X,Data.Y,Data.Shift);
-			SetCapture(hWnd);
-			break;
-			}
-		case WM_RBUTTONUP:
-		case WM_MBUTTONUP:
-		case WM_LBUTTONUP:
-			{
-			ReleaseCapture();
-			TranslateMouseMessage(Data,wParam,lParam);
-			if (message == WM_RBUTTONUP)
-				Data.Shift = Data.Shift | SS_BUTTONRIGHT;
-			else if (message == WM_LBUTTONUP)
-				Data.Shift = Data.Shift | SS_BUTTONLEFT;
-			else if (message == WM_MBUTTONUP)
-				Data.Shift = Data.Shift | SS_BUTTONMIDDLE;
-			DoMouseUp(Data.X,Data.Y,Data.Shift);
-			break;
-			}
-		case WM_LBUTTONDBLCLK:
-		case WM_MBUTTONDBLCLK:
-		case WM_RBUTTONDBLCLK:
-			{
-				DoDblClick();
-			}
-			break;
-		case WM_MOUSEWHEEL:
-			{
-				UI_MsgArgs a;
-				a.Sender = this;
-				a.Type = MSG_UI_MOUSEWHEEL;
-				UIMouseEventArgs e;
-				TranslateMouseMessage(e, wParam, lParam);
-				a.Data = &e;
-				//InternalBroadcastMessage(&a);
-				DoMouseWheel(e.Delta);
-			}
-			break;
-		case WM_SIZE:
-			{
-				RECT rect;
-				GetClientRect(hWnd, &rect);
-				SetWidth(rect.right-rect.left);
-				SetHeight(rect.bottom-rect.top);
-			}
-			break;
-		case WM_PAINT:
-			{
-				//Draw(0,0);
-			}
-			break;
-		case WM_ERASEBKGND:
-			{
-			}
-			break;
-		case WM_NCMBUTTONDOWN:
-		case WM_NCRBUTTONDOWN:
-		case WM_NCLBUTTONDOWN:
-			{
-				DoClosePopup();
-			}
-			break;
-		default:
-			break;
-		}
-		if (rs == -1)
-			rs = FIMEHandler->HandleMessage(hWnd,message,wParam,lParam);
-		return rs;
 	}
 
 	void UIEntry::RemoveForm(Form *Form)
@@ -1827,19 +1655,25 @@ namespace GraphicsUI
 		this->RemoveChild(Form);
 	}
 
-	void UIEntry::DrawUI()
+	List<DrawCommand> & UIEntry::DrawUI()
 	{
+		DrawCommands.ClearCommands();
 		Draw(0,0);
+		return DrawCommands.Buffer();
 	}
 
-	bool UIEntry::DoKeyDown(unsigned short Key,SHIFTSTATE Shift)
+	bool UIEntry::DoKeyDown(unsigned short Key, SHIFTSTATE Shift)
 	{
-		if (Key == VK_TAB)
+		if (Key == 0x09)  // VK_TAB
 		{
 			if (Shift & SS_CONTROL)
 			{
 				if (Forms.Count())
-					ShowWindow(Forms.First());
+				{
+					auto window = Forms.First();
+					window->SetFocus();
+					ShowWindow(window);
+				}
 			}
 			else
 			{
@@ -1848,39 +1682,62 @@ namespace GraphicsUI
 				else
 					MoveFocusForward();
 			}
+			return true;
 		}
-		//Key events are broadcasted to the active form only.
-		if (ActiveForm)
+		else if (Key == 0x12) // VK_MENU
 		{
-			ActiveForm->DoKeyDown(Key,Shift);
+			Menu * menu = nullptr;
+			if (ActiveForm && ActiveForm->MainMenu)
+				menu = ActiveForm->MainMenu;
+			else if (this->MainMenu)
+				menu = this->MainMenu;
+			if (menu)
+			{
+				menu->SetFocus();
+				if (menu->Count())
+					menu->GetItem(0)->Selected = true;
+				return true;
+			}
 		}
-		else
-			Container::DoKeyDown(Key,Shift);
+		auto ctrl = FocusedControl;
+		while (ctrl && ctrl != this)
+		{
+			if (ctrl->DoKeyDown(Key, Shift))
+				return true;
+			ctrl = ctrl->Parent;
+		}
 		return false;
 	}
 
 	bool UIEntry::DoKeyUp(unsigned short Key, SHIFTSTATE Shift)
 	{
-		//Key events are broadcasted to the active form only.
-		if (ActiveForm)
+		auto ctrl = FocusedControl;
+		while (ctrl && ctrl != this)
 		{
-			ActiveForm->DoKeyUp(Key,Shift);
+			if (ctrl->DoKeyUp(Key, Shift))
+				return true;
+			ctrl = ctrl->Parent;
 		}
-		else
-			Container::DoKeyUp(Key,Shift);
 		return false;
 	}
 
 	bool UIEntry::DoKeyPress(unsigned short Key, SHIFTSTATE Shift)
 	{
-		//Key events are broadcasted to the active form only.
-		if (ActiveForm)
+		bool rs = false;
+		auto ctrl = FocusedControl;
+		while (ctrl && ctrl != this)
 		{
-			ActiveForm->DoKeyPress(Key,Shift);
+			if (ctrl->DoKeyPress(Key, Shift))
+				return true;
+			ctrl = ctrl->Parent;
 		}
-		else
-			Container::DoKeyPress(Key,Shift);
-		return false;
+		if (ImeMessageHandler.ImeWindow->Visible &&
+			(Key == 9 || (Key >= 32 && Key <= 127)))
+		{
+			ImeMessageHandler.StringInputed(String((wchar_t)(Key)));
+			return true;
+		}
+		return rs;
 	}
 
 	template<typename Func>
@@ -1983,7 +1840,7 @@ namespace GraphicsUI
 			processed = processed || rs;
 			return rs;
 		});
-		if (Global::MouseCaptureControl == this)
+		if (Global::MouseCaptureControl == this || !processed)
 		{
 			UIMouseEventArgs e;
 			e.Delta = 0;
@@ -2025,7 +1882,7 @@ namespace GraphicsUI
 			processed = processed || rs;
 			return rs;
 		});
-		if (Global::MouseCaptureControl == this)
+		if (Global::MouseCaptureControl == this || !processed)
 		{
 			UIMouseEventArgs e;
 			e.Delta = 0;
@@ -2053,14 +1910,26 @@ namespace GraphicsUI
 		e.Y = Global::CursorPosY;
 		OnMouseWheel.Invoke(this, e);
 		return false;
-		/*UI_MsgArgs a;
-		a.Sender = this;
-		a.Type = MSG_UI_MOUSEWHEEL;
-		UIMouseEventArgs e;
-		e.Delta = delta;
-		a.Data = &e;
-		InternalBroadcastMessage(&a);
-		return false;*/
+	}
+
+	bool UIEntry::DoMouseHover()
+	{
+		auto ctrlToBroadcast = Global::MouseCaptureControl ? Global::MouseCaptureControl : Global::PointedComponent;
+		while (ctrlToBroadcast && ctrlToBroadcast != this)
+		{
+			if (ctrlToBroadcast->DoMouseHover())
+				return true;
+			ctrlToBroadcast = ctrlToBroadcast->Parent;
+		}
+		OnMouseHover.Invoke(this);
+		return false;
+	}
+
+	bool UIEntry::DoTick()
+	{
+		for (auto & ctrl : tickEventSubscribers)
+			ctrl->DoTick();
+		return true;
 	}
 
 	void UIEntry::DeactivateAllForms()
@@ -2305,9 +2174,9 @@ namespace GraphicsUI
 		//Draw IME 
 		if (FocusedControl && (FocusedControl->Type & CT_TEXTBOX)==CT_TEXTBOX)
 		{
-			if (FIMEHandler->Enabled)
+			if (ImeMessageHandler.ImeWindow->Visible)
 			{
-				FIMEHandler->IMEWindow->Draw(((CustomTextBox *)FocusedControl)->AbsCursorPosX,((CustomTextBox *)FocusedControl)->AbsCursorPosY);
+				ImeMessageHandler.ImeWindow->Draw(((CustomTextBox *)FocusedControl)->AbsCursorPosX,((CustomTextBox *)FocusedControl)->AbsCursorPosY);
 			}
 		}
 			
@@ -2315,6 +2184,8 @@ namespace GraphicsUI
 
 	void UIEntry::SetFocusedControl(Control *Target)
 	{
+		while (Target && !Target->AcceptsFocus)
+			Target = Target->Parent;
 		if (FocusedControl &&FocusedControl != Target)
 		{
 			FocusedControl->LostFocus(Target);
@@ -2328,7 +2199,7 @@ namespace GraphicsUI
 		{
 			if (parent->Type == CT_FORM)
 			{
-				this->ShowWindow(dynamic_cast<Form*>(parent));
+				this->ShowWindow((Form*)(parent));
 				formFound = true;
 				break;
 			}
@@ -2340,16 +2211,14 @@ namespace GraphicsUI
 			this->DeactivateAllForms();
 			this->ActiveForm = nullptr;
 		}
-		if (Target)
-			Target->Focused = true;
 		FocusedControl = Target;
 		if (Target && (Target->Type & CT_TEXTBOX) == CT_TEXTBOX)
 		{
-			FIMEHandler->TextBox = (CustomTextBox *)Target;
+			ImeMessageHandler.TextBox = (CustomTextBox *)Target;
 		}
 		else
 		{
-			FIMEHandler->TextBox = NULL;
+			ImeMessageHandler.TextBox = nullptr;
 		}
 	}
 
@@ -2390,9 +2259,8 @@ namespace GraphicsUI
 	CheckBox::CheckBox(Container * parent)
 		: Label(parent)
 	{
-		FontColor = Global::ColorTable.MenuItemForeColor;
-		FocusRectColor.R = 0; FocusRectColor.G = 0; FocusRectColor.G = 0; FocusRectColor.A = 100;
-		BackColor = Global::ColorTable.ControlBackColor;
+		FontColor = Global::Colors.MenuItemForeColor;
+		BackColor = Global::Colors.ControlBackColor;
 		TabStop = true;
 		Type = CT_CHECKBOX;
 		BorderStyle = BS_NONE;
@@ -2405,7 +2273,7 @@ namespace GraphicsUI
 	{
 		Label::SetText(pText);
 		if (AutoSize)
-			this->Width = TextWidth + (int)(GetEntry()->CheckmarkLabel->TextWidth * 1.5f) + 1;
+			this->Width = TextWidth + (int)(GetEntry()->CheckmarkLabel->TextWidth * 1.5f) + 2;
 	}
 
 	void CheckBox::Draw(int absX, int absY)
@@ -2415,23 +2283,24 @@ namespace GraphicsUI
 		absY = absY + Top;
 		//Draw Check Box
 		Color LightColor, DarkColor;
-		LightColor.R = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.R + COLOR_LIGHTEN,0,255);
-		LightColor.G = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.G + COLOR_LIGHTEN,0,255);
-		LightColor.B = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.B + COLOR_LIGHTEN,0,255);
-		LightColor.A = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.A+COLOR_LIGHTEN, 0, 255);
-		DarkColor.R = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.R - COLOR_LIGHTEN, 0, 255);
-		DarkColor.G = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.G - COLOR_LIGHTEN, 0, 255);
-		DarkColor.B = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.B - COLOR_LIGHTEN, 0, 255);
-		DarkColor.A = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.A + COLOR_LIGHTEN, 0, 255);
+		LightColor.R = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.R + COLOR_LIGHTEN,0,255);
+		LightColor.G = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.G + COLOR_LIGHTEN,0,255);
+		LightColor.B = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.B + COLOR_LIGHTEN,0,255);
+		LightColor.A = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.A+COLOR_LIGHTEN, 0, 255);
+		DarkColor.R = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.R - COLOR_LIGHTEN, 0, 255);
+		DarkColor.G = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.G - COLOR_LIGHTEN, 0, 255);
+		DarkColor.B = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.B - COLOR_LIGHTEN, 0, 255);
+		DarkColor.A = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.A + COLOR_LIGHTEN, 0, 255);
 		auto entry = GetEntry();
 		int checkBoxSize = GetEntry()->CheckmarkLabel->TextWidth;
 		int checkBoxTop = (Height - checkBoxSize) >> 1;
-		Graphics::PenColor = DarkColor;
-		Graphics::DrawLine(entry->System, absX, absY + checkBoxTop, absX + checkBoxSize, absY + checkBoxTop);
-		Graphics::DrawLine(entry->System, absX, absY + checkBoxTop, absX, absY + checkBoxSize + checkBoxTop);
-		Graphics::PenColor = LightColor;
-		Graphics::DrawLine(entry->System, absX + checkBoxSize, absY + checkBoxTop, absX + checkBoxSize, absY + checkBoxSize + checkBoxTop);
-		Graphics::DrawLine(entry->System, absX + checkBoxSize, absY + checkBoxSize + checkBoxTop, absX, absY + checkBoxSize + checkBoxTop);
+		auto & graphics = entry->DrawCommands;
+		graphics.PenColor = DarkColor;
+		graphics.DrawLine(absX, absY + checkBoxTop, absX + checkBoxSize, absY + checkBoxTop);
+		graphics.DrawLine(absX, absY + checkBoxTop, absX, absY + checkBoxSize + checkBoxTop);
+		graphics.PenColor = LightColor;
+		graphics.DrawLine(absX + checkBoxSize, absY + checkBoxTop, absX + checkBoxSize, absY + checkBoxSize + checkBoxTop);
+		graphics.DrawLine(absX + checkBoxSize, absY + checkBoxSize + checkBoxTop, absX, absY + checkBoxSize + checkBoxTop);
 		// Draw check mark
 		if (Checked)
 		{
@@ -2443,18 +2312,16 @@ namespace GraphicsUI
 		int textStart = checkBoxSize + checkBoxSize / 4;
 		Label::Draw(absX+ textStart -Left, absY-Top);
 		// Draw Focus Rect
-		if (Focused)
+		if (IsFocused())
 		{
-			Graphics::DashPattern = DASH_DOT_PATTERN;
-			Graphics::PenColor = FocusRectColor;
-			Graphics::DrawRectangle(entry->System, absX + textStart, absY, absX + text->GetWidth() + textStart, absY + text->GetHeight());
-			Graphics::DashPattern = -1;
+			graphics.PenColor = Global::Colors.FocusRectColor;
+			graphics.DrawRectangle(absX + textStart, absY, absX + text->GetWidth() + textStart, absY + text->GetHeight());
 		}
 	}
 
 	bool CheckBox::DoMouseDown(int X, int Y, SHIFTSTATE Shift)
 	{
-		Control::DoMouseDown(X,Y,Shift);
+		Label::DoMouseDown(X,Y,Shift);
 		if (!Enabled || !Visible)
 			return false;
 		Checked = !Checked;
@@ -2462,15 +2329,15 @@ namespace GraphicsUI
 		Args.Sender = this;
 		Args.Type = MSG_UI_CHANGED;
 		BroadcastMessage(&Args);
-		return false;
+		return true;
 	}
 
 	bool CheckBox::DoKeyDown(unsigned short Key, SHIFTSTATE Shift)
 	{
 		Control::DoKeyDown(Key,Shift);
-		if (!Focused || !Enabled || !Visible)
+		if (!Enabled || !Visible)
 			return false;
-		if (Key == VK_RETURN || Key == VK_SPACE)
+		if (Key == 0x20 || Key == 0x0D) // VK_SPACE, VK_RETURN
 		{
 			Checked = !Checked; 
 			UI_MsgArgs Args;
@@ -2516,49 +2383,38 @@ namespace GraphicsUI
 		absY = absY + Top;
 		//Draw Check Box
 		Color LightColor, DarkColor;
-		LightColor.R = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.R + COLOR_LIGHTEN, 0, 255);
-		LightColor.G = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.G + COLOR_LIGHTEN, 0, 255);
-		LightColor.B = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.B + COLOR_LIGHTEN, 0, 255);
-		LightColor.A = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.A + COLOR_LIGHTEN, 0, 255);
-		DarkColor.R = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.R - COLOR_LIGHTEN, 0, 255);
-		DarkColor.G = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.G - COLOR_LIGHTEN, 0, 255);
-		DarkColor.B = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.B - COLOR_LIGHTEN, 0, 255);
-		DarkColor.A = (unsigned char)ClampInt(Global::ColorTable.ControlBorderColor.A + COLOR_LIGHTEN, 0, 255);
+		LightColor.R = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.R + COLOR_LIGHTEN, 0, 255);
+		LightColor.G = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.G + COLOR_LIGHTEN, 0, 255);
+		LightColor.B = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.B + COLOR_LIGHTEN, 0, 255);
+		LightColor.A = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.A + COLOR_LIGHTEN, 0, 255);
+		DarkColor.R = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.R - COLOR_LIGHTEN, 0, 255);
+		DarkColor.G = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.G - COLOR_LIGHTEN, 0, 255);
+		DarkColor.B = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.B - COLOR_LIGHTEN, 0, 255);
+		DarkColor.A = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.A + COLOR_LIGHTEN, 0, 255);
 		auto entry = GetEntry();
 		int checkBoxSize = GetEntry()->GetLineHeight();
 		int rad = checkBoxSize / 2;
 		int dotX = absX + rad;
 		int dotY = absY + (Height >> 1);
-		Graphics::PenColor = DarkColor;
-		Graphics::DrawArc(entry->System, dotX, dotY, rad, Math::Pi / 4, Math::Pi * 5 / 4);
-		Graphics::PenColor = LightColor;
-		Graphics::DrawArc(entry->System, dotX, dotY, rad, PI * 5 / 4, PI * 9 / 4);
-
-		// Draw dot
+		auto & graphics = entry->DrawCommands;
+		graphics.PenColor = DarkColor;
+		graphics.DrawArc(dotX, dotY, rad, Math::Pi / 4, Math::Pi * 5 / 4);
+		graphics.PenColor = LightColor;
+		graphics.DrawArc(dotX, dotY, rad, PI * 5 / 4, PI * 9 / 4);
+		float dotRad = rad * 0.5f;
 		if (Checked)
 		{
-			Array<Vec2, 24> circlePoints;
-			int edges = 20;
-			float dTheta = Math::Pi * 2.0f / edges;
-			float theta = 0.0f;
-			float dotRad = rad * 0.5f;
-			for (int i = 0; i < edges; i++)
-			{
-				circlePoints.Add(Vec2::Create(dotX + dotRad * cos(theta), dotY - dotRad * sin(theta)));
-				theta += dTheta;
-			}
-			entry->System->FillPolygon(FontColor, circlePoints.GetArrayView());
+			// Draw dot
+			graphics.FillEllipse((int)(dotX - dotRad), (int)(dotY - dotRad), (int)(dotX + dotRad), (int)(dotY + dotRad));
 		}
 		//Draw Caption
 		int textStart = checkBoxSize + checkBoxSize / 4;
 		Label::Draw(absX + textStart - Left, absY - Top);
 		// Draw Focus Rect
-		if (Focused)
+		if (IsFocused())
 		{
-			Graphics::DashPattern = DASH_DOT_PATTERN;
-			Graphics::PenColor = FocusRectColor;
-			Graphics::DrawRectangle(entry->System, absX + textStart, absY, absX + text->GetWidth() + textStart, absY + text->GetHeight());
-			Graphics::DashPattern = -1;
+			graphics.PenColor = Global::Colors.FocusRectColor;
+			graphics.DrawRectangle(absX + textStart, absY, absX + text->GetWidth() + textStart, absY + text->GetHeight());
 		}
 	}
 
@@ -2568,25 +2424,25 @@ namespace GraphicsUI
 		if (!Enabled || !Visible)
 			return false;
 		SetValue(true);
-		return false;
+		return true;
 	}
 
 	bool RadioBox::DoKeyDown(unsigned short Key, SHIFTSTATE Shift)
 	{
 		Control::DoKeyDown(Key,Shift);
-		if (!Focused || !Enabled || !Visible)
+		if (!Enabled || !Visible)
 			return false;
-		if (Key == VK_RETURN || Key == VK_SPACE)
+		if (Key == 0x20 || Key == 0x0D) // VK_SPACE, VK_RETURN
 		{
 			SetValue(true);
 		}
-		return false;
+		return true;
 	}
 
 	CustomTextBox::CustomTextBox(Container * parent)
-		: Control(parent)
+		: Container(parent)
 	{
-		Cursor = IBeam;
+		Cursor = CursorType::IBeam;
 		Type = CT_TEXTBOX;
 		FText= "";
 		font = parent->GetFont();
@@ -2594,15 +2450,36 @@ namespace GraphicsUI
 		TabStop = true;
 		Locked = false; Changed = true;
 		SelStart = SelLength = SelOrigin = 0;
-		SelectionColor = Global::ColorTable.SelectionColor;
-		SelectedTextColor = Global::ColorTable.SelectionForeColor;
-		BorderStyle = BS_LOWERED;
-		BackColor = Global::ColorTable.EditableAreaBackColor;
-		FontColor = Global::ColorTable.ControlFontColor;
+		SelectionColor = Global::Colors.SelectionColor;
+		SelectedTextColor = Global::Colors.SelectionForeColor;
+		BorderStyle = BS_FLAT_;
+		BackColor = Global::Colors.EditableAreaBackColor;
+		FontColor = Global::Colors.ControlFontColor;
 		TextBorderX =2; TextBorderY = 4;
 		LabelOffset = TextBorderX;
-		QueryPerformanceFrequency((LARGE_INTEGER *)&Freq);
-		QueryPerformanceCounter((LARGE_INTEGER *)&Time);
+		menu = new Menu(this, Menu::msPopup);
+		auto mnCut = new MenuItem(menu, L"Cut", L"Ctrl+X");
+		auto mnCopy = new MenuItem(menu, L"Copy", L"Ctrl+C");
+		auto mnPaste = new MenuItem(menu, L"Paste", L"Ctrl+V");
+		auto mnSelAll = new MenuItem(menu, L"Select All", L"Ctrl+A");
+		mnCut->OnClick.Bind([this](auto) 
+		{
+			CopyToClipBoard();
+			DeleteSelectionText();
+		});
+		mnCopy->OnClick.Bind([this](auto)
+		{
+			CopyToClipBoard();
+		});
+		mnPaste->OnClick.Bind([this](auto)
+		{
+			PasteFromClipBoard();
+		});
+		mnSelAll->OnClick.Bind([this](auto)
+		{
+			SelectAll();
+		});
+		time = CoreLib::Diagnostics::PerformanceCounter::Start();
 		CursorPos = 0;
 		KeyDown = false;
 	}
@@ -2654,26 +2531,6 @@ namespace GraphicsUI
 		}
 	}
 
-	bool CustomTextBox::DoMouseDown(int X, int Y, SHIFTSTATE Shift)
-	{
-		Control::DoMouseDown(X,Y,Shift);
-		if (Enabled && Visible && (Shift | SS_BUTTONLEFT))
-		{
-			SetFocus();
-			SelLength = 0;
-			SelStart = HitTest(X);
-			CursorPos = SelStart;
-			SelectMode = true;
-			SelOrigin = CursorPos;
-			CursorPosChanged();
-			Global::MouseCaptureControl = this;
-			return true;
-		}
-		else
-			SelectMode=false;
-		return false;
-	}
-
 	int CustomTextBox::HitTest(int posX)
 	{
 		String curText;
@@ -2709,6 +2566,10 @@ namespace GraphicsUI
 
 	bool CustomTextBox::DoInput(const String & AInput)
 	{
+		if (AInput == L"\t")
+			return false;
+		if (Locked)
+			return true;
 		String nStr;
 		nStr = AInput;
 		if (SelLength !=0)
@@ -2722,33 +2583,22 @@ namespace GraphicsUI
 		TextChanged();
 		CursorPos += nStr.Length();
 		SelStart = CursorPos;
-		CursorPosChanged();
-		return false;
+		return true;
 	}
 
 	void CustomTextBox::CopyToClipBoard()
 	{
-		if( SelLength!=0 && OpenClipboard( NULL ) )
+		if( SelLength != 0)
 		{
-			EmptyClipboard();
-
-			HGLOBAL hBlock = GlobalAlloc( GMEM_MOVEABLE, sizeof(WCHAR) * ( FText.Length() + 1 ) );
-			if( hBlock )
-			{
-				WCHAR *pwszText = (WCHAR*)GlobalLock( hBlock );
-				if( pwszText )
-				{
-					CopyMemory( pwszText, FText.Buffer() + SelStart, SelLength* sizeof(WCHAR) );
-					pwszText[SelLength] = L'\0';  // Terminate it
-					GlobalUnlock( hBlock );
-				}
-				SetClipboardData( CF_UNICODETEXT, hBlock );
-			}
-			CloseClipboard();
-			if( hBlock )
-				GlobalFree( hBlock );
+			GetEntry()->System->SetClipboardText(FText.SubString(SelStart, SelLength));
 		}
 	}
+	void CustomTextBox::PasteFromClipBoard()
+	{
+		DeleteSelectionText();
+		DoInput(GetEntry()->System->GetClipboardText());
+	}
+
 
 	void CustomTextBox::DeleteSelectionText()
 	{
@@ -2760,49 +2610,20 @@ namespace GraphicsUI
 			TextChanged();
 			SelLength=0;
 			CursorPos = SelStart;
-			CursorPosChanged();
-		}
-	}
-
-	void CustomTextBox::PasteFromClipBoard()
-	{
-		DeleteSelectionText();
-
-		if( OpenClipboard( NULL ) )
-		{
-			HANDLE handle = GetClipboardData( CF_UNICODETEXT );
-			if( handle )
-			{
-				// Convert the ANSI string to Unicode, then
-				// insert to our buffer.
-				WCHAR *pwszText = (WCHAR*)GlobalLock( handle );
-				if( pwszText )
-				{
-					// Copy all characters up to null.
-					String txt = pwszText;
-					wchar_t rtn[2]={13,0};
-					int fid = txt.IndexOf(String(rtn));
-					if (fid!=-1)
-						txt = txt.SubString(0, fid);
-					DoInput(txt);
-					GlobalUnlock( handle );
-				}
-			}
-			CloseClipboard();
 		}
 	}
 
 	bool CustomTextBox::DoKeyDown(unsigned short Key, SHIFTSTATE Shift)
 	{
 		Control::DoKeyDown(Key,Shift);
-		if (Enabled && Visible && Focused)
+		if (Enabled && Visible)
 		{
 			KeyDown=true;
 			if (Shift==SS_SHIFT)
 			{
 				int selEnd;
 				selEnd = SelStart+SelLength;
-				if (Key==VK_LEFT)
+				if (Key == 0x25) // VK_LEFT
 				{
 					if (CursorPos==0)
 						return false;
@@ -2819,9 +2640,9 @@ namespace GraphicsUI
 						SelStart=CursorPos;
 						SelLength =0;
 					}
-					CursorPosChanged();
+					cursorPosChanged = true;
 				}
-				else if(Key==VK_RIGHT)
+				else if(Key == 0x27) // VK_RIGHT
 				{
 					if (CursorPos==FText.Length())
 						return false;
@@ -2838,12 +2659,36 @@ namespace GraphicsUI
 						SelStart= CursorPos;
 						SelLength = 0;
 					}	
-					CursorPosChanged();
-				}	
+					cursorPosChanged = true;
+				}
+				return true;
 			}
-			else
+			else if (Shift == SS_CONTROL)
 			{
-				if (Key==VK_LEFT)
+				if (Key == L'C')
+				{
+					CopyToClipBoard();
+				}
+				else if (Key == L'V')
+				{
+					DeleteSelectionText();
+					if (!Locked)
+						PasteFromClipBoard();
+				}
+				else if (Key == L'X')
+				{
+					CopyToClipBoard();
+					DeleteSelectionText();
+				}
+				else if (Key == L'A')
+				{
+					SelectAll();
+				}
+				return true;
+			}
+			else if (Shift == 0)
+			{
+				if (Key == 0x25) // VK_LEFT
 				{
 					if (SelLength == 0)
 						CursorPos--;
@@ -2853,9 +2698,10 @@ namespace GraphicsUI
 					}
 					SelLength = 0;
 					SelStart = CursorPos=ClampInt(CursorPos,0,FText.Length());
-					CursorPosChanged();
+					cursorPosChanged = true;
+					return true;
 				}			
-				else if (Key==VK_RIGHT)
+				else if (Key == 0x27) // VK_RIGHT
 				{
 					if (SelLength ==0)
 						CursorPos++;
@@ -2863,9 +2709,10 @@ namespace GraphicsUI
 						CursorPos = SelStart+SelLength;
 					SelLength = 0;
 					SelStart = CursorPos=ClampInt(CursorPos,0,FText.Length());
-					CursorPosChanged();
+					cursorPosChanged = true;
+					return true;
 				}
-				else if (Key == VK_DELETE && !Locked)
+				else if (Key == 0x2E && !Locked) // VK_DELETE
 				{
 					if (SelLength!=0)
 					{
@@ -2873,26 +2720,29 @@ namespace GraphicsUI
 						TextChanged();
 						SelLength=0;
 						CursorPos = SelStart;
+						cursorPosChanged = true;
 					}
 					else if (CursorPos<(int)FText.Length())
 					{
 						FText = DeleteString(FText, CursorPos, 1);
 						TextChanged();
 					}
-					CursorPosChanged();
+					return true;
 				}
-				else if (Key == VK_BACK &&!Locked)
+				else if (Key == 0x08 && !Locked) // VK_BACK
 				{
-					if (SelLength !=0)
+					if (SelLength != 0)
+					{
 						DeleteSelectionText();
+						cursorPosChanged = true;
+					}
 					else if (CursorPos>0)
 					{
 						FText = DeleteString(FText, CursorPos-1, 1);
 						CursorPos--;
 						TextChanged();
-						CursorPosChanged();
 					}
-						
+					return true;
 				}
 			}
 		}
@@ -2902,32 +2752,20 @@ namespace GraphicsUI
 	bool CustomTextBox::DoKeyPress(unsigned short Key, SHIFTSTATE Shift)
 	{
 		Control::DoKeyPress(Key,Shift);
-		if (!Focused)
-			return false;
-		if (GetAsyncKeyState('C') && Shift == SS_CONTROL)
+		if (Shift == 0)
 		{
-			CopyToClipBoard();
-		}
-		else if (GetAsyncKeyState('V')  && Shift == SS_CONTROL)
-		{
-			DeleteSelectionText();
-			if (!Locked)
-				PasteFromClipBoard();
-		}
-		else if (GetAsyncKeyState('X')  && Shift == SS_CONTROL)
-		{
-			CopyToClipBoard();
-			DeleteSelectionText();
-		}
-		else if (GetAsyncKeyState(L'A') && Shift == SS_CONTROL)
-		{
-			SelectAll();
+			if (Key >= 32)
+			{
+				DoInput((wchar_t)Key);
+				return true;
+			}
 		}
 		return false;
 	}
 
 	void CustomTextBox::TextChanged()
 	{
+		cursorPosChanged = true;
 		Changed = true;
 		UI_MsgArgs Args;
 		Args.Sender = this;
@@ -2939,6 +2777,30 @@ namespace GraphicsUI
 	{
 		Control::DoKeyUp(Key,Shift);
 		KeyDown = false;
+		return false;
+	}
+
+	bool CustomTextBox::DoMouseDown(int X, int Y, SHIFTSTATE Shift)
+	{
+		Control::DoMouseDown(X, Y, Shift);
+		if (Enabled && Visible)
+		{
+			time = CoreLib::Diagnostics::PerformanceCounter::Start();
+			SetFocus();
+			if (Shift & SS_BUTTONLEFT)
+			{
+				SelLength = 0;
+				SelStart = HitTest(X);
+				CursorPos = SelStart;
+				SelectMode = true;
+				SelOrigin = CursorPos;
+				cursorPosChanged = true;
+				Global::MouseCaptureControl = this;
+			}
+			return true;
+		}
+		else
+			SelectMode = false;
 		return false;
 	}
 
@@ -2961,7 +2823,7 @@ namespace GraphicsUI
 					SelLength = cp - SelOrigin;
 				}
 				CursorPos = cp;
-				CursorPosChanged();
+				cursorPosChanged = true;
 			}
 			return true;
 		}
@@ -2974,7 +2836,13 @@ namespace GraphicsUI
 		SelectMode = false;
 		ReleaseMouse();
 		if (Enabled && Visible)
+		{
+			if (Shift == SS_BUTTONRIGHT)
+			{
+				menu->Popup(X, Y);
+			}
 			return true;
+		}
 		return false;
 	}
 
@@ -2994,16 +2862,23 @@ namespace GraphicsUI
 			font = entry->System->LoadDefaultFont();
 			Changed = true;
 		}
+		if (cursorPosChanged)
+		{
+			cursorPosChanged = false;
+			CursorPosChanged();
+		}
 		if (Changed)
 		{
 			text = font->BakeString(FText, 0);
 			Changed = false;
 		}
+		auto & graphics = entry->DrawCommands;
 		//Draw Text
 		Rect textRect;
 		textRect.x = absX+TextBorderX; textRect.y = absY; textRect.w = Width-TextBorderX-TextBorderX; textRect.h = Height;
 		entry->ClipRects->AddRect(textRect);
-		entry->System->DrawBakedText(text.Ptr(), FontColor, absX+LabelOffset,absY+TextBorderY);
+		graphics.SolidBrushColor = FontColor;
+		graphics.DrawTextQuad(text.Ptr(), absX+LabelOffset,absY+TextBorderY);
 		entry->ClipRects->PopRect();
 		String ls;
 		ls= FText.SubString(0, CursorPos);
@@ -3012,7 +2887,7 @@ namespace GraphicsUI
 		csX+=LabelOffset;
 		//Draw Selection Rect
 			
-		if (Focused && SelLength!=0)
+		if ((IsFocused() || menu->Visible) && SelLength!=0)
 		{
 			if (SelStart + SelLength > FText.Length())
 				SelLength = FText.Length() - SelStart;
@@ -3021,25 +2896,23 @@ namespace GraphicsUI
 			ls = FText.SubString(0, SelStart+SelLength);
 			epX = font->MeasureString(ls, 0).w;
 			spX+=LabelOffset+absX; epX+=LabelOffset+absX;
-			Graphics::SolidBrushColor = SelectionColor;
-			Graphics::FillRectangle(entry->System, spX, absY + TextBorderX, epX - 1, absY + Height - TextBorderX);
+			graphics.SolidBrushColor = SelectionColor;
+			graphics.FillRectangle(spX, absY + TextBorderX, epX - 1, absY + Height - TextBorderX);
 			entry->ClipRects->AddRect(Rect(spX, absY + TextBorderX, epX - 1 - spX, Height - TextBorderX));
-			entry->System->DrawBakedText(text.Ptr(), Color(255, 255, 255, 255), absX + LabelOffset, absY + TextBorderY);
+			graphics.SolidBrushColor = Color(255, 255, 255, 255);
+			graphics.DrawTextQuad(text.Ptr(), absX + LabelOffset, absY + TextBorderY);
 			entry->ClipRects->PopRect();
 		}
 			
 		//Draw Cursor
-		long long CurTime;
-		float TimePassed;
-		QueryPerformanceCounter((LARGE_INTEGER *)&CurTime);
-		TimePassed = (CurTime-Time)/(float)Freq;
-		int tick = int(TimePassed/CURSOR_FREQUENCY);
-		if (Focused && (tick%2 || KeyDown))
+		float timePassed = CoreLib::Diagnostics::PerformanceCounter::EndSeconds(time);
+		int tick = int(timePassed / CURSOR_FREQUENCY);
+		if (IsFocused() && ((tick&1)==0 || KeyDown))
 		{
 			AbsCursorPosX = absX+csX;
 			AbsCursorPosY = absY+Height-TextBorderX;
-			Graphics::PenColor = Color(255 - BackColor.R, 255 - BackColor.G, 255 - BackColor.B, 255);
-			Graphics::DrawLine(entry->System, AbsCursorPosX, absY + TextBorderX, AbsCursorPosX, AbsCursorPosY);				
+			graphics.PenColor = Color(255 - BackColor.R, 255 - BackColor.G, 255 - BackColor.B, 255);
+			graphics.DrawLine(AbsCursorPosX, absY + TextBorderX, AbsCursorPosX, AbsCursorPosY);
 		}
 
 	}
@@ -3047,7 +2920,7 @@ namespace GraphicsUI
 	bool TextBox::DoKeyPress(unsigned short Key, SHIFTSTATE Shift)
 	{
 		CustomTextBox::DoKeyPress(Key,Shift);
-		if (!Focused || !Enabled ||!Visible)
+		if (!IsFocused() || !Enabled ||!Visible)
 			return false;
 		return false;
 	}
@@ -3055,38 +2928,34 @@ namespace GraphicsUI
 	IMEWindow::IMEWindow(Container * parent)
 		: Container(parent)
 	{
-		CursorPos = 0;
 		CandidateCount = 0;
-		BorderWeight = 5;
 		ShowCandidate = false;
 		lblCompStr = new Label(this);
 		lblIMEName = new Label(this);
-		lblCompReadStr = new Label(this);
 		Panel = new Control(this);
-		lblIMEName->FontColor = Color(0,0,255,255);
-		Panel->BorderStyle = BS_RAISED;
-		Panel->BackColor.A = 200;
+		Panel->BorderStyle = BS_FLAT_;
 	}
 
 	IMEWindow::~IMEWindow()
 	{
 	}
 
-	void IMEWindow::SetCandidateListItem(int Index, const wchar_t* Data)
+	void IMEWindow::SetCandidateListItem(int idx, const String & str)
 	{
-		String id;
-		CandidateList[Index] = Data;
-		id = String(Index+1);
-		CandidateList[Index] = id + L":" + Data;
-		if (!lblCandList[Index])
-			lblCandList[Index] = new Label(this->Parent);
-		lblCandList[Index]->SetText(CandidateList[Index]);
-	}
-
-	void IMEWindow::ChangeCompositionReadString(String AString)
-	{
-		strCompRead = AString;
-		lblCompReadStr->SetText(AString);
+		StringBuilder id;
+		CandidateList[idx] = str;
+		id << (idx + 1);
+		id << L":" << str;
+		CandidateList[idx] = id.ProduceString();
+		if (!lblCandList[idx])
+		{
+			auto lbl = new Label(this);
+			lbl->FontColor = Global::Colors.ControlFontColor;
+			lblCandList[idx] = lbl;
+		}
+		lblCandList[idx]->SetText(CandidateList[idx]);
+		lblIMEName->FontColor = Global::Colors.ControlFontColor;
+		Panel->BackColor = Global::Colors.MenuBackColor;
 	}
 
 	void IMEWindow::ChangeCompositionString(String AString)
@@ -3106,8 +2975,9 @@ namespace GraphicsUI
 		int maxW=0;
 		int height;
 		int cpx,cpy;
-		absX+=BorderWeight;
-		if (strComp!="")
+		const int panelMargin = 4;
+		absX += panelMargin;
+		if (strComp.Length())
 		{
 			if (lblCompStr->TextWidth+absX > WindowWidth)
 				cpx = WindowWidth-lblCompStr->TextWidth;
@@ -3119,10 +2989,10 @@ namespace GraphicsUI
 				cpy = absY;
 			height = lblCompStr->TextHeight;
 			maxW = lblCompStr->TextWidth;
-			Panel->Left = cpx-BorderWeight;
-			Panel->Top = cpy-BorderWeight;
-			Panel->SetWidth(maxW+BorderWeight*2);
-			Panel->SetHeight(height + BorderWeight *2);
+			Panel->Left = cpx - panelMargin;
+			Panel->Top = cpy - panelMargin;
+			Panel->SetWidth(maxW + panelMargin * 2);
+			Panel->SetHeight(height + panelMargin * 2);
 			Panel->Draw(0,0);
 			lblCompStr->Draw(cpx,cpy);		
 			
@@ -3145,22 +3015,22 @@ namespace GraphicsUI
 					cpx = WindowWidth-maxW;
 				else
 					cpx = absX;
-				Panel->Left = cpx-BorderWeight;
-				Panel->Top = cpy-BorderWeight;
-				Panel->SetWidth( maxW+BorderWeight*2);
-				Panel->SetHeight( height + BorderWeight *2);
+				Panel->Left = cpx - panelMargin;
+				Panel->Top = cpy - panelMargin;
+				Panel->SetWidth( maxW+ panelMargin * 2);
+				Panel->SetHeight( height + panelMargin * 2);
 				Panel->Draw(0,0);
 				for (int i =0;i<CandidateCount;i++)
 				{
 					int posY = cpy+20*i;
 					lblCandList[i]->Draw(cpx,posY);
 				}
-				Panel->Left = cpx-BorderWeight;
+				Panel->Left = cpx - panelMargin;
 				Panel->Top += Panel->GetHeight();
-				Panel->SetWidth(maxW+BorderWeight*2);
-				Panel->SetHeight(lblIMEName->TextHeight + BorderWeight*2);
+				Panel->SetWidth(maxW + panelMargin * 2);
+				Panel->SetHeight(lblIMEName->TextHeight + panelMargin * 2);
 				Panel->Draw(0,0);
-				lblIMEName->Draw(cpx,Panel->Top+BorderWeight);
+				lblIMEName->Draw(cpx,Panel->Top + panelMargin);
 			}
 		}
 	}
@@ -3173,20 +3043,71 @@ namespace GraphicsUI
 		}
 		lblCandList.Clear();
 		lblCandList.SetSize(Count);
+		for (int i = 0; i < lblCandList.Count(); i++)
+			lblCandList[i] = nullptr;
 		CandidateList.SetSize(Count);
 		CandidateCount = Count;
 	}
 
 
-	IMEHandler::IMEHandler(UIEntry * entry)
+	void IMEHandler::Init(UIEntry * entry)
 	{
 		TextBox = NULL;
-		IMEWindow = new GraphicsUI::IMEWindow(entry);
-		Enabled = false;
+		ImeWindow = new GraphicsUI::IMEWindow(entry);
 	}
 
-	IMEHandler::~IMEHandler()
+	bool IMEHandler::DoImeStart()
 	{
+		ImeWindow->ChangeCompositionString(String(L""));
+		ImeWindow->Visible = true;
+		return true;
+	}
+
+	bool IMEHandler::DoImeEnd()
+	{
+		ImeWindow->Visible = false;
+		ImeWindow->ShowCandidate = false;
+		return true;
+	}
+
+	bool IMEHandler::DoImeChangeName(const CoreLib::String & imeName)
+	{
+		ImeWindow->ChangeInputMethod(imeName);
+		return true;
+	}
+
+	bool IMEHandler::DoImeCompositeString(const CoreLib::String & str)
+	{
+		ImeWindow->ChangeCompositionString(str);
+		return false;
+	}
+
+	bool IMEHandler::DoImeResultString(const CoreLib::String & str)
+	{
+		StringInputed(str);
+		return true;
+	}
+
+	bool IMEHandler::DoImeOpenCandidate()
+	{
+		ImeWindow->ChangeCompositionString(L"");
+		ImeWindow->ShowCandidate = true;
+		return true;
+	}
+
+	bool IMEHandler::DoImeCloseCandidate()
+	{
+		ImeWindow->ShowCandidate = false;
+		ImeWindow->Visible = false;
+		return false;
+	}
+
+	bool IMEHandler::DoImeChangeCandidate(const CoreLib::List<CoreLib::String>& candidate)
+	{
+		ImeWindow->SetCandidateCount(candidate.Count());
+		for (int i = 0; i < candidate.Count(); i++)
+			ImeWindow->SetCandidateListItem(i, candidate[i]);
+		return true;
 	}
 
 	void IMEHandler::StringInputed(String AString)
@@ -3195,146 +3116,19 @@ namespace GraphicsUI
 			TextBox->DoInput(AString);
 	}
 
-	int IMEHandler::HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-	{
-		int rs = -1;
-		switch (message)
-		{
-		case WM_CHAR:
-			{
-				if (wParam == 9 || (wParam >= 32 && wParam <= 127))
-					StringInputed(String((wchar_t)(wParam)));
-			}
-			break;
-		case WM_INPUTLANGCHANGE://改变输入法
-			{
-				HKL hKL=GetKeyboardLayout(0);
-				if(ImmIsIME(hKL))//判断是否使用输入法
-				{
-					Enabled = true;
-					wchar_t InputName[50]={0};
-					HIMC hIMC=ImmGetContext(hWnd);
-					ImmEscape(hKL,hIMC,IME_ESC_IME_NAME,InputName);
-					ImmReleaseContext(hWnd,hIMC);
-					IMEWindow->ChangeInputMethod(String(InputName));
-				}
-				else
-				{
-					Enabled = false;
-					IMEWindow->ChangeInputMethod(String(L""));
-				}
-			}
-			rs = 0;
-			break;
-		case WM_IME_NOTIFY://选字列表修改
-			{
-				switch(wParam)
-				{
-					bool OpenCandidate;
-					int Count;
-				case IMN_OPENCANDIDATE://打开选字列表
-					OpenCandidate=1;
-					IMEWindow->ShowCandidate = true;
-					break;
-				case IMN_CHANGECANDIDATE://修改选字列表
-					OpenCandidate=0;
-					{
-						HIMC hIMC=ImmGetContext(hWnd);
-						unsigned int ListSize=ImmGetCandidateList(hIMC,0,NULL,0);
-						if(ListSize)
-						{
-							//开辟缓冲区存放选字列表信息
-							unsigned char* Buffer=new unsigned char[ListSize];
-							CANDIDATELIST* List=(CANDIDATELIST*)Buffer;
-							ImmGetCandidateList(hIMC,0,List,ListSize);
-								
-							if(List->dwCount<List->dwSelection)
-							{
-								Count=0;
-							}
-							else
-							{
-								Count=min(List->dwCount-List->dwSelection,List->dwPageSize);
-								IMEWindow->SetCandidateCount(Count);
-								for(unsigned int Index=0;((int)Index<Count);Index++)
-								{
-									//获得列表信息并计算数量
-									IMEWindow->SetCandidateListItem(Index,(TCHAR *)(Buffer+List->dwOffset[List->dwSelection+Index]));
-								}
-							}
-							delete[] Buffer;
-						}
-						ImmReleaseContext(hWnd,hIMC);
-					}
-					if(OpenCandidate)
-					{
-						IMEWindow->ChangeCompositionString(String(L""));
-					}
-					break;
-				case IMN_CLOSECANDIDATE://关闭选字列表
-					IMEWindow->ShowCandidate = false;
-					break;
-				}
-			}
-			break;
-		case WM_IME_COMPOSITION:
-			{
-				HIMC hIMC=ImmGetContext(hWnd);
-				if(lParam&GCS_COMPSTR)//获得输入栏的文字
-				{
-					TCHAR EditString[201];
-					unsigned int StrSize=ImmGetCompositionString(hIMC,GCS_COMPSTR,EditString,sizeof(EditString)-sizeof(char));
-					EditString[StrSize/sizeof(TCHAR)]=0;
-					IMEWindow->ChangeCompositionString(String(EditString));
-				}
-				if(lParam&GCS_COMPREADSTR)//获得输入栏的文字
-				{
-					TCHAR EditString[201];
-					unsigned int StrSize=ImmGetCompositionString(hIMC,GCS_COMPREADSTR,EditString,sizeof(EditString)-sizeof(TCHAR));
-					EditString[StrSize/sizeof(TCHAR)]=0;
-					IMEWindow->ChangeCompositionReadString(String(EditString));
-				}
-				if(lParam&GCS_CURSORPOS)
-				{
-					int CurPos;
-					CurPos=ImmGetCompositionString(hIMC,GCS_CURSORPOS,NULL,0);
-					IMEWindow->CursorPos = (CurPos*sizeof(TCHAR));
-				}
-				if(lParam&GCS_RESULTSTR)
-				{
-					TCHAR ResultStr[201];
-					unsigned int StrSize=ImmGetCompositionString(hIMC,GCS_RESULTSTR,ResultStr,sizeof(ResultStr)-sizeof(TCHAR));
-					ResultStr[StrSize/sizeof(TCHAR)]=0;
-					StringInputed(String(ResultStr));
-				}
-				ImmReleaseContext(hWnd,hIMC);
-				rs = 0;
-			}
-			break;
-		case WM_IME_STARTCOMPOSITION://把WM_IME_STARTCOMPOSITION视为已处理以便消除Windows自己打开的输入框
-			IMEWindow->ChangeCompositionString(String(L""));
-			rs = 0;
-			break;
-		case WM_IME_ENDCOMPOSITION:
-			IMEWindow->ChangeCompositionString(String(L""));
-			IMEWindow->ShowCandidate = false;
-			rs = 0;
-			break;
-		}
-		return rs;
-	}
-
 	ScrollBar::ScrollBar(Container * parent, bool addToParent)
 		: Container(parent, addToParent)
 	{
 		Type = CT_SCROLLBAR;
 		BorderStyle = BS_NONE;
-		BackColor = Global::ColorTable.ScrollBarBackColor;
+		BackColor = Global::Colors.ScrollBarBackColor;
 		btnInc = new Button(this);
 		btnDec = new Button(this);
 		Slider = new Control(this);
 		btnInc->TabStop = false;
 		btnDec->TabStop = false;
+		btnInc->BackColor.A = 0;
+		btnDec->BackColor.A = 0;
 		btnInc->SetFont(GetEntry()->System->LoadDefaultFont(DefaultFontType::Symbol));
 		btnDec->SetFont(GetEntry()->System->LoadDefaultFont(DefaultFontType::Symbol));
 		Min = 0; Max = 100; Position = 0;
@@ -3342,12 +3136,21 @@ namespace GraphicsUI
 		btnDec->OnMouseDown.Bind(this, &ScrollBar::BtnDecMouseDown);
 		btnInc->OnMouseUp.Bind(this, &ScrollBar::BtnIncMouseUp);
 		btnDec->OnMouseUp.Bind(this, &ScrollBar::BtnDecMouseUp);
+		btnInc->BorderStyle = BS_NONE;
+		btnDec->BorderStyle = BS_NONE;
+		btnInc->BorderColor.A = 0;
+		btnDec->BorderColor.A = 0;
+		Slider->BorderStyle = BS_NONE;
+		Slider->BackColor = Global::Colors.ScrollBarSliderColor;
+		btnInc->FontColor = btnDec->FontColor = Global::Colors.ScrollBarForeColor;
+		Slider->OnMouseEnter.Bind([this](auto) {Slider->BackColor = Global::Colors.ScrollBarHighlightColor; });
+		Slider->OnMouseLeave.Bind([this](auto) {Slider->BackColor = Global::Colors.ScrollBarForeColor; });
+
 		SetOrientation(SO_HORIZONTAL);
 		SetValue(0,100,0,20);
 		SmallChange = 1;
 		LargeChange = 10;
 		DownInSlider = false;
-		tmrTick.OnTick.Bind(this, &ScrollBar::tmrTick_Tick);
 	}
 
 	ScrollBar::ScrollBar(Container * parent)
@@ -3364,6 +3167,15 @@ namespace GraphicsUI
 		if (!Visible) return;
 		Control::Draw(absX,absY);
 		absX+=Left; absY+=Top;
+		if (DownInSlider)
+			Slider->BackColor = Global::Colors.ScrollBarPressedColor;
+		else
+		{
+			if (highlightSlider)
+				Slider->BackColor = Global::Colors.ScrollBarHighlightColor;
+			else
+				Slider->BackColor = Global::Colors.ScrollBarSliderColor;
+		}
 		btnInc->Draw(absX,absY);
 		btnDec->Draw(absX,absY);
 		Slider->Draw(absX,absY);
@@ -3525,7 +3337,7 @@ namespace GraphicsUI
 		if (!Enabled || !Visible)
 			return false;
 		Control::DoMouseMove(X, Y);
-		int Delta,FreeSpace,Range,APos;
+		int Delta, FreeSpace, Range, APos;
 		if (DownInSlider)
 		{
 			Range = Max-Min;
@@ -3540,13 +3352,15 @@ namespace GraphicsUI
 				Delta = Y-DownPosY;
 			}
 			APos = OriPos + (int)(Delta*(float)Range/(float)FreeSpace);
-			APos = max(Min,APos);
-			APos = min(Max,APos);
+			APos = Math::Max(Min, APos);
+			APos = Math::Min(Max, APos);
 			SetPosition(APos);
 		}
 		auto hitTest = Container::FindControlAtPosition(X, Y);
 		if (hitTest == btnDec || hitTest == btnInc)
 			hitTest->DoMouseMove(X - hitTest->Left, Y - hitTest->Top);
+		else if (hitTest == Slider)
+			highlightSlider = true;
 		return true;
 	}
 
@@ -3565,28 +3379,40 @@ namespace GraphicsUI
 		return true;
 	}
 
-	void ScrollBar::tmrTick_Tick(Object *, CoreLib::WinForm::EventArgs e)
+	bool ScrollBar::DoMouseLeave()
+	{
+		highlightSlider = false;
+		return false;
+	}
+
+	bool ScrollBar::DoMouseHover()
+	{
+		if (tmrOrientation != -1)
+			GetEntry()->SubscribeTickEvent(this);
+		return false;
+	}
+
+	bool ScrollBar::DoTick()
 	{
 		if (tmrOrientation == 0)
 		{
-			if (Position-SmallChange>=Min)
+			if (Position - SmallChange >= Min)
 			{
-				SetPosition(Position-SmallChange);
+				SetPosition(Position - SmallChange);
 			}
 			else
 				SetPosition(Min);
 		}
 		else
 		{
-			if (Position+SmallChange<=Max)
+			if (Position + SmallChange <= Max)
 			{
-				SetPosition(Position+SmallChange);
+				SetPosition(Position + SmallChange);
 			}
 			else
 				SetPosition(Max);
 		}
-		tmrTick.Interval = 80;
-		tmrTick.StartTimer();
+		return true;
 	}
 
 	void ScrollBar::BtnDecMouseDown(UI_Base *, UIMouseEventArgs &)
@@ -3595,8 +3421,6 @@ namespace GraphicsUI
 		{
 			SetPosition(Position-SmallChange);
 			tmrOrientation = 0;
-			tmrTick.Interval = 500;
-			tmrTick.StartTimer();
 		}
 	}
 
@@ -3606,19 +3430,19 @@ namespace GraphicsUI
 		{
 			SetPosition(Position+SmallChange);
 			tmrOrientation = 1;
-			tmrTick.Interval = 500;
-			tmrTick.StartTimer();
 		}
 	}
 
 	void ScrollBar::BtnDecMouseUp(UI_Base *, UIMouseEventArgs &)
 	{
-		tmrTick.StopTimer();
+		tmrOrientation = -1;
+		GetEntry()->UnSubscribeTickEvent(this);
 	}
 
 	void ScrollBar::BtnIncMouseUp(UI_Base *, UIMouseEventArgs &)
 	{
-		tmrTick.StopTimer();
+		tmrOrientation = -1;
+		GetEntry()->UnSubscribeTickEvent(this);
 	}
 
 	void ScrollBar::HandleMessage(const UI_MsgArgs *Args)
@@ -3651,8 +3475,8 @@ namespace GraphicsUI
 	{
 		Type = CT_LISTBOX;
 		TabStop = true;
-		BorderStyle = BS_LOWERED;
-		BackColor = Global::ColorTable.EditableAreaBackColor;
+		BorderStyle = BS_FLAT_;
+		BackColor = Global::Colors.EditableAreaBackColor;
 		HideSelection = false;
 		MultiSelect = false;
 		Selecting = false;
@@ -3661,14 +3485,13 @@ namespace GraphicsUI
 		SelectedIndex= -1;
 		ItemHeight = 18;
 		Margin = 2;
-		SelectionColor = Global::ColorTable.SelectionColor;
-		HighLightColor = Global::ColorTable.HighlightColor;
-		HighLightForeColor = Global::ColorTable.HighlightForeColor;
-		SelectionForeColor = Global::ColorTable.SelectionForeColor;
-		FontColor = Global::ColorTable.ControlFontColor;
-		FocusRectColor = Color(0,0,0,255);
-		UnfocusedSelectionColor = Global::ColorTable.UnfocusedSelectionColor;
-		HighLightColor = Global::ColorTable.HighlightColor;
+		SelectionColor = Global::Colors.SelectionColor;
+		HighLightColor = Global::Colors.HighlightColor;
+		HighLightForeColor = Global::Colors.HighlightForeColor;
+		SelectionForeColor = Global::Colors.SelectionForeColor;
+		FontColor = Global::Colors.ControlFontColor;
+		UnfocusedSelectionColor = Global::Colors.UnfocusedSelectionColor;
+		HighLightColor = Global::Colors.HighlightColor;
 		ScrollBar = new GraphicsUI::ScrollBar(this);
 		ScrollBar->SetOrientation(SO_VERTICAL);
 		ScrollBar->Visible = false;
@@ -3693,7 +3516,9 @@ namespace GraphicsUI
 		int ShowCount = Height / ItemHeight +1;
 		int bdr = (ScrollBar->Visible?ScrollBar->GetWidth():0);
 		auto entry = GetEntry();
-		entry->ClipRects->AddRect(Rect(absX,absY,Width-BorderWidth*2-(ScrollBar->Visible?ScrollBar->GetWidth():0),Height-BorderWidth*2));
+		entry->ClipRects->AddRect(Rect(absX+BorderWidth, absY + BorderWidth, Width-BorderWidth*2 - bdr, Height-BorderWidth*2));
+		bool focused = IsFocused();
+		auto & graphics = entry->DrawCommands;
 		for (int i=ScrollBar->GetPosition();i<=ScrollBar->GetPosition()+ShowCount && i<Items.Count();i++)
 		{
 			Control *CurItem = Items[i];
@@ -3704,7 +3529,8 @@ namespace GraphicsUI
 			}
 			else if (SelectedIndex ==i || ItemInSelection(CurItem))
 			{
-				CurItem->BackColor = HideSelection&&!Focused?BackColor:(Focused?SelectionColor:UnfocusedSelectionColor);
+
+				CurItem->BackColor = HideSelection && !focused ? BackColor : (focused ? SelectionColor : UnfocusedSelectionColor);
 				CurItem->FontColor = SelectionForeColor;
 			}
 				
@@ -3713,13 +3539,12 @@ namespace GraphicsUI
 				CurItem->BackColor = BackColor;
 				CurItem->FontColor = FontColor;
 			}
-			CurItem->Posit(BorderWidth+Margin,BorderWidth+(i-ScrollBar->GetPosition())*ItemHeight,Width-BorderWidth*2-1-bdr-Margin*2,ItemHeight);
-			Graphics::SolidBrushColor = CurItem->BackColor;
-			Graphics::FillRectangle(entry->System, absX + BorderWidth, absY + CurItem->Top, absX + Width - BorderWidth, absY + CurItem->Top + CurItem->GetHeight());
+			CurItem->Posit(BorderWidth,BorderWidth+(i-ScrollBar->GetPosition())*ItemHeight,Width-BorderWidth*2-bdr, ItemHeight);
+			graphics.SolidBrushColor = CurItem->BackColor;
+			graphics.FillRectangle(absX + BorderWidth, absY + CurItem->Top, absX + Width - BorderWidth, absY + CurItem->Top + CurItem->GetHeight());
 			CurItem->Draw(absX,absY);
 		}
-		entry->ClipRects->PopRect();
-		if (Focused)
+		if (focused && AcceptsFocus)
 		{
 			int FID =SelectedIndex;
 			if (FID==-1) FID =0;
@@ -3729,11 +3554,10 @@ namespace GraphicsUI
 			int RectX2 = RectX1 + Width - bdr;
 			int RectY1 = (FID-ScrollBar->GetPosition())*ItemHeight+absY+BorderWidth-1;
 			int RectY2 = RectY1+ItemHeight+1;
-			Graphics::DashPattern = DASH_DOT_PATTERN;
-			Graphics::PenColor = FocusRectColor;
-			Graphics::DrawRectangle(entry->System, RectX1, RectY1, RectX2, RectY2);
-			Graphics::DashPattern = -1;
+			graphics.PenColor = Global::Colors.FocusRectColor;
+			graphics.DrawRectangle(RectX1, RectY1, RectX2, RectY2);
 		}
+		entry->ClipRects->PopRect();
 		ScrollBar->Draw(absX,absY);
 	}
 
@@ -3779,13 +3603,13 @@ namespace GraphicsUI
 		}
 		if (hitTest != ScrollBar)
 			Global::MouseCaptureControl = this;
-		return false;
+		return true;
 	}
 
 	bool ListBox::DoKeyDown(unsigned short Key, SHIFTSTATE Shift)
 	{
 		Control::DoKeyDown(Key,Shift);
-		if (!Enabled || !Visible || !Focused)
+		if (!Enabled || !Visible)
 			return false;
 		int ShowCount=Height/ItemHeight;
 		for (int i = ScrollBar->GetPosition();i <= ScrollBar->GetPosition()+ShowCount && i < Items.Count();i++)
@@ -3795,13 +3619,13 @@ namespace GraphicsUI
 		}
 		if (Items.Count())
 		{
-			if (Key == VK_DOWN)
+			if (Key == 0x28) // VK_DOWN
 			{
 				SelectedIndex = ClampInt(SelectedIndex+1,0,Items.Count()-1);
 				SelectionChanged();
 
 			}
-			else if (Key==VK_UP)
+			else if (Key == 0x26) // VK_UP
 			{
 				SelectedIndex = ClampInt(SelectedIndex-1,0,Items.Count()-1);
 				SelectionChanged();
@@ -3820,6 +3644,12 @@ namespace GraphicsUI
 		return false;
 	}
 
+	bool ListBox::DoMouseLeave()
+	{
+		this->ScrollBar->DoMouseLeave();
+		return false;
+	}
+
 	bool ListBox::DoMouseMove(int X, int Y)
 	{
 		Control::DoMouseMove(X,Y);
@@ -3829,6 +3659,8 @@ namespace GraphicsUI
 		int bdr = ScrollBar->Visible?ScrollBar->GetWidth():0;
 		if (ScrollBar->Visible && hitTest == ScrollBar)
 			ScrollBar->DoMouseMove(X - hitTest->Left, Y - hitTest->Top);
+		else
+			ScrollBar->DoMouseLeave();
 		int ShowCount=Height/ItemHeight;
 		for (int i = ScrollBar->GetPosition(); i <= ScrollBar->GetPosition() + ShowCount && i<Items.Count(); i++)
 		{
@@ -3866,7 +3698,7 @@ namespace GraphicsUI
 			auto newSelIdx = HitTest(X, Y);
 			SelectedIndex = newSelIdx;
 		}
-		if (DownInItem)
+		if (DownInItem && ScrollBar->Visible)
 		{
 			if (Y>=Height)
 			{
@@ -3892,7 +3724,7 @@ namespace GraphicsUI
 
 	bool ListBox::DoMouseWheel(int delta)
 	{
-		if (Visible && Enabled)
+		if (Visible && Enabled && ScrollBar->Visible)
 		{
 			ScrollBar->SetPosition(Math::Clamp(ScrollBar->GetPosition() + (delta > 0 ? -1 : 1) * 3, 0, ScrollBar->GetMax()));
 			return true;
@@ -3949,6 +3781,8 @@ namespace GraphicsUI
 		Item->BackColor = Color(255,255,255,0);
 		if (Item->GetHeight()>ItemHeight)
 			ItemHeight = Item->GetHeight();
+		Item->AcceptsFocus = false;
+		Item->TabStop = false;
 		ListChanged();
 		return Items.Count()-1;
 	}
@@ -4002,7 +3836,7 @@ namespace GraphicsUI
 		{
 			//无需显示滚动条
 			ScrollBar->Visible = false;
-			ScrollBar->SetValue(0, 2, 0, 1);
+			ScrollBar->SetValue(0, 1, 0, 1);
 		}
 		else
 		{
@@ -4052,17 +3886,20 @@ namespace GraphicsUI
 		: ListBox(parent)
 	{
 		btnDrop = new Button(this);
+		btnDrop->AcceptsFocus = false;
 		btnDrop->TabStop = false;
 		btnDrop->SetFont(GetEntry()->System->LoadDefaultFont(DefaultFontType::Symbol));
 		btnDrop->SetText(L"6");
+		btnDrop->BorderColor.A = 0;
 		TextBox = new GraphicsUI::TextBox(this);
-		BorderStyle = BS_LOWERED;
+		BorderStyle = BS_FLAT_;
 		TextBox->BorderStyle = BS_NONE;
+		TextBox->AcceptsFocus = false;
+		TextBox->TabStop = false;
 		ShowList = false;
 		HotTrack = true;
 		HighLightColor = SelectionColor;
 		HighLightForeColor = SelectionForeColor;
-		FocusRectColor = Color(255,255,255,0);
 		SelectionColor = BackColor;
 		SelectionForeColor = FontColor;
 		UnfocusedSelectionColor = BackColor;
@@ -4084,8 +3921,8 @@ namespace GraphicsUI
 
 	void ComboBox::SizeChanged()
 	{
-		TextBox->Posit(BorderWidth,BorderWidth,Width-ButtonSize-BorderWidth*2,Height);
-		btnDrop->Posit(Width-ButtonSize-BorderWidth,BorderWidth,ButtonSize,ButtonSize);
+		TextBox->Posit(BorderWidth,0,Width-ButtonSize-BorderWidth*2, Height);
+		btnDrop->Posit(Width-ButtonSize-BorderWidth,BorderWidth,ButtonSize,Height - BorderWidth * 2);
 	}
 
 	void ComboBox::Posit(int left, int top, int width, int height)
@@ -4096,14 +3933,19 @@ namespace GraphicsUI
 
 	void ComboBox::Draw(int absX, int absY)
 	{
-		Control::Draw(absX,absY);
-		absX+=Left; absY+=Top;
+		Control::Draw(absX, absY);
+		absX += Left; absY += Top;
 		if (!Visible)
 			return;
-		TextBox->Focused = (Focused && !ShowList);
-		TextBox->Draw(absX,absY);
+		TextBox->Draw(absX, absY);
 		btnDrop->Checked = ShowList;
-		btnDrop->Draw(absX,absY);
+		btnDrop->Draw(absX, absY);
+		if (IsFocused())
+		{
+			auto & graphics = GetEntry()->DrawCommands;
+			graphics.PenColor = Global::Colors.FocusRectColor;
+			graphics.DrawRectangle(absX + 3, absY + 3, absX + btnDrop->Left - 2, absY + Height - 3);
+		}
 	}
 
 	void ComboBox::ToggleList(bool sl)
@@ -4146,17 +3988,12 @@ namespace GraphicsUI
 		}
 		else
 			TextBox->SetText(L"");
-		TextBox->SetFocus();
 		SelectedIndex = id;
-		//TextBox->SelectAll();
-		//OnChanged.Invoke(this);
 	}
 
 	void ComboBox::SetFocus()
 	{
 		Control::SetFocus();
-		//TextBox->SelectAll();
-			
 	}
 
 	void ComboBox::BeginListBoxFunctions()
@@ -4279,30 +4116,51 @@ namespace GraphicsUI
 		return true;
 	}
 
-	bool ComboBox::DoKeyDown(unsigned short Key, SHIFTSTATE)
+	bool ComboBox::DoKeyDown(unsigned short Key, SHIFTSTATE shift)
 	{
 		if (!Visible || !Enabled)
 			return false;
-		bool AltDown = GetAsyncKeyState(VK_SHIFT)!=0;
-		if (Focused && !AltDown)
+		bool AltDown = (shift != 0);
+		if (!AltDown)
 		{
-			if (Key == VK_UP)
+			if (Key == 0x26) // VK_UP
 			{
-				SelectedIndex=ClampInt(SelectedIndex-1,0,Items.Count()-1);
-				ChangeSelectedItem(SelectedIndex);
-				return false;
+				HighLightID = ClampInt(HighLightID - 1, 0, Items.Count() - 1);
 			}
-			else if (Key == VK_DOWN)
+			else if (Key == 0x28) // VK_DOWN
 			{
-				SelectedIndex=ClampInt(SelectedIndex+1,0,Items.Count()-1);
-				ChangeSelectedItem(SelectedIndex);
-				return false;
+				HighLightID = ClampInt(HighLightID + 1, 0, Items.Count() - 1);
+			}
+			if (!ShowList)
+			{
+				if (HighLightID != SelectedIndex)
+				{
+					ChangeSelectedItem(HighLightID);
+					SelectionChanged();
+				}
 			}
 		}
-		if (Focused && Key == VK_DOWN && AltDown)
+		if ((Key == 0x20 || Key == 0x0D)) // VK_SPACE VK_RETURN
 		{
-			ToggleList(ShowList=true);
+			if (ShowList)
+			{
+				ChangeSelectedItem(HighLightID);
+				if (HighLightID != SelectedIndex)
+				{
+					ChangeSelectedItem(HighLightID);
+					SelectionChanged();
+				}
+			}
+			ToggleList(!ShowList);
+			return true;
 		}
+		else if (Key == 0x1B) // VK_ESCAPE
+		{
+			ToggleList(false);
+			return true;
+		}
+		if (Key == 0x26 || Key == 0x28)
+			return true;
 		return false;
 	}
 
@@ -4317,7 +4175,7 @@ namespace GraphicsUI
 				BeginListBoxFunctions();
 				int lstB = BorderStyle;
 				Color lstBC= BorderColor;
-				BorderColor = Global::ColorTable.ControlFontColor;
+				BorderColor = Global::Colors.ControlFontColor;
 				BorderStyle = BS_FLAT_;
 				auto oldShadow = BackgroundShadow;
 				BackgroundShadow = true;
@@ -4330,7 +4188,7 @@ namespace GraphicsUI
 		}
 		if (Args->Type == MSG_UI_MOUSEWHEEL)
 		{
-			if (!ShowList && Focused)
+			if (!ShowList && IsFocused())
 			{
 				if ((*(UIMouseEventArgs *)Args->Data).Delta<0)
 				{
@@ -4363,10 +4221,6 @@ namespace GraphicsUI
 		Style = PROGRESSBAR_STYLE_NORMAL;
 		Max = 100;
 		Position = 0;
-		ProgressBarColors[0]=Color(60,86,156,255);
-		ProgressBarColors[1]=Color(10,36,106,255);
-		ProgressBarColors[2]=Color(10,36,106,255);
-		ProgressBarColors[3]=Color(60,86,156,255);
 	}
 
 	ProgressBar::~ProgressBar()
@@ -4403,6 +4257,7 @@ namespace GraphicsUI
 		int PH,PW;
 		PH = Height - 4;
 		auto entry = GetEntry();
+		auto & graphics = entry->DrawCommands;
 		if (Style == 2) //Block Style
 		{
 			entry->ClipRects->AddRect(Rect(absX+2,absY+2,Width-6,Height-4));
@@ -4412,8 +4267,8 @@ namespace GraphicsUI
 			{
 				int cx = i*PW+3+absX;
 				int cy = 2+absY;
-				Graphics::SolidBrushColor = ProgressBarColors[0];
-				Graphics::FillRectangle(entry->System, cx, cy, cx + PW - 2, cy + PH);
+				graphics.SolidBrushColor = Global::Colors.SelectionColor;
+				graphics.FillRectangle(cx, cy, cx + PW - 2, cy + PH);
 			}
 			entry->ClipRects->PopRect();
 		}
@@ -4421,8 +4276,8 @@ namespace GraphicsUI
 		{
 			int cx = absX+3, cy= absY+2;
 			PW = (Width -4)*Position/Max;
-			Graphics::SolidBrushColor = ProgressBarColors[0];
-			Graphics::FillRectangle(entry->System, cx, cy, cx + PW, cy + PH);
+			graphics.SolidBrushColor = Global::Colors.SelectionColor;
+			graphics.FillRectangle(cx, cy, cx + PW, cy + PH);
 		}
 	}
 		
@@ -4430,13 +4285,13 @@ namespace GraphicsUI
 		: Container(parent), style(s)
 	{
 		Type = CT_MENU;
-		TabStop = true;
+		TabStop = s == msMainMenu;
 		TopMost = true;
 		Height = (Margin*2);
 		Width = (Margin*2);
 		BorderStyle = BS_NONE;
-		BorderColor = Global::ColorTable.MenuBorderColor;
-		BackColor = Global::ColorTable.MenuBackColor;
+		BorderColor = Global::Colors.MenuBorderColor;
+		BackColor = Global::Colors.MenuBackColor;
 		curSubMenu = 0;
 		parentItem = 0;
 		if (style == msPopup)
@@ -4446,7 +4301,14 @@ namespace GraphicsUI
 		else
 		{
 			DockStyle = dsTop;
-			BackColor = Global::ColorTable.ToolButtonBackColor1;
+			BackColor = Global::Colors.ToolButtonBackColor1;
+		}
+		if (s == msMainMenu)
+		{
+			if (parent->Type == CT_ENTRY)
+				((UIEntry*)parent)->MainMenu = this;
+			else if (parent->Type == CT_FORM)
+				((Form*)parent)->MainMenu = this;
 		}
 	}
 
@@ -4607,24 +4469,25 @@ namespace GraphicsUI
 		int absX, absY;
 		LocalPosToAbsolutePos(0, 0, absX, absY);
 		Control::Draw(absX - Left, absY - Top);
-		entry->System->SetRenderTransform(absX, absY);
+		auto & graphics = entry->DrawCommands;
+		graphics.SetRenderTransform(absX, absY);
 		for (auto & item : Items)
 			ItemHeight = Math::Max(ItemHeight, item->GetHeight());
-		Graphics::SolidBrushColor = Global::ColorTable.MemuIconBackColor;
-		Graphics::FillRectangle(entry->System, 0,Margin, ItemHeight, Height-Margin);
-		Graphics::PenColor = Global::ColorTable.MenuBorderColor;
-		Graphics::DrawRectangle(entry->System, 0,0,Width,Height);
-		Graphics::DrawLine(entry->System, ItemHeight+Margin, Margin, ItemHeight+Margin, Height-Margin);
+		graphics.SolidBrushColor = Global::Colors.MemuIconBackColor;
+		graphics.FillRectangle(0, Margin, ItemHeight + Margin, Height);
+		graphics.PenColor = Global::Colors.MenuBorderColor;
+		graphics.DrawRectangle(0,0,Width-1,Height-1);
+		graphics.DrawLine(ItemHeight+Margin, Margin, ItemHeight+Margin, Height-Margin);
 		int cposY = 0;
 
 		for (int i =0; i<Items.Count(); i++)
 		{
 			int itemHeight = Items[i]->GetHeight();
-			entry->System->SetRenderTransform(absX + Margin, absY + Margin + cposY);
+			graphics.SetRenderTransform(absX + Margin, absY + Margin + cposY);
 			Items[i]->DrawMenuItem(Width, ItemHeight);
 			cposY += itemHeight;
 		}
-		entry->System->SetRenderTransform(0, 0);
+		graphics.SetRenderTransform(0, 0);
 	}
 
 
@@ -4641,6 +4504,12 @@ namespace GraphicsUI
 				Items[i]->Selected = false;
 			Left = x;
 			Top = y;
+			int ax, ay;
+			LocalPosToAbsolutePos(0, 0, ax, ay);
+			if (ax + Width > entry->GetWidth())
+				Left -= Width;
+			if (ay + Height > entry->GetHeight())
+				Top -= Height;
 			Visible = true;
 			SetFocus();
 			Global::MouseCaptureControl = this;
@@ -4663,7 +4532,7 @@ namespace GraphicsUI
 				if (parent)
 					((Menu*)parent)->curSubMenu = 0;
 			}
-			tmrHover.StopTimer();
+			enableMouseHover = false;
 			curSubMenu = nullptr;
 			ReleaseMouse();
 		}
@@ -4676,14 +4545,15 @@ namespace GraphicsUI
 		int ox = absX + Left;
 		int oy = absY + Top;
 		int cposY = 0;
+		auto & graphics = entry->DrawCommands;
 		for (int i = 0; i < Items.Count(); i++)
 		{
-			entry->System->SetRenderTransform(ox + Items[i]->Left, oy + Items[i]->Top);
+			graphics.SetRenderTransform(ox + Items[i]->Left, oy + Items[i]->Top);
 			int itemHeight = Items[i]->IsSeperator()?3:ItemHeight;
 			Items[i]->DrawMenuButton(Items[i]->GetWidth(), Items[i]->GetHeight());
 			cposY += itemHeight;
 		}
-		entry->System->SetRenderTransform(0, 0);
+		graphics.SetRenderTransform(0, 0);
 	}
 
 	void Menu::Draw(int absX, int absY)
@@ -4694,6 +4564,9 @@ namespace GraphicsUI
 
 	bool Menu::DoMouseHover()
 	{
+		if (!enableMouseHover)
+			return false;
+		enableMouseHover = false;
 		for (auto & item : Items)
 		{
 			if (item->Selected)
@@ -4722,13 +4595,13 @@ namespace GraphicsUI
 		}
 		if (IsPointInClient(X, Y))
 		{
+			enableMouseHover = true;
 			if (parentItem)
 				parentItem->Selected = true;
-			tmrHover.StartTimer();
 		}
 		else
 		{
-			tmrHover.StopTimer();
+			enableMouseHover = false;
 			if (!curSubMenu)
 			{
 				for (int i = 0; i < Items.Count(); i++)
@@ -4752,6 +4625,8 @@ namespace GraphicsUI
 				}
 			}
 		}
+		if (!Parent || Parent->Type != CT_MENU && Parent->Type != CT_MENU_ITEM)
+			return true;
 		return false;
 	}
 	bool Menu::DoMouseDown(int X, int Y, SHIFTSTATE Shift)
@@ -4773,14 +4648,15 @@ namespace GraphicsUI
 				if (X >= item->Left && X <= item->Left + item->Width &&
 					Y >= item->Top && Y <= item->Top + item->Height)
 					item->DoMouseDown(X - item->Left, Y - item->Top, Shift);
-			
+			return true;
 		}
+		
 		return false;
 	}
 	bool Menu::DoMouseUp(int X, int Y, SHIFTSTATE Shift)
 	{
 		Container::DoMouseUp(X, Y, Shift);
-		return false;
+		return true;
 	}
 
 	int Menu::GetSelectedItemID()
@@ -4791,213 +4667,249 @@ namespace GraphicsUI
 		return -1;
 	}
 
-	bool Menu::DoKeyDown(unsigned short Key, SHIFTSTATE Shift)
+	bool Menu::DoKeyDown(unsigned short Key, SHIFTSTATE /*Shift*/)
 	{
-		bool IsLastLevel = !(curSubMenu && curSubMenu->Visible);
-		if (style == msMainMenu && Shift == SS_ALT)
+		if (!Enabled || !Visible)
+			return false;
+		if (Key >= L'A' && Key <= L'Z' || Key >= L'0' && Key <= L'9')
 		{
-			if (Key == VK_MENU)
-			{
-				SetFocus();
-				if (Items.Count())
-					Items[0]->Selected = true;
-				return false;
-			}
 			for (int i=0; i<Items.Count(); i++)
 				Items[i]->Selected = false;
 			for (int i=0; i<Items.Count(); i++)
 				if (Items[i]->GetAccessKey() == Key)
 				{
-					Items[i]->DoClick();
+					Items[i]->Hit();
 					Items[i]->Selected = true;
-					return false;
+					return true;
 				}
 			return false;
 		}
-		if (IsLastLevel && Enabled && Visible)
+		int id = GetSelectedItemID();
+
+		if (Key == 0x20 || Key == 0x0D) // VK_SPACE || VK_RETURN
 		{
-			int id = GetSelectedItemID();
-			if (style == msPopup)
+			if (id >= 0 && Items[id]->Selected && Items[id]->Enabled && !Items[id]->IsSeperator())
 			{
-				if (Key == VK_UP || Key == VK_DOWN)
-				{
-					for (int i=0; i<Items.Count(); i++)
-						Items[i]->Selected = false;
-					
-					if (Key == VK_DOWN)
-					{
-						int nxt = id + 1;
-						int tc = Items.Count();
-						nxt %= Items.Count();
-						while (nxt != id && tc)
-						{
-							if (!Items[nxt]->IsSeperator() && Items[nxt]->Visible && Items[nxt]->Enabled)
-							{
-								Items[nxt]->Selected = true;
-								break;
-							}
-							nxt ++;
-							nxt %= Items.Count();
-							tc--;
-						}
-						if (nxt == id)
-							Items[id]->Selected = true;
-					}
-					else if (Key == VK_UP)
-					{
-						int nxt = id - 1;
-						int tc = Items.Count();
-						if (nxt < 0)
-							nxt += Items.Count();
-						nxt %= Items.Count();
-						while (nxt != id && tc)
-						{
-							if (!Items[nxt]->IsSeperator() && Items[nxt]->Visible && Items[nxt]->Enabled)
-							{
-								Items[nxt]->Selected = true;
-								break;
-							}
-							nxt --;
-							if (nxt < 0)
-								nxt += Items.Count();
-							nxt %= Items.Count();
-							tc--;
-						}
-						if (nxt == id && id != -1)
-							Items[id]->Selected = true;
-					}
-					Container::DoKeyDown(Key, Shift);
-				}
-				if (Key == VK_RIGHT)
-				{
-					Container::DoKeyDown(Key, Shift);
-					if (id != -1 && Items[id]->SubMenu && Items[id]->SubMenu->Count())
-					{
-						PopupSubMenu(Items[id]->SubMenu, Items[id]->Width - 2, 0);
-						for (int i=0; i<Items[id]->SubMenu->Count(); i++)
-						{
-							MenuItem * item = Items[id]->SubMenu->GetItem(i);
-							if (!item->IsSeperator() && item->Enabled && item->Visible)
-							{
-								item->Selected = true;
-								break;
-							}
-						}
-					}
-				}
-				else if (Key == VK_LEFT || Key == VK_ESCAPE)
-				{
-					if (parentItem && parentItem->Parent)
-					{
-						((Menu *)parentItem->Parent)->CloseSubMenu();
-						Container::DoKeyDown(Key, Shift);
-					}
-					else if (Key == VK_ESCAPE)
-					{
-						CloseMenu();
-						Container::DoKeyDown(Key, Shift);
-					}
-				}
-				else if (Key == VK_RETURN)
-				{
-					Container::DoKeyDown(Key, Shift);
-					if (id != -1)
-						Items[id]->DoClick();
-					if (curSubMenu)
-					{
-						for (int i=0; i<curSubMenu->Count(); i++)
-						{
-							MenuItem * item = curSubMenu->GetItem(i);
-							if (!item->IsSeperator() && item->Enabled && item->Visible)
-							{
-								item->Selected = true;
-								break;
-							}
-						}
-					}
-				}
-				else
-				{
-					for (int i=0; i<Items.Count(); i++)
-						if (Items[i]->GetAccessKey() == Key)
-							Items[i]->DoClick();
-				}
+				Items[id]->Hit();
 			}
-			else
+			return true;
+		}
+		if (style == msPopup)
+		{
+			Menu * parentMainMenu = nullptr;
+			if (parentItem && parentItem->Parent && parentItem->Parent->Type == CT_MENU &&
+				((Menu*)parentItem->Parent)->style == msMainMenu)
+				parentMainMenu = ((Menu*)parentItem->Parent);
+			if (Key == 0x26 || Key == 0x28) // VK_UP VK_DOWN
 			{
-				if (!Focused)
-					return false;
-				if (Key == VK_LEFT || Key == VK_RIGHT)
-				{
-					for (int i=0; i<Items.Count(); i++)
-						Items[i]->Selected = false;
+				for (int i=0; i<Items.Count(); i++)
+					Items[i]->Selected = false;
 					
-					if (Key == VK_RIGHT)
+				if (Key == 0x28)
+				{
+					int nxt = id + 1;
+					int tc = Items.Count();
+					nxt %= Items.Count();
+					while (nxt != id && tc)
 					{
-						int nxt = id + 1;
-						int tc = Items.Count();
-						nxt %= Items.Count();
-						while (nxt != id && tc)
+						if (!Items[nxt]->IsSeperator() && Items[nxt]->Visible && Items[nxt]->Enabled)
 						{
-							if (!Items[nxt]->IsSeperator() && Items[nxt]->Visible && Items[nxt]->Enabled)
-							{
-								Items[nxt]->Selected = true;
-								break;
-							}
-							nxt ++;
-							nxt %= Items.Count();
-							tc--;
+							Items[nxt]->Selected = true;
+							break;
 						}
-						if (nxt == id)
-							Items[id]->Selected = true;
+						nxt ++;
+						nxt %= Items.Count();
+						tc--;
 					}
-					else if (Key == VK_LEFT)
+					if (nxt == id)
+						Items[id]->Selected = true;
+				}
+				else if (Key == 0x26)
+				{
+					int nxt = id - 1;
+					int tc = Items.Count();
+					if (nxt < 0)
+						nxt += Items.Count();
+					nxt %= Items.Count();
+					while (nxt != id && tc)
 					{
-						int nxt = id - 1;
-						int tc = Items.Count();
+						if (!Items[nxt]->IsSeperator() && Items[nxt]->Visible && Items[nxt]->Enabled)
+						{
+							Items[nxt]->Selected = true;
+							break;
+						}
+						nxt --;
 						if (nxt < 0)
 							nxt += Items.Count();
 						nxt %= Items.Count();
-						while (nxt != id && tc)
-						{
-							if (!Items[nxt]->IsSeperator() && Items[nxt]->Visible && Items[nxt]->Enabled)
-							{
-								Items[nxt]->Selected = true;
-								break;
-							}
-							nxt --;
-							if (nxt < 0)
-								nxt += Items.Count();
-							nxt %= Items.Count();
-							tc--;
-						}
-						if (nxt == id && id != -1)
-							Items[id]->Selected = true;
+						tc--;
 					}
-					Container::DoKeyDown(Key, Shift);
+					if (nxt == id && id != -1)
+						Items[id]->Selected = true;
 				}
-				else if (Key == VK_RETURN || Key == VK_DOWN)
+				return true;
+			}
+			if (Key == 0x27)  // VK_RIGHT
+			{
+				if (id != -1 && Items[id]->SubMenu && Items[id]->SubMenu->Count())
 				{
-					Container::DoKeyDown(Key, Shift);
-					if (id != -1)
-						Items[id]->DoClick();
-					if (curSubMenu)
+					PopupSubMenu(Items[id]->SubMenu, Items[id]->Width - 2, 0);
+					for (int i=0; i<Items[id]->SubMenu->Count(); i++)
 					{
-						for (int i=0; i<curSubMenu->Count(); i++)
+						MenuItem * item = Items[id]->SubMenu->GetItem(i);
+						if (!item->IsSeperator() && item->Enabled && item->Visible)
 						{
-							MenuItem * item = curSubMenu->GetItem(i);
-							if (!item->IsSeperator() && item->Enabled && item->Visible)
-							{
-								item->Selected = true;
-								break;
-							}
+							item->Selected = true;
+							break;
 						}
 					}
 				}
+				else if (parentMainMenu && parentMainMenu->Items.Count())
+				{
+					int pid = -1;
+					for (int i = 0; i < parentMainMenu->Items.Count(); i++)
+						if (parentMainMenu->Items[i]->Selected)
+						{
+							pid = i;
+							break;
+						}
+					int npId = (pid + 1) % parentMainMenu->Items.Count();
+					int trials = 0;
+					while (trials < parentMainMenu->Items.Count() && (parentMainMenu->Items[npId]->IsSeperator() || !parentMainMenu->Items[npId]->Enabled
+						|| !parentMainMenu->Items[npId]->Visible))
+						npId = (npId + 1) % parentMainMenu->Items.Count();
+					for (auto item : parentMainMenu->Items)
+						item->Selected = false;
+					parentMainMenu->Items[npId]->Selected = true;
+
+					parentMainMenu->Items[npId]->Hit();
+				}
+				return true;
+			}
+			else if (Key == 0x25)
+			{
+				if (parentMainMenu && parentMainMenu->Items.Count())
+				{
+					int pid = -1;
+					for (int i = 0; i < parentMainMenu->Items.Count(); i++)
+						if (parentMainMenu->Items[i]->Selected)
+						{
+							pid = i;
+							break;
+						}
+					int npId = (pid - 1 + parentMainMenu->Items.Count()) % parentMainMenu->Items.Count();
+					int trials = 0;
+					while (trials < parentMainMenu->Items.Count() && (parentMainMenu->Items[npId]->IsSeperator() || !parentMainMenu->Items[npId]->Enabled
+						|| !parentMainMenu->Items[npId]->Visible))
+						npId = (npId - 1 + parentMainMenu->Items.Count()) % parentMainMenu->Items.Count();
+					for (auto item : parentMainMenu->Items)
+						item->Selected = false;
+					parentMainMenu->Items[npId]->Selected = true;
+					parentMainMenu->Items[npId]->Hit();
+				}
+				else if (parentItem && parentItem->Parent)
+				{
+					((Menu *)parentItem->Parent)->CloseSubMenu();
+				}
+				return true;
+			}
+			else if (Key == 0x1B) // VK_LEFT || VK_ESCAPE
+			{
+				if (parentItem && parentItem->Parent)
+				{
+					((Menu *)parentItem->Parent)->CloseSubMenu();
+				}
+				CloseMenu();
+				if (parentMainMenu)
+				{
+					parentMainMenu->SetFocus();
+					int pid = parentMainMenu->Items.IndexOf(parentItem);
+					if (pid != -1)
+						parentMainMenu->Items[pid]->Selected = true;
+				}
+				return true;
 			}
 		}
 		else
-			Container::DoKeyDown(Key, Shift);
+		{
+			if (Key == 0x25 || Key == 0x27) // VK_LEFT VK_RIGHT
+			{
+				for (int i=0; i<Items.Count(); i++)
+					Items[i]->Selected = false;
+					
+				if (Key == 0x27)
+				{
+					int nxt = id + 1;
+					int tc = Items.Count();
+					nxt %= Items.Count();
+					while (nxt != id && tc)
+					{
+						if (!Items[nxt]->IsSeperator() && Items[nxt]->Visible && Items[nxt]->Enabled)
+						{
+							Items[nxt]->Selected = true;
+							break;
+						}
+						nxt ++;
+						nxt %= Items.Count();
+						tc--;
+					}
+					if (nxt == id)
+						Items[id]->Selected = true;
+				}
+				else if (Key == 0x25)
+				{
+					int nxt = id - 1;
+					int tc = Items.Count();
+					if (nxt < 0)
+						nxt += Items.Count();
+					nxt %= Items.Count();
+					while (nxt != id && tc)
+					{
+						if (!Items[nxt]->IsSeperator() && Items[nxt]->Visible && Items[nxt]->Enabled)
+						{
+							Items[nxt]->Selected = true;
+							break;
+						}
+						nxt --;
+						if (nxt < 0)
+							nxt += Items.Count();
+						nxt %= Items.Count();
+						tc--;
+					}
+					if (nxt == id && id != -1)
+						Items[id]->Selected = true;
+				}
+				return true;
+			}
+			else if (Key == 0x28) // VK_DOWN
+ 			{
+				if (id != -1)
+					Items[id]->Hit();
+				if (curSubMenu)
+				{
+					for (int i=0; i<curSubMenu->Count(); i++)
+					{
+						MenuItem * item = curSubMenu->GetItem(i);
+						if (!item->IsSeperator() && item->Enabled && item->Visible)
+						{
+							item->Selected = true;
+							break;
+						}
+					}
+				}
+				return true;
+			}
+			else if (Key == 0x1B) // VK_ESCAPE
+			{
+				CloseSubMenu();
+				for (auto item : Items)
+					item->Selected = false;
+				if (lastFocusedCtrl)
+					lastFocusedCtrl->SetFocus();
+				return true;
+			}
+		}
+
 		return false;
 	}
 
@@ -5014,7 +4926,7 @@ namespace GraphicsUI
 	MenuItem::MenuItem(Menu * parent)
 		: Container(parent), accKey(0)
 	{
-		TabStop = true;
+		TabStop = false;
 		isSeperator = true;
 		parent->AddItem(this);
 	}
@@ -5022,7 +4934,7 @@ namespace GraphicsUI
 	MenuItem::MenuItem(MenuItem * parent)
 		: Container(parent->GetSubMenu()), accKey(0)
 	{
-		TabStop = true;
+		TabStop = false;
 		isSeperator = true;
 		parent->AddItem(this);
 	}
@@ -5030,7 +4942,7 @@ namespace GraphicsUI
 	MenuItem::MenuItem(Menu * parent, const String & text, const String & shortcutText)
 		: Container(parent)
 	{
-		TabStop = true;
+		TabStop = false;
 		isSeperator = false;
 		Init();
 		SetText(text);
@@ -5042,7 +4954,7 @@ namespace GraphicsUI
 	MenuItem::MenuItem(MenuItem * parent, const String & text, const String & shortcutText)
 		: Container(parent->GetSubMenu())
 	{
-		TabStop = true;
+		TabStop = false;
 		isSeperator = false;
 		Init();
 		SetText(text);
@@ -5062,10 +4974,25 @@ namespace GraphicsUI
 
 	void MenuItem::SetText(const String & text)
 	{
-		lblText->SetText(text);
-		int fid = text.IndexOf(L"&");
-		if (fid != -1 && fid < text.Length())
-			accKey = text[fid+1];
+		StringBuilder unescape;
+		accKey = 0;
+		accKeyId = -1;
+		for (int i = 0; i < text.Length(); i++)
+		{
+			if (text[i] != L'&')
+				unescape << text[i];
+			else if (i < text.Length() - 1)
+			{
+				if (text[i + 1] != L'&')
+				{
+					accKey = text[i + 1];
+					accKeyId = unescape.Length();
+				}
+			}
+		}
+		if (accKey >= 97 && accKey <= 122)
+			accKey = accKey + (-97 + 65);
+		lblText->SetText(unescape.ProduceString());
 	}
 
 	String MenuItem::GetText()
@@ -5189,14 +5116,6 @@ namespace GraphicsUI
 		{
 			if (!SubMenu || SubMenu->Count() == 0)
 				((Menu*)Parent)->ItemSelected(this);
-			else
-				DoMouseHover();
-
-			/*if (Parent && SubMenu && SubMenu->Count())
-			{
-				Menu * mn = (Menu*)Parent;
-				mn->PopupSubMenu(SubMenu.operator ->(), Left,Top+Height+2);
-			}*/
 		}
 		Control::DoClick();
 		return false;
@@ -5248,26 +5167,27 @@ namespace GraphicsUI
 			auto entry = GetEntry();
 			if (Selected || (SubMenu && SubMenu->Visible))
 			{
+				auto & graphics = entry->DrawCommands;
 				if (SubMenu && SubMenu->Visible)
 				{
-					Graphics::SolidBrushColor = Global::ColorTable.ToolButtonBackColorPressed1;
-					Graphics::FillRectangle(entry->System, 0,0,width-1, height-1);
+					graphics.SolidBrushColor = Global::Colors.ToolButtonBackColorPressed1;
+					graphics.FillRectangle(0,0,width-1, height-1);
 				}
 				else
 				{
-					Graphics::SolidBrushColor = Global::ColorTable.ToolButtonBackColorHighlight1;
-					Graphics::FillRectangle(entry->System, 0,0,width-1, height-1);
+					graphics.SolidBrushColor = Global::Colors.ToolButtonBackColorHighlight1;
+					graphics.FillRectangle(0,0,width-1, height-1);
 				}
-				Graphics::PenColor = Global::ColorTable.ToolButtonBorderHighLight;
-				Graphics::DrawRectangle(entry->System, 0,0,width-1,height-1);
-				lblText->FontColor = Global::ColorTable.MenuItemHighlightForeColor;
+				graphics.PenColor = Global::Colors.ToolButtonBorderHighLight;
+				graphics.DrawRectangle(0,0,width-1,height-1);
+				lblText->FontColor = Global::Colors.MenuItemHighlightForeColor;
 			}
 			else
 			{
 				if (Enabled)
-					lblText->FontColor = Global::ColorTable.MenuItemForeColor;
+					lblText->FontColor = Global::Colors.MenuItemForeColor;
 				else
-					lblText->FontColor = Global::ColorTable.MenuItemDisabledForeColor;
+					lblText->FontColor = Global::Colors.MenuItemDisabledForeColor;
 			}
 			lblText->Draw((width-lblText->GetWidth())/2, 
 				(height-lblText->GetHeight())/2);
@@ -5278,37 +5198,44 @@ namespace GraphicsUI
 	void MenuItem::DrawMenuItem(int width, int height)
 	{
 		auto entry = GetEntry();
-
+		auto & graphics = entry->DrawCommands;
 		if (isSeperator)
 		{
-			Graphics::PenColor = Global::ColorTable.MenuItemDisabledForeColor;
-			Graphics::DrawLine(entry->System, height + Margin, Height >> 1, width-2, Height >> 1);
+			graphics.PenColor = Global::Colors.MenuItemDisabledForeColor;
+			graphics.DrawLine(height + Margin, Height >> 1, width-2, Height >> 1);
 		}
 		else
 		{
-			if (Selected)
+			if (Selected || (SubMenu && SubMenu->Visible))
 			{
-				Graphics::SolidBrushColor = Global::ColorTable.ToolButtonBackColorHighlight1;
-				Graphics::FillRoundRect(entry->System, Left, 0, Left+Width, Height, 5);
-				//Graphics::DrawRoundRect(entry->System, Left, 0, Left+Width, Height, 5);
+				if (SubMenu && SubMenu->Visible)
+				{
+					graphics.SolidBrushColor = Global::Colors.ToolButtonBackColorPressed1;
+					graphics.FillRectangle(0, 0, width, height);
+				}
+				else
+				{
+					graphics.SolidBrushColor = Global::Colors.ToolButtonBackColorHighlight1;
+					graphics.FillRectangle(Left, 0, Left + Width, Height);
+				}
 			}
 			int top = (height - lblText->GetHeight()+2)/2;
 			if (!Enabled)
 			{
-				lblText->FontColor = Global::ColorTable.MenuItemDisabledForeColor;
-				lblShortcut->FontColor = Global::ColorTable.MenuItemDisabledForeColor;
+				lblText->FontColor = Global::Colors.MenuItemDisabledForeColor;
+				lblShortcut->FontColor = Global::Colors.MenuItemDisabledForeColor;
 			}
 			else
 			{
 				if (Selected)
 				{
-					lblText->FontColor = Global::ColorTable.MenuItemHighlightForeColor;
-					lblShortcut->FontColor = Global::ColorTable.MenuItemHighlightForeColor;
+					lblText->FontColor = Global::Colors.MenuItemHighlightForeColor;
+					lblShortcut->FontColor = Global::Colors.MenuItemHighlightForeColor;
 				}
 				else
 				{
-					lblText->FontColor = Global::ColorTable.MenuItemForeColor;
-					lblShortcut->FontColor = Global::ColorTable.MenuItemForeColor;
+					lblText->FontColor = Global::Colors.MenuItemForeColor;
+					lblShortcut->FontColor = Global::Colors.MenuItemForeColor;
 				}
 			}
 			lblText->Draw(height + Margin, top);
@@ -5317,25 +5244,22 @@ namespace GraphicsUI
 			{
 				int x1 = Width - 12;
 				int y1 = height/2 - 5;
-				Array<Vec2, 3> polygon;
-				polygon.Add(Vec2::Create((float)x1, (float)y1));
-				polygon.Add(Vec2::Create((float)x1, (float)y1 + 10));
-				polygon.Add(Vec2::Create((float)x1 + 5, (float)y1 + 5));
-				entry->System->FillPolygon(lblText->FontColor, polygon.GetArrayView());
+				graphics.SolidBrushColor = lblText->FontColor;
+				graphics.FillTriangle(x1, y1, x1 + 5, y1 + 5, x1, y1 + 10);
 			}
 			if (Checked)
 			{
 				// Draw Checkmark
 				if (Selected)
-					Graphics::SolidBrushColor = Global::ColorTable.ToolButtonBackColorPressed1;
+					graphics.SolidBrushColor = Global::Colors.ToolButtonBackColorPressed1;
 				else
-					Graphics::SolidBrushColor = Global::ColorTable.ToolButtonBackColorHighlight1;
+					graphics.SolidBrushColor = Global::Colors.ToolButtonBackColorHighlight1;
 				const int IconMargin = 2;
-				Graphics::FillRectangle(entry->System, 0, 0, Height - IconMargin, Height-IconMargin);
+				graphics.FillRectangle(0, 0, Height - IconMargin, Height-IconMargin);
 				if (!Selected)
 				{
-					Graphics::PenColor = Global::ColorTable.ToolButtonBorderHighLight;
-					Graphics::DrawRectangle(entry->System, IconMargin, IconMargin, Height - IconMargin, Height-IconMargin);
+					graphics.PenColor = Global::Colors.ToolButtonBorderHighLight;
+					graphics.DrawRectangle(IconMargin, IconMargin, Height - IconMargin, Height-IconMargin);
 				}
 				entry->CheckmarkLabel->FontColor = lblText->FontColor;
 				entry->CheckmarkLabel->Draw((Height- entry->CheckmarkLabel->GetHeight())/2 + 2,
@@ -5350,36 +5274,38 @@ namespace GraphicsUI
 		Control::HandleMessage(Args);
 	}
 
+	void MenuItem::Hit()
+	{
+		Menu * mn = (Menu*)Parent;
+
+		if (Parent && SubMenu && SubMenu->Count())
+		{
+			if (isButton)
+				mn->PopupSubMenu(SubMenu, 0, Height + 2);
+			else
+				mn->PopupSubMenu(SubMenu, Width - 2, 0);
+		}
+		else
+		{
+			while (mn)
+			{
+				if (mn->style == Menu::msPopup)
+					mn->CloseMenu();
+				else
+					break;
+				if (mn->Parent)
+					mn = dynamic_cast<Menu*>(mn->Parent->Parent);
+			}
+			OnClick(this);
+		}
+	}
+
 	bool MenuItem::DoMouseDown(int X, int Y, SHIFTSTATE Shift)
 	{
-		bool vis = (((Menu*)Parent)->curSubMenu == SubMenu);
 		Control::DoMouseDown(X,Y, Shift);
 		if (IsPointInClient(X, Y))
 		{
-			Menu * mn = (Menu*)Parent;
-			if (Parent && SubMenu && SubMenu->Count())
-			{
-				if (!vis)
-				{
-					if (isButton)
-						mn->PopupSubMenu(SubMenu, 0, Height + 2);
-					else
-						mn->PopupSubMenu(SubMenu, Width - 2, 0);
-				}
-			}
-			else
-			{
-				while (mn)
-				{
-					if (mn->style == Menu::msPopup)
-						mn->CloseMenu();
-					else
-						break;
-					if (mn->Parent)
-						mn = dynamic_cast<Menu*>(mn->Parent->Parent);
-				}
-				OnClick(this);
-			}
+			Hit();
 			return true;
 		}
 		return false;
@@ -5431,7 +5357,7 @@ namespace GraphicsUI
 		{
 			auto entry = GetEntry();
 			entry->ClipRects->AddRect(Rect(absX, absY, Width-2, Height-2));
-			image->Draw(absX, absY);
+			GetEntry()->DrawCommands.DrawImage(image.Ptr(), absX, absY);
 			entry->ClipRects->PopRect();
 		}
 	}
@@ -5492,8 +5418,6 @@ namespace GraphicsUI
 	bool ToolButton::DoMouseEnter()
 	{
 		Control::DoMouseEnter();
-		if ((GetAsyncKeyState(VK_LBUTTON)<0 || GetAsyncKeyState(VK_RBUTTON)<0 || GetAsyncKeyState(VK_MBUTTON)<0))
-			return false;
 		if (Enabled && Visible)
 			Selected = true;
 		if (bindButton && bindButton->Enabled && bindButton->Visible)
@@ -5565,10 +5489,11 @@ namespace GraphicsUI
 		absX += Left;
 		absY += Top;
 		auto entry = GetEntry();
+		auto & graphics = entry->DrawCommands;
 		if (ButtonStyle == bsSeperator)
 		{
-			Graphics::PenColor = Global::ColorTable.ToolButtonSeperatorColor;
-			Graphics::DrawLine(entry->System, absX+1,absY+1, absX+1, absY+Height-2);
+			graphics.PenColor = Global::Colors.ToolButtonSeperatorColor;
+			graphics.DrawLine(absX+1,absY+1, absX+1, absY+Height-2);
 			return;
 		}
 		bool drawbkg = true;
@@ -5576,11 +5501,11 @@ namespace GraphicsUI
 		{
 			if (Checked || Pressed)
 			{
-				Graphics::SolidBrushColor = Global::ColorTable.ToolButtonBackColorPressed1;
+				graphics.SolidBrushColor = Global::Colors.ToolButtonBackColorPressed1;
 			}
 			else
 			{
-				Graphics::SolidBrushColor = Global::ColorTable.ToolButtonBackColorHighlight1;
+				graphics.SolidBrushColor = Global::Colors.ToolButtonBackColorHighlight1;
 			}
 
 		}
@@ -5588,7 +5513,7 @@ namespace GraphicsUI
 		{
 			if (Checked)
 			{
-				Graphics::SolidBrushColor = Global::ColorTable.ToolButtonBackColorChecked1;
+				graphics.SolidBrushColor = Global::Colors.ToolButtonBackColorChecked1;
 			}
 			else
 			{
@@ -5596,11 +5521,11 @@ namespace GraphicsUI
 			}
 		}
 		if (drawbkg)
-			Graphics::FillRectangle(entry->System, absX,absY,absX+Width-1,absY+Height-1);
+			graphics.FillRectangle(absX,absY,absX+Width-1,absY+Height-1);
 		if (Selected || Checked)
 		{
-			Graphics::PenColor = Global::ColorTable.ToolButtonBorderHighLight;
-			Graphics::DrawRectangle(entry->System, absX,absY,absX+Width-1,absY+Height-1);
+			graphics.PenColor = Global::Colors.ToolButtonBorderHighLight;
+			graphics.DrawRectangle(absX,absY,absX+Width-1,absY+Height-1);
 		}
 		if (ButtonStyle == bsNormal)
 		{
@@ -5625,14 +5550,14 @@ namespace GraphicsUI
 			{
 				if (image)
 				{
-					image->Draw(imgX,imgY);
+					graphics.DrawImage(image.Ptr(), imgX, imgY);
 				}
 			}
 			else
 			{
 				if (imageDisabled)
 				{
-					imageDisabled->Draw(imgX,imgY);
+					graphics.DrawImage(imageDisabled.Ptr(), imgX, imgY);
 				}
 			}
 			if (ShowText)
@@ -5648,12 +5573,10 @@ namespace GraphicsUI
 			if (Enabled)
 				color = Color(0,0,0,255);
 			else
-				color = Global::ColorTable.ToolButtonSeperatorColor;
+				color = Global::Colors.ToolButtonSeperatorColor;
 			Array<Vec2, 3> polygon;
-			polygon.Add(Vec2::Create((float)absX + 3, (float)absY + 10));
-			polygon.Add(Vec2::Create((float)absX + 7, (float)absY + 10));
-			polygon.Add(Vec2::Create((float)absX + 5, (float)absY + 12));
-			entry->System->FillPolygon(color, polygon.GetArrayView());
+			graphics.SolidBrushColor = color;
+			graphics.FillTriangle(absX + 3, absY + 10, absX + 7, absY + 10, absX + 5, absY + 12);
 		}
 				
 	}
@@ -5772,8 +5695,9 @@ namespace GraphicsUI
 
 	void ToolStrip::Draw(int absX, int absY)
 	{
-		Graphics::SolidBrushColor = Global::ColorTable.ToolButtonBackColor1;
-		Graphics::FillRectangle(GetEntry()->System, absX+Left,absY+Top,absX+Left+Width-1,absY+Top+Height-1);
+		auto & graphics = GetEntry()->DrawCommands;
+		graphics.SolidBrushColor = Global::Colors.ToolButtonBackColor1;
+		graphics.FillRectangle(absX+Left,absY+Top,absX+Left+Width-1,absY+Top+Height-1);
 		for (int i=0; i<buttons.Count(); i++)
 			buttons[i]->Draw(absX+Left, absY+Top);
 	}
@@ -5935,8 +5859,9 @@ namespace GraphicsUI
 		absX += Left;
 		absY += Top;
 		PositItems();
-		Graphics::SolidBrushColor = Global::ColorTable.StatusStripBackColor1;
-		Graphics::FillRectangle(GetEntry()->System, absX, absY, absX+Width, absY+Height);
+		auto & graphics = GetEntry()->DrawCommands;
+		graphics.SolidBrushColor = Global::Colors.StatusStripBackColor1;
+		graphics.FillRectangle(absX, absY, absX+Width, absY+Height);
 		for (int i=0; i<panels.Count(); i++)
 		{
 			panels[i]->Draw(absX, absY);
@@ -6026,7 +5951,7 @@ namespace GraphicsUI
 		case TabControl::tsText:
 			return text->GetHeight() + TopMargin * 2;
 		case TabControl::tsTextImage:
-			return max(text->GetHeight(), (image?image->GetHeight():0))+ TopMargin * 2;
+			return Math::Max(text->GetHeight(), (image?image->GetHeight():0))+ TopMargin * 2;
 		default:
 			return 0;
 		}
@@ -6121,7 +6046,7 @@ namespace GraphicsUI
 				int cw = x + LeftMargin;
 				if (image)
 				{
-					image->Draw(cw, y+TopMargin);
+					GetEntry()->DrawCommands.DrawImage(image.Ptr(), cw, y + TopMargin);
 					cw += image->GetWidth() + LeftMargin;
 				}
 				text->Draw(cw, y + (h-text->GetHeight())/2);
@@ -6135,7 +6060,7 @@ namespace GraphicsUI
 		case TabControl::tsImage:
 			{
 				if (image)
-					image->Draw(x+LeftMargin, y+TopMargin);
+					GetEntry()->DrawCommands.DrawImage(image.Ptr(), x + LeftMargin, y + TopMargin);
 			}
 			break;
 		}
@@ -6234,7 +6159,8 @@ namespace GraphicsUI
 			page->Draw(absX+clientRect.x, absY+clientRect.y);
 			entry->ClipRects->PopRect();
 		}
-		entry->System->SetRenderTransform(absX, absY);
+		auto & graphics = entry->DrawCommands;
+		graphics.SetRenderTransform(absX, absY);
 		int h0 = Height-headerHeight-1;
 		for (int i=0; i<pages.Count(); i++)
 		{
@@ -6243,38 +6169,38 @@ namespace GraphicsUI
 				break;
 			if (SelectedIndex != i && highlightItem != i)
 			{
-				Graphics::SolidBrushColor = Global::ColorTable.TabPageItemBackColor1;
+				graphics.SolidBrushColor = Global::Colors.TabPageItemBackColor1;
 			}
 			else if (SelectedIndex == i)
 			{
-				Graphics::SolidBrushColor = Global::ColorTable.TabPageItemSelectedBackColor1;
+				graphics.SolidBrushColor = Global::Colors.TabPageItemSelectedBackColor1;
 			}
 			else
 			{
-				Graphics::SolidBrushColor = Global::ColorTable.TabPageItemHighlightBackColor1;
+				graphics.SolidBrushColor = Global::Colors.TabPageItemHighlightBackColor1;
 			}
-			Graphics::PenColor = Global::ColorTable.TabPageBorderColor;
+			graphics.PenColor = Global::Colors.TabPageBorderColor;
 			if (TabPosition == tpTop)
 			{
-				Graphics::FillRectangle(entry->System, cw, 0, cw+pw, headerHeight);
-				Graphics::DrawLine(entry->System, cw,0,cw+pw,0);
-				Graphics::DrawLine(entry->System, cw,0, cw, headerHeight);
-				Graphics::DrawLine(entry->System, cw+pw,0, cw+pw, headerHeight);
+				graphics.FillRectangle(cw, 0, cw+pw, headerHeight);
+				graphics.DrawLine(cw,0,cw+pw,0);
+				graphics.DrawLine(cw,0, cw, headerHeight);
+				graphics.DrawLine(cw+pw,0, cw+pw, headerHeight);
 				if (SelectedIndex != i)
 				{
-					Graphics::DrawLine(entry->System, cw, headerHeight, cw+pw, headerHeight);
+					graphics.DrawLine(cw, headerHeight, cw+pw, headerHeight);
 				}
 				pages[i]->DrawHeader(cw, 0, headerHeight, TabStyle);
 			}
 			else
 			{
-				Graphics::FillRectangle(entry->System, cw, h0+headerHeight, cw+pw, h0);
-				Graphics::DrawLine(entry->System, cw,h0, cw, h0+headerHeight);
-				Graphics::DrawLine(entry->System, cw+pw,h0, cw+pw, h0+headerHeight);
-				Graphics::DrawLine(entry->System, cw, h0+headerHeight, cw+pw, h0+headerHeight);
+				graphics.FillRectangle(cw, h0+headerHeight, cw+pw, h0);
+				graphics.DrawLine(cw,h0, cw, h0+headerHeight);
+				graphics.DrawLine(cw+pw,h0, cw+pw, h0+headerHeight);
+				graphics.DrawLine(cw, h0+headerHeight, cw+pw, h0+headerHeight);
 				if (SelectedIndex != i)
 				{
-					Graphics::DrawLine(entry->System, cw,h0,cw+pw,h0);
+					graphics.DrawLine(cw,h0,cw+pw,h0);
 				}
 				pages[i]->DrawHeader(cw, h0, headerHeight, TabStyle);
 			}
@@ -6284,20 +6210,19 @@ namespace GraphicsUI
 			
 		if (TabPosition == tpTop)
 		{
-			Graphics::DrawLine(entry->System, cw,headerHeight, Width, headerHeight);
-			Graphics::DrawLine(entry->System, 0,headerHeight,0,Height-1);
-			Graphics::DrawLine(entry->System, Width-1,headerHeight,Width-1,Height-1);
-			Graphics::DrawLine(entry->System, 0,Height-1,Width,Height-1);
+			graphics.DrawLine(cw,headerHeight, Width, headerHeight);
+			graphics.DrawLine(0,headerHeight,0,Height-1);
+			graphics.DrawLine(Width-1,headerHeight,Width-1,Height-1);
+			graphics.DrawLine(0,Height-1,Width,Height-1);
 		}
 		else
 		{
-			Graphics::DrawLine(entry->System, cw,h0, Width, h0);
-			Graphics::DrawLine(entry->System, 0,0,0,Height-headerHeight);
-			Graphics::DrawLine(entry->System, Width-1,0,Width-1,Height-1-headerHeight);
-			Graphics::DrawLine(entry->System, 0,0,Width,0);
+			graphics.DrawLine(cw,h0, Width, h0);
+			graphics.DrawLine(0,0,0,Height-headerHeight);
+			graphics.DrawLine(Width-1,0,Width-1,Height-1-headerHeight);
+			graphics.DrawLine(0,0,Width,0);
 		}
-		entry->System->SetRenderTransform(0, 0);
-			
+		graphics.SetRenderTransform(0, 0);
 	}
 
 	class DeviceNotReadyException
@@ -6328,7 +6253,11 @@ namespace GraphicsUI
 		btnDown->SetFont(symFont);
 		btnUp->SetText(L"5");
 		btnDown->SetText(L"6");
-		tmrHover.OnTick.Bind(this, &UpDown::tmrHoverTick);
+	}
+
+	UpDown::~UpDown()
+	{
+		GetEntry()->UnSubscribeTickEvent(this);
 	}
 
 	void UpDown::Draw(int absX, int absY)
@@ -6348,6 +6277,19 @@ namespace GraphicsUI
 		btnDown->Draw(absX,absY+btnUp->GetHeight());
 	}
 
+	bool UpDown::DoTick()
+	{
+		float val = (float)StringToDouble(text->GetText());
+		if (state == 1)
+			val += inc;
+		else
+			val -= inc;
+		val = Math::Max(Min, val);
+		val = Math::Min(Max, val);
+		text->SetText(String(val, (L"%." + String(Digits) + L"f").Buffer()));
+		return true;
+	}
+
 	bool UpDown::DoMouseDown(int X, int Y, SHIFTSTATE Shift)
 	{
 		if (!Enabled || !Visible)
@@ -6359,9 +6301,6 @@ namespace GraphicsUI
 		else
 			state = 2;
 		inc = MinIncrement;
-		tmrHoverTick(this, WinForm::EventArgs());
-		tmrHover.Interval = 500;
-		tmrHover.StartTimer();
 		Global::MouseCaptureControl = this;
 		return false;
 	}
@@ -6370,9 +6309,18 @@ namespace GraphicsUI
 	{
 		Control::DoMouseUp(X,Y,Shift);
 		state = 0;
-		tmrHover.StopTimer();
+		GetEntry()->UnSubscribeTickEvent(this);
 		ReleaseMouse();
 		return false;
+	}
+
+	bool UpDown::DoMouseHover()
+	{
+		if (state != 0)
+		{
+			GetEntry()->SubscribeTickEvent(this);
+		}
+		return true;
 	}
 
 	bool UpDown::DoMouseMove(int /*X*/, int Y)
@@ -6385,27 +6333,15 @@ namespace GraphicsUI
 		}
 		return false;
 	}
-
-	void UpDown::tmrHoverTick(Object *, WinForm::EventArgs)
-	{
-		float val = (float)StringToDouble(text->GetText());
-		if (state == 1)
-			val += inc;
-		else
-			val -= inc;
-		val = max(Min,val);
-		val = min(Max,val);
-		text->SetText(String(val, (L"%." + String(Digits) + L"f").Buffer()));
-		tmrHover.Interval = 50;
-		tmrHover.StartTimer();
-	}
-
 	UIEntry * Control::GetEntry()
 	{
-		Control * parent = Parent;
-		if (parent)
-			return parent->GetEntry();
-		return nullptr;
+		if (entryCache == nullptr)
+		{
+			Control * parent = Parent;
+			if (parent)
+				entryCache = parent->GetEntry();
+		}
+		return entryCache;
 	}
 	void VScrollPanel::ScrollBar_Changed(UI_Base * /*sender*/)
 	{
@@ -6497,7 +6433,8 @@ namespace GraphicsUI
 	}
 	void Line::Draw(int absX, int absY)
 	{
-		Graphics::PenColor = BorderColor;
-		Graphics::DrawLine(GetEntry()->System, absX + Left, absY + Top, absX + Left + Width, absY + Top + Height);
+		auto & graphics = GetEntry()->DrawCommands;
+		graphics.PenColor = BorderColor;
+		graphics.DrawLine(absX + Left, absY + Top, absX + Left + Width, absY + Top + Height);
 	}
 }

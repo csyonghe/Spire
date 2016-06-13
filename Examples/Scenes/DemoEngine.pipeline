@@ -265,7 +265,15 @@ module Footer
     using normalTransform = TangentSpaceTransform(Normal);
     using lighting = Lighting(normalTransform.normal, Albedo, vec3(Roughness, Metallic, Specular));
     public float opacity = 1.0;
-    public vec4 outputColor = vec4(lighting.result, opacity);
+    
+    float fog
+    {
+        float fogDensity = 0.0002;
+        float viewDist = length(cameraPos - pos);
+        return 1.0/exp2(viewDist*fogDensity);
+    }
+    vec4 fogColor = vec4(0.54, 0.58, 0.67, 1.0);
+    public vec4 outputColor = mix(fogColor, vec4(lighting.result, opacity), fog);
 }
 
 float ComputeHighlightPhong(vec3 L, vec3 N, vec3 V, float roughness, float metallic, float specular)

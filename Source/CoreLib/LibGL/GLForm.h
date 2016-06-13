@@ -29,18 +29,19 @@ namespace CoreLib
 		protected:
 			RefPtr<GL::HardwareRenderer> glContext = nullptr;
 			RefPtr<GraphicsUI::UIEntry> uiEntry;
-			RefPtr<GraphicsUI::UISystemInterface> uiSystemInterface;
+			RefPtr<GraphicsUI::WinGLSystemInterface> uiSystemInterface;
 			void InitGL()
 			{
 				glContext = new GL::HardwareRenderer();
 				glContext->Initialize((GL::GUIHandle)this->GetHandle());
-				uiSystemInterface = GraphicsUI::CreateWinGLInterface(glContext.Ptr());
+				uiSystemInterface = new GraphicsUI::WinGLSystemInterface(glContext.Ptr());
 				uiEntry = new GraphicsUI::UIEntry(GetClientWidth(), GetClientHeight(), uiSystemInterface.Ptr());
 				uiEntry->BackColor.A = 0;
+				uiSystemInterface->SetEntry(uiEntry.Ptr());
 			}
 			int ProcessMessage(WinMessage & msg) override
 			{
-				int rs = uiEntry->HandleSystemMessage(msg.hWnd, msg.message, msg.wParam, msg.lParam);
+				int rs = uiSystemInterface->HandleSystemMessage(msg.hWnd, msg.message, msg.wParam, msg.lParam);
 				if (rs == -1)
 					return BaseForm::ProcessMessage(msg);
 				return rs;
@@ -66,9 +67,7 @@ namespace CoreLib
 			}
 			void DrawUIOverlay()
 			{
-				uiSystemInterface->BeginUIDrawing();
-				uiEntry->DrawUI();
-				uiSystemInterface->EndUIDrawing();
+				uiSystemInterface->ExecuteDrawCommands(uiEntry->DrawUI());
 			}
 		};
 	}

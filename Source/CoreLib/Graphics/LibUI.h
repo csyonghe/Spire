@@ -4,7 +4,7 @@
 #include "../VectorMath.h"
 #include "../Basic.h"
 #include "../Events.h"
-#include "../WinForm/WinTimer.h"
+#include "../PerformanceCounter.h"
 #include "UISystemInterface.h"
 
 namespace GraphicsUI
@@ -15,9 +15,6 @@ namespace GraphicsUI
 	// enum types defination
 
 	const int COLOR_LIGHTEN = 100;
-	// Dash dot pattern in binary : 1010101010101010
-	const int DASH_DOT_PATTERN = 43690;
-	const int DASH_DOT_FACTOR = 1;
 
 	// Border Styles
 	const int BS_NONE = 0;
@@ -73,31 +70,6 @@ namespace GraphicsUI
 	const int SO_VERTICAL = 0;
 	const int SO_HORIZONTAL = 1;
 
-	//Message Type defination
-	const int MSG_UI_NOTIFY = 0;
-	const int MSG_UI_CLICK = 1;
-	const int MSG_UI_DBLCLICK = 2;
-	const int MSG_UI_MOUSEDOWN = 3;
-	const int MSG_UI_MOUSEUP = 4;
-	const int MSG_UI_MOUSEMOVE = 5;
-	const int MSG_UI_MOUSEENTER = 6;
-	const int MSG_UI_MOUSELEAVE = 7;
-	const int MSG_UI_MOUSEHOVER = 19;
-	const int MSG_UI_KEYDOWN = 8;
-	const int MSG_UI_KEYUP = 9;
-	const int MSG_UI_KEYPRESS = 10;
-	const int MSG_UI_CHANGED = 11;
-	const int MSG_UI_RESIZE = 12;
-
-	// this message(TopLayer Draw) is sent by Entry to notify controls to do some drawing above any other controls if necessary.
-	const int MSG_UI_TOPLAYER_DRAW = 13;
-	const int MSG_UI_MOUSEWHEEL = 14;
-	// Form Messages
-	const int MSG_UI_FORM_ACTIVATE = 15;
-	const int MSG_UI_FORM_DEACTIVATE = 16;
-	const int MSG_UI_FORM_SHOW = 17;
-	const int MSG_UI_FORM_HIDE = 18;
-
 	class UI_Base;
 
 	struct UI_MsgArgs
@@ -134,17 +106,38 @@ namespace GraphicsUI
 
 	class Graphics
 	{
+	private:
+		int dx = 0, dy = 0;
+		CoreLib::List<DrawCommand> commandBuffer;
 	public:
-		static int DashPattern;
-		static Color PenColor, SolidBrushColor;
-		static Color GradiantBrushColor1, GradiantBrushColor2;
-		static Color GradiantBrushColor3, GradiantBrushColor4;
-		static void DrawArc(ISystemInterface * sys, int x, int y, int rad, float theta, float theta2);
-		static void DrawRectangle(ISystemInterface * sys, int x1, int y1, int x2, int y2);
-		static void FillRectangle(ISystemInterface * sys, int x1, int y1, int x2, int y2);
-		static void DrawRoundRect(ISystemInterface * sys, int x1, int y1, int x2, int y2, int rad);
-		static void FillRoundRect(ISystemInterface * sys, int x1, int y1, int x2, int y2, int rad);
-		static void DrawLine(ISystemInterface * sys, int x1, int y1, int x2, int y2);
+		Color PenColor, SolidBrushColor;
+		void SetRenderTransform(int x, int y)
+		{
+			dx = x;
+			dy = y;
+		}
+		void SetClipRect(int x, int y, int w, int h);
+		void DrawShadowRect(Color color, int x0, int y0, int w, int h, int offsetX, int offsetY, float size);
+		void DrawTextQuad(IBakedText * text, int x, int y);
+		void DrawImage(IImage * image, int x, int y);
+		void DrawArc(int x, int y, int rad, float theta, float theta2);
+		void DrawRectangle(int x1, int y1, int x2, int y2);
+		void FillRectangle(int x1, int y1, int x2, int y2);
+		void FillEllipse(int x1, int y1, int x2, int y2);
+		void FillTriangle(int x0, int y0, int x1, int y1, int x2, int y2);
+		void DrawLine(float x1, float y1, float x2, float y2);
+		inline void DrawLine(int x1, int y1, int x2, int y2)
+		{
+			DrawLine((float)x1, (float)y1, (float)x2, (float)y2);
+		}
+		void ClearCommands()
+		{
+			commandBuffer.Clear();
+		}
+		CoreLib::List<DrawCommand> & Buffer()
+		{
+			return commandBuffer;
+		}
 	};
 
 
@@ -171,7 +164,6 @@ namespace GraphicsUI
 		Color ControlBackColor, ControlFontColor;
 		Color ControlBorderColor;
 		Color EditableAreaBackColor;
-		Color ScrollBarBackColor;
 		Color ToolButtonBorderHighLight;
 		Color ToolButtonBorderSelected;
 		Color ToolButtonBackColor1;
@@ -199,8 +191,10 @@ namespace GraphicsUI
 		Color TabPageItemBackColor1, TabPageItemBackColor2;
 		Color TabPageItemSelectedBackColor1, TabPageItemSelectedBackColor2;
 		Color TabPageItemHighlightBackColor1, TabPageItemHighlightBackColor2;
-		Color SelectionColor, SelectionForeColor, HighlightColor, HighlightForeColor, UnfocusedSelectionColor;
+		Color SelectionColor, SelectionForeColor, HighlightColor, HighlightForeColor, UnfocusedSelectionColor, FocusRectColor;
+		Color ScrollBarForeColor, ScrollBarBackColor, ScrollBarHighlightColor, ScrollBarPressedColor, ScrollBarSliderColor;
 		FormStyle DefaultFormStyle;
+		Color ShadowColor;
 	};
 
 	ColorTable CreateDefaultColorTable();
@@ -209,11 +203,10 @@ namespace GraphicsUI
 	class ClipRectStack
 	{
 	protected:
-		ISystemInterface * system;
+		Graphics * graphics;
 		Rect Buffer[MAX_CLIPRECT_STACK_SIZE];
 	public:
-		ClipRectStack(ISystemInterface * pSystem);
-		~ClipRectStack();
+		ClipRectStack(Graphics * pGraphics);
 	public:
 		int StackSize;
 		int WindowWidth, WindowHeight;
@@ -237,7 +230,7 @@ namespace GraphicsUI
 		static Control * MouseCaptureControl;
 		static int CursorPosX;
 		static int CursorPosY;
-		static ColorTable ColorTable;
+		static ColorTable Colors;
 		static int SCROLLBAR_BUTTON_SIZE;
 		static int SCROLLBAR_MIN_PAGESIZE;
 	};
@@ -248,11 +241,6 @@ namespace GraphicsUI
 		virtual void HandleMessage(const UI_MsgArgs *Args);
 	};
 
-	enum Cursor
-	{
-		Arrow, Cross, IBeam, Wait, SizeNS, SizeWE, SizeNESW, SizeNWSE, SizeAll
-	};
-
 	class Control : public UI_Base
 	{
 		friend Container;
@@ -260,7 +248,7 @@ namespace GraphicsUI
 	protected:
 		int EventID; // Used by Containers to avoid message resending;
 	protected:
-		CoreLib::WinForm::Timer tmrHover;
+		UIEntry * entryCache = nullptr;
 		IFont * font = nullptr;
 		Rect clientRect;
 		bool LastInClient;
@@ -268,21 +256,25 @@ namespace GraphicsUI
 		int Height, Width;
 		bool IsPointInClient(int X, int Y);
 		virtual Control * FindControlAtPosition(int x, int y);
-		void HoverTimerTick(Object * sender, CoreLib::WinForm::EventArgs e);
 		void LocalPosToAbsolutePos(int x, int y, int & ax, int & ay);
 	public:
 		Control(Container * parent);
 		Control(Container * parent, bool addToParent);
 		~Control();
 	public:
-		GraphicsUI::Cursor Cursor;
+		bool AcceptsFocus = true;
+		GraphicsUI::CursorType Cursor;
 		CoreLib::String Name;
 		int ID;
 		CONTROLTYPE Type;
 		Container *Parent;
 		int  Left, Top;
-		bool BackgroundShadow;
-		bool Enabled, Visible, Focused, TabStop = false, GenerateMouseHoverEvent = false;
+		bool BackgroundShadow = false;
+		int ShadowOffset = 4;
+		float ShadowSize = 8.0;
+		unsigned char ShadowOpacity = 80;
+		bool Enabled, Visible;
+		bool TabStop = false;
 		Color BackColor, FontColor, BorderColor;
 		BORDERSTYLE BorderStyle;
 		int AbsolutePosX; int AbsolutePosY;
@@ -294,6 +286,7 @@ namespace GraphicsUI
 		int GetWidth();
 		Rect ClientRect();
 		virtual void SizeChanged();
+		bool IsFocused();
 		virtual void Draw(int absX, int absY);
 		virtual void SetFont(IFont * AFont);
 		virtual void KillFocus();
@@ -339,8 +332,8 @@ namespace GraphicsUI
 		virtual bool DoMouseHover();
 		virtual bool DoClick();
 		virtual bool DoDblClick();
+		virtual bool DoTick() { return false; };
 		virtual void SetFocus();
-		virtual bool ContainsFocus();
 		virtual void LostFocus(Control * newFocus);
 		virtual bool DoClosePopup();
 	};
@@ -367,7 +360,6 @@ namespace GraphicsUI
 		int Margin;
 		virtual void AddChild(Control *nControl);
 		virtual void RemoveChild(Control *AControl);
-		virtual bool ContainsFocus();
 		virtual void ArrangeControls(Rect initalClientRect);
 		virtual void SetAlpha(unsigned char Alpha);
 		virtual void InternalBroadcastMessage(UI_MsgArgs *Args);
@@ -390,6 +382,8 @@ namespace GraphicsUI
 	{
 		None, Left = 1, Right = 2, Top = 4, Bottom = 8, TopLeft = 5, TopRight = 6, BottomLeft = 9, BottomRight = 10
 	};
+	
+	class Menu;
 
 	class Form : public Container
 	{
@@ -409,6 +403,7 @@ namespace GraphicsUI
 		Form(UIEntry * parent);
 		~Form();
 	public:
+		Menu * MainMenu = nullptr;
 		NotifyEvent OnResize;
 		NotifyEvent OnShow;
 		NotifyEvent OnClose;
@@ -466,7 +461,6 @@ namespace GraphicsUI
 		Button(Container * parent);
 	public:
 		bool Checked;
-		Color FocusRectColor;
 		virtual void Draw(int absX, int absY);
 		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift);
 		virtual bool DoMouseUp(int X, int Y, SHIFTSTATE Shift);
@@ -481,7 +475,6 @@ namespace GraphicsUI
 		CheckBox(Container * parent);
 	public:
 		bool Checked;
-		Color FocusRectColor;
 		virtual void SetText(const CoreLib::String & text) override;
 		virtual void Draw(int absX, int absY);
 		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift);
@@ -500,15 +493,18 @@ namespace GraphicsUI
 		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift);
 	};
 
-	class CustomTextBox : public Control
+	class Menu;
+
+	class CustomTextBox : public Container
 	{
 	protected:
-		long long Time,Freq;
+		CoreLib::Diagnostics::TimePoint time;
 		CoreLib::String FText;
 		IFont * font = nullptr;
+		Menu * menu = nullptr;
 		CoreLib::RefPtr<IBakedText> text;
 		int SelOrigin;
-		bool Changed, KeyDown,SelectMode;
+		bool Changed, cursorPosChanged = false, KeyDown,SelectMode;
 		int LabelOffset;
 		int HitTest(int posX);
 		void CursorPosChanged();
@@ -557,22 +553,20 @@ namespace GraphicsUI
 	{
 	protected:
 		CoreLib::List<CoreLib::String> CandidateList;
-		Label * lblIMEName, *lblCompStr, *lblCompReadStr;
+		Label * lblIMEName, *lblCompStr;
 		CoreLib::List<Label *> lblCandList;
 	public:
 		IMEWindow(Container * parent);
 		~IMEWindow();
 	public:
 		Control *Panel;
-		int CursorPos,CandidateCount;
-		int BorderWeight;
+		int CandidateCount;
 		int WindowWidth, WindowHeight;
 		CoreLib::String strComp,strIME,strCompRead;
 		bool ShowCandidate;
 		void ChangeInputMethod(CoreLib::String AInput);
 		void ChangeCompositionString(CoreLib::String AString);
-		void ChangeCompositionReadString(CoreLib::String AString);
-		void SetCandidateListItem(int Index, const wchar_t *Data);
+		void SetCandidateListItem(int idx, const CoreLib::String & str);
 		void SetCandidateCount(int Count);
 		virtual void Draw(int absX, int absY);
 	};
@@ -580,13 +574,18 @@ namespace GraphicsUI
 	class IMEHandler : public CoreLib::Object
 	{
 	public:
-		IMEHandler(UIEntry * entry);
-		~IMEHandler();
+		void Init(UIEntry * entry);
 	public:
-		bool Enabled;
-		CustomTextBox *TextBox;
-		IMEWindow *IMEWindow;
-		int HandleMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+		CustomTextBox * TextBox = nullptr;
+		IMEWindow * ImeWindow = nullptr;
+		bool DoImeStart();
+		bool DoImeEnd();
+		bool DoImeChangeName(const CoreLib::String & imeName);
+		bool DoImeCompositeString(const CoreLib::String & str);
+		bool DoImeResultString(const CoreLib::String & str);
+		bool DoImeOpenCandidate();
+		bool DoImeCloseCandidate();
+		bool DoImeChangeCandidate(const CoreLib::List<CoreLib::String> & candidate);
 		void StringInputed(CoreLib::String AString);
 	};
 
@@ -597,29 +596,37 @@ namespace GraphicsUI
 		int X, Y;
 	};
 
-	class UIEntry: public Container
+	class UIEntry : public Container
 	{
 	private:
 		CoreLib::List<MouseMessageStack> controlStack;
+		CoreLib::EnumerableHashSet<Control*> tickEventSubscribers;
 	protected:
-		SHIFTSTATE GetCurrentShiftState();
-		void TranslateMouseMessage(UIMouseEventArgs &Data,WPARAM wParam, LPARAM lParam);
 		void DeactivateAllForms();
 	public:
 		UIEntry(int WndWidth, int WndHeight, ISystemInterface * pSystem);
 		ISystemInterface * System = nullptr;
 	public:
+		Menu * MainMenu = nullptr;
 		Label * CheckmarkLabel = nullptr;
 		CoreLib::RefPtr<ClipRectStack> ClipRects;
 		Control *FocusedControl;
-		CoreLib::RefPtr<IMEHandler> FIMEHandler;
+		IMEHandler ImeMessageHandler;
 		Form *ActiveForm = nullptr;
+		Graphics DrawCommands;
 		CoreLib::List<Form*> Forms;
-		void DrawUI();
+		CoreLib::List<DrawCommand> & DrawUI();
 		void RemoveForm(Form *Form);
 		void ShowWindow(Form *Form);
 		void CloseWindow(Form *Form);
-		int HandleSystemMessage(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+		void SubscribeTickEvent(Control * ctrl)
+		{
+			tickEventSubscribers.Add(ctrl);
+		}
+		void UnSubscribeTickEvent(Control * ctrl)
+		{
+			tickEventSubscribers.Remove(ctrl);
+		}
 		virtual void InternalBroadcastMessage(UI_MsgArgs *Args);
 		virtual void SizeChanged();
 		virtual void Draw(int absX,int absY);
@@ -630,6 +637,8 @@ namespace GraphicsUI
 		virtual bool DoMouseUp(int X, int Y, SHIFTSTATE Shift);
 		virtual bool DoMouseMove(int X, int Y);
 		virtual bool DoMouseWheel(int delta);
+		virtual bool DoMouseHover();
+		virtual bool DoTick();
 		virtual void HandleMessage(const UI_MsgArgs *Args);
 		void MoveFocusBackward();
 		void MoveFocusForward();
@@ -649,9 +658,9 @@ namespace GraphicsUI
 	class ScrollBar: public Container
 	{
 	protected:
-		int tmrOrientation;
-		CoreLib::WinForm::Timer tmrTick;
+		int tmrOrientation = -1;
 		bool DownInSlider;
+		bool highlightSlider = false;
 		int OriPos;
 		int DownPosX,DownPosY;
 		int Orientation; // SO_VERTICAL or SO_HORIZONTAL
@@ -664,7 +673,6 @@ namespace GraphicsUI
 		void BtnDecMouseDown(UI_Base * sender, UIMouseEventArgs & e);
 		void BtnIncMouseUp(UI_Base * sender, UIMouseEventArgs & e);
 		void BtnDecMouseUp(UI_Base * sender, UIMouseEventArgs & e);
-		void tmrTick_Tick(Object * sender, CoreLib::WinForm::EventArgs e);
 		virtual Control* FindControlAtPosition(int x, int y) override
 		{
 			return Control::FindControlAtPosition(x, y);
@@ -686,10 +694,13 @@ namespace GraphicsUI
 		int GetMin();
 		int GetMax();
 		int GetPosition();
+		virtual bool DoTick();
 		virtual void Draw(int absX, int absY);
 		virtual bool DoMouseMove(int X, int Y);
 		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift);
 		virtual bool DoMouseUp(int X,int Y, SHIFTSTATE Shift);
+		virtual bool DoMouseLeave();
+		virtual bool DoMouseHover();
 		virtual void HandleMessage(const UI_MsgArgs *Args);
 		virtual void SizeChanged();
 	};
@@ -697,9 +708,9 @@ namespace GraphicsUI
 	class ListBox : public Container
 	{
 	protected:
-		int HighLightID;
+		int HighLightID = -1;
 		int ItemHeight;
-		bool Selecting;
+		bool Selecting = false;
 		bool HotTrack;
 		int SelOriX,SelOriY;
 		int BorderWidth;
@@ -717,10 +728,9 @@ namespace GraphicsUI
 	public:
 		CoreLib::List<Control*> Items;
 		bool HideSelection, MultiSelect;
-		Color SelectionColor,UnfocusedSelectionColor,SelectionForeColor,FocusRectColor,HighLightColor,HighLightForeColor;
+		Color SelectionColor,UnfocusedSelectionColor,SelectionForeColor,HighLightColor,HighLightForeColor;
 		CoreLib::List<Control *> Selection;
 		int SelectedIndex = -1;
-		int Margin;
 		int HitTest(int X, int Y);
 		Control *GetSelectedItem();
 		int GetItemHeight();
@@ -742,6 +752,7 @@ namespace GraphicsUI
 		virtual bool DoMouseMove(int x, int Y);
 		virtual bool DoMouseWheel(int delta) override;
 		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift);
+		virtual bool DoMouseLeave();
 	};
 
 	class ComboBox : public ListBox
@@ -818,6 +829,7 @@ namespace GraphicsUI
 	private:
 		CoreLib::List<MenuItem*> Items;
 		MenuStyle style;
+		bool enableMouseHover = false; // handle mouse hover only when true
 	protected:
 		MenuItem * parentItem = nullptr;
 		Menu * curSubMenu = nullptr;
@@ -855,6 +867,7 @@ namespace GraphicsUI
 		friend Menu;
 	protected:
 		wchar_t accKey;
+		int accKeyId = -1;
 		bool isButton;
 		void ItemSelected(MenuItem * item); // Called by SubMenu
 		virtual Control* FindControlAtPosition(int x, int y) override
@@ -890,7 +903,7 @@ namespace GraphicsUI
 
 		MenuItem(Menu* menu, const CoreLib::String & text, const CoreLib::String & shortcutText);
 		MenuItem(MenuItem* menu, const CoreLib::String & text, const CoreLib::String & shortcutText);
-
+		void Hit();
 		void DrawMenuItem(int width, int height);
 		void DrawMenuButton(int width, int height);
 		virtual bool DoMouseEnter();
@@ -1127,18 +1140,19 @@ namespace GraphicsUI
 		int state;
 		int ldY;
 		float inc;
-		CoreLib::WinForm::Timer tmrHover;
-		void tmrHoverTick(Object * sender, CoreLib::WinForm::EventArgs e);
 	public:
 		UpDown(Container * parent, TextBox * txtBox, float _min, float _max, float minInc, float maxInc);
+		~UpDown();
 		int Digits;			
 		float MinIncrement;
 		float MaxIncrement;
 		float Min, Max;
 		void Draw(int absX, int absY);
+		bool DoTick();
 		bool DoMouseDown(int X, int Y, SHIFTSTATE Shift);
 		bool DoMouseMove(int X, int Y);
 		bool DoMouseUp(int X, int Y, SHIFTSTATE Shift);
+		bool DoMouseHover();
 	};
 }
 #endif

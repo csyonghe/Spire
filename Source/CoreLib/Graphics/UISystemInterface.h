@@ -38,7 +38,6 @@ namespace GraphicsUI
 		Color() { R = G = B = 0; A = 0; };
 		Color(unsigned char AR, unsigned char AG, unsigned char AB, unsigned char AA) { R = AR; G = AG; B = AB; A = AA; };
 		Color(unsigned char AR, unsigned char AG, unsigned char AB) { R = AR; G = AG; B = AB; A = 255; };
-		Color(COLORREF c) { R = GetRValue(c); G = GetGValue(c); B = GetBValue(c); A = 255; };
 	};
 
 	class Pen
@@ -62,7 +61,6 @@ namespace GraphicsUI
 	class IImage : public CoreLib::Object
 	{
 	public:
-		virtual void Draw(int x, int y) = 0;
 		virtual int GetHeight() = 0;
 		virtual int GetWidth() = 0;
 	};
@@ -79,7 +77,7 @@ namespace GraphicsUI
 	{
 	public:
 		virtual Rect MeasureString(const CoreLib::String & text, int width) = 0;
-		virtual IBakedText * BakeString(const CoreLib::String & text, int width) = 0;
+		virtual IBakedText * BakeString(const CoreLib::String & tex, int width) = 0;
 	};
 
 	enum class DefaultFontType
@@ -87,16 +85,70 @@ namespace GraphicsUI
 		Content, Title, Symbol
 	};
 
+	enum class CursorType
+	{
+		Arrow, Cross, IBeam, Wait, SizeNS, SizeWE, SizeNESW, SizeNWSE, SizeAll
+	};
+
+	class DrawBufferVertex
+	{
+	public:
+		float x, y, u, v;
+		unsigned int ShaderType : 2;
+		unsigned int ShaderInput : 30;
+		unsigned int Color;
+	};
+
+	enum class DrawCommandName
+	{
+		Line, Ellipse, Triangle, SolidQuad, TextureQuad, ShadowQuad, TextQuad, ClipQuad
+	};
+	struct SolidColorCommand
+	{
+		Color color;
+	};
+	struct TextureCommand
+	{
+		IImage * image;
+	};
+	struct TextCommand
+	{
+		IBakedText * text;
+		Color color;
+	};
+	struct ShadowCommand
+	{
+		short x, y, w, h;
+		unsigned char offsetX, offsetY, shadowSize;
+		Color color;
+	};
+	struct DrawTriangleCommand
+	{
+		float x2, y2;
+		Color color;
+	};
+	class DrawCommand
+	{
+	public:
+		DrawCommandName Name;
+		float x0, y0, x1, y1;
+		union
+		{
+			SolidColorCommand SolidColorParams;
+			TextureCommand TextureParams;
+			TextCommand TextParams;
+			ShadowCommand ShadowParams;
+			DrawTriangleCommand TriangleParams;
+		};
+		DrawCommand() {}
+	};
+
 	class ISystemInterface : public CoreLib::Object
 	{
 	public:
-		virtual void SetRenderTransform(int dx, int dy) = 0;
-		virtual void SetClipRect(const Rect & rect) = 0;
-		virtual void DrawLine(const Pen & pen, float x0, float y0, float x1, float y1) = 0;
-		virtual void FillRectangle(const Color & color, const Rect & rect) = 0;
-		virtual void FillPolygon(const Color & color, CoreLib::ArrayView<VectorMath::Vec2> points) = 0;
-		virtual void DrawBakedText(IBakedText * text, const Color & color, int x, int y) = 0;
-		virtual void AdvanceTime(float seconds) = 0;
+		virtual void SwitchCursor(GraphicsUI::CursorType cursor) = 0;
+		virtual void SetClipboardText(const CoreLib::String & text) = 0;
+		virtual CoreLib::String GetClipboardText() = 0;
 		virtual IFont * LoadDefaultFont(DefaultFontType dt = DefaultFontType::Content) = 0;
 	};
 }

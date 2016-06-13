@@ -1,6 +1,7 @@
 #ifndef SHADER_INFO_FORM_H
 #define SHADER_INFO_FORM_H
 
+#include "CoreLib/WinForm.h"
 #include "CoreLib/Graphics.h"
 #include "Spire.h"
 

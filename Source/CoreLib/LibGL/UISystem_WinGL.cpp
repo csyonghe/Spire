@@ -4,15 +4,303 @@
 #include "../VectorMath.h"
 #include "OpenGLHardwareRenderer.h"
 
+#pragma comment(lib,"imm32.lib")
+
+#ifndef GET_X_LPARAM
+#define GET_X_LPARAM(lParam)	((int)(short)LOWORD(lParam))
+#endif
+#ifndef GET_Y_LPARAM
+#define GET_Y_LPARAM(lParam)	((int)(short)HIWORD(lParam))
+#endif
+
 using namespace CoreLib;
 using namespace VectorMath;
 
 namespace GraphicsUI
 {
-	struct TextSize
+	SHIFTSTATE GetCurrentShiftState()
 	{
-		int x, y;
-	};
+		SHIFTSTATE Shift = 0;
+		if (GetAsyncKeyState(VK_SHIFT))
+			Shift = Shift | SS_SHIFT;
+		if (GetAsyncKeyState(VK_CONTROL))
+			Shift = Shift | SS_CONTROL;
+		if (GetAsyncKeyState(VK_MENU))
+			Shift = Shift | SS_ALT;
+		return Shift;
+	}
+
+	void TranslateMouseMessage(UIMouseEventArgs &Data, WPARAM wParam, LPARAM lParam)
+	{
+		Data.Shift = GetCurrentShiftState();
+		bool L, M, R, S, C;
+		L = (wParam&MK_LBUTTON) != 0;
+		M = (wParam&MK_MBUTTON) != 0;
+		R = (wParam&MK_RBUTTON) != 0;
+		S = (wParam & MK_SHIFT) != 0;
+		C = (wParam & MK_CONTROL) != 0;
+		Data.Delta = GET_WHEEL_DELTA_WPARAM(wParam);
+		if (L)
+		{
+			Data.Shift = Data.Shift | SS_BUTTONLEFT;
+		}
+		else {
+			if (M) {
+				Data.Shift = Data.Shift | SS_BUTTONMIDDLE;
+			}
+			else {
+				if (R) {
+					Data.Shift = Data.Shift | SS_BUTTONRIGHT;
+				}
+			}
+		}
+		if (S)
+			Data.Shift = Data.Shift | SS_SHIFT;
+		if (C)
+			Data.Shift = Data.Shift | SS_CONTROL;
+		Data.X = GET_X_LPARAM(lParam);
+		Data.Y = GET_Y_LPARAM(lParam);
+	}
+
+	void WinGLSystemInterface::TickTimerTick(CoreLib::Object *, CoreLib::WinForm::EventArgs e)
+	{
+		entry->DoTick();
+	}
+
+	void WinGLSystemInterface::HoverTimerTick(Object *, CoreLib::WinForm::EventArgs e)
+	{
+		entry->DoMouseHover();
+	}
+
+	void WinGLSystemInterface::SetEntry(UIEntry * pEntry)
+	{
+		this->entry = pEntry;
+		tmrHover.Interval = Global::HoverTimeThreshold;
+		tmrHover.OnTick.Bind(this, &WinGLSystemInterface::HoverTimerTick);
+	}
+
+	int WinGLSystemInterface::HandleSystemMessage(HWND hWnd, UINT message, WPARAM &wParam, LPARAM &lParam)
+	{
+		int rs = -1;
+		unsigned short Key;
+		UIMouseEventArgs Data;
+
+		switch (message)
+		{
+		case WM_CHAR:
+		{
+			Key = (unsigned short)(DWORD)wParam;
+			entry->DoKeyPress(Key, GetCurrentShiftState());
+			break;
+		}
+		case WM_KEYUP:
+		{
+			Key = (unsigned short)(DWORD)wParam;
+			entry->DoKeyUp(Key, GetCurrentShiftState());
+			break;
+		}
+		case WM_KEYDOWN:
+		{
+			Key = (unsigned short)(DWORD)wParam;
+			entry->DoKeyDown(Key, GetCurrentShiftState());
+			break;
+		}
+		case WM_SYSKEYDOWN:
+		{
+			Key = (unsigned short)(DWORD)wParam;
+			if ((lParam&(1 << 29)))
+			{
+				entry->DoKeyDown(Key, SS_ALT);
+			}
+			else
+				entry->DoKeyDown(Key, 0);
+			if (Key != VK_F4)
+				rs = 0;
+			break;
+		}
+		case WM_SYSCHAR:
+		{
+			rs = 0;
+			break;
+		}
+		case WM_SYSKEYUP:
+		{
+			Key = (unsigned short)(DWORD)wParam;
+			if ((lParam & (1 << 29)))
+			{
+				entry->DoKeyUp(Key, SS_ALT);
+			}
+			else
+				entry->DoKeyUp(Key, 0);
+			rs = 0;
+			break;
+		}
+		case WM_MOUSEMOVE:
+		{
+			tmrHover.StartTimer();
+			TranslateMouseMessage(Data, wParam, lParam);
+			entry->DoMouseMove(Data.X, Data.Y);
+			break;
+		}
+		case WM_LBUTTONDOWN:
+		case WM_MBUTTONDOWN:
+		case WM_RBUTTONDOWN:
+		{
+			tmrHover.StartTimer();
+			TranslateMouseMessage(Data, wParam, lParam);
+			entry->DoMouseDown(Data.X, Data.Y, Data.Shift);
+			SetCapture(hWnd);
+			break;
+		}
+		case WM_RBUTTONUP:
+		case WM_MBUTTONUP:
+		case WM_LBUTTONUP:
+		{
+			tmrHover.StopTimer();
+			ReleaseCapture();
+			TranslateMouseMessage(Data, wParam, lParam);
+			if (message == WM_RBUTTONUP)
+				Data.Shift = Data.Shift | SS_BUTTONRIGHT;
+			else if (message == WM_LBUTTONUP)
+				Data.Shift = Data.Shift | SS_BUTTONLEFT;
+			else if (message == WM_MBUTTONUP)
+				Data.Shift = Data.Shift | SS_BUTTONMIDDLE;
+			entry->DoMouseUp(Data.X, Data.Y, Data.Shift);
+			break;
+		}
+		case WM_LBUTTONDBLCLK:
+		case WM_MBUTTONDBLCLK:
+		case WM_RBUTTONDBLCLK:
+		{
+			entry->DoDblClick();
+		}
+		break;
+		case WM_MOUSEWHEEL:
+		{
+			UIMouseEventArgs e;
+			TranslateMouseMessage(e, wParam, lParam);
+			entry->DoMouseWheel(e.Delta);
+		}
+		break;
+		case WM_SIZE:
+		{
+			RECT rect;
+			GetClientRect(hWnd, &rect);
+			entry->SetWidth(rect.right - rect.left);
+			entry->SetHeight(rect.bottom - rect.top);
+		}
+		break;
+		case WM_PAINT:
+		{
+			//Draw(0,0);
+		}
+		break;
+		case WM_ERASEBKGND:
+		{
+		}
+		break;
+		case WM_NCMBUTTONDOWN:
+		case WM_NCRBUTTONDOWN:
+		case WM_NCLBUTTONDOWN:
+		{
+			tmrHover.StopTimer();
+			entry->DoClosePopup();
+		}
+		break;
+		break;
+		case WM_IME_SETCONTEXT:
+			lParam = 0;
+			break;
+		case WM_INPUTLANGCHANGE://改变输入法
+		{
+			HKL hKL = GetKeyboardLayout(0);
+			if (ImmIsIME(hKL))//判断是否使用输入法
+			{
+				wchar_t inputName[128] = { 0 };
+				HIMC hIMC = ImmGetContext(hWnd);
+				ImmEscape(hKL, hIMC, IME_ESC_IME_NAME, inputName);
+				ImmReleaseContext(hWnd, hIMC);
+				entry->ImeMessageHandler.DoImeChangeName(String(inputName));
+			}
+			else
+			{
+				entry->ImeMessageHandler.DoImeChangeName(String(L""));
+			}
+		}
+		rs = 0;
+		break;
+		case WM_IME_NOTIFY://选字列表修改
+		{
+			rs = 0;
+			switch (wParam)
+			{
+			case IMN_OPENCANDIDATE://打开选字列表
+				entry->ImeMessageHandler.DoImeOpenCandidate();
+				break;
+			case IMN_CHANGECANDIDATE://修改选字列表
+				{
+					HIMC hIMC = ImmGetContext(hWnd);
+					unsigned int listSize = ImmGetCandidateList(hIMC, 0, NULL, 0);
+					if (listSize)
+					{
+						//开辟缓冲区存放选字列表信息
+						List<unsigned char> buffer;
+						buffer.SetSize(listSize);
+						CANDIDATELIST * list = (CANDIDATELIST*)buffer.Buffer();
+						ImmGetCandidateList(hIMC, 0, list, listSize);
+						int count = 0;
+						if (list->dwCount >= list->dwSelection)
+						{
+							count = Math::Min(list->dwCount - list->dwSelection, list->dwPageSize);
+							List<String> candList;
+							for (int i = 0; i < count; i++)
+							{
+								candList.Add(String((wchar_t*)(buffer.Buffer() + list->dwOffset[list->dwSelection + i])));
+							}
+							entry->ImeMessageHandler.DoImeChangeCandidate(candList);
+						}
+					}
+					ImmReleaseContext(hWnd, hIMC);
+				}
+				break;
+			case IMN_CLOSECANDIDATE://关闭选字列表
+				entry->ImeMessageHandler.DoImeCloseCandidate();
+				break;
+			}
+		}
+		break;
+		case WM_IME_COMPOSITION:
+		{
+			HIMC hIMC = ImmGetContext(hWnd);
+			if (lParam&GCS_COMPSTR)//获得输入栏的文字
+			{
+				wchar_t EditString[201];
+				unsigned int StrSize = ImmGetCompositionStringW(hIMC, GCS_COMPSTR, EditString, sizeof(EditString) - sizeof(char));
+				EditString[StrSize / sizeof(wchar_t)] = 0;
+				entry->ImeMessageHandler.DoImeCompositeString(String(EditString));
+			}
+			if (lParam&GCS_RESULTSTR)
+			{
+				wchar_t ResultStr[201];
+				unsigned int StrSize = ImmGetCompositionStringW(hIMC, GCS_RESULTSTR, ResultStr, sizeof(ResultStr) - sizeof(TCHAR));
+				ResultStr[StrSize / sizeof(wchar_t)] = 0;
+				entry->ImeMessageHandler.StringInputed(String(ResultStr));
+			}
+			ImmReleaseContext(hWnd, hIMC);
+			rs = 0;
+		}
+		break;
+		case WM_IME_STARTCOMPOSITION://把WM_IME_STARTCOMPOSITION视为已处理以便消除Windows自己打开的输入框
+			entry->ImeMessageHandler.DoImeStart();
+			rs = 1;
+			break;
+		case WM_IME_ENDCOMPOSITION:
+			entry->ImeMessageHandler.DoImeEnd();
+			rs = 0;
+			break;
+		}
+		return rs;
+	}
 
 	class Font
 	{
@@ -102,7 +390,7 @@ namespace GraphicsUI
 			R.top = Y;
 			R.right = X + W;
 			R.bottom = 1024;
-			return ::DrawText(Handle, text.Buffer(), text.Length(), &R, DT_WORDBREAK);
+			return ::DrawText(Handle, text.Buffer(), text.Length(), &R, DT_WORDBREAK | DT_NOPREFIX);
 		}
 		TextSize GetTextSize(const CoreLib::String& Text)
 		{
@@ -191,79 +479,6 @@ namespace GraphicsUI
 
 	};
 
-	class TextRasterizationResult
-	{
-	public:
-		TextSize Size;
-		List<unsigned char> Image;
-	};
-
-	class TextRasterizer
-	{
-	private:
-		unsigned int TexID;
-		DIBImage *Bit;
-	public:
-		TextRasterizer()
-		{
-			Bit = new DIBImage();
-		}
-		~TextRasterizer()
-		{
-			delete Bit;
-		}
-		bool MultiLine;
-		void SetFont(Font Font) // Set the font style of this label
-		{
-			Bit->canvas->ChangeFont(Font);
-		}
-		TextRasterizationResult RasterizeText(const CoreLib::String & text, int w = 0) // Set the text that is going to be displayed.
-		{
-			int TextWidth, TextHeight;
-			List<unsigned char> pic;
-			TextSize size;
-			if (w == 0)
-			{
-				size = Bit->canvas->GetTextSize(text);
-				TextWidth = size.x;
-				TextHeight = size.y;
-				Bit->SetSize(TextWidth, TextHeight);
-				Bit->canvas->Clear(TextWidth, TextHeight);
-				Bit->canvas->DrawText(text, 0, 0, 10240);
-			}
-			else
-			{
-				size.x = w;
-				size.y = Bit->canvas->DrawText(text, 0, 0, w);
-				TextWidth = size.x;
-				TextHeight = size.y;
-				Bit->SetSize(TextWidth, TextHeight);
-				Bit->canvas->Clear(TextWidth, TextHeight);
-				Bit->canvas->DrawText(text, 0, 0, w);
-			}
-			pic.SetSize(TextWidth*TextHeight*4);
-			int LineWidth = TextWidth;
-			for (int i = 0; i < TextHeight; i++)
-			{
-				for (int j = 0; j < TextWidth; j++)
-				{
-					auto val = 255 - (Bit->ScanLine[i][j * 3 + 2] + Bit->ScanLine[i][j * 3 + 1] + Bit->ScanLine[i][j * 3])/3;
-					pic[(i*LineWidth + j) * 4] = pic[(i*LineWidth + j) * 4 + 1] = pic[(i*LineWidth + j) * 4 + 2] = pic[(i*LineWidth + j) * 4 + 3] = (unsigned char)val;
-				}
-			}
-			TextRasterizationResult result;
-			result.Image = _Move(pic);
-			result.Size.x = TextWidth;
-			result.Size.y = TextHeight;
-			return result;
-		}
-
-		TextSize GetTextSize(const CoreLib::String & text)
-		{
-			return Bit->canvas->GetTextSize(text);
-		}
-	};
-
 	class GLUIRenderer
 	{
 	private:
@@ -277,8 +492,8 @@ namespace GraphicsUI
 				layout(location = 0) uniform mat4 orthoMatrix;
 				layout(location = 1) uniform vec2 translation;
 
-				out vec2 uv;
 				out vec2 pos;
+				out vec2 uv;
 				void main()
 				{
 					pos = vert_pos + translation;
@@ -291,8 +506,8 @@ namespace GraphicsUI
 				layout(location = 2) uniform sampler2D texAlbedo;
 				layout(location = 3) uniform vec4 clipBounds;
 				
-				in vec2 uv;
 				in vec2 pos;
+				in vec2 uv;
 				layout(location = 0) out vec4 color;
 				void main()
 				{
@@ -307,7 +522,6 @@ namespace GraphicsUI
 				#version 440
 				layout(location = 2) uniform vec4 solidColor;
 				layout(location = 3) uniform vec4 clipBounds;
-				in vec2 uv;
 				in vec2 pos;
 				layout(location = 0) out vec4 color;
 				void main()
@@ -324,8 +538,8 @@ namespace GraphicsUI
 				layout(location = 2) uniform sampler2D texAlbedo;
 				layout(location = 3) uniform vec4 clipBounds;
 				layout(location = 4) uniform vec4 fontColor;
-				in vec2 uv;
 				in vec2 pos;
+				in vec2 uv;
 				layout(location = 0) out vec4 color;
 				void main()
 				{
@@ -338,9 +552,48 @@ namespace GraphicsUI
 					color.w *= alpha;
 				}
 			)";
+		const char * shadowFsSrc = R"(
+			#version 440
+			layout(location = 1) uniform vec2 translation;
+			layout(location = 2) uniform vec2 origin;
+			layout(location = 3) uniform vec2 size;
+			layout(location = 4) uniform vec4 shadowColor;
+			layout(location = 5) uniform float shadowSize;
+			layout(location = 6) uniform vec4 rectBounds;
+			layout(location = 7) uniform vec4 clipBounds;
+			in vec2 pos;
+			layout(location = 0) out vec4 color;
+			// This approximates the error function, needed for the gaussian integral
+			vec4 erf(vec4 x)
+			{
+				vec4 s = sign(x), a = abs(x);
+				x = 1.0 + (0.278393 + (0.230389 + 0.078108 * (a * a)) * a) * a;
+				x *= x;
+				return s - s / (x * x);
+			}
+			// Return the mask for the shadow of a box from lower to upper
+			float boxShadow(vec2 lower, vec2 upper, vec2 point, float sigma)
+			{
+				vec4 query = vec4(point - lower, point - upper);
+				vec4 integral = 0.5 + 0.5 * erf(query * (sqrt(0.5) / sigma));
+				return (integral.z - integral.x) * (integral.w - integral.y);
+			}
+
+			void main()
+			{
+				if (pos.x > rectBounds.x && pos.x <rectBounds.z && pos.y > rectBounds.y && pos.y < rectBounds.w)
+					discard;
+				if (pos.x < clipBounds.x) discard;
+				if (pos.y < clipBounds.y) discard;
+				if (pos.x > clipBounds.z) discard;
+				if (pos.y > clipBounds.w) discard;
+				float shadow = boxShadow(origin, origin+size, pos - translation, shadowSize);
+				color = vec4(shadowColor.xyz, shadowColor.w*shadow);
+			}
+			)";
 	private:
-		GL::Shader vs, textureFs, textFs, solidColorFs;
-		GL::Program textureProgram, textProgram, solidColorProgram;
+		GL::Shader vs, textureFs, textFs, solidColorFs, shadowFs;
+		GL::Program textureProgram, textProgram, solidColorProgram, shadowProgram;
 		GL::BufferObject vertexBuffer;
 		GL::VertexArray posUvVertexArray, posVertexArray;
 		GL::TextureSampler linearSampler;
@@ -356,7 +609,7 @@ namespace GraphicsUI
 			textureFs = glContext->CreateShader(GL::ShaderType::FragmentShader, textureFSSrc);
 			textFs = glContext->CreateShader(GL::ShaderType::FragmentShader, textFSSrc);
 			solidColorFs = glContext->CreateShader(GL::ShaderType::FragmentShader, solidColorFSSrc);
-
+			shadowFs = glContext->CreateShader(GL::ShaderType::FragmentShader, shadowFsSrc);
 			textureProgram = glContext->CreateProgram(vs, textureFs);
 			textureProgram.Link();
 
@@ -365,6 +618,9 @@ namespace GraphicsUI
 
 			solidColorProgram = glContext->CreateProgram(vs, solidColorFs);
 			solidColorProgram.Link();
+
+			shadowProgram = glContext->CreateProgram(vs, shadowFs);
+			shadowProgram.Link();
 
 			vertexBuffer = glContext->CreateBuffer(GL::BufferUsage::ArrayBuffer);
 			vertexBuffer.SetData(nullptr, sizeof(float) * 16);
@@ -442,14 +698,14 @@ namespace GraphicsUI
 			glContext->DrawArray(GL::PrimitiveType::TriangleFans, 0, points.Count());
 		}
 
-		void DrawSolidQuad(const Vec4 & color, int x, int y, int w, int h)
+		void DrawSolidQuad(const Vec4 & color, float x, float y, float x1, float y1)
 		{
 			Vec2 vertexData[4];
 			vertexData[0] = Vec2::Create((float)x, (float)y);
-			vertexData[1] = Vec2::Create((float)x, (float)(y + h));
-			vertexData[2] = Vec2::Create((float)(x + w), (float)(y + h));
-			vertexData[3] = Vec2::Create((float)(x + w), (float)y);
-			vertexBuffer.SetData(vertexData, sizeof(float) * 16);
+			vertexData[1] = Vec2::Create((float)x, (float)y1);
+			vertexData[2] = Vec2::Create((float)x1, (float)y1);
+			vertexData[3] = Vec2::Create((float)x1, (float)y);
+			vertexBuffer.SetData(vertexData, sizeof(float) * 8);
 			solidColorProgram.Use();
 			solidColorProgram.SetUniform(0, orthoMatrix);
 			solidColorProgram.SetUniform(1, translation);
@@ -459,13 +715,13 @@ namespace GraphicsUI
 			glContext->BindVertexArray(posVertexArray);
 			glContext->DrawArray(GL::PrimitiveType::TriangleFans, 0, 4);
 		}
-		void DrawTextureQuad(GL::Texture2D texture, int x, int y, int w, int h)
+		void DrawTextureQuad(GL::Texture2D texture, float x, float y, float x1, float y1)
 		{
 			Vec4 vertexData[4];
-			vertexData[0] = Vec4::Create((float)x, (float)y, 0.0f, 0.0f);
-			vertexData[1] = Vec4::Create((float)x, (float)(y + h), 0.0f, -1.0f);
-			vertexData[2] = Vec4::Create((float)(x + w), (float)(y + h), 1.0f, -1.0f);
-			vertexData[3] = Vec4::Create((float)(x + w), (float)y, 1.0f, 0.0f);
+			vertexData[0] = Vec4::Create(x, y, 0.0f, 0.0f);
+			vertexData[1] = Vec4::Create(x, y1, 0.0f, -1.0f);
+			vertexData[2] = Vec4::Create(x1, y1, 1.0f, -1.0f);
+			vertexData[3] = Vec4::Create(x1, y, 1.0f, 0.0f);
 			vertexBuffer.SetData(vertexData, sizeof(float) * 16);
 
 			textureProgram.Use();
@@ -478,13 +734,13 @@ namespace GraphicsUI
 			glContext->BindVertexArray(posUvVertexArray);
 			glContext->DrawArray(GL::PrimitiveType::TriangleFans, 0, 4);
 		}
-		void DrawTextQuad(GL::Texture2D texture, const Vec4 & fontColor, int x, int y, int w, int h)
+		void DrawTextQuad(GL::Texture2D texture, const Vec4 & fontColor, float x, float y, float x1, float y1)
 		{
 			Vec4 vertexData[4];
 			vertexData[0] = Vec4::Create((float)x, (float)y, 0.0f, 0.0f);
-			vertexData[1] = Vec4::Create((float)x, (float)(y + h), 0.0f, 1.0f);
-			vertexData[2] = Vec4::Create((float)(x + w), (float)(y + h), 1.0f, 1.0f);
-			vertexData[3] = Vec4::Create((float)(x + w), (float)y, 1.0f, 0.0f);
+			vertexData[1] = Vec4::Create((float)x, (float)y1, 0.0f, 1.0f);
+			vertexData[2] = Vec4::Create((float)x1, (float)y1, 1.0f, 1.0f);
+			vertexData[3] = Vec4::Create((float)x1, (float)y, 1.0f, 0.0f);
 			vertexBuffer.SetData(vertexData, sizeof(float) * 16);
 
 			textProgram.Use();
@@ -497,157 +753,34 @@ namespace GraphicsUI
 			glContext->BindVertexArray(posUvVertexArray);
 			glContext->DrawArray(GL::PrimitiveType::TriangleFans, 0, 4);
 		}
-
-		void SetRenderTransform(int dx, int dy)
+		void DrawRectangleShadow(const Vec4 & color, float x, float y, float w, float h, float offsetX, float offsetY, float shadowSize)
 		{
-			translation.x = (float)dx;
-			translation.y = (float)dy;
+			Vec2 vertexData[4];
+			vertexData[0] = Vec2::Create((float)x + offsetX - shadowSize * 1.5f, (float)y + offsetY - shadowSize * 1.5f);
+			vertexData[1] = Vec2::Create((float)x + offsetX - shadowSize * 1.5f, (float)(y + h + offsetY) + shadowSize * 3.0f);
+			vertexData[2] = Vec2::Create((float)(x + w + offsetX + shadowSize * 3.0f), (float)(y + h + offsetY) + shadowSize * 3.0f);
+			vertexData[3] = Vec2::Create((float)(x + w + offsetX + shadowSize * 3.0f), (float)y + offsetY - shadowSize * 1.5f);
+			vertexBuffer.SetData(vertexData, sizeof(float) * 8);
+			shadowProgram.Use();
+			shadowProgram.SetUniform(0, orthoMatrix);
+			shadowProgram.SetUniform(1, translation);
+			shadowProgram.SetUniform(2, Vec2::Create(x + offsetX, y + offsetY));
+			shadowProgram.SetUniform(3, Vec2::Create(w, h));
+			shadowProgram.SetUniform(4, color);
+			shadowProgram.SetUniform(5, shadowSize * 0.5f);
+			shadowProgram.SetUniform(6, Vec4::Create(x, y, x + w, y + h));
+			shadowProgram.SetUniform(7, clipRect);
+			glContext->BindVertexArray(posVertexArray);
+			glContext->DrawArray(GL::PrimitiveType::TriangleFans, 0, 4);
 		}
-		void SetClipRect(const Rect & rect)
+		void SetClipRect(float x, float y, float x1, float y1)
 		{
-			clipRect.x = (float)rect.x - 0.5f;
-			clipRect.y = (float)rect.y - 0.5f;
-			clipRect.z = (float)(rect.x + rect.w + 1.0f);
-			clipRect.w = (float)(rect.y + rect.h + 1.0f);
-		}
-	};
-
-	class BakedText : public IBakedText
-	{
-	public:
-		GL::HardwareRenderer * glContext;
-		GL::Texture2D texture;
-		int Width, Height;
-		virtual int GetWidth() override
-		{
-			return Width;
-		}
-
-		virtual int GetHeight() override
-		{
-			return Height;
-		}
-		~BakedText()
-		{
-			if (texture.Handle)
-				glContext->DestroyTexture(texture);
+			clipRect.x = x;
+			clipRect.y = y;
+			clipRect.z = x1;
+			clipRect.w = y1;
 		}
 	};
-
-	class WinGLFont : public IFont
-	{
-	private:
-		TextRasterizer rasterizer;
-		GL::HardwareRenderer * glContext;
-	public:
-		WinGLFont(GL::HardwareRenderer * ctx, const GraphicsUI::Font & font)
-		{
-			glContext = ctx;
-			rasterizer.SetFont(font);
-		}
-		virtual Rect MeasureString(const CoreLib::String & text, int /*width*/) override
-		{
-			Rect rs;
-			auto size = rasterizer.GetTextSize(text);
-			rs.x = rs.y = 0;
-			rs.w = size.x;
-			rs.h = size.y;
-			return rs;
-		}
-
-		virtual IBakedText * BakeString(const CoreLib::String & text, int width) override
-		{
-			BakedText * result = new BakedText();
-			auto imageData = rasterizer.RasterizeText(text, width);
-			result->glContext = this->glContext;
-			result->Width = imageData.Size.x;
-			result->Height = imageData.Size.y;
-			result->texture = glContext->CreateTexture2D();
-			result->texture.SetData(GL::StorageFormat::Int8, result->Width, result->Height, 1, GL::DataType::Byte4, imageData.Image.Buffer());
-			return result;
-		}
-
-	};
-
-	class WinGLSystemInterface : public UISystemInterface
-	{
-	private:
-		Vec4 ColorToVec(GraphicsUI::Color c)
-		{
-			return Vec4::Create(c.R / 255.0f, c.G / 255.0f, c.B / 255.0f, c.A / 255.0f);
-		}
-		RefPtr<WinGLFont> defaultFont, titleFont, symbolFont;
-	public:
-		RefPtr<GLUIRenderer> uiRenderer;
-		GL::HardwareRenderer * glContext = nullptr;
-		virtual void BeginUIDrawing() override
-		{
-			uiRenderer->BeginUIDrawing();
-		}
-		virtual void EndUIDrawing() override
-		{
-			uiRenderer->EndUIDrawing();
-		}
-		virtual void SetRenderTransform(int dx, int dy) override
-		{
-			uiRenderer->SetRenderTransform(dx, dy);
-		}
-		virtual void SetClipRect(const Rect & rect) override
-		{
-			uiRenderer->SetClipRect(rect);
-		}
-		virtual void DrawLine(const Pen & pen, float x0, float y0, float x1, float y1) override
-		{
-			uiRenderer->DrawLine(ColorToVec(pen.Color), x0, y0, x1, y1);
-		}
-		virtual void FillRectangle(const Color & color, const Rect & rect) override
-		{
-			uiRenderer->DrawSolidQuad(ColorToVec(color), rect.x, rect.y, rect.w, rect.h);
-		}
-		virtual void FillPolygon(const Color & color, CoreLib::ArrayView<VectorMath::Vec2> points) override
-		{
-			uiRenderer->DrawSolidPolygon(ColorToVec(color), points);
-		}
-		virtual void DrawBakedText(IBakedText * text, const Color & color, int x, int y) override
-		{
-			auto bt = dynamic_cast<BakedText*>(text);
-			uiRenderer->DrawTextQuad(bt->texture, Vec4::Create(color.R/255.0f, color.G/255.0f, color.B/255.0f, color.A/255.0f), x, y, bt->Width, bt->Height);
-		}
-		virtual void AdvanceTime(float /*seconds*/) override
-		{
-		}
-		virtual IFont * LoadDefaultFont(DefaultFontType dt = DefaultFontType::Content) override
-		{
-			switch (dt)
-			{
-			case DefaultFontType::Content:
-				return defaultFont.Ptr();
-			case DefaultFontType::Title:
-				return titleFont.Ptr();
-			default:
-				return symbolFont.Ptr();
-			}
-		}
-		virtual void SetResolution(int w, int h) override
-		{
-			uiRenderer->SetScreenResolution(w, h);
-		}
-	public:
-		WinGLSystemInterface(GL::HardwareRenderer * ctx)
-		{
-			glContext = ctx;
-			uiRenderer = new GLUIRenderer(ctx);
-			defaultFont = new WinGLFont(ctx, Font(L"Segoe UI", 13));
-			titleFont = new WinGLFont(ctx, Font(L"Segoe UI", 13, true, false, false));
-			symbolFont = new WinGLFont(ctx, Font(L"Webdings", 13));
-		}
-		virtual IFont * CreateFont(const Font & f) override
-		{
-			return new WinGLFont(glContext, f);
-		}
-		virtual IImage * CreateImage(const CoreLib::Imaging::Bitmap & bmp) override;
-	};
-
 
 	class UIImage : public IImage
 	{
@@ -668,10 +801,6 @@ namespace GraphicsUI
 		{
 			context->glContext->DestroyTexture(texture);
 		}
-		virtual void Draw(int x, int y) override
-		{
-			context->uiRenderer->DrawTextureQuad(texture, x, y, w, h);
-		}
 		virtual int GetHeight() override
 		{
 			return h;
@@ -682,14 +811,288 @@ namespace GraphicsUI
 		}
 	};
 
-	IImage * WinGLSystemInterface::CreateImage(const CoreLib::Imaging::Bitmap & bmp)
+	IImage * WinGLSystemInterface::CreateImageObject(const CoreLib::Imaging::Bitmap & bmp)
 	{
 		return new UIImage(this, bmp);
 	}
 
-	UISystemInterface * CreateWinGLInterface(GL::HardwareRenderer * glContext)
+	Vec4 WinGLSystemInterface::ColorToVec(GraphicsUI::Color c)
 	{
-		return new WinGLSystemInterface(glContext);
+		return Vec4::Create(c.R / 255.0f, c.G / 255.0f, c.B / 255.0f, c.A / 255.0f);
+	}
+
+	void WinGLSystemInterface::SetClipboardText(const String & text)
+	{
+		if (OpenClipboard(NULL))
+		{
+			EmptyClipboard();
+			HGLOBAL hBlock = GlobalAlloc(GMEM_MOVEABLE, sizeof(WCHAR) * (text.Length() + 1));
+			if (hBlock)
+			{
+				WCHAR *pwszText = (WCHAR*)GlobalLock(hBlock);
+				if (pwszText)
+				{
+					CopyMemory(pwszText, text.Buffer(), text.Length() * sizeof(WCHAR));
+					pwszText[text.Length()] = L'\0';  // Terminate it
+					GlobalUnlock(hBlock);
+				}
+				SetClipboardData(CF_UNICODETEXT, hBlock);
+			}
+			CloseClipboard();
+			if (hBlock)
+				GlobalFree(hBlock);
+		}
+	}
+
+	String WinGLSystemInterface::GetClipboardText()
+	{
+		String txt;
+		if (OpenClipboard(NULL))
+		{
+			HANDLE handle = GetClipboardData(CF_UNICODETEXT);
+			if (handle)
+			{
+				// Convert the ANSI string to Unicode, then
+				// insert to our buffer.
+				WCHAR *pwszText = (WCHAR*)GlobalLock(handle);
+				if (pwszText)
+				{
+					// Copy all characters up to null.
+					txt = pwszText;
+					wchar_t rtn[2] = { 13,0 };
+					int fid = txt.IndexOf(String(rtn));
+					if (fid != -1)
+						txt = txt.SubString(0, fid);
+					GlobalUnlock(handle);
+				}
+			}
+			CloseClipboard();
+		}
+		return txt;
+	}
+
+	IFont * WinGLSystemInterface::LoadDefaultFont(DefaultFontType dt)
+	{
+		switch (dt)
+		{
+		case DefaultFontType::Content:
+			return defaultFont.Ptr();
+		case DefaultFontType::Title:
+			return titleFont.Ptr();
+		default:
+			return symbolFont.Ptr();
+		}
+	}
+
+	void WinGLSystemInterface::SetResolution(int w, int h)
+	{
+		uiRenderer->SetScreenResolution(w, h);
+	}
+
+	void WinGLSystemInterface::ExecuteDrawCommands(CoreLib::List<DrawCommand>& commands)
+	{
+		uiRenderer->BeginUIDrawing();
+		int ptr = 0;
+		while (ptr < commands.Count())
+		{
+			auto & cmd = commands[ptr];
+			switch (cmd.Name)
+			{
+			case DrawCommandName::ClipQuad:
+				uiRenderer->SetClipRect(cmd.x0, cmd.y0, cmd.x1, cmd.y1);
+				break;
+			case DrawCommandName::Line:
+				uiRenderer->DrawLine(ColorToVec(cmd.SolidColorParams.color), cmd.x0, cmd.y0, cmd.x1, cmd.y1);
+				break;
+			case DrawCommandName::SolidQuad:
+				uiRenderer->DrawSolidQuad(ColorToVec(cmd.SolidColorParams.color), cmd.x0, cmd.y0, cmd.x1, cmd.y1);
+				break;
+			case DrawCommandName::TextQuad:
+				uiRenderer->DrawTextQuad(((BakedText*)cmd.TextParams.text)->texture, ColorToVec(cmd.TextParams.color), cmd.x0, cmd.y0, cmd.x1, cmd.y1);
+				break;
+			case DrawCommandName::ShadowQuad:
+				uiRenderer->DrawRectangleShadow(ColorToVec(cmd.ShadowParams.color), (float)cmd.ShadowParams.x, (float)cmd.ShadowParams.y, (float)cmd.ShadowParams.w,
+					(float)cmd.ShadowParams.h, (float)cmd.ShadowParams.offsetX, (float)cmd.ShadowParams.offsetY, cmd.ShadowParams.shadowSize);
+				break;
+			case DrawCommandName::TextureQuad:
+				uiRenderer->DrawTextureQuad(((UIImage*)cmd.TextParams.text)->texture, cmd.x0, cmd.y0, cmd.x1, cmd.y1);
+				break;
+			case DrawCommandName::Triangle:
+			{
+				Array<Vec2, 3> verts;
+				verts.Add(Vec2::Create(cmd.x0, cmd.y0));
+				verts.Add(Vec2::Create(cmd.x1, cmd.y1));
+				verts.Add(Vec2::Create(cmd.TriangleParams.x2, cmd.TriangleParams.y2));
+				uiRenderer->DrawSolidPolygon(ColorToVec(cmd.TriangleParams.color), verts.GetArrayView());
+				break;
+			}
+			case DrawCommandName::Ellipse:
+			{
+				Array<Vec2, 24> verts;
+				int edges = 20;
+				float dTheta = Math::Pi * 2.0f / edges;
+				float theta = 0.0f;
+				float dotX = (cmd.x0 + cmd.x1) * 0.5f;
+				float dotY = (cmd.y0 + cmd.y1) * 0.5f;
+				float radX = (cmd.x1 - cmd.x0) * 0.5f;
+				float radY = (cmd.y1 - cmd.y0) * 0.5f;
+				for (int i = 0; i < edges; i++)
+				{
+					verts.Add(Vec2::Create(dotX + radX * cos(theta), dotY - radY * sin(theta)));
+					theta += dTheta;
+				}
+				uiRenderer->DrawSolidPolygon(ColorToVec(cmd.SolidColorParams.color), verts.GetArrayView());
+			}
+			}
+			ptr++;
+		}
+		uiRenderer->EndUIDrawing();
+	}
+
+	void WinGLSystemInterface::SwitchCursor(CursorType c)
+	{
+		LPTSTR cursorName;
+		switch (c)
+		{
+		case CursorType::Arrow:
+			cursorName = IDC_ARROW;
+			break;
+		case CursorType::IBeam:
+			cursorName = IDC_IBEAM;
+			break;
+		case CursorType::Cross:
+			cursorName = IDC_CROSS;
+			break;
+		case CursorType::Wait:
+			cursorName = IDC_WAIT;
+			break;
+		case CursorType::SizeAll:
+			cursorName = IDC_SIZEALL;
+			break;
+		case CursorType::SizeNS:
+			cursorName = IDC_SIZENS;
+			break;
+		case CursorType::SizeWE:
+			cursorName = IDC_SIZEWE;
+			break;
+		case CursorType::SizeNWSE:
+			cursorName = IDC_SIZENWSE;
+			break;
+		case CursorType::SizeNESW:
+			cursorName = IDC_SIZENESW;
+			break;
+		default:
+			cursorName = IDC_ARROW;
+		}
+		SetCursor(LoadCursor(0, cursorName));
+	}
+
+	WinGLSystemInterface::WinGLSystemInterface(GL::HardwareRenderer * ctx)
+	{
+		glContext = ctx;
+		uiRenderer = new GLUIRenderer(ctx);
+		defaultFont = new WinGLFont(ctx, Font(L"Segoe UI", 13));
+		titleFont = new WinGLFont(ctx, Font(L"Segoe UI", 13, true, false, false));
+		symbolFont = new WinGLFont(ctx, Font(L"Webdings", 13));
+		tmrHover.Interval = Global::HoverTimeThreshold;
+		tmrHover.OnTick.Bind(this, &WinGLSystemInterface::HoverTimerTick);
+		tmrTick.Interval = 50;
+		tmrTick.OnTick.Bind(this, &WinGLSystemInterface::TickTimerTick);
+		tmrTick.StartTimer();
+	}
+
+	WinGLSystemInterface::~WinGLSystemInterface()
+	{
+		tmrTick.StopTimer();
+		delete uiRenderer;
+	}
+
+	IFont * WinGLSystemInterface::CreateFontObject(const Font & f)
+	{
+		return new WinGLFont(glContext, f);
+	}
+
+	Rect WinGLFont::MeasureString(const CoreLib::String & text, int /*width*/)
+	{
+		Rect rs;
+		auto size = rasterizer.GetTextSize(text);
+		rs.x = rs.y = 0;
+		rs.w = size.x;
+		rs.h = size.y;
+		return rs;
+	}
+
+	IBakedText * WinGLFont::BakeString(const CoreLib::String & text, int width)
+	{
+		BakedText * result = new BakedText();
+		auto imageData = rasterizer.RasterizeText(text, width);
+		result->glContext = this->glContext;
+		result->Width = imageData.Size.x;
+		result->Height = imageData.Size.y;
+		result->texture = glContext->CreateTexture2D();
+		result->texture.SetData(GL::StorageFormat::Int8, result->Width, result->Height, 1, GL::DataType::Byte4, imageData.Image.Buffer());
+		return result;
+	}
+
+	TextRasterizer::TextRasterizer()
+	{
+		Bit = new DIBImage();
+	}
+
+	TextRasterizer::~TextRasterizer()
+	{
+		delete Bit;
+	}
+
+	void TextRasterizer::SetFont(const Font & Font) // Set the font style of this label
+	{
+		Bit->canvas->ChangeFont(Font);
+	}
+
+	TextRasterizationResult TextRasterizer::RasterizeText(const CoreLib::String & text, int w) // Set the text that is going to be displayed.
+	{
+		int TextWidth, TextHeight;
+		List<unsigned char> pic;
+		TextSize size;
+		if (w == 0)
+		{
+			size = Bit->canvas->GetTextSize(text);
+			TextWidth = size.x;
+			TextHeight = size.y;
+			Bit->SetSize(TextWidth, TextHeight);
+			Bit->canvas->Clear(TextWidth, TextHeight);
+			Bit->canvas->DrawText(text, 0, 0, 10240);
+		}
+		else
+		{
+			size.x = w;
+			size.y = Bit->canvas->DrawText(text, 0, 0, w);
+			TextWidth = size.x;
+			TextHeight = size.y;
+			Bit->SetSize(TextWidth, TextHeight);
+			Bit->canvas->Clear(TextWidth, TextHeight);
+			Bit->canvas->DrawText(text, 0, 0, w);
+		}
+		pic.SetSize(TextWidth*TextHeight * 4);
+		int LineWidth = TextWidth;
+		for (int i = 0; i < TextHeight; i++)
+		{
+			for (int j = 0; j < TextWidth; j++)
+			{
+				auto val = 255 - (Bit->ScanLine[i][j * 3 + 2] + Bit->ScanLine[i][j * 3 + 1] + Bit->ScanLine[i][j * 3]) / 3;
+				pic[(i*LineWidth + j) * 4] = pic[(i*LineWidth + j) * 4 + 1] = pic[(i*LineWidth + j) * 4 + 2] = pic[(i*LineWidth + j) * 4 + 3] = (unsigned char)val;
+			}
+		}
+		TextRasterizationResult result;
+		result.Image = _Move(pic);
+		result.Size.x = TextWidth;
+		result.Size.y = TextHeight;
+		return result;
+	}
+
+	inline TextSize TextRasterizer::GetTextSize(const CoreLib::String & text)
+	{
+		return Bit->canvas->GetTextSize(text);
 	}
 
 }

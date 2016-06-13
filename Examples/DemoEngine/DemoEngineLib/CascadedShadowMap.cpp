@@ -103,7 +103,7 @@ namespace DemoEngine
 					
 				} blkshadowMapUniform;
 
-								float computeShadow(vec3 pos)
+				float computeShadow(vec3 pos)
 				{
 				)";
 			if (Enabled)

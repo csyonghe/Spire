@@ -29,11 +29,61 @@ WARNING: This is an automatically generated file.
 #include "Basic.h"
 
 /***********************************************************************
+WINACCEL.H
+***********************************************************************/
+#ifndef GX_WINACCEL_H
+#define GX_WINACCEL_H
+
+#include <windows.h>
+
+namespace CoreLib
+{
+	namespace WinForm
+	{
+		using namespace CoreLib;
+		using namespace CoreLib::Basic;
+
+		class MenuItem;
+
+		class Accelerator : public Object
+		{
+			friend class AccelTable;
+		public:
+			typedef unsigned char AccelAuxKey;
+			static const unsigned char Ctrl = FCONTROL;
+			static const unsigned char Shift = FSHIFT;
+			static const unsigned char Alt = FALT;
+		private:
+			ACCEL accel;
+		public:
+			Accelerator(AccelAuxKey auxKey, Word mainKey);
+			Accelerator();
+		};
+
+		class AccelTable : public Object
+		{
+		private:
+			HACCEL handle;
+			List<ACCEL> accels;
+		public:
+			AccelTable();
+			~AccelTable();
+		public:
+			HACCEL GetHandle();
+			void RegisterAccel(Accelerator acc, MenuItem * item);
+			void UpdateAccel(Accelerator acc, MenuItem * item);
+			void Update();
+		};
+	}
+}
+
+#endif
+
+/***********************************************************************
 WINMESSAGE.H
 ***********************************************************************/
 #ifndef GX_WINMESSAGE_H
 #define GX_WINMESSAGE_H
-#include <Windows.h>
 #define   ULONG_PTR   void*
 #pragma warning(push)
 #pragma warning(disable:4458)
@@ -149,85 +199,6 @@ namespace CoreLib
 		typedef Event<Object *, ResizingEventArgs &> ResizingEvent;
 		typedef Event<Object *, PaintEventArgs> PaintEvent;
 
-	}
-}
-
-#endif
-
-/***********************************************************************
-WINTIMER.H
-***********************************************************************/
-#ifndef GX_WIN_TIMER_H
-#define GX_WIN_TIMER_H
-
-namespace CoreLib
-{
-	namespace WinForm
-	{
-		using namespace CoreLib::Basic;
-
-		class Timer : public Object
-		{
-		private:
-			UINT_PTR timerHandle;
-		public:
-			int Interval;
-			NotifyEvent OnTick;
-			void StartTimer();
-			void StopTimer();
-			Timer();
-			~Timer();
-		};
-	}
-}
-
-#endif
-
-/***********************************************************************
-WINACCEL.H
-***********************************************************************/
-#ifndef GX_WINACCEL_H
-#define GX_WINACCEL_H
-
-
-namespace CoreLib
-{
-	namespace WinForm
-	{
-		using namespace CoreLib;
-		using namespace CoreLib::Basic;
-
-		class MenuItem;
-
-		class Accelerator : public Object
-		{
-			friend class AccelTable;
-		public:
-			typedef unsigned char AccelAuxKey;
-			static const unsigned char Ctrl = FCONTROL;
-			static const unsigned char Shift = FSHIFT;
-			static const unsigned char Alt = FALT;
-		private:
-			ACCEL accel;
-		public:
-			Accelerator(AccelAuxKey auxKey, Word mainKey);
-			Accelerator();
-		};
-
-		class AccelTable : public Object
-		{
-		private:
-			HACCEL handle;
-			List<ACCEL> accels;
-		public:
-			AccelTable();
-			~AccelTable();
-		public:
-			HACCEL GetHandle();
-			void RegisterAccel(Accelerator acc, MenuItem * item);
-			void UpdateAccel(Accelerator acc, MenuItem * item);
-			void Update();
-		};
 	}
 }
 
@@ -408,7 +379,6 @@ namespace CoreLib
 		{
 			friend LRESULT CALLBACK SubClassWndProc(HWND hWnd,UINT message, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass,
 				DWORD_PTR dwRefData);
-			friend LRESULT CALLBACK LibWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 			friend LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 		protected:
 			List<RefPtr<Component>> children;
@@ -781,6 +751,35 @@ namespace CoreLib
 		};
 	}
 }
+#endif
+
+/***********************************************************************
+WINTIMER.H
+***********************************************************************/
+#ifndef GX_WIN_TIMER_H
+#define GX_WIN_TIMER_H
+
+namespace CoreLib
+{
+	namespace WinForm
+	{
+		using namespace CoreLib::Basic;
+
+		class Timer : public Object
+		{
+		private:
+			UINT_PTR timerHandle;
+		public:
+			int Interval;
+			NotifyEvent OnTick;
+			void StartTimer();
+			void StopTimer();
+			Timer();
+			~Timer();
+		};
+	}
+}
+
 #endif
 
 /***********************************************************************

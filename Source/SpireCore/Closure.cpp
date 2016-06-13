@@ -281,7 +281,23 @@ namespace Spire
 						// silently ignore consistently defined global components (components in abstract worlds)
 						if (!IsConsistentGlobalComponentDefinition(comp.Value.Ptr(), existingComp))
 						{
-							err->Error(34025, L"'" + existingComp->Name + L"': global component conflicts with previous declaration.see previous declaration at " + existingComp->Implementations.First()->SyntaxNode->Position.ToString(),
+							err->Error(34025, L"'" + existingComp->Name + L"': global component conflicts with previous declaration.\nsee previous declaration at " + existingComp->Implementations.First()->SyntaxNode->Position.ToString(),
+								comp.Value->Implementations.First()->SyntaxNode->Position);
+						}
+						else
+						{
+							for (auto & user : existingComp->UserComponents)
+							{
+								user->DependentComponents.Remove(existingComp);
+								user->DependentComponents.Add(comp.Value.Ptr());
+								for (auto & impl : user->Implementations)
+									if (impl->DependentComponents.Contains(existingComp))
+									{
+										impl->DependentComponents.Remove(existingComp);
+										impl->DependentComponents.Add(comp.Value.Ptr());
+									}
+							}
+							err->Warning(34026, L"'" + existingComp->Name + L"': component is already defined when compiling shader '" + closure->Name + L"'. use 'require' to declare it as a parameter. \nsee previous declaration at " + existingComp->Implementations.First()->SyntaxNode->Position.ToString(),
 								comp.Value->Implementations.First()->SyntaxNode->Position);
 						}
 					}
@@ -298,7 +314,7 @@ namespace Spire
 						err->Error(34024, errBuilder.ProduceString(), comp.Value->Implementations.First()->SyntaxNode->Position);
 					}
 				}
-				closure->AllComponents.AddIfNotExists(comp.Value->UniqueName, comp.Value.Ptr());
+				closure->AllComponents[comp.Value->UniqueName] = comp.Value.Ptr();
 			}
 			for (auto & sc : subClosure->SubClosures)
 				GatherComponents(err, closure, sc.Value.Ptr());
