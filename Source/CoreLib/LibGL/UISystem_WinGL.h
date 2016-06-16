@@ -5,6 +5,7 @@
 #include "../Graphics/LibUI.h"
 #include "../Imaging/Bitmap.h"
 #include "../WinForm/WinTimer.h"
+#include "../MemoryPool.h"
 #include "OpenGLHardwareRenderer.h"
 
 namespace GraphicsUI
@@ -22,8 +23,11 @@ namespace GraphicsUI
 	{
 	public:
 		TextSize Size;
-		CoreLib::List<unsigned char> Image;
+		int BufferSize;
+		unsigned char * ImageData;
 	};
+
+	class WinGLSystemInterface;
 
 	class TextRasterizer
 	{
@@ -35,15 +39,17 @@ namespace GraphicsUI
 		~TextRasterizer();
 		bool MultiLine = false;
 		void SetFont(const Font & Font);
-		TextRasterizationResult RasterizeText(const CoreLib::String & text, int w = 0);
+		TextRasterizationResult RasterizeText(WinGLSystemInterface * system, const CoreLib::String & text, int w = 0);
 		TextSize GetTextSize(const CoreLib::String & text);
 	};
+
 
 	class BakedText : public IBakedText
 	{
 	public:
-		GL::HardwareRenderer * glContext;
-		GL::Texture2D texture;
+		WinGLSystemInterface* system;
+		unsigned char * textBuffer;
+		int BufferSize;
 		int Width, Height;
 		virtual int GetWidth() override
 		{
@@ -53,22 +59,19 @@ namespace GraphicsUI
 		{
 			return Height;
 		}
-		~BakedText()
-		{
-			if (texture.Handle)
-				glContext->DestroyTexture(texture);
-		}
+		~BakedText();
 	};
+
 
 	class WinGLFont : public IFont
 	{
 	private:
 		TextRasterizer rasterizer;
-		GL::HardwareRenderer * glContext;
+		WinGLSystemInterface * system;
 	public:
-		WinGLFont(GL::HardwareRenderer * ctx, const GraphicsUI::Font & font)
+		WinGLFont(WinGLSystemInterface * ctx, const GraphicsUI::Font & font)
 		{
-			glContext = ctx;
+			system = ctx;
 			rasterizer.SetFont(font);
 		}
 		virtual Rect MeasureString(const CoreLib::String & text, int /*width*/) override;
@@ -81,6 +84,9 @@ namespace GraphicsUI
 	class WinGLSystemInterface : public ISystemInterface
 	{
 	private:
+		unsigned char * textBuffer = nullptr;
+		GL::BufferObject textBufferObj;
+		CoreLib::MemoryPool textBufferPool;
 		VectorMath::Vec4 ColorToVec(GraphicsUI::Color c);
 		CoreLib::RefPtr<WinGLFont> defaultFont, titleFont, symbolFont;
 		CoreLib::WinForm::Timer tmrHover, tmrTick;
@@ -97,6 +103,22 @@ namespace GraphicsUI
 	public:
 		WinGLSystemInterface(GL::HardwareRenderer * ctx);
 		~WinGLSystemInterface();
+		unsigned char * AllocTextBuffer(int size)
+		{
+			return textBufferPool.Alloc(size);
+		}
+		void FreeTextBuffer(unsigned char * buffer, int size)
+		{
+			textBufferPool.Free(buffer, size);
+		}
+		int GetTextBufferRelativeAddress(unsigned char * buffer)
+		{
+			return (int)(buffer - textBuffer);
+		}
+		GL::BufferObject GetTextBufferObject()
+		{
+			return textBufferObj;
+		}
 		IFont * CreateFontObject(const Font & f);
 		IImage * CreateImageObject(const CoreLib::Imaging::Bitmap & bmp);
 		void SetResolution(int w, int h);

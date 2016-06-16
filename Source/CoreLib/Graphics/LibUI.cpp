@@ -47,9 +47,10 @@ namespace GraphicsUI
 	{
 		float lastX = x + rad*cos(theta);
 		float lastY = y - rad*sin(theta);
-		float deltaPhi = (theta2-theta)/rad;
+		int segs = rad;
+		float deltaPhi = (theta2-theta)/segs;
 		theta += deltaPhi;
-		for (int i=1; i<rad+1; i++)
+		for (int i=1; i < segs + 1; i++)
 		{	
 			float nx = x + rad*cos(theta);
 			float ny = y - rad*sin(theta);
@@ -60,13 +61,13 @@ namespace GraphicsUI
 		}
 	}
 
-	void Graphics::FillEllipse(int x1, int y1, int x2, int y2)
+	void Graphics::FillEllipse(float x1, float y1, float x2, float y2)
 	{
 		DrawCommand cmd;
 		cmd.Name = DrawCommandName::Ellipse;
 		cmd.SolidColorParams.color = SolidBrushColor;
-		cmd.x0 = (float)x1 + dx; cmd.y0 = (float)y1 + dy;
-		cmd.x1 = (float)x2 + dx; cmd.y1 = (float)y2 + dy;
+		cmd.x0 = x1 + dx; cmd.y0 = y1 + dy;
+		cmd.x1 = x2 + dx; cmd.y1 = y2 + dy;
 		commandBuffer.Add(cmd);
 	}
 
@@ -86,10 +87,10 @@ namespace GraphicsUI
 
 	void Graphics::DrawRectangle(int x1, int y1, int x2, int y2)
 	{
-		DrawLine((float)x1, (float)y1, (float)x2, (float)y1);
-		DrawLine((float)x2, (float)y1, (float)x2, (float)y2);
-		DrawLine((float)x2, (float)y2, (float)x1, (float)y2);
-		DrawLine((float)x1, (float)y2, (float)x1, (float)y1);
+		DrawLine((float)x1 + 0.5f, (float)y1 + 0.5f, (float)x2 + 0.5f, (float)y1 + 0.5f);
+		DrawLine((float)x2 + 0.5f, (float)y1 + 0.5f, (float)x2 + 0.5f, (float)y2 + 0.5f);
+		DrawLine((float)x2 + 0.5f, (float)y2 + 0.5f, (float)x1 + 0.5f, (float)y2 + 0.5f);
+		DrawLine((float)x1 + 0.5f, (float)y2 + 0.5f, (float)x1 + 0.5f, (float)y1 + 0.5f);
 	}
 
 	void Graphics::FillRectangle(int x1, int y1, int x2, int y2)
@@ -1148,7 +1149,7 @@ namespace GraphicsUI
 						dx = clientRect.x;
 						dy = clientRect.y;
 					}
-					entry->ClipRects->AddRect(Rect(ctrl->Left + absX + dx, ctrl->Top + absY + dy, ctrl->GetWidth() + 1, ctrl->GetHeight() + 1));
+					entry->ClipRects->AddRect(Rect(ctrl->Left + absX + dx, ctrl->Top + absY + dy, ctrl->GetWidth(), ctrl->GetHeight()));
 					auto clipRect = entry->ClipRects->GetTop();
 					if (ctrl->Visible && clipRect.Intersects(Rect(absX + dx + ctrl->Left, absY + dy + ctrl->Top, ctrl->GetWidth(), ctrl->GetHeight())))
 						ctrl->Draw(absX + dx, absY + dy);
@@ -2260,10 +2261,10 @@ namespace GraphicsUI
 		: Label(parent)
 	{
 		FontColor = Global::Colors.MenuItemForeColor;
-		BackColor = Global::Colors.ControlBackColor;
+		BackColor = Global::Colors.EditableAreaBackColor;
 		TabStop = true;
 		Type = CT_CHECKBOX;
-		BorderStyle = BS_NONE;
+		BorderStyle = BS_FLAT_;
 		BackColor.A = 0;
 		Checked = false;
 	}
@@ -2278,27 +2279,39 @@ namespace GraphicsUI
 
 	void CheckBox::Draw(int absX, int absY)
 	{
-		Control::Draw(absX,absY);
+		auto oldBorderStyle = BorderStyle;
+		BorderStyle = BS_NONE;
+		Control::Draw(absX, absY);
+		BorderStyle = oldBorderStyle;
 		absX = absX + Left;
 		absY = absY + Top;
-		//Draw Check Box
-		Color LightColor, DarkColor;
-		LightColor.R = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.R + COLOR_LIGHTEN,0,255);
-		LightColor.G = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.G + COLOR_LIGHTEN,0,255);
-		LightColor.B = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.B + COLOR_LIGHTEN,0,255);
-		LightColor.A = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.A+COLOR_LIGHTEN, 0, 255);
-		DarkColor.R = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.R - COLOR_LIGHTEN, 0, 255);
-		DarkColor.G = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.G - COLOR_LIGHTEN, 0, 255);
-		DarkColor.B = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.B - COLOR_LIGHTEN, 0, 255);
-		DarkColor.A = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.A + COLOR_LIGHTEN, 0, 255);
 		auto entry = GetEntry();
 		int checkBoxSize = GetEntry()->CheckmarkLabel->TextWidth;
 		int checkBoxTop = (Height - checkBoxSize) >> 1;
 		auto & graphics = entry->DrawCommands;
-		graphics.PenColor = DarkColor;
+		graphics.SolidBrushColor = Global::Colors.EditableAreaBackColor;
+		graphics.FillRectangle(absX + 1, absY + checkBoxTop + 1, absX + checkBoxSize, absY + checkBoxTop + checkBoxSize);
+		//Draw Check Box
+		Color lightColor, darkColor;
+		if (BorderStyle == BS_LOWERED)
+		{
+			lightColor.R = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.R + COLOR_LIGHTEN, 0, 255);
+			lightColor.G = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.G + COLOR_LIGHTEN, 0, 255);
+			lightColor.B = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.B + COLOR_LIGHTEN, 0, 255);
+			lightColor.A = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.A + COLOR_LIGHTEN, 0, 255);
+			darkColor.R = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.R - COLOR_LIGHTEN, 0, 255);
+			darkColor.G = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.G - COLOR_LIGHTEN, 0, 255);
+			darkColor.B = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.B - COLOR_LIGHTEN, 0, 255);
+			darkColor.A = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.A + COLOR_LIGHTEN, 0, 255);
+		}
+		else
+		{
+			lightColor = darkColor = Global::Colors.ControlBorderColor;
+		}
+		graphics.PenColor = darkColor;
 		graphics.DrawLine(absX, absY + checkBoxTop, absX + checkBoxSize, absY + checkBoxTop);
 		graphics.DrawLine(absX, absY + checkBoxTop, absX, absY + checkBoxSize + checkBoxTop);
-		graphics.PenColor = LightColor;
+		graphics.PenColor = lightColor;
 		graphics.DrawLine(absX + checkBoxSize, absY + checkBoxTop, absX + checkBoxSize, absY + checkBoxSize + checkBoxTop);
 		graphics.DrawLine(absX + checkBoxSize, absY + checkBoxSize + checkBoxTop, absX, absY + checkBoxSize + checkBoxTop);
 		// Draw check mark
@@ -2310,7 +2323,9 @@ namespace GraphicsUI
 		}
 		//Draw Caption
 		int textStart = checkBoxSize + checkBoxSize / 4;
+		BorderStyle = BS_NONE;
 		Label::Draw(absX+ textStart -Left, absY-Top);
+		BorderStyle = oldBorderStyle;
 		// Draw Focus Rect
 		if (IsFocused())
 		{
@@ -2378,38 +2393,55 @@ namespace GraphicsUI
 
 	void RadioBox::Draw(int absX, int absY)
 	{
+		auto oldBorderStyle = BorderStyle;
+		BorderStyle = BS_NONE;
 		Control::Draw(absX,absY);
+		BorderStyle = oldBorderStyle;
 		absX = absX + Left;
 		absY = absY + Top;
-		//Draw Check Box
-		Color LightColor, DarkColor;
-		LightColor.R = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.R + COLOR_LIGHTEN, 0, 255);
-		LightColor.G = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.G + COLOR_LIGHTEN, 0, 255);
-		LightColor.B = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.B + COLOR_LIGHTEN, 0, 255);
-		LightColor.A = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.A + COLOR_LIGHTEN, 0, 255);
-		DarkColor.R = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.R - COLOR_LIGHTEN, 0, 255);
-		DarkColor.G = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.G - COLOR_LIGHTEN, 0, 255);
-		DarkColor.B = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.B - COLOR_LIGHTEN, 0, 255);
-		DarkColor.A = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.A + COLOR_LIGHTEN, 0, 255);
 		auto entry = GetEntry();
 		int checkBoxSize = GetEntry()->GetLineHeight();
 		int rad = checkBoxSize / 2;
 		int dotX = absX + rad;
 		int dotY = absY + (Height >> 1);
 		auto & graphics = entry->DrawCommands;
-		graphics.PenColor = DarkColor;
-		graphics.DrawArc(dotX, dotY, rad, Math::Pi / 4, Math::Pi * 5 / 4);
-		graphics.PenColor = LightColor;
-		graphics.DrawArc(dotX, dotY, rad, PI * 5 / 4, PI * 9 / 4);
+		graphics.SolidBrushColor = Global::Colors.EditableAreaBackColor;
+		graphics.FillEllipse((float)dotX - rad, (float)dotY - rad, (float)dotX + rad, (float)dotY + rad);
+
+		if (BorderStyle == BS_LOWERED)
+		{
+			//Draw Check Box
+			Color LightColor, DarkColor;
+			LightColor.R = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.R + COLOR_LIGHTEN, 0, 255);
+			LightColor.G = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.G + COLOR_LIGHTEN, 0, 255);
+			LightColor.B = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.B + COLOR_LIGHTEN, 0, 255);
+			LightColor.A = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.A + COLOR_LIGHTEN, 0, 255);
+			DarkColor.R = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.R - COLOR_LIGHTEN, 0, 255);
+			DarkColor.G = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.G - COLOR_LIGHTEN, 0, 255);
+			DarkColor.B = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.B - COLOR_LIGHTEN, 0, 255);
+			DarkColor.A = (unsigned char)ClampInt(Global::Colors.ControlBorderColor.A + COLOR_LIGHTEN, 0, 255);
+			graphics.PenColor = DarkColor;
+			graphics.DrawArc(dotX, dotY, rad, Math::Pi / 4, Math::Pi * 5 / 4);
+			graphics.PenColor = LightColor;
+			graphics.DrawArc(dotX, dotY, rad, PI * 5 / 4, PI * 9 / 4);
+		}
+		else
+		{
+			graphics.PenColor = Global::Colors.ControlBorderColor;
+			graphics.DrawArc(dotX, dotY, rad, 0.0f, Math::Pi * 2.0f);
+		}
 		float dotRad = rad * 0.5f;
 		if (Checked)
 		{
 			// Draw dot
-			graphics.FillEllipse((int)(dotX - dotRad), (int)(dotY - dotRad), (int)(dotX + dotRad), (int)(dotY + dotRad));
+			graphics.SolidBrushColor = Global::Colors.ControlFontColor;
+			graphics.FillEllipse((dotX + 0.5f - dotRad), (dotY + 0.5f - dotRad), (dotX + dotRad), (dotY + dotRad));
 		}
 		//Draw Caption
 		int textStart = checkBoxSize + checkBoxSize / 4;
+		BorderStyle = BS_NONE;
 		Label::Draw(absX + textStart - Left, absY - Top);
+		BorderStyle = oldBorderStyle;
 		// Draw Focus Rect
 		if (IsFocused())
 		{
@@ -2752,7 +2784,7 @@ namespace GraphicsUI
 	bool CustomTextBox::DoKeyPress(unsigned short Key, SHIFTSTATE Shift)
 	{
 		Control::DoKeyPress(Key,Shift);
-		if (Shift == 0)
+		if ((Shift & SS_CONTROL) == 0)
 		{
 			if (Key >= 32)
 			{
@@ -3967,6 +3999,10 @@ namespace GraphicsUI
 		Height = ListHeight; Width = ListWidth; Left = ListLeft; Top = ListTop;
 		ListBox::SizeChanged();
 		Height = vlH; Width = vlW; Left = vlL; Top = vlT;
+		if (ShowList)
+		{
+			Global::MouseCaptureControl = this;
+		}
 	}
 
 	bool ComboBox::PosInList(int X, int Y)
@@ -4121,7 +4157,7 @@ namespace GraphicsUI
 		if (!Visible || !Enabled)
 			return false;
 		bool AltDown = (shift != 0);
-		if (!AltDown)
+		if (!AltDown && (Key == 0x26 || Key == 0x28))
 		{
 			if (Key == 0x26) // VK_UP
 			{
@@ -4139,12 +4175,23 @@ namespace GraphicsUI
 					SelectionChanged();
 				}
 			}
+			else
+			{
+				int sy = (HighLightID - ScrollBar->GetPosition())*ItemHeight + BorderWidth - 1;
+				if (sy < 0)
+				{
+					ScrollBar->SetPosition(ClampInt(HighLightID, 0, ScrollBar->GetMax()));
+				}
+				else if (sy > ListHeight - ItemHeight - 1)
+				{
+					ScrollBar->SetPosition(ClampInt(HighLightID - ListHeight / ItemHeight + 1, 0, ScrollBar->GetMax()));
+				}
+			}
 		}
 		if ((Key == 0x20 || Key == 0x0D)) // VK_SPACE VK_RETURN
 		{
 			if (ShowList)
 			{
-				ChangeSelectedItem(HighLightID);
 				if (HighLightID != SelectedIndex)
 				{
 					ChangeSelectedItem(HighLightID);
@@ -6435,6 +6482,6 @@ namespace GraphicsUI
 	{
 		auto & graphics = GetEntry()->DrawCommands;
 		graphics.PenColor = BorderColor;
-		graphics.DrawLine(absX + Left, absY + Top, absX + Left + Width, absY + Top + Height);
+		graphics.DrawLine(absX + Left, absY + Top, absX + Left + Width - 1, absY + Top + Height - 1);
 	}
 }

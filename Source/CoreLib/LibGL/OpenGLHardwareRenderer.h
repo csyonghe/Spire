@@ -97,7 +97,8 @@ namespace GL
 		Char = 0x60, Char2 = 0x61, Char3 = 0x62, Char4 = 0x63,
 		UShort = 0x70, UShort2 = 0x71, UShort3 = 0x72, UShort4 = 0x73,
 		UInt4_10_10_10_2 = 0x83,
-		Half = 0x90, Half2 = 0x91, Half3 = 0x92, Half4 = 0x93
+		Half = 0x90, Half2 = 0x91, Half3 = 0x92, Half4 = 0x93,
+		UInt = 0x100
 	};
 
 	inline DataType GetSingularDataType(DataType type)
@@ -325,6 +326,9 @@ namespace GL
 		case DataType::Int3:
 		case DataType::Int4:
 			return GL_INT;
+			break;
+		case DataType::UInt:
+			return GL_UNSIGNED_INT;
 			break;
 		case DataType::Byte:
 		case DataType::Byte2:
@@ -830,6 +834,22 @@ namespace GL
 		ElementBuffer = GL_ELEMENT_ARRAY_BUFFER,
 	};
 
+	enum class BufferStorageFlag
+	{
+		DynamicStorage = GL_DYNAMIC_STORAGE_BIT,
+		MapRead = GL_MAP_READ_BIT,
+		MapWrite = GL_MAP_WRITE_BIT,
+		MapPersistent = GL_MAP_PERSISTENT_BIT,
+		MapCoherent = GL_MAP_COHERENT_BIT,
+		ClientStorage = GL_CLIENT_STORAGE_BIT
+	};
+
+	enum class BufferAccess
+	{
+		Read = GL_MAP_READ_BIT, Write = GL_MAP_WRITE_BIT, ReadWrite = GL_MAP_READ_BIT | GL_MAP_WRITE_BIT,
+		ReadWritePersistent = GL_MAP_READ_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT
+	};
+
 	class BufferObject : public GL_Object
 	{
 	public:
@@ -848,6 +868,18 @@ namespace GL
 			else if (BindTarget == GL_ARRAY_BUFFER || BindTarget == GL_ELEMENT_ARRAY_BUFFER)
 				usage = GL_STREAM_DRAW;
 			glNamedBufferData(Handle, sizeInBytes, data, usage);
+		}
+		void BufferStorage(int size, void * data, BufferStorageFlag storageFlags)
+		{
+			glNamedBufferStorage(Handle, (GLsizeiptr)size, data, (GLbitfield)storageFlags);
+		}
+		void * Map(BufferAccess access, int offset, int len)
+		{
+			return glMapNamedBufferRange(Handle, offset, len, (GLenum)access);
+		}
+		void Unmap()
+		{
+			glUnmapNamedBuffer(Handle);
 		}
 		void SubData(int offset, int size, void * data)
 		{
@@ -903,7 +935,11 @@ namespace GL
 				if (attribs[i].Binding != -1)
 					id = attribs[i].Binding;
 				glEnableVertexAttribArray(id);
-				glVertexAttribPointer(id, GetDataTypeComponenets(attribs[i].Type), TranslateDataTypeToInputType(attribs[i].Type), attribs[i].Normalized, vertSize, (void*)(CoreLib::PtrInt)attribs[i].StartOffset);
+				if (attribs[i].Type == DataType::Int || attribs[i].Type == DataType::Int2 || attribs[i].Type == DataType::Int3 || attribs[i].Type == DataType::Int4
+					|| attribs[i].Type == DataType::UInt)
+					glVertexAttribIPointer(id, GetDataTypeComponenets(attribs[i].Type), TranslateDataTypeToInputType(attribs[i].Type), vertSize, (void*)(CoreLib::PtrInt)attribs[i].StartOffset);
+				else
+					glVertexAttribPointer(id, GetDataTypeComponenets(attribs[i].Type), TranslateDataTypeToInputType(attribs[i].Type), attribs[i].Normalized, vertSize, (void*)(CoreLib::PtrInt)attribs[i].StartOffset);
 				glVertexAttribDivisor(id, instanceDivisor);
 			}
 
@@ -1001,6 +1037,24 @@ namespace GL
 			if (loc != -1)
 				glProgramUniform4fv(Handle, loc, 1, (float*)&value);
 		}
+		void SetUniform(String name, Vec2i value)
+		{
+			int loc = glGetUniformLocation(Handle, name.ToMultiByteString());
+			if (loc != -1)
+				glProgramUniform2iv(Handle, loc, 1, (int*)&value);
+		}
+		void SetUniform(String name, Vec3i value)
+		{
+			int loc = glGetUniformLocation(Handle, name.ToMultiByteString());
+			if (loc != -1)
+				glProgramUniform3iv(Handle, loc, 1, (int*)&value);
+		}
+		void SetUniform(String name, Vec4i value)
+		{
+			int loc = glGetUniformLocation(Handle, name.ToMultiByteString());
+			if (loc != -1)
+				glProgramUniform4iv(Handle, loc, 1, (int*)&value);
+		}
 		void SetUniform(String name, Matrix3 value)
 		{
 			int loc = glGetUniformLocation(Handle, name.ToMultiByteString());
@@ -1023,6 +1077,21 @@ namespace GL
 		{
 			if (loc != -1)
 				glProgramUniform1i(Handle, loc, value);
+		}
+		void SetUniform(int loc, Vec2i value)
+		{
+			if (loc != -1)
+				glProgramUniform2iv(Handle, loc, 1, (int*)&value);
+		}
+		void SetUniform(int loc, Vec3i value)
+		{
+			if (loc != -1)
+				glProgramUniform3iv(Handle, loc, 1, (int*)&value);
+		}
+		void SetUniform(int loc, Vec4i value)
+		{
+			if (loc != -1)
+				glProgramUniform4iv(Handle, loc, 1, (int*)&value);
 		}
 		void SetUniform(int loc, uint64_t value)
 		{
@@ -1728,6 +1797,11 @@ namespace GL
 		void BindVertexArray(VertexArray vertArray)
 		{
 			glBindVertexArray(vertArray.Handle);
+		}
+
+		void DrawElements(PrimitiveType primType, int count, DataType indexType)
+		{
+			glDrawElements((GLenum)primType, count, TranslateDataTypeToInputType(indexType), nullptr);
 		}
 
 		void DrawArray(PrimitiveType primType, int first, int count)

@@ -201,6 +201,9 @@
     <ClInclude Include="Imaging\stb_image.h">
       <Filter>Imaging</Filter>
     </ClInclude>
+    <ClInclude Include="MemoryPool.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="LibString.cpp">
@@ -325,6 +328,9 @@
     </ClCompile>
     <ClCompile Include="Imaging\stb_image.cpp">
       <Filter>Imaging</Filter>
+    </ClCompile>
+    <ClCompile Include="MemoryPool.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

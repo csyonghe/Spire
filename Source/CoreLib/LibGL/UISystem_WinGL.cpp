@@ -16,6 +16,10 @@
 using namespace CoreLib;
 using namespace VectorMath;
 
+const int TextBufferSize = 4 * 1024 * 1024;
+const int TextPixelBits = 2;
+const int Log2TextPixelsPerByte = Math::Log2Floor(8 / TextPixelBits);
+
 namespace GraphicsUI
 {
 	SHIFTSTATE GetCurrentShiftState()
@@ -479,90 +483,76 @@ namespace GraphicsUI
 
 	};
 
+	struct UberVertex
+	{
+		float x, y, u, v;
+		int inputIndex;
+	};
+
+	struct TextUniformFields
+	{
+		int TextWidth, TextHeight;
+		int StartPointer;
+		int NotUsed;
+	};
+
+	struct ShadowUniformFields
+	{
+		unsigned short ShadowOriginX, ShadowOriginY, ShadowWidth, ShadowHeight;
+		int ShadowSize;
+		int NotUsed;
+	};
+
+	struct UniformField
+	{
+		unsigned short ClipRectX, ClipRectY, ClipRectX1, ClipRectY1;
+		int ShaderType;
+		Color InputColor;
+		union
+		{
+			TextUniformFields TextParams;
+			ShadowUniformFields ShadowParams;
+		};
+	};
+
 	class GLUIRenderer
 	{
 	private:
 		GL::HardwareRenderer * glContext;
 		int screenWidth, screenHeight;
 		Matrix4 orthoMatrix;
-		const wchar_t * textureVSSrc = LR"(
+		const wchar_t * uberVsSrc = LR"(
 				#version 440
 				layout(location = 0) in vec2 vert_pos;
 				layout(location = 1) in vec2 vert_uv;	
+				layout(location = 2) in int vert_primId;
 				layout(location = 0) uniform mat4 orthoMatrix;
-				layout(location = 1) uniform vec2 translation;
-
 				out vec2 pos;
 				out vec2 uv;
+				flat out int primId;
 				void main()
 				{
-					pos = vert_pos + translation;
+					pos = vert_pos;
 					gl_Position = orthoMatrix * vec4(pos, 0.0, 1.0);
 					uv = vert_uv;
+					primId = vert_primId;
 				}
 			)";
-		const char * textureFSSrc = R"(
-				#version 440
-				layout(location = 2) uniform sampler2D texAlbedo;
-				layout(location = 3) uniform vec4 clipBounds;
-				
-				in vec2 pos;
-				in vec2 uv;
-				layout(location = 0) out vec4 color;
-				void main()
-				{
-					if (pos.x < clipBounds.x) discard;
-					if (pos.y < clipBounds.y) discard;
-					if (pos.x > clipBounds.z) discard;
-					if (pos.y > clipBounds.w) discard;
- 					color = texture(texAlbedo, uv);
-				}
-			)";
-		const char * solidColorFSSrc = R"(
-				#version 440
-				layout(location = 2) uniform vec4 solidColor;
-				layout(location = 3) uniform vec4 clipBounds;
-				in vec2 pos;
-				layout(location = 0) out vec4 color;
-				void main()
-				{
-					if (pos.x < clipBounds.x) discard;
-					if (pos.y < clipBounds.y) discard;
-					if (pos.x > clipBounds.z) discard;
-					if (pos.y > clipBounds.w) discard;
-					color = solidColor;
-				}
-			)";
-		const char * textFSSrc = R"(
-				#version 440
-				layout(location = 2) uniform sampler2D texAlbedo;
-				layout(location = 3) uniform vec4 clipBounds;
-				layout(location = 4) uniform vec4 fontColor;
-				in vec2 pos;
-				in vec2 uv;
-				layout(location = 0) out vec4 color;
-				void main()
-				{
-					if (pos.x < clipBounds.x) discard;
-					if (pos.y < clipBounds.y) discard;
-					if (pos.x > clipBounds.z) discard;
-					if (pos.y > clipBounds.w) discard;
-					float alpha = texture(texAlbedo, uv).x;
-					color = fontColor;
-					color.w *= alpha;
-				}
-			)";
-		const char * shadowFsSrc = R"(
+		const char * uberFsSrc = R"(
 			#version 440
-			layout(location = 1) uniform vec2 translation;
-			layout(location = 2) uniform vec2 origin;
-			layout(location = 3) uniform vec2 size;
-			layout(location = 4) uniform vec4 shadowColor;
-			layout(location = 5) uniform float shadowSize;
-			layout(location = 6) uniform vec4 rectBounds;
-			layout(location = 7) uniform vec4 clipBounds;
+			layout(binding = 0, std430) buffer uniformBuffer
+			{
+				uvec4 uniformInput[];
+			};
+			layout(binding = 1, std430) buffer textBuffer
+			{
+				uint textContent[];
+			};
 			in vec2 pos;
+			in vec2 uv;
+			flat in int primId;
 			layout(location = 0) out vec4 color;
+
 			// This approximates the error function, needed for the gaussian integral
 			vec4 erf(vec4 x)
 			{
@@ -578,81 +568,114 @@ namespace GraphicsUI
 				vec4 integral = 0.5 + 0.5 * erf(query * (sqrt(0.5) / sigma));
 				return (integral.z - integral.x) * (integral.w - integral.y);
 			}
-
+	
 			void main()
 			{
-				if (pos.x > rectBounds.x && pos.x <rectBounds.z && pos.y > rectBounds.y && pos.y < rectBounds.w)
+				uvec4 params0 = uniformInput[int(primId) * 2];
+				uvec4 params1 = uniformInput[int(primId) * 2 + 1];
+				int clipBoundX = int(params0.x & 65535);
+				int clipBoundY = int(params0.x >> 16);
+				int clipBoundX1 = int(params0.y & 65535);
+				int clipBoundY1 = int(params0.y >> 16);
+				int shaderType = int(params0.z);
+				uint pColor = params0.w;
+				vec4 inputColor = vec4(float(pColor&255), float((pColor>>8)&255), float((pColor>>16)&255), float((pColor>>24)&255)) * (1.0/255.0);
+				if (shaderType == 0) // solid color
+				{
+					if (pos.x < clipBoundX) discard;
+					if (pos.y < clipBoundY) discard;
+					if (pos.x > clipBoundX1) discard;
+					if (pos.y > clipBoundY1) discard;
+					color = inputColor;
+				}
+				else if (shaderType == 1) // text
+				{
+					if (pos.x < clipBoundX) discard;
+					if (pos.y < clipBoundY) discard;
+					if (pos.x > clipBoundX1) discard;
+					if (pos.y > clipBoundY1) discard;
+					
+					int textWidth = int(params1.x);
+					int textHeight = int(params1.y);
+					int startAddr = int(params1.z);
+					
+					ivec2 fetchPos = ivec2(uv * ivec2(textWidth, textHeight));
+					int relAddr = fetchPos.y * textWidth + fetchPos.x;
+					int ptr = startAddr + (relAddr >> 2);
+					uint word = textContent[ptr >> 2];
+					uint ptrMod = (ptr & 3);
+					word >>= (ptrMod<<3);
+					int bitPtr = relAddr & 3;
+					word >>= (bitPtr << 1);
+					float alpha = float(word & 3) * (1.0/3.0);
+					color = inputColor;
+					color.w *= alpha;
+				}
+				else if (shaderType == 2)
+				{
+					if (pos.x > clipBoundX && pos.x < clipBoundX1 && pos.y > clipBoundY && pos.y < clipBoundY1)
+						discard;
+					vec2 origin, size;
+					origin.x = float(params1.x & 65535);
+					origin.y = float(params1.x >> 16);
+					size.x = float(params1.y & 65535);
+					size.y = float(params1.y >> 16);
+					float shadowSize = float(params1.z);
+					float shadow = boxShadow(origin, origin+size, pos, shadowSize);
+					color = vec4(inputColor.xyz, inputColor.w*shadow);
+				}
+				else
 					discard;
-				if (pos.x < clipBounds.x) discard;
-				if (pos.y < clipBounds.y) discard;
-				if (pos.x > clipBounds.z) discard;
-				if (pos.y > clipBounds.w) discard;
-				float shadow = boxShadow(origin, origin+size, pos - translation, shadowSize);
-				color = vec4(shadowColor.xyz, shadowColor.w*shadow);
 			}
-			)";
+		)";
 	private:
-		GL::Shader vs, textureFs, textFs, solidColorFs, shadowFs;
-		GL::Program textureProgram, textProgram, solidColorProgram, shadowProgram;
-		GL::BufferObject vertexBuffer;
-		GL::VertexArray posUvVertexArray, posVertexArray;
+		GL::Shader uberVs, uberFs;
+		GL::Program uberProgram;
+		GL::BufferObject vertexBuffer, indexBuffer, uniformBuffer;
+		GL::BufferObject shaderBuffers[2];
+		GL::VertexArray uberVertexArray;
 		GL::TextureSampler linearSampler;
-		Vec2 translation;
+		List<UniformField> uniformFields;
+		List<UberVertex> vertexStream;
+		List<int> indexStream;
+		int primCounter;
+		WinGLSystemInterface * system;
 		Vec4 clipRect;
 	public:
-		GLUIRenderer(GL::HardwareRenderer * hw)
+		GLUIRenderer(WinGLSystemInterface * pSystem, GL::HardwareRenderer * hw)
 		{
-			translation = Vec2::Create(0.0f, 0.0f);
+			system = pSystem;
 			clipRect = Vec4::Create(0.0f, 0.0f, 1e20f, 1e20f);
 			glContext = hw;
-			vs = glContext->CreateShader(GL::ShaderType::VertexShader, textureVSSrc);
-			textureFs = glContext->CreateShader(GL::ShaderType::FragmentShader, textureFSSrc);
-			textFs = glContext->CreateShader(GL::ShaderType::FragmentShader, textFSSrc);
-			solidColorFs = glContext->CreateShader(GL::ShaderType::FragmentShader, solidColorFSSrc);
-			shadowFs = glContext->CreateShader(GL::ShaderType::FragmentShader, shadowFsSrc);
-			textureProgram = glContext->CreateProgram(vs, textureFs);
-			textureProgram.Link();
 
-			textProgram = glContext->CreateProgram(vs, textFs);
-			textProgram.Link();
+			uberVs = glContext->CreateShader(GL::ShaderType::VertexShader, uberVsSrc);
+			uberFs = glContext->CreateShader(GL::ShaderType::FragmentShader, uberFsSrc);
+			uberProgram = glContext->CreateProgram(uberVs, uberFs);
 
-			solidColorProgram = glContext->CreateProgram(vs, solidColorFs);
-			solidColorProgram.Link();
-
-			shadowProgram = glContext->CreateProgram(vs, shadowFs);
-			shadowProgram.Link();
+			uniformBuffer = glContext->CreateBuffer(GL::BufferUsage::ShadeStorageBuffer);
 
 			vertexBuffer = glContext->CreateBuffer(GL::BufferUsage::ArrayBuffer);
-			vertexBuffer.SetData(nullptr, sizeof(float) * 16);
+			indexBuffer = glContext->CreateBuffer(GL::BufferUsage::ArrayBuffer);
 
-			posUvVertexArray = glContext->CreateVertexArray();
-			posVertexArray = glContext->CreateVertexArray();
-
+			uberVertexArray = glContext->CreateVertexArray();
 			List<GL::VertexAttributeDesc> attribs;
 			attribs.Add(GL::VertexAttributeDesc(GL::DataType::Float2, 0, 0, 0));
-			posVertexArray.SetVertex(vertexBuffer, attribs.GetArrayView(), 8);
-
 			attribs.Add(GL::VertexAttributeDesc(GL::DataType::Float2, 0, 8, 1));
-			posUvVertexArray.SetVertex(vertexBuffer, attribs.GetArrayView(), 16);
-
+			attribs.Add(GL::VertexAttributeDesc(GL::DataType::Int, 0, 16, 2));
+			uberVertexArray.SetVertex(vertexBuffer, attribs.GetArrayView(), 20);
+			uberVertexArray.SetIndex(indexBuffer);
 			linearSampler = glContext->CreateTextureSampler();
 			linearSampler.SetFilter(GL::TextureFilter::Linear);
 		}
 		~GLUIRenderer()
 		{
-			glContext->DestroyProgram(textProgram);
-			glContext->DestroyProgram(textureProgram);
-			glContext->DestroyProgram(solidColorProgram);
-			glContext->DestroyShader(vs);
-			glContext->DestroyShader(textureFs);
-			glContext->DestroyShader(textFs);
-			glContext->DestroyShader(solidColorFs);
-			glContext->DestroyVertexArray(posUvVertexArray);
-			glContext->DestroyVertexArray(posVertexArray);
-
+			glContext->DestroyShader(uberVs);
+			glContext->DestroyShader(uberFs);
+			glContext->DestroyProgram(uberProgram);
+			glContext->DestroyBuffer(uniformBuffer);
 			glContext->DestroyBuffer(vertexBuffer);
+			glContext->DestroyBuffer(indexBuffer);
 			glContext->DestroyTextureSampler(linearSampler);
-
 		}
 		void SetScreenResolution(int w, int h)
 		{
@@ -662,62 +685,111 @@ namespace GraphicsUI
 		}
 		void BeginUIDrawing()
 		{
-			glContext->SetBlendMode(GL::BlendMode::AlphaBlend);
-			glContext->SetZTestMode(GL::BlendOperator::Disabled);
-			glContext->SetViewport(0, 0, screenWidth, screenHeight);
+			shaderBuffers[0] = uniformBuffer;
+			shaderBuffers[1] = system->GetTextBufferObject();
+			vertexStream.Clear();
+			uniformFields.Clear();
+			indexStream.Clear();
+			primCounter = 0;
 		}
 		void EndUIDrawing()
 		{
+			vertexBuffer.SetData(vertexStream.Buffer(), sizeof(UberVertex) * vertexStream.Count());
+			uniformBuffer.SetData(uniformFields.Buffer(), sizeof(UniformField) * uniformFields.Count());
+			indexBuffer.SetData(indexStream.Buffer(), sizeof(int) * indexStream.Count());
+			glMemoryBarrier(GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT);
+			glContext->SetBlendMode(GL::BlendMode::AlphaBlend);
+			glContext->SetZTestMode(GL::BlendOperator::Disabled);
+			glContext->SetViewport(0, 0, screenWidth, screenHeight);
+			uberProgram.Use();
+			uberProgram.SetUniform(0, orthoMatrix);
+			glContext->BindShaderBuffers(ArrayView<GL::BufferObject>(shaderBuffers, 2));
+			glContext->BindVertexArray(uberVertexArray);
+			glEnable(GL_PRIMITIVE_RESTART);
+			glPrimitiveRestartIndex((GLuint)(-1));
+			glContext->DrawElements(GL::PrimitiveType::TriangleFans, indexStream.Count(), GL::DataType::UInt);
 			glContext->SetBlendMode(GL::BlendMode::Replace);
 			glContext->BindVertexArray(GL::VertexArray());
 		}
-		void DrawLine(const Vec4 & color, float x0, float y0, float x1, float y1)
+		void DrawLine(const Color & color, float x0, float y0, float x1, float y1)
 		{
-			Vec2 points[2];
-			points[0] = Vec2::Create(x0 + 0.5f, y0 + 0.5f);
-			points[1] = Vec2::Create(x1 + 0.5f, y1 + 0.5f);
-			vertexBuffer.SetData(points, sizeof(float) * 4);
-			solidColorProgram.Use();
-			solidColorProgram.SetUniform(0, orthoMatrix);
-			solidColorProgram.SetUniform(1, translation);
-			solidColorProgram.SetUniform(2, color);
-			solidColorProgram.SetUniform(3, clipRect);
-			glContext->BindVertexArray(posVertexArray);
-			glContext->DrawArray(GL::PrimitiveType::Lines, 0, 2);
+			UberVertex points[4];
+			Vec2 p0 = Vec2::Create(x0, y0);
+			Vec2 p1 = Vec2::Create(x1, y1);
+			Vec2 lineDir = (p1 - p0) * 0.5f;
+			lineDir = lineDir.Normalize();
+			Vec2 lineDirOtho = Vec2::Create(-lineDir.y * 0.5f, lineDir.x * 0.5f);
+			p0.x -= lineDir.x; p0.y -= lineDir.y;
+			//p1.x += lineDir.x; p1.y += lineDir.y;
+			points[0].x = p0.x - lineDirOtho.x; points[0].y = p0.y - lineDirOtho.y; points[0].inputIndex = primCounter;
+			points[1].x = p0.x + lineDirOtho.x; points[1].y = p0.y + lineDirOtho.y; points[1].inputIndex = primCounter;
+			points[2].x = p1.x + lineDirOtho.x; points[2].y = p1.y + lineDirOtho.y; points[2].inputIndex = primCounter;
+			points[3].x = p1.x - lineDirOtho.x; points[3].y = p1.y - lineDirOtho.y; points[3].inputIndex = primCounter;
+			indexStream.Add(vertexStream.Count());
+			indexStream.Add(vertexStream.Count() + 1);
+			indexStream.Add(vertexStream.Count() + 2);
+			indexStream.Add(vertexStream.Count() + 3);
+			indexStream.Add(-1);
+			vertexStream.AddRange(points, 4);
+			UniformField fields;
+			fields.ClipRectX = (unsigned short)clipRect.x;
+			fields.ClipRectY = (unsigned short)clipRect.y;
+			fields.ClipRectX1 = (unsigned short)clipRect.z;
+			fields.ClipRectY1 = (unsigned short)clipRect.w;
+			fields.ShaderType = 0;
+			fields.InputColor = color;
+			uniformFields.Add(fields);
+			primCounter++;
 		}
-		void DrawSolidPolygon(const Vec4 & color, CoreLib::ArrayView<Vec2> points)
+		void DrawSolidPolygon(const Color & color, CoreLib::ArrayView<Vec2> points)
 		{
-			vertexBuffer.SetData(points.Buffer(), sizeof(float) * 2 * points.Count());
-			solidColorProgram.Use();
-			solidColorProgram.SetUniform(0, orthoMatrix);
-			solidColorProgram.SetUniform(1, translation);
-			solidColorProgram.SetUniform(2, color);
-			solidColorProgram.SetUniform(3, clipRect);
-
-			glContext->BindVertexArray(posVertexArray);
-			glContext->DrawArray(GL::PrimitiveType::TriangleFans, 0, points.Count());
+			for (auto p : points)
+			{
+				UberVertex vtx;
+				vtx.x = p.x; vtx.y = p.y; vtx.inputIndex = primCounter;
+				indexStream.Add(vertexStream.Count());
+				vertexStream.Add(vtx);
+			}
+			indexStream.Add(-1);
+			UniformField fields;
+			fields.ClipRectX = (unsigned short)clipRect.x;
+			fields.ClipRectY = (unsigned short)clipRect.y;
+			fields.ClipRectX1 = (unsigned short)clipRect.z;
+			fields.ClipRectY1 = (unsigned short)clipRect.w;
+			fields.ShaderType = 0;
+			fields.InputColor = color;
+			uniformFields.Add(fields);
+			primCounter++;
 		}
 
-		void DrawSolidQuad(const Vec4 & color, float x, float y, float x1, float y1)
+		void DrawSolidQuad(const Color & color, float x, float y, float x1, float y1)
 		{
-			Vec2 vertexData[4];
-			vertexData[0] = Vec2::Create((float)x, (float)y);
-			vertexData[1] = Vec2::Create((float)x, (float)y1);
-			vertexData[2] = Vec2::Create((float)x1, (float)y1);
-			vertexData[3] = Vec2::Create((float)x1, (float)y);
-			vertexBuffer.SetData(vertexData, sizeof(float) * 8);
-			solidColorProgram.Use();
-			solidColorProgram.SetUniform(0, orthoMatrix);
-			solidColorProgram.SetUniform(1, translation);
-			solidColorProgram.SetUniform(2, color);
-			solidColorProgram.SetUniform(3, clipRect);
+			indexStream.Add(vertexStream.Count());
+			indexStream.Add(vertexStream.Count() + 1);
+			indexStream.Add(vertexStream.Count() + 2);
+			indexStream.Add(vertexStream.Count() + 3);
+			indexStream.Add(-1);
 
-			glContext->BindVertexArray(posVertexArray);
-			glContext->DrawArray(GL::PrimitiveType::TriangleFans, 0, 4);
+			UberVertex points[4];
+			points[0].x = x; points[0].y = y; points[0].inputIndex = primCounter;
+			points[1].x = x; points[1].y = y1; points[1].inputIndex = primCounter;
+			points[2].x = x1; points[2].y = y1; points[2].inputIndex = primCounter;
+			points[3].x = x1; points[3].y = y; points[3].inputIndex = primCounter;
+			vertexStream.AddRange(points, 4);
+
+			UniformField fields;
+			fields.ClipRectX = (unsigned short)clipRect.x;
+			fields.ClipRectY = (unsigned short)clipRect.y;
+			fields.ClipRectX1 = (unsigned short)clipRect.z;
+			fields.ClipRectY1 = (unsigned short)clipRect.w;
+			fields.ShaderType = 0;
+			fields.InputColor = color;
+			uniformFields.Add(fields);
+			primCounter++;
 		}
-		void DrawTextureQuad(GL::Texture2D texture, float x, float y, float x1, float y1)
+		void DrawTextureQuad(GL::Texture2D /*texture*/, float /*x*/, float /*y*/, float /*x1*/, float /*y1*/)
 		{
-			Vec4 vertexData[4];
+			/*Vec4 vertexData[4];
 			vertexData[0] = Vec4::Create(x, y, 0.0f, 0.0f);
 			vertexData[1] = Vec4::Create(x, y1, 0.0f, -1.0f);
 			vertexData[2] = Vec4::Create(x1, y1, 1.0f, -1.0f);
@@ -726,52 +798,70 @@ namespace GraphicsUI
 
 			textureProgram.Use();
 			textureProgram.SetUniform(0, orthoMatrix);
-			textureProgram.SetUniform(1, translation);
 			textureProgram.SetUniform(2, 0);
 			textureProgram.SetUniform(3, clipRect);
 
 			glContext->UseTexture(0, texture, linearSampler);
 			glContext->BindVertexArray(posUvVertexArray);
-			glContext->DrawArray(GL::PrimitiveType::TriangleFans, 0, 4);
+			glContext->DrawArray(GL::PrimitiveType::TriangleFans, 0, 4);*/
 		}
-		void DrawTextQuad(GL::Texture2D texture, const Vec4 & fontColor, float x, float y, float x1, float y1)
+		void DrawTextQuad(BakedText * text, const Color & fontColor, float x, float y, float x1, float y1)
 		{
-			Vec4 vertexData[4];
-			vertexData[0] = Vec4::Create((float)x, (float)y, 0.0f, 0.0f);
-			vertexData[1] = Vec4::Create((float)x, (float)y1, 0.0f, 1.0f);
-			vertexData[2] = Vec4::Create((float)x1, (float)y1, 1.0f, 1.0f);
-			vertexData[3] = Vec4::Create((float)x1, (float)y, 1.0f, 0.0f);
-			vertexBuffer.SetData(vertexData, sizeof(float) * 16);
+			indexStream.Add(vertexStream.Count());
+			indexStream.Add(vertexStream.Count() + 1);
+			indexStream.Add(vertexStream.Count() + 2);
+			indexStream.Add(vertexStream.Count() + 3);
+			indexStream.Add(-1);
 
-			textProgram.Use();
-			textProgram.SetUniform(0, orthoMatrix);
-			textProgram.SetUniform(1, translation);
-			textProgram.SetUniform(2, 0);
-			textProgram.SetUniform(3, clipRect);
-			textProgram.SetUniform(4, fontColor);
-			glContext->UseTexture(0, texture, linearSampler);
-			glContext->BindVertexArray(posUvVertexArray);
-			glContext->DrawArray(GL::PrimitiveType::TriangleFans, 0, 4);
+			UberVertex vertexData[4];
+			vertexData[0].x = x; vertexData[0].y = y; vertexData[0].u = 0.0f; vertexData[0].v = 0.0f; vertexData[0].inputIndex = primCounter;
+			vertexData[1].x = x; vertexData[1].y = y1; vertexData[1].u = 0.0f; vertexData[1].v = 1.0f; vertexData[1].inputIndex = primCounter;
+			vertexData[2].x = x1; vertexData[2].y = y1; vertexData[2].u = 1.0f; vertexData[2].v = 1.0f; vertexData[2].inputIndex = primCounter;
+			vertexData[3].x = x1; vertexData[3].y = y; vertexData[3].u = 1.0f; vertexData[3].v = 0.0f; vertexData[3].inputIndex = primCounter;
+			vertexStream.AddRange(vertexData, 4);
+
+			UniformField fields;
+			fields.ClipRectX = (unsigned short)clipRect.x;
+			fields.ClipRectY = (unsigned short)clipRect.y;
+			fields.ClipRectX1 = (unsigned short)clipRect.z;
+			fields.ClipRectY1 = (unsigned short)clipRect.w;
+			fields.ShaderType = 1;
+			fields.InputColor = fontColor;
+			fields.TextParams.TextWidth = text->Width;
+			fields.TextParams.TextHeight = text->Height;
+			fields.TextParams.StartPointer = system->GetTextBufferRelativeAddress(text->textBuffer);
+			uniformFields.Add(fields);
+			primCounter++;
 		}
-		void DrawRectangleShadow(const Vec4 & color, float x, float y, float w, float h, float offsetX, float offsetY, float shadowSize)
+		void DrawRectangleShadow(const Color & color, float x, float y, float w, float h, float offsetX, float offsetY, float shadowSize)
 		{
-			Vec2 vertexData[4];
-			vertexData[0] = Vec2::Create((float)x + offsetX - shadowSize * 1.5f, (float)y + offsetY - shadowSize * 1.5f);
-			vertexData[1] = Vec2::Create((float)x + offsetX - shadowSize * 1.5f, (float)(y + h + offsetY) + shadowSize * 3.0f);
-			vertexData[2] = Vec2::Create((float)(x + w + offsetX + shadowSize * 3.0f), (float)(y + h + offsetY) + shadowSize * 3.0f);
-			vertexData[3] = Vec2::Create((float)(x + w + offsetX + shadowSize * 3.0f), (float)y + offsetY - shadowSize * 1.5f);
-			vertexBuffer.SetData(vertexData, sizeof(float) * 8);
-			shadowProgram.Use();
-			shadowProgram.SetUniform(0, orthoMatrix);
-			shadowProgram.SetUniform(1, translation);
-			shadowProgram.SetUniform(2, Vec2::Create(x + offsetX, y + offsetY));
-			shadowProgram.SetUniform(3, Vec2::Create(w, h));
-			shadowProgram.SetUniform(4, color);
-			shadowProgram.SetUniform(5, shadowSize * 0.5f);
-			shadowProgram.SetUniform(6, Vec4::Create(x, y, x + w, y + h));
-			shadowProgram.SetUniform(7, clipRect);
-			glContext->BindVertexArray(posVertexArray);
-			glContext->DrawArray(GL::PrimitiveType::TriangleFans, 0, 4);
+			indexStream.Add(vertexStream.Count());
+			indexStream.Add(vertexStream.Count() + 1);
+			indexStream.Add(vertexStream.Count() + 2);
+			indexStream.Add(vertexStream.Count() + 3);
+			indexStream.Add(-1);
+			
+			UberVertex vertexData[4];
+			vertexData[0].x = x + offsetX - shadowSize * 1.5f; vertexData[0].y = y + offsetY - shadowSize * 1.5f; vertexData[0].u = 0.0f; vertexData[0].v = 0.0f; vertexData[0].inputIndex = primCounter;
+			vertexData[1].x = x + offsetX - shadowSize * 1.5f; vertexData[1].y = (y + h + offsetY) + shadowSize * 1.5f; vertexData[1].u = 0.0f; vertexData[1].v = 1.0f; vertexData[1].inputIndex = primCounter;
+			vertexData[2].x = x + w + offsetX + shadowSize * 1.5f; vertexData[2].y = (y + h + offsetY) + shadowSize * 1.5f; vertexData[2].u = 1.0f; vertexData[2].v = 1.0f; vertexData[2].inputIndex = primCounter;
+			vertexData[3].x = x + w + offsetX + shadowSize * 1.5f; vertexData[3].y = y + offsetY - shadowSize * 1.5f; vertexData[3].u = 1.0f; vertexData[3].v = 0.0f; vertexData[3].inputIndex = primCounter;
+			vertexStream.AddRange(vertexData, 4);
+
+			UniformField fields;
+			fields.ClipRectX = (unsigned short)x;
+			fields.ClipRectY = (unsigned short)y;
+			fields.ClipRectX1 = (unsigned short)(x + w);
+			fields.ClipRectY1 = (unsigned short)(y + h);
+			fields.ShaderType = 2;
+			fields.InputColor = color;
+			fields.ShadowParams.ShadowOriginX = (unsigned short)(x + offsetX);
+			fields.ShadowParams.ShadowOriginY = (unsigned short)(y + offsetY);
+			fields.ShadowParams.ShadowWidth = (unsigned short)(w);
+			fields.ShadowParams.ShadowHeight = (unsigned short)(h);
+			fields.ShadowParams.ShadowSize = (int)(shadowSize * 0.5f);
+			uniformFields.Add(fields);
+			primCounter++;
 		}
 		void SetClipRect(float x, float y, float x1, float y1)
 		{
@@ -902,16 +992,16 @@ namespace GraphicsUI
 				uiRenderer->SetClipRect(cmd.x0, cmd.y0, cmd.x1, cmd.y1);
 				break;
 			case DrawCommandName::Line:
-				uiRenderer->DrawLine(ColorToVec(cmd.SolidColorParams.color), cmd.x0, cmd.y0, cmd.x1, cmd.y1);
+				uiRenderer->DrawLine(cmd.SolidColorParams.color, cmd.x0, cmd.y0, cmd.x1, cmd.y1);
 				break;
 			case DrawCommandName::SolidQuad:
-				uiRenderer->DrawSolidQuad(ColorToVec(cmd.SolidColorParams.color), cmd.x0, cmd.y0, cmd.x1, cmd.y1);
+				uiRenderer->DrawSolidQuad(cmd.SolidColorParams.color, cmd.x0, cmd.y0, cmd.x1, cmd.y1);
 				break;
 			case DrawCommandName::TextQuad:
-				uiRenderer->DrawTextQuad(((BakedText*)cmd.TextParams.text)->texture, ColorToVec(cmd.TextParams.color), cmd.x0, cmd.y0, cmd.x1, cmd.y1);
+				uiRenderer->DrawTextQuad((BakedText*)cmd.TextParams.text, cmd.TextParams.color, cmd.x0, cmd.y0, cmd.x1, cmd.y1);
 				break;
 			case DrawCommandName::ShadowQuad:
-				uiRenderer->DrawRectangleShadow(ColorToVec(cmd.ShadowParams.color), (float)cmd.ShadowParams.x, (float)cmd.ShadowParams.y, (float)cmd.ShadowParams.w,
+				uiRenderer->DrawRectangleShadow(cmd.ShadowParams.color, (float)cmd.ShadowParams.x, (float)cmd.ShadowParams.y, (float)cmd.ShadowParams.w,
 					(float)cmd.ShadowParams.h, (float)cmd.ShadowParams.offsetX, (float)cmd.ShadowParams.offsetY, cmd.ShadowParams.shadowSize);
 				break;
 			case DrawCommandName::TextureQuad:
@@ -923,7 +1013,7 @@ namespace GraphicsUI
 				verts.Add(Vec2::Create(cmd.x0, cmd.y0));
 				verts.Add(Vec2::Create(cmd.x1, cmd.y1));
 				verts.Add(Vec2::Create(cmd.TriangleParams.x2, cmd.TriangleParams.y2));
-				uiRenderer->DrawSolidPolygon(ColorToVec(cmd.TriangleParams.color), verts.GetArrayView());
+				uiRenderer->DrawSolidPolygon(cmd.TriangleParams.color, verts.GetArrayView());
 				break;
 			}
 			case DrawCommandName::Ellipse:
@@ -941,7 +1031,7 @@ namespace GraphicsUI
 					verts.Add(Vec2::Create(dotX + radX * cos(theta), dotY - radY * sin(theta)));
 					theta += dTheta;
 				}
-				uiRenderer->DrawSolidPolygon(ColorToVec(cmd.SolidColorParams.color), verts.GetArrayView());
+				uiRenderer->DrawSolidPolygon(cmd.SolidColorParams.color, verts.GetArrayView());
 			}
 			}
 			ptr++;
@@ -990,10 +1080,15 @@ namespace GraphicsUI
 	WinGLSystemInterface::WinGLSystemInterface(GL::HardwareRenderer * ctx)
 	{
 		glContext = ctx;
-		uiRenderer = new GLUIRenderer(ctx);
-		defaultFont = new WinGLFont(ctx, Font(L"Segoe UI", 13));
-		titleFont = new WinGLFont(ctx, Font(L"Segoe UI", 13, true, false, false));
-		symbolFont = new WinGLFont(ctx, Font(L"Webdings", 13));
+		defaultFont = new WinGLFont(this, Font(L"Segoe UI", 13));
+		titleFont = new WinGLFont(this, Font(L"Segoe UI", 13, true, false, false));
+		symbolFont = new WinGLFont(this, Font(L"Webdings", 13));
+		textBufferObj = ctx->CreateBuffer(GL::BufferUsage::ShadeStorageBuffer);
+		textBufferObj.BufferStorage(TextBufferSize, nullptr,
+			(GL::BufferStorageFlag)((int)GL::BufferStorageFlag::DynamicStorage | (int)GL::BufferStorageFlag::MapRead | (int)GL::BufferStorageFlag::MapWrite | (int)GL::BufferStorageFlag::MapPersistent));
+		textBuffer = (unsigned char*)textBufferObj.Map(GL::BufferAccess::ReadWritePersistent, 0, TextBufferSize);
+		textBufferPool.Init(textBuffer, 6, TextBufferSize >> 6);
+		uiRenderer = new GLUIRenderer(this, ctx);
 		tmrHover.Interval = Global::HoverTimeThreshold;
 		tmrHover.OnTick.Bind(this, &WinGLSystemInterface::HoverTimerTick);
 		tmrTick.Interval = 50;
@@ -1004,12 +1099,14 @@ namespace GraphicsUI
 	WinGLSystemInterface::~WinGLSystemInterface()
 	{
 		tmrTick.StopTimer();
+		textBufferObj.Unmap();
+		glContext->DestroyBuffer(textBufferObj);
 		delete uiRenderer;
 	}
 
 	IFont * WinGLSystemInterface::CreateFontObject(const Font & f)
 	{
-		return new WinGLFont(glContext, f);
+		return new WinGLFont(this, f);
 	}
 
 	Rect WinGLFont::MeasureString(const CoreLib::String & text, int /*width*/)
@@ -1025,12 +1122,12 @@ namespace GraphicsUI
 	IBakedText * WinGLFont::BakeString(const CoreLib::String & text, int width)
 	{
 		BakedText * result = new BakedText();
-		auto imageData = rasterizer.RasterizeText(text, width);
-		result->glContext = this->glContext;
+		auto imageData = rasterizer.RasterizeText(system, text, width);
+		result->system = system;
 		result->Width = imageData.Size.x;
 		result->Height = imageData.Size.y;
-		result->texture = glContext->CreateTexture2D();
-		result->texture.SetData(GL::StorageFormat::Int8, result->Width, result->Height, 1, GL::DataType::Byte4, imageData.Image.Buffer());
+		result->textBuffer = imageData.ImageData;
+		result->BufferSize = imageData.BufferSize;
 		return result;
 	}
 
@@ -1049,7 +1146,7 @@ namespace GraphicsUI
 		Bit->canvas->ChangeFont(Font);
 	}
 
-	TextRasterizationResult TextRasterizer::RasterizeText(const CoreLib::String & text, int w) // Set the text that is going to be displayed.
+	TextRasterizationResult TextRasterizer::RasterizeText(WinGLSystemInterface * system, const CoreLib::String & text, int w) // Set the text that is going to be displayed.
 	{
 		int TextWidth, TextHeight;
 		List<unsigned char> pic;
@@ -1073,26 +1170,45 @@ namespace GraphicsUI
 			Bit->canvas->Clear(TextWidth, TextHeight);
 			Bit->canvas->DrawText(text, 0, 0, w);
 		}
-		pic.SetSize(TextWidth*TextHeight * 4);
-		int LineWidth = TextWidth;
-		for (int i = 0; i < TextHeight; i++)
+
+		int pixelCount = (TextWidth * TextHeight);
+		int bytes = pixelCount >> Log2TextPixelsPerByte;
+		if (pixelCount & ((1 << Log2TextPixelsPerByte) - 1))
+			bytes++;
+		auto buffer = system->AllocTextBuffer(bytes);
+		if (buffer)
 		{
-			for (int j = 0; j < TextWidth; j++)
+			for (int i = 0; i < TextHeight; i++)
 			{
-				auto val = 255 - (Bit->ScanLine[i][j * 3 + 2] + Bit->ScanLine[i][j * 3 + 1] + Bit->ScanLine[i][j * 3]) / 3;
-				pic[(i*LineWidth + j) * 4] = pic[(i*LineWidth + j) * 4 + 1] = pic[(i*LineWidth + j) * 4 + 2] = pic[(i*LineWidth + j) * 4 + 3] = (unsigned char)val;
+				for (int j = 0; j < TextWidth; j++)
+				{
+					int idx = i * TextWidth + j;
+					auto val = 255 - (Bit->ScanLine[i][j * 3 + 2] + Bit->ScanLine[i][j * 3 + 1] + Bit->ScanLine[i][j * 3]) / 3;
+					auto packedVal = Math::FastFloor(val / (255.0f / 3.0f) + 0.5f);
+					int addr = idx >> Log2TextPixelsPerByte;
+					int mod = idx & ((1 << Log2TextPixelsPerByte) - 1);
+					int mask = 3 << (mod * TextPixelBits);
+					buffer[addr] = (unsigned char)((buffer[addr] & (~mask)) | (packedVal << (mod * TextPixelBits)));
+				}
 			}
 		}
 		TextRasterizationResult result;
-		result.Image = _Move(pic);
+		result.ImageData = buffer;
 		result.Size.x = TextWidth;
 		result.Size.y = TextHeight;
+		result.BufferSize = bytes;
 		return result;
 	}
 
 	inline TextSize TextRasterizer::GetTextSize(const CoreLib::String & text)
 	{
 		return Bit->canvas->GetTextSize(text);
+	}
+
+	BakedText::~BakedText()
+	{
+		if (textBuffer)
+			system->FreeTextBuffer(textBuffer, BufferSize);
 	}
 
 }

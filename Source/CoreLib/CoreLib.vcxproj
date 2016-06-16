@@ -463,6 +463,7 @@
     <ClInclude Include="List.h" />
     <ClInclude Include="LibMath.h" />
     <ClInclude Include="MD5.h" />
+    <ClInclude Include="MemoryPool.h" />
     <ClInclude Include="Parser.h" />
     <ClInclude Include="PerformanceCounter.h" />
     <ClInclude Include="Regex\MetaLexer.h" />
@@ -508,6 +509,7 @@
     <ClCompile Include="LibMath.cpp" />
     <ClCompile Include="LibString.cpp" />
     <ClCompile Include="MD5.cpp" />
+    <ClCompile Include="MemoryPool.cpp" />
     <ClCompile Include="Parser.cpp" />
     <ClCompile Include="PerformanceCounter.cpp" />
     <ClCompile Include="Regex\MetaLexer.cpp" />

@@ -1629,6 +1629,48 @@ namespace VectorMath
 		}
 	};
 #endif
+
+	class Vec2i
+	{
+	public:
+		int x, y;
+		static Vec2i Create(int px, int py)
+		{
+			Vec2i rs;
+			rs.x = px;
+			rs.y = py;
+			return rs;
+		}
+	};
+
+	class Vec3i
+	{
+	public:
+		int x, y, z;
+		static Vec3i Create(int px, int py, int pz)
+		{
+			Vec3i rs;
+			rs.x = px;
+			rs.y = py;
+			rs.z = pz;
+			return rs;
+		}
+	};
+
+	class Vec4i
+	{
+	public:
+		int x, y, z, w;
+		static Vec4i Create(int px, int py, int pz, int pw)
+		{
+			Vec4i rs;
+			rs.x = px;
+			rs.y = py;
+			rs.z = pz;
+			rs.w = pw;
+			return rs;
+		}
+	};
 }
 
 #endif
