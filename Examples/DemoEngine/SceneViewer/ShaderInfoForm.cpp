@@ -88,7 +88,7 @@ namespace SceneViewer
 		for (int i = 1; i < metaData.Worlds.Count(); i++)
 		{
 			auto line = new GraphicsUI::Line(contentBox);
-			line->Posit(i * columnWidth + 10, 0, 0, maxY);
+			line->Posit(i * columnWidth + 10, 0, 1, maxY);
 		}
 		contentBox->SetWidth(maxX);
 		contentBox->SetHeight(maxY);

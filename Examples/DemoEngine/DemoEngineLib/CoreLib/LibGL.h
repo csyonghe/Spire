@@ -438,7 +438,8 @@ namespace GL
 		Char = 0x60, Char2 = 0x61, Char3 = 0x62, Char4 = 0x63,
 		UShort = 0x70, UShort2 = 0x71, UShort3 = 0x72, UShort4 = 0x73,
 		UInt4_10_10_10_2 = 0x83,
-		Half = 0x90, Half2 = 0x91, Half3 = 0x92, Half4 = 0x93
+		Half = 0x90, Half2 = 0x91, Half3 = 0x92, Half4 = 0x93,
+		UInt = 0x100
 	};
 
 	inline DataType GetSingularDataType(DataType type)
@@ -666,6 +667,9 @@ namespace GL
 		case DataType::Int3:
 		case DataType::Int4:
 			return GL_INT;
+			break;
+		case DataType::UInt:
+			return GL_UNSIGNED_INT;
 			break;
 		case DataType::Byte:
 		case DataType::Byte2:
@@ -1171,6 +1175,22 @@ namespace GL
 		ElementBuffer = GL_ELEMENT_ARRAY_BUFFER,
 	};
 
+	enum class BufferStorageFlag
+	{
+		DynamicStorage = GL_DYNAMIC_STORAGE_BIT,
+		MapRead = GL_MAP_READ_BIT,
+		MapWrite = GL_MAP_WRITE_BIT,
+		MapPersistent = GL_MAP_PERSISTENT_BIT,
+		MapCoherent = GL_MAP_COHERENT_BIT,
+		ClientStorage = GL_CLIENT_STORAGE_BIT
+	};
+
+	enum class BufferAccess
+	{
+		Read = GL_MAP_READ_BIT, Write = GL_MAP_WRITE_BIT, ReadWrite = GL_MAP_READ_BIT | GL_MAP_WRITE_BIT,
+		ReadWritePersistent = GL_MAP_READ_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT
+	};
+
 	class BufferObject : public GL_Object
 	{
 	public:
@@ -1189,6 +1209,18 @@ namespace GL
 			else if (BindTarget == GL_ARRAY_BUFFER || BindTarget == GL_ELEMENT_ARRAY_BUFFER)
 				usage = GL_STREAM_DRAW;
 			glNamedBufferData(Handle, sizeInBytes, data, usage);
+		}
+		void BufferStorage(int size, void * data, BufferStorageFlag storageFlags)
+		{
+			glNamedBufferStorage(Handle, (GLsizeiptr)size, data, (GLbitfield)storageFlags);
+		}
+		void * Map(BufferAccess access, int offset, int len)
+		{
+			return glMapNamedBufferRange(Handle, offset, len, (GLenum)access);
+		}
+		void Unmap()
+		{
+			glUnmapNamedBuffer(Handle);
 		}
 		void SubData(int offset, int size, void * data)
 		{
@@ -1244,7 +1276,11 @@ namespace GL
 				if (attribs[i].Binding != -1)
 					id = attribs[i].Binding;
 				glEnableVertexAttribArray(id);
-				glVertexAttribPointer(id, GetDataTypeComponenets(attribs[i].Type), TranslateDataTypeToInputType(attribs[i].Type), attribs[i].Normalized, vertSize, (void*)(CoreLib::PtrInt)attribs[i].StartOffset);
+				if (attribs[i].Type == DataType::Int || attribs[i].Type == DataType::Int2 || attribs[i].Type == DataType::Int3 || attribs[i].Type == DataType::Int4
+					|| attribs[i].Type == DataType::UInt)
+					glVertexAttribIPointer(id, GetDataTypeComponenets(attribs[i].Type), TranslateDataTypeToInputType(attribs[i].Type), vertSize, (void*)(CoreLib::PtrInt)attribs[i].StartOffset);
+				else
+					glVertexAttribPointer(id, GetDataTypeComponenets(attribs[i].Type), TranslateDataTypeToInputType(attribs[i].Type), attribs[i].Normalized, vertSize, (void*)(CoreLib::PtrInt)attribs[i].StartOffset);
 				glVertexAttribDivisor(id, instanceDivisor);
 			}
 
@@ -1342,6 +1378,24 @@ namespace GL
 			if (loc != -1)
 				glProgramUniform4fv(Handle, loc, 1, (float*)&value);
 		}
+		void SetUniform(String name, Vec2i value)
+		{
+			int loc = glGetUniformLocation(Handle, name.ToMultiByteString());
+			if (loc != -1)
+				glProgramUniform2iv(Handle, loc, 1, (int*)&value);
+		}
+		void SetUniform(String name, Vec3i value)
+		{
+			int loc = glGetUniformLocation(Handle, name.ToMultiByteString());
+			if (loc != -1)
+				glProgramUniform3iv(Handle, loc, 1, (int*)&value);
+		}
+		void SetUniform(String name, Vec4i value)
+		{
+			int loc = glGetUniformLocation(Handle, name.ToMultiByteString());
+			if (loc != -1)
+				glProgramUniform4iv(Handle, loc, 1, (int*)&value);
+		}
 		void SetUniform(String name, Matrix3 value)
 		{
 			int loc = glGetUniformLocation(Handle, name.ToMultiByteString());
@@ -1364,6 +1418,21 @@ namespace GL
 		{
 			if (loc != -1)
 				glProgramUniform1i(Handle, loc, value);
+		}
+		void SetUniform(int loc, Vec2i value)
+		{
+			if (loc != -1)
+				glProgramUniform2iv(Handle, loc, 1, (int*)&value);
+		}
+		void SetUniform(int loc, Vec3i value)
+		{
+			if (loc != -1)
+				glProgramUniform3iv(Handle, loc, 1, (int*)&value);
+		}
+		void SetUniform(int loc, Vec4i value)
+		{
+			if (loc != -1)
+				glProgramUniform4iv(Handle, loc, 1, (int*)&value);
 		}
 		void SetUniform(int loc, uint64_t value)
 		{
@@ -2071,6 +2140,11 @@ namespace GL
 			glBindVertexArray(vertArray.Handle);
 		}
 
+		void DrawElements(PrimitiveType primType, int count, DataType indexType)
+		{
+			glDrawElements((GLenum)primType, count, TranslateDataTypeToInputType(indexType), nullptr);
+		}
+
 		void DrawArray(PrimitiveType primType, int first, int count)
 		{
 			glDrawArrays((GLenum)primType, first, count);
@@ -2265,8 +2339,11 @@ namespace GraphicsUI
 	{
 	public:
 		TextSize Size;
-		CoreLib::List<unsigned char> Image;
+		int BufferSize;
+		unsigned char * ImageData;
 	};
+
+	class WinGLSystemInterface;
 
 	class TextRasterizer
 	{
@@ -2278,15 +2355,17 @@ namespace GraphicsUI
 		~TextRasterizer();
 		bool MultiLine = false;
 		void SetFont(const Font & Font);
-		TextRasterizationResult RasterizeText(const CoreLib::String & text, int w = 0);
+		TextRasterizationResult RasterizeText(WinGLSystemInterface * system, const CoreLib::String & text, int w = 0);
 		TextSize GetTextSize(const CoreLib::String & text);
 	};
+
 
 	class BakedText : public IBakedText
 	{
 	public:
-		GL::HardwareRenderer * glContext;
-		GL::Texture2D texture;
+		WinGLSystemInterface* system;
+		unsigned char * textBuffer;
+		int BufferSize;
 		int Width, Height;
 		virtual int GetWidth() override
 		{
@@ -2296,22 +2375,19 @@ namespace GraphicsUI
 		{
 			return Height;
 		}
-		~BakedText()
-		{
-			if (texture.Handle)
-				glContext->DestroyTexture(texture);
-		}
+		~BakedText();
 	};
+
 
 	class WinGLFont : public IFont
 	{
 	private:
 		TextRasterizer rasterizer;
-		GL::HardwareRenderer * glContext;
+		WinGLSystemInterface * system;
 	public:
-		WinGLFont(GL::HardwareRenderer * ctx, const GraphicsUI::Font & font)
+		WinGLFont(WinGLSystemInterface * ctx, const GraphicsUI::Font & font)
 		{
-			glContext = ctx;
+			system = ctx;
 			rasterizer.SetFont(font);
 		}
 		virtual Rect MeasureString(const CoreLib::String & text, int /*width*/) override;
@@ -2324,6 +2400,9 @@ namespace GraphicsUI
 	class WinGLSystemInterface : public ISystemInterface
 	{
 	private:
+		unsigned char * textBuffer = nullptr;
+		GL::BufferObject textBufferObj;
+		CoreLib::MemoryPool textBufferPool;
 		VectorMath::Vec4 ColorToVec(GraphicsUI::Color c);
 		CoreLib::RefPtr<WinGLFont> defaultFont, titleFont, symbolFont;
 		CoreLib::WinForm::Timer tmrHover, tmrTick;
@@ -2340,6 +2419,22 @@ namespace GraphicsUI
 	public:
 		WinGLSystemInterface(GL::HardwareRenderer * ctx);
 		~WinGLSystemInterface();
+		unsigned char * AllocTextBuffer(int size)
+		{
+			return textBufferPool.Alloc(size);
+		}
+		void FreeTextBuffer(unsigned char * buffer, int size)
+		{
+			textBufferPool.Free(buffer, size);
+		}
+		int GetTextBufferRelativeAddress(unsigned char * buffer)
+		{
+			return (int)(buffer - textBuffer);
+		}
+		GL::BufferObject GetTextBufferObject()
+		{
+			return textBufferObj;
+		}
 		IFont * CreateFontObject(const Font & f);
 		IImage * CreateImageObject(const CoreLib::Imaging::Bitmap & bmp);
 		void SetResolution(int w, int h);

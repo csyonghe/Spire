@@ -376,7 +376,7 @@ namespace GraphicsUI
 
 	// enum types defination
 
-	const int COLOR_LIGHTEN = 100;
+	const int COLOR_LIGHTEN = 40;
 
 	// Border Styles
 	const int BS_NONE = 0;
@@ -485,12 +485,12 @@ namespace GraphicsUI
 		void DrawArc(int x, int y, int rad, float theta, float theta2);
 		void DrawRectangle(int x1, int y1, int x2, int y2);
 		void FillRectangle(int x1, int y1, int x2, int y2);
-		void FillEllipse(int x1, int y1, int x2, int y2);
+		void FillEllipse(float x1, float y1, float x2, float y2);
 		void FillTriangle(int x0, int y0, int x1, int y1, int x2, int y2);
 		void DrawLine(float x1, float y1, float x2, float y2);
 		inline void DrawLine(int x1, int y1, int x2, int y2)
 		{
-			DrawLine((float)x1, (float)y1, (float)x2, (float)y2);
+			DrawLine((float)x1 + 0.5f, (float)y1 + 0.5f, (float)x2 + 0.5f, (float)y2 + 0.5f);
 		}
 		void ClearCommands()
 		{
