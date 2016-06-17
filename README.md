@@ -21,3 +21,7 @@ Currently the demo engine runs only on Windows with an NVIDIA Kepler or later GP
 However, the compiler is platform independent and is compatible with both msvc and g++ 5.0 (with `-fpermissive -std=c++14 -msse2` flag). Spire currently supports generating GLSL compute, vertex and fragment shaders. 
 
 Now that you can get the demo engine running, <a href="https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1">read this tutorial</a> to learn the basics of Spire.
+
+Also explore Examples/Scenes directory for more interesting shaders!
+
+![](https://github.com/csyonghe/Spire/blob/master/Docs/sceneGallery.jpg)
