@@ -1,7 +1,29 @@
 # Using Spire
-If you have read the [Understanding Spire](https://github.com/csyonghe/Spire/tree/master/Docs/tutorial1) tutorial and want to integrate Spire into your engine, follow this guide to learn the compiler interface.
-### As Library
-The Spire compiler is distributed directly as four C++ source files with no external dependencies. To integrate the compiler into your engine, simply grab "Spire.h" "Spire.cpp" "Basic.h" "Basic.cpp" from "LibraryRelease" directory and place them into your project.
+If you have read the [Understanding Spire](https://github.com/csyonghe/Spire/tree/master/Docs/tutorial1) tutorial and want to integrate Spire into your engine, 
+follow this guide to learn the compiler interface.
+## As Stand-alone Compiler
+The simplest way to use Spire is to use it as a stand-alone Compiler. Build "Source/Spire.sln" and use "SpireCompiler.exe". The command line format is:
+```
+> SpireCompiler.exe filename [-out output_filename] [-symbol shader_to_compile] [-schedule schedule_file] [-genchoice]
+```
+`filename` specifies the source filename.
+
+Optionally, you can use:
+
+`-out`: specifies the output filename. <br/>
+`-symbol`: instructs the compiler to only generate code for the specified shader.<br/>
+`-schedule`: instructs the compiler to apply the specified schedule file. A schedule file contains rate placement or algorithmic choice decisions for the given shader.<br/>
+`-genchoice`: instructs the compiler to generate a choice file, which contains all the optimization options (including rate placement or algorithimic choices) exposed by the input shader.
+
+SpireCompiler emits the compiled shader in parsable text format. The output file contains GPU shaders for each pipeline defined world, as well as 
+metadata that describes the binding interface and components being computed at each world.
+
+## As Library
+To integrate Spire more closely to your engine or to extend spire compiler, you can use it as a library. 
+The Spire compiler library is platform-independent and self-contained. The library is distributed as four C++ source files (yes, that is all you need!)
+ with no additional dependencies. 
+To integrate Spire into your engine, simply grab "Spire.h" "Spire.cpp" "Basic.h" "Basic.cpp" from "LibraryRelease" directory and place them into your project.
+
 To invoke the compiler, call:
 ```c++
 CoreLib::List<SpireLib::ShaderLibFile> CompileShaderSource(Spire::Compiler::CompileResult & result,
@@ -53,19 +75,3 @@ int main(int argc, char** args)
     return 0;
 }
 ```
-### As Stand-alone Compiler
-Build "Source/Spire.sln" and use "SpireCompiler.exe". The command line format is:
-```
-SpireCompiler filename [-out output_filename] [-symbol shader_to_compile] [-schedule schedule_file] [-genchoice]
-```
-`filename` specifies the source filename.
-
-Optionally, you can use:
-
-`-out`: specifies the output filename.
-
-`-symbol`: instructs the compiler to only generate code for the specified shader.
-
-`-schedule`: instructs the compiler to apply the specified schedule file. A schedule file contains rate placement or algorithmic choice decisions for the given shader.
-
-`-genchoice`: instructs the compiler to generate a choice file, which contains all the optimization options (including rate placement or algorithimic choices) exposed by the input shader.
