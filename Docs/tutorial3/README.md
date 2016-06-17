@@ -75,11 +75,11 @@ input world rootVert;
 By default, Spire compiler generates one shader interface block per world, so all components defined in `rootVert` world
 will be in the same interface block. Additionally, Spire supports several attributes that control the code generation of
 an input world. These attributes are:
-*`Pinned` - informs the compiler not to eliminate unsed components from the resulting interface block.
-*`Packed` - informs the compiler the components defined in the input world are tightly packed. If this attribute is not declared,
+* `Pinned` - informs the compiler not to eliminate unsed components from the resulting interface block.
+* `Packed` - informs the compiler the components defined in the input world are tightly packed. If this attribute is not declared,
 the compiler uses `std140` layout.
-*`InterfaceBlockIndex` - specify the binding index of the resulting interface block from this input world.
-*`InterfaceBlock` - specify the resulting interface block name (and optionally the binding index) of the resulting interface block.
+* `InterfaceBlockIndex` - specify the binding index of the resulting interface block from this input world.
+* `InterfaceBlock` - specify the resulting interface block name (and optionally the binding index) of the resulting interface block.
 
 Therefore, the above declaration says that there is an input world called `rootVert`, and the input comes in a tightly packed
 buffer.
@@ -187,10 +187,10 @@ pipeline DemoPipeline
 
 So far we have declared the input worlds, the `vs` and `fs` world as well as the `projCoord` requirement in `DemoPipeline`.
 There is one more thing we need to do: declare the data pathes between worlds. In this pipeline, the data pathes are:
-*`rootVert` -> `vs`: vertex shader(`vs`) should have access to the input vertex stream(`rootVert`)
-*`viewUniform` -> `vs`: vertex shader(`vs`) should have access to the uniform buffer(`viewUniform`)
-*`viewUniform` -> `fs`: fragment shader(`fs`) should also have access to the uniform buffer(`viewUniform`)
-*`vs`->`fs`: fragment shader(`fs`) should have access to vertex shader outputs(`vs`)
+* `rootVert` -> `vs`: vertex shader(`vs`) should have access to the input vertex stream(`rootVert`)
+* `viewUniform` -> `vs`: vertex shader(`vs`) should have access to the uniform buffer(`viewUniform`)
+* `viewUniform` -> `fs`: fragment shader(`fs`) should also have access to the uniform buffer(`viewUniform`)
+* `vs`->`fs`: fragment shader(`fs`) should have access to vertex shader outputs(`vs`)
 
 Note that all of the listed data pathes are direct pathes: we do not need to declare transitive pathes (such as `rootVert`->`fs`),
 these transitive pathes will be implemnted automatically by the compiler.
@@ -213,9 +213,9 @@ Spire models different type of data path using import operators. Currently Spire
   buffer. Spire will inject buffer fetch instruction to load the value at gl_InvocationIndex. 
 
 For our `DemoPipeline`, we should use these import operators:
-*`rootVert`->`vs` should use `vertexImport`
-*`viewUniform`->`vs` and `viewUniform`->`fs` should use `uniformImport`
-*`vs`->`fs` should use `standardImport`
+* `rootVert`->`vs` should use `vertexImport`
+* `viewUniform`->`vs` and `viewUniform`->`fs` should use `uniformImport`
+* `vs`->`fs` should use `standardImport`
 
 After declaring the import operators, our final pipeline delcaration is:
 ```glsl
