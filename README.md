@@ -7,7 +7,7 @@ Paper: http://graphics.cs.cmu.edu/projects/spire/
 
 [1. Understanding Spire](https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1) <br/>
 [2. Using Shader Modules](https://github.com/csyonghe/Spire/blob/master/Docs/tutorial2) <br/>
-[3. Using Spire in your engine](https://github.com/csyonghe/Spire/blob/master/Docs/UserGuide.md)
+[3. Integrating Spire in your engine](https://github.com/csyonghe/Spire/blob/master/Docs/UserGuide.md)
 
 
 ## Getting Started
