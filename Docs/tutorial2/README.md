@@ -1,13 +1,13 @@
 #Using Shader Modules
 
-In previous tutorial, you've seen what a basic Spire shader looks like. Our first shader contains many different type of shading logic, 
+In [previous tutorial](https://github.com/csyonghe/Spire/tree/master/Docs/tutorial1), you've seen what a basic Spire shader looks like. Our first shader contains many different type of shading logic, 
 such as vertex input declaration, vertex and normal transformation, pattern generation and lighting. In practice, we often want
 to encapsulate different types of shading concerns into separate modules for code re-use or just making shader code cleaner and easier to read.
 In this tutorial, we are going to talk about the modularity features supported by Spire.
 
 ##Shader Modules
 A shader module can be defined with the syntax
-```
+```glsl
 module ModuleName
 {
 	...Definitions...
@@ -19,7 +19,7 @@ to generate final shader code for a `shader`. Modules are supposed to be a part 
 ##Using Modules as Mix-ins
 The simplest way to use modules is to "include" them in another module or shader.
 For example you can define all vertex attribute inputs of `Demo1Shader` from tutorial 1 as a module:
-```
+```glsl
 module VertexInput
 {
 	// define vertex inputs
@@ -30,7 +30,7 @@ module VertexInput
 }
 ```
 And `Demo1Shader` can be changed to use the `VertexInput` module instead of re-defining all the vertex attributes:
-```
+```glsl
 shader DemoShader
 {
 	using VertexInput;
@@ -42,7 +42,7 @@ The using statement above can be thought as C++'s `#include`: it imports all def
 `Demo1Shader` can reference the vertex attributes directly as if they are defined in `DemoShader`.
 
 Alternatively, you can import all definitions from `VertexInput` into a separate namespace, as demostrated in the following code
-```
+```glsl
 shader DemoShader
 {
 	using vertex = VertexInput;
@@ -60,7 +60,7 @@ Note that in this example, all components in `VertexInput` are marked as `public
 ##Using Modules as Functions
 
 Modules can also be used as functions. For example, you can define a module that performs tangent frame transformation on a normal vector:
-```
+```glsl
 module TangentFrameTransform
 {
     require vec3 inputVector;
@@ -74,7 +74,7 @@ module TangentFrameTransform
 ```
 As you can see, parameters of a module are defined via `require` clause. Return values of a module are defined as normal public components.
 This module can then be used like a function in another module or shader like the following:
-```
+```glsl
 shader DemoShader
 {
 	vec3 normal = ...;
@@ -87,7 +87,7 @@ shader DemoShader
 ```
 ###Named Argument Passing
 You can also use the named argument syntax (similar to C#):
-```
+```glsl
 shader DemoShader
 {
 	vec3 normal = ...;
@@ -105,7 +105,7 @@ shader DemoShader
 As a syntactic convenience, Spire allows you to omit argument specification if there is already a component with the same name as the parameter in current
 name scope. For example in the above case, `DemoShader` defines `vNormal`, `vTangent` and `vBiNormal` component, and they have the same name of 
 `TangentFrameTransform`'s paremeters. Therefore you can omit the specification for these arguments, like the following:
-```
+```glsl
 shader DemoShader
 {
 	vec3 normal = ...;
@@ -117,7 +117,7 @@ shader DemoShader
 }
 ```
 Since the only parameter that requires an explicit argument is `inputVector`, which is the first parameter, you can use the short syntax as well:
-```
+```glsl
 shader DemoShader
 {
 	vec3 normal = ...;
@@ -131,7 +131,7 @@ shader DemoShader
 In both cases, the compiler searches in the scope of DemoShader to find components with the same name and use them as arguments. However if you are 
 using the short syntax, you must specify arguments according the same order as the corresponding parameters. If at some point you want to skip
 some parameters in the middle, the rest of the parameters must be specified in the explicitly named form. For example
-```
+```glsl
 shader DemoShader
 {
 	vec3 normal = ...;
@@ -153,7 +153,7 @@ the demo shader, compile `Examples/DemoEngine/DemoEngine.sln` and run `SceneView
 `Docs/tutorial2/Demo.world`.
 
 First, we can define all vertex attributes in a module:
-```
+```glsl
 module VertexInput
 {
     // define vertex inputs
@@ -164,7 +164,7 @@ module VertexInput
 }
 ```
 Next, we use another module to hold all engine-provided uniform inputs:
-```
+```glsl
 module SystemUniforms
 {
     // define engine provided uniforms
@@ -184,7 +184,7 @@ module SystemUniforms
 ``` 
 And then, we define a module that does vertex transform and computes the `projCoord` `texSpaceVert` and `screenCoord` that are required 
 `MultiRatePipeline`.
-```
+```glsl
 module VertexTransform
 {
     require mat4 modelMatrix;
@@ -206,7 +206,7 @@ Note that in `VertexTransform` module,
 all required components are declared as parameters using the `require` statement, instead of providing the actual definition of those components.
 
 Next, we can define another module that contains all the material pattern generation logic:
-```
+```glsl
 module Material
 {
     require vec2 vert_uv;
@@ -229,7 +229,7 @@ module Material
 The `Material` module requires a `vert_uv` parameterization and returns the `albedo` and `normal` (in tangent space) for the given surface position.
 
 Next, we have a module that does tangent space to world space normal transformation:
-```
+```glsl
 module TangentFrameTransform
 {
     require vec3 inputVector;
@@ -247,7 +247,7 @@ module TangentFrameTransform
 }
 ```
 And last, we define a lighting module:
-```
+```glsl
 module Lighting
 {
     require vec3 albedo;
@@ -272,7 +272,7 @@ where do those parameters actually come from.
 Now that we have all the modules defined, let's piece them together into a final shader!
 
 First, we define our shader and include both `VertexInput` and `SystemUniforms`:
-```
+```glsl
 shader DemoShader
 {
     using VertexInput;
@@ -282,7 +282,7 @@ After using these two modules, the current name scope of `DemoShader` contains a
 `VertexInput` and `SystemUniforms`.
 
 We can continue to include the vertex transform logic by using `VertexTransform` module:
-```
+```glsl
     using VertexTransform;
 ```
 Note that `VertexTransform` module requires `modelMatrix` `viewProjectionMatrix` `vert_pos` and `vert_uv`. Since we have already included 
@@ -290,7 +290,7 @@ Note that `VertexTransform` module requires `modelMatrix` `viewProjectionMatrix`
 we do not need to explicitly specify those arguments here.
 
 Next, we use the `Material` module to compute material properties (`albedo` and `normal`):
-```
+```glsl
     using material = Material();
 ```
 Again, `Material` module require `vert_uv`, but we do not need to explicitly specify that argument because `vert_uv` is already in current scope
@@ -298,13 +298,13 @@ due to inclusion of `VertexInput`.
 
 Then, we use the `TangentFrameTransform` module to transform the tangent space normal returned by `Material` module into world space, so we can use it
 for lighting:
-```
+```glsl
     using normalTransform = TangentFrameTransform(material.normal);
 ```
 Here, we explicitly specify the `inputVector` parameter, but leave all other parameters implicitly specified.
 
 Now we have everything ready, let's use the `Lighting` module to compute final lighting result and use it as our color output:
-```
+```glsl
     using lighting = Lighting(material.albedo, normalTransform.result);
     vec4 outputColor = lighting.result;
 }
