@@ -3,7 +3,7 @@ As we have mentioned in [tutorial 1](https://github.com/csyonghe/Spire/tree/mast
 you need to write a pipeline declaration so that the Spire compiler knows how to generate shader code
 that your engine can use. [Docs/tutorial1/MultiRate.pipeline](https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/MultiRate.pipeline)
 and [Docs/tutorial1/ObjSpace.pipeline](https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/ObjSpace.pipeline)
-are examples of pipeline declarations. In this tutorial, we will examine all the details in a pipeline delcaration.
+are examples of pipeline declarations. In this tutorial, we will examine all the details in a pipeline declaration.
 
 In Spire, a pipeline declaration begins by
 ```
@@ -18,7 +18,7 @@ A pipeline declaration consists of three parts:
 *Import operator declarations - declarate data flow pathes between worlds
 
 Now let's go through each part of a pipeline delcaration. Assume you have implemented a simple rendering engine
-that supports vertex and fragment shading. You also pass in addtional uniform inputs using a uniform buffer object.
+that supports vertex and fragment shading. Your engine also pass in addtional uniform inputs using a uniform buffer object.
 Let's say your uniform buffer object has the following content
 ```c++
 struct ViewUniforms
@@ -39,7 +39,7 @@ struct Vertex
 ```
 Let's say you use Spire as library (as in [this tutorial](https://github.com/csyonghe/Spire/blob/master/Docs/UserGuide.md)),
 and at initialization time, you compile Spire shaders and set up OpenGL program objects (assuming the Spire shader
-defines `vs` world for vertex shader and `fs` world for fragment shader:
+defines `vs` world for vertex shader and `fs` world for fragment shader):
 ```
     Spire::Compiler::CompileResult result;
     Spire::Compiler:CompileOptions options;
@@ -49,14 +49,15 @@ defines `vs` world for vertex shader and `fs` world for fragment shader:
     auto fs = createGLshader(compiledShaders[0].Sources["fs"], GL_FRAGMENT_SHADER);
     auto program = createGLprogram(vs, fs);
 ```
-Then at every frame, the engine binds the uniform buffer at binding point 0 and draws a mesh:
+At each frame, the engine binds the uniform buffer at binding point 0 and draws a mesh:
 ```
     glBindVertexArray(vao);
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, uniformBufferObj);
     glUseProgram(program);
     glDrawElements(...);
 ```
-Now let's see how to declare this render pipeline in Spire, so the Spire compiler can generate proper shader code.
+Now let's see how to declare this render pipeline in Spire, so the Spire compiler can generate proper shader code
+for this engine.
 
 
 ##World Declarations
@@ -83,7 +84,7 @@ the compiler uses `std140` layout.
 Therefore, the above declaration says that there is an input world called `rootVert`, and the input comes in a tightly packed
 buffer.
 
-For example, the following declaration
+So to declare our uniform buffer input, we need another input world:
 ```
 [Pinned]
 [InterfaceBlock: "view_uniforms: 0"]
@@ -113,11 +114,13 @@ uniform view_uniforms
     vec3 lightDir;
 } blkview_Uniforms;
 ```
+Which matches the engine's definition of the uniform buffer.
 
 ###Regular Worlds
-Regular worlds models compute stages. A regular world correspond to a compute, vertex or fragment shader 
-of the compiled shader source. For example, if you want to use Spire to generate vertex and fragment shader
-from a Spire shader, you can define two worlds
+A regular world represent a compute stage that the compiler can generate shdaer code for, it corresponds to a compute,
+vertex or fragment shader of the compiled shader source. 
+For example, because we want to use Spire to generate vertex and fragment shader
+from a Spire shader, we should define two worlds
 ```
 world vs;
 world fs;
@@ -125,8 +128,8 @@ world fs;
 This tells Spire to generate code for two worlds named `vs` and `fs`, but we need to tell more about what `vs` and
 `fs` is.
 
-First, we need to tell the compiler to generate glsl code for `vs` world, and the output of 'vs' world should be defined
-using the standard `out` syntax in glsl:
+First, we need to tell the compiler to generate GLSL code for `vs` world, and the output of 'vs' world should be defined
+using the standard `out` syntax in GLSL:
 ```
 world vs: "glsl" export standardExport;
 ``` 
@@ -142,19 +145,19 @@ Here we are using `fragmentExport` instead of `standardExport` for fragment shad
 the `fs` world will be stored in framebuffers or textures.
 
 Note that we are still missing one important piece of information in the `vs` declaration: we haven't tell the Spire compiler
-what is the projected vertex output (`gl_Position`) for the vertex shader, to do that we need the second part of pipeline
+what the projected vertex output (`gl_Position`) is for the vertex shader. To do that we need the second part of pipeline
 declaration: pipeline requirements.
 
 ##Requirement Declarations
 Pipeline requirements are declared using `require` statement (same as the `require` statement used to define shader module
 parameters). Declaring a requirement in the pipeline means all shaders written against the pipeline must provide a definition
-of the requirement component at specified world. For example,
+of the required component at specified world. For example, with the statement
 ```glsl
 require @vs vec4 projCoord;
 ```
-With this requirement, the Spire compiler guarantees
-all verified shaders will have a definition of `projCoord` at `vs` world. Therefore, we can modify our `vs` world declaration
-to inform the compiler that `vs` correspond to a vertex shader, and to use `projCoord` as the `gl_Position` output:
+the Spire compiler guarantees
+all verified shaders will have a definition of `projCoord` at `vs` world. Now, we can modify our `vs` world declaration
+to inform the compiler that `vs` correspond to a vertex shader, and should use `projCoord` as the `gl_Position` output:
 ```glsl
 world vs : "glsl(vertex:projCoord)" using projCoord export standardExport;
 ```
@@ -189,24 +192,24 @@ There is one more thing we need to do: declare the data pathes between worlds. I
 *`viewUniform` -> `fs`: fragment shader(`fs`) should also have access to the uniform buffer(`viewUniform`)
 *`vs`->`fs`: fragment shader(`fs`) should have access to vertex shader outputs(`vs`)
 
-Note that the listed data pathes are all direct pathes: we do not need to declare transitive pathes (such as `rootVert`->`fs`),
+Note that all of the listed data pathes are direct pathes: we do not need to declare transitive pathes (such as `rootVert`->`fs`),
 these transitive pathes will be implemnted automatically by the compiler.
  
 Besides the source and destination worlds, Spire also need to know the type of the data path (e.g. is it importing a uniform buffer,
 or is it reading from a vertex stream?), because different type of data path requires slightly different code generation logic.
 
 Spire models different type of data path using import operators. Currently Spire implements five import operators:
-* uniformImport is used to define dependency between an uniform input world and a regular world. 
+* `uniformImport` is used to define dependency between an uniform input world and a regular world. 
   the source world of an uniformImport dependency will be compiled to an uniform buffer definition. 
-* vertexImport is used to define dependency between an vertex buffer input world and a regular world. 
+* `vertexImport` is used to define dependency between an vertex buffer input world and a regular world. 
   the source world of an vertexImport dependency will be regarded as the vertex attribute definition. 
   the destination world must be used as a vertex shader. 
-* standardImport is used to define dependency between GPU pipeline stages,  
+* `standardImport` is used to define dependency between GPU pipeline stages,  
   such as from vertex shader to fragment shader 
-* textureImport is used to define dependency on a fragment shading world. 
+* `textureImport` is used to define dependency on a fragment shading world. 
   Spire compiler will inject texture fetch operations in the user world to fetch the textures produced 
   by the source world. 
-* bufferImport is used to inform the compiler that the output of source world is stored in a general 
+* `bufferImport` is used to inform the compiler that the output of source world is stored in a general 
   buffer. Spire will inject buffer fetch instruction to load the value at gl_InvocationIndex. 
 
 For our `DemoPipeline`, we should use these import operators:
@@ -214,7 +217,7 @@ For our `DemoPipeline`, we should use these import operators:
 *`viewUniform`->`vs` and `viewUniform`->`fs` should use `uniformImport`
 *`vs`->`fs` should use `standardImport`
 
-After declaring the import operators, our final pipeline delcaration is as follows.
+After declaring the import operators, our final pipeline delcaration is:
 ```glsl
 pipeline DemoPipeline
 {
@@ -261,4 +264,4 @@ That is everything you need to declare the engine pipeline in Spire! You should 
 basics regarding the pipeline declaration and how Spire's code generator works. We have not covered more advanced 
 import operators such as `textureImport` and `bufferImport` in this tutorial, and you are encouraged to look
 at our DemoEngine code as well as [Docs/tutorial1/MultiRate.pipeline](https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1/MultiRate.pipeline)
-to learn how to use them to declare complex pipelines that does object space and screen space multi-rate rendering.
+to learn how to use them to declare complex pipelines that involve object space and screen space multi-rate rendering.
