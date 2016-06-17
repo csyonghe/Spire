@@ -14,7 +14,7 @@ module ModuleName
 }
 ```
 A `module` is treated almost the same as a `shader` by the compiler, except that modules do not triger shader code generation - the compiler is only going
-to generate final shader code for a `shader`. Modules are supposed to be a part of a shader, and does not need to contain pipeline-required components.
+to generate final shader code for a `shader`. Modules are supposed to be a part of a shader, and do not need to contain all pipeline-required components.
 
 ##Using Modules as "#include"
 The simplest way to use modules is to "include" them in another module or shader.
