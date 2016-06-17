@@ -1697,6 +1697,8 @@ namespace GraphicsUI
 	const int MSG_UI_FORM_SHOW = 17;
 	const int MSG_UI_FORM_HIDE = 18;
 
+	Control * FindNextFocus(Control * ctrl);
+
 	void Graphics::DrawArc(int x, int y, int rad, float theta, float theta2)
 	{
 		float lastX = x + rad*cos(theta);
@@ -1741,10 +1743,10 @@ namespace GraphicsUI
 
 	void Graphics::DrawRectangle(int x1, int y1, int x2, int y2)
 	{
-		DrawLine((float)x1 + 0.5f, (float)y1 + 0.5f, (float)x2 + 0.5f, (float)y1 + 0.5f);
-		DrawLine((float)x2 + 0.5f, (float)y1 + 0.5f, (float)x2 + 0.5f, (float)y2 + 0.5f);
+		DrawLine((float)x1 + 0.5f, (float)y1 + 0.5f, (float)x2, (float)y1 + 0.5f);
+		DrawLine((float)x1 + 0.5f, (float)y1 + 1.5f, (float)x1 + 0.5f, (float)y2);
+		DrawLine((float)x2 + 0.5f, (float)y1 + 0.5f, (float)x2 + 0.5f, (float)y2);
 		DrawLine((float)x2 + 0.5f, (float)y2 + 0.5f, (float)x1 + 0.5f, (float)y2 + 0.5f);
-		DrawLine((float)x1 + 0.5f, (float)y2 + 0.5f, (float)x1 + 0.5f, (float)y1 + 0.5f);
 	}
 
 	void Graphics::FillRectangle(int x1, int y1, int x2, int y2)
@@ -2102,24 +2104,33 @@ namespace GraphicsUI
 		return false;
 	}
 
-	void Control::LocalPosToAbsolutePos(int x, int y, int & ax, int & ay)
+	VectorMath::Vec2i Control::GetRelativePos(Container * parent)
 	{
-		ax = x + Left;
-		ay = y + Top;
-		auto parent = Parent;
+		VectorMath::Vec2i result;
+		result.x = Left;
+		result.y = Top;
 		auto current = this;
-		while (parent)
+		auto curParent = this->Parent;
+		while (curParent != parent)
 		{
-			ax += parent->Left;
-			ay += parent->Top;
+			result.x += curParent->Left;
+			result.y += curParent->Top;
 			if (current->DockStyle == dsFill || current->DockStyle == dsNone)
 			{
-				ax += parent->ClientRect().x;
-				ay += parent->ClientRect().y;
+				result.x += curParent->ClientRect().x;
+				result.y += curParent->ClientRect().y;
 			}
-			current = parent;
-			parent = parent->Parent;
+			current = curParent;
+			curParent = curParent->Parent;
 		}
+		return result;
+	}
+
+	void Control::LocalPosToAbsolutePos(int x, int y, int & ax, int & ay)
+	{
+		auto relPos = GetRelativePos(nullptr);
+		ax = relPos.x + x;
+		ay = relPos.y + y;
 	}
 
 	bool Control::IsFocused()
@@ -2166,10 +2177,8 @@ namespace GraphicsUI
 			OnMouseUp.Invoke(this, *((UIMouseEventArgs*)Args->Data));
 			return;
 		case MSG_UI_MOUSEWHEEL:
-			{
-				OnMouseWheel.Invoke(this,*((UIMouseEventArgs*)Args->Data));
-				return;
-			}
+			OnMouseWheel.Invoke(this,*((UIMouseEventArgs*)Args->Data));
+			return;
 		case MSG_UI_MOUSEHOVER:
 			OnMouseHover.Invoke(this);
 			return;
@@ -2914,6 +2923,12 @@ namespace GraphicsUI
 		return false;
 	}
 
+	void Container::DoFocusChange()
+	{
+		if (Parent)
+			Parent->DoFocusChange();
+	}
+
 	void Container::InternalBroadcastMessage(UI_MsgArgs *Args)
 	{
 		this->HandleMessage(Args);
@@ -3097,6 +3112,16 @@ namespace GraphicsUI
 		FormStyleChanged();
 	}
 
+	void Form::HandleMessage(const UI_MsgArgs * msg)
+	{
+		if (msg->Type == MSG_UI_FORM_ACTIVATE)
+		{
+			auto nxt = FindNextFocus(this);
+			if (nxt && nxt->IsChildOf(this))
+				nxt->SetFocus();
+		}
+	}
+
 	bool Form::DoMouseUp(int X, int Y, SHIFTSTATE Shift)
 	{
 		if (!Enabled ||!Visible)
@@ -3114,6 +3139,10 @@ namespace GraphicsUI
 		}
 		if (Left < 0) Left = 0;
 		if (Top < 0) Top = 0;
+		if (Left > Parent->GetWidth() - 50)
+			Left = Parent->GetWidth() - 50;
+		if (Top > Parent->GetHeight() - 50)
+			Top = Parent->GetHeight() - 50;
 		DownInButton = false;
 		return true;
 	}
@@ -3294,6 +3323,17 @@ namespace GraphicsUI
 		ImeMessageHandler.ImeWindow->WindowHeight = Height;
 		ClipRects->WindowHeight = Height;
 		ClipRects->WindowWidth = Width;
+		for (auto & form : Forms)
+		{
+			if (form->Left + form->GetWidth() > Width - 1)
+				form->Left = Width - form->GetWidth() - 1;
+			if (form->Top + form->GetHeight() > Height - 1)
+				form->Top = Height - form->GetHeight() - 1;
+			if (form->Left < 0)
+				form->Left = 0;
+			if (form->Top < 0)
+				form->Top = 0;
+		}
 	}
 
 	void UIEntry::RemoveForm(Form *Form)
@@ -3326,7 +3366,7 @@ namespace GraphicsUI
 				if (Forms.Count())
 				{
 					auto window = Forms.First();
-					window->SetFocus();
+					//window->SetFocus();
 					ShowWindow(window);
 				}
 			}
@@ -3361,6 +3401,8 @@ namespace GraphicsUI
 				return true;
 			ctrl = ctrl->Parent;
 		}
+		Control::DoKeyDown(Key, Shift);
+
 		return false;
 	}
 
@@ -3373,6 +3415,8 @@ namespace GraphicsUI
 				return true;
 			ctrl = ctrl->Parent;
 		}
+		Control::DoKeyUp(Key, Shift);
+
 		return false;
 	}
 
@@ -3392,6 +3436,8 @@ namespace GraphicsUI
 			ImeMessageHandler.StringInputed(String((wchar_t)(Key)));
 			return true;
 		}
+		Control::DoKeyPress(Key, Shift);
+
 		return rs;
 	}
 
@@ -3616,6 +3662,7 @@ namespace GraphicsUI
 		if (!Form->Visible)
 			Form->OnShow.Invoke(Form);
 		Form->Visible = true;
+		DeactivateAllForms();
 		if (ActiveForm != Form)
 		{
 			UI_MsgArgs Args;
@@ -3629,7 +3676,6 @@ namespace GraphicsUI
 			Args.Type = MSG_UI_FORM_ACTIVATE;
 			Form->HandleMessage(&Args);
 		}
-		DeactivateAllForms();
 		ActiveForm = Form;
 		Form->Activated = true;
 	}
@@ -3867,6 +3913,8 @@ namespace GraphicsUI
 			this->ActiveForm = nullptr;
 		}
 		FocusedControl = Target;
+		if (Target && Target->Parent)
+			Target->Parent->DoFocusChange();
 		if (Target && (Target->Type & CT_TEXTBOX) == CT_TEXTBOX)
 		{
 			ImeMessageHandler.TextBox = (CustomTextBox *)Target;
@@ -3928,7 +3976,10 @@ namespace GraphicsUI
 	{
 		Label::SetText(pText);
 		if (AutoSize)
+		{
 			this->Width = TextWidth + (int)(GetEntry()->CheckmarkLabel->TextWidth * 1.5f) + 2;
+			this->Height = TextHeight + 1;
+		}
 	}
 
 	void CheckBox::Draw(int absX, int absY)
@@ -3964,16 +4015,16 @@ namespace GraphicsUI
 		}
 		graphics.PenColor = darkColor;
 		graphics.DrawLine(absX, absY + checkBoxTop, absX + checkBoxSize, absY + checkBoxTop);
-		graphics.DrawLine(absX, absY + checkBoxTop, absX, absY + checkBoxSize + checkBoxTop);
+		graphics.DrawLine(absX, absY + checkBoxTop + 1, absX, absY + checkBoxSize + checkBoxTop);
 		graphics.PenColor = lightColor;
 		graphics.DrawLine(absX + checkBoxSize, absY + checkBoxTop, absX + checkBoxSize, absY + checkBoxSize + checkBoxTop);
-		graphics.DrawLine(absX + checkBoxSize, absY + checkBoxSize + checkBoxTop, absX, absY + checkBoxSize + checkBoxTop);
+		graphics.DrawLine(absX + checkBoxSize - 1, absY + checkBoxSize + checkBoxTop, absX + 1, absY + checkBoxSize + checkBoxTop);
 		// Draw check mark
 		if (Checked)
 		{
 			auto checkMark = entry->CheckmarkLabel;
 			checkMark->FontColor = FontColor;
-			checkMark->Draw(absX,absY);
+			checkMark->Draw(absX + (checkBoxSize - checkMark->TextWidth) / 2 + 1,absY + checkBoxTop + (checkBoxSize - checkMark->TextHeight) / 2 - 1);
 		}
 		//Draw Caption
 		int textStart = checkBoxSize + checkBoxSize / 4;
@@ -4432,7 +4483,7 @@ namespace GraphicsUI
 				}
 			}
 		}
-		return false;
+		return true;
 	}
 
 	bool CustomTextBox::DoKeyPress(unsigned short Key, SHIFTSTATE Shift)
@@ -4446,7 +4497,7 @@ namespace GraphicsUI
 				return true;
 			}
 		}
-		return false;
+		return true;
 	}
 
 	void CustomTextBox::TextChanged()
@@ -4463,7 +4514,7 @@ namespace GraphicsUI
 	{
 		Control::DoKeyUp(Key,Shift);
 		KeyDown = false;
-		return false;
+		return true;
 	}
 
 	bool CustomTextBox::DoMouseDown(int X, int Y, SHIFTSTATE Shift)
@@ -4536,6 +4587,32 @@ namespace GraphicsUI
 	{
 		SelStart = 0;
 		SelLength = FText.Length();
+	}
+
+	bool IsSeparatorChar(wchar_t ch)
+	{
+		bool isLetter = (ch >= '0' && ch <= '9' || ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch == '_');
+		return !isLetter;
+	}
+
+	bool CustomTextBox::DoDblClick()
+	{
+		if (CursorPos >= FText.Length())
+			SelectAll();
+		else
+		{
+			int begin = CursorPos;
+			while (begin > 0 && !IsSeparatorChar(FText[begin - 1]))
+				begin--;
+			int end = CursorPos;
+			while (end < FText.Length() && !IsSeparatorChar(FText[end]))
+				end++;
+			SelStart = begin;
+			SelLength = end - begin;
+			CursorPos = end;
+			cursorPosChanged = true;
+		}
+		return true;
 	}
 
 	void CustomTextBox::Draw(int absX, int absY)
@@ -8113,6 +8190,23 @@ namespace GraphicsUI
 			return true;
 		}
 		return false;
+	}
+	void VScrollPanel::DoFocusChange()
+	{
+		Container::DoFocusChange();
+		auto focusedCtrl = GetEntry()->FocusedControl;
+		if (focusedCtrl && focusedCtrl->IsChildOf(content))
+		{
+			auto pos = focusedCtrl->GetRelativePos(content);
+			if (pos.y - vscrollBar->GetPosition() < 0)
+			{
+				vscrollBar->SetPosition(Math::Clamp(pos.y, vscrollBar->GetMin(), vscrollBar->GetMax()));
+			}
+			else if (pos.y - vscrollBar->GetPosition() + focusedCtrl->GetHeight() > Height)
+			{
+				vscrollBar->SetPosition(Math::Clamp(pos.y - Height + focusedCtrl->GetHeight(), vscrollBar->GetMin(), vscrollBar->GetMax()));
+			}
+		}
 	}
 	void VScrollPanel::ClearChildren()
 	{

@@ -336,6 +336,7 @@ namespace GraphicsUI
 		virtual void SetFocus();
 		virtual void LostFocus(Control * newFocus);
 		virtual bool DoClosePopup();
+		VectorMath::Vec2i GetRelativePos(Container * parent);
 	};
 
 	class Line : public Control
@@ -368,6 +369,7 @@ namespace GraphicsUI
 		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift);
 		virtual bool DoKeyUp(unsigned short Key, SHIFTSTATE Shift);
 		virtual bool DoKeyPress(unsigned short Key, SHIFTSTATE Shift);
+		virtual void DoFocusChange();
 		virtual void Draw(int absX, int absY);
 		virtual void DrawChildren(int absX, int absY);
 		virtual void SizeChanged();
@@ -420,7 +422,7 @@ namespace GraphicsUI
 			return formStyle;
 		}
 		void SetFormStyle(const FormStyle & FormStyle);
-
+		virtual void HandleMessage(const UI_MsgArgs * msg) override;
 		virtual bool DoMouseMove(int X, int Y);
 		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift);
 		virtual bool DoMouseUp(int X, int Y, SHIFTSTATE Shift);
@@ -524,6 +526,7 @@ namespace GraphicsUI
 		void PasteFromClipBoard();
 		void DeleteSelectionText();
 		void SelectAll();
+		virtual bool DoDblClick();
  		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift);
 		virtual bool DoMouseUp(int X, int Y, SHIFTSTATE Shift);
 		virtual bool DoMouseMove(int X, int Y);
@@ -943,6 +946,7 @@ namespace GraphicsUI
 		virtual void AddChild(Control *nControl) override;
 		virtual void RemoveChild(Control *AControl) override;
 		virtual bool DoMouseWheel(int delta) override;
+		virtual void DoFocusChange() override;
 		void ClearChildren();
 		int GetClientWidth();
 		int GetClientHeight();

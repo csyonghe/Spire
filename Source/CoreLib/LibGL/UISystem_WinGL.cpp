@@ -718,7 +718,8 @@ namespace GraphicsUI
 			Vec2 p1 = Vec2::Create(x1, y1);
 			Vec2 lineDir = (p1 - p0) * 0.5f;
 			lineDir = lineDir.Normalize();
-			Vec2 lineDirOtho = Vec2::Create(-lineDir.y * 0.5f, lineDir.x * 0.5f);
+			lineDir = lineDir * 0.5f;
+			Vec2 lineDirOtho = Vec2::Create(-lineDir.y, lineDir.x);
 			p0.x -= lineDir.x; p0.y -= lineDir.y;
 			//p1.x += lineDir.x; p1.y += lineDir.y;
 			points[0].x = p0.x - lineDirOtho.x; points[0].y = p0.y - lineDirOtho.y; points[0].inputIndex = primCounter;

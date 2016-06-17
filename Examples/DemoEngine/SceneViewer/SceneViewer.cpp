@@ -188,7 +188,7 @@ namespace SceneViewer
 
 			this->RegisterAccel(Accelerator(Accelerator::Ctrl, L'O'), openMenu);
 			this->OnResized.Bind(this, &MainForm::Form_Resized);
-			this->OnKeyDown.Bind(this, &MainForm::Form_KeyPressed);
+			uiEntry->OnKeyDown.Bind(this, &MainForm::Form_KeyPressed);
 			uiEntry->OnMouseMove.Bind(this, &MainForm::Form_MouseMove);
 			uiEntry->OnMouseWheel.Bind(this, &MainForm::Form_MouseWheel);
 			uiEntry->OnMouseDown.Bind(this, &MainForm::Form_MouseDown);
@@ -646,7 +646,7 @@ namespace SceneViewer
 			SaveCurrentViewToFile(fileName, fileName.ToLower().EndsWith(L"png"));
 		}
 			
-		void Form_KeyPressed(Object *, KeyEventArgs e)
+		void Form_KeyPressed(GraphicsUI::UI_Base*, GraphicsUI::UIKeyEventArgs&)
 		{
 			if (scene)
 			{

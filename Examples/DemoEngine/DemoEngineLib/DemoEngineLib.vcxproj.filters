@@ -163,4 +163,9 @@
       <Filter>CoreLib\glew</Filter>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="CoreLib\corelib.natvis">
+      <Filter>CoreLib</Filter>
+    </Natvis>
+  </ItemGroup>
 </Project>
