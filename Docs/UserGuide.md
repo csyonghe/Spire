@@ -1,4 +1,4 @@
-# Using Spire
+# Integrating Spire in Your Engine
 If you have read the [Understanding Spire](https://github.com/csyonghe/Spire/tree/master/Docs/tutorial1) tutorial and want to integrate Spire into your engine, 
 follow this guide to learn the compiler interface.
 ## As Stand-alone Compiler
