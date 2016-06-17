@@ -16,7 +16,7 @@ module ModuleName
 A `module` is treated almost the same as a `shader` by the compiler, except that modules do not triger shader code generation - the compiler is only going
 to generate final shader code for a `shader`. Modules are supposed to be a part of a shader, and does not need to contain pipeline-required components.
 
-##Using Modules as Mix-ins
+##Using Modules as "#include"
 The simplest way to use modules is to "include" them in another module or shader.
 For example you can define all vertex attribute inputs of `Demo1Shader` from tutorial 1 as a module:
 ```glsl
@@ -293,7 +293,7 @@ Next, we use the `Material` module to compute material properties (`albedo` and 
 ```glsl
     using material = Material();
 ```
-Again, `Material` module require `vert_uv`, but we do not need to explicitly specify that argument because `vert_uv` is already in current scope
+Again, `Material` module requires `vert_uv`, but we do not need to explicitly specify that argument because `vert_uv` is already in current scope
 due to inclusion of `VertexInput`.
 
 Then, we use the `TangentFrameTransform` module to transform the tangent space normal returned by `Material` module into world space, so we can use it
