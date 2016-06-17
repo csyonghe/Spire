@@ -148,7 +148,7 @@ shader DemoShader
 
 ##Examples of Using Modules
 So that is all the syntax basics you need to know about modules. Now let's rewrite our `Demo1Shader` using several sub-modules. You can find the 
-full source code for the rewritten shader at [Docs/tutorial2/Demo.shader](https://github.com/csyonghe/Spire/Docs/tutorial2/Demo.shader). To see
+full source code for the rewritten shader at [Docs/tutorial2/Demo.shader](https://github.com/csyonghe/Spire/blob/master/Docs/tutorial2/Demo.shader). To see
 the demo shader, compile `Examples/DemoEngine/DemoEngine.sln` and run `SceneViewer`, in `SceneViewer`, select File->Open and choose 
 `Docs/tutorial2/Demo.world`.
 
