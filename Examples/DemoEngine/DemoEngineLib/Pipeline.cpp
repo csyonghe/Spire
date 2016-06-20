@@ -251,16 +251,19 @@ namespace DemoEngine
 		}
 		return result.Choices;
 	}
-	void EnginePipeline::RecompileShader(String shaderName, String schedule)
+	bool EnginePipeline::RecompileShader(String shaderName, String schedule)
 	{
 		engine->GetHardwareRenderer()->Finish();
 		if (shaderIds.ContainsKey(shaderName))
 		{
 			int shaderId = shaderIds[shaderName];
-			shaderLibs[shaderId]->CompileFrom(shaderName, Path::ReplaceExt(shaderFileNames[shaderName].GetValue(), L"shader"), schedule);
+			bool rs = shaderLibs[shaderId]->CompileFrom(shaderName, Path::ReplaceExt(shaderFileNames[shaderName].GetValue(), L"shader"), schedule);
 			ReloadShader(gpuShaders[shaderId], *shaderLibs[shaderId]);
 			InitializeShader(shaderId);
+			return rs;
 		}
+		else
+			return false;
 	}
 	BBox EnginePipeline::GetBounds()
 	{

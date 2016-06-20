@@ -106,7 +106,7 @@ namespace DemoEngine
 
 		List<String> GetShaders();
 		List<Spire::Compiler::ShaderChoice> GetChoices(String shaderName, const EnumerableDictionary<String, Spire::Compiler::ShaderChoiceValue> & existingChoices);
-		void RecompileShader(String shaderName, String schedule);
+		bool RecompileShader(String shaderName, String schedule);
 		CoreLib::Graphics::BBox GetBounds();
 		void SetFoveatedRendering(bool enable);
 		bool GetFoveatedRendering()

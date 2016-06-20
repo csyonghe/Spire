@@ -25,10 +25,23 @@ namespace SceneViewer
 		auto menuView = new GraphicsUI::MenuItem(menuEditor, L"&View");
 		auto menuWordWrap = new GraphicsUI::MenuItem(menuView, L"&Word Wrap");
 		menuWordWrap->Checked = true;
+		auto statusStrip = new GraphicsUI::StatusStrip(this);
+		pnlStatus = new GraphicsUI::StatusPanel(statusStrip, L"Ready", 100, GraphicsUI::StatusPanel::Fill);
+		auto pnlLine = new GraphicsUI::StatusPanel(statusStrip, L"Line 1", 150, GraphicsUI::StatusPanel::Fixed);
+		auto pnlCol = new GraphicsUI::StatusPanel(statusStrip, L"Col 1", 150, GraphicsUI::StatusPanel::Fixed);
+
 		textBox = GraphicsUI::CreateMultiLineTextBox(this);
 		textBox->DockStyle = GraphicsUI::Control::dsFill;
 		textBox->SetFont(font);
 		this->Posit(100, 100, 600, 500);
+
+		textBox->OnCaretPosChanged.Bind([=](auto)
+		{
+			auto pos = textBox->GetCaretPos();
+			pnlLine->SetText(L"Line " + String(pos.Line));
+			pnlCol->SetText(L"Col " + String(pos.Col));
+		});
+
 		textBox->OnKeyDown.Bind([=](UI_Base *, GraphicsUI::UIKeyEventArgs & e)
 		{
 			if (e.Key == L'S' && e.Shift == GraphicsUI::SS_CONTROL)
@@ -80,6 +93,8 @@ namespace SceneViewer
 		{
 			textBox->SelectAll();
 		});
+
+		
 	}
 
 	void ShaderEditorForm::SaveAndApply()

@@ -1584,6 +1584,7 @@ namespace GraphicsUI
 		MultiLineTextBox(Container * parent)
 			: Container(parent)
 		{}
+		NotifyEvent OnCaretPosChanged;
 		virtual CoreLib::String GetSelectionText() = 0;
 		virtual void SetCaretPos(const CaretPos & pCaretPos) = 0;
 		virtual void ScrollToCaret() = 0;

@@ -211,9 +211,14 @@ namespace SceneViewer
 		{
 			if (scene)
 			{
-				scene->RecompileShader(shaderEditorForm->shaderName, L"");
+				bool rs = scene->RecompileShader(shaderEditorForm->shaderName, L"");
 				if (choiceForm)
 					choiceForm->Update();
+				if (rs)
+					shaderEditorForm->pnlStatus->SetText(L"Compilation successful.");
+				else
+					shaderEditorForm->pnlStatus->SetText(L"Compilation failed. See command prompt for details.");
+
 			}
 		}
 

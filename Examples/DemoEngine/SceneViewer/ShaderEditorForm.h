@@ -14,6 +14,7 @@ namespace SceneViewer
 	private:
 		GraphicsUI::MultiLineTextBox * textBox;
 	public:
+		GraphicsUI::StatusPanel * pnlStatus;
 		String shaderFileName, shaderName;
 		ShaderEditorForm(GraphicsUI::UIEntry * parent, GraphicsUI::IFont * font);
 		Event<> OnShaderChange;

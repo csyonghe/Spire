@@ -467,6 +467,7 @@ namespace GraphicsUI
 				physicalSelEnd = textBuffer.LogicalToPhysical(selStart);
 			}
 			caretPosChanged = true;
+			OnCaretPosChanged(this);
 		}
 
 		void UpdateCaretDocumentPos()
@@ -706,6 +707,7 @@ namespace GraphicsUI
 		{
 			this->caretPos = pCaretPos;
 			caretPosChanged = true;
+			OnCaretPosChanged(this);
 			ScrollToCaret();
 		}
 		virtual void ScrollToCaret()
@@ -826,6 +828,7 @@ namespace GraphicsUI
 			}
 			desiredCol = textBuffer.LogicalToPhysical(caretPos).Col;
 			caretPosChanged = true;
+			OnCaretPosChanged(this);
 			ResetCaretTimer();
 			return true;
 		}

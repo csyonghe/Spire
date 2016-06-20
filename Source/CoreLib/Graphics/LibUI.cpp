@@ -223,7 +223,7 @@ namespace GraphicsUI
 		tbl.FocusRectColor = Color(120, 120, 120, 220);
 
 		tbl.ToolButtonBackColor1 = tbl.ControlBackColor;
-		tbl.ToolButtonBackColor2 = Color(215, 226, 228, 255);
+		tbl.ToolButtonBackColor2 = Color(55, 55, 55, 220);
 		tbl.ToolButtonBackColorHighlight1 = tbl.SelectionColor;
 		tbl.ToolButtonBackColorHighlight2 = tbl.SelectionColor;
 		tbl.ToolButtonBackColorPressed1 = Color(184, 75, 0, 255);
@@ -5857,6 +5857,7 @@ namespace GraphicsUI
 		FillMode = fm;
 		SetText(_text);
 		Width = width;
+		Height = (int)(GetEntry()->GetLineHeight() * 1.2f);
 		parent->AddItem(this);
 	}
 
@@ -5866,7 +5867,6 @@ namespace GraphicsUI
 		BorderStyle = BS_NONE;
 		FillMode = Fixed;
 		Width = 50;
-		DockStyle = dsBottom;
 		text = new Label(this);
 	}
 
@@ -5893,19 +5893,25 @@ namespace GraphicsUI
 	void StatusPanel::Draw(int absX, int absY)
 	{
 		Control::Draw(absX, absY);
-		text->Draw(absX+Left, absY+Top);
+		auto entry = GetEntry();
+		entry->ClipRects->PushRect(Rect(absX + Left, absY + Top, Width - text->TextHeight, Height));
+		text->Draw(absX+Left, absY+Top + ((Height - text->TextHeight) >> 1));
+		entry->ClipRects->PopRect();
 	}
 		
 	StatusStrip::StatusStrip(Container * parent)
 		: Container(parent)
 	{
 		LeftMargin = 8;
-		TopMargin = 6;
+		TopMargin = 1;
+		DockStyle = dsBottom;
+		Height = (int)(GetEntry()->GetLineHeight() * 1.2f);
 	}
 
-	void StatusStrip::AddItem(GraphicsUI::StatusPanel *pannel)
+	void StatusStrip::AddItem(GraphicsUI::StatusPanel *panel)
 	{
-		panels.Add(pannel);
+		panels.Add(panel);
+		Height = Math::Max(Height, panel->GetHeight());
 	}
 
 	int StatusStrip::Count()
