@@ -8212,6 +8212,78 @@ namespace GraphicsUI
 		graphics.PenColor = BorderColor;
 		graphics.DrawLine(absX + Left, absY + Top, absX + Left + Width - 1, absY + Top + Height - 1);
 	}
+
+	CommandForm::CommandForm(UIEntry * parent)
+		:Form(parent)
+	{
+		this->SetText(L"Command Prompt");
+		txtCmd = new TextBox(this);
+		txtCmd->SetHeight((int)(GetEntry()->GetLineHeight() * 1.2f));
+		txtCmd->DockStyle = dsBottom;
+		textBox = CreateMultiLineTextBox(this);
+		textBox->DockStyle = dsFill;
+		textBox->BorderStyle = BS_NONE;
+		textBox->TabStop = false;
+		textBox->SetReadOnly(true);
+		txtCmd->OnKeyDown.Bind([=](UI_Base *, UIKeyEventArgs & e)
+		{
+			if (e.Key == Keys::Return)
+			{
+				auto cmdText = txtCmd->GetText();
+				if (cmdText.Length())
+				{
+					commandHistories.Add(cmdText);
+					cmdPtr = commandHistories.Count();
+					txtCmd->SetText(L"");
+					Write(L"> " + cmdText + L"\n");
+					OnCommand(cmdText);
+
+					auto pos = textBox->GetCaretPos();
+					if (pos.Col > 0)
+						textBox->InsertText(L"\n");
+				}
+			}
+			else if (e.Key == Keys::Up)
+			{
+				cmdPtr--;
+				if (cmdPtr < 0)
+					cmdPtr = 0;
+				if (cmdPtr < commandHistories.Count())
+				{
+					txtCmd->SetText(commandHistories[cmdPtr]);
+				}
+			}
+			else if (e.Key == Keys::Down)
+			{
+				cmdPtr++;
+				if (cmdPtr >= commandHistories.Count())
+					cmdPtr = commandHistories.Count();
+				if (cmdPtr < commandHistories.Count())
+					txtCmd->SetText(commandHistories[cmdPtr]);
+				else
+					txtCmd->SetText(L"");
+			}
+		});
+		this->Posit(10, 10, 500, 400);
+	}
+	void CommandForm::Write(const CoreLib::String & text)
+	{
+		textBox->MoveCaretToEnd();
+		textBox->InsertText(text);
+		while (textBox->GetLineCount() > 2048)
+			textBox->DeleteLine(0);
+	}
+	bool CommandForm::DoMouseUp(int x, int y, SHIFTSTATE shift)
+	{
+		Form::DoMouseUp(x, y, shift);
+		if (this->Visible)
+			txtCmd->SetFocus();
+		return true;
+	}
+	void UICommandLineWriter::Write(const String & text)
+	{
+		cmdForm->Write(text);
+	}
 }
 
 /***********************************************************************
@@ -8386,11 +8458,12 @@ namespace GraphicsUI
 		String GetAllText()
 		{
 			StringBuilder sb;
-			for (auto & line : Lines)
+			for (int i = 0; i < Lines.Count(); i++)
 			{
-				for (auto & ch : line.Chars)
+				for (auto & ch : Lines[i].Chars)
 					sb << (wchar_t)ch;
-				sb << L'\n';
+				if (i < Lines.Count() - 1)
+					sb << L'\n';
 			}
 			return sb.ProduceString();
 		}
@@ -8656,6 +8729,7 @@ namespace GraphicsUI
 		CaretPos physicalSelStart, physicalSelEnd;
 		int caretDocumentPosX = 0;
 		int caretDocumentPosY = 0;
+		bool readOnly = false;
 		bool caretPosChanged = true;
 		bool selecting = false;
 		bool wordSelecting = false;
@@ -8912,6 +8986,14 @@ namespace GraphicsUI
 			auto mnSelAll = new MenuItem(contextMenu, L"&Select All", L"Ctrl+A");
 			mnSelAll->OnClick.Bind([this](auto) {SelectAll(); });
 		}
+		virtual void SetReadOnly(bool value) override
+		{
+			readOnly = value;
+		}
+		virtual bool GetReadOnly() override
+		{
+			return readOnly;
+		}
 		void ResetCaretTimer()
 		{
 			time = CoreLib::Diagnostics::PerformanceCounter::Start();
@@ -8926,6 +9008,10 @@ namespace GraphicsUI
 			caretPosChanged = true;
 			OnCaretPosChanged(this);
 			ScrollToCaret();
+		}
+		virtual void MoveCaretToEnd()
+		{
+			SetCaretPos(CaretPos(textBuffer.Lines.Count() - 1, textBuffer.Lines.Last().Chars.Count()));
 		}
 		virtual void ScrollToCaret()
 		{
@@ -9154,6 +9240,8 @@ namespace GraphicsUI
 			Control::DoKeyPress(key, shift);
 			if ((shift & SS_CONTROL) == 0)
 			{
+				if (readOnly)
+					return true;
 				if (key >= Keys::Space)
 				{
 					InsertText((wchar_t)key);
@@ -9339,6 +9427,8 @@ namespace GraphicsUI
 			}
 			else
 			{
+				if (readOnly)
+					return true;
 				if (key == Keys::Delete)
 				{
 					DeleteAfterCaret();
@@ -9356,6 +9446,8 @@ namespace GraphicsUI
 
 		void Cut() override
 		{
+			if (readOnly)
+				return;
 			String text;
 			if (selStart != selEnd)
 			{
@@ -9385,6 +9477,8 @@ namespace GraphicsUI
 
 		void Paste() override
 		{
+			if (readOnly)
+				return;
 			auto text = GetEntry()->System->GetClipboardText();
 			InsertText(text);
 		}
@@ -9402,6 +9496,8 @@ namespace GraphicsUI
 
 		virtual void Undo() override
 		{
+			if (readOnly)
+				return;
 			auto op = operationStack.PopOperation();
 			operationStack.Lock();
 			switch (op.Name)
@@ -9426,6 +9522,8 @@ namespace GraphicsUI
 
 		virtual void Redo() override
 		{
+			if (readOnly)
+				return;
 			auto op = operationStack.GetNextRedo();
 			operationStack.Lock();
 			switch (op.Name)
@@ -9557,11 +9655,15 @@ namespace GraphicsUI
 
 		virtual void IncreaseIndent() override
 		{
+			if (readOnly)
+				return;
 			IncreaseLineIndent(selStart, selEnd);
 		}
 
 		virtual void DecreaseIndent() override
 		{
+			if (readOnly)
+				return;
 			DecreaseLineIndent(selStart, selEnd);
 		}
 
@@ -9723,6 +9825,8 @@ namespace GraphicsUI
 		}
 		virtual void ImeInputString(const String & txt)
 		{
+			if (readOnly)
+				return;
 			InsertText(txt);
 		}
 		virtual void Draw(int absX, int absY)

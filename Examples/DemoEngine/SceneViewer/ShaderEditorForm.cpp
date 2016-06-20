@@ -38,8 +38,8 @@ namespace SceneViewer
 		textBox->OnCaretPosChanged.Bind([=](auto)
 		{
 			auto pos = textBox->GetCaretPos();
-			pnlLine->SetText(L"Line " + String(pos.Line));
-			pnlCol->SetText(L"Col " + String(pos.Col));
+			pnlLine->SetText(L"Line " + String(pos.Line + 1));
+			pnlCol->SetText(L"Col " + String(pos.Col + 1));
 		});
 
 		textBox->OnKeyDown.Bind([=](UI_Base *, GraphicsUI::UIKeyEventArgs & e)

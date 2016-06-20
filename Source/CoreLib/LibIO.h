@@ -4,6 +4,7 @@
 #include "LibString.h"
 #include "Stream.h"
 #include "TextIO.h"
+#include "SecureCRT.h"
 
 namespace CoreLib
 {
@@ -38,6 +39,26 @@ namespace CoreLib
 #endif
 			static bool CreateDirectory(const String & path);
 		};
+
+		class CommandLineWriter : public Object
+		{
+		public:
+			virtual void Write(const String & text) = 0;
+		};
+
+		void SetCommandLineWriter(CommandLineWriter * writer);
+
+		extern CommandLineWriter * currentCommandWriter;
+		template<typename ...Args>
+		void uiprintf(const wchar_t * format, Args... args)
+		{
+			if (currentCommandWriter)
+			{
+				wchar_t buffer[1024];
+				swprintf_s(buffer, format, args...);
+				currentCommandWriter->Write(buffer);
+			}
+		}
 	}
 }
 

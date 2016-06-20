@@ -169,11 +169,12 @@ namespace GraphicsUI
 		String GetAllText()
 		{
 			StringBuilder sb;
-			for (auto & line : Lines)
+			for (int i = 0; i < Lines.Count(); i++)
 			{
-				for (auto & ch : line.Chars)
+				for (auto & ch : Lines[i].Chars)
 					sb << (wchar_t)ch;
-				sb << L'\n';
+				if (i < Lines.Count() - 1)
+					sb << L'\n';
 			}
 			return sb.ProduceString();
 		}
@@ -439,6 +440,7 @@ namespace GraphicsUI
 		CaretPos physicalSelStart, physicalSelEnd;
 		int caretDocumentPosX = 0;
 		int caretDocumentPosY = 0;
+		bool readOnly = false;
 		bool caretPosChanged = true;
 		bool selecting = false;
 		bool wordSelecting = false;
@@ -695,6 +697,14 @@ namespace GraphicsUI
 			auto mnSelAll = new MenuItem(contextMenu, L"&Select All", L"Ctrl+A");
 			mnSelAll->OnClick.Bind([this](auto) {SelectAll(); });
 		}
+		virtual void SetReadOnly(bool value) override
+		{
+			readOnly = value;
+		}
+		virtual bool GetReadOnly() override
+		{
+			return readOnly;
+		}
 		void ResetCaretTimer()
 		{
 			time = CoreLib::Diagnostics::PerformanceCounter::Start();
@@ -709,6 +719,10 @@ namespace GraphicsUI
 			caretPosChanged = true;
 			OnCaretPosChanged(this);
 			ScrollToCaret();
+		}
+		virtual void MoveCaretToEnd()
+		{
+			SetCaretPos(CaretPos(textBuffer.Lines.Count() - 1, textBuffer.Lines.Last().Chars.Count()));
 		}
 		virtual void ScrollToCaret()
 		{
@@ -937,6 +951,8 @@ namespace GraphicsUI
 			Control::DoKeyPress(key, shift);
 			if ((shift & SS_CONTROL) == 0)
 			{
+				if (readOnly)
+					return true;
 				if (key >= Keys::Space)
 				{
 					InsertText((wchar_t)key);
@@ -1122,6 +1138,8 @@ namespace GraphicsUI
 			}
 			else
 			{
+				if (readOnly)
+					return true;
 				if (key == Keys::Delete)
 				{
 					DeleteAfterCaret();
@@ -1139,6 +1157,8 @@ namespace GraphicsUI
 
 		void Cut() override
 		{
+			if (readOnly)
+				return;
 			String text;
 			if (selStart != selEnd)
 			{
@@ -1168,6 +1188,8 @@ namespace GraphicsUI
 
 		void Paste() override
 		{
+			if (readOnly)
+				return;
 			auto text = GetEntry()->System->GetClipboardText();
 			InsertText(text);
 		}
@@ -1185,6 +1207,8 @@ namespace GraphicsUI
 
 		virtual void Undo() override
 		{
+			if (readOnly)
+				return;
 			auto op = operationStack.PopOperation();
 			operationStack.Lock();
 			switch (op.Name)
@@ -1209,6 +1233,8 @@ namespace GraphicsUI
 
 		virtual void Redo() override
 		{
+			if (readOnly)
+				return;
 			auto op = operationStack.GetNextRedo();
 			operationStack.Lock();
 			switch (op.Name)
@@ -1340,11 +1366,15 @@ namespace GraphicsUI
 
 		virtual void IncreaseIndent() override
 		{
+			if (readOnly)
+				return;
 			IncreaseLineIndent(selStart, selEnd);
 		}
 
 		virtual void DecreaseIndent() override
 		{
+			if (readOnly)
+				return;
 			DecreaseLineIndent(selStart, selEnd);
 		}
 
@@ -1506,6 +1536,8 @@ namespace GraphicsUI
 		}
 		virtual void ImeInputString(const String & txt)
 		{
+			if (readOnly)
+				return;
 			InsertText(txt);
 		}
 		virtual void Draw(int absX, int absY)

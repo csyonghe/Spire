@@ -21,72 +21,12 @@ using namespace DemoEngine;
 
 namespace SceneViewer
 {
-	class CommandForm : public GraphicsUI::Form
-	{
-	private:
-		GraphicsUI::TextBox* textBox;
-		List<String> commandHistories;
-		int cmdPtr = 0;
-	public:
-		Event<String> OnCommand;
-
-		CommandForm(GraphicsUI::UIEntry * entry)
-			: Form(entry)
-		{
-			Posit(0,0,512, 70);
-			textBox = new GraphicsUI::TextBox(this);
-			textBox->Posit(0, 0, 500, 30);
-			SetText(L"Command");
-			formStyle.Sizeable = false;
-			textBox->SetText(L"");
-			textBox->OnKeyPress.Bind(this, &CommandForm::TextBox_KeyPressed);
-			textBox->OnKeyDown.Bind(this, &CommandForm::TextBox_KeyDown);
-		}
-
-		void TextBox_KeyDown(GraphicsUI::UI_Base *, GraphicsUI::UIKeyEventArgs & e)
-		{
-			if (e.Key == VK_UP)
-			{
-				cmdPtr--;
-				if (cmdPtr < 0)
-					cmdPtr = 0;
-				if (cmdPtr < commandHistories.Count())
-				{
-					textBox->SetText(commandHistories[cmdPtr]);
-				}
-			}
-			else if (e.Key == VK_DOWN)
-			{
-				cmdPtr++;
-				if (cmdPtr >= commandHistories.Count())
-					cmdPtr = commandHistories.Count();
-				if (cmdPtr < commandHistories.Count())
-					textBox->SetText(commandHistories[cmdPtr]);
-				else
-					textBox->SetText(L"");
-			}
-		}
-
-		void TextBox_KeyPressed(GraphicsUI::UI_Base *, GraphicsUI::UIKeyEventArgs & e)
-		{
-			if (e.Key == 13)
-			{
-				auto cmd = textBox->GetText();
-				OnCommand.Invoke(cmd);
-				if (cmd.Length())
-					commandHistories.Add(cmd);
-				textBox->SetText(L"");
-				cmdPtr = commandHistories.Count();
-			}
-		}
-	};
-
 	class MainForm : public GLForm, IChoiceControl
 	{
 	private:
 		RefPtr<DeviceResourcePool> resourcePool;
 		RefPtr<EnginePipeline> scene;
-		CommandForm* cmdForm = nullptr;
+		GraphicsUI::CommandForm * cmdForm = nullptr;
 		ChoiceForm * choiceForm = nullptr;
 		ShaderInfoForm * shaderInfoForm = nullptr;
 		ShaderEditorForm * shaderEditorForm = nullptr;
@@ -95,6 +35,7 @@ namespace SceneViewer
 		CameraControl camera;
 		SystemUniforms sysUniforms;
 		MenuItem * renderTargetsMenu, *freezeTimeMenu;
+		RefPtr<CommandLineWriter> cmdWriter;
 		float time;
 		bool foveated = false;
 		bool stereo = false;
@@ -196,10 +137,13 @@ namespace SceneViewer
 			uiEntry->OnMouseDown.Bind(this, &MainForm::Form_MouseDown);
 			uiEntry->OnMouseUp.Bind(this, &MainForm::Form_MouseUp);
 
-			cmdForm = new CommandForm(uiEntry.Ptr());
+			cmdForm = new GraphicsUI::CommandForm(uiEntry.Ptr());
 			cmdForm->OnCommand.Bind(this, &MainForm::OnCommand);
 			cmdForm->Left = 10;
 			cmdForm->Top = GetClientHeight() - 80;
+			cmdWriter = new GraphicsUI::UICommandLineWriter(cmdForm);
+			CoreLib::IO::SetCommandLineWriter(cmdWriter.Ptr());
+
 			CreateChoiceForm();
 
 			shaderEditorForm = new ShaderEditorForm(uiEntry.Ptr(), uiSystemInterface->LoadFont(GraphicsUI::Font(L"Consolas", 13)));
@@ -217,8 +161,10 @@ namespace SceneViewer
 				if (rs)
 					shaderEditorForm->pnlStatus->SetText(L"Compilation successful.");
 				else
+				{
 					shaderEditorForm->pnlStatus->SetText(L"Compilation failed. See command prompt for details.");
-
+					uiEntry->ShowWindow(cmdForm);
+				}
 			}
 		}
 
@@ -256,9 +202,9 @@ namespace SceneViewer
 			if (scene)
 				scene->SetFoveatedRendering(foveated);
 			if (foveated)
-				printf("Foveated rendering enabled.\n");
+				uiprintf(L"Foveated rendering enabled.\n");
 			else
-				printf("Foveated rendering disabled.\n");
+				uiprintf(L"Foveated rendering disabled.\n");
 		}
 		void ConsoleViewMenu_Clicked(Object * , EventArgs )
 		{
@@ -474,7 +420,7 @@ namespace SceneViewer
 					parser.ReadToken();
 					if (scene)
 					{
-						printf("Command lists submitted: %d\n", scene->CommandListsDrawn);
+						uiprintf(L"Command lists submitted: %d\n", scene->CommandListsDrawn);
 						scene->PrintStats();
 					}
 				}
@@ -492,7 +438,7 @@ namespace SceneViewer
 					{
 						curveRecording->Save(fileName);
 						curveRecording->Initialize();
-						printf("Camera curve saved. %d control points, total distance %f\n", curveRecording->Points.Count(), curveRecording->TotalDistance);
+						uiprintf(L"Camera curve saved. %d control points, total distance %f\n", curveRecording->Points.Count(), curveRecording->TotalDistance);
 					}
 					else
 						MessageBox(L"At least two camera points should be specified.", L"Error", MB_ICONEXCLAMATION);
@@ -891,6 +837,8 @@ namespace SceneViewer
 
 int main(int argc, char* argv[])
 {
+	ShowWindow(GetConsoleWindow(), SW_HIDE);
+
 	Application::Init();
 	try
 	{

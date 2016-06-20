@@ -6,6 +6,7 @@
 #include "../Events.h"
 #include "../PerformanceCounter.h"
 #include "UISystemInterface.h"
+#include "../LibIO.h"
 
 namespace GraphicsUI
 {
@@ -1243,12 +1244,41 @@ namespace GraphicsUI
 		virtual void Cut() = 0;
 		virtual void IncreaseIndent() = 0;
 		virtual void DecreaseIndent() = 0;
+		virtual void MoveCaretToEnd() = 0;
 		virtual void SelectAll() = 0;
+		virtual void SetReadOnly(bool value) = 0;
+		virtual bool GetReadOnly() = 0;
 		virtual void Select(CaretPos start, CaretPos end) = 0;
 		virtual int GetLineCount() = 0;
 		virtual CoreLib::String GetLine(int i) = 0;
 		virtual void DeleteLine(int i) = 0;
 	};
 	MultiLineTextBox * CreateMultiLineTextBox(Container * parent);
+
+	class CommandForm : public Form
+	{
+	private:
+		MultiLineTextBox * textBox;
+		TextBox * txtCmd;
+		CoreLib::List<CoreLib::String> commandHistories;
+		int cmdPtr = 0;
+	public:
+		CommandForm(UIEntry * parent);
+		void Write(const CoreLib::String & text);
+		CoreLib::Event<CoreLib::String> OnCommand;
+		virtual bool DoMouseUp(int x, int y, SHIFTSTATE shift) override;
+	};
+
+	class UICommandLineWriter : public CoreLib::IO::CommandLineWriter
+	{
+	private:
+		CommandForm * cmdForm = nullptr;
+	public:
+		UICommandLineWriter(CommandForm * form)
+		{
+			cmdForm = form;
+		}
+		virtual void Write(const CoreLib::String & text) override;
+	};
 }
 #endif

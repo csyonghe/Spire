@@ -91,7 +91,7 @@ namespace DemoEngine
 	RefPtr<DeviceMesh> EnginePipeline::LoadMesh(String meshFileName)
 	{
 		RefPtr<DeviceMesh> rs;
-		printf("loading %s\n", meshFileName.ToMultiByteString());
+		uiprintf(L"loading %s\n", meshFileName.Buffer());
 		if (!meshBuffers.TryGetValue(meshFileName, rs))
 		{
 			Mesh m;
@@ -105,7 +105,7 @@ namespace DemoEngine
 	}
 	void EnginePipeline::InitializeShader(int shaderId)
 	{
-		printf("Initializing material %d\n", shaderId);
+		uiprintf(L"Initializing material %d\n", shaderId);
 		BuildUniformBuffer(shaderId);
 		Precompute(shaderId);
 		AllocObjectSpaceBuffers(shaderId);
@@ -257,7 +257,42 @@ namespace DemoEngine
 		if (shaderIds.ContainsKey(shaderName))
 		{
 			int shaderId = shaderIds[shaderName];
-			bool rs = shaderLibs[shaderId]->CompileFrom(shaderName, Path::ReplaceExt(shaderFileNames[shaderName].GetValue(), L"shader"), schedule);
+			bool rs = false;
+			// compile shader
+			{
+				CompileResult result;
+				CompileOptions options;
+				options.ScheduleSource = schedule;
+				options.SymbolToCompile = shaderName;
+				options.Mode = CompilerMode::ProduceShader;
+				auto compiledShaderLibs = CompileShaderSourceFromFile(result, Path::ReplaceExt(shaderFileNames[shaderName].GetValue(), L"shader"), options);
+				if (result.Success)
+				{
+					for (auto & lib : compiledShaderLibs)
+					{
+						if (lib.MetaData.ShaderName == shaderName)
+						{
+							shaderLibs[shaderId]->FromString(compiledShaderLibs[0].ToString());
+							rs = true;
+							break;
+						}
+					}
+				}
+				else
+				{
+					rs = false;
+					for (int i = 0; i < result.ErrorList.Count(); i++)
+					{
+						uiprintf(L"%s(%d): error %d: %s\n", result.ErrorList[i].Position.FileName.Buffer(), result.ErrorList[i].Position.Line,
+							result.ErrorList[i].ErrorID, result.ErrorList[i].Message.Buffer());
+					}
+					for (int i = 0; i < result.WarningList.Count(); i++)
+					{
+						uiprintf(L"%s(%d): warning %d: %s\n", result.WarningList[i].Position.FileName.Buffer(),
+							result.WarningList[i].Position.Line, result.WarningList[i].ErrorID, result.WarningList[i].Message.Buffer());
+					}
+				}
+			}
 			ReloadShader(gpuShaders[shaderId], *shaderLibs[shaderId]);
 			InitializeShader(shaderId);
 			return rs;
@@ -636,7 +671,7 @@ namespace DemoEngine
 				parser.Read(L",");
 				storage = parseTextureStorage(parser);
 			}
-			printf("loading %s\n", textureName.ToMultiByteString());
+			uiprintf(L"loading %s\n", textureName.Buffer());
 
 			textureName = Path::Combine(dir, textureName);
 			val.TextureName = textureName;
@@ -649,7 +684,7 @@ namespace DemoEngine
 			Array<String, 6> faces;
 			parser.Read(L"=");
 			parser.Read(L"(");
-			printf("loading %s\n", name.ToMultiByteString());
+			uiprintf(L"loading %s\n", name.Buffer());
 			for (int i = 0; i < 6; i++)
 			{
 				auto textureName = parser.ReadStringLiteral();
@@ -885,7 +920,7 @@ namespace DemoEngine
 		int totalTextures = 0;
 		for (auto & s : gpuShaders)
 			totalTextures += s.PrebakedTextures.Count();
-		printf("%d textures baked.\n", totalTextures);
+		uiprintf(L"%d textures baked.\n", totalTextures);
 		CompileCommandLists();
 	}
 
@@ -1157,7 +1192,7 @@ namespace DemoEngine
 			gpuShader.PrecomputeTexUniformBuffer = hw->CreateBuffer(BufferUsage::UniformBuffer);
 			gpuShader.PrecomputeTexUniformBuffer.SetData(precomputeTexUniformBuffer.Buffer(), precomputeTexUniformBuffer.Count());
 			gpuShader.PrecomputeTexUniformBuffer.MakeResident(true);
-			printf("buffer %d: %d\n", shaderId, gpuShader.PrecomputeTexUniformBuffer.Handle);
+			uiprintf(L"buffer %d: %d\n", shaderId, gpuShader.PrecomputeTexUniformBuffer.Handle);
 			auto addr = gpuShader.PrecomputeTexUniformBuffer.GetGpuAddress();
 			// fill in true gpu address with precomputeTex uniforms
 			for (auto & obj : objects)
@@ -1376,7 +1411,7 @@ namespace DemoEngine
 								sformat = StorageFormat::RGBA_F32;
 							else
 							{
-								printf("Unknown storage format for component %s - %s", comp.Name.ToMultiByteString(), storage.ToMultiByteString());
+								uiprintf(L"Unknown storage format for component %s - %s", comp.Name.ToMultiByteString(), storage.ToMultiByteString());
 								storage = L"RGBA_16F";
 							}
 						}
@@ -1385,7 +1420,7 @@ namespace DemoEngine
 							sformat = StorageFormat::RGB10_A2;
 							storage = L"RGB10_A2 (Normal)";
 						}
-						printf("Prebaking texture '%s', format: %s...\n", comp.Name.ToMultiByteString(), storage.ToMultiByteString());
+						uiprintf(L"Prebaking texture '%s', format: %s...\n", comp.Name.ToMultiByteString(), storage.ToMultiByteString());
 						tex.SetData(sformat, frameBufferSize, frameBufferSize, 1, DataType::Float, nullptr);
 						tex.BuildMipmaps();
 					}
@@ -1513,7 +1548,7 @@ namespace DemoEngine
 	{
 		float cellSizeX = (bounds.Max.x - bounds.Min.x) / sceneGridSize;
 		float cellSizeZ = (bounds.Max.z - bounds.Min.z) / sceneGridSize;
-		printf("CPU time: %f\n", cpuFrameTime);
+		uiprintf(L"CPU time: %f\n", cpuFrameTime);
 		for (int i = 0; i < sceneGridSize; i++)
 		{
 			for (int j = 0; j < sceneGridSize; j++)
@@ -1525,17 +1560,17 @@ namespace DemoEngine
 				if (cellBounds.Contains(sysUniforms.Views[0].CamPos))
 				{
 					auto &objs = sceneGridObjLists[j*sceneGridSize + i];
-					printf("Object count: %d\n", objs.Count());
+					uiprintf(L"Object count: %d\n", objs.Count());
 					auto & lists = GetMainRenderPassContext().CompiledCommandLists[j*sceneGridSize + i];
 					for (int k = 0; k < lists.Count(); k++)
 					{
-						printf("lod %d: %d lists\n", k, lists[k].Count());
+						uiprintf(L"lod %d: %d lists\n", k, lists[k].Count());
 						HashSet<GLuint> programHandles;
 						for (auto obj : objs)
 						{
 							programHandles.Add(gpuShaders[obj->Techniques[Math::Min(k, obj->Techniques.Count() - 1)].ShaderId].Programs[MaterialContext::MainProgramId].Handle);
 						}
-						printf("       %d shaders types\n", programHandles.Count());
+						uiprintf(L"       %d shaders types\n", programHandles.Count());
 					}
 				}
 			}

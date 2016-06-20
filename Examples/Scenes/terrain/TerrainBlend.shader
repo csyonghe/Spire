@@ -65,7 +65,7 @@ module SnowMaterial
 {
     @perInstanceUniform sampler2D snow_map;
     @perInstanceUniform sampler2D snow_Nmap;
-    require vec2 uv;  
+    require vec2 uv;
     
     public vec3 Albedo = texture(snow_map, uv).xyz + vec3(0.2);
     public vec3 Normal = texture(snow_Nmap, uv).xyz;

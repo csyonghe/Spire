@@ -6558,4 +6558,76 @@ namespace GraphicsUI
 		graphics.PenColor = BorderColor;
 		graphics.DrawLine(absX + Left, absY + Top, absX + Left + Width - 1, absY + Top + Height - 1);
 	}
+
+	CommandForm::CommandForm(UIEntry * parent)
+		:Form(parent)
+	{
+		this->SetText(L"Command Prompt");
+		txtCmd = new TextBox(this);
+		txtCmd->SetHeight((int)(GetEntry()->GetLineHeight() * 1.2f));
+		txtCmd->DockStyle = dsBottom;
+		textBox = CreateMultiLineTextBox(this);
+		textBox->DockStyle = dsFill;
+		textBox->BorderStyle = BS_NONE;
+		textBox->TabStop = false;
+		textBox->SetReadOnly(true);
+		txtCmd->OnKeyDown.Bind([=](UI_Base *, UIKeyEventArgs & e)
+		{
+			if (e.Key == Keys::Return)
+			{
+				auto cmdText = txtCmd->GetText();
+				if (cmdText.Length())
+				{
+					commandHistories.Add(cmdText);
+					cmdPtr = commandHistories.Count();
+					txtCmd->SetText(L"");
+					Write(L"> " + cmdText + L"\n");
+					OnCommand(cmdText);
+
+					auto pos = textBox->GetCaretPos();
+					if (pos.Col > 0)
+						textBox->InsertText(L"\n");
+				}
+			}
+			else if (e.Key == Keys::Up)
+			{
+				cmdPtr--;
+				if (cmdPtr < 0)
+					cmdPtr = 0;
+				if (cmdPtr < commandHistories.Count())
+				{
+					txtCmd->SetText(commandHistories[cmdPtr]);
+				}
+			}
+			else if (e.Key == Keys::Down)
+			{
+				cmdPtr++;
+				if (cmdPtr >= commandHistories.Count())
+					cmdPtr = commandHistories.Count();
+				if (cmdPtr < commandHistories.Count())
+					txtCmd->SetText(commandHistories[cmdPtr]);
+				else
+					txtCmd->SetText(L"");
+			}
+		});
+		this->Posit(10, 10, 500, 400);
+	}
+	void CommandForm::Write(const CoreLib::String & text)
+	{
+		textBox->MoveCaretToEnd();
+		textBox->InsertText(text);
+		while (textBox->GetLineCount() > 2048)
+			textBox->DeleteLine(0);
+	}
+	bool CommandForm::DoMouseUp(int x, int y, SHIFTSTATE shift)
+	{
+		Form::DoMouseUp(x, y, shift);
+		if (this->Visible)
+			txtCmd->SetFocus();
+		return true;
+	}
+	void UICommandLineWriter::Write(const String & text)
+	{
+		cmdForm->Write(text);
+	}
 }
