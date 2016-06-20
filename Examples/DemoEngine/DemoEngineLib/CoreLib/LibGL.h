@@ -2559,6 +2559,7 @@ namespace CoreLib
 			}
 			void DrawUIOverlay()
 			{
+				glFinish();
 				uiSystemInterface->ExecuteDrawCommands(uiEntry->DrawUI());
 			}
 		};
