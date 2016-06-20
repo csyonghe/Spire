@@ -254,10 +254,13 @@ namespace DemoEngine
 	void EnginePipeline::RecompileShader(String shaderName, String schedule)
 	{
 		engine->GetHardwareRenderer()->Finish();
-		int shaderId = shaderIds[shaderName];
-		shaderLibs[shaderId]->CompileFrom(shaderName, Path::ReplaceExt(shaderFileNames[shaderName].GetValue(), L"shader"), schedule);
-		ReloadShader(gpuShaders[shaderId], *shaderLibs[shaderId]);
-		InitializeShader(shaderId);
+		if (shaderIds.ContainsKey(shaderName))
+		{
+			int shaderId = shaderIds[shaderName];
+			shaderLibs[shaderId]->CompileFrom(shaderName, Path::ReplaceExt(shaderFileNames[shaderName].GetValue(), L"shader"), schedule);
+			ReloadShader(gpuShaders[shaderId], *shaderLibs[shaderId]);
+			InitializeShader(shaderId);
+		}
 	}
 	BBox EnginePipeline::GetBounds()
 	{

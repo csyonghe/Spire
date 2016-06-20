@@ -7,6 +7,7 @@
 #include "ChoiceControl.h"
 #include "DemoRecording.h"
 #include "ShaderInfoForm.h"
+#include "ShaderEditorForm.h"
 
 using namespace CoreLib::WinForm;
 using namespace CoreLib::Diagnostics;
@@ -88,6 +89,7 @@ namespace SceneViewer
 		CommandForm* cmdForm = nullptr;
 		ChoiceForm * choiceForm = nullptr;
 		ShaderInfoForm * shaderInfoForm = nullptr;
+		ShaderEditorForm * shaderEditorForm = nullptr;
 		RefPtr<CameraCurve> curveRecording;
 		String currentView = L"color";
 		CameraControl camera;
@@ -199,6 +201,20 @@ namespace SceneViewer
 			cmdForm->Left = 10;
 			cmdForm->Top = GetClientHeight() - 80;
 			CreateChoiceForm();
+
+			shaderEditorForm = new ShaderEditorForm(uiEntry.Ptr(), uiSystemInterface->LoadFont(GraphicsUI::Font(L"Consolas", 13)));
+			shaderEditorForm->OnShaderChange.Bind(this, &MainForm::ShaderChanged);
+			uiEntry->CloseWindow(shaderEditorForm);
+		}
+
+		void ShaderChanged()
+		{
+			if (scene)
+			{
+				scene->RecompileShader(shaderEditorForm->shaderName, L"");
+				if (choiceForm)
+					choiceForm->Update();
+			}
 		}
 
 		void CreateShaderInfoForm()
@@ -220,6 +236,7 @@ namespace SceneViewer
 				choiceForm->ShaderChanged.Bind(this, &MainForm::ChoiceForm_ShaderChanged);
 				choiceForm->Update();
 				choiceForm->Posit(10, 10, 650, 400);
+				choiceForm->OnEditShader.Bind(this, &MainForm::ChoiceForm_EditShader);
 			}
 			uiEntry->ShowWindow(choiceForm);
 		}
@@ -261,6 +278,19 @@ namespace SceneViewer
 			if (shaderInfoForm && scene)
 			{
 				shaderInfoForm->Update(scene->GetShaderMetaData(shaderName));
+			}
+		}
+
+		void ChoiceForm_EditShader(String shaderName)
+		{
+			if (scene)
+			{
+				auto fileName = scene->GetShaderFileName(shaderName);
+				if (File::Exists(fileName))
+				{
+					shaderEditorForm->SetShaderFile(shaderName, fileName);
+					uiEntry->ShowWindow(shaderEditorForm);
+				}
 			}
 		}
 

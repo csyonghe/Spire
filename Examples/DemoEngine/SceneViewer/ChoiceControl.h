@@ -52,6 +52,7 @@ namespace SceneViewer
 		int AutotuneHelper(HashSet<String> & selectedChoices, EnumerableDictionary<String, Spire::Compiler::ShaderChoiceValue>& currentChoices, float timeBudget, bool countOnly = false);
 		void Autotune(float timeBudget);
 		void AutotuneTex();
+		void EditButton_Clicked(GraphicsUI::UI_Base *);
 		void ResetButton_Clicked(GraphicsUI::UI_Base *);
 		void AutotuneButton_Clicked(GraphicsUI::UI_Base *);
 		void AutotuneTexButton_Clicked(GraphicsUI::UI_Base *);
@@ -63,6 +64,7 @@ namespace SceneViewer
 		void PipelineBox_Changed(GraphicsUI::UI_Base *);
 	public:
 		Event<String> ShaderChanged;
+		Event<String> OnEditShader;
 		ChoiceForm(IChoiceControl * pChoiceControl, WinForm::GLForm * ownerForm, GraphicsUI::UIEntry * entry);
 		void Update();
 

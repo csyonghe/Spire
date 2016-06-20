@@ -498,6 +498,7 @@
     <ClCompile Include="Graphics\Camera.cpp" />
     <ClCompile Include="Graphics\GGX.cpp" />
     <ClCompile Include="Graphics\LibUI.cpp" />
+    <ClCompile Include="Graphics\LibUI_MultiTextBox.cpp" />
     <ClCompile Include="Graphics\ObjModel.cpp" />
     <ClCompile Include="Graphics\TextureFile.cpp" />
     <ClCompile Include="Graphics\ViewFrustum.cpp" />

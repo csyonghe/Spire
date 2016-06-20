@@ -500,68 +500,14 @@ namespace GraphicsUI
 		case WM_IME_SETCONTEXT:
 			lParam = 0;
 			break;
-		case WM_INPUTLANGCHANGE://改变输入法
-		{
-			HKL hKL = GetKeyboardLayout(0);
-			if (ImmIsIME(hKL))//判断是否使用输入法
-			{
-				wchar_t inputName[128] = { 0 };
-				HIMC hIMC = ImmGetContext(hWnd);
-				ImmEscape(hKL, hIMC, IME_ESC_IME_NAME, inputName);
-				ImmReleaseContext(hWnd, hIMC);
-				entry->ImeMessageHandler.DoImeChangeName(String(inputName));
-			}
-			else
-			{
-				entry->ImeMessageHandler.DoImeChangeName(String(L""));
-			}
-		}
-		rs = 0;
-		break;
-		case WM_IME_NOTIFY://选字列表修改
-		{
-			rs = 0;
-			switch (wParam)
-			{
-			case IMN_OPENCANDIDATE://打开选字列表
-				entry->ImeMessageHandler.DoImeOpenCandidate();
-				break;
-			case IMN_CHANGECANDIDATE://修改选字列表
-				{
-					HIMC hIMC = ImmGetContext(hWnd);
-					unsigned int listSize = ImmGetCandidateList(hIMC, 0, NULL, 0);
-					if (listSize)
-					{
-						//开辟缓冲区存放选字列表信息
-						List<unsigned char> buffer;
-						buffer.SetSize(listSize);
-						CANDIDATELIST * list = (CANDIDATELIST*)buffer.Buffer();
-						ImmGetCandidateList(hIMC, 0, list, listSize);
-						int count = 0;
-						if (list->dwCount >= list->dwSelection)
-						{
-							count = Math::Min(list->dwCount - list->dwSelection, list->dwPageSize);
-							List<String> candList;
-							for (int i = 0; i < count; i++)
-							{
-								candList.Add(String((wchar_t*)(buffer.Buffer() + list->dwOffset[list->dwSelection + i])));
-							}
-							entry->ImeMessageHandler.DoImeChangeCandidate(candList);
-						}
-					}
-					ImmReleaseContext(hWnd, hIMC);
-				}
-				break;
-			case IMN_CLOSECANDIDATE://关闭选字列表
-				entry->ImeMessageHandler.DoImeCloseCandidate();
-				break;
-			}
-		}
+		case WM_INPUTLANGCHANGE:
 		break;
 		case WM_IME_COMPOSITION:
 		{
 			HIMC hIMC = ImmGetContext(hWnd);
-			if (lParam&GCS_COMPSTR)//获得输入栏的文字
+			VectorMath::Vec2i pos = entry->GetCaretScreenPos();
+			UpdateCompositionWindowPos(hIMC, pos.x, pos.y + 6);
+			if (lParam&GCS_COMPSTR)
 			{
 				wchar_t EditString[201];
 				unsigned int StrSize = ImmGetCompositionStringW(hIMC, GCS_COMPSTR, EditString, sizeof(EditString) - sizeof(char));
@@ -579,55 +525,15 @@ namespace GraphicsUI
 			rs = 0;
 		}
 		break;
-		case WM_IME_STARTCOMPOSITION://把WM_IME_STARTCOMPOSITION视为已处理以便消除Windows自己打开的输入框
+		case WM_IME_STARTCOMPOSITION:
 			entry->ImeMessageHandler.DoImeStart();
-			rs = 1;
 			break;
 		case WM_IME_ENDCOMPOSITION:
 			entry->ImeMessageHandler.DoImeEnd();
-			rs = 0;
 			break;
 		}
 		return rs;
 	}
-
-	class Font
-	{
-	public:
-		CoreLib::String FontName;
-		int Size;
-		bool Bold, Underline, Italic, StrikeOut;
-		Font()
-		{
-			NONCLIENTMETRICS NonClientMetrics;
-			NonClientMetrics.cbSize = sizeof(NONCLIENTMETRICS) - sizeof(NonClientMetrics.iPaddedBorderWidth);
-			SystemParametersInfo(SPI_GETNONCLIENTMETRICS, sizeof(NONCLIENTMETRICS), &NonClientMetrics, 0);
-			FontName = NonClientMetrics.lfMessageFont.lfFaceName;
-			Size = 9;
-			Bold = false;
-			Underline = false;
-			Italic = false;
-			StrikeOut = false;
-		}
-		Font(const CoreLib::String& sname, int ssize)
-		{
-			FontName = sname;
-			Size = ssize;
-			Bold = false;
-			Underline = false;
-			Italic = false;
-			StrikeOut = false;
-		}
-		Font(const CoreLib::String & sname, int ssize, bool sBold, bool sItalic, bool sUnderline)
-		{
-			FontName = sname;
-			Size = ssize;
-			Bold = sBold;
-			Underline = sUnderline;
-			Italic = sItalic;
-			StrikeOut = false;
-		}
-	};
 
 	class Canvas
 	{
@@ -672,7 +578,7 @@ namespace GraphicsUI
 		{
 			(::TextOut(Handle, X, Y, text.Buffer(), text.Length()));
 		}
-		int DrawText(const CoreLib::String & text, int X, int Y, int W)
+		/*int DrawText(const CoreLib::String & text, int X, int Y, int W)
 		{
 			RECT R;
 			R.left = X;
@@ -680,7 +586,7 @@ namespace GraphicsUI
 			R.right = X + W;
 			R.bottom = 1024;
 			return ::DrawText(Handle, text.Buffer(), text.Length(), &R, DT_WORDBREAK | DT_NOPREFIX);
-		}
+		}*/
 		TextSize GetTextSize(const CoreLib::String& Text)
 		{
 			SIZE sText;
@@ -1235,10 +1141,6 @@ namespace GraphicsUI
 				{
 					// Copy all characters up to null.
 					txt = pwszText;
-					wchar_t rtn[2] = { 13,0 };
-					int fid = txt.IndexOf(String(rtn));
-					if (fid != -1)
-						txt = txt.SubString(0, fid);
 					GlobalUnlock(handle);
 				}
 			}
@@ -1363,6 +1265,15 @@ namespace GraphicsUI
 		SetCursor(LoadCursor(0, cursorName));
 	}
 
+	void WinGLSystemInterface::UpdateCompositionWindowPos(HIMC imc, int x, int y)
+	{
+		COMPOSITIONFORM cf;
+		cf.dwStyle = CFS_POINT;
+		cf.ptCurrentPos.x = x;
+		cf.ptCurrentPos.y = y;
+		ImmSetCompositionWindow(imc, &cf);
+	}
+
 	WinGLSystemInterface::WinGLSystemInterface(GL::HardwareRenderer * ctx)
 	{
 		glContext = ctx;
@@ -1390,12 +1301,19 @@ namespace GraphicsUI
 		delete uiRenderer;
 	}
 
-	IFont * WinGLSystemInterface::CreateFontObject(const Font & f)
+	IFont * WinGLSystemInterface::LoadFont(const Font & f)
 	{
-		return new WinGLFont(this, f);
+		auto identifier = f.ToString();
+		RefPtr<WinGLFont> font;
+		if (!fonts.TryGetValue(identifier, font))
+		{
+			font = new WinGLFont(this, f);
+			fonts[identifier] = font;
+		}
+		return font.Ptr();
 	}
 
-	Rect WinGLFont::MeasureString(const CoreLib::String & text, int /*width*/)
+	Rect WinGLFont::MeasureString(const CoreLib::String & text)
 	{
 		Rect rs;
 		auto size = rasterizer.GetTextSize(text);
@@ -1405,10 +1323,10 @@ namespace GraphicsUI
 		return rs;
 	}
 
-	IBakedText * WinGLFont::BakeString(const CoreLib::String & text, int width)
+	IBakedText * WinGLFont::BakeString(const CoreLib::String & text)
 	{
 		BakedText * result = new BakedText();
-		auto imageData = rasterizer.RasterizeText(system, text, width);
+		auto imageData = rasterizer.RasterizeText(system, text);
 		result->system = system;
 		result->Width = imageData.Size.x;
 		result->Height = imageData.Size.y;
@@ -1432,30 +1350,18 @@ namespace GraphicsUI
 		Bit->canvas->ChangeFont(Font);
 	}
 
-	TextRasterizationResult TextRasterizer::RasterizeText(WinGLSystemInterface * system, const CoreLib::String & text, int w) // Set the text that is going to be displayed.
+	TextRasterizationResult TextRasterizer::RasterizeText(WinGLSystemInterface * system, const CoreLib::String & text) // Set the text that is going to be displayed.
 	{
 		int TextWidth, TextHeight;
 		List<unsigned char> pic;
 		TextSize size;
-		if (w == 0)
-		{
-			size = Bit->canvas->GetTextSize(text);
-			TextWidth = size.x;
-			TextHeight = size.y;
-			Bit->SetSize(TextWidth, TextHeight);
-			Bit->canvas->Clear(TextWidth, TextHeight);
-			Bit->canvas->DrawText(text, 0, 0, 10240);
-		}
-		else
-		{
-			size.x = w;
-			size.y = Bit->canvas->DrawText(text, 0, 0, w);
-			TextWidth = size.x;
-			TextHeight = size.y;
-			Bit->SetSize(TextWidth, TextHeight);
-			Bit->canvas->Clear(TextWidth, TextHeight);
-			Bit->canvas->DrawText(text, 0, 0, w);
-		}
+		size = Bit->canvas->GetTextSize(text);
+		TextWidth = size.x;
+		TextHeight = size.y;
+		Bit->SetSize(TextWidth, TextHeight);
+		Bit->canvas->Clear(TextWidth, TextHeight);
+		Bit->canvas->DrawText(text, 0, 0);
+		
 
 		int pixelCount = (TextWidth * TextHeight);
 		int bytes = pixelCount >> Log2TextPixelsPerByte;

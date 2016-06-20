@@ -297,7 +297,7 @@ namespace CoreLib
 			wcex.cbWndExtra		= 0;
 			wcex.hInstance		= Application::GetHandle();
 			wcex.hIcon			= 0;
-			wcex.hCursor		= LoadCursor(NULL, IDC_ARROW);
+			wcex.hCursor		= NULL;
 			wcex.hbrBackground	= NULL;
 			wcex.lpszMenuName	= 0;
 			wcex.lpszClassName	= GLFormClassName;

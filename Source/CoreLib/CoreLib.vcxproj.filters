@@ -332,6 +332,9 @@
     <ClCompile Include="MemoryPool.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Graphics\LibUI_MultiTextBox.cpp">
+      <Filter>Graphics\UI</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="corelib.natvis" />

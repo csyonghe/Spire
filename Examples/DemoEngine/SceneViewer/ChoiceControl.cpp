@@ -51,17 +51,21 @@ namespace SceneViewer
 		shaderBox = new GraphicsUI::ListBox(this);
 		shaderBox->Posit(10, 10, 130, GetClientHeight() - 60);
 		shaderBox->OnChanged.Bind(this, &ChoiceForm::SelectedShaderChanged);
+		auto editButton = new GraphicsUI::Button(this);
+		editButton->Posit(140, 10, 100, 30);
+		editButton->SetText(L"Edit");
+		editButton->OnClick.Bind(this, &ChoiceForm::EditButton_Clicked);
 		applyButton = new GraphicsUI::Button(this);
-		applyButton->Posit(140, 10, 100, 30);
+		applyButton->Posit(250, 10, 100, 30);
 		applyButton->SetText(L"Recompile");
 		applyButton->OnClick.Bind(this, &ChoiceForm::ApplyButton_Clicked);
 		resetButton = new GraphicsUI::Button(this);
-		resetButton->Posit(250, 10, 100, 30);
+		resetButton->Posit(360, 10, 100, 30);
 		resetButton->SetText(L"Reset");
 		resetButton->OnClick.Bind(this, &ChoiceForm::ResetButton_Clicked);
 		autoRecompileCheckBox = new GraphicsUI::CheckBox(this);
 		autoRecompileCheckBox->SetText(L"Auto Recompile");
-		autoRecompileCheckBox->Posit(360, 14, 150, 25);
+		autoRecompileCheckBox->Posit(470, 14, 150, 25);
 		autoRecompileCheckBox->Checked = true;
 #ifdef ENABLE_AUTO_TUNE
 		timeBudgetTextBox = new GraphicsUI::TextBox(this);
@@ -85,6 +89,7 @@ namespace SceneViewer
 	}
 	void ChoiceForm::UpdateChoicePanel(String shaderName)
 	{
+		glFinish();
 		if (shaderName.Length())
 			SetText(L"Choice Control - " + shaderName);
 		currentShaderName = shaderName;
@@ -340,6 +345,10 @@ namespace SceneViewer
 			}
 		}
 		Recompile();
+	}
+	void ChoiceForm::EditButton_Clicked(GraphicsUI::UI_Base *)
+	{
+		OnEditShader(currentShaderName);
 	}
 	void ChoiceForm::AutotuneTexButton_Clicked(GraphicsUI::UI_Base *)
 	{

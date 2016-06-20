@@ -43,7 +43,9 @@ namespace GraphicsUI
 	const int CT_CHECKBOX = 4;
 	const int CT_RADIOBOX = 8;
 	const int CT_TEXTBOX = 16;
-	const int CT_IMETEXTBOX = 17;
+	const int CT_IME_RECEIVER = (1 << 30);
+	const int CT_IMETEXTBOX = CT_TEXTBOX | CT_IME_RECEIVER;
+	const int CT_MULTILINETEXTBOX = 1024 | CT_IME_RECEIVER;
 	const int CT_SCROLLBAR = 32;
 	const int CT_LISTBOX = 64;
 	const int CT_PROGRESSBAR = 128;
@@ -51,6 +53,27 @@ namespace GraphicsUI
 	const int CT_MENU_ITEM = 512;
 	const int CT_TOOL_BUTTON = 513;
 
+	namespace Keys
+	{
+		const int Left = 0x25;
+		const int Up = 0x26; 
+		const int Down = 0x28;
+		const int Right = 0x27;
+		const int Escape = 0x1B;
+		const int Return = 0x0D;
+		const int Space = 0x20;
+		const int Shift = 0x10;
+		const int Ctrl = 0x11;
+		const int Alt = 0x12;
+		const int Backspace = 0x08;
+		const int Delete = 0x2E;
+		const int Home = 0x24;
+		const int End = 0x23;
+		const int PageUp = 0x21;
+		const int PageDown = 0x22;
+		const int Insert = 0x2D;
+		const int Tab = 0x09;
+	}
 
 	typedef int CONTROLTYPE;
 	typedef int BORDERSTYLE;
@@ -262,6 +285,7 @@ namespace GraphicsUI
 		Control(Container * parent, bool addToParent);
 		~Control();
 	public:
+		bool WantsTab = false;
 		bool AcceptsFocus = true;
 		GraphicsUI::CursorType Cursor;
 		CoreLib::String Name;
@@ -270,9 +294,9 @@ namespace GraphicsUI
 		Container *Parent;
 		int  Left, Top;
 		bool BackgroundShadow = false;
-		int ShadowOffset = 4;
-		float ShadowSize = 8.0;
-		unsigned char ShadowOpacity = 80;
+		int ShadowOffset = 2;
+		float ShadowSize = 6.0;
+		unsigned char ShadowOpacity = 170;
 		bool Enabled, Visible;
 		bool TabStop = false;
 		Color BackColor, FontColor, BorderColor;
@@ -337,6 +361,13 @@ namespace GraphicsUI
 		virtual void LostFocus(Control * newFocus);
 		virtual bool DoClosePopup();
 		VectorMath::Vec2i GetRelativePos(Container * parent);
+	};
+
+	class ImeCharReceiver
+	{
+	public:
+		virtual void ImeInputString(const CoreLib::String & /*txt*/) = 0;
+		virtual VectorMath::Vec2i GetCaretScreenPos() = 0;
 	};
 
 	class Line : public Control
@@ -446,7 +477,7 @@ namespace GraphicsUI
 	public:
 		Color ShadowColor;
 		bool DropShadow;
-		bool AutoSize = true, MultiLine = false;
+		bool AutoSize = true;
 		virtual void SetText(const CoreLib::String & text);
 		virtual void SetFont(IFont * pFont) override;
 		void UpdateText();
@@ -466,6 +497,7 @@ namespace GraphicsUI
 		virtual void Draw(int absX, int absY);
 		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift);
 		virtual bool DoMouseUp(int X, int Y, SHIFTSTATE Shift);
+		virtual bool DoDblClick();
 		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift);
 		virtual bool DoKeyUp(unsigned short Key, SHIFTSTATE Shift);
 			
@@ -480,6 +512,7 @@ namespace GraphicsUI
 		virtual void SetText(const CoreLib::String & text) override;
 		virtual void Draw(int absX, int absY);
 		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift);
+		virtual bool DoDblClick();
 		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift);
 	};
 
@@ -537,13 +570,17 @@ namespace GraphicsUI
 		virtual void Draw(int absX, int absY);
 	};
 
-	class TextBox : public CustomTextBox
+	class TextBox : public CustomTextBox, public ImeCharReceiver
 	{
 	public:
 		TextBox(Container * parent)
 			: CustomTextBox(parent)
-		{}
+		{
+			Type = CT_IMETEXTBOX;
+		}
+		virtual void ImeInputString(const CoreLib::String & txt);
 		virtual bool DoKeyPress(unsigned short Key, SHIFTSTATE Shift);
+		virtual VectorMath::Vec2i GetCaretScreenPos() override;
 	};
 
 	class IMETextBox : public TextBox
@@ -555,22 +592,15 @@ namespace GraphicsUI
 	class IMEWindow : public Container
 	{
 	protected:
-		CoreLib::List<CoreLib::String> CandidateList;
-		Label * lblIMEName, *lblCompStr;
-		CoreLib::List<Label *> lblCandList;
+		Label * lblCompStr;
 	public:
 		IMEWindow(Container * parent);
 		~IMEWindow();
 	public:
 		Control *Panel;
-		int CandidateCount;
 		int WindowWidth, WindowHeight;
-		CoreLib::String strComp,strIME,strCompRead;
-		bool ShowCandidate;
-		void ChangeInputMethod(CoreLib::String AInput);
+		CoreLib::String strComp;
 		void ChangeCompositionString(CoreLib::String AString);
-		void SetCandidateListItem(int idx, const CoreLib::String & str);
-		void SetCandidateCount(int Count);
 		virtual void Draw(int absX, int absY);
 	};
 
@@ -579,16 +609,12 @@ namespace GraphicsUI
 	public:
 		void Init(UIEntry * entry);
 	public:
-		CustomTextBox * TextBox = nullptr;
+		ImeCharReceiver * TextBox = nullptr;
 		IMEWindow * ImeWindow = nullptr;
 		bool DoImeStart();
 		bool DoImeEnd();
-		bool DoImeChangeName(const CoreLib::String & imeName);
 		bool DoImeCompositeString(const CoreLib::String & str);
 		bool DoImeResultString(const CoreLib::String & str);
-		bool DoImeOpenCandidate();
-		bool DoImeCloseCandidate();
-		bool DoImeChangeCandidate(const CoreLib::List<CoreLib::String> & candidate);
 		void StringInputed(CoreLib::String AString);
 	};
 
@@ -604,6 +630,7 @@ namespace GraphicsUI
 	private:
 		CoreLib::List<MouseMessageStack> controlStack;
 		CoreLib::EnumerableHashSet<Control*> tickEventSubscribers;
+		int lineHeight;
 	protected:
 		void DeactivateAllForms();
 	public:
@@ -641,13 +668,15 @@ namespace GraphicsUI
 		virtual bool DoMouseMove(int X, int Y);
 		virtual bool DoMouseWheel(int delta);
 		virtual bool DoMouseHover();
+		virtual bool DoDblClick();
 		virtual bool DoTick();
 		virtual void HandleMessage(const UI_MsgArgs *Args);
 		void MoveFocusBackward();
 		void MoveFocusForward();
+		VectorMath::Vec2i GetCaretScreenPos();
 		int GetLineHeight()
 		{
-			return CheckmarkLabel->TextHeight;
+			return lineHeight;
 		}
 		void SetFocusedControl(Control *Target);
 
@@ -697,6 +726,7 @@ namespace GraphicsUI
 		int GetMin();
 		int GetMax();
 		int GetPosition();
+		int GetPageSize();
 		virtual bool DoTick();
 		virtual void Draw(int absX, int absY);
 		virtual bool DoMouseMove(int X, int Y);
@@ -1158,5 +1188,66 @@ namespace GraphicsUI
 		bool DoMouseUp(int X, int Y, SHIFTSTATE Shift);
 		bool DoMouseHover();
 	};
+
+	struct CaretPos
+	{
+		int Line = 0, Col = 0;
+		CaretPos() = default;
+		CaretPos(int line, int col)
+		{
+			Line = line;
+			Col = col;
+		}
+		bool operator < (const CaretPos & pos)
+		{
+			return Line < pos.Line || (Line == pos.Line && Col < pos.Col);
+		}
+		bool operator <=(const CaretPos & pos)
+		{
+			return Line < pos.Line || (Line == pos.Line && Col <= pos.Col);
+		}
+		bool operator ==(const CaretPos & pos)
+		{
+			return Line == pos.Line && Col == pos.Col;
+		}
+		bool operator !=(const CaretPos & pos)
+		{
+			return Line != pos.Line || Col != pos.Col;
+		}
+	};
+
+	class MultiLineTextBox : public Container, public ImeCharReceiver
+	{
+	public:
+		MultiLineTextBox(Container * parent)
+			: Container(parent)
+		{}
+		virtual CoreLib::String GetSelectionText() = 0;
+		virtual void SetCaretPos(const CaretPos & pCaretPos) = 0;
+		virtual void ScrollToCaret() = 0;
+		virtual CaretPos GetCaretPos() = 0;
+		virtual CoreLib::String GetText() = 0;
+		virtual void SetText(const CoreLib::String & pText) = 0;
+		virtual void SetWordWrap(bool pValue) = 0;
+		virtual bool GetWordWrap() = 0;
+		virtual void SetUndoStackSize(int size) = 0;
+		virtual CoreLib::String GetTextFromRange(CaretPos start, CaretPos end) = 0;
+		virtual void SetScrollBars(bool vertical, bool horizontal) = 0;
+		virtual void InsertText(const CoreLib::String & text) = 0;
+		virtual void Delete() = 0;
+		virtual void Redo() = 0;
+		virtual void Undo() = 0;
+		virtual void Copy() = 0;
+		virtual void Paste() = 0;
+		virtual void Cut() = 0;
+		virtual void IncreaseIndent() = 0;
+		virtual void DecreaseIndent() = 0;
+		virtual void SelectAll() = 0;
+		virtual void Select(CaretPos start, CaretPos end) = 0;
+		virtual int GetLineCount() = 0;
+		virtual CoreLib::String GetLine(int i) = 0;
+		virtual void DeleteLine(int i) = 0;
+	};
+	MultiLineTextBox * CreateMultiLineTextBox(Container * parent);
 }
 #endif

@@ -16,6 +16,9 @@
     <ClCompile Include="ShaderInfoForm.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ShaderEditorForm.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DemoRecording.h" />
@@ -23,6 +26,9 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="ShaderInfoForm.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ShaderEditorForm.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

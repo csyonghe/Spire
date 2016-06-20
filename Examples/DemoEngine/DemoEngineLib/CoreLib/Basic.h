@@ -480,11 +480,11 @@ namespace CoreLib
 				wchar_t arr[] = {ch, 0};
 				*this = String(arr);
 			}
-			const wchar_t * begin()
+			const wchar_t * begin() const
 			{
 				return buffer.Ptr();
 			}
-			const wchar_t * end()
+			const wchar_t * end() const
 			{
 				return buffer.Ptr() + length;
 			}

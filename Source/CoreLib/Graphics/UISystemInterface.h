@@ -76,8 +76,8 @@ namespace GraphicsUI
 	class IFont
 	{
 	public:
-		virtual Rect MeasureString(const CoreLib::String & text, int width) = 0;
-		virtual IBakedText * BakeString(const CoreLib::String & tex, int width) = 0;
+		virtual Rect MeasureString(const CoreLib::String & text) = 0;
+		virtual IBakedText * BakeString(const CoreLib::String & tex) = 0;
 	};
 
 	enum class DefaultFontType

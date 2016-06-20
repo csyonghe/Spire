@@ -178,20 +178,35 @@ namespace CoreLib
 		void StreamWriter::Write(const String & str)
 		{
 			encodingBuffer.Clear();
-			encoding->GetBytes(encodingBuffer, str);
+			StringBuilder sb;
+			String newLine;
+#ifdef _WIN32
+			newLine = L"\r\n";
+#else
+			newLine = L"\n";
+#endif
+			for (int i = 0; i < str.Length(); i++)
+			{
+				if (str[i] == L'\r')
+					sb << newLine;
+				else if (str[i] == L'\n')
+				{
+					if (i > 0 && str[i - 1] != L'\r')
+						sb << newLine;
+				}
+				else
+					sb << str[i];
+			}
+			encoding->GetBytes(encodingBuffer, sb.ProduceString());
 			stream->Write(encodingBuffer.Buffer(), encodingBuffer.Count());
 		}
 		void StreamWriter::Write(const wchar_t * str)
 		{
-			encodingBuffer.Clear();
-			encoding->GetBytes(encodingBuffer, String(str));
-			stream->Write(encodingBuffer.Buffer(), encodingBuffer.Count());
+			Write(String(str));
 		}
 		void StreamWriter::Write(const char * str)
 		{
-			encodingBuffer.Clear();
-			encoding->GetBytes(encodingBuffer, String(str));
-			stream->Write(encodingBuffer.Buffer(), encodingBuffer.Count());
+			Write(String(str));
 		}
 
 		StreamReader::StreamReader(const String & path)

@@ -173,7 +173,7 @@ namespace GraphicsUI
 	{
 		ColorTable tbl;
 
-		tbl.ShadowColor = Color(0, 0, 0, 200);
+		tbl.ShadowColor = Color(0, 0, 0, 255);
 		tbl.ControlBackColor = Color(0, 0, 0, 0);
 		tbl.ControlBorderColor = Color(220, 220, 220, 160);
 		tbl.ControlFontColor = Color(255, 255, 255, 255);
@@ -441,6 +441,10 @@ namespace GraphicsUI
 	Control::~Control()
 	{
 		auto entry = GetEntry();
+		if (Global::PointedComponent == this)
+			Global::PointedComponent = Parent;
+		if (Global::MouseCaptureControl == this)
+			Global::MouseCaptureControl = nullptr;
 		if (entry && entry->FocusedControl == this)
 			entry->FocusedControl = nullptr;
 	}
@@ -678,6 +682,7 @@ namespace GraphicsUI
 		Args.Data = &Data;
 		Args.Type = MSG_UI_MOUSEENTER;
 		BroadcastMessage(&Args);
+		//GetEntry()->System->SwitchCursor(Cursor);
 		return false;
 	}
 
@@ -690,7 +695,7 @@ namespace GraphicsUI
 		Args.Data = &Data;
 		Args.Type = MSG_UI_MOUSELEAVE;
 		BroadcastMessage(&Args);
-		GetEntry()->System->SwitchCursor(CursorType::Arrow);
+		//GetEntry()->System->SwitchCursor(CursorType::Arrow);
 		return false;
 	}
 
@@ -856,7 +861,6 @@ namespace GraphicsUI
 		FChanged = true;
 		Type = CT_LABEL;
 		AutoSize = true;
-		MultiLine = false;
 		DropShadow = false;
 		this->font = parent->GetFont();
 	}
@@ -872,16 +876,22 @@ namespace GraphicsUI
 
 	void Label::SetText(const String & pText)
 	{
-		FCaption = pText;
-		FChanged = true;
-		UpdateText();
-
+		bool diff = FCaption != pText;
+		FChanged = FChanged || diff;
+		if (FCaption != pText)
+		{
+			FCaption = pText;
+			UpdateText();
+		}
 	}
 
 	void Label::SetFont(IFont * pFont)
 	{
-		Control::SetFont(pFont);
-		FChanged = true;
+		if (pFont != font)
+		{
+			Control::SetFont(pFont);
+			FChanged = true;
+		}
 	}
 
 	void Label::SizeChanged()
@@ -892,18 +902,14 @@ namespace GraphicsUI
 	{
 		if (text)
 			text = nullptr;
-		if (MultiLine)
-			text = font->BakeString(FCaption, Width);
-		else
-			text = font->BakeString(FCaption, 0);
-		TextWidth = text->GetWidth();
-		TextHeight = text->GetHeight();
+		auto size = font->MeasureString(FCaption);
+		TextWidth = size.w;
+		TextHeight = size.h;
 		FChanged = false;
 		if (AutoSize)
 		{
-			auto rect = font->MeasureString(FCaption, MultiLine ? Width : 0);
-			SetWidth(rect.w);
-			SetHeight(rect.h);
+			SetWidth(TextWidth);
+			SetHeight(TextHeight);
 		}
 	}
 
@@ -917,9 +923,13 @@ namespace GraphicsUI
 		{
 			font = entry->System->LoadDefaultFont();
 			FChanged = true;
+			UpdateText();
 		}
 		if (FChanged || !text)
-			UpdateText();
+		{
+			text = font->BakeString(FCaption);
+			FChanged = false;
+		}
 		if (DropShadow)
 		{
 			entry->DrawCommands.SolidBrushColor = ShadowColor;
@@ -962,10 +972,12 @@ namespace GraphicsUI
 		if (font == nullptr)
 			font = entry->System->LoadDefaultFont();
 		if (FChanged || !text)
-			UpdateText();
+		{
+			text = font->BakeString(FCaption);
+		}
 		int tx,ty;
-		tx = (Width - text->GetWidth())/2;
-		ty = (Height - text->GetHeight())/2;
+		tx = (Width - TextWidth)/2;
+		ty = (Height - TextHeight)/2;
 		if (BorderStyle == BS_LOWERED)
 		{
 			tx += 1;
@@ -1017,6 +1029,11 @@ namespace GraphicsUI
 		BorderStyle = BS_RAISED;
 		ReleaseMouse();
 		return true;
+	}
+
+	bool Button::DoDblClick()
+	{
+		return DoMouseDown(1, 1, SS_BUTTONLEFT);
 	}
 
 	bool Button::DoKeyDown(unsigned short Key, SHIFTSTATE Shift)
@@ -1240,8 +1257,6 @@ namespace GraphicsUI
 		if (!Enabled || !Visible)
 			return false;
 		Control::DoDblClick();
-		for (int i=0; i<Controls.Count(); i++)
-			Controls[i]->DoDblClick();
 		return false;
 	}
 	
@@ -1638,6 +1653,7 @@ namespace GraphicsUI
 		CheckmarkLabel->Visible = false;
 		CheckmarkLabel->SetFont(pSystem->LoadDefaultFont(DefaultFontType::Symbol));
 		CheckmarkLabel->SetText(L"a");
+		lineHeight = font->MeasureString(L"M").h;
 		Global::SCROLLBAR_BUTTON_SIZE = (int)(GetLineHeight());
 		ImeMessageHandler.Init(this);
 		ImeMessageHandler.ImeWindow->Visible = false;
@@ -1718,6 +1734,8 @@ namespace GraphicsUI
 			}
 			else
 			{
+				if (FocusedControl && FocusedControl->WantsTab)
+					goto noTabProcess;
 				if (Shift == SS_SHIFT)
 					MoveFocusBackward();
 				else
@@ -1740,6 +1758,7 @@ namespace GraphicsUI
 				return true;
 			}
 		}
+	noTabProcess:;
 		auto ctrl = FocusedControl;
 		while (ctrl && ctrl != this)
 		{
@@ -1931,6 +1950,7 @@ namespace GraphicsUI
 		});
 		if (Global::MouseCaptureControl == this || !processed)
 		{
+			Control::DoMouseMove(X, Y);
 			UIMouseEventArgs e;
 			e.Delta = 0;
 			e.Shift = 0;
@@ -1970,6 +1990,19 @@ namespace GraphicsUI
 		}
 		OnMouseHover.Invoke(this);
 		return false;
+	}
+
+	bool UIEntry::DoDblClick()
+	{
+		auto ctrlToBroadcast = Global::MouseCaptureControl ? Global::MouseCaptureControl : Global::PointedComponent;
+		while (ctrlToBroadcast && ctrlToBroadcast != this)
+		{
+			if (ctrlToBroadcast->DoDblClick())
+				return true;
+			ctrlToBroadcast = ctrlToBroadcast->Parent;
+		}
+		OnDblClick.Invoke(this);
+		return true;
 	}
 
 	bool UIEntry::DoTick()
@@ -2187,6 +2220,19 @@ namespace GraphicsUI
 		}
 	}
 
+	VectorMath::Vec2i UIEntry::GetCaretScreenPos()
+	{
+		if (FocusedControl && (FocusedControl->Type & CT_IME_RECEIVER))
+		{
+			auto receiver = dynamic_cast<ImeCharReceiver*>(FocusedControl);
+			if (receiver)
+			{
+				return receiver->GetCaretScreenPos();
+			}
+		}
+		return VectorMath::Vec2i::Create(0, 0);
+	}
+
 	void UIEntry::Draw(int absX,int absY)
 	{
 		drawChildren = false;
@@ -2219,11 +2265,12 @@ namespace GraphicsUI
 		InternalBroadcastMessage(&Arg);
 
 		//Draw IME 
-		if (FocusedControl && (FocusedControl->Type & CT_TEXTBOX)==CT_TEXTBOX)
+		if (FocusedControl && (FocusedControl->Type & CT_IME_RECEIVER))
 		{
 			if (ImeMessageHandler.ImeWindow->Visible)
 			{
-				ImeMessageHandler.ImeWindow->Draw(((CustomTextBox *)FocusedControl)->AbsCursorPosX,((CustomTextBox *)FocusedControl)->AbsCursorPosY);
+				auto screenPos = ImeMessageHandler.TextBox->GetCaretScreenPos();
+				ImeMessageHandler.ImeWindow->Draw(screenPos.x, screenPos.y);
 			}
 		}
 			
@@ -2261,9 +2308,12 @@ namespace GraphicsUI
 		FocusedControl = Target;
 		if (Target && Target->Parent)
 			Target->Parent->DoFocusChange();
-		if (Target && (Target->Type & CT_TEXTBOX) == CT_TEXTBOX)
+		if (Target && (Target->Type & CT_IME_RECEIVER) != 0)
 		{
-			ImeMessageHandler.TextBox = (CustomTextBox *)Target;
+			if (Target->Type == CT_IMETEXTBOX)
+				ImeMessageHandler.TextBox = (TextBox*)(Target);
+			else
+				ImeMessageHandler.TextBox = (MultiLineTextBox*)(Target);
 		}
 		else
 		{
@@ -2383,6 +2433,13 @@ namespace GraphicsUI
 			graphics.PenColor = Global::Colors.FocusRectColor;
 			graphics.DrawRectangle(absX + textStart, absY, absX + text->GetWidth() + textStart, absY + text->GetHeight());
 		}
+	}
+
+	bool CheckBox::DoDblClick()
+	{
+		Control::DoDblClick();
+		CheckBox::DoMouseDown(1, 1, 0);
+		return true;
 	}
 
 	bool CheckBox::DoMouseDown(int X, int Y, SHIFTSTATE Shift)
@@ -2590,7 +2647,7 @@ namespace GraphicsUI
 	void CustomTextBox::CursorPosChanged()
 	{
 		//Calculate Text offset.
-		int txtWidth = font->MeasureString(FText, 0).w;
+		int txtWidth = font->MeasureString(FText).w;
 		if (txtWidth <= Width-TextBorderX*2)
 		{
 			LabelOffset = TextBorderX;
@@ -2599,7 +2656,7 @@ namespace GraphicsUI
 		{
 			String ls;
 			ls = FText.SubString(0, CursorPos);
-			int px = font->MeasureString(ls, 0).w+LabelOffset;
+			int px = font->MeasureString(ls).w+LabelOffset;
 			if (px>Width-TextBorderX)
 			{
 				int delta = px-(Width-TextBorderX);
@@ -2622,10 +2679,10 @@ namespace GraphicsUI
 		for (int i =0;i<FText.Length();i++)
 		{
 			curText = curText + FText[i];
-			int tw = font->MeasureString(curText, 0).w;
+			int tw = font->MeasureString(curText).w;
 			if (tw>posX)
 			{
-				int cw = font->MeasureString(FText[i], 0).w;
+				int cw = font->MeasureString(FText[i]).w;
 				cw /=2;
 				if (tw-cw>posX)
 				{
@@ -2679,7 +2736,14 @@ namespace GraphicsUI
 	void CustomTextBox::PasteFromClipBoard()
 	{
 		DeleteSelectionText();
-		DoInput(GetEntry()->System->GetClipboardText());
+		auto txt = GetEntry()->System->GetClipboardText();
+		int fid = txt.IndexOf(L'\r');
+		if (fid != -1)
+			txt = txt.SubString(0, fid);
+		fid = txt.IndexOf(L'\n');
+		if (fid != -1)
+			txt = txt.SubString(0, fid);
+		DoInput(txt);
 	}
 
 
@@ -2978,7 +3042,7 @@ namespace GraphicsUI
 		}
 		if (Changed)
 		{
-			text = font->BakeString(FText, 0);
+			text = font->BakeString(FText);
 			Changed = false;
 		}
 		auto & graphics = entry->DrawCommands;
@@ -2991,7 +3055,7 @@ namespace GraphicsUI
 		entry->ClipRects->PopRect();
 		String ls;
 		ls= FText.SubString(0, CursorPos);
-		int csX = font->MeasureString(ls, 0).w;
+		int csX = font->MeasureString(ls).w;
 		int spX=0,epX=0;
 		csX+=LabelOffset;
 		//Draw Selection Rect
@@ -3001,9 +3065,9 @@ namespace GraphicsUI
 			if (SelStart + SelLength > FText.Length())
 				SelLength = FText.Length() - SelStart;
 			ls = FText.SubString(0, SelStart);
-			spX = font->MeasureString(ls, 0).w;
+			spX = font->MeasureString(ls).w;
 			ls = FText.SubString(0, SelStart+SelLength);
-			epX = font->MeasureString(ls, 0).w;
+			epX = font->MeasureString(ls).w;
 			spX+=LabelOffset+absX; epX+=LabelOffset+absX;
 			graphics.SolidBrushColor = SelectionColor;
 			graphics.FillRectangle(spX, absY + TextBorderX, epX - 1, absY + Height - TextBorderX);
@@ -3026,6 +3090,11 @@ namespace GraphicsUI
 
 	}
 
+	void TextBox::ImeInputString(const String & txt)
+	{
+		DoInput(txt);
+	}
+
 	bool TextBox::DoKeyPress(unsigned short Key, SHIFTSTATE Shift)
 	{
 		CustomTextBox::DoKeyPress(Key,Shift);
@@ -3034,13 +3103,15 @@ namespace GraphicsUI
 		return false;
 	}
 
+	VectorMath::Vec2i TextBox::GetCaretScreenPos()
+	{
+		return Vec2i::Create(AbsCursorPosX, AbsCursorPosY);
+	}
+
 	IMEWindow::IMEWindow(Container * parent)
 		: Container(parent)
 	{
-		CandidateCount = 0;
-		ShowCandidate = false;
 		lblCompStr = new Label(this);
-		lblIMEName = new Label(this);
 		Panel = new Control(this);
 		Panel->BorderStyle = BS_FLAT_;
 	}
@@ -3049,34 +3120,10 @@ namespace GraphicsUI
 	{
 	}
 
-	void IMEWindow::SetCandidateListItem(int idx, const String & str)
-	{
-		StringBuilder id;
-		CandidateList[idx] = str;
-		id << (idx + 1);
-		id << L":" << str;
-		CandidateList[idx] = id.ProduceString();
-		if (!lblCandList[idx])
-		{
-			auto lbl = new Label(this);
-			lbl->FontColor = Global::Colors.ControlFontColor;
-			lblCandList[idx] = lbl;
-		}
-		lblCandList[idx]->SetText(CandidateList[idx]);
-		lblIMEName->FontColor = Global::Colors.ControlFontColor;
-		Panel->BackColor = Global::Colors.MenuBackColor;
-	}
-
 	void IMEWindow::ChangeCompositionString(String AString)
 	{
 		lblCompStr->SetText(AString);
 		strComp = AString;
-	}
-
-	void IMEWindow::ChangeInputMethod(String AInput)
-	{
-		lblIMEName->SetText(AInput);
-		strIME = AInput;
 	}
 
 	void IMEWindow::Draw(int absX, int absY)
@@ -3104,61 +3151,9 @@ namespace GraphicsUI
 			Panel->SetHeight(height + panelMargin * 2);
 			Panel->Draw(0,0);
 			lblCompStr->Draw(cpx,cpy);		
-			
-			if (ShowCandidate)
-			{
-				height = (CandidateCount+1) *20;
-				if (height+absY+25>WindowHeight)
-					cpy = absY-20-height;
-				else
-					cpy = absY+25;
-				height -=25;
-				for (int i =0;i<CandidateCount;i++)
-				{
-					if (lblCandList[i]->TextWidth > maxW)
-						maxW = lblCandList[i]->TextWidth;
-				}
-				if (lblIMEName->TextWidth > maxW)
-					maxW = lblIMEName->TextWidth;
-				if (maxW+absX>WindowWidth)
-					cpx = WindowWidth-maxW;
-				else
-					cpx = absX;
-				Panel->Left = cpx - panelMargin;
-				Panel->Top = cpy - panelMargin;
-				Panel->SetWidth( maxW+ panelMargin * 2);
-				Panel->SetHeight( height + panelMargin * 2);
-				Panel->Draw(0,0);
-				for (int i =0;i<CandidateCount;i++)
-				{
-					int posY = cpy+20*i;
-					lblCandList[i]->Draw(cpx,posY);
-				}
-				Panel->Left = cpx - panelMargin;
-				Panel->Top += Panel->GetHeight();
-				Panel->SetWidth(maxW + panelMargin * 2);
-				Panel->SetHeight(lblIMEName->TextHeight + panelMargin * 2);
-				Panel->Draw(0,0);
-				lblIMEName->Draw(cpx,Panel->Top + panelMargin);
-			}
 		}
 	}
-
-	void IMEWindow::SetCandidateCount(int Count)
-	{
-		for (auto & obj : lblCandList)
-		{
-			this->Parent->RemoveChild(obj);
-		}
-		lblCandList.Clear();
-		lblCandList.SetSize(Count);
-		for (int i = 0; i < lblCandList.Count(); i++)
-			lblCandList[i] = nullptr;
-		CandidateList.SetSize(Count);
-		CandidateCount = Count;
-	}
-
-
+	
 	void IMEHandler::Init(UIEntry * entry)
 	{
 		TextBox = NULL;
@@ -3175,13 +3170,6 @@ namespace GraphicsUI
 	bool IMEHandler::DoImeEnd()
 	{
 		ImeWindow->Visible = false;
-		ImeWindow->ShowCandidate = false;
-		return true;
-	}
-
-	bool IMEHandler::DoImeChangeName(const CoreLib::String & imeName)
-	{
-		ImeWindow->ChangeInputMethod(imeName);
 		return true;
 	}
 
@@ -3197,32 +3185,10 @@ namespace GraphicsUI
 		return true;
 	}
 
-	bool IMEHandler::DoImeOpenCandidate()
-	{
-		ImeWindow->ChangeCompositionString(L"");
-		ImeWindow->ShowCandidate = true;
-		return true;
-	}
-
-	bool IMEHandler::DoImeCloseCandidate()
-	{
-		ImeWindow->ShowCandidate = false;
-		ImeWindow->Visible = false;
-		return false;
-	}
-
-	bool IMEHandler::DoImeChangeCandidate(const CoreLib::List<CoreLib::String>& candidate)
-	{
-		ImeWindow->SetCandidateCount(candidate.Count());
-		for (int i = 0; i < candidate.Count(); i++)
-			ImeWindow->SetCandidateListItem(i, candidate[i]);
-		return true;
-	}
-
 	void IMEHandler::StringInputed(String AString)
 	{
 		if (TextBox)
-			TextBox->DoInput(AString);
+			TextBox->ImeInputString(AString);
 	}
 
 	ScrollBar::ScrollBar(Container * parent, bool addToParent)
@@ -3260,6 +3226,7 @@ namespace GraphicsUI
 		SmallChange = 1;
 		LargeChange = 10;
 		DownInSlider = false;
+		
 	}
 
 	ScrollBar::ScrollBar(Container * parent)
@@ -3287,7 +3254,8 @@ namespace GraphicsUI
 		}
 		btnInc->Draw(absX,absY);
 		btnDec->Draw(absX,absY);
-		Slider->Draw(absX,absY);
+		if (Slider->Visible)
+			Slider->Draw(absX, absY);
 	}
 
 	void ScrollBar::SetOrientation(int NewOri)
@@ -3297,11 +3265,13 @@ namespace GraphicsUI
 		SetValue(Min,Max,Position, PageSize);
 		if (NewOri == SO_HORIZONTAL)
 		{
+			Height = Global::SCROLLBAR_BUTTON_SIZE;
 			btnInc->SetText(L"4"); 
 			btnDec->SetText(L"3");
 		}
 		else
 		{
+			Width = Global::SCROLLBAR_BUTTON_SIZE;
 			btnInc->SetText(L"6"); 
 			btnDec->SetText(L"5");
 		}
@@ -3345,7 +3315,10 @@ namespace GraphicsUI
 	{
 		return Position;
 	}
-
+	int ScrollBar::GetPageSize()
+	{
+		return PageSize;
+	}
 	void ScrollBar::SetMax(int AMax)
 	{
 		SetValue(Min,AMax,Position, PageSize);
@@ -3394,11 +3367,12 @@ namespace GraphicsUI
 				Slider->Top = spos;
 				Slider->SetHeight(slideSize);
 			}
-				
+			Slider->Visible = true;
 		}
 		else
 		{
-			throw ("Invalid ScrollBar value.");
+			Slider->Visible = false;
+			Min = Max = Position = 0;
 		}
 	}
 
@@ -4533,14 +4507,14 @@ namespace GraphicsUI
 		}
 		else
 		{
-			Height = (int)(GetEntry()->GetLineHeight() * 1.1f);
-			Width = Margin;
+			Height = (int)(GetEntry()->GetLineHeight() * 1.25f);
+			Width = 0;
 			for (int i=0; i<Items.Count(); i++)
 			{
 				Items[i]->isButton = true;
 				if (Items[i]->Visible && !Items[i]->IsSeperator())
 				{
-					Items[i]->Top = Margin;
+					Items[i]->Top = 0;
 					Items[i]->SetWidth(Items[i]->MeasureWidth(true));
 					Items[i]->SetHeight(Height);
 					Items[i]->Left = Width;
@@ -4743,7 +4717,7 @@ namespace GraphicsUI
 						if (style == Menu::msMainMenu)
 						{
 							CloseSubMenu();
-							PopupSubMenu(item->SubMenu, 0, Height + 2);
+							PopupSubMenu(item->SubMenu, 0, Height);
 						}
 					}
 				}
@@ -5295,15 +5269,15 @@ namespace GraphicsUI
 				if (SubMenu && SubMenu->Visible)
 				{
 					graphics.SolidBrushColor = Global::Colors.ToolButtonBackColorPressed1;
-					graphics.FillRectangle(0,0,width-1, height-1);
+					graphics.FillRectangle(0,0,width, height);
 				}
 				else
 				{
 					graphics.SolidBrushColor = Global::Colors.ToolButtonBackColorHighlight1;
-					graphics.FillRectangle(0,0,width-1, height-1);
+					graphics.FillRectangle(0,0,width, height);
 				}
 				graphics.PenColor = Global::Colors.ToolButtonBorderHighLight;
-				graphics.DrawRectangle(0,0,width-1,height-1);
+				graphics.DrawRectangle(0,0,width,height);
 				lblText->FontColor = Global::Colors.MenuItemHighlightForeColor;
 			}
 			else
@@ -5314,7 +5288,7 @@ namespace GraphicsUI
 					lblText->FontColor = Global::Colors.MenuItemDisabledForeColor;
 			}
 			lblText->Draw((width-lblText->GetWidth())/2, 
-				(height-lblText->GetHeight())/2);
+				(height-entry->GetLineHeight())/2);
 			
 		}
 	}
@@ -5405,7 +5379,7 @@ namespace GraphicsUI
 		if (Parent && SubMenu && SubMenu->Count())
 		{
 			if (isButton)
-				mn->PopupSubMenu(SubMenu, 0, Height + 2);
+				mn->PopupSubMenu(SubMenu, 0, Height);
 			else
 				mn->PopupSubMenu(SubMenu, Width - 2, 0);
 		}

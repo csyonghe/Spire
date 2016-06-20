@@ -121,6 +121,12 @@ namespace DemoEngine
 		{
 			return shadowMap->Enabled;
 		}
+		String GetShaderFileName(String shader)
+		{
+			String result;
+			shaderFileNames.TryGetValue(shader, result);
+			return result;
+		}
 		void SetUseShadowMap(bool enable);
 		void CompileCommandLists();
 		void FrameResized();
