@@ -785,7 +785,6 @@ namespace GraphicsUI
 		virtual void AddChild(Control *nControl);
 		virtual void RemoveChild(Control *AControl);
 		virtual void ArrangeControls(Rect initalClientRect);
-		virtual void SetAlpha(unsigned char Alpha);
 		virtual void InternalBroadcastMessage(UI_MsgArgs *Args);
 		virtual bool DoDblClick();
 		virtual bool DoMouseLeave();
@@ -850,14 +849,13 @@ namespace GraphicsUI
 		}
 		void SetFormStyle(const FormStyle & FormStyle);
 		virtual void HandleMessage(const UI_MsgArgs * msg) override;
-		virtual bool DoMouseMove(int X, int Y);
-		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift);
-		virtual bool DoMouseUp(int X, int Y, SHIFTSTATE Shift);
-		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift);
-		virtual void Draw(int absX,int absY);
-		virtual void SizeChanged();
-		virtual void SetAlpha(unsigned char Alpha);
-		virtual void AddChild(Control * ctrl) override;
+		virtual bool DoMouseMove(int X, int Y) override;
+		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift) override;
+		virtual bool DoMouseUp(int X, int Y, SHIFTSTATE Shift) override;
+		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift) override;
+		virtual void Draw(int absX,int absY) override;
+		virtual void AddChild(Control*) override;
+		virtual void SizeChanged() override;
 		virtual ContainerLayoutType GetLayout() override;
 		virtual void SetLayout(ContainerLayoutType layout) override;
 		virtual CoreLib::List<CoreLib::RefPtr<Control>> & GetChildren() override;
@@ -901,12 +899,12 @@ namespace GraphicsUI
 		Button(Container * parent, const CoreLib::String & text);
 	public:
 		bool Checked;
-		virtual void Draw(int absX, int absY);
-		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift);
-		virtual bool DoMouseUp(int X, int Y, SHIFTSTATE Shift);
-		virtual bool DoDblClick();
-		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift);
-		virtual bool DoKeyUp(unsigned short Key, SHIFTSTATE Shift);
+		virtual void Draw(int absX, int absY) override;
+		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift) override;
+		virtual bool DoMouseUp(int X, int Y, SHIFTSTATE Shift) override;
+		virtual bool DoDblClick() override;
+		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift) override;
+		virtual bool DoKeyUp(unsigned short Key, SHIFTSTATE Shift) override;
 		virtual void DoDpiChanged() override;
 	};
 
@@ -921,10 +919,10 @@ namespace GraphicsUI
 		bool Checked;
 		virtual void DoDpiChanged() override;
 		virtual void SetText(const CoreLib::String & text) override;
-		virtual void Draw(int absX, int absY);
-		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift);
-		virtual bool DoDblClick();
-		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift);
+		virtual void Draw(int absX, int absY) override;
+		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift) override;
+		virtual bool DoDblClick() override;
+		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift) override;
 	};
 
 	class RadioBox : public CheckBox
@@ -934,9 +932,9 @@ namespace GraphicsUI
 	public:
 		bool GetValue();
 		void SetValue(bool AValue);
-		virtual void Draw(int absX, int absY);
-		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift);
-		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift);
+		virtual void Draw(int absX, int absY) override;
+		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift) override;
+		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift) override;
 	};
 
 	class Menu;
@@ -965,22 +963,22 @@ namespace GraphicsUI
 		const CoreLib::String GetText();
 		void TextChanged();
 		void SetText(const CoreLib::String & AText);
-		void SetFont(IFont * AFont);
+		void SetFont(IFont * AFont) override;
 		void CopyToClipBoard();
 		void PasteFromClipBoard();
 		void DeleteSelectionText();
 		void SelectAll();
 		virtual void Posit(int pLeft, int pTop, int pWidth, int pHeight) override;
-		virtual void DoDpiChanged();
-		virtual bool DoDblClick();
- 		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift);
-		virtual bool DoMouseUp(int X, int Y, SHIFTSTATE Shift);
-		virtual bool DoMouseMove(int X, int Y);
-		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift);
-		virtual bool DoKeyUp(unsigned short Key, SHIFTSTATE Shift);
-		virtual bool DoKeyPress(unsigned short Key, SHIFTSTATE Shift);
+		virtual void DoDpiChanged() override;
+		virtual bool DoDblClick() override;
+ 		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift) override;
+		virtual bool DoMouseUp(int X, int Y, SHIFTSTATE Shift) override;
+		virtual bool DoMouseMove(int X, int Y) override;
+		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift) override;
+		virtual bool DoKeyUp(unsigned short Key, SHIFTSTATE Shift) override;
+		virtual bool DoKeyPress(unsigned short Key, SHIFTSTATE Shift) override;
 		bool DoInput(const CoreLib::String & AInput);
-		virtual void Draw(int absX, int absY);
+		virtual void Draw(int absX, int absY) override;
 	};
 
 	class TextBox : public CustomTextBox, public ImeCharReceiver
@@ -991,8 +989,8 @@ namespace GraphicsUI
 		{
 			Type = CT_IMETEXTBOX;
 		}
-		virtual void ImeInputString(const CoreLib::String & txt);
-		virtual bool DoKeyPress(unsigned short Key, SHIFTSTATE Shift);
+		virtual void ImeInputString(const CoreLib::String & txt) override;
+		virtual bool DoKeyPress(unsigned short Key, SHIFTSTATE Shift) override;
 		virtual VectorMath::Vec2i GetCaretScreenPos() override;
 	};
 
@@ -1014,7 +1012,7 @@ namespace GraphicsUI
 		int WindowWidth, WindowHeight;
 		CoreLib::String strComp;
 		void ChangeCompositionString(CoreLib::String AString);
-		virtual void Draw(int absX, int absY);
+		virtual void Draw(int absX, int absY) override;
 	};
 
 	class IMEHandler : public CoreLib::Object
@@ -1071,20 +1069,20 @@ namespace GraphicsUI
 		{
 			tickEventSubscribers.Remove(ctrl);
 		}
-		virtual void InternalBroadcastMessage(UI_MsgArgs *Args);
-		virtual void SizeChanged();
-		virtual void Draw(int absX,int absY);
-		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift);
-		virtual bool DoKeyUp(unsigned short Key, SHIFTSTATE Shift);
-		virtual bool DoKeyPress(unsigned short Key, SHIFTSTATE Shift);
-		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift);
-		virtual bool DoMouseUp(int X, int Y, SHIFTSTATE Shift);
-		virtual bool DoMouseMove(int X, int Y);
-		virtual bool DoMouseWheel(int delta);
-		virtual bool DoMouseHover();
-		virtual bool DoDblClick();
-		virtual bool DoTick();
-		virtual void HandleMessage(const UI_MsgArgs *Args);
+		virtual void InternalBroadcastMessage(UI_MsgArgs *Args) override;
+		virtual void SizeChanged() override;
+		virtual void Draw(int absX,int absY) override;
+		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift) override;
+		virtual bool DoKeyUp(unsigned short Key, SHIFTSTATE Shift) override;
+		virtual bool DoKeyPress(unsigned short Key, SHIFTSTATE Shift) override;
+		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift) override;
+		virtual bool DoMouseUp(int X, int Y, SHIFTSTATE Shift) override;
+		virtual bool DoMouseMove(int X, int Y) override;
+		virtual bool DoMouseWheel(int delta) override;
+		virtual bool DoMouseHover() override;
+		virtual bool DoDblClick() override;
+		virtual bool DoTick() override;
+		virtual void HandleMessage(const UI_MsgArgs *Args) override;
 		virtual void DoDpiChanged() override;
 		void MoveFocusBackward();
 		void MoveFocusForward();
@@ -1146,16 +1144,16 @@ namespace GraphicsUI
 		int GetMax();
 		int GetPosition();
 		int GetPageSize();
-		virtual bool DoTick();
-		virtual void Draw(int absX, int absY);
-		virtual bool DoMouseMove(int X, int Y);
-		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift);
-		virtual bool DoMouseUp(int X,int Y, SHIFTSTATE Shift);
-		virtual bool DoMouseLeave();
-		virtual bool DoMouseHover();
-		virtual void HandleMessage(const UI_MsgArgs *Args);
-		virtual void SizeChanged();
-		virtual void DoDpiChanged();
+		virtual bool DoTick() override;
+		virtual void Draw(int absX, int absY) override;
+		virtual bool DoMouseMove(int X, int Y) override;
+		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift) override;
+		virtual bool DoMouseUp(int X,int Y, SHIFTSTATE Shift) override;
+		virtual bool DoMouseLeave() override;
+		virtual bool DoMouseHover() override;
+		virtual void HandleMessage(const UI_MsgArgs *Args) override;
+		virtual void SizeChanged() override;
+		virtual void DoDpiChanged() override;
 	};
 
 	class ListBox : public Container
@@ -1198,14 +1196,14 @@ namespace GraphicsUI
 		void Clear();
 		bool ItemInSelection(Control *Item);
 	public:
-		virtual void Draw(int absX, int absY);
-		virtual void SizeChanged();
-		virtual bool DoMouseDown(int x, int Y, SHIFTSTATE Shift);
-		virtual bool DoMouseUp(int x, int Y, SHIFTSTATE Shift);
-		virtual bool DoMouseMove(int x, int Y);
+		virtual void Draw(int absX, int absY) override;
+		virtual void SizeChanged() override;
+		virtual bool DoMouseDown(int x, int Y, SHIFTSTATE Shift) override;
+		virtual bool DoMouseUp(int x, int Y, SHIFTSTATE Shift) override;
+		virtual bool DoMouseMove(int x, int Y) override;
 		virtual bool DoMouseWheel(int delta) override;
-		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift);
-		virtual bool DoMouseLeave();
+		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift) override;
+		virtual bool DoMouseLeave() override;
 		virtual void DoDpiChanged() override;
 	};
 
@@ -1237,17 +1235,17 @@ namespace GraphicsUI
 		}
 		virtual void Posit(int left, int top, int width, int height) override;
 		virtual void Draw(int absX, int absY) override;
-		virtual void SizeChanged();
+		virtual void SizeChanged() override;
 		virtual void DoDpiChanged() override;
-		virtual void HandleMessage(const UI_MsgArgs *Args);
-		virtual bool DoMouseDown(int x, int Y, SHIFTSTATE Shift);
-		virtual bool DoMouseUp(int x, int Y, SHIFTSTATE Shift);
-		virtual bool DoMouseMove(int x, int Y);
-		virtual bool DoMouseWheel(int delta);
-		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift);
-		virtual void SetFocus();
-		virtual void LostFocus(Control * newFocus);
-		virtual bool DoClosePopup();
+		virtual void HandleMessage(const UI_MsgArgs *Args) override;
+		virtual bool DoMouseDown(int x, int Y, SHIFTSTATE Shift) override;
+		virtual bool DoMouseUp(int x, int Y, SHIFTSTATE Shift) override;
+		virtual bool DoMouseMove(int x, int Y) override;
+		virtual bool DoMouseWheel(int delta) override;
+		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift) override;
+		virtual void SetFocus() override;
+		virtual void LostFocus(Control * newFocus) override;
+		virtual bool DoClosePopup() override;
 		void SetSelectedIndex(int id);
 	};
 
@@ -1301,18 +1299,18 @@ namespace GraphicsUI
 		MenuItem * GetItem(int id);
 		void DrawPopup();
 		void DrawMenuBar(int absX, int absY);
-		void Draw(int absX, int absY);
+		void Draw(int absX, int absY) override;
 		void Popup(int x, int y);
 		void CloseMenu();
-		bool DoClosePopup();
+		virtual bool DoClosePopup() override;
 		Menu(Container * parent, MenuStyle mstyle = msPopup);
-		virtual bool DoMouseHover();
-		virtual bool DoMouseMove(int X, int Y);
-		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift);
-		virtual bool DoMouseUp(int X, int Y, SHIFTSTATE Shift);
-		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift);
-		virtual void HandleMessage(const UI_MsgArgs * Args);
-		virtual void SetFocus();
+		virtual bool DoMouseHover() override;
+		virtual bool DoMouseMove(int X, int Y) override;
+		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift) override;
+		virtual bool DoMouseUp(int X, int Y, SHIFTSTATE Shift) override;
+		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift) override;
+		virtual void HandleMessage(const UI_MsgArgs * Args) override;
+		virtual void SetFocus() override;
 		virtual void DoDpiChanged() override;
 	};
 
@@ -1350,8 +1348,8 @@ namespace GraphicsUI
 		wchar_t GetAccessKey();
 		int Count();
 		int MeasureWidth(bool isButton = false);
-		MenuItem::MenuItem(Menu * parent);
-		MenuItem::MenuItem(MenuItem * parent);
+		MenuItem(Menu * parent);
+		MenuItem(MenuItem * parent);
 		MenuItem(Menu* menu, const CoreLib::String & text);
 		MenuItem(MenuItem* menu, const CoreLib::String & text);
 
@@ -1360,14 +1358,14 @@ namespace GraphicsUI
 		void Hit();
 		void DrawMenuItem(int width, int height);
 		void DrawMenuButton(int width, int height);
-		virtual bool DoMouseEnter();
-		virtual bool DoMouseLeave();
-		virtual bool DoMouseHover();
-		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift);
-		virtual bool DoMouseUp(int X, int Y, SHIFTSTATE Shift);
-		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift);
-		virtual bool DoClick();
-		virtual void HandleMessage(const UI_MsgArgs * Args);
+		virtual bool DoMouseEnter() override;
+		virtual bool DoMouseLeave() override;
+		virtual bool DoMouseHover() override;
+		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift) override;
+		virtual bool DoMouseUp(int X, int Y, SHIFTSTATE Shift) override;
+		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift) override;
+		virtual bool DoClick() override;
+		virtual void HandleMessage(const UI_MsgArgs * Args) override;
 		virtual void DoDpiChanged() override;
 	};
 	
@@ -1429,7 +1427,6 @@ namespace GraphicsUI
 		Label * lblText = nullptr;
 		ToolButton * bindButton;
 		int imageLabelPadding = 4;
-		int mousePosX;
 		void Init();
 	public:
 		ToolButton(ToolStrip * parent);
@@ -1443,15 +1440,15 @@ namespace GraphicsUI
 		CoreLib::String GetText();
 		void BindButton(ToolButton * btn);
 		void SetText(const CoreLib::String & _text);
-		void Draw(int absX, int absY);
+		void Draw(int absX, int absY) override;
 		int MeasureWidth();
 		int MeasureHeight();
 		void SetImage(IImage * img);
-		bool DoMouseEnter();
-		bool DoMouseLeave();
-		bool DoMouseMove(int X, int Y);
-		bool DoMouseDown(int X, int Y, SHIFTSTATE shift);
-		bool DoMouseUp(int X, int Y, SHIFTSTATE shift);
+		bool DoMouseEnter() override;
+		bool DoMouseLeave() override;
+		bool DoMouseMove(int X, int Y) override;
+		bool DoMouseDown(int X, int Y, SHIFTSTATE shift) override;
+		bool DoMouseUp(int X, int Y, SHIFTSTATE shift) override;
 	};
 
 	class ToolStrip : public Container
@@ -1466,7 +1463,7 @@ namespace GraphicsUI
 		ToolStripOrientation orientation;
 	protected:
 		void PositButtons();
-		virtual void SizeChanged();
+		virtual void SizeChanged() override;
 	public:
 		bool FullLineFill;
 		bool ShowText;
@@ -1481,11 +1478,11 @@ namespace GraphicsUI
 		void SetOrientation(ToolStripOrientation ori);
 		ToolButton * GetButton(int id);
 		int Count();
-		void Draw(int absX, int absY);
-		bool DoMouseMove(int X, int Y);
-		bool DoMouseDown(int X, int Y, SHIFTSTATE shift);
-		bool DoMouseUp(int X, int Y, SHIFTSTATE shift);
-		bool DoMouseLeave();
+		void Draw(int absX, int absY) override;
+		bool DoMouseMove(int X, int Y) override;
+		bool DoMouseDown(int X, int Y, SHIFTSTATE shift) override;
+		bool DoMouseUp(int X, int Y, SHIFTSTATE shift) override;
+		bool DoMouseLeave() override;
 	};
 
 	class StatusStrip;
@@ -1522,11 +1519,11 @@ namespace GraphicsUI
 		StatusStrip(Container * parent);
 		int Count();
 		StatusPanel * GetItem(int id);
-		bool DoMouseMove(int X, int Y);
-		bool DoMouseDown(int X, int Y, SHIFTSTATE Shift);
-		bool DoMouseUp(int X, int Y, SHIFTSTATE Shift);
+		bool DoMouseMove(int X, int Y) override;
+		bool DoMouseDown(int X, int Y, SHIFTSTATE Shift) override;
+		bool DoMouseUp(int X, int Y, SHIFTSTATE Shift) override;
 		virtual void DoDpiChanged() override;
-		void Draw(int absX, int absY);
+		void Draw(int absX, int absY) override;
 	};
 
 	class TabPage;
@@ -1561,12 +1558,12 @@ namespace GraphicsUI
 		void RemoveItem(TabPage * page);
 		TabPage * GetItem(int id);
 		TabPage * GetSelectedItem();
-		bool DoMouseMove(int X, int Y);
-		bool DoMouseDown(int X, int Y, SHIFTSTATE Shift);
-		bool DoMouseUp(int X, int Y, SHIFTSTATE Shift);
+		bool DoMouseMove(int X, int Y) override;
+		bool DoMouseDown(int X, int Y, SHIFTSTATE Shift) override;
+		bool DoMouseUp(int X, int Y, SHIFTSTATE Shift) override;
 		virtual void DoDpiChanged() override;
-		void Draw(int absX, int absY);
-		void SizeChanged();
+		void Draw(int absX, int absY) override;
+		void SizeChanged() override;
 		void SwitchPage(int id);
 		int HitTest(int X, int Y);
 		TabControl(Container * parent);
@@ -1609,12 +1606,12 @@ namespace GraphicsUI
 		float MinIncrement;
 		float MaxIncrement;
 		float Min, Max;
-		void Draw(int absX, int absY);
-		bool DoTick();
-		bool DoMouseDown(int X, int Y, SHIFTSTATE Shift);
-		bool DoMouseMove(int X, int Y);
-		bool DoMouseUp(int X, int Y, SHIFTSTATE Shift);
-		bool DoMouseHover();
+		void Draw(int absX, int absY) override;
+		bool DoTick() override;
+		bool DoMouseDown(int X, int Y, SHIFTSTATE Shift) override;
+		bool DoMouseMove(int X, int Y) override;
+		bool DoMouseUp(int X, int Y, SHIFTSTATE Shift) override;
+		bool DoMouseHover() override;
 	};
 
 	struct CaretPos

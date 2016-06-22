@@ -182,7 +182,7 @@ namespace CoreLib
 						codePoint += (get(i) & 0b111111);
 					}
 #ifdef _WIN32
-					if (codePoint <= 0xD7FF || codePoint >= 0xE000 && codePoint <= 0xFFFF)
+					if (codePoint <= 0xD7FF || (codePoint >= 0xE000 && codePoint <= 0xFFFF))
 						return (wchar_t)codePoint;
 					else
 					{

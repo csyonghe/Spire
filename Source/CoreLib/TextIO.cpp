@@ -146,9 +146,6 @@ namespace CoreLib
 		const unsigned short Utf16Header = 0xFEFF;
 		const unsigned short Utf16ReversedHeader = 0xFFFE;
 
-
-		const unsigned char Utf8Header[] = { 0xEF,0xBB,0xBF };
-
 		StreamWriter::StreamWriter(const String & path, Encoding * encoding)
 		{
 			this->stream = new FileStream(path, FileMode::Create);

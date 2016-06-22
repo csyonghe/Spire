@@ -35,7 +35,7 @@ char * WideCharToMByte(const wchar_t * buffer, int length)
 #else
 		auto pos = std::wcstombs(multiByteBuffer, buffer, requiredBufferSize + 1);
 #endif
-		if (pos <= requiredBufferSize && pos >= 0)
+		if (pos <= requiredBufferSize)
 			multiByteBuffer[pos] = 0;
 		return multiByteBuffer;
 	}
@@ -61,7 +61,7 @@ wchar_t * MByteToWideChar(const char * buffer, int length)
 #else
 		pos = std::mbstowcs(rbuffer, buffer, bufferSize + 1);
 #endif
-		if (pos <= bufferSize && pos >= 0)
+		if (pos <= bufferSize)
 			rbuffer[pos] = 0;
 		return rbuffer;
 	}

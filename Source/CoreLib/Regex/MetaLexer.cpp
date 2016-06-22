@@ -42,13 +42,13 @@ namespace Text
 
 	bool IsIdent(wchar_t ch)
 	{
-		return (ch >=L'A' && ch <= L'Z' || ch >= L'a' && ch<=L'z' || ch>=L'0' && ch<=L'9'
+		return ((ch >=L'A' && ch <= L'Z') || (ch >= L'a' && ch<=L'z') || (ch>=L'0' && ch<=L'9')
 			|| ch == L'_' || ch==L'#');
 	}
 
 	bool IsLetter(wchar_t ch)
 	{
-		return (ch >=L'A' && ch <= L'Z' || ch >= L'a' && ch<=L'z' || ch == L'_' || ch==L'#');
+		return ((ch >=L'A' && ch <= L'Z') || (ch >= L'a' && ch<=L'z') || ch == L'_' || ch==L'#');
 	}
 
 	bool MetaLexer::ParseLexProfile(const CoreLib::String & lex)

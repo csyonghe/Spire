@@ -1787,8 +1787,8 @@ namespace CoreLib
 
 		void ScrollPanel::_OnResize()
 		{
-			int bboxMaxY = -1<<30;
-			int bboxMaxX = -1 << 30;
+			int bboxMaxY = -(1<<30);
+			int bboxMaxX = -(1<<30);
 			int bboxMinY = hiddenCtrl ? hiddenCtrl->GetTop() : 0;
 			int bboxMinX = hiddenCtrl ? hiddenCtrl->GetLeft() : 0;
 			for (auto & child : children)
@@ -2653,13 +2653,13 @@ namespace CoreLib
 		}
 
 		MenuItem::MenuItem(CustomMenu * menu, int pos)
-			: parent(menu), type(mitCommand)
+			: type(mitCommand), parent(menu)
 		{
 			Init(pos);
 		}
 
 		MenuItem::MenuItem(MenuItem * menu, int pos)
-			: parent(menu->popup.operator ->()), type(mitCommand)	
+			: type(mitCommand), parent(menu->popup.operator ->())
 		{
 			Init(pos);
 			menu->SetType(mitDropDown);
@@ -2919,7 +2919,7 @@ namespace CoreLib
 		}
 
 		KeyEventArgs::KeyEventArgs(wchar_t key, int * keycode, bool ctrl, bool shift, bool alt)
-			:Key(key), KeyCodeRef(keycode), KeyCode(*keycode), BaseControl(ctrl), Shift(shift), Alt(alt)
+			:Key(key), KeyCode(*keycode), KeyCodeRef(keycode), BaseControl(ctrl), Shift(shift), Alt(alt)
 		{
 		}
 	}

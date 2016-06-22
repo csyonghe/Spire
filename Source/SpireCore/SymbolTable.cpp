@@ -307,8 +307,8 @@ namespace Spire
 					MarkUsing(ref.Content, w->Name.Content);
 			for (auto & comp : Definitions)
 				if (comp->Implementation->ExportWorlds.Contains(comp->World) ||
-					Shader->Pipeline->IsAbstractWorld(comp->World) &&
-					(comp->Implementation->SyntaxNode->LayoutAttributes.ContainsKey(L"Pinned") || Shader->Pipeline->Worlds[comp->World]().SyntaxNode->LayoutAttributes.ContainsKey(L"Pinned")))
+					(Shader->Pipeline->IsAbstractWorld(comp->World) &&
+					(comp->Implementation->SyntaxNode->LayoutAttributes.ContainsKey(L"Pinned") || Shader->Pipeline->Worlds[comp->World]().SyntaxNode->LayoutAttributes.ContainsKey(L"Pinned"))))
 				{
 					comp->IsEntryPoint = true;
 				}
@@ -401,7 +401,7 @@ namespace Spire
 									isPinned = true;
 									break;
 								}
-							if (pass == 0 && !isPinned || pass == 1 && isPinned) continue;
+							if ((pass == 0 && !isPinned) || (pass == 1 && isPinned)) continue;
 							ComponentDefinitionIR * depDef;
 							if (depDefs.TryGetValue(depWorld, depDef))
 							{

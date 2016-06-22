@@ -1463,7 +1463,7 @@ namespace CoreLib
 
 			static inline unsigned int Log2Ceil(register unsigned int x)
 			{
-				register int y = (x & (x - 1));
+				int y = (x & (x - 1));
 				y |= -y;
 				y >>= (32 - 1);
 				x |= (x >> 1);
@@ -3404,12 +3404,12 @@ namespace CoreLib
 				hashMap = 0;
 			}
 			Dictionary(const Dictionary<TKey, TValue> & other)
-				: hashMap(0), _count(0), bucketSizeMinusOne(-1)
+				: bucketSizeMinusOne(-1), _count(0), hashMap(0)
 			{
 				*this = other;
 			}
 			Dictionary(Dictionary<TKey, TValue> && other)
-				: hashMap(0), _count(0), bucketSizeMinusOne(-1)
+				: bucketSizeMinusOne(-1), _count(0), hashMap(0)
 			{
 				*this = (_Move(other));
 			}
@@ -3771,12 +3771,12 @@ namespace CoreLib
 				hashMap = 0;
 			}
 			EnumerableDictionary(const EnumerableDictionary<TKey, TValue> & other)
-				: hashMap(0), _count(0), bucketSizeMinusOne(-1)
+				: bucketSizeMinusOne(-1), _count(0), hashMap(0)
 			{
 				*this = other;
 			}
 			EnumerableDictionary(EnumerableDictionary<TKey, TValue> && other)
-				: hashMap(0), _count(0), bucketSizeMinusOne(-1)
+				: bucketSizeMinusOne(-1), _count(0), hashMap(0)
 			{
 				*this = (_Move(other));
 			}
@@ -3949,6 +3949,7 @@ namespace CoreLib
 			{
 				return false;
 			}
+			virtual ~FuncPtr() {}
 		};
 
 		template<typename TResult, typename... Arguments>
@@ -3989,7 +3990,7 @@ namespace CoreLib
 			Class * object;
 		public:
 			MemberFuncPtr(Class * obj, FuncType func)
-				:object(obj), funcPtr(func)
+				: funcPtr(func), object(obj)
 			{
 			}
 
@@ -5044,7 +5045,7 @@ namespace CoreLib
 						codePoint += (get(i) & 0b111111);
 					}
 #ifdef _WIN32
-					if (codePoint <= 0xD7FF || codePoint >= 0xE000 && codePoint <= 0xFFFF)
+					if (codePoint <= 0xD7FF || (codePoint >= 0xE000 && codePoint <= 0xFFFF))
 						return (wchar_t)codePoint;
 					else
 					{
@@ -5523,7 +5524,7 @@ namespace CoreLib
 			String InputText;
 			LazyLexStream() = default;
 			LazyLexStream(String text, const RefPtr<DFA_Table> & dfa, List<bool> *ignoreSet)
-				: InputText(text), dfa(dfa), ignoreSet(ignoreSet)
+				: dfa(dfa), ignoreSet(ignoreSet), InputText(text)
 			{}
 			inline DFA_Table * GetDFA()
 			{
@@ -5803,7 +5804,7 @@ VECTORMATH.H
 #ifdef _M_X64
 #define NO_SIMD_ASM
 #endif
-#ifndef _MSC_VER
+#if !defined(_MSC_VER) || defined(__clang__)
 #define NO_SIMD_ASM
 #endif
 #ifndef NO_VECTOR_CONSTRUCTORS
@@ -6955,7 +6956,7 @@ namespace VectorMath
 	}
 	inline void Matrix4_M128::Multiply(Matrix4_M128 & rs, const Matrix4 & mB) const
 	{
-		register __m128 T0, T1, T2, T3, R0, R1, R2, R3;
+		__m128 T0, T1, T2, T3, R0, R1, R2, R3;
 		T0 = _mm_set_ps1(mB.values[0]);
 		T1 = _mm_set_ps1(mB.values[1]);
 		T2 = _mm_set_ps1(mB.values[2]);
@@ -7003,7 +7004,7 @@ namespace VectorMath
 	}
 	inline void Matrix4_M128::Multiply(Matrix4_M128 & rs, const Matrix4_M128 & mB) const
 	{
-		register __m128 T0, T1, T2, T3, R0, R1, R2, R3;
+		__m128 T0, T1, T2, T3, R0, R1, R2, R3;
 		T0 = _mm_shuffle_ps(mB.C1, mB.C1, _MM_SHUFFLE(0,0,0,0));
 		T1 = _mm_shuffle_ps(mB.C1, mB.C1, _MM_SHUFFLE(1,1,1,1));
 		T2 = _mm_shuffle_ps(mB.C1, mB.C1, _MM_SHUFFLE(2,2,2,2));
@@ -7093,6 +7094,7 @@ namespace VectorMath
 			(-p0 + p1 * 3.0f - p2 * 3.0f + p3) * t3) * 0.5f;
 	}
 #ifdef _MSC_VER
+#ifndef __clang__
 #ifndef M128_OPERATOR_OVERLOADS
 #define M128_OPERATOR_OVERLOADS
 	inline __m128 & operator += (__m128 & v0, const __m128 &v1)
@@ -7169,6 +7171,7 @@ namespace VectorMath
 	{
 		return _mm_xor_si128(v0, _mm_set1_epi32(0xFFFFFFFF));
 	}
+#endif
 #endif
 	_declspec(align(16))
 	class SSEVec3

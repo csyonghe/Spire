@@ -63,7 +63,7 @@ namespace CoreLib
 			String InputText;
 			LazyLexStream() = default;
 			LazyLexStream(String text, const RefPtr<DFA_Table> & dfa, List<bool> *ignoreSet)
-				: InputText(text), dfa(dfa), ignoreSet(ignoreSet)
+				: dfa(dfa), ignoreSet(ignoreSet), InputText(text)
 			{}
 			inline DFA_Table * GetDFA()
 			{

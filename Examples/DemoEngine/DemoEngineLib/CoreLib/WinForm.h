@@ -285,9 +285,9 @@ namespace CoreLib
 			static bool terminate;
 			static NotifyEvent * onMainLoop;
 			static EnumerableHashSet<BaseForm*> forms;
-			static void Application::RegisterControlClass();
-			static void Application::RegisterFormClass();
-			static void Application::RegisterGLFormClass();
+			static void RegisterControlClass();
+			static void RegisterFormClass();
+			static void RegisterGLFormClass();
 			static void ProcessMessage(MSG & msg);
 		public:
 			static const wchar_t * ControlClassName;
@@ -341,6 +341,8 @@ namespace CoreLib
 			static int GetScreenWidth();
 			static int GetScreenHeight();
 		};
+
+		LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 	}
 }
 
@@ -416,7 +418,7 @@ namespace CoreLib
 			void ApplyActionToComponentAndChildren(Action * act);
 		};
 
-		class BaseControl abstract : public Component 
+		class BaseControl : public Component 
 		{
 		protected:
 			RefPtr<Font> font;
@@ -509,7 +511,7 @@ namespace CoreLib
 			int maxYScroll = 0, maxXScroll = 0;
 			RefPtr<Control> hiddenCtrl;
 		protected:
-			virtual int ProcessMessage(WinMessage & msg);
+			virtual int ProcessMessage(WinMessage & msg) override;
 			virtual void _OnResize() override;
 			ScrollPanel();
 			void VScroll(int delta);
@@ -520,17 +522,17 @@ namespace CoreLib
 				hiddenCtrl = nullptr;
 			}
 			ScrollPanel(Component * parent);
-			virtual void AddChild(Component * comp)
+			virtual void AddChild(Component * comp) override
 			{
 				Control::AddChild(comp);
 				UpdateScrollBar();
 			}
-			virtual void RemoveChild(Component * comp)
+			virtual void RemoveChild(Component * comp) override
 			{
 				Control::RemoveChild(comp);
 				UpdateScrollBar();
 			}
-			virtual void ClearChildren()
+			virtual void ClearChildren() override
 			{
 				Control::ClearChildren();
 				VScroll(lastScrollY);
@@ -670,7 +672,7 @@ namespace CoreLib
 			fbFixedToolWindow
 		};
 
-		class BaseForm abstract: public BaseControl 
+		class BaseForm : public BaseControl 
 		{
 		public:
 			enum DialogResult
@@ -995,10 +997,10 @@ namespace CoreLib
 		class TextBox : public Control
 		{		
 		protected:
-			virtual void CreateWnd(Component * parent);
+			virtual void CreateWnd(Component * parent) override;
 			virtual int ProcessMessage(WinMessage & msg) override;
 
-			virtual int ProcessNotification(WinNotification note);
+			virtual int ProcessNotification(WinNotification note) override;
 			TextBox();
 		public:
 			NotifyEvent OnChanged;

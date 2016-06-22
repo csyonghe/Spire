@@ -1411,7 +1411,7 @@ namespace DemoEngine
 								sformat = StorageFormat::RGBA_F32;
 							else
 							{
-								uiprintf(L"Unknown storage format for component %s - %s", comp.Name.ToMultiByteString(), storage.ToMultiByteString());
+								uiprintf(L"Unknown storage format for component %s - %s", comp.Name.Buffer(), storage.Buffer());
 								storage = L"RGBA_16F";
 							}
 						}
@@ -1420,7 +1420,7 @@ namespace DemoEngine
 							sformat = StorageFormat::RGB10_A2;
 							storage = L"RGB10_A2 (Normal)";
 						}
-						uiprintf(L"Prebaking texture '%s', format: %s...\n", comp.Name.ToMultiByteString(), storage.ToMultiByteString());
+						uiprintf(L"Prebaking texture '%s', format: %s...\n", comp.Name.Buffer(), storage.Buffer());
 						tex.SetData(sformat, frameBufferSize, frameBufferSize, 1, DataType::Float, nullptr);
 						tex.BuildMipmaps();
 					}

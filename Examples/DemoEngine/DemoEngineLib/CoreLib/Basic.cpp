@@ -31,6 +31,9 @@ WARNING: This is an automatically generated file.
 /***********************************************************************
 LIBIO.CPP
 ***********************************************************************/
+#ifndef __STDC__
+#define __STDC__ 1
+#endif
 #include <sys/stat.h>
 #ifdef _WIN32
 #include <direct.h>
@@ -50,8 +53,8 @@ namespace CoreLib
 
 		bool File::Exists(const String & fileName)
 		{
-			struct stat sts;
-			return stat(((String)fileName).ToMultiByteString(), &sts) != -1;
+			struct _stat32 statVar;
+			return ::_stat32(((String)fileName).ToMultiByteString(), &statVar) != -1;
 		}
 
 		String Path::TruncateExt(const String & path)
@@ -1215,9 +1218,6 @@ namespace CoreLib
 		const unsigned short Utf16Header = 0xFEFF;
 		const unsigned short Utf16ReversedHeader = 0xFFFE;
 
-
-		const unsigned char Utf8Header[] = { 0xEF,0xBB,0xBF };
-
 		StreamWriter::StreamWriter(const String & path, Encoding * encoding)
 		{
 			this->stream = new FileStream(path, FileMode::Create);
@@ -1914,7 +1914,7 @@ char * WideCharToMByte(const wchar_t * buffer, int length)
 #else
 		auto pos = std::wcstombs(multiByteBuffer, buffer, requiredBufferSize + 1);
 #endif
-		if (pos <= requiredBufferSize && pos >= 0)
+		if (pos <= requiredBufferSize)
 			multiByteBuffer[pos] = 0;
 		return multiByteBuffer;
 	}
@@ -1940,7 +1940,7 @@ wchar_t * MByteToWideChar(const char * buffer, int length)
 #else
 		pos = std::mbstowcs(rbuffer, buffer, bufferSize + 1);
 #endif
-		if (pos <= bufferSize && pos >= 0)
+		if (pos <= bufferSize)
 			rbuffer[pos] = 0;
 		return rbuffer;
 	}
@@ -2003,13 +2003,13 @@ namespace Text
 
 	bool IsIdent(wchar_t ch)
 	{
-		return (ch >=L'A' && ch <= L'Z' || ch >= L'a' && ch<=L'z' || ch>=L'0' && ch<=L'9'
+		return ((ch >=L'A' && ch <= L'Z') || (ch >= L'a' && ch<=L'z') || (ch>=L'0' && ch<=L'9')
 			|| ch == L'_' || ch==L'#');
 	}
 
 	bool IsLetter(wchar_t ch)
 	{
-		return (ch >=L'A' && ch <= L'Z' || ch >= L'a' && ch<=L'z' || ch == L'_' || ch==L'#');
+		return ((ch >=L'A' && ch <= L'Z') || (ch >= L'a' && ch<=L'z') || ch == L'_' || ch==L'#');
 	}
 
 	bool MetaLexer::ParseLexProfile(const CoreLib::String & lex)
@@ -2789,7 +2789,7 @@ namespace Text
 	int NFA_Node::HandleCount = 0;
 
 	NFA_Translation::NFA_Translation(NFA_Node * src, NFA_Node * dest, RefPtr<RegexCharSet> charSet)
-		: NodeSrc(src), NodeDest(dest), CharSet(charSet)
+		: CharSet(charSet), NodeSrc(src), NodeDest(dest)
 	{}
 
 	NFA_Translation::NFA_Translation()

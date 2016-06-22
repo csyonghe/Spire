@@ -16,7 +16,7 @@ namespace Spire
 			SymbolTable * symbolTable;
 		public:
 			SemanticsVisitor(SymbolTable * symbols, ErrorWriter * pErr)
-				:symbolTable(symbols), SyntaxVisitor(pErr)
+				:SyntaxVisitor(pErr), symbolTable(symbols)
 			{
 			}
 			// return true if world0 depends on world1 (there exists a series of import operators that converts world1 variables to world0)
@@ -63,8 +63,8 @@ namespace Spire
 				}
 				for (auto comp : pipeline->AbstractComponents)
 				{
-					if (comp->IsParam || comp->Rate && comp->Rate->Worlds.Count() == 1
-						&& psymbol->IsAbstractWorld(comp->Rate->Worlds.First().World.Content))
+					if (comp->IsParam || (comp->Rate && comp->Rate->Worlds.Count() == 1
+						&& psymbol->IsAbstractWorld(comp->Rate->Worlds.First().World.Content)))
 						AddNewComponentSymbol(psymbol->Components, comp);
 					else
 						Error(33003, L"cannot define components in a pipeline.",
@@ -225,10 +225,9 @@ namespace Spire
 				SymbolTable * symbolTable = nullptr;
 				ShaderSymbol * currentShader = nullptr;
 				ShaderComponentSymbol * currentComp = nullptr;
-				SemanticsVisitor * typeChecker = nullptr;
 			public:
-				ShaderImportVisitor(ErrorWriter * writer, SymbolTable * symTable, SemanticsVisitor * pTypeChecker)
-					: SyntaxVisitor(writer), symbolTable(symTable), typeChecker(pTypeChecker)
+				ShaderImportVisitor(ErrorWriter * writer, SymbolTable * symTable)
+					: SyntaxVisitor(writer), symbolTable(symTable)
 				{}
 				virtual void VisitShader(ShaderSyntaxNode * shader) override
 				{
@@ -327,7 +326,7 @@ namespace Spire
 					}
 				}
 				// add shader objects to symbol table
-				ShaderImportVisitor importVisitor(err, symbolTable, this);
+				ShaderImportVisitor importVisitor(err, symbolTable);
 				shader->Accept(&importVisitor);
 
 				for (auto & comp : shaderSymbol->Components)
@@ -452,7 +451,7 @@ namespace Spire
 				}
 				compSym->Implementations.Add(compImpl);
 			}
-			virtual void VisitProgram(ProgramSyntaxNode * programNode)
+			virtual void VisitProgram(ProgramSyntaxNode * programNode) override
 			{
 				HashSet<String> funcNames;
 				this->program = programNode;
@@ -607,7 +606,7 @@ namespace Spire
 
 				loops.RemoveAt(loops.Count() - 1);
 			}
-			virtual void VisitEmptyStatement(EmptyStatementSyntaxNode *){}
+			virtual void VisitEmptyStatement(EmptyStatementSyntaxNode *) override {}
 			virtual void VisitForStatement(ForStatementSyntaxNode *stmt) override
 			{
 				loops.Add(stmt);
@@ -721,7 +720,7 @@ namespace Spire
 					}
 				}
 			}
-			virtual void VisitWhileStatement(WhileStatementSyntaxNode *stmt)
+			virtual void VisitWhileStatement(WhileStatementSyntaxNode *stmt) override
 			{
 				loops.Add(stmt);
 				stmt->Predicate->Accept(this);
@@ -731,11 +730,11 @@ namespace Spire
 				stmt->Statement->Accept(this);
 				loops.RemoveAt(loops.Count() - 1);
 			}
-			virtual void VisitExpressionStatement(ExpressionStatementSyntaxNode *stmt)
+			virtual void VisitExpressionStatement(ExpressionStatementSyntaxNode *stmt) override
 			{
 				stmt->Expression->Accept(this);
 			}
-			virtual void VisitBinaryExpression(BinaryExpressionSyntaxNode *expr)
+			virtual void VisitBinaryExpression(BinaryExpressionSyntaxNode *expr) override
 			{
 				expr->LeftExpression->Accept(this);
 				expr->RightExpression->Accept(this);
@@ -760,11 +759,11 @@ namespace Spire
 					{
 						if (leftType == rightType && !leftType.IsTextureType())
 							expr->Type = leftType;
-						else if (leftType.BaseType == BaseType::Float3x3 && rightType == ExpressionType::Float3 ||
-							leftType.BaseType == BaseType::Float3 && rightType.BaseType == BaseType::Float3x3)
+						else if ((leftType.BaseType == BaseType::Float3x3 && rightType == ExpressionType::Float3) ||
+							(leftType.BaseType == BaseType::Float3 && rightType.BaseType == BaseType::Float3x3))
 							expr->Type = ExpressionType::Float3;
-						else if (leftType.BaseType == BaseType::Float4x4 && rightType == ExpressionType::Float4 ||
-							leftType.BaseType == BaseType::Float4 && rightType.BaseType == BaseType::Float4x4)
+						else if ((leftType.BaseType == BaseType::Float4x4 && rightType == ExpressionType::Float4) ||
+							(leftType.BaseType == BaseType::Float4 && rightType.BaseType == BaseType::Float4x4))
 							expr->Type = ExpressionType::Float4;
 						else if (leftType.IsVectorType() && rightType == GetVectorBaseType(leftType.BaseType))
 							expr->Type = leftType;
@@ -832,7 +831,7 @@ namespace Spire
 					leftType != ExpressionType::Error && rightType != ExpressionType::Error)
 					Error(30012, L"no overload found for operator " + OperatorToString(expr->Operator)  + L" (" + leftType.ToString() + L", " + rightType.ToString() + L").", expr);
 			}
-			virtual void VisitConstantExpression(ConstantExpressionSyntaxNode *expr)
+			virtual void VisitConstantExpression(ConstantExpressionSyntaxNode *expr) override
 			{
 				switch (expr->ConstType)
 				{
@@ -848,7 +847,7 @@ namespace Spire
 					break;
 				}
 			}
-			virtual void VisitIndexExpression(IndexExpressionSyntaxNode *expr)
+			virtual void VisitIndexExpression(IndexExpressionSyntaxNode *expr) override
 			{
 				expr->BaseExpression->Accept(this);
 				expr->IndexExpression->Accept(this);
@@ -882,7 +881,7 @@ namespace Spire
 				expr->Type.IsLeftValue = true;
 				expr->Type.IsReference = true;
 			}
-			bool MatchArguments(FunctionSyntaxNode * functionNode, List < RefPtr < ExpressionSyntaxNode >> &args)
+			bool MatchArguments(FunctionSyntaxNode * functionNode, List <RefPtr<ExpressionSyntaxNode>> &args)
 			{
 				if (functionNode->Parameters.Count() != args.Count())
 					return false;
@@ -893,7 +892,7 @@ namespace Spire
 				}
 				return true;
 			}
-			virtual void VisitInvokeExpression(InvokeExpressionSyntaxNode *expr)
+			virtual void VisitInvokeExpression(InvokeExpressionSyntaxNode *expr) override
 			{
 				StringBuilder internalName;
 				StringBuilder argList;
@@ -1031,7 +1030,7 @@ namespace Spire
 					return L"ERROR";
 				}
 			}
-			virtual void VisitUnaryExpression(UnaryExpressionSyntaxNode *expr)
+			virtual void VisitUnaryExpression(UnaryExpressionSyntaxNode *expr) override
 			{
 				expr->Expression->Accept(this);
 				
@@ -1072,7 +1071,7 @@ namespace Spire
 				if(expr->Type == ExpressionType::Error && expr->Expression->Type != ExpressionType::Error)
 					Error(30020, L"operator " + OperatorToString(expr->Operator) + L" can not be applied to " + expr->Expression->Type.ToString(), expr);
 			}
-			virtual void VisitVarExpression(VarExpressionSyntaxNode *expr)
+			virtual void VisitVarExpression(VarExpressionSyntaxNode *expr) override
 			{
 				VariableEntry variable;
 				ShaderUsing shaderObj;
@@ -1117,8 +1116,9 @@ namespace Spire
 				{
 					if (expr->Expression->Type.IsArray)
 						expr->Type = ExpressionType::Error;
-					else if (GetVectorBaseType(expr->Expression->Type.BaseType) != BaseType::Int && GetVectorBaseType(expr->Expression->Type.BaseType) != BaseType::Float ||
-						GetVectorBaseType(targetType.BaseType) != BaseType::Int && GetVectorBaseType(targetType.BaseType) != BaseType::Float)
+					else if ((GetVectorBaseType(expr->Expression->Type.BaseType) != BaseType::Int && GetVectorBaseType(expr->Expression->Type.BaseType) != BaseType::Float)
+						||
+						(GetVectorBaseType(targetType.BaseType) != BaseType::Int && GetVectorBaseType(targetType.BaseType) != BaseType::Float))
 						expr->Type = ExpressionType::Error;
 					else if (targetType.BaseType == BaseType::Void || expr->Expression->Type.BaseType == BaseType::Void)
 						expr->Type = ExpressionType::Error;
@@ -1249,9 +1249,9 @@ namespace Spire
 						expr->MemberName + L"\".", expr);
 				}
 			}
-			virtual void VisitParameter(ParameterSyntaxNode *){}
-			virtual void VisitType(TypeSyntaxNode *){}
-			virtual void VisitDeclrVariable(Variable *){}
+			virtual void VisitParameter(ParameterSyntaxNode *) override {}
+			virtual void VisitType(TypeSyntaxNode *) override {}
+			virtual void VisitDeclrVariable(Variable *) override {}
 			SemanticsVisitor & operator = (const SemanticsVisitor &) = delete;
 		};
 

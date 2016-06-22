@@ -46,7 +46,7 @@ namespace Spire
 			}
 		public:
 			Parser(List<Token> & _tokens, List<CompileError> & _errors, String _fileName)
-				:tokens(_tokens), errors(_errors), pos(0), fileName(_fileName)
+				: pos(0), tokens(_tokens), errors(_errors), fileName(_fileName)
 			{
 				typeNames.Add(L"int");
 				typeNames.Add(L"float");

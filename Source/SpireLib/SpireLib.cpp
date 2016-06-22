@@ -313,18 +313,6 @@ namespace SpireLib
 				parser.Read(L"{");
 				while (!parser.LookAhead(L"}"))
 				{
-					auto readAttribs = [&](InterfaceMetaData & comp)
-					{
-						parser.Read(L"{");
-						while (!parser.LookAhead(L"}"))
-						{
-							auto name = parser.ReadWord();
-							parser.Read(L":");
-							auto value = parser.ReadStringLiteral();
-							comp.Attributes[name] = parser.UnescapeStringLiteral(value);
-						}
-						parser.Read(L"}");
-					};
 					auto subFieldName = parser.ReadWord();
 					if (subFieldName == L"target")
 						world.TargetName = parser.ReadWord();

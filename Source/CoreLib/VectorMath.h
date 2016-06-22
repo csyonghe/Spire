@@ -8,7 +8,7 @@
 #ifdef _M_X64
 #define NO_SIMD_ASM
 #endif
-#ifndef _MSC_VER
+#if !defined(_MSC_VER) || defined(__clang__)
 #define NO_SIMD_ASM
 #endif
 #ifndef NO_VECTOR_CONSTRUCTORS
@@ -1160,7 +1160,7 @@ namespace VectorMath
 	}
 	inline void Matrix4_M128::Multiply(Matrix4_M128 & rs, const Matrix4 & mB) const
 	{
-		register __m128 T0, T1, T2, T3, R0, R1, R2, R3;
+		__m128 T0, T1, T2, T3, R0, R1, R2, R3;
 		T0 = _mm_set_ps1(mB.values[0]);
 		T1 = _mm_set_ps1(mB.values[1]);
 		T2 = _mm_set_ps1(mB.values[2]);
@@ -1208,7 +1208,7 @@ namespace VectorMath
 	}
 	inline void Matrix4_M128::Multiply(Matrix4_M128 & rs, const Matrix4_M128 & mB) const
 	{
-		register __m128 T0, T1, T2, T3, R0, R1, R2, R3;
+		__m128 T0, T1, T2, T3, R0, R1, R2, R3;
 		T0 = _mm_shuffle_ps(mB.C1, mB.C1, _MM_SHUFFLE(0,0,0,0));
 		T1 = _mm_shuffle_ps(mB.C1, mB.C1, _MM_SHUFFLE(1,1,1,1));
 		T2 = _mm_shuffle_ps(mB.C1, mB.C1, _MM_SHUFFLE(2,2,2,2));
@@ -1298,6 +1298,7 @@ namespace VectorMath
 			(-p0 + p1 * 3.0f - p2 * 3.0f + p3) * t3) * 0.5f;
 	}
 #ifdef _MSC_VER
+#ifndef __clang__
 #ifndef M128_OPERATOR_OVERLOADS
 #define M128_OPERATOR_OVERLOADS
 	inline __m128 & operator += (__m128 & v0, const __m128 &v1)
@@ -1374,6 +1375,7 @@ namespace VectorMath
 	{
 		return _mm_xor_si128(v0, _mm_set1_epi32(0xFFFFFFFF));
 	}
+#endif
 #endif
 	_declspec(align(16))
 	class SSEVec3

@@ -11,7 +11,6 @@ namespace Spire
 		class CodeGenerator : public ICodeGenerator
 		{
 		private:
-			ShaderCompiler * compiler;
 			SymbolTable * symTable;
 			CompiledWorld * currentWorld = nullptr;
 			ShaderComponentSymbol * currentComponent = nullptr;
@@ -508,11 +507,11 @@ namespace Spire
 					}
 				}
 			}
-			virtual void VisitComponent(ComponentSyntaxNode *)
+			virtual void VisitComponent(ComponentSyntaxNode *) override
 			{
 				throw NotImplementedException();
 			}
-			virtual void VisitComponent(ComponentDefinitionIR * comp)
+			void VisitComponent(ComponentDefinitionIR * comp)
 			{
 				currentComponent = comp->Component;
 				currentComponentImpl = comp->Implementation;
@@ -545,7 +544,7 @@ namespace Spire
 				currentComponentImpl = nullptr;
 				currentComponent = nullptr;
 			}
-			virtual void VisitFunction(FunctionSyntaxNode* function)
+			virtual void VisitFunction(FunctionSyntaxNode* function) override
 			{
 				if (function->IsExtern)
 					return;
@@ -567,15 +566,15 @@ namespace Spire
 				func->Code = codeWriter.PopNode();
 				variables.PopScope();
 			}
-			virtual void VisitBlockStatement(BlockStatementSyntaxNode* stmt)
+			virtual void VisitBlockStatement(BlockStatementSyntaxNode* stmt) override
 			{
 				variables.PushScope();
 				for (auto & subStmt : stmt->Statements)
 					subStmt->Accept(this);
 				variables.PopScope();
 			}
-			virtual void VisitEmptyStatement(EmptyStatementSyntaxNode*){}
-			virtual void VisitWhileStatement(WhileStatementSyntaxNode* stmt)
+			virtual void VisitEmptyStatement(EmptyStatementSyntaxNode*) override {}
+			virtual void VisitWhileStatement(WhileStatementSyntaxNode* stmt) override
 			{
 				RefPtr<WhileInstruction> instr = new WhileInstruction();
 				variables.PushScope();
@@ -589,7 +588,7 @@ namespace Spire
 				codeWriter.Insert(instr.Release());
 				variables.PopScope();
 			}
-			virtual void VisitDoWhileStatement(DoWhileStatementSyntaxNode* stmt)
+			virtual void VisitDoWhileStatement(DoWhileStatementSyntaxNode* stmt) override
 			{
 				RefPtr<WhileInstruction> instr = new DoInstruction();
 				variables.PushScope();
@@ -603,7 +602,7 @@ namespace Spire
 				codeWriter.Insert(instr.Release());
 				variables.PopScope();
 			}
-			virtual void VisitForStatement(ForStatementSyntaxNode* stmt)
+			virtual void VisitForStatement(ForStatementSyntaxNode* stmt) override
 			{
 				RefPtr<ForInstruction> instr = new ForInstruction();
 				variables.PushScope();
@@ -650,7 +649,7 @@ namespace Spire
 				codeWriter.Insert(instr.Release());
 				variables.PopScope();
 			}
-			virtual void VisitIfStatement(IfStatementSyntaxNode* stmt)
+			virtual void VisitIfStatement(IfStatementSyntaxNode* stmt) override
 			{
 				RefPtr<IfInstruction> instr = new IfInstruction();
 				variables.PushScope();
@@ -668,7 +667,7 @@ namespace Spire
 				codeWriter.Insert(instr.Release());
 				variables.PopScope();
 			}
-			virtual void VisitReturnStatement(ReturnStatementSyntaxNode* stmt)
+			virtual void VisitReturnStatement(ReturnStatementSyntaxNode* stmt) override
 			{
 				if (currentComponentImpl != nullptr)
 				{
@@ -693,15 +692,15 @@ namespace Spire
 					codeWriter.Insert(new ReturnInstruction(PopStack()));
 				}
 			}
-			virtual void VisitBreakStatement(BreakStatementSyntaxNode*)
+			virtual void VisitBreakStatement(BreakStatementSyntaxNode*) override
 			{
 				codeWriter.Insert(new BreakInstruction());
 			}
-			virtual void VisitContinueStatement(ContinueStatementSyntaxNode*)
+			virtual void VisitContinueStatement(ContinueStatementSyntaxNode*) override
 			{
 				codeWriter.Insert(new ContinueInstruction());
 			}
-			virtual void VisitSelectExpression(SelectExpressionSyntaxNode * expr)
+			virtual void VisitSelectExpression(SelectExpressionSyntaxNode * expr) override
 			{
 				expr->SelectorExpr->Accept(this);
 				auto predOp = PopStack();
@@ -726,7 +725,7 @@ namespace Spire
 					return op;
 			}
 			
-			virtual void VisitVarDeclrStatement(VarDeclrStatementSyntaxNode* stmt)
+			virtual void VisitVarDeclrStatement(VarDeclrStatementSyntaxNode* stmt) override
 			{
 				for (auto & v : stmt->Variables)
 				{
@@ -740,7 +739,7 @@ namespace Spire
 					}
 				}
 			}
-			virtual void VisitExpressionStatement(ExpressionStatementSyntaxNode* stmt)
+			virtual void VisitExpressionStatement(ExpressionStatementSyntaxNode* stmt) override
 			{
 				stmt->Expression->Accept(this);
 				PopStack();
@@ -756,7 +755,7 @@ namespace Spire
 				else
 					codeWriter.Store(left, right);
 			}
-			virtual void VisitBinaryExpression(BinaryExpressionSyntaxNode* expr)
+			virtual void VisitBinaryExpression(BinaryExpressionSyntaxNode* expr) override
 			{
 				expr->RightExpression->Accept(this);
 				auto right = PopStack();
@@ -863,7 +862,7 @@ namespace Spire
 					PushStack(rs);
 				}
 			}
-			virtual void VisitConstantExpression(ConstantExpressionSyntaxNode* expr)
+			virtual void VisitConstantExpression(ConstantExpressionSyntaxNode* expr) override
 			{
 				ILConstOperand * op;
 				if (expr->ConstType == ConstantExpressionSyntaxNode::ConstantType::Float)
@@ -889,7 +888,7 @@ namespace Spire
 					PushStack(codeWriter.Add(base, idx));
 				}
 			}
-			virtual void VisitIndexExpression(IndexExpressionSyntaxNode* expr)
+			virtual void VisitIndexExpression(IndexExpressionSyntaxNode* expr) override
 			{
 				expr->BaseExpression->Access = expr->Access;
 				expr->BaseExpression->Accept(this);
@@ -900,7 +899,7 @@ namespace Spire
 				GenerateIndexExpression(base, idx,
 					expr->Access == ExpressionAccess::Read);
 			}
-			virtual void VisitMemberExpression(MemberExpressionSyntaxNode * expr)
+			virtual void VisitMemberExpression(MemberExpressionSyntaxNode * expr) override
 			{
 				RefPtr<Object> refObj;
 				if (expr->Tags.TryGetValue(L"ComponentReference", refObj))
@@ -958,7 +957,7 @@ namespace Spire
 						throw NotImplementedException(L"member expression codegen");
 				}
 			}
-			virtual void VisitInvokeExpression(InvokeExpressionSyntaxNode* expr)
+			virtual void VisitInvokeExpression(InvokeExpressionSyntaxNode* expr) override
 			{
 				List<ILOperand*> args;
 				if (currentWorld)
@@ -976,7 +975,7 @@ namespace Spire
 				codeWriter.Insert(instr);
 				PushStack(instr);
 			}
-			virtual void VisitTypeCastExpression(TypeCastExpressionSyntaxNode * expr)
+			virtual void VisitTypeCastExpression(TypeCastExpressionSyntaxNode * expr) override
 			{
 				expr->Expression->Accept(this);
 				auto base = PopStack();
@@ -1004,7 +1003,7 @@ namespace Spire
 						expr->Type.ToString() + L"\"", expr);
 				}
 			}
-			virtual void VisitUnaryExpression(UnaryExpressionSyntaxNode* expr)
+			virtual void VisitUnaryExpression(UnaryExpressionSyntaxNode* expr) override
 			{
 				if (expr->Operator == Operator::PostDec || expr->Operator == Operator::PostInc
 					|| expr->Operator == Operator::PreDec || expr->Operator == Operator::PreInc)
@@ -1115,7 +1114,7 @@ namespace Spire
 				}
 				return true;
 			}
-			virtual void VisitVarExpression(VarExpressionSyntaxNode* expr)
+			virtual void VisitVarExpression(VarExpressionSyntaxNode* expr) override
 			{
 				RefPtr<Object> refObj;
 				if (expr->Tags.TryGetValue(L"ComponentReference", refObj))
@@ -1134,23 +1133,23 @@ namespace Spire
 						throw InvalidProgramException(L"identifier is neither a variable nor a regnoized component.");
 				}
 			}
-			virtual void VisitParameter(ParameterSyntaxNode*){}
-			virtual void VisitType(TypeSyntaxNode*){}
-			virtual void VisitDeclrVariable(Variable*){}
+			virtual void VisitParameter(ParameterSyntaxNode*) override {}
+			virtual void VisitType(TypeSyntaxNode*) override {}
+			virtual void VisitDeclrVariable(Variable*) override {}
 		private:
 			CodeGenerator & operator = (const CodeGenerator & other) = delete;
 		public:
-			CodeGenerator(ShaderCompiler * compiler, SymbolTable * symbols, ErrorWriter * pErr, CompileResult & _result)
-				: ICodeGenerator(pErr), compiler(compiler), symTable(symbols), result(_result)
+			CodeGenerator(SymbolTable * symbols, ErrorWriter * pErr, CompileResult & _result)
+				: ICodeGenerator(pErr), symTable(symbols), result(_result)
 			{
 				result.Program = new CompiledProgram();
 				codeWriter.SetConstantPool(result.Program->ConstantPool.Ptr());
 			}
 		};
 
-		ICodeGenerator * CreateCodeGenerator(ShaderCompiler * compiler, SymbolTable * symbols, CompileResult & result)
+		ICodeGenerator * CreateCodeGenerator(SymbolTable * symbols, CompileResult & result)
 		{
-			return new CodeGenerator(compiler, symbols, result.GetErrorWriter(), result);
+			return new CodeGenerator(symbols, result.GetErrorWriter(), result);
 		}
 	}
 }

@@ -16,6 +16,7 @@ namespace CoreLib
 			{
 				return false;
 			}
+			virtual ~FuncPtr() {}
 		};
 
 		template<typename TResult, typename... Arguments>
@@ -56,7 +57,7 @@ namespace CoreLib
 			Class * object;
 		public:
 			MemberFuncPtr(Class * obj, FuncType func)
-				:object(obj), funcPtr(func)
+				: funcPtr(func), object(obj)
 			{
 			}
 

@@ -490,12 +490,12 @@ namespace CoreLib
 				hashMap = 0;
 			}
 			Dictionary(const Dictionary<TKey, TValue> & other)
-				: hashMap(0), _count(0), bucketSizeMinusOne(-1)
+				: bucketSizeMinusOne(-1), _count(0), hashMap(0)
 			{
 				*this = other;
 			}
 			Dictionary(Dictionary<TKey, TValue> && other)
-				: hashMap(0), _count(0), bucketSizeMinusOne(-1)
+				: bucketSizeMinusOne(-1), _count(0), hashMap(0)
 			{
 				*this = (_Move(other));
 			}
@@ -857,12 +857,12 @@ namespace CoreLib
 				hashMap = 0;
 			}
 			EnumerableDictionary(const EnumerableDictionary<TKey, TValue> & other)
-				: hashMap(0), _count(0), bucketSizeMinusOne(-1)
+				: bucketSizeMinusOne(-1), _count(0), hashMap(0)
 			{
 				*this = other;
 			}
 			EnumerableDictionary(EnumerableDictionary<TKey, TValue> && other)
-				: hashMap(0), _count(0), bucketSizeMinusOne(-1)
+				: bucketSizeMinusOne(-1), _count(0), hashMap(0)
 			{
 				*this = (_Move(other));
 			}

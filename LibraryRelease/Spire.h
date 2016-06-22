@@ -724,7 +724,7 @@ namespace Spire
 		public:
 			List<RateWorld> Worlds;
 			virtual void Accept(SyntaxVisitor *) override {}
-			virtual RateSyntaxNode * Clone(CloneContext & ctx);
+			virtual RateSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class ShaderMemberNode : public SyntaxNode
@@ -741,7 +741,7 @@ namespace Spire
 			RefPtr<BlockStatementSyntaxNode> BlockStatement;
 			RefPtr<ExpressionSyntaxNode> Expression;
 			virtual void Accept(SyntaxVisitor * visitor) override;
-			virtual ComponentSyntaxNode * Clone(CloneContext & ctx);
+			virtual ComponentSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class WorldSyntaxNode : public SyntaxNode
@@ -754,7 +754,7 @@ namespace Spire
 			List<Token> Usings;
 			EnumerableDictionary<String, String> LayoutAttributes;
 			virtual void Accept(SyntaxVisitor *) override {}
-			virtual WorldSyntaxNode * Clone(CloneContext & ctx);
+			virtual WorldSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class ImportOperatorDefSyntaxNode : public SyntaxNode
@@ -766,7 +766,7 @@ namespace Spire
 			EnumerableDictionary<String, String> LayoutAttributes;
 			EnumerableDictionary<String, String> Arguments;
 			virtual void Accept(SyntaxVisitor *) override {}
-			virtual ImportOperatorDefSyntaxNode * Clone(CloneContext & ctx);
+			virtual ImportOperatorDefSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 		
 		class PipelineSyntaxNode : public SyntaxNode
@@ -777,7 +777,7 @@ namespace Spire
 			List<RefPtr<ImportOperatorDefSyntaxNode>> ImportOperators;
 			List<RefPtr<ComponentSyntaxNode>> AbstractComponents;
 			virtual void Accept(SyntaxVisitor *) override {}
-			virtual PipelineSyntaxNode * Clone(CloneContext & ctx);
+			virtual PipelineSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class ImportArgumentSyntaxNode : public SyntaxNode
@@ -786,7 +786,7 @@ namespace Spire
 			RefPtr<ExpressionSyntaxNode> Expression;
 			Token ArgumentName;
 			virtual void Accept(SyntaxVisitor *) override;
-			virtual ImportArgumentSyntaxNode * Clone(CloneContext & ctx);
+			virtual ImportArgumentSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class ImportSyntaxNode : public ShaderMemberNode
@@ -810,7 +810,7 @@ namespace Spire
 			List<RefPtr<ShaderMemberNode>> Members;
 			bool IsModule = false;
 			virtual void Accept(SyntaxVisitor * visitor) override;
-			virtual ShaderSyntaxNode * Clone(CloneContext & ctx);
+			virtual ShaderSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class ProgramSyntaxNode : public SyntaxNode
@@ -826,16 +826,16 @@ namespace Spire
 				Pipelines.AddRange(other->Pipelines);
 				Shaders.AddRange(other->Shaders);
 			}
-			virtual void Accept(SyntaxVisitor * visitor);
-			virtual ProgramSyntaxNode * Clone(CloneContext & ctx);
+			virtual void Accept(SyntaxVisitor * visitor) override;
+			virtual ProgramSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class ImportStatementSyntaxNode : public StatementSyntaxNode
 		{
 		public:
 			RefPtr<ImportSyntaxNode> Import;
-			virtual void Accept(SyntaxVisitor * visitor);
-			virtual ImportStatementSyntaxNode * Clone(CloneContext & ctx);
+			virtual void Accept(SyntaxVisitor * visitor) override;
+			virtual ImportStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class IfStatementSyntaxNode : public StatementSyntaxNode
@@ -844,8 +844,8 @@ namespace Spire
 			RefPtr<ExpressionSyntaxNode> Predicate;
 			RefPtr<StatementSyntaxNode> PositiveStatement;
 			RefPtr<StatementSyntaxNode> NegativeStatement;
-			virtual void Accept(SyntaxVisitor * visitor);
-			virtual IfStatementSyntaxNode * Clone(CloneContext & ctx);
+			virtual void Accept(SyntaxVisitor * visitor) override;
+			virtual IfStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class ForStatementSyntaxNode : public StatementSyntaxNode
@@ -856,8 +856,8 @@ namespace Spire
 
 			RefPtr<ExpressionSyntaxNode> InitialExpression, StepExpression, EndExpression;
 			RefPtr<StatementSyntaxNode> Statement;
-			virtual void Accept(SyntaxVisitor * visitor);
-			virtual ForStatementSyntaxNode * Clone(CloneContext & ctx);
+			virtual void Accept(SyntaxVisitor * visitor) override;
+			virtual ForStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class WhileStatementSyntaxNode : public StatementSyntaxNode
@@ -865,8 +865,8 @@ namespace Spire
 		public:
 			RefPtr<ExpressionSyntaxNode> Predicate;
 			RefPtr<StatementSyntaxNode> Statement;
-			virtual void Accept(SyntaxVisitor * visitor);
-			virtual WhileStatementSyntaxNode * Clone(CloneContext & ctx);
+			virtual void Accept(SyntaxVisitor * visitor) override;
+			virtual WhileStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class DoWhileStatementSyntaxNode : public StatementSyntaxNode
@@ -874,38 +874,38 @@ namespace Spire
 		public:
 			RefPtr<StatementSyntaxNode> Statement;
 			RefPtr<ExpressionSyntaxNode> Predicate;
-			virtual void Accept(SyntaxVisitor * visitor);
-			virtual DoWhileStatementSyntaxNode * Clone(CloneContext & ctx);
+			virtual void Accept(SyntaxVisitor * visitor) override;
+			virtual DoWhileStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class BreakStatementSyntaxNode : public StatementSyntaxNode
 		{
 		public:
-			virtual void Accept(SyntaxVisitor * visitor);
-			virtual BreakStatementSyntaxNode * Clone(CloneContext & ctx);
+			virtual void Accept(SyntaxVisitor * visitor) override;
+			virtual BreakStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class ContinueStatementSyntaxNode : public StatementSyntaxNode
 		{
 		public:
-			virtual void Accept(SyntaxVisitor * visitor);
-			virtual ContinueStatementSyntaxNode * Clone(CloneContext & ctx);
+			virtual void Accept(SyntaxVisitor * visitor) override;
+			virtual ContinueStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class ReturnStatementSyntaxNode : public StatementSyntaxNode
 		{
 		public:
 			RefPtr<ExpressionSyntaxNode> Expression;
-			virtual void Accept(SyntaxVisitor * visitor);
-			virtual ReturnStatementSyntaxNode * Clone(CloneContext & ctx);
+			virtual void Accept(SyntaxVisitor * visitor) override;
+			virtual ReturnStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class ExpressionStatementSyntaxNode : public StatementSyntaxNode
 		{
 		public:
 			RefPtr<ExpressionSyntaxNode> Expression;
-			virtual void Accept(SyntaxVisitor * visitor);
-			virtual ExpressionStatementSyntaxNode * Clone(CloneContext & ctx);
+			virtual void Accept(SyntaxVisitor * visitor) override;
+			virtual ExpressionStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class SyntaxVisitor : public Object
@@ -1625,7 +1625,7 @@ namespace Spire
 			{
 				Name = L"<undef>";
 			}
-			virtual String ToString()
+			virtual String ToString() override
 			{
 				return L"<undef>";
 			}
@@ -1954,11 +1954,11 @@ namespace Spire
 		{
 		public:
 			List<UseReference> Candidates;
-			virtual OperandIterator begin()
+			virtual OperandIterator begin() override
 			{
 				return Candidates.begin();
 			}
-			virtual OperandIterator end()
+			virtual OperandIterator end() override
 			{
 				return Candidates.end();
 			}
@@ -2000,7 +2000,7 @@ namespace Spire
 				}
 
 			}
-			virtual SwitchInstruction * Clone()
+			virtual SwitchInstruction * Clone() override
 			{
 				return new SwitchInstruction(*this);
 			}
@@ -2045,11 +2045,11 @@ namespace Spire
 			CompiledWorld * SourceWorld;
 
 			List<UseReference> Arguments;
-			virtual OperandIterator begin()
+			virtual OperandIterator begin() override
 			{
 				return Arguments.begin();
 			}
-			virtual OperandIterator end()
+			virtual OperandIterator end() override
 			{
 				return Arguments.end();
 			}
@@ -2109,7 +2109,7 @@ namespace Spire
 				this->Size = count;
 			}
 			AllocVarInstruction(const AllocVarInstruction & other)
-				:Size(this), LeaInstruction(other)
+				:LeaInstruction(other), Size(this)
 			{
 				Size = other.Size.Ptr();
 			}
@@ -2450,7 +2450,7 @@ namespace Spire
 				}
 				return sb.ProduceString();
 			}
-			virtual PhiInstruction * Clone()
+			virtual PhiInstruction * Clone() override
 			{
 				return new PhiInstruction(*this);
 			}
@@ -2469,11 +2469,11 @@ namespace Spire
 			{
 				Operand = other.Operand.Ptr();
 			}
-			virtual OperandIterator begin()
+			virtual OperandIterator begin() override
 			{
 				return &Operand;
 			}
-			virtual OperandIterator end()
+			virtual OperandIterator end() override
 			{
 				return &Operand + 1;
 			}
@@ -2536,11 +2536,11 @@ namespace Spire
 				Operands[0] = other.Operands[0].Ptr();
 				Operands[1] = other.Operands[1].Ptr();
 			}
-			virtual OperandIterator begin()
+			virtual OperandIterator begin() override
 			{
 				return Operands.begin();
 			}
-			virtual OperandIterator end()
+			virtual OperandIterator end() override
 			{
 				return Operands.end();
 			}
@@ -2576,11 +2576,11 @@ namespace Spire
 				Operands[2] = val1;
 				Type = val0->Type->Clone();
 			}
-			virtual OperandIterator begin()
+			virtual OperandIterator begin() override
 			{
 				return Operands;
 			}
-			virtual OperandIterator end()
+			virtual OperandIterator end() override
 			{
 				return Operands + 3;
 			}
@@ -2605,11 +2605,11 @@ namespace Spire
 		public:
 			String Function;
 			List<UseReference> Arguments;
-			virtual OperandIterator begin()
+			virtual OperandIterator begin() override
 			{
 				return Arguments.begin();
 			}
-			virtual OperandIterator end()
+			virtual OperandIterator end() override
 			{
 				return Arguments.end();
 			}
@@ -2653,7 +2653,7 @@ namespace Spire
 				}
 
 			}
-			virtual CallInstruction * Clone()
+			virtual CallInstruction * Clone() override
 			{
 				return new CallInstruction(*this);
 			}
@@ -2671,7 +2671,7 @@ namespace Spire
 			{
 				return L"not";
 			}
-			virtual NotInstruction * Clone()
+			virtual NotInstruction * Clone() override
 			{
 				return new NotInstruction(*this);
 			}
@@ -2697,7 +2697,7 @@ namespace Spire
 			{
 				return L"neg";
 			}
-			virtual NegInstruction * Clone()
+			virtual NegInstruction * Clone() override
 			{
 				return new NegInstruction(*this);
 			}
@@ -2715,7 +2715,7 @@ namespace Spire
 			{
 				return L"bnot";
 			}
-			virtual BitNotInstruction * Clone()
+			virtual BitNotInstruction * Clone() override
 			{
 				return new BitNotInstruction(*this);
 			}
@@ -2749,7 +2749,7 @@ namespace Spire
 			{
 				return L"add";
 			}
-			virtual AddInstruction * Clone()
+			virtual AddInstruction * Clone() override
 			{
 				return new AddInstruction(*this);
 			}
@@ -2802,7 +2802,7 @@ namespace Spire
 			{
 				return L"retrieve";
 			}
-			virtual MemberLoadInstruction * Clone()
+			virtual MemberLoadInstruction * Clone() override
 			{
 				return new MemberLoadInstruction(*this);
 			}
@@ -2820,7 +2820,7 @@ namespace Spire
 			{
 				return L"sub";
 			}
-			virtual SubInstruction * Clone()
+			virtual SubInstruction * Clone() override
 			{
 				return new SubInstruction(*this);
 			}
@@ -2847,7 +2847,7 @@ namespace Spire
 			{
 				return L"mul";
 			}
-			virtual MulInstruction * Clone()
+			virtual MulInstruction * Clone() override
 			{
 				return new MulInstruction(*this);
 			}
@@ -2865,7 +2865,7 @@ namespace Spire
 			{
 				return L"div";
 			}
-			virtual DivInstruction * Clone()
+			virtual DivInstruction * Clone() override
 			{
 				return new DivInstruction(*this);
 			}
@@ -2882,7 +2882,7 @@ namespace Spire
 			{
 				return L"mod";
 			}
-			virtual ModInstruction * Clone()
+			virtual ModInstruction * Clone() override
 			{
 				return new ModInstruction(*this);
 			}
@@ -3246,7 +3246,7 @@ namespace Spire
 			{
 				return Name + L" = load " + Operand.ToString();
 			}
-			virtual bool IsDeterministic()
+			virtual bool IsDeterministic() override
 			{
 				return Deterministic;
 			}
@@ -3327,11 +3327,11 @@ namespace Spire
 				Operands[2] = value;
 				Type = var->Type->Clone();
 			}
-			virtual OperandIterator begin()
+			virtual OperandIterator begin() override
 			{
 				return Operands;
 			}
-			virtual OperandIterator end()
+			virtual OperandIterator end() override
 			{
 				return Operands + 3;
 			}
@@ -3343,7 +3343,7 @@ namespace Spire
 			{
 				return L"update";
 			}
-			virtual MemberUpdateInstruction * Clone()
+			virtual MemberUpdateInstruction * Clone() override
 			{
 				return new MemberUpdateInstruction(*this);
 			}
@@ -3805,11 +3805,11 @@ namespace Spire
 				EnumerableDictionary<String, String> & backendArgs,
 				CompiledWorld * destWorld,
 				CompileResult & result, CompiledWorld * srcWorld)
-				: Arguments(args), BackendArguments(backendArgs), DestWorld(destWorld),
-				Result(result), SourceWorld(srcWorld)
+				: Arguments(args), BackendArguments(backendArgs), SourceWorld(srcWorld), DestWorld(destWorld),
+				 Result(result)
 			{}
 		};
-		class ImportOperatorHandler
+		class ImportOperatorHandler : public CoreLib::Object
 		{
 		public:
 			virtual String GetName() = 0;
@@ -3820,7 +3820,7 @@ namespace Spire
 			virtual void GenerateSetInput(StringBuilder & sb, ComponentDefinition * gvar, const ImportOperatorContext & context) = 0;
 		};
 
-		class ExportOperatorHandler
+		class ExportOperatorHandler : public CoreLib::Object
 		{
 		public:
 			virtual String GetName() = 0;
@@ -3941,7 +3941,7 @@ namespace Spire
 			EnumerableHashSet<ShaderComponentSymbol *> & _dependentComponents,
 			Dictionary<ShaderComponentSymbol*, SyntaxNode*> & _referenceNodes);
 		SyntaxVisitor * CreateSemanticsVisitor(SymbolTable * symbols, ErrorWriter * err);
-		ICodeGenerator * CreateCodeGenerator(ShaderCompiler * compiler, SymbolTable * symbols, CompileResult & result);
+		ICodeGenerator * CreateCodeGenerator(SymbolTable * symbols, CompileResult & result);
 	}
 }
 
@@ -4269,7 +4269,7 @@ namespace Spire
 			}
 		public:
 			Parser(List<Token> & _tokens, List<CompileError> & _errors, String _fileName)
-				:tokens(_tokens), errors(_errors), pos(0), fileName(_fileName)
+				: pos(0), tokens(_tokens), errors(_errors), fileName(_fileName)
 			{
 				typeNames.Add(L"int");
 				typeNames.Add(L"float");

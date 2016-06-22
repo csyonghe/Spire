@@ -12,8 +12,8 @@ namespace Spire
 
 		bool IsLetter(wchar_t ch)
 		{
-			return (ch >= L'a' && ch <= L'z'||
-				ch >= L'A' && ch <= L'Z' || ch == L'_' || ch == L'#');
+			return ((ch >= L'a' && ch <= L'z') ||
+				(ch >= L'A' && ch <= L'Z') || ch == L'_' || ch == L'#');
 		}
 
 		bool IsDigit(wchar_t ch)
@@ -407,7 +407,7 @@ namespace Spire
 					}
 					break;
 				case State::Operator:
-					if (IsPunctuation(curChar) && !(curChar == L'/' && nextChar == L'/' || curChar == L'/' && nextChar == L'*'))
+					if (IsPunctuation(curChar) && !((curChar == L'/' && nextChar == L'/') || (curChar == L'/' && nextChar == L'*')))
 					{
 						tokenBuilder.Append(curChar);
 						pos++;

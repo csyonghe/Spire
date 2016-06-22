@@ -1674,7 +1674,6 @@ namespace GraphicsUI
 	Control * lastFocusedCtrl = 0;
 
 	//Message Type defination
-	const int MSG_UI_NOTIFY = 0;
 	const int MSG_UI_CLICK = 1;
 	const int MSG_UI_DBLCLICK = 2;
 	const int MSG_UI_MOUSEDOWN = 3;
@@ -1695,8 +1694,6 @@ namespace GraphicsUI
 	// Form Messages
 	const int MSG_UI_FORM_ACTIVATE = 15;
 	const int MSG_UI_FORM_DEACTIVATE = 16;
-	const int MSG_UI_FORM_SHOW = 17;
-	const int MSG_UI_FORM_HIDE = 18;
 
 	Control * FindNextFocus(Control * ctrl);
 
@@ -2840,15 +2837,6 @@ namespace GraphicsUI
 		SizeChanged();
 	}
 
-	void Container::SetAlpha(unsigned char Alpha)
-	{
-		BackColor.A = Alpha;
-		for (int i=0; i<controls.Count(); i++)
-		{
-			controls[i]->BackColor.A = Alpha;
-		}
-	}
-
 	void Container::AddChild(Control *nControl)
 	{
 		controls.Add(nControl);
@@ -2938,6 +2926,8 @@ namespace GraphicsUI
 					controls[i]->GetWidth(), clientRect.h);
 				clientRect.w -= controls[i]->GetWidth();
 				break;
+			default:
+				break;
 			}
 		}
 		int layoutX = 0;
@@ -2957,7 +2947,7 @@ namespace GraphicsUI
 				if (controls[i]->DockStyle == dsNone)
 				{
 					if (layout == ContainerLayoutType::Stack ||
-						layoutX > 0 && layoutX + controls[i]->GetWidth() + controls[i]->Margin.Left > clientRect.w) // new line
+						(layoutX > 0 && layoutX + controls[i]->GetWidth() + controls[i]->Margin.Left > clientRect.w)) // new line
 					{
 						layoutY += maxHeight;
 						layoutX = 0;
@@ -3111,20 +3101,6 @@ namespace GraphicsUI
 	String Form::GetText()
 	{
 		return Text;
-	}
-
-	void Form::SetAlpha(unsigned char Alpha)
-	{
-		Container::SetAlpha(Alpha);
-		formStyle.TitleBarColors[0].A = Alpha;
-		formStyle.TitleBarColors[1].A = Alpha;
-		formStyle.TitleBarColors[2].A = Alpha;
-		formStyle.TitleBarColors[3].A = Alpha;
-
-		formStyle.TitleBarDeactiveColors[0].A = Alpha;
-		formStyle.TitleBarDeactiveColors[1].A = Alpha;
-		formStyle.TitleBarDeactiveColors[2].A = Alpha;
-		formStyle.TitleBarDeactiveColors[3].A = Alpha;
 	}
 
 	void Form::AddChild(Control * ctrl)
@@ -3657,8 +3633,8 @@ namespace GraphicsUI
 			for (int i = Forms.Count() - 1; i >= 0; i--)
 			{
 				Form *curForm = Forms[i];
-				if (curForm->Visible && curForm->Enabled && (curForm == Global::PointedComponent || Global::PointedComponent &&
-					Global::PointedComponent->IsChildOf(curForm)))
+				if (curForm->Visible && curForm->Enabled && (curForm == Global::PointedComponent || 
+					(Global::PointedComponent && Global::PointedComponent->IsChildOf(curForm))))
 				{
 					ShowWindow(curForm);
 					nForm = curForm;
@@ -4849,7 +4825,7 @@ namespace GraphicsUI
 
 	bool IsSeparatorChar(wchar_t ch)
 	{
-		bool isLetter = (ch >= '0' && ch <= '9' || ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch == '_');
+		bool isLetter = ((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == L'_');
 		return !isLetter;
 	}
 
@@ -5518,7 +5494,7 @@ namespace GraphicsUI
 		for (int i=ScrollBar->GetPosition();i<=ScrollBar->GetPosition()+ShowCount && i<Items.Count();i++)
 		{
 			Control *CurItem = Items[i];
-			if (hitTest == CurItem || hitTest && hitTest->IsChildOf((Container*)CurItem))
+			if (hitTest == CurItem || (hitTest && hitTest->IsChildOf((Container*)CurItem)))
 				CurItem->DoMouseDown(X-CurItem->Left, Y-CurItem->Top, Shift);
 		}
 		if (ScrollBar->Visible)
@@ -5611,7 +5587,7 @@ namespace GraphicsUI
 		for (int i = ScrollBar->GetPosition(); i <= ScrollBar->GetPosition() + ShowCount && i<Items.Count(); i++)
 		{
 			Control *CurItem = Items[i];
-			if (hitTest == CurItem || hitTest && hitTest->IsChildOf((Container*)CurItem))
+			if (hitTest == CurItem || (hitTest && hitTest->IsChildOf((Container*)CurItem)))
 				CurItem->DoMouseMove(X - CurItem->Left, Y - CurItem->Top);
 		}
 		if (Selecting)
@@ -5688,14 +5664,14 @@ namespace GraphicsUI
 		for (int i = ScrollBar->GetPosition(); i <= ScrollBar->GetPosition() + ShowCount && i<Items.Count(); i++)
 		{
 			Control *CurItem = Items[i];
-			if (hitTest == CurItem || hitTest && hitTest->IsChildOf((Container*)CurItem))
+			if (hitTest == CurItem || (hitTest && hitTest->IsChildOf((Container*)CurItem)))
 				CurItem->DoMouseUp(X - CurItem->Left, Y - CurItem->Top, Shift);
 		}
 		DownInItem = false;
 		Selecting = false;
 		if (ScrollBar->Visible && hitTest == ScrollBar)
 			ScrollBar->DoMouseUp(X - hitTest->Left, Y - hitTest->Top,Shift);
-		if (lastSelIdx != SelectedIndex || Items.Count() && Items[0]->Type == CT_CHECKBOX)
+		if (lastSelIdx != SelectedIndex || (Items.Count() && Items[0]->Type == CT_CHECKBOX))
 		{
 			SelectionChanged();
 		}
@@ -6601,7 +6577,7 @@ namespace GraphicsUI
 				}
 			}
 		}
-		if (!Parent || Parent->Type != CT_MENU && Parent->Type != CT_MENU_ITEM)
+		if (!Parent || (Parent->Type != CT_MENU && Parent->Type != CT_MENU_ITEM))
 			return true;
 		return false;
 	}
@@ -6647,7 +6623,7 @@ namespace GraphicsUI
 	{
 		if (!Enabled || !Visible)
 			return false;
-		if (Key >= L'A' && Key <= L'Z' || Key >= L'0' && Key <= L'9')
+		if ((Key >= L'A' && Key <= L'Z') || (Key >= L'0' && Key <= L'9'))
 		{
 			for (int i=0; i<Items.Count(); i++)
 				Items[i]->Selected = false;
@@ -8570,7 +8546,7 @@ namespace GraphicsUI
 
 	bool IsPunctuation(unsigned int ch)
 	{
-		if (ch >= '0' && ch <= '9' || ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z')
+		if ((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z'))
 			return false;
 		return true;
 	}
@@ -9286,24 +9262,24 @@ namespace GraphicsUI
 		{
 			time = CoreLib::Diagnostics::PerformanceCounter::Start();
 		}
-		virtual CaretPos GetCaretPos()
+		virtual CaretPos GetCaretPos() override
 		{
 			return caretPos;
 		}
-		virtual void SetCaretPos(const CaretPos & pCaretPos)
+		virtual void SetCaretPos(const CaretPos & pCaretPos) override
 		{
 			this->caretPos = pCaretPos;
 			caretPosChanged = true;
 			OnCaretPosChanged(this);
 			ScrollToCaret();
 		}
-		virtual void MoveCaretToEnd()
+		virtual void MoveCaretToEnd() override
 		{
 			SetCaretPos(CaretPos(textBuffer.Lines.Count() - 1, textBuffer.Lines.Last().Chars.Count()));
 			selStart = selEnd = caretPos;
 			SelectionChanged();
 		}
-		virtual void ScrollToCaret()
+		virtual void ScrollToCaret() override
 		{
 			auto physicalPos = textBuffer.LogicalToPhysical(caretPos);
 			if (physicalPos.Line < vScroll->GetPosition())
@@ -9356,7 +9332,7 @@ namespace GraphicsUI
 					selStart.Col--;
 			}
 		}
-		virtual bool DoMouseMove(int x, int y)
+		virtual bool DoMouseMove(int x, int y) override
 		{
 			if (!Enabled || !Visible)
 				return false;
@@ -9386,7 +9362,7 @@ namespace GraphicsUI
 			return true;
 		}
 
-		virtual bool DoMouseDown(int x, int y, SHIFTSTATE shift)
+		virtual bool DoMouseDown(int x, int y, SHIFTSTATE shift) override
 		{
 			if (!Enabled || !Visible)
 				return false;
@@ -9425,7 +9401,7 @@ namespace GraphicsUI
 			ResetCaretTimer();
 			return true;
 		}
-		virtual bool DoMouseUp(int x, int y, SHIFTSTATE shift)
+		virtual bool DoMouseUp(int x, int y, SHIFTSTATE shift) override
 		{
 			if (!Enabled || !Visible)
 				return false;
@@ -9444,7 +9420,7 @@ namespace GraphicsUI
 				|| key == Keys::PageDown || key == Keys::PageUp || key == Keys::Home || key == Keys::End);
 		}
 
-		virtual void IncreaseLineIndent(CaretPos start, CaretPos end)
+		void IncreaseLineIndent(CaretPos start, CaretPos end)
 		{
 			if (end < start)
 				Swap(start, end);
@@ -9476,7 +9452,7 @@ namespace GraphicsUI
 			operationStack.PushOperation(op);
 		}
 
-		virtual void DecreaseLineIndent(CaretPos start, CaretPos end)
+		void DecreaseLineIndent(CaretPos start, CaretPos end)
 		{
 			if (end < start)
 				Swap(start, end);
@@ -9523,7 +9499,7 @@ namespace GraphicsUI
 			operationStack.PushOperation(op);
 		}
 
-		bool DoKeyPress(unsigned short key, SHIFTSTATE shift)
+		bool DoKeyPress(unsigned short key, SHIFTSTATE shift) override
 		{
 			if (!Enabled || !Visible)
 				return false;
@@ -9806,6 +9782,8 @@ namespace GraphicsUI
 				selEnd = op.SelEnd1;
 				InsertText(op.Text);
 				break;
+			case OperationName::None:
+				break;
 			}
 			operationStack.Unlock();
 		}
@@ -9831,6 +9809,8 @@ namespace GraphicsUI
 				selStart = op.SelStart;
 				selEnd = op.SelEnd;
 				InsertText(op.Text1);
+				break;
+			case OperationName::None:
 				break;
 			}
 			operationStack.Unlock();
@@ -9934,7 +9914,7 @@ namespace GraphicsUI
 			SelectionChanged();
 			ScrollToCaret();
 			auto physical = textBuffer.LogicalToPhysical(caretPos);
-			desiredCol = caretPos.Col;
+			desiredCol = physical.Col;
 		}
 
 		virtual void Delete() override
@@ -10060,12 +10040,12 @@ namespace GraphicsUI
 			invalidateScreen = true;
 			SelectionChanged();
 		}
-		virtual void SetScrollBars(bool vertical, bool horizontal)
+		virtual void SetScrollBars(bool vertical, bool horizontal) override
 		{
 			vScroll->Visible = vertical;
 			hScroll->Visible = horizontal;
 		}
-		String GetTextFromRange(CaretPos start, CaretPos end)
+		virtual String GetTextFromRange(CaretPos start, CaretPos end) override
 		{
 			StringBuilder sb;
 			while (start < end)
@@ -10087,7 +10067,7 @@ namespace GraphicsUI
 			return sb.ProduceString();
 		}
 
-		virtual String GetSelectionText()
+		virtual String GetSelectionText() override
 		{
 			CaretPos sel0, sel1;
 			if (selStart < selEnd)
@@ -10104,13 +10084,13 @@ namespace GraphicsUI
 			sel1.Line = Math::Clamp(sel1.Line, 0, textBuffer.Lines.Count() - 1);
 			return GetTextFromRange(sel0, sel1);
 		}
-		virtual void ImeInputString(const String & txt)
+		virtual void ImeInputString(const String & txt) override
 		{
 			if (readOnly)
 				return;
 			InsertText(txt);
 		}
-		virtual void Draw(int absX, int absY)
+		virtual void Draw(int absX, int absY) override
 		{
 			Control::Draw(absX, absY);
 			if (invalidateScreen)

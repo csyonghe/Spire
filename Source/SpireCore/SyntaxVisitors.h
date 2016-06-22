@@ -30,7 +30,7 @@ namespace Spire
 			EnumerableHashSet<ShaderComponentSymbol *> & _dependentComponents,
 			Dictionary<ShaderComponentSymbol*, SyntaxNode*> & _referenceNodes);
 		SyntaxVisitor * CreateSemanticsVisitor(SymbolTable * symbols, ErrorWriter * err);
-		ICodeGenerator * CreateCodeGenerator(ShaderCompiler * compiler, SymbolTable * symbols, CompileResult & result);
+		ICodeGenerator * CreateCodeGenerator(SymbolTable * symbols, CompileResult & result);
 	}
 }
 

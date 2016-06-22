@@ -20,11 +20,11 @@ namespace Spire
 				EnumerableDictionary<String, String> & backendArgs,
 				CompiledWorld * destWorld,
 				CompileResult & result, CompiledWorld * srcWorld)
-				: Arguments(args), BackendArguments(backendArgs), DestWorld(destWorld),
-				Result(result), SourceWorld(srcWorld)
+				: Arguments(args), BackendArguments(backendArgs), SourceWorld(srcWorld), DestWorld(destWorld),
+				 Result(result)
 			{}
 		};
-		class ImportOperatorHandler
+		class ImportOperatorHandler : public CoreLib::Object
 		{
 		public:
 			virtual String GetName() = 0;
@@ -35,7 +35,7 @@ namespace Spire
 			virtual void GenerateSetInput(StringBuilder & sb, ComponentDefinition * gvar, const ImportOperatorContext & context) = 0;
 		};
 
-		class ExportOperatorHandler
+		class ExportOperatorHandler : public CoreLib::Object
 		{
 		public:
 			virtual String GetName() = 0;

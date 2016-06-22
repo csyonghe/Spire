@@ -21,9 +21,15 @@
     <ClCompile Include="..\Spire.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\Basic.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\Spire.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Basic.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

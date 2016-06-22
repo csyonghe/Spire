@@ -8,7 +8,7 @@ namespace Text
 	int NFA_Node::HandleCount = 0;
 
 	NFA_Translation::NFA_Translation(NFA_Node * src, NFA_Node * dest, RefPtr<RegexCharSet> charSet)
-		: NodeSrc(src), NodeDest(dest), CharSet(charSet)
+		: CharSet(charSet), NodeSrc(src), NodeDest(dest)
 	{}
 
 	NFA_Translation::NFA_Translation()

@@ -594,7 +594,6 @@ namespace Spire
 		class CodeGenerator : public ICodeGenerator
 		{
 		private:
-			ShaderCompiler * compiler;
 			SymbolTable * symTable;
 			CompiledWorld * currentWorld = nullptr;
 			ShaderComponentSymbol * currentComponent = nullptr;
@@ -1091,11 +1090,11 @@ namespace Spire
 					}
 				}
 			}
-			virtual void VisitComponent(ComponentSyntaxNode *)
+			virtual void VisitComponent(ComponentSyntaxNode *) override
 			{
 				throw NotImplementedException();
 			}
-			virtual void VisitComponent(ComponentDefinitionIR * comp)
+			void VisitComponent(ComponentDefinitionIR * comp)
 			{
 				currentComponent = comp->Component;
 				currentComponentImpl = comp->Implementation;
@@ -1128,7 +1127,7 @@ namespace Spire
 				currentComponentImpl = nullptr;
 				currentComponent = nullptr;
 			}
-			virtual void VisitFunction(FunctionSyntaxNode* function)
+			virtual void VisitFunction(FunctionSyntaxNode* function) override
 			{
 				if (function->IsExtern)
 					return;
@@ -1150,15 +1149,15 @@ namespace Spire
 				func->Code = codeWriter.PopNode();
 				variables.PopScope();
 			}
-			virtual void VisitBlockStatement(BlockStatementSyntaxNode* stmt)
+			virtual void VisitBlockStatement(BlockStatementSyntaxNode* stmt) override
 			{
 				variables.PushScope();
 				for (auto & subStmt : stmt->Statements)
 					subStmt->Accept(this);
 				variables.PopScope();
 			}
-			virtual void VisitEmptyStatement(EmptyStatementSyntaxNode*){}
-			virtual void VisitWhileStatement(WhileStatementSyntaxNode* stmt)
+			virtual void VisitEmptyStatement(EmptyStatementSyntaxNode*) override {}
+			virtual void VisitWhileStatement(WhileStatementSyntaxNode* stmt) override
 			{
 				RefPtr<WhileInstruction> instr = new WhileInstruction();
 				variables.PushScope();
@@ -1172,7 +1171,7 @@ namespace Spire
 				codeWriter.Insert(instr.Release());
 				variables.PopScope();
 			}
-			virtual void VisitDoWhileStatement(DoWhileStatementSyntaxNode* stmt)
+			virtual void VisitDoWhileStatement(DoWhileStatementSyntaxNode* stmt) override
 			{
 				RefPtr<WhileInstruction> instr = new DoInstruction();
 				variables.PushScope();
@@ -1186,7 +1185,7 @@ namespace Spire
 				codeWriter.Insert(instr.Release());
 				variables.PopScope();
 			}
-			virtual void VisitForStatement(ForStatementSyntaxNode* stmt)
+			virtual void VisitForStatement(ForStatementSyntaxNode* stmt) override
 			{
 				RefPtr<ForInstruction> instr = new ForInstruction();
 				variables.PushScope();
@@ -1233,7 +1232,7 @@ namespace Spire
 				codeWriter.Insert(instr.Release());
 				variables.PopScope();
 			}
-			virtual void VisitIfStatement(IfStatementSyntaxNode* stmt)
+			virtual void VisitIfStatement(IfStatementSyntaxNode* stmt) override
 			{
 				RefPtr<IfInstruction> instr = new IfInstruction();
 				variables.PushScope();
@@ -1251,7 +1250,7 @@ namespace Spire
 				codeWriter.Insert(instr.Release());
 				variables.PopScope();
 			}
-			virtual void VisitReturnStatement(ReturnStatementSyntaxNode* stmt)
+			virtual void VisitReturnStatement(ReturnStatementSyntaxNode* stmt) override
 			{
 				if (currentComponentImpl != nullptr)
 				{
@@ -1276,15 +1275,15 @@ namespace Spire
 					codeWriter.Insert(new ReturnInstruction(PopStack()));
 				}
 			}
-			virtual void VisitBreakStatement(BreakStatementSyntaxNode*)
+			virtual void VisitBreakStatement(BreakStatementSyntaxNode*) override
 			{
 				codeWriter.Insert(new BreakInstruction());
 			}
-			virtual void VisitContinueStatement(ContinueStatementSyntaxNode*)
+			virtual void VisitContinueStatement(ContinueStatementSyntaxNode*) override
 			{
 				codeWriter.Insert(new ContinueInstruction());
 			}
-			virtual void VisitSelectExpression(SelectExpressionSyntaxNode * expr)
+			virtual void VisitSelectExpression(SelectExpressionSyntaxNode * expr) override
 			{
 				expr->SelectorExpr->Accept(this);
 				auto predOp = PopStack();
@@ -1309,7 +1308,7 @@ namespace Spire
 					return op;
 			}
 			
-			virtual void VisitVarDeclrStatement(VarDeclrStatementSyntaxNode* stmt)
+			virtual void VisitVarDeclrStatement(VarDeclrStatementSyntaxNode* stmt) override
 			{
 				for (auto & v : stmt->Variables)
 				{
@@ -1323,7 +1322,7 @@ namespace Spire
 					}
 				}
 			}
-			virtual void VisitExpressionStatement(ExpressionStatementSyntaxNode* stmt)
+			virtual void VisitExpressionStatement(ExpressionStatementSyntaxNode* stmt) override
 			{
 				stmt->Expression->Accept(this);
 				PopStack();
@@ -1339,7 +1338,7 @@ namespace Spire
 				else
 					codeWriter.Store(left, right);
 			}
-			virtual void VisitBinaryExpression(BinaryExpressionSyntaxNode* expr)
+			virtual void VisitBinaryExpression(BinaryExpressionSyntaxNode* expr) override
 			{
 				expr->RightExpression->Accept(this);
 				auto right = PopStack();
@@ -1446,7 +1445,7 @@ namespace Spire
 					PushStack(rs);
 				}
 			}
-			virtual void VisitConstantExpression(ConstantExpressionSyntaxNode* expr)
+			virtual void VisitConstantExpression(ConstantExpressionSyntaxNode* expr) override
 			{
 				ILConstOperand * op;
 				if (expr->ConstType == ConstantExpressionSyntaxNode::ConstantType::Float)
@@ -1472,7 +1471,7 @@ namespace Spire
 					PushStack(codeWriter.Add(base, idx));
 				}
 			}
-			virtual void VisitIndexExpression(IndexExpressionSyntaxNode* expr)
+			virtual void VisitIndexExpression(IndexExpressionSyntaxNode* expr) override
 			{
 				expr->BaseExpression->Access = expr->Access;
 				expr->BaseExpression->Accept(this);
@@ -1483,7 +1482,7 @@ namespace Spire
 				GenerateIndexExpression(base, idx,
 					expr->Access == ExpressionAccess::Read);
 			}
-			virtual void VisitMemberExpression(MemberExpressionSyntaxNode * expr)
+			virtual void VisitMemberExpression(MemberExpressionSyntaxNode * expr) override
 			{
 				RefPtr<Object> refObj;
 				if (expr->Tags.TryGetValue(L"ComponentReference", refObj))
@@ -1541,7 +1540,7 @@ namespace Spire
 						throw NotImplementedException(L"member expression codegen");
 				}
 			}
-			virtual void VisitInvokeExpression(InvokeExpressionSyntaxNode* expr)
+			virtual void VisitInvokeExpression(InvokeExpressionSyntaxNode* expr) override
 			{
 				List<ILOperand*> args;
 				if (currentWorld)
@@ -1559,7 +1558,7 @@ namespace Spire
 				codeWriter.Insert(instr);
 				PushStack(instr);
 			}
-			virtual void VisitTypeCastExpression(TypeCastExpressionSyntaxNode * expr)
+			virtual void VisitTypeCastExpression(TypeCastExpressionSyntaxNode * expr) override
 			{
 				expr->Expression->Accept(this);
 				auto base = PopStack();
@@ -1587,7 +1586,7 @@ namespace Spire
 						expr->Type.ToString() + L"\"", expr);
 				}
 			}
-			virtual void VisitUnaryExpression(UnaryExpressionSyntaxNode* expr)
+			virtual void VisitUnaryExpression(UnaryExpressionSyntaxNode* expr) override
 			{
 				if (expr->Operator == Operator::PostDec || expr->Operator == Operator::PostInc
 					|| expr->Operator == Operator::PreDec || expr->Operator == Operator::PreInc)
@@ -1698,7 +1697,7 @@ namespace Spire
 				}
 				return true;
 			}
-			virtual void VisitVarExpression(VarExpressionSyntaxNode* expr)
+			virtual void VisitVarExpression(VarExpressionSyntaxNode* expr) override
 			{
 				RefPtr<Object> refObj;
 				if (expr->Tags.TryGetValue(L"ComponentReference", refObj))
@@ -1717,23 +1716,23 @@ namespace Spire
 						throw InvalidProgramException(L"identifier is neither a variable nor a regnoized component.");
 				}
 			}
-			virtual void VisitParameter(ParameterSyntaxNode*){}
-			virtual void VisitType(TypeSyntaxNode*){}
-			virtual void VisitDeclrVariable(Variable*){}
+			virtual void VisitParameter(ParameterSyntaxNode*) override {}
+			virtual void VisitType(TypeSyntaxNode*) override {}
+			virtual void VisitDeclrVariable(Variable*) override {}
 		private:
 			CodeGenerator & operator = (const CodeGenerator & other) = delete;
 		public:
-			CodeGenerator(ShaderCompiler * compiler, SymbolTable * symbols, ErrorWriter * pErr, CompileResult & _result)
-				: ICodeGenerator(pErr), compiler(compiler), symTable(symbols), result(_result)
+			CodeGenerator(SymbolTable * symbols, ErrorWriter * pErr, CompileResult & _result)
+				: ICodeGenerator(pErr), symTable(symbols), result(_result)
 			{
 				result.Program = new CompiledProgram();
 				codeWriter.SetConstantPool(result.Program->ConstantPool.Ptr());
 			}
 		};
 
-		ICodeGenerator * CreateCodeGenerator(ShaderCompiler * compiler, SymbolTable * symbols, CompileResult & result)
+		ICodeGenerator * CreateCodeGenerator(SymbolTable * symbols, CompileResult & result)
 		{
-			return new CodeGenerator(compiler, symbols, result.GetErrorWriter(), result);
+			return new CodeGenerator(symbols, result.GetErrorWriter(), result);
 		}
 	}
 }
@@ -2343,7 +2342,7 @@ namespace Spire
 			{
 				PrintDef(sbCode, arrType->BaseType.Ptr(), name + L"[" + arrType->ArrayLength + L"]");
 			}
-			else if (auto baseType = dynamic_cast<ILBasicType*>(type))
+			else if (dynamic_cast<ILBasicType*>(type))
 			{
 				PrintBaseType(sbCode, type);
 				sbCode << L" ";
@@ -2374,7 +2373,10 @@ namespace Spire
 				nameBuilder << prefix;
 				for (int i = startPos; i < name.Length(); i++)
 				{
-					if (name[i] >= L'a' && name[i] <= L'z' || name[i] >= L'A' && name[i] <= L'Z' || name[i] == L'_' || name[i] >= L'0' && name[i] <= L'9')
+					if ((name[i] >= L'a' && name[i] <= L'z') || 
+						(name[i] >= L'A' && name[i] <= L'Z') ||
+						name[i] == L'_' || 
+						(name[i] >= L'0' && name[i] <= L'9'))
 					{
 						nameBuilder << name[i];
 					}
@@ -2436,7 +2438,8 @@ namespace Spire
 				StringBuilder rs;
 				for (int i = 0; i < name.Length(); i++)
 				{
-					if (name[i] >= L'a' && name[i] <= L'z' || name[i] >= L'A' && name[i] <= L'Z' || name[i] == L'_' || name[i] >= L'0' && name[i] <= L'9')
+					if ((name[i] >= L'a' && name[i] <= L'z') || (name[i] >= L'A' && name[i] <= L'Z') || 
+						name[i] == L'_' || (name[i] >= L'0' && name[i] <= L'9'))
 					{
 						rs << name[i];
 					}
@@ -2557,7 +2560,7 @@ namespace Spire
 				{
 					throw InvalidOperationException(L"store instruction cannot appear as expression.");
 				}
-				if (auto load = instr->As<MemberLoadInstruction>())
+				if (instr->Is<MemberLoadInstruction>())
 				{
 					PrintOp(ctx, op0);
 					bool printDefault = true;
@@ -2694,7 +2697,7 @@ namespace Spire
 					return;
 				}
 				auto varName = ctx.DefineVariable(instr);
-				if (auto load = instr->As<MemberLoadInstruction>())
+				if (instr->Is<MemberLoadInstruction>())
 				{
 					ctx.Body << varName << L" = ";
 					PrintBinaryInstrExpr(ctx, instr);
@@ -2760,7 +2763,7 @@ namespace Spire
 
 			void PrintAllocVarInstr(CodeGenContext & ctx, AllocVarInstruction * instr)
 			{
-				if (auto size = dynamic_cast<ILConstOperand*>(instr->Size.Ptr()))
+				if (dynamic_cast<ILConstOperand*>(instr->Size.Ptr()))
 				{
 					PrintDef(ctx.Header, instr->Type.Ptr(), instr->Name);
 					ctx.Header << L";\n";
@@ -2870,7 +2873,7 @@ namespace Spire
 						if (&instr == update->Operands[0].Ptr())
 							return false;
 					}
-					else if (auto import = dynamic_cast<ImportInstruction*>(usr))
+					else if (dynamic_cast<ImportInstruction*>(usr))
 						return false;
 				}
 				if (instr.Is<StoreInstruction>() && force)
@@ -2948,7 +2951,7 @@ namespace Spire
 					PrintCastF2IInstrExpr(ctx, castf2i);
 				else if (auto casti2f = instr.As<Int2FloatInstruction>())
 					PrintCastI2FInstrExpr(ctx, casti2f);
-				else if (auto update = instr.As<MemberUpdateInstruction>())
+				else if (instr.As<MemberUpdateInstruction>())
 					throw InvalidOperationException(L"member update instruction cannot appear as expression.");
 			}
 
@@ -3015,9 +3018,9 @@ namespace Spire
 					else if (auto doInstr = instr.As<DoInstruction>())
 					{
 						context.Body << L"do\n{\n";
-						GenerateCode(context, forInstr->BodyCode.Ptr());
+						GenerateCode(context, doInstr->BodyCode.Ptr());
 						context.Body << L"} while (bool(";
-						PrintOp(context, forInstr->ConditionCode->GetLastInstruction()->As<ReturnInstruction>()->Operand.Ptr(), true);
+						PrintOp(context, doInstr->ConditionCode->GetLastInstruction()->As<ReturnInstruction>()->Operand.Ptr(), true);
 						context.Body << L"));\n";
 					}
 					else if (auto whileInstr = instr.As<WhileInstruction>())
@@ -3034,11 +3037,11 @@ namespace Spire
 						PrintOp(context, ret->Operand.Ptr());
 						context.Body << L";\n";
 					}
-					else if (auto brk = instr.As<BreakInstruction>())
+					else if (instr.Is<BreakInstruction>())
 					{
 						context.Body << L"break;\n";
 					}
-					else if (auto ctn = instr.As<ContinueInstruction>())
+					else if (instr.Is<ContinueInstruction>())
 					{
 						context.Body << L"continue;\n";
 					}
@@ -3198,7 +3201,7 @@ namespace Spire
 				return sbCode.ProduceString();
 			}
 			EnumerableDictionary<String, String> backendArguments;
-			virtual void SetParameters(EnumerableDictionary<String, String> & args)
+			virtual void SetParameters(EnumerableDictionary<String, String> & args) override
 			{
 				backendArguments = args;
 				if (!args.TryGetValue(L"vertex", vertexOutputName))
@@ -3844,8 +3847,8 @@ namespace Spire
 
 		bool IsLetter(wchar_t ch)
 		{
-			return (ch >= L'a' && ch <= L'z'||
-				ch >= L'A' && ch <= L'Z' || ch == L'_' || ch == L'#');
+			return ((ch >= L'a' && ch <= L'z') ||
+				(ch >= L'A' && ch <= L'Z') || ch == L'_' || ch == L'#');
 		}
 
 		bool IsDigit(wchar_t ch)
@@ -4239,7 +4242,7 @@ namespace Spire
 					}
 					break;
 				case State::Operator:
-					if (IsPunctuation(curChar) && !(curChar == L'/' && nextChar == L'/' || curChar == L'/' && nextChar == L'*'))
+					if (IsPunctuation(curChar) && !((curChar == L'/' && nextChar == L'/') || (curChar == L'/' && nextChar == L'*')))
 					{
 						tokenBuilder.Append(curChar);
 						pos++;
@@ -4698,7 +4701,7 @@ namespace Spire
 						LookAheadToken(L"out") || LookAheadToken(L"@") || IsTypeKeyword()
 						|| LookAheadToken(L"[") || LookAheadToken(L"require"))
 						shader->Members.Add(ParseComponent());
-					else if (LookAheadToken(L"using") || LookAheadToken(L"public") && LookAheadToken(L"using", 1))
+					else if (LookAheadToken(L"using") || (LookAheadToken(L"public") && LookAheadToken(L"using", 1)))
 					{
 						shader->Members.Add(ParseImport());
 					}
@@ -5071,7 +5074,7 @@ namespace Spire
 				statement = ParseContinueStatement();
 			else if (LookAheadToken(TokenType::KeywordReturn))
 				statement = ParseReturnStatement();
-			else if (LookAheadToken(TokenType::Identifier) && LookAheadToken(TokenType::Identifier, 1) || LookAheadToken(L"using"))
+			else if ((LookAheadToken(TokenType::Identifier) && LookAheadToken(TokenType::Identifier, 1)) || LookAheadToken(L"using"))
 				statement = ParseImportStatement();
 			else if (LookAheadToken(TokenType::Identifier))
 				statement = ParseExpressionStatement();
@@ -5858,7 +5861,7 @@ namespace Spire
 			SymbolTable * symbolTable;
 		public:
 			SemanticsVisitor(SymbolTable * symbols, ErrorWriter * pErr)
-				:symbolTable(symbols), SyntaxVisitor(pErr)
+				:SyntaxVisitor(pErr), symbolTable(symbols)
 			{
 			}
 			// return true if world0 depends on world1 (there exists a series of import operators that converts world1 variables to world0)
@@ -5905,8 +5908,8 @@ namespace Spire
 				}
 				for (auto comp : pipeline->AbstractComponents)
 				{
-					if (comp->IsParam || comp->Rate && comp->Rate->Worlds.Count() == 1
-						&& psymbol->IsAbstractWorld(comp->Rate->Worlds.First().World.Content))
+					if (comp->IsParam || (comp->Rate && comp->Rate->Worlds.Count() == 1
+						&& psymbol->IsAbstractWorld(comp->Rate->Worlds.First().World.Content)))
 						AddNewComponentSymbol(psymbol->Components, comp);
 					else
 						Error(33003, L"cannot define components in a pipeline.",
@@ -6067,10 +6070,9 @@ namespace Spire
 				SymbolTable * symbolTable = nullptr;
 				ShaderSymbol * currentShader = nullptr;
 				ShaderComponentSymbol * currentComp = nullptr;
-				SemanticsVisitor * typeChecker = nullptr;
 			public:
-				ShaderImportVisitor(ErrorWriter * writer, SymbolTable * symTable, SemanticsVisitor * pTypeChecker)
-					: SyntaxVisitor(writer), symbolTable(symTable), typeChecker(pTypeChecker)
+				ShaderImportVisitor(ErrorWriter * writer, SymbolTable * symTable)
+					: SyntaxVisitor(writer), symbolTable(symTable)
 				{}
 				virtual void VisitShader(ShaderSyntaxNode * shader) override
 				{
@@ -6169,7 +6171,7 @@ namespace Spire
 					}
 				}
 				// add shader objects to symbol table
-				ShaderImportVisitor importVisitor(err, symbolTable, this);
+				ShaderImportVisitor importVisitor(err, symbolTable);
 				shader->Accept(&importVisitor);
 
 				for (auto & comp : shaderSymbol->Components)
@@ -6294,7 +6296,7 @@ namespace Spire
 				}
 				compSym->Implementations.Add(compImpl);
 			}
-			virtual void VisitProgram(ProgramSyntaxNode * programNode)
+			virtual void VisitProgram(ProgramSyntaxNode * programNode) override
 			{
 				HashSet<String> funcNames;
 				this->program = programNode;
@@ -6449,7 +6451,7 @@ namespace Spire
 
 				loops.RemoveAt(loops.Count() - 1);
 			}
-			virtual void VisitEmptyStatement(EmptyStatementSyntaxNode *){}
+			virtual void VisitEmptyStatement(EmptyStatementSyntaxNode *) override {}
 			virtual void VisitForStatement(ForStatementSyntaxNode *stmt) override
 			{
 				loops.Add(stmt);
@@ -6563,7 +6565,7 @@ namespace Spire
 					}
 				}
 			}
-			virtual void VisitWhileStatement(WhileStatementSyntaxNode *stmt)
+			virtual void VisitWhileStatement(WhileStatementSyntaxNode *stmt) override
 			{
 				loops.Add(stmt);
 				stmt->Predicate->Accept(this);
@@ -6573,11 +6575,11 @@ namespace Spire
 				stmt->Statement->Accept(this);
 				loops.RemoveAt(loops.Count() - 1);
 			}
-			virtual void VisitExpressionStatement(ExpressionStatementSyntaxNode *stmt)
+			virtual void VisitExpressionStatement(ExpressionStatementSyntaxNode *stmt) override
 			{
 				stmt->Expression->Accept(this);
 			}
-			virtual void VisitBinaryExpression(BinaryExpressionSyntaxNode *expr)
+			virtual void VisitBinaryExpression(BinaryExpressionSyntaxNode *expr) override
 			{
 				expr->LeftExpression->Accept(this);
 				expr->RightExpression->Accept(this);
@@ -6602,11 +6604,11 @@ namespace Spire
 					{
 						if (leftType == rightType && !leftType.IsTextureType())
 							expr->Type = leftType;
-						else if (leftType.BaseType == BaseType::Float3x3 && rightType == ExpressionType::Float3 ||
-							leftType.BaseType == BaseType::Float3 && rightType.BaseType == BaseType::Float3x3)
+						else if ((leftType.BaseType == BaseType::Float3x3 && rightType == ExpressionType::Float3) ||
+							(leftType.BaseType == BaseType::Float3 && rightType.BaseType == BaseType::Float3x3))
 							expr->Type = ExpressionType::Float3;
-						else if (leftType.BaseType == BaseType::Float4x4 && rightType == ExpressionType::Float4 ||
-							leftType.BaseType == BaseType::Float4 && rightType.BaseType == BaseType::Float4x4)
+						else if ((leftType.BaseType == BaseType::Float4x4 && rightType == ExpressionType::Float4) ||
+							(leftType.BaseType == BaseType::Float4 && rightType.BaseType == BaseType::Float4x4))
 							expr->Type = ExpressionType::Float4;
 						else if (leftType.IsVectorType() && rightType == GetVectorBaseType(leftType.BaseType))
 							expr->Type = leftType;
@@ -6674,7 +6676,7 @@ namespace Spire
 					leftType != ExpressionType::Error && rightType != ExpressionType::Error)
 					Error(30012, L"no overload found for operator " + OperatorToString(expr->Operator)  + L" (" + leftType.ToString() + L", " + rightType.ToString() + L").", expr);
 			}
-			virtual void VisitConstantExpression(ConstantExpressionSyntaxNode *expr)
+			virtual void VisitConstantExpression(ConstantExpressionSyntaxNode *expr) override
 			{
 				switch (expr->ConstType)
 				{
@@ -6690,7 +6692,7 @@ namespace Spire
 					break;
 				}
 			}
-			virtual void VisitIndexExpression(IndexExpressionSyntaxNode *expr)
+			virtual void VisitIndexExpression(IndexExpressionSyntaxNode *expr) override
 			{
 				expr->BaseExpression->Accept(this);
 				expr->IndexExpression->Accept(this);
@@ -6724,7 +6726,7 @@ namespace Spire
 				expr->Type.IsLeftValue = true;
 				expr->Type.IsReference = true;
 			}
-			bool MatchArguments(FunctionSyntaxNode * functionNode, List < RefPtr < ExpressionSyntaxNode >> &args)
+			bool MatchArguments(FunctionSyntaxNode * functionNode, List <RefPtr<ExpressionSyntaxNode>> &args)
 			{
 				if (functionNode->Parameters.Count() != args.Count())
 					return false;
@@ -6735,7 +6737,7 @@ namespace Spire
 				}
 				return true;
 			}
-			virtual void VisitInvokeExpression(InvokeExpressionSyntaxNode *expr)
+			virtual void VisitInvokeExpression(InvokeExpressionSyntaxNode *expr) override
 			{
 				StringBuilder internalName;
 				StringBuilder argList;
@@ -6873,7 +6875,7 @@ namespace Spire
 					return L"ERROR";
 				}
 			}
-			virtual void VisitUnaryExpression(UnaryExpressionSyntaxNode *expr)
+			virtual void VisitUnaryExpression(UnaryExpressionSyntaxNode *expr) override
 			{
 				expr->Expression->Accept(this);
 				
@@ -6914,7 +6916,7 @@ namespace Spire
 				if(expr->Type == ExpressionType::Error && expr->Expression->Type != ExpressionType::Error)
 					Error(30020, L"operator " + OperatorToString(expr->Operator) + L" can not be applied to " + expr->Expression->Type.ToString(), expr);
 			}
-			virtual void VisitVarExpression(VarExpressionSyntaxNode *expr)
+			virtual void VisitVarExpression(VarExpressionSyntaxNode *expr) override
 			{
 				VariableEntry variable;
 				ShaderUsing shaderObj;
@@ -6959,8 +6961,9 @@ namespace Spire
 				{
 					if (expr->Expression->Type.IsArray)
 						expr->Type = ExpressionType::Error;
-					else if (GetVectorBaseType(expr->Expression->Type.BaseType) != BaseType::Int && GetVectorBaseType(expr->Expression->Type.BaseType) != BaseType::Float ||
-						GetVectorBaseType(targetType.BaseType) != BaseType::Int && GetVectorBaseType(targetType.BaseType) != BaseType::Float)
+					else if ((GetVectorBaseType(expr->Expression->Type.BaseType) != BaseType::Int && GetVectorBaseType(expr->Expression->Type.BaseType) != BaseType::Float)
+						||
+						(GetVectorBaseType(targetType.BaseType) != BaseType::Int && GetVectorBaseType(targetType.BaseType) != BaseType::Float))
 						expr->Type = ExpressionType::Error;
 					else if (targetType.BaseType == BaseType::Void || expr->Expression->Type.BaseType == BaseType::Void)
 						expr->Type = ExpressionType::Error;
@@ -7091,9 +7094,9 @@ namespace Spire
 						expr->MemberName + L"\".", expr);
 				}
 			}
-			virtual void VisitParameter(ParameterSyntaxNode *){}
-			virtual void VisitType(TypeSyntaxNode *){}
-			virtual void VisitDeclrVariable(Variable *){}
+			virtual void VisitParameter(ParameterSyntaxNode *) override {}
+			virtual void VisitType(TypeSyntaxNode *) override {}
+			virtual void VisitDeclrVariable(Variable *) override {}
 			SemanticsVisitor & operator = (const SemanticsVisitor &) = delete;
 		};
 
@@ -7371,7 +7374,7 @@ namespace Spire
 						if (result.ErrorList.Count() > 0)
 							return;
 						// generate IL code
-						RefPtr<ICodeGenerator> codeGen = CreateCodeGenerator(this, &symTable, result);
+						RefPtr<ICodeGenerator> codeGen = CreateCodeGenerator(&symTable, result);
 						for (auto & func : programSyntaxNode->Functions)
 							codeGen->ProcessFunction(func.Ptr());
 						for (auto & shader : shaderClosures)
@@ -7396,7 +7399,7 @@ namespace Spire
 						};
 						for (auto & shader : result.Program->Shaders)
 						{
-							if (options.SymbolToCompile.Length() == 0 && IsSymbolToGen(shader->MetaData.ShaderName)
+							if ((options.SymbolToCompile.Length() == 0 && IsSymbolToGen(shader->MetaData.ShaderName))
 								|| options.SymbolToCompile == shader->MetaData.ShaderName)
 							{
 								StringBuilder glslBuilder;
@@ -7969,8 +7972,8 @@ namespace Spire
 					MarkUsing(ref.Content, w->Name.Content);
 			for (auto & comp : Definitions)
 				if (comp->Implementation->ExportWorlds.Contains(comp->World) ||
-					Shader->Pipeline->IsAbstractWorld(comp->World) &&
-					(comp->Implementation->SyntaxNode->LayoutAttributes.ContainsKey(L"Pinned") || Shader->Pipeline->Worlds[comp->World]().SyntaxNode->LayoutAttributes.ContainsKey(L"Pinned")))
+					(Shader->Pipeline->IsAbstractWorld(comp->World) &&
+					(comp->Implementation->SyntaxNode->LayoutAttributes.ContainsKey(L"Pinned") || Shader->Pipeline->Worlds[comp->World]().SyntaxNode->LayoutAttributes.ContainsKey(L"Pinned"))))
 				{
 					comp->IsEntryPoint = true;
 				}
@@ -8063,7 +8066,7 @@ namespace Spire
 									isPinned = true;
 									break;
 								}
-							if (pass == 0 && !isPinned || pass == 1 && isPinned) continue;
+							if ((pass == 0 && !isPinned) || (pass == 1 && isPinned)) continue;
 							ComponentDefinitionIR * depDef;
 							if (depDefs.TryGetValue(depWorld, depDef))
 							{
@@ -9495,18 +9498,6 @@ namespace SpireLib
 				parser.Read(L"{");
 				while (!parser.LookAhead(L"}"))
 				{
-					auto readAttribs = [&](InterfaceMetaData & comp)
-					{
-						parser.Read(L"{");
-						while (!parser.LookAhead(L"}"))
-						{
-							auto name = parser.ReadWord();
-							parser.Read(L":");
-							auto value = parser.ReadStringLiteral();
-							comp.Attributes[name] = parser.UnescapeStringLiteral(value);
-						}
-						parser.Read(L"}");
-					};
 					auto subFieldName = parser.ReadWord();
 					if (subFieldName == L"target")
 						world.TargetName = parser.ReadWord();

@@ -267,7 +267,7 @@ namespace Spire
 			{
 				Name = L"<undef>";
 			}
-			virtual String ToString()
+			virtual String ToString() override
 			{
 				return L"<undef>";
 			}
@@ -596,11 +596,11 @@ namespace Spire
 		{
 		public:
 			List<UseReference> Candidates;
-			virtual OperandIterator begin()
+			virtual OperandIterator begin() override
 			{
 				return Candidates.begin();
 			}
-			virtual OperandIterator end()
+			virtual OperandIterator end() override
 			{
 				return Candidates.end();
 			}
@@ -642,7 +642,7 @@ namespace Spire
 				}
 
 			}
-			virtual SwitchInstruction * Clone()
+			virtual SwitchInstruction * Clone() override
 			{
 				return new SwitchInstruction(*this);
 			}
@@ -687,11 +687,11 @@ namespace Spire
 			CompiledWorld * SourceWorld;
 
 			List<UseReference> Arguments;
-			virtual OperandIterator begin()
+			virtual OperandIterator begin() override
 			{
 				return Arguments.begin();
 			}
-			virtual OperandIterator end()
+			virtual OperandIterator end() override
 			{
 				return Arguments.end();
 			}
@@ -751,7 +751,7 @@ namespace Spire
 				this->Size = count;
 			}
 			AllocVarInstruction(const AllocVarInstruction & other)
-				:Size(this), LeaInstruction(other)
+				:LeaInstruction(other), Size(this)
 			{
 				Size = other.Size.Ptr();
 			}
@@ -1092,7 +1092,7 @@ namespace Spire
 				}
 				return sb.ProduceString();
 			}
-			virtual PhiInstruction * Clone()
+			virtual PhiInstruction * Clone() override
 			{
 				return new PhiInstruction(*this);
 			}
@@ -1111,11 +1111,11 @@ namespace Spire
 			{
 				Operand = other.Operand.Ptr();
 			}
-			virtual OperandIterator begin()
+			virtual OperandIterator begin() override
 			{
 				return &Operand;
 			}
-			virtual OperandIterator end()
+			virtual OperandIterator end() override
 			{
 				return &Operand + 1;
 			}
@@ -1178,11 +1178,11 @@ namespace Spire
 				Operands[0] = other.Operands[0].Ptr();
 				Operands[1] = other.Operands[1].Ptr();
 			}
-			virtual OperandIterator begin()
+			virtual OperandIterator begin() override
 			{
 				return Operands.begin();
 			}
-			virtual OperandIterator end()
+			virtual OperandIterator end() override
 			{
 				return Operands.end();
 			}
@@ -1218,11 +1218,11 @@ namespace Spire
 				Operands[2] = val1;
 				Type = val0->Type->Clone();
 			}
-			virtual OperandIterator begin()
+			virtual OperandIterator begin() override
 			{
 				return Operands;
 			}
-			virtual OperandIterator end()
+			virtual OperandIterator end() override
 			{
 				return Operands + 3;
 			}
@@ -1247,11 +1247,11 @@ namespace Spire
 		public:
 			String Function;
 			List<UseReference> Arguments;
-			virtual OperandIterator begin()
+			virtual OperandIterator begin() override
 			{
 				return Arguments.begin();
 			}
-			virtual OperandIterator end()
+			virtual OperandIterator end() override
 			{
 				return Arguments.end();
 			}
@@ -1295,7 +1295,7 @@ namespace Spire
 				}
 
 			}
-			virtual CallInstruction * Clone()
+			virtual CallInstruction * Clone() override
 			{
 				return new CallInstruction(*this);
 			}
@@ -1313,7 +1313,7 @@ namespace Spire
 			{
 				return L"not";
 			}
-			virtual NotInstruction * Clone()
+			virtual NotInstruction * Clone() override
 			{
 				return new NotInstruction(*this);
 			}
@@ -1339,7 +1339,7 @@ namespace Spire
 			{
 				return L"neg";
 			}
-			virtual NegInstruction * Clone()
+			virtual NegInstruction * Clone() override
 			{
 				return new NegInstruction(*this);
 			}
@@ -1357,7 +1357,7 @@ namespace Spire
 			{
 				return L"bnot";
 			}
-			virtual BitNotInstruction * Clone()
+			virtual BitNotInstruction * Clone() override
 			{
 				return new BitNotInstruction(*this);
 			}
@@ -1391,7 +1391,7 @@ namespace Spire
 			{
 				return L"add";
 			}
-			virtual AddInstruction * Clone()
+			virtual AddInstruction * Clone() override
 			{
 				return new AddInstruction(*this);
 			}
@@ -1444,7 +1444,7 @@ namespace Spire
 			{
 				return L"retrieve";
 			}
-			virtual MemberLoadInstruction * Clone()
+			virtual MemberLoadInstruction * Clone() override
 			{
 				return new MemberLoadInstruction(*this);
 			}
@@ -1462,7 +1462,7 @@ namespace Spire
 			{
 				return L"sub";
 			}
-			virtual SubInstruction * Clone()
+			virtual SubInstruction * Clone() override
 			{
 				return new SubInstruction(*this);
 			}
@@ -1489,7 +1489,7 @@ namespace Spire
 			{
 				return L"mul";
 			}
-			virtual MulInstruction * Clone()
+			virtual MulInstruction * Clone() override
 			{
 				return new MulInstruction(*this);
 			}
@@ -1507,7 +1507,7 @@ namespace Spire
 			{
 				return L"div";
 			}
-			virtual DivInstruction * Clone()
+			virtual DivInstruction * Clone() override
 			{
 				return new DivInstruction(*this);
 			}
@@ -1524,7 +1524,7 @@ namespace Spire
 			{
 				return L"mod";
 			}
-			virtual ModInstruction * Clone()
+			virtual ModInstruction * Clone() override
 			{
 				return new ModInstruction(*this);
 			}
@@ -1888,7 +1888,7 @@ namespace Spire
 			{
 				return Name + L" = load " + Operand.ToString();
 			}
-			virtual bool IsDeterministic()
+			virtual bool IsDeterministic() override
 			{
 				return Deterministic;
 			}
@@ -1969,11 +1969,11 @@ namespace Spire
 				Operands[2] = value;
 				Type = var->Type->Clone();
 			}
-			virtual OperandIterator begin()
+			virtual OperandIterator begin() override
 			{
 				return Operands;
 			}
-			virtual OperandIterator end()
+			virtual OperandIterator end() override
 			{
 				return Operands + 3;
 			}
@@ -1985,7 +1985,7 @@ namespace Spire
 			{
 				return L"update";
 			}
-			virtual MemberUpdateInstruction * Clone()
+			virtual MemberUpdateInstruction * Clone() override
 			{
 				return new MemberUpdateInstruction(*this);
 			}

@@ -272,7 +272,7 @@ namespace Spire
 						if (result.ErrorList.Count() > 0)
 							return;
 						// generate IL code
-						RefPtr<ICodeGenerator> codeGen = CreateCodeGenerator(this, &symTable, result);
+						RefPtr<ICodeGenerator> codeGen = CreateCodeGenerator(&symTable, result);
 						for (auto & func : programSyntaxNode->Functions)
 							codeGen->ProcessFunction(func.Ptr());
 						for (auto & shader : shaderClosures)
@@ -297,7 +297,7 @@ namespace Spire
 						};
 						for (auto & shader : result.Program->Shaders)
 						{
-							if (options.SymbolToCompile.Length() == 0 && IsSymbolToGen(shader->MetaData.ShaderName)
+							if ((options.SymbolToCompile.Length() == 0 && IsSymbolToGen(shader->MetaData.ShaderName))
 								|| options.SymbolToCompile == shader->MetaData.ShaderName)
 							{
 								StringBuilder glslBuilder;

@@ -174,7 +174,7 @@ namespace CoreLib
 
 			static inline unsigned int Log2Ceil(register unsigned int x)
 			{
-				register int y = (x & (x - 1));
+				int y = (x & (x - 1));
 				y |= -y;
 				y >>= (32 - 1);
 				x |= (x >> 1);
@@ -3403,12 +3403,12 @@ namespace CoreLib
 				hashMap = 0;
 			}
 			Dictionary(const Dictionary<TKey, TValue> & other)
-				: hashMap(0), _count(0), bucketSizeMinusOne(-1)
+				: bucketSizeMinusOne(-1), _count(0), hashMap(0)
 			{
 				*this = other;
 			}
 			Dictionary(Dictionary<TKey, TValue> && other)
-				: hashMap(0), _count(0), bucketSizeMinusOne(-1)
+				: bucketSizeMinusOne(-1), _count(0), hashMap(0)
 			{
 				*this = (_Move(other));
 			}
@@ -3770,12 +3770,12 @@ namespace CoreLib
 				hashMap = 0;
 			}
 			EnumerableDictionary(const EnumerableDictionary<TKey, TValue> & other)
-				: hashMap(0), _count(0), bucketSizeMinusOne(-1)
+				: bucketSizeMinusOne(-1), _count(0), hashMap(0)
 			{
 				*this = other;
 			}
 			EnumerableDictionary(EnumerableDictionary<TKey, TValue> && other)
-				: hashMap(0), _count(0), bucketSizeMinusOne(-1)
+				: bucketSizeMinusOne(-1), _count(0), hashMap(0)
 			{
 				*this = (_Move(other));
 			}
@@ -3948,6 +3948,7 @@ namespace CoreLib
 			{
 				return false;
 			}
+			virtual ~FuncPtr() {}
 		};
 
 		template<typename TResult, typename... Arguments>
@@ -3988,7 +3989,7 @@ namespace CoreLib
 			Class * object;
 		public:
 			MemberFuncPtr(Class * obj, FuncType func)
-				:object(obj), funcPtr(func)
+				: funcPtr(func), object(obj)
 			{
 			}
 
@@ -5059,7 +5060,7 @@ namespace CoreLib
 			String InputText;
 			LazyLexStream() = default;
 			LazyLexStream(String text, const RefPtr<DFA_Table> & dfa, List<bool> *ignoreSet)
-				: InputText(text), dfa(dfa), ignoreSet(ignoreSet)
+				: dfa(dfa), ignoreSet(ignoreSet), InputText(text)
 			{}
 			inline DFA_Table * GetDFA()
 			{
@@ -5802,7 +5803,7 @@ namespace CoreLib
 						codePoint += (get(i) & 0b111111);
 					}
 #ifdef _WIN32
-					if (codePoint <= 0xD7FF || codePoint >= 0xE000 && codePoint <= 0xFFFF)
+					if (codePoint <= 0xD7FF || (codePoint >= 0xE000 && codePoint <= 0xFFFF))
 						return (wchar_t)codePoint;
 					else
 					{
@@ -6050,17 +6051,356 @@ namespace CoreLib
 #endif
 
 /***********************************************************************
+LIBIO.H
+***********************************************************************/
+#ifndef CORE_LIB_IO_H
+#define CORE_LIB_IO_H
+
+
+namespace CoreLib
+{
+	namespace IO
+	{
+		class File
+		{
+		public:
+			static bool Exists(const CoreLib::Basic::String & fileName);
+			static CoreLib::Basic::String ReadAllText(const CoreLib::Basic::String & fileName);
+			static void WriteAllText(const CoreLib::Basic::String & fileName, const CoreLib::Basic::String & text);
+		};
+
+		class Path
+		{
+		public:
+#ifdef _WIN32
+			static const wchar_t PathDelimiter = L'\\';
+#else
+			static const wchar_t PathDelimiter = L'/';
+#endif
+			static String TruncateExt(const String & path);
+			static String ReplaceExt(const String & path, const wchar_t * newExt);
+			static String GetFileName(const String & path);
+			static String GetFileNameWithoutEXT(const String & path);
+			static String GetFileExt(const String & path);
+			static String GetDirectoryName(const String & path);
+			static String Combine(const String & path1, const String & path2);
+			static String Combine(const String & path1, const String & path2, const String & path3);
+#ifdef CreateDirectory
+#undef CreateDirectory
+#endif
+			static bool CreateDirectory(const String & path);
+		};
+
+		class CommandLineWriter : public Object
+		{
+		public:
+			virtual void Write(const String & text) = 0;
+		};
+
+		void SetCommandLineWriter(CommandLineWriter * writer);
+
+		extern CommandLineWriter * currentCommandWriter;
+		template<typename ...Args>
+		void uiprintf(const wchar_t * format, Args... args)
+		{
+			if (currentCommandWriter)
+			{
+				wchar_t buffer[1024];
+				swprintf_s(buffer, format, args...);
+				currentCommandWriter->Write(buffer);
+			}
+		}
+	}
+}
+
+#endif
+
+/***********************************************************************
+MD5.H
+***********************************************************************/
+/*
+* This is an OpenSSL-compatible implementation of the RSA Data Security, Inc.
+* MD5 Message-Digest Algorithm (RFC 1321).
+*
+* Homepage:
+* http://openwall.info/wiki/people/solar/software/public-domain-source-code/md5
+*
+* Author:
+* Alexander Peslyak, better known as Solar Designer <solar at openwall.com>
+*
+* This software was written by Alexander Peslyak in 2001.  No copyright is
+* claimed, and the software is hereby placed in the public domain.
+* In case this attempt to disclaim copyright and place the software in the
+* public domain is deemed null and void, then the software is
+* Copyright (c) 2001 Alexander Peslyak and it is hereby released to the
+* general public under the following terms:
+*
+* Redistribution and use in source and binary forms, with or without
+* modification, are permitted.
+*
+* There's ABSOLUTELY NO WARRANTY, express or implied.
+*
+* See md5.c for more information.
+*/
+
+#ifdef HAVE_OPENSSL
+#include <openssl/md5.h>
+#elif !defined(_MD5_H)
+#define _MD5_H
+
+/* Any 32-bit or wider unsigned integer data type will do */
+typedef unsigned int MD5_u32plus;
+
+typedef struct {
+	MD5_u32plus lo, hi;
+	MD5_u32plus a, b, c, d;
+	unsigned char buffer[64];
+	MD5_u32plus block[16];
+} MD5_CTX;
+
+extern void MD5_Init(MD5_CTX *ctx);
+extern void MD5_Update(MD5_CTX *ctx, const void *data, unsigned long size);
+extern void MD5_Final(unsigned char *result, MD5_CTX *ctx);
+
+#endif
+
+/***********************************************************************
+MEMORYPOOL.H
+***********************************************************************/
+#ifndef CORE_LIB_MEMORY_POOL_H
+#define CORE_LIB_MEMORY_POOL_H
+
+
+namespace CoreLib
+{
+	namespace Basic
+	{
+		struct MemoryBlockFields
+		{
+			unsigned int Occupied : 1;
+			unsigned int Order : 31;
+		};
+		struct FreeListNode
+		{
+			FreeListNode * PrevPtr = nullptr, *NextPtr = nullptr;
+		};
+		class MemoryPool
+		{
+		private:
+			static const int MaxLevels = 32;
+			int blockSize = 0, log2BlockSize = 0;
+			int numLevels = 0;
+			int bytesAllocated = 0;
+			int bytesWasted = 0;
+			unsigned char * buffer = nullptr;
+			FreeListNode * freeList[MaxLevels];
+			IntSet used;
+			int AllocBlock(int level);
+			void FreeBlock(unsigned char * ptr, int level);
+		public:
+			MemoryPool(unsigned char * buffer, int log2BlockSize, int numBlocks);
+			MemoryPool() = default;
+			void Init(unsigned char * buffer, int log2BlockSize, int numBlocks);
+			unsigned char * Alloc(int size);
+			void Free(unsigned char * ptr, int size);
+		};
+	}
+}
+
+#endif
+
+/***********************************************************************
+PERFORMANCECOUNTER.H
+***********************************************************************/
+#ifndef CORELIB_PERFORMANCE_COUNTER_H
+#define CORELIB_PERFORMANCE_COUNTER_H
+
+#include <chrono>
+
+namespace CoreLib
+{
+	namespace Diagnostics
+	{
+		typedef std::chrono::high_resolution_clock::time_point TimePoint;
+		typedef std::chrono::high_resolution_clock::duration Duration;
+		class PerformanceCounter
+		{
+		public:
+			static TimePoint Start();
+			static Duration End(TimePoint counter);
+			static float EndSeconds(TimePoint counter);
+			static double ToSeconds(Duration duration);
+		};
+	}
+}
+
+#endif
+
+/***********************************************************************
+THREADING.H
+***********************************************************************/
+#ifndef CORE_LIB_THREADING_H
+#define CORE_LIB_THREADING_H
+#include <atomic>
+#include <thread>
+#include <mutex>
+#include <xmmintrin.h>
+
+#ifndef _WIN32
+#define __stdcall
+#endif
+
+namespace CoreLib
+{
+	namespace Threading
+	{
+		class SpinLock
+		{
+		private:
+			std::atomic_flag lck;
+		public:
+			SpinLock()
+			{
+				lck.clear();
+			}
+			inline bool TryLock()
+			{
+				return !lck.test_and_set(std::memory_order_acquire);
+			}
+			inline void Lock()
+			{
+				while (lck.test_and_set(std::memory_order_acquire))
+				{
+				}
+			}
+			inline void Unlock()
+			{
+				lck.clear(std::memory_order_release);
+			}
+			SpinLock & operator = (const SpinLock & /*other*/)
+			{
+				lck.clear();
+				return *this;
+			}
+		};
+
+		class ParallelSystemInfo
+		{
+		public:
+			static int GetProcessorCount();
+		};
+
+		typedef CoreLib::Basic::Event<> ThreadProc;
+		typedef CoreLib::Basic::Event<CoreLib::Basic::Object *> ThreadParameterizedProc;
+		class Thread;
+
+		class ThreadParam
+		{
+		public:
+			Thread * thread;
+			CoreLib::Basic::Object * threadParam;
+		};
+
+		enum class ThreadPriority
+		{
+			Normal,
+			AboveNormal,
+			Highest,
+			Critical,
+			BelowNormal,
+			Lowest,
+			Idle
+		};
+		unsigned int __stdcall ThreadProcedure(const ThreadParam& param);
+		class Thread : public CoreLib::Basic::Object
+		{
+			friend unsigned int __stdcall ThreadProcedure(const ThreadParam& param);
+		private:
+			 ThreadParam internalParam;
+		public:
+			
+		private:
+			std::thread threadHandle;
+			CoreLib::Basic::RefPtr<ThreadProc> threadProc;
+			CoreLib::Basic::RefPtr<ThreadParameterizedProc> paramedThreadProc;
+		public:
+			Thread()
+			{
+				internalParam.threadParam = nullptr;
+				internalParam.thread = this;
+			}
+			Thread(ThreadProc * p)
+				: Thread()
+			{
+				Start(p);
+			}
+			Thread(ThreadParameterizedProc * p, CoreLib::Basic::Object * param)
+				: Thread()
+			{
+				Start(p, param);
+			}
+			void Start(ThreadProc * p)
+			{
+				threadProc = p;
+				threadHandle = std::thread(ThreadProcedure, internalParam);
+			}
+			void Start(ThreadParameterizedProc * p, CoreLib::Basic::Object * param)
+			{
+				paramedThreadProc = p;
+				internalParam.thread = this;
+				internalParam.threadParam = param;
+				threadHandle = std::thread(ThreadProcedure, internalParam);
+			}
+			void Join()
+			{
+				if (threadHandle.joinable())
+					threadHandle.join();
+			}
+			void Detach()
+			{
+				if (threadHandle.joinable())
+					threadHandle.detach();
+			}
+			std::thread::id GetHandle()
+			{
+				return threadHandle.get_id();
+			}
+		};
+
+		class Mutex : public CoreLib::Basic::Object
+		{
+		private:
+			std::mutex handle;
+		public:
+			void Lock()
+			{
+				handle.lock();
+			}
+			bool TryLock()
+			{
+				return handle.try_lock();
+			}
+			void Unlock()
+			{
+				return handle.unlock();
+			}
+		};
+	}
+}
+
+#endif
+
+/***********************************************************************
 VECTORMATH.H
 ***********************************************************************/
 #ifndef VECTOR_MATH_H
 #define VECTOR_MATH_H
 #include <random>
 #include <cmath>
-#include <xmmintrin.h>
 #ifdef _M_X64
 #define NO_SIMD_ASM
 #endif
-#ifndef _MSC_VER
+#if !defined(_MSC_VER) || defined(__clang__)
 #define NO_SIMD_ASM
 #endif
 #ifndef NO_VECTOR_CONSTRUCTORS
@@ -7212,7 +7552,7 @@ namespace VectorMath
 	}
 	inline void Matrix4_M128::Multiply(Matrix4_M128 & rs, const Matrix4 & mB) const
 	{
-		register __m128 T0, T1, T2, T3, R0, R1, R2, R3;
+		__m128 T0, T1, T2, T3, R0, R1, R2, R3;
 		T0 = _mm_set_ps1(mB.values[0]);
 		T1 = _mm_set_ps1(mB.values[1]);
 		T2 = _mm_set_ps1(mB.values[2]);
@@ -7260,7 +7600,7 @@ namespace VectorMath
 	}
 	inline void Matrix4_M128::Multiply(Matrix4_M128 & rs, const Matrix4_M128 & mB) const
 	{
-		register __m128 T0, T1, T2, T3, R0, R1, R2, R3;
+		__m128 T0, T1, T2, T3, R0, R1, R2, R3;
 		T0 = _mm_shuffle_ps(mB.C1, mB.C1, _MM_SHUFFLE(0,0,0,0));
 		T1 = _mm_shuffle_ps(mB.C1, mB.C1, _MM_SHUFFLE(1,1,1,1));
 		T2 = _mm_shuffle_ps(mB.C1, mB.C1, _MM_SHUFFLE(2,2,2,2));
@@ -7350,6 +7690,7 @@ namespace VectorMath
 			(-p0 + p1 * 3.0f - p2 * 3.0f + p3) * t3) * 0.5f;
 	}
 #ifdef _MSC_VER
+#ifndef __clang__
 #ifndef M128_OPERATOR_OVERLOADS
 #define M128_OPERATOR_OVERLOADS
 	inline __m128 & operator += (__m128 & v0, const __m128 &v1)
@@ -7426,6 +7767,7 @@ namespace VectorMath
 	{
 		return _mm_xor_si128(v0, _mm_set1_epi32(0xFFFFFFFF));
 	}
+#endif
 #endif
 	_declspec(align(16))
 	class SSEVec3
@@ -7723,345 +8065,6 @@ namespace VectorMath
 			return rs;
 		}
 	};
-}
-
-#endif
-
-/***********************************************************************
-LIBIO.H
-***********************************************************************/
-#ifndef CORE_LIB_IO_H
-#define CORE_LIB_IO_H
-
-
-namespace CoreLib
-{
-	namespace IO
-	{
-		class File
-		{
-		public:
-			static bool Exists(const CoreLib::Basic::String & fileName);
-			static CoreLib::Basic::String ReadAllText(const CoreLib::Basic::String & fileName);
-			static void WriteAllText(const CoreLib::Basic::String & fileName, const CoreLib::Basic::String & text);
-		};
-
-		class Path
-		{
-		public:
-#ifdef _WIN32
-			static const wchar_t PathDelimiter = L'\\';
-#else
-			static const wchar_t PathDelimiter = L'/';
-#endif
-			static String TruncateExt(const String & path);
-			static String ReplaceExt(const String & path, const wchar_t * newExt);
-			static String GetFileName(const String & path);
-			static String GetFileNameWithoutEXT(const String & path);
-			static String GetFileExt(const String & path);
-			static String GetDirectoryName(const String & path);
-			static String Combine(const String & path1, const String & path2);
-			static String Combine(const String & path1, const String & path2, const String & path3);
-#ifdef CreateDirectory
-#undef CreateDirectory
-#endif
-			static bool CreateDirectory(const String & path);
-		};
-
-		class CommandLineWriter : public Object
-		{
-		public:
-			virtual void Write(const String & text) = 0;
-		};
-
-		void SetCommandLineWriter(CommandLineWriter * writer);
-
-		extern CommandLineWriter * currentCommandWriter;
-		template<typename ...Args>
-		void uiprintf(const wchar_t * format, Args... args)
-		{
-			if (currentCommandWriter)
-			{
-				wchar_t buffer[1024];
-				swprintf_s(buffer, format, args...);
-				currentCommandWriter->Write(buffer);
-			}
-		}
-	}
-}
-
-#endif
-
-/***********************************************************************
-PERFORMANCECOUNTER.H
-***********************************************************************/
-#ifndef CORELIB_PERFORMANCE_COUNTER_H
-#define CORELIB_PERFORMANCE_COUNTER_H
-
-#include <chrono>
-
-namespace CoreLib
-{
-	namespace Diagnostics
-	{
-		typedef std::chrono::high_resolution_clock::time_point TimePoint;
-		typedef std::chrono::high_resolution_clock::duration Duration;
-		class PerformanceCounter
-		{
-		public:
-			static TimePoint Start();
-			static Duration End(TimePoint counter);
-			static float EndSeconds(TimePoint counter);
-			static double ToSeconds(Duration duration);
-		};
-	}
-}
-
-#endif
-
-/***********************************************************************
-MEMORYPOOL.H
-***********************************************************************/
-#ifndef CORE_LIB_MEMORY_POOL_H
-#define CORE_LIB_MEMORY_POOL_H
-
-
-namespace CoreLib
-{
-	namespace Basic
-	{
-		struct MemoryBlockFields
-		{
-			unsigned int Occupied : 1;
-			unsigned int Order : 31;
-		};
-		struct FreeListNode
-		{
-			FreeListNode * PrevPtr = nullptr, *NextPtr = nullptr;
-		};
-		class MemoryPool
-		{
-		private:
-			static const int MaxLevels = 32;
-			int blockSize = 0, log2BlockSize = 0;
-			int numLevels = 0;
-			int bytesAllocated = 0;
-			int bytesWasted = 0;
-			unsigned char * buffer = nullptr;
-			FreeListNode * freeList[MaxLevels];
-			IntSet used;
-			int AllocBlock(int level);
-			void FreeBlock(unsigned char * ptr, int level);
-		public:
-			MemoryPool(unsigned char * buffer, int log2BlockSize, int numBlocks);
-			MemoryPool() = default;
-			void Init(unsigned char * buffer, int log2BlockSize, int numBlocks);
-			unsigned char * Alloc(int size);
-			void Free(unsigned char * ptr, int size);
-		};
-	}
-}
-
-#endif
-
-/***********************************************************************
-MD5.H
-***********************************************************************/
-/*
-* This is an OpenSSL-compatible implementation of the RSA Data Security, Inc.
-* MD5 Message-Digest Algorithm (RFC 1321).
-*
-* Homepage:
-* http://openwall.info/wiki/people/solar/software/public-domain-source-code/md5
-*
-* Author:
-* Alexander Peslyak, better known as Solar Designer <solar at openwall.com>
-*
-* This software was written by Alexander Peslyak in 2001.  No copyright is
-* claimed, and the software is hereby placed in the public domain.
-* In case this attempt to disclaim copyright and place the software in the
-* public domain is deemed null and void, then the software is
-* Copyright (c) 2001 Alexander Peslyak and it is hereby released to the
-* general public under the following terms:
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted.
-*
-* There's ABSOLUTELY NO WARRANTY, express or implied.
-*
-* See md5.c for more information.
-*/
-
-#ifdef HAVE_OPENSSL
-#include <openssl/md5.h>
-#elif !defined(_MD5_H)
-#define _MD5_H
-
-/* Any 32-bit or wider unsigned integer data type will do */
-typedef unsigned int MD5_u32plus;
-
-typedef struct {
-	MD5_u32plus lo, hi;
-	MD5_u32plus a, b, c, d;
-	unsigned char buffer[64];
-	MD5_u32plus block[16];
-} MD5_CTX;
-
-extern void MD5_Init(MD5_CTX *ctx);
-extern void MD5_Update(MD5_CTX *ctx, const void *data, unsigned long size);
-extern void MD5_Final(unsigned char *result, MD5_CTX *ctx);
-
-#endif
-
-/***********************************************************************
-THREADING.H
-***********************************************************************/
-#ifndef CORE_LIB_THREADING_H
-#define CORE_LIB_THREADING_H
-#include <atomic>
-#include <thread>
-#include <mutex>
-
-#ifndef _WIN32
-#define __stdcall
-#endif
-
-namespace CoreLib
-{
-	namespace Threading
-	{
-		class SpinLock
-		{
-		private:
-			std::atomic_flag lck;
-		public:
-			SpinLock()
-			{
-				lck.clear();
-			}
-			inline bool TryLock()
-			{
-				return !lck.test_and_set(std::memory_order_acquire);
-			}
-			inline void Lock()
-			{
-				while (lck.test_and_set(std::memory_order_acquire))
-				{
-				}
-			}
-			inline void Unlock()
-			{
-				lck.clear(std::memory_order_release);
-			}
-			SpinLock & operator = (const SpinLock & /*other*/)
-			{
-				lck.clear();
-				return *this;
-			}
-		};
-
-		class ParallelSystemInfo
-		{
-		public:
-			static int GetProcessorCount();
-		};
-
-		typedef CoreLib::Basic::Event<> ThreadProc;
-		typedef CoreLib::Basic::Event<CoreLib::Basic::Object *> ThreadParameterizedProc;
-		class Thread;
-
-		class ThreadParam
-		{
-		public:
-			Thread * thread;
-			CoreLib::Basic::Object * threadParam;
-		};
-
-		enum class ThreadPriority
-		{
-			Normal,
-			AboveNormal,
-			Highest,
-			Critical,
-			BelowNormal,
-			Lowest,
-			Idle
-		};
-		unsigned int __stdcall ThreadProcedure(const ThreadParam& param);
-		class Thread : public CoreLib::Basic::Object
-		{
-			friend unsigned int __stdcall ThreadProcedure(const ThreadParam& param);
-		private:
-			 ThreadParam internalParam;
-		public:
-			
-		private:
-			std::thread threadHandle;
-			CoreLib::Basic::RefPtr<ThreadProc> threadProc;
-			CoreLib::Basic::RefPtr<ThreadParameterizedProc> paramedThreadProc;
-		public:
-			Thread()
-			{
-				internalParam.threadParam = nullptr;
-				internalParam.thread = this;
-			}
-			Thread(ThreadProc * p)
-				: Thread()
-			{
-				Start(p);
-			}
-			Thread(ThreadParameterizedProc * p, CoreLib::Basic::Object * param)
-				: Thread()
-			{
-				Start(p, param);
-			}
-			void Start(ThreadProc * p)
-			{
-				threadProc = p;
-				threadHandle = std::thread(ThreadProcedure, internalParam);
-			}
-			void Start(ThreadParameterizedProc * p, CoreLib::Basic::Object * param)
-			{
-				paramedThreadProc = p;
-				internalParam.thread = this;
-				internalParam.threadParam = param;
-				threadHandle = std::thread(ThreadProcedure, internalParam);
-			}
-			void Join()
-			{
-				if (threadHandle.joinable())
-					threadHandle.join();
-			}
-			void Detach()
-			{
-				if (threadHandle.joinable())
-					threadHandle.detach();
-			}
-			std::thread::id GetHandle()
-			{
-				return threadHandle.get_id();
-			}
-		};
-
-		class Mutex : public CoreLib::Basic::Object
-		{
-		private:
-			std::mutex handle;
-		public:
-			void Lock()
-			{
-				handle.lock();
-			}
-			bool TryLock()
-			{
-				return handle.try_lock();
-			}
-			void Unlock()
-			{
-				return handle.unlock();
-			}
-		};
-	}
 }
 
 #endif

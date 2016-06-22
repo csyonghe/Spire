@@ -70,7 +70,7 @@ namespace Spire
 			{
 				PrintDef(sbCode, arrType->BaseType.Ptr(), name + L"[" + arrType->ArrayLength + L"]");
 			}
-			else if (auto baseType = dynamic_cast<ILBasicType*>(type))
+			else if (dynamic_cast<ILBasicType*>(type))
 			{
 				PrintBaseType(sbCode, type);
 				sbCode << L" ";
@@ -101,7 +101,10 @@ namespace Spire
 				nameBuilder << prefix;
 				for (int i = startPos; i < name.Length(); i++)
 				{
-					if (name[i] >= L'a' && name[i] <= L'z' || name[i] >= L'A' && name[i] <= L'Z' || name[i] == L'_' || name[i] >= L'0' && name[i] <= L'9')
+					if ((name[i] >= L'a' && name[i] <= L'z') || 
+						(name[i] >= L'A' && name[i] <= L'Z') ||
+						name[i] == L'_' || 
+						(name[i] >= L'0' && name[i] <= L'9'))
 					{
 						nameBuilder << name[i];
 					}
@@ -163,7 +166,8 @@ namespace Spire
 				StringBuilder rs;
 				for (int i = 0; i < name.Length(); i++)
 				{
-					if (name[i] >= L'a' && name[i] <= L'z' || name[i] >= L'A' && name[i] <= L'Z' || name[i] == L'_' || name[i] >= L'0' && name[i] <= L'9')
+					if ((name[i] >= L'a' && name[i] <= L'z') || (name[i] >= L'A' && name[i] <= L'Z') || 
+						name[i] == L'_' || (name[i] >= L'0' && name[i] <= L'9'))
 					{
 						rs << name[i];
 					}
@@ -284,7 +288,7 @@ namespace Spire
 				{
 					throw InvalidOperationException(L"store instruction cannot appear as expression.");
 				}
-				if (auto load = instr->As<MemberLoadInstruction>())
+				if (instr->Is<MemberLoadInstruction>())
 				{
 					PrintOp(ctx, op0);
 					bool printDefault = true;
@@ -421,7 +425,7 @@ namespace Spire
 					return;
 				}
 				auto varName = ctx.DefineVariable(instr);
-				if (auto load = instr->As<MemberLoadInstruction>())
+				if (instr->Is<MemberLoadInstruction>())
 				{
 					ctx.Body << varName << L" = ";
 					PrintBinaryInstrExpr(ctx, instr);
@@ -487,7 +491,7 @@ namespace Spire
 
 			void PrintAllocVarInstr(CodeGenContext & ctx, AllocVarInstruction * instr)
 			{
-				if (auto size = dynamic_cast<ILConstOperand*>(instr->Size.Ptr()))
+				if (dynamic_cast<ILConstOperand*>(instr->Size.Ptr()))
 				{
 					PrintDef(ctx.Header, instr->Type.Ptr(), instr->Name);
 					ctx.Header << L";\n";
@@ -597,7 +601,7 @@ namespace Spire
 						if (&instr == update->Operands[0].Ptr())
 							return false;
 					}
-					else if (auto import = dynamic_cast<ImportInstruction*>(usr))
+					else if (dynamic_cast<ImportInstruction*>(usr))
 						return false;
 				}
 				if (instr.Is<StoreInstruction>() && force)
@@ -675,7 +679,7 @@ namespace Spire
 					PrintCastF2IInstrExpr(ctx, castf2i);
 				else if (auto casti2f = instr.As<Int2FloatInstruction>())
 					PrintCastI2FInstrExpr(ctx, casti2f);
-				else if (auto update = instr.As<MemberUpdateInstruction>())
+				else if (instr.As<MemberUpdateInstruction>())
 					throw InvalidOperationException(L"member update instruction cannot appear as expression.");
 			}
 
@@ -742,9 +746,9 @@ namespace Spire
 					else if (auto doInstr = instr.As<DoInstruction>())
 					{
 						context.Body << L"do\n{\n";
-						GenerateCode(context, forInstr->BodyCode.Ptr());
+						GenerateCode(context, doInstr->BodyCode.Ptr());
 						context.Body << L"} while (bool(";
-						PrintOp(context, forInstr->ConditionCode->GetLastInstruction()->As<ReturnInstruction>()->Operand.Ptr(), true);
+						PrintOp(context, doInstr->ConditionCode->GetLastInstruction()->As<ReturnInstruction>()->Operand.Ptr(), true);
 						context.Body << L"));\n";
 					}
 					else if (auto whileInstr = instr.As<WhileInstruction>())
@@ -761,11 +765,11 @@ namespace Spire
 						PrintOp(context, ret->Operand.Ptr());
 						context.Body << L";\n";
 					}
-					else if (auto brk = instr.As<BreakInstruction>())
+					else if (instr.Is<BreakInstruction>())
 					{
 						context.Body << L"break;\n";
 					}
-					else if (auto ctn = instr.As<ContinueInstruction>())
+					else if (instr.Is<ContinueInstruction>())
 					{
 						context.Body << L"continue;\n";
 					}
@@ -925,7 +929,7 @@ namespace Spire
 				return sbCode.ProduceString();
 			}
 			EnumerableDictionary<String, String> backendArguments;
-			virtual void SetParameters(EnumerableDictionary<String, String> & args)
+			virtual void SetParameters(EnumerableDictionary<String, String> & args) override
 			{
 				backendArguments = args;
 				if (!args.TryGetValue(L"vertex", vertexOutputName))

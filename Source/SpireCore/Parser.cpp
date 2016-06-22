@@ -200,7 +200,7 @@ namespace Spire
 						LookAheadToken(L"out") || LookAheadToken(L"@") || IsTypeKeyword()
 						|| LookAheadToken(L"[") || LookAheadToken(L"require"))
 						shader->Members.Add(ParseComponent());
-					else if (LookAheadToken(L"using") || LookAheadToken(L"public") && LookAheadToken(L"using", 1))
+					else if (LookAheadToken(L"using") || (LookAheadToken(L"public") && LookAheadToken(L"using", 1)))
 					{
 						shader->Members.Add(ParseImport());
 					}
@@ -573,7 +573,7 @@ namespace Spire
 				statement = ParseContinueStatement();
 			else if (LookAheadToken(TokenType::KeywordReturn))
 				statement = ParseReturnStatement();
-			else if (LookAheadToken(TokenType::Identifier) && LookAheadToken(TokenType::Identifier, 1) || LookAheadToken(L"using"))
+			else if ((LookAheadToken(TokenType::Identifier) && LookAheadToken(TokenType::Identifier, 1)) || LookAheadToken(L"using"))
 				statement = ParseImportStatement();
 			else if (LookAheadToken(TokenType::Identifier))
 				statement = ParseExpressionStatement();

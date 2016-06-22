@@ -1,5 +1,8 @@
 #include "LibIO.h"
 #include "Exception.h"
+#ifndef __STDC__
+#define __STDC__ 1
+#endif
 #include <sys/stat.h>
 #ifdef _WIN32
 #include <direct.h>
@@ -19,8 +22,8 @@ namespace CoreLib
 
 		bool File::Exists(const String & fileName)
 		{
-			struct stat sts;
-			return stat(((String)fileName).ToMultiByteString(), &sts) != -1;
+			struct _stat32 statVar;
+			return ::_stat32(((String)fileName).ToMultiByteString(), &statVar) != -1;
 		}
 
 		String Path::TruncateExt(const String & path)

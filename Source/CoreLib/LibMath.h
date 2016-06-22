@@ -91,7 +91,7 @@ namespace CoreLib
 
 			static inline unsigned int Log2Ceil(register unsigned int x)
 			{
-				register int y = (x & (x - 1));
+				int y = (x & (x - 1));
 				y |= -y;
 				y >>= (32 - 1);
 				x |= (x >> 1);
