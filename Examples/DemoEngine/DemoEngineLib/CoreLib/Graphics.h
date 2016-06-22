@@ -1702,6 +1702,7 @@ namespace GraphicsUI
 		{
 			cmdForm = form;
 		}
+		CoreLib::Event<const CoreLib::String &> OnWriteText;
 		virtual void Write(const CoreLib::String & text) override;
 	};
 }

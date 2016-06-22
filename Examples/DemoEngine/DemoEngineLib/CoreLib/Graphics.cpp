@@ -8533,6 +8533,7 @@ namespace GraphicsUI
 	void UICommandLineWriter::Write(const String & text)
 	{
 		cmdForm->Write(text);
+		OnWriteText(text);
 	}
 }
 

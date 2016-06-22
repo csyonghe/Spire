@@ -37,7 +37,7 @@ namespace SceneViewer
 		CameraControl camera;
 		SystemUniforms sysUniforms;
 		MenuItem * renderTargetsMenu, *freezeTimeMenu;
-		RefPtr<CommandLineWriter> cmdWriter;
+		RefPtr<GraphicsUI::UICommandLineWriter> cmdWriter;
 		float time;
 		bool foveated = false;
 		bool stereo = false;
@@ -144,6 +144,7 @@ namespace SceneViewer
 			cmdForm->Left = 10;
 			cmdForm->Top = GetClientHeight() - 80;
 			cmdWriter = new GraphicsUI::UICommandLineWriter(cmdForm);
+			cmdWriter->OnWriteText.Bind(this, &MainForm::OnCommandOutput);
 			CoreLib::IO::SetCommandLineWriter(cmdWriter.Ptr());
 
 			CreateChoiceForm();
@@ -151,6 +152,11 @@ namespace SceneViewer
 			shaderEditorForm = new ShaderEditorForm(uiEntry.Ptr(), uiSystemInterface->LoadFont(GraphicsUI::Font(L"Consolas", 13)));
 			shaderEditorForm->OnShaderChange.Bind(this, &MainForm::ShaderChanged);
 			uiEntry->CloseWindow(shaderEditorForm);
+		}
+
+		void OnCommandOutput(const String & /*text*/)
+		{
+			MainLoop(this, EventArgs());
 		}
 
 		void ShaderChanged()
@@ -659,10 +665,12 @@ namespace SceneViewer
 		void LoadScene(String fileName)
 		{
 			SetCursor(LoadCursor(NULL, IDC_WAIT));
-			scene = new EnginePipeline();
-			scene->Initialize(resourcePool.Ptr());
-			scene->LoadFromFile(fileName);
-			scene->SetFoveatedRendering(foveated);
+			scene = nullptr;
+			RefPtr<EnginePipeline> newScene = new EnginePipeline();
+			newScene->Initialize(resourcePool.Ptr());
+			newScene->LoadFromFile(fileName);
+			newScene->SetFoveatedRendering(foveated);
+			scene = newScene;
 			camera.Reset();
 			camera.MaxSpeed = 100.0f;
 			sysUniforms.LightColor = Vec3::Create(1.0f);
