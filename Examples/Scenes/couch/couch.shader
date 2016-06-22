@@ -1,4 +1,4 @@
-﻿using "../DemoEngine.pipeline";
+using "../DemoEngine.pipeline";
 
 shader Couch
 {
@@ -50,3 +50,4 @@ shader Couch
     
     using Footer;
 }
+
