@@ -18,7 +18,7 @@ To experience the benefit of using Spire as your engine's shading language, we h
 The Choice Control window allows you to dynamically recompile the modified shader and explore different rate placement choices in real-time.
 
 Currently the demo engine runs only on Windows with an NVIDIA Kepler or later GPU. AMD and Intel GPUs are not supported. 
-However, the compiler is platform independent and is compatible with both msvc and g++ 5.0 (with `-fpermissive -std=c++14 -msse2` flag). Spire currently supports generating GLSL compute, vertex and fragment shaders. 
+However, the compiler is platform independent and is compatible with msvc (level 4 warning free), clang 3.7 and above (warning free) and g++ 5.0 (with `-fpermissive -std=c++14 -msse2` flag). Spire currently supports generating GLSL compute, vertex and fragment shaders. 
 
 Now that you can get the demo engine running, <a href="https://github.com/csyonghe/Spire/blob/master/Docs/tutorial1">read this tutorial</a> to learn the basics of Spire.
 
