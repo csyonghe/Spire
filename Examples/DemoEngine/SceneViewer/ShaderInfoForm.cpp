@@ -21,9 +21,9 @@ namespace SceneViewer
 	{
 		this->metaData = pMetaData;
 		contentBox->Enabled = false;
-		for (auto & child : contentBox->Controls)
+		for (auto & child : contentBox->GetChildren())
 			child = nullptr;
-		contentBox->Controls.Clear();
+		contentBox->GetChildren().Clear();
 		const int leftMargin = 20;
 		auto titleFont = GetEntry()->System->LoadDefaultFont(GraphicsUI::DefaultFontType::Title);
 		

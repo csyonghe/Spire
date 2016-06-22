@@ -76,6 +76,25 @@ namespace GraphicsUI
 		const int Tab = 0x09;
 	}
 
+	struct MarginValues
+	{
+		int Left = 0, Top = 0, Right = 0, Bottom = 0;
+		MarginValues & operator = (const MarginValues & val) = default;
+		MarginValues & operator = (int val)
+		{
+			Left = Top = Right = Bottom = val;
+			return *this;
+		}
+		int Horizontal()
+		{
+			return Left + Right;
+		}
+		int Vertical()
+		{
+			return Top + Bottom;
+		}
+	};
+
 	typedef int CONTROLTYPE;
 	typedef int BORDERSTYLE;
 	typedef unsigned char SHIFTSTATE;
@@ -171,14 +190,13 @@ namespace GraphicsUI
 		Color TitleBarDeactiveColors[4];
 		Color TitleBarFontColor;
 		Color BackColor, BorderColor;
-		bool ShowIcon;
+		bool ShowIcon = false;
 		Color CtrlButtonBackColor;
 		IFont * TitleFont = nullptr;
 		int CtrlButtonBorderStyle;
-		int TitleBarHeight;
-		bool TopMost;
+		float emTitleBarHeight = 1.2f;
+		bool TopMost = false;
 		bool Sizeable = true;
-		FormStyle();
 	};
 
 
@@ -254,10 +272,13 @@ namespace GraphicsUI
 		static Control * MouseCaptureControl;
 		static int CursorPosX;
 		static int CursorPosY;
+		static int DeviceLineHeight;
 		static ColorTable Colors;
 		static int SCROLLBAR_BUTTON_SIZE;
 		static int SCROLLBAR_MIN_PAGESIZE;
 	};
+
+	int emToPixel(float em);
 
 	class UI_Base : public CoreLib::Object
 	{
@@ -275,7 +296,7 @@ namespace GraphicsUI
 		UIEntry * entryCache = nullptr;
 		IFont * font = nullptr;
 		Rect clientRect;
-		bool LastInClient;
+		bool LastInClient, IsMouseDown = false;
 		bool TopMost;
 		int Height, Width;
 		bool IsPointInClient(int X, int Y);
@@ -288,6 +309,7 @@ namespace GraphicsUI
 	public:
 		bool WantsTab = false;
 		bool AcceptsFocus = true;
+		MarginValues Margin;
 		GraphicsUI::CursorType Cursor;
 		CoreLib::String Name;
 		int ID;
@@ -361,6 +383,7 @@ namespace GraphicsUI
 		virtual void SetFocus();
 		virtual void LostFocus(Control * newFocus);
 		virtual bool DoClosePopup();
+		virtual void DoDpiChanged() {}
 		VectorMath::Vec2i GetRelativePos(Container * parent);
 	};
 
@@ -378,19 +401,26 @@ namespace GraphicsUI
 		virtual void Draw(int absX, int absY);
 	};
 
+	enum class ContainerLayoutType
+	{
+		None, Flow, Stack
+	};
+
 	class Container : public Control
 	{
 	protected:
 		bool drawChildren = true;
+		ContainerLayoutType layout = ContainerLayoutType::None;
 		virtual Control * FindControlAtPosition(int x, int y);
-
+		CoreLib::List<CoreLib::RefPtr<Control>> controls;
 	public:
 		Container(Container * parent);
+		Container(Container * parent, ContainerLayoutType pLayout);
 		Container(Container * parent, bool addToParent);
-		~Container();
 	public:
-		CoreLib::List<CoreLib::RefPtr<Control>> Controls;
-		int Margin;
+		bool AutoHeight = false, AutoWidth = false;
+		MarginValues Padding;
+		virtual CoreLib::List<CoreLib::RefPtr<Control>> & GetChildren() { return controls; }
 		virtual void AddChild(Control *nControl);
 		virtual void RemoveChild(Control *AControl);
 		virtual void ArrangeControls(Rect initalClientRect);
@@ -407,6 +437,9 @@ namespace GraphicsUI
 		virtual void SizeChanged();
 		virtual bool DoClosePopup();
 		virtual void KillFocus();
+		virtual ContainerLayoutType GetLayout() { return layout; }
+		virtual void SetLayout(ContainerLayoutType layout);
+		virtual void DoDpiChanged();
 	};
 
 	class Label;
@@ -428,14 +461,15 @@ namespace GraphicsUI
 		Control *btnClose;
 		Label *lblClose;
 		Label *lblTitle;
+		Container * content;
 		CoreLib::String Text; 
 		FormStyle formStyle;
 		ResizeMode resizeMode = ResizeMode::None;
 		ResizeMode GetResizeHandleType(int x, int y);
 		void FormStyleChanged();
+		int GetTitleBarHeight();
 	public:
 		Form(UIEntry * parent);
-		~Form();
 	public:
 		Menu * MainMenu = nullptr;
 		NotifyEvent OnResize;
@@ -462,6 +496,16 @@ namespace GraphicsUI
 		virtual void Draw(int absX,int absY);
 		virtual void SizeChanged();
 		virtual void SetAlpha(unsigned char Alpha);
+		virtual void AddChild(Control * ctrl) override;
+		virtual ContainerLayoutType GetLayout() override;
+		virtual void SetLayout(ContainerLayoutType layout) override;
+		virtual CoreLib::List<CoreLib::RefPtr<Control>> & GetChildren() override;
+		virtual Control * FindControlAtPosition(int x, int y) override;
+	};
+
+	enum class VerticalAlignment
+	{
+		Top, Center, Bottom
 	};
 
 	class Label: public Container
@@ -473,6 +517,7 @@ namespace GraphicsUI
 	public:
 		int TextWidth = 0;
 		int TextHeight = 0;
+		VerticalAlignment VertAlignment = VerticalAlignment::Top;
 		Label(Container * parent);
 		~Label();
 	public:
@@ -483,16 +528,16 @@ namespace GraphicsUI
 		virtual void SetFont(IFont * pFont) override;
 		void UpdateText();
 		CoreLib::String GetText();
-		virtual void Draw(int absX, int absY);
-		virtual void SizeChanged();
+		virtual void Draw(int absX, int absY) override;
+		virtual void SizeChanged() override;
+		virtual void DoDpiChanged() override;
 	};
 
 	class Button: public Label
 	{
-	protected:
-		bool IsMouseDown;
 	public:
 		Button(Container * parent);
+		Button(Container * parent, const CoreLib::String & text);
 	public:
 		bool Checked;
 		virtual void Draw(int absX, int absY);
@@ -501,15 +546,19 @@ namespace GraphicsUI
 		virtual bool DoDblClick();
 		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift);
 		virtual bool DoKeyUp(unsigned short Key, SHIFTSTATE Shift);
-			
+		virtual void DoDpiChanged() override;
 	};
 
 	class CheckBox : public Label
 	{
+	private:
+		void ComputeAutoSize();
 	public:
 		CheckBox(Container * parent);
+		CheckBox(Container * parent, const CoreLib::String & text, bool checked = false);
 	public:
 		bool Checked;
+		virtual void DoDpiChanged() override;
 		virtual void SetText(const CoreLib::String & text) override;
 		virtual void Draw(int absX, int absY);
 		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift);
@@ -560,6 +609,8 @@ namespace GraphicsUI
 		void PasteFromClipBoard();
 		void DeleteSelectionText();
 		void SelectAll();
+		virtual void Posit(int pLeft, int pTop, int pWidth, int pHeight) override;
+		virtual void DoDpiChanged();
 		virtual bool DoDblClick();
  		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift);
 		virtual bool DoMouseUp(int X, int Y, SHIFTSTATE Shift);
@@ -631,7 +682,8 @@ namespace GraphicsUI
 	private:
 		CoreLib::List<MouseMessageStack> controlStack;
 		CoreLib::EnumerableHashSet<Control*> tickEventSubscribers;
-		int lineHeight;
+		int lineHeight = 0;
+		float dpiScale = 1.0f;
 	protected:
 		void DeactivateAllForms();
 	public:
@@ -672,6 +724,7 @@ namespace GraphicsUI
 		virtual bool DoDblClick();
 		virtual bool DoTick();
 		virtual void HandleMessage(const UI_MsgArgs *Args);
+		virtual void DoDpiChanged() override;
 		void MoveFocusBackward();
 		void MoveFocusForward();
 		VectorMath::Vec2i GetCaretScreenPos();
@@ -686,6 +739,10 @@ namespace GraphicsUI
 			return this;
 		}
 		virtual Control * FindControlAtPosition(int x, int y) override;
+		float GetDpiScale()
+		{
+			return dpiScale;
+		}
 	};
 
 	class ScrollBar: public Container
@@ -737,6 +794,7 @@ namespace GraphicsUI
 		virtual bool DoMouseHover();
 		virtual void HandleMessage(const UI_MsgArgs *Args);
 		virtual void SizeChanged();
+		virtual void DoDpiChanged();
 	};
 
 	class ListBox : public Container
@@ -787,6 +845,7 @@ namespace GraphicsUI
 		virtual bool DoMouseWheel(int delta) override;
 		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift);
 		virtual bool DoMouseLeave();
+		virtual void DoDpiChanged() override;
 	};
 
 	class ComboBox : public ListBox
@@ -795,7 +854,6 @@ namespace GraphicsUI
 		int lH,lW,lL,lT;
 	protected:	
 		int ListLeft,ListTop,ListHeight,ListWidth;
-		int ButtonSize;
 		bool ShowList;
 		bool PosInList(int X, int Y);
 		void ChangeSelectedItem(int id);
@@ -819,6 +877,7 @@ namespace GraphicsUI
 		virtual void Posit(int left, int top, int width, int height) override;
 		virtual void Draw(int absX, int absY) override;
 		virtual void SizeChanged();
+		virtual void DoDpiChanged() override;
 		virtual void HandleMessage(const UI_MsgArgs *Args);
 		virtual bool DoMouseDown(int x, int Y, SHIFTSTATE Shift);
 		virtual bool DoMouseUp(int x, int Y, SHIFTSTATE Shift);
@@ -854,7 +913,6 @@ namespace GraphicsUI
 		friend MenuItem;
 	private:
 		int ItemHeight = 24;
-		static const int Margin = 2;
 	public:
 		enum MenuStyle
 		{
@@ -894,6 +952,7 @@ namespace GraphicsUI
 		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift);
 		virtual void HandleMessage(const UI_MsgArgs * Args);
 		virtual void SetFocus();
+		virtual void DoDpiChanged() override;
 	};
 
 	class MenuItem : public Container
@@ -910,7 +969,7 @@ namespace GraphicsUI
 		}
 	private:
 		bool cursorInClient;
-		static const int Margin = 8;
+		static const int separatorHeading = 8;
 		bool isSeperator;
 		Label *lblText = nullptr, *lblShortcut = nullptr;
 		void Init();
@@ -948,6 +1007,7 @@ namespace GraphicsUI
 		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift);
 		virtual bool DoClick();
 		virtual void HandleMessage(const UI_MsgArgs * Args);
+		virtual void DoDpiChanged() override;
 	};
 	
 	class ImageDisplay : public Container
@@ -969,15 +1029,17 @@ namespace GraphicsUI
 		void ScrollBar_Changed(UI_Base * sender);
 	public:
 		VScrollPanel(Container * parent);
-		CoreLib::List<CoreLib::RefPtr<Control>> & GetChildren()
+		virtual CoreLib::List<CoreLib::RefPtr<Control>> & GetChildren() override
 		{
-			return content->Controls;
+			return content->GetChildren();
 		}
 		virtual void SizeChanged() override;
 		virtual void AddChild(Control *nControl) override;
 		virtual void RemoveChild(Control *AControl) override;
 		virtual bool DoMouseWheel(int delta) override;
 		virtual void DoFocusChange() override;
+		virtual ContainerLayoutType GetLayout() override;
+		virtual void SetLayout(ContainerLayoutType layout) override;
 		void ClearChildren();
 		int GetClientWidth();
 		int GetClientHeight();
@@ -999,13 +1061,13 @@ namespace GraphicsUI
 			bsNormal, bsDropDown, bsSeperator
 		};
 	private:
-		static const int Margin = 3;
 		static const int DropDownButtonWidth = 12;
 	private:
 		CoreLib::RefPtr<IImage> image, imageDisabled;
 		CoreLib::String text;
 		Label * lblText = nullptr;
 		ToolButton * bindButton;
+		int imageLabelPadding = 4;
 		int mousePosX;
 		void Init();
 	public:
@@ -1039,10 +1101,8 @@ namespace GraphicsUI
 			Horizontal, Vertical
 		};
 	private:
-		static const int LeftMargin = 4;
-		static const int TopMargin = 2;
-			
 		CoreLib::List<ToolButton*> buttons;
+		ToolStripOrientation orientation;
 	protected:
 		void PositButtons();
 		virtual void SizeChanged();
@@ -1050,10 +1110,14 @@ namespace GraphicsUI
 		bool FullLineFill;
 		bool ShowText;
 		bool MultiLine;
-		ToolStripOrientation Orientation;
 		ToolStrip(Container * parent);
 		ToolButton * AddButton(const CoreLib::String & text, IImage * bmp);
 		void AddSeperator();
+		ToolStripOrientation GetOrientation()
+		{
+			return orientation;
+		}
+		void SetOrientation(ToolStripOrientation ori);
 		ToolButton * GetButton(int id);
 		int Count();
 		void Draw(int absX, int absY);
@@ -1094,14 +1158,13 @@ namespace GraphicsUI
 	protected:
 		void AddItem(StatusPanel * pannel);
 	public:
-		int LeftMargin;
-		int TopMargin;
 		StatusStrip(Container * parent);
 		int Count();
 		StatusPanel * GetItem(int id);
 		bool DoMouseMove(int X, int Y);
 		bool DoMouseDown(int X, int Y, SHIFTSTATE Shift);
 		bool DoMouseUp(int X, int Y, SHIFTSTATE Shift);
+		virtual void DoDpiChanged() override;
 		void Draw(int absX, int absY);
 	};
 
@@ -1128,6 +1191,8 @@ namespace GraphicsUI
 			tpTop, tpBottom
 		};
 	public:
+		MarginValues HeaderPadding;
+
 		bool CanClose, CanMove;
 		_TabStyle TabStyle;
 		_TabPosition TabPosition;
@@ -1138,6 +1203,7 @@ namespace GraphicsUI
 		bool DoMouseMove(int X, int Y);
 		bool DoMouseDown(int X, int Y, SHIFTSTATE Shift);
 		bool DoMouseUp(int X, int Y, SHIFTSTATE Shift);
+		virtual void DoDpiChanged() override;
 		void Draw(int absX, int absY);
 		void SizeChanged();
 		void SwitchPage(int id);
@@ -1150,16 +1216,16 @@ namespace GraphicsUI
 	private:
 		Label* text;
 		CoreLib::RefPtr<IImage> image;
-		static const int LeftMargin = 4;
-		static const int TopMargin = 6;
+		int imageTextPadding = 4;
 	public:
 		void SetText(const CoreLib::String & text);
 		CoreLib::String GetText();
 		void SetImage(IImage * bitmap);
 		int MeasureWidth(TabControl::_TabStyle style);
 		int MeasureHeight(TabControl::_TabStyle style);
-		void DrawHeader(int x, int y, int h, TabControl::_TabStyle style);
+		void DrawHeader(int x, int y, int h, const MarginValues & headerPadding, TabControl::_TabStyle style);
 		TabPage(TabControl * parent);
+		TabPage(TabControl * parent, CoreLib::String text);
 	};
 
 	class UpDown : public Container

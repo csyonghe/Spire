@@ -7,6 +7,8 @@ using namespace CoreLib::IO;
 using namespace CoreLib::Diagnostics;
 using namespace DemoEngine;
 
+#define EM(x) GraphicsUI::emToPixel(x)
+
 #define ENABLE_AUTO_TUNE
 namespace SceneViewer
 {
@@ -17,7 +19,6 @@ namespace SceneViewer
 		this->choiceControl = pChoiceControl;
 		SetText("Choice Control");
 		InitUI();
-		OnResize.Bind(this, &ChoiceForm::ChoiceForm_OnResize);
 	}
 	List<Vec4> ChoiceForm::ReadFrameData(GL::Texture2D tex)
 	{
@@ -48,44 +49,49 @@ namespace SceneViewer
 	}
 	void ChoiceForm::InitUI()
 	{
-		shaderBox = new GraphicsUI::ListBox(this);
-		shaderBox->Posit(10, 10, 130, GetClientHeight() - 60);
+		auto leftPanel = new GraphicsUI::Container(this);
+		leftPanel->DockStyle = GraphicsUI::Control::dsLeft;
+		leftPanel->Posit(0, 0, EM(5.2f), EM(10.0f));
+		leftPanel->Padding = EM(0.2f);
+		shaderBox = new GraphicsUI::ListBox(leftPanel);
+		shaderBox->DockStyle = GraphicsUI::Control::dsFill;
 		shaderBox->OnChanged.Bind(this, &ChoiceForm::SelectedShaderChanged);
-		auto editButton = new GraphicsUI::Button(this);
-		editButton->Posit(140, 10, 100, 30);
-		editButton->SetText(L"Edit");
+		auto toolFlowPanel = new GraphicsUI::Container(this);
+		toolFlowPanel->SetLayout(GraphicsUI::ContainerLayoutType::Flow);
+		toolFlowPanel->DockStyle = GraphicsUI::Control::dsTop;
+		toolFlowPanel->AutoHeight = true;
+		auto editButton = new GraphicsUI::Button(toolFlowPanel, L"Edit");
+		editButton->Margin = EM(0.2f);
 		editButton->OnClick.Bind(this, &ChoiceForm::EditButton_Clicked);
-		applyButton = new GraphicsUI::Button(this);
-		applyButton->Posit(250, 10, 100, 30);
-		applyButton->SetText(L"Recompile");
+		applyButton = new GraphicsUI::Button(toolFlowPanel, L"Recompile");
+		applyButton->Margin = EM(0.2f);
 		applyButton->OnClick.Bind(this, &ChoiceForm::ApplyButton_Clicked);
-		resetButton = new GraphicsUI::Button(this);
-		resetButton->Posit(360, 10, 100, 30);
-		resetButton->SetText(L"Reset");
+		resetButton = new GraphicsUI::Button(toolFlowPanel, L"Reset");
+		resetButton->Margin = EM(0.2f);
 		resetButton->OnClick.Bind(this, &ChoiceForm::ResetButton_Clicked);
-		autoRecompileCheckBox = new GraphicsUI::CheckBox(this);
+		autoRecompileCheckBox = new GraphicsUI::CheckBox(toolFlowPanel);
 		autoRecompileCheckBox->SetText(L"Auto Recompile");
-		autoRecompileCheckBox->Posit(470, 14, 150, 25);
+		autoRecompileCheckBox->Margin = EM(0.2f);
+		autoRecompileCheckBox->Margin.Top = EM(0.3f);
 		autoRecompileCheckBox->Checked = true;
 #ifdef ENABLE_AUTO_TUNE
-		timeBudgetTextBox = new GraphicsUI::TextBox(this);
+		timeBudgetTextBox = new GraphicsUI::TextBox(toolFlowPanel);
 		timeBudgetTextBox->SetText(L"10");
-		timeBudgetTextBox->Posit(140, 49, 80, 30);
-		autoTuneButton = new GraphicsUI::Button(this);
-		autoTuneButton->Posit(230, 50, 100, 30);
-		autoTuneButton->SetText(L"Autotune");
+		timeBudgetTextBox->Posit(0, 0, EM(3.0f), EM(1.5f));
+		timeBudgetTextBox->Margin = EM(0.2f);
+		timeBudgetTextBox->Margin.Top = EM(0.3f);
+		autoTuneButton = new GraphicsUI::Button(toolFlowPanel, L"Autotune");
+		autoTuneButton->Margin = EM(0.2f);
 		autoTuneButton->OnClick.Bind(this, &ChoiceForm::AutotuneButton_Clicked);
-		autoTuneTexButton = new GraphicsUI::Button(this);
-		autoTuneTexButton->Posit(340, 50, 140, 30);
-		autoTuneTexButton->SetText(L"Tune Texture");
+		autoTuneTexButton = new GraphicsUI::Button(toolFlowPanel, L"Tune Texture");
+		autoTuneTexButton->Margin = EM(0.2f);
 		autoTuneTexButton->OnClick.Bind(this, &ChoiceForm::AutotuneTexButton_Clicked);
-		saveScheduleButton = new GraphicsUI::Button(this);
-		saveScheduleButton->Posit(490, 50, 100, 30);
-		saveScheduleButton->SetText(L"Save");
+		saveScheduleButton = new GraphicsUI::Button(toolFlowPanel, L"Save");
+		saveScheduleButton->Margin = EM(0.2f);
 		saveScheduleButton->OnClick.Bind(this, &ChoiceForm::SaveScheduleButton_Clicked);
 #endif
 		scrollPanel = new GraphicsUI::VScrollPanel(this);
-		scrollPanel->Posit(140, 90, GetClientWidth() - 120, GetClientHeight() - 100);
+		scrollPanel->DockStyle = GraphicsUI::Control::dsFill;
 	}
 	void ChoiceForm::UpdateChoicePanel(String shaderName)
 	{
@@ -94,8 +100,6 @@ namespace SceneViewer
 			SetText(L"Choice Control - " + shaderName);
 		currentShaderName = shaderName;
 		scrollPanel->ClearChildren();
-		int scWidth = scrollPanel->GetClientWidth();
-
 		existingChoices.Clear();
 		additionalAttribs.Clear();
 		auto choices = choiceControl->GetChoices(shaderName, existingChoices);
@@ -104,16 +108,19 @@ namespace SceneViewer
 		choiceComboBoxes.Clear();
 		choiceCheckBoxes.Clear();
 		existingChoices.Clear();
+		scrollPanel->SetLayout(GraphicsUI::ContainerLayoutType::Stack);
 		for (auto & choice : choices)
 		{
 			if (choice.Options.Count() == 1)
 				continue;
-			int cmbLeft = scWidth - 140;
-			auto lbl = new GraphicsUI::CheckBox(scrollPanel);
+			auto wrapper = new GraphicsUI::Container(scrollPanel);
+			wrapper->AutoHeight = true;
+			wrapper->Padding = EM(0.1f);
+			auto lbl = new GraphicsUI::CheckBox(wrapper);
 			lbl->SetText(choice.ChoiceName);
-			lbl->Posit(0, line * 30, cmbLeft - 5, 25);
+			lbl->Top = EM(0.2f);
 			choiceCheckBoxes.Add(choice.ChoiceName, lbl);
-			auto cmb = new GraphicsUI::ComboBox(scrollPanel);
+			auto cmb = new GraphicsUI::ComboBox(wrapper);
 			cmb->AddTextItem(L"(auto) " + choice.DefaultValue);
 			for (auto & opt : choice.Options)
 			{
@@ -123,10 +130,11 @@ namespace SceneViewer
 			choiceComboBoxes[choice.ChoiceName] = cmb;
 			cmb->SetSelectedIndex(0);
 			cmb->OnChanged.Bind(this, &ChoiceForm::ChoiceComboBox_Changed);
-			cmb->Posit(cmbLeft, line * 30, 180, 25);
+			cmb->Posit(0, 0, EM(7.0f), EM(1.5f));
+			cmb->DockStyle = GraphicsUI::Control::dsRight;
 			line++;
 		}
-		ChoiceForm_OnResize(this);
+		SizeChanged();
 	}
 	int GetSelIdx(GraphicsUI::ListBox * cmb)
 	{
@@ -419,31 +427,6 @@ namespace SceneViewer
 	void ChoiceForm::ApplyButton_Clicked(GraphicsUI::UI_Base *)
 	{
 		Recompile();
-	}
-	void ChoiceForm::ChoiceForm_OnResize(GraphicsUI::UI_Base *)
-	{
-		shaderBox->Posit(10, 10, 120, GetClientHeight() - 20);
-#ifdef ENABLE_AUTO_TUNE
-		scrollPanel->Posit(140, 90, GetClientWidth() - 150, GetClientHeight() - 100);
-#else
-		scrollPanel->Posit(140, 50, GetClientWidth() - 150, GetClientHeight() - 60);
-#endif
-		int scWidth = scrollPanel->GetClientWidth();
-		int cmbLeft = scWidth;
-		for (auto & cmb : choiceComboBoxes)
-		{
-			int cmbW = cmb.Value->GetWidth();
-			cmbLeft = scWidth - 10 - cmbW;
-			cmb.Value->Left = scWidth - 10 - cmbW;
-		}
-		for (int i = 0; i < scrollPanel->GetChildren().Count(); i++)
-		{
-			auto child = scrollPanel->GetChildren()[i];
-			if (auto lbl = dynamic_cast<GraphicsUI::CheckBox*>(child.Ptr()))
-			{
-				lbl->SetWidth(cmbLeft - 5);
-			}
-		}
 	}
 	void ChoiceForm::Update()
 	{

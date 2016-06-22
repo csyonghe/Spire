@@ -15,6 +15,8 @@ using namespace CoreLib::Diagnostics;
 using namespace GL;
 using namespace DemoEngine;
 
+#define EM(x) GraphicsUI::emToPixel(x)
+
 #ifdef CreateDirectory
 #undef CreateDirectory
 #endif
@@ -186,7 +188,7 @@ namespace SceneViewer
 				choiceForm = new ChoiceForm(this, this, this->uiEntry.Ptr());
 				choiceForm->ShaderChanged.Bind(this, &MainForm::ChoiceForm_ShaderChanged);
 				choiceForm->Update();
-				choiceForm->Posit(10, 10, 650, 400);
+				choiceForm->Posit(EM(1.0f), EM(1.0f), EM(20.0f), EM(15.0f));
 				choiceForm->OnEditShader.Bind(this, &MainForm::ChoiceForm_EditShader);
 			}
 			uiEntry->ShowWindow(choiceForm);

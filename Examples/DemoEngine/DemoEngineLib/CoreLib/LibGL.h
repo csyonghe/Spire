@@ -1118,14 +1118,13 @@ namespace GL
 					buffers.Add(GL_COLOR_ATTACHMENT0 + i);
 				}
 			}
-			//glNamedFramebufferDrawBuffers(Handle, buffers.Count(), buffers.Buffer());
-			//if (buffers.Count())
-			glNamedFramebufferDrawBuffers(Handle, buffers.Count(), buffers.Buffer());
-			/*else
+			if (glNamedFramebufferDrawBuffers)
+				glNamedFramebufferDrawBuffers(Handle, buffers.Count(), buffers.Buffer());
+			else
 			{
-				GLenum none = GL_NONE;
-				glDrawBuffers(1, &none);
-			}*/
+				glBindFramebuffer(GL_FRAMEBUFFER, Handle);
+				glDrawBuffers(buffers.Count(), buffers.Buffer());
+			}
 		}
 
 		void SetDepthStencilRenderTarget(const Texture2D &texture)
@@ -1656,12 +1655,33 @@ namespace GL
 		HWND hwnd;
 		HDC hdc;
 		HGLRC hrc;
+	private:
+		void FindExtensionSubstitutes()
+		{
+			if (!glNamedBufferData)
+			{
+				glNamedBufferData = glNamedBufferDataEXT;
+				glNamedBufferStorage = glNamedBufferStorageEXT;
+				glMapNamedBuffer = glMapNamedBufferEXT;
+				glMapNamedBufferRange = glMapNamedBufferRangeEXT;
+				glUnmapNamedBuffer = glUnmapNamedBufferEXT;
+				glGetNamedBufferParameteriv = glGetNamedBufferParameterivEXT;
+				glGetNamedBufferSubData = glGetNamedBufferSubDataEXT;
+				glNamedFramebufferRenderbuffer = glNamedFramebufferRenderbufferEXT;
+				glNamedFramebufferTexture = glNamedFramebufferTextureEXT;
+				glCheckNamedFramebufferStatus = glCheckNamedFramebufferStatusEXT;
+			}
+		}
 	public:
 		HardwareRenderer()
 		{
 			hwnd = 0;
 			hdc = 0;
 			hrc = 0;
+		}
+		GUIHandle GetWindowHandle()
+		{
+			return (GUIHandle)hwnd;
 		}
 		void Initialize(GUIHandle handle)
 		{
@@ -1736,6 +1756,8 @@ namespace GL
 			contextFlags |= WGL_CONTEXT_DEBUG_BIT_ARB;
 //#endif
 			glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+
+			FindExtensionSubstitutes();
 		}
 
 		void Destroy()
@@ -1749,6 +1771,7 @@ namespace GL
 			if (hdc)
 				ReleaseDC(hwnd, hdc); // Release the device context from our window
 		}
+
 
 		void SetClearColor(const Vec4 & color)
 		{
@@ -1948,7 +1971,13 @@ namespace GL
 		RenderBuffer CreateRenderBuffer(StorageFormat format, int width, int height, int samples)
 		{
 			auto rs = RenderBuffer();
-			glCreateRenderbuffers(1, &rs.Handle);
+			if (glCreateRenderbuffers)
+				glCreateRenderbuffers(1, &rs.Handle);
+			else
+			{
+				glGenRenderbuffers(1, &rs.Handle);
+				glBindRenderbuffer(GL_RENDERBUFFER, rs.Handle);
+			}
 			rs.storageFormat = format;
 			rs.internalFormat = TranslateStorageFormat(format);
 			if (samples <= 1)
@@ -1987,7 +2016,13 @@ namespace GL
 		FrameBuffer CreateFrameBuffer()
 		{	
 			GLuint handle = 0;
-			glCreateFramebuffers(1, &handle);
+			if (glCreateFramebuffers)
+				glCreateFramebuffers(1, &handle);
+			else
+			{
+				glGenFramebuffers(1, &handle);
+				glBindFramebuffer(GL_FRAMEBUFFER, handle);
+			}
 			auto rs = FrameBuffer();
 			rs.Handle = handle;
 			return rs;
@@ -1996,7 +2031,14 @@ namespace GL
 		TransformFeedback CreateTransformFeedback()
 		{
 			TransformFeedback rs;
-			glCreateTransformFeedbacks(1, &rs.Handle);
+			if (glCreateTransformFeedbacks)
+				glCreateTransformFeedbacks(1, &rs.Handle);
+			else
+			{
+				glGenTransformFeedbacks(1, &rs.Handle);
+				glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, rs.Handle);
+			}
+
 			return rs;
 		}
 
@@ -2105,7 +2147,13 @@ namespace GL
 		Texture2D CreateTexture2D()
 		{
 			GLuint handle = 0;
-			glCreateTextures(GL_TEXTURE_2D, 1, &handle);
+			if (glCreateTextures)
+				glCreateTextures(GL_TEXTURE_2D, 1, &handle);
+			else
+			{
+				glGenTextures(1, &handle);
+				glBindTexture(GL_TEXTURE_2D, handle);
+			}
 			glTextureParameteri(handle, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 			glTextureParameteri(handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 			glTextureParameterf(handle, GL_TEXTURE_MAX_ANISOTROPY_EXT, 8.0f);
@@ -2118,7 +2166,13 @@ namespace GL
 		TextureCube CreateTextureCube()
 		{
 			GLuint handle = 0;
-			glCreateTextures(GL_TEXTURE_CUBE_MAP, 1, &handle);
+			if (glCreateTextures)
+				glCreateTextures(GL_TEXTURE_CUBE_MAP, 1, &handle);
+			else
+			{
+				glGenTextures(1, &handle);
+				glBindTexture(GL_TEXTURE_CUBE_MAP, handle);
+			}
 			glTextureParameteri(handle, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 			glTextureParameteri(handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 			//glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAX_ANISOTROPY_EXT, 8.0f);
@@ -2131,7 +2185,13 @@ namespace GL
 		VertexArray CreateVertexArray()
 		{
 			auto rs = VertexArray();
-			glCreateVertexArrays(1, &rs.Handle);
+			if (glCreateVertexArrays)
+				glCreateVertexArrays(1, &rs.Handle);
+			else
+			{
+				glGenVertexArrays(1, &rs.Handle);
+				glBindVertexArray(rs.Handle);
+			}
 			return rs;
 		}
 
@@ -2245,7 +2305,13 @@ namespace GL
 		{
 			auto rs = BufferObject();
 			rs.BindTarget = TranslateBufferUsage(usage);
-			glCreateBuffers(1, &rs.Handle);
+			if (glCreateBuffers)
+				glCreateBuffers(1, &rs.Handle);
+			else
+			{
+				glGenBuffers(1, &rs.Handle);
+				glBindBuffer(rs.BindTarget, rs.Handle);
+			}
 			return rs;
 		}
 
@@ -2326,76 +2392,6 @@ UISYSTEM_WINGL.H
 
 namespace GraphicsUI
 {
-	class Font;
-
-	class DIBImage;
-
-	struct TextSize
-	{
-		int x, y;
-	};
-
-	class TextRasterizationResult
-	{
-	public:
-		TextSize Size;
-		int BufferSize;
-		unsigned char * ImageData;
-	};
-
-	class WinGLSystemInterface;
-
-	class TextRasterizer
-	{
-	private:
-		unsigned int TexID;
-		DIBImage *Bit;
-	public:
-		TextRasterizer();
-		~TextRasterizer();
-		bool MultiLine = false;
-		void SetFont(const Font & Font);
-		TextRasterizationResult RasterizeText(WinGLSystemInterface * system, const CoreLib::String & text);
-		TextSize GetTextSize(const CoreLib::String & text);
-	};
-
-
-	class BakedText : public IBakedText
-	{
-	public:
-		WinGLSystemInterface* system;
-		unsigned char * textBuffer;
-		int BufferSize;
-		int Width, Height;
-		virtual int GetWidth() override
-		{
-			return Width;
-		}
-		virtual int GetHeight() override
-		{
-			return Height;
-		}
-		~BakedText();
-	};
-
-
-	class WinGLFont : public IFont
-	{
-	private:
-		TextRasterizer rasterizer;
-		WinGLSystemInterface * system;
-	public:
-		WinGLFont(WinGLSystemInterface * ctx, const GraphicsUI::Font & font)
-		{
-			system = ctx;
-			rasterizer.SetFont(font);
-		}
-		virtual Rect MeasureString(const CoreLib::String & text) override;
-		virtual IBakedText * BakeString(const CoreLib::String & text) override;
-
-	};
-
-	class GLUIRenderer;
 
 	class Font
 	{
@@ -2441,6 +2437,82 @@ namespace GraphicsUI
 		}
 	};
 
+	class DIBImage;
+
+	struct TextSize
+	{
+		int x, y;
+	};
+
+	class TextRasterizationResult
+	{
+	public:
+		TextSize Size;
+		int BufferSize;
+		unsigned char * ImageData;
+	};
+
+	class WinGLSystemInterface;
+
+	class TextRasterizer
+	{
+	private:
+		unsigned int TexID;
+		DIBImage *Bit;
+	public:
+		TextRasterizer();
+		~TextRasterizer();
+		bool MultiLine = false;
+		void SetFont(const Font & Font, int dpi);
+		TextRasterizationResult RasterizeText(WinGLSystemInterface * system, const CoreLib::String & text);
+		TextSize GetTextSize(const CoreLib::String & text);
+	};
+
+
+	class BakedText : public IBakedText
+	{
+	public:
+		WinGLSystemInterface* system;
+		unsigned char * textBuffer;
+		int BufferSize;
+		int Width, Height;
+		virtual int GetWidth() override
+		{
+			return Width;
+		}
+		virtual int GetHeight() override
+		{
+			return Height;
+		}
+		~BakedText();
+	};
+
+
+	class WinGLFont : public IFont
+	{
+	private:
+		CoreLib::RefPtr<TextRasterizer> rasterizer;
+		WinGLSystemInterface * system;
+		GraphicsUI::Font fontDesc;
+	public:
+		WinGLFont(WinGLSystemInterface * ctx, int dpi, const GraphicsUI::Font & font)
+		{
+			system = ctx;
+			fontDesc = font;
+			rasterizer = new TextRasterizer();
+			UpdateFontContext(dpi);
+		}
+		void UpdateFontContext(int dpi)
+		{
+			rasterizer->SetFont(fontDesc, dpi);
+		}
+		virtual Rect MeasureString(const CoreLib::String & text) override;
+		virtual IBakedText * BakeString(const CoreLib::String & text) override;
+
+	};
+
+	class GLUIRenderer;
+
 	class WinGLSystemInterface : public ISystemInterface
 	{
 	private:
@@ -2452,6 +2524,7 @@ namespace GraphicsUI
 		CoreLib::RefPtr<WinGLFont> defaultFont, titleFont, symbolFont;
 		CoreLib::WinForm::Timer tmrHover, tmrTick;
 		UIEntry * entry = nullptr;
+		int GetCurrentDpi();
 		void TickTimerTick(CoreLib::Object *, CoreLib::WinForm::EventArgs e);
 		void HoverTimerTick(CoreLib::Object *, CoreLib::WinForm::EventArgs e);
 	public:

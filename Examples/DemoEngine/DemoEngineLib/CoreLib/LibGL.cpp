@@ -288,6 +288,8 @@ namespace GL
 UISYSTEM_WINGL.CPP
 ***********************************************************************/
 #include <wingdi.h>
+#include <ShellScalingApi.h>
+#include <VersionHelpers.h>
 
 #pragma comment(lib,"imm32.lib")
 
@@ -349,6 +351,16 @@ namespace GraphicsUI
 			Data.Shift = Data.Shift | SS_CONTROL;
 		Data.X = GET_X_LPARAM(lParam);
 		Data.Y = GET_Y_LPARAM(lParam);
+	}
+
+	int WinGLSystemInterface::GetCurrentDpi()
+	{
+		int dpi = 96;
+		if (IsWindows8Point1OrGreater())
+			GetDpiForMonitor(MonitorFromWindow((HWND)glContext->GetWindowHandle(), MONITOR_DEFAULTTOPRIMARY), MDT_EFFECTIVE_DPI, (UINT*)&dpi, (UINT*)&dpi);
+		else
+			dpi = GetDeviceCaps(NULL, LOGPIXELSY);
+		return dpi;
 	}
 
 	void WinGLSystemInterface::TickTimerTick(CoreLib::Object *, CoreLib::WinForm::EventArgs e)
@@ -531,6 +543,27 @@ namespace GraphicsUI
 		case WM_IME_ENDCOMPOSITION:
 			entry->ImeMessageHandler.DoImeEnd();
 			break;
+		case WM_DPICHANGED:
+		{
+			int dpi = 96;
+			GetDpiForMonitor(MonitorFromWindow((HWND)glContext->GetWindowHandle(), MONITOR_DEFAULTTOPRIMARY), MDT_EFFECTIVE_DPI, (UINT*)&dpi, (UINT*)&dpi);
+			defaultFont->UpdateFontContext(dpi);
+			titleFont->UpdateFontContext(dpi);
+			symbolFont->UpdateFontContext(dpi);
+			for (auto & f : fonts)
+				f.Value->UpdateFontContext(dpi);
+			RECT* const prcNewWindow = (RECT*)lParam;
+			SetWindowPos(hWnd,
+				NULL,
+				prcNewWindow->left,
+				prcNewWindow->top,
+				prcNewWindow->right - prcNewWindow->left,
+				prcNewWindow->bottom - prcNewWindow->top,
+				SWP_NOZORDER | SWP_NOACTIVATE);
+			entry->DoDpiChanged();
+			rs = 0;
+			break;
+		}
 		}
 		return rs;
 	}
@@ -553,14 +586,14 @@ namespace GraphicsUI
 			DeleteObject(hdFont);
 			DeleteObject(hdBrush);
 		}
-		void ChangeFont(Font newFont)
+		void ChangeFont(Font newFont, int dpi)
 		{
 			LOGFONT font;
 			font.lfCharSet = DEFAULT_CHARSET;
 			font.lfClipPrecision = CLIP_DEFAULT_PRECIS;
 			font.lfEscapement = 0;
 			wcscpy_s(font.lfFaceName, 32, newFont.FontName.Buffer());
-			font.lfHeight = -MulDiv(newFont.Size, GetDeviceCaps(Handle, LOGPIXELSY), 72);
+			font.lfHeight = -MulDiv(newFont.Size, dpi, 72);
 			font.lfItalic = newFont.Italic;
 			font.lfOrientation = 0;
 			font.lfOutPrecision = OUT_DEVICE_PRECIS;
@@ -576,7 +609,13 @@ namespace GraphicsUI
 		}
 		void DrawText(const CoreLib::String & text, int X, int Y)
 		{
-			(::TextOut(Handle, X, Y, text.Buffer(), text.Length()));
+			RECT R;
+			R.left = X;
+			R.top = Y;
+			R.right = X + 10240;
+			R.bottom = 1024;
+			::DrawText(Handle, text.Buffer(), text.Length(), &R, DT_SINGLELINE | DT_EDITCONTROL);
+			//(::TextOut(Handle, X, Y, text.Buffer(), text.Length()));
 		}
 		/*int DrawText(const CoreLib::String & text, int X, int Y, int W)
 		{
@@ -655,7 +694,7 @@ namespace GraphicsUI
 			ScanLine = NULL;
 			Handle = CreateCompatibleDC(NULL);
 			canvas = new Canvas(Handle);
-			canvas->ChangeFont(Font(L"Segoe UI", 10));
+			canvas->ChangeFont(Font(L"Segoe UI", 10), 96);
 
 		}
 		~DIBImage()
@@ -1277,9 +1316,10 @@ namespace GraphicsUI
 	WinGLSystemInterface::WinGLSystemInterface(GL::HardwareRenderer * ctx)
 	{
 		glContext = ctx;
-		defaultFont = new WinGLFont(this, Font(L"Segoe UI", 13));
-		titleFont = new WinGLFont(this, Font(L"Segoe UI", 13, true, false, false));
-		symbolFont = new WinGLFont(this, Font(L"Webdings", 13));
+		int dpi = GetCurrentDpi();
+		defaultFont = new WinGLFont(this, dpi, Font(L"Segoe UI", 13));
+		titleFont = new WinGLFont(this, dpi, Font(L"Segoe UI", 13, true, false, false));
+		symbolFont = new WinGLFont(this, dpi, Font(L"Webdings", 13));
 		textBufferObj = ctx->CreateBuffer(GL::BufferUsage::ShadeStorageBuffer);
 		textBufferObj.BufferStorage(TextBufferSize, nullptr,
 			(GL::BufferStorageFlag)((int)GL::BufferStorageFlag::DynamicStorage | (int)GL::BufferStorageFlag::MapRead | (int)GL::BufferStorageFlag::MapWrite | (int)GL::BufferStorageFlag::MapPersistent));
@@ -1307,7 +1347,7 @@ namespace GraphicsUI
 		RefPtr<WinGLFont> font;
 		if (!fonts.TryGetValue(identifier, font))
 		{
-			font = new WinGLFont(this, f);
+			font = new WinGLFont(this, GetCurrentDpi(), f);
 			fonts[identifier] = font;
 		}
 		return font.Ptr();
@@ -1316,7 +1356,7 @@ namespace GraphicsUI
 	Rect WinGLFont::MeasureString(const CoreLib::String & text)
 	{
 		Rect rs;
-		auto size = rasterizer.GetTextSize(text);
+		auto size = rasterizer->GetTextSize(text);
 		rs.x = rs.y = 0;
 		rs.w = size.x;
 		rs.h = size.y;
@@ -1326,7 +1366,7 @@ namespace GraphicsUI
 	IBakedText * WinGLFont::BakeString(const CoreLib::String & text)
 	{
 		BakedText * result = new BakedText();
-		auto imageData = rasterizer.RasterizeText(system, text);
+		auto imageData = rasterizer->RasterizeText(system, text);
 		result->system = system;
 		result->Width = imageData.Size.x;
 		result->Height = imageData.Size.y;
@@ -1345,9 +1385,9 @@ namespace GraphicsUI
 		delete Bit;
 	}
 
-	void TextRasterizer::SetFont(const Font & Font) // Set the font style of this label
+	void TextRasterizer::SetFont(const Font & Font, int dpi) // Set the font style of this label
 	{
-		Bit->canvas->ChangeFont(Font);
+		Bit->canvas->ChangeFont(Font, dpi);
 	}
 
 	TextRasterizationResult TextRasterizer::RasterizeText(WinGLSystemInterface * system, const CoreLib::String & text) // Set the text that is going to be displayed.

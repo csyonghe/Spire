@@ -10,76 +10,6 @@
 
 namespace GraphicsUI
 {
-	class Font;
-
-	class DIBImage;
-
-	struct TextSize
-	{
-		int x, y;
-	};
-
-	class TextRasterizationResult
-	{
-	public:
-		TextSize Size;
-		int BufferSize;
-		unsigned char * ImageData;
-	};
-
-	class WinGLSystemInterface;
-
-	class TextRasterizer
-	{
-	private:
-		unsigned int TexID;
-		DIBImage *Bit;
-	public:
-		TextRasterizer();
-		~TextRasterizer();
-		bool MultiLine = false;
-		void SetFont(const Font & Font);
-		TextRasterizationResult RasterizeText(WinGLSystemInterface * system, const CoreLib::String & text);
-		TextSize GetTextSize(const CoreLib::String & text);
-	};
-
-
-	class BakedText : public IBakedText
-	{
-	public:
-		WinGLSystemInterface* system;
-		unsigned char * textBuffer;
-		int BufferSize;
-		int Width, Height;
-		virtual int GetWidth() override
-		{
-			return Width;
-		}
-		virtual int GetHeight() override
-		{
-			return Height;
-		}
-		~BakedText();
-	};
-
-
-	class WinGLFont : public IFont
-	{
-	private:
-		TextRasterizer rasterizer;
-		WinGLSystemInterface * system;
-	public:
-		WinGLFont(WinGLSystemInterface * ctx, const GraphicsUI::Font & font)
-		{
-			system = ctx;
-			rasterizer.SetFont(font);
-		}
-		virtual Rect MeasureString(const CoreLib::String & text) override;
-		virtual IBakedText * BakeString(const CoreLib::String & text) override;
-
-	};
-
-	class GLUIRenderer;
 
 	class Font
 	{
@@ -125,6 +55,82 @@ namespace GraphicsUI
 		}
 	};
 
+	class DIBImage;
+
+	struct TextSize
+	{
+		int x, y;
+	};
+
+	class TextRasterizationResult
+	{
+	public:
+		TextSize Size;
+		int BufferSize;
+		unsigned char * ImageData;
+	};
+
+	class WinGLSystemInterface;
+
+	class TextRasterizer
+	{
+	private:
+		unsigned int TexID;
+		DIBImage *Bit;
+	public:
+		TextRasterizer();
+		~TextRasterizer();
+		bool MultiLine = false;
+		void SetFont(const Font & Font, int dpi);
+		TextRasterizationResult RasterizeText(WinGLSystemInterface * system, const CoreLib::String & text);
+		TextSize GetTextSize(const CoreLib::String & text);
+	};
+
+
+	class BakedText : public IBakedText
+	{
+	public:
+		WinGLSystemInterface* system;
+		unsigned char * textBuffer;
+		int BufferSize;
+		int Width, Height;
+		virtual int GetWidth() override
+		{
+			return Width;
+		}
+		virtual int GetHeight() override
+		{
+			return Height;
+		}
+		~BakedText();
+	};
+
+
+	class WinGLFont : public IFont
+	{
+	private:
+		CoreLib::RefPtr<TextRasterizer> rasterizer;
+		WinGLSystemInterface * system;
+		GraphicsUI::Font fontDesc;
+	public:
+		WinGLFont(WinGLSystemInterface * ctx, int dpi, const GraphicsUI::Font & font)
+		{
+			system = ctx;
+			fontDesc = font;
+			rasterizer = new TextRasterizer();
+			UpdateFontContext(dpi);
+		}
+		void UpdateFontContext(int dpi)
+		{
+			rasterizer->SetFont(fontDesc, dpi);
+		}
+		virtual Rect MeasureString(const CoreLib::String & text) override;
+		virtual IBakedText * BakeString(const CoreLib::String & text) override;
+
+	};
+
+	class GLUIRenderer;
+
 	class WinGLSystemInterface : public ISystemInterface
 	{
 	private:
@@ -136,6 +142,7 @@ namespace GraphicsUI
 		CoreLib::RefPtr<WinGLFont> defaultFont, titleFont, symbolFont;
 		CoreLib::WinForm::Timer tmrHover, tmrTick;
 		UIEntry * entry = nullptr;
+		int GetCurrentDpi();
 		void TickTimerTick(CoreLib::Object *, CoreLib::WinForm::EventArgs e);
 		void HoverTimerTick(CoreLib::Object *, CoreLib::WinForm::EventArgs e);
 	public:

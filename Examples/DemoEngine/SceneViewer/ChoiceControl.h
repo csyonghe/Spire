@@ -58,7 +58,6 @@ namespace SceneViewer
 		void AutotuneTexButton_Clicked(GraphicsUI::UI_Base *);
 		void SaveScheduleButton_Clicked(GraphicsUI::UI_Base *);
 		void ApplyButton_Clicked(GraphicsUI::UI_Base *);
-		void ChoiceForm_OnResize(GraphicsUI::UI_Base *);
 		void SelectedShaderChanged(GraphicsUI::UI_Base *);
 		void ChoiceComboBox_Changed(GraphicsUI::UI_Base *);
 		void PipelineBox_Changed(GraphicsUI::UI_Base *);

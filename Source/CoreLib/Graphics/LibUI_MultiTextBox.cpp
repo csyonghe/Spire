@@ -539,9 +539,9 @@ namespace GraphicsUI
 		void CreateLineLabels(int lines)
 		{
 			screen.Clear();
-			for (auto & lbl : content->Controls)
+			for (auto & lbl : content->GetChildren())
 				lbl = nullptr;
-			content->Controls.Clear();
+			content->GetChildren().Clear();
 			for (int i = 0; i < lines; i++)
 			{
 				auto lbl = new Label(content);
@@ -697,6 +697,20 @@ namespace GraphicsUI
 			auto mnSelAll = new MenuItem(contextMenu, L"&Select All", L"Ctrl+A");
 			mnSelAll->OnClick.Bind([this](auto) {SelectAll(); });
 		}
+		virtual void DoDpiChanged() override
+		{
+			textWidthCache.Clear();
+			if (font)
+			{
+				int fontLineHeight = this->font->MeasureString(L"X").h;
+				lineHeight = (int)(fontLineHeight * 1.1f);
+				CreateLineLabels(Height / lineHeight + 1);
+			}
+			hScroll->SmallChange = lineHeight;
+			hScroll->LargeChange = lineHeight * 50;
+			invalidateScreen = true;
+			Container::DoDpiChanged();
+		}
 		virtual void SetReadOnly(bool value) override
 		{
 			readOnly = value;
@@ -723,6 +737,8 @@ namespace GraphicsUI
 		virtual void MoveCaretToEnd()
 		{
 			SetCaretPos(CaretPos(textBuffer.Lines.Count() - 1, textBuffer.Lines.Last().Chars.Count()));
+			selStart = selEnd = caretPos;
+			SelectionChanged();
 		}
 		virtual void ScrollToCaret()
 		{
@@ -1453,17 +1469,8 @@ namespace GraphicsUI
 		}
 		virtual void SetFont(IFont * pFont) override
 		{
-			textWidthCache.Clear();
 			Control::SetFont(pFont);
-			if (pFont)
-			{
-				int fontLineHeight = this->font->MeasureString(L"X").h;
-				lineHeight = (int)(fontLineHeight * 1.1f);
-				CreateLineLabels(Height / lineHeight + 1);
-			}
-			hScroll->SmallChange = lineHeight;
-			hScroll->LargeChange = lineHeight * 50;
-			invalidateScreen = true;
+			DoDpiChanged();
 		}
 		virtual bool DoMouseWheel(int delta) override
 		{

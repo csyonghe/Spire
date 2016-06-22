@@ -10,6 +10,7 @@ namespace GraphicsUI
 	int Global::EventGUID = 0;
 	int Global::CursorPosX = 0;
 	int Global::CursorPosY = 0;
+	int Global::DeviceLineHeight = 18;
 	int Global::SCROLLBAR_BUTTON_SIZE = 17;
 	int Global::SCROLLBAR_MIN_PAGESIZE = 8;
 
@@ -175,7 +176,7 @@ namespace GraphicsUI
 
 		tbl.ShadowColor = Color(0, 0, 0, 255);
 		tbl.ControlBackColor = Color(0, 0, 0, 0);
-		tbl.ControlBorderColor = Color(220, 220, 220, 160);
+		tbl.ControlBorderColor = Color(140, 140, 140, 255);
 		tbl.ControlFontColor = Color(255, 255, 255, 255);
 		tbl.EditableAreaBackColor = Color(50, 50, 50, 170);
 
@@ -187,12 +188,12 @@ namespace GraphicsUI
 		tbl.MenuItemDisabledForeColor = Color(180, 180, 180, 255);
 		tbl.MenuItemHighlightForeColor = tbl.MenuItemForeColor;
 	
-		tbl.TabPageBorderColor = Color(127, 127, 127, 255);
-		tbl.TabPageItemSelectedBackColor1 = Color(210, 227, 255, 255);
-		tbl.TabPageItemSelectedBackColor2 = tbl.ControlBackColor;
+		tbl.TabPageBorderColor = tbl.ControlBorderColor;
+		tbl.TabPageItemSelectedBackColor1 = Color(140, 140, 140, 255);
+		tbl.TabPageItemSelectedBackColor2 = tbl.TabPageItemSelectedBackColor1;
 
-		tbl.TabPageItemHighlightBackColor1 = Color(220, 244, 255, 255);
-		tbl.TabPageItemHighlightBackColor2 = Color(220, 244, 255, 255);
+		tbl.TabPageItemHighlightBackColor1 = Color(70, 70, 70, 255);
+		tbl.TabPageItemHighlightBackColor2 = tbl.TabPageItemHighlightBackColor1;
 
 		tbl.TabPageItemBackColor1 = tbl.ControlBackColor;
 		tbl.TabPageItemBackColor2 = tbl.TabPageBorderColor;
@@ -248,6 +249,11 @@ namespace GraphicsUI
 		return tbl;
 	}
 
+	int emToPixel(float em)
+	{
+		return (int)(em * Global::DeviceLineHeight);
+	}
+
 	ColorTable CreateDefaultColorTable()
 	{
 		ColorTable tbl;
@@ -278,12 +284,12 @@ namespace GraphicsUI
 		tbl.StatusStripBackColor1 = tbl.StatusStripBackColor2 = tbl.ToolButtonBackColor2;
 		tbl.StatusStripBackColor3 = tbl.StatusStripBackColor4 = tbl.ToolButtonBackColor2;
 
-		tbl.TabPageBorderColor = Color(181, 201,241, 255);
-		tbl.TabPageItemSelectedBackColor1 = Color(210,227,255, 255);
+		tbl.TabPageBorderColor = Color(127, 127, 127, 255);
+		tbl.TabPageItemSelectedBackColor1 = Color(210, 227, 255, 255);
 		tbl.TabPageItemSelectedBackColor2 = tbl.ControlBackColor;
 
-		tbl.TabPageItemHighlightBackColor1 = Color(220,244,255, 255);
-		tbl.TabPageItemHighlightBackColor2 = Color(220,244,255, 255);
+		tbl.TabPageItemHighlightBackColor1 = Color(220, 244, 255, 255);
+		tbl.TabPageItemHighlightBackColor2 = Color(220, 244, 255, 255);
 
 		tbl.TabPageItemBackColor1 = tbl.ControlBackColor;
 		tbl.TabPageItemBackColor2 = tbl.TabPageBorderColor;
@@ -626,13 +632,17 @@ namespace GraphicsUI
 			return false;
 		if (IsPointInClient(X,Y))
 		{
+			if (Shift == SS_BUTTONLEFT)
+			{
+				IsMouseDown = true;
+				Global::MouseCaptureControl = this;
+			}
 			GetEntry()->System->SwitchCursor(Cursor);
 			UI_MsgArgs Args;UIMouseEventArgs Data;
 			Args.Sender = this;	Args.Type = MSG_UI_MOUSEDOWN;
 			Data.Shift = Shift;	Data.X = X;	Data.Y = Y;
 			Args.Data = &Data;
 			BroadcastMessage(&Args);
-				
 			if (Parent)
 				SetFocus();
 		}
@@ -646,15 +656,16 @@ namespace GraphicsUI
 			
 		if (IsPointInClient(X,Y))
 		{
-				
-			if (Shift & SS_BUTTONLEFT)
+			if (IsMouseDown && (Shift & SS_BUTTONLEFT) && Visible)
 				DoClick();
 		}
+		IsMouseDown = false;
 		UI_MsgArgs Args;UIMouseEventArgs Data;
 		Args.Sender = this;	Args.Type = MSG_UI_MOUSEUP;
 		Data.Shift = Shift;	Data.X = X;	Data.Y = Y;
 		Args.Data = &Data;
 		BroadcastMessage(&Args);
+		ReleaseMouse();
 		return false;
 	}
 
@@ -898,6 +909,11 @@ namespace GraphicsUI
 	{
 	}
 
+	void Label::DoDpiChanged()
+	{
+		UpdateText();
+	}
+
 	void Label::UpdateText()
 	{
 		if (text)
@@ -908,8 +924,8 @@ namespace GraphicsUI
 		FChanged = false;
 		if (AutoSize)
 		{
-			SetWidth(TextWidth);
-			SetHeight(TextHeight);
+			SetWidth(TextWidth + Padding.Horizontal());
+			SetHeight(TextHeight + Padding.Vertical());
 		}
 	}
 
@@ -917,7 +933,6 @@ namespace GraphicsUI
 	{
 		Control::Draw(absX, absY);
 		absX = absX + Left;
-		absY = absY + Top;
 		auto entry = GetEntry();
 		if (font == nullptr)
 		{
@@ -930,6 +945,12 @@ namespace GraphicsUI
 			text = font->BakeString(FCaption);
 			FChanged = false;
 		}
+		if (VertAlignment == VerticalAlignment::Top)
+			absY = absY + Top + Padding.Top;
+		else if (VertAlignment == VerticalAlignment::Center)
+			absY = absY + Top + (Height - TextHeight) / 2;
+		else
+			absY = absY + Top + Height - Padding.Bottom - TextHeight;
 		if (DropShadow)
 		{
 			entry->DrawCommands.SolidBrushColor = ShadowColor;
@@ -949,7 +970,14 @@ namespace GraphicsUI
 		BackColor = Global::Colors.ControlBackColor;
 		FontColor = Global::Colors.ControlFontColor;
 		Checked = false;
-		AutoSize = false;
+		Padding = GetEntry()->GetLineHeight() / 2;
+		Padding.Top = Padding.Bottom = Padding.Left / 2;
+	}
+
+	Button::Button(Container * parent, const CoreLib::String & text)
+		:Button(parent)
+	{
+		SetText(text);
 	}
 
 	void Button::Draw(int absX, int absY)
@@ -1013,21 +1041,17 @@ namespace GraphicsUI
 		Label::DoMouseDown(X,Y,Shift); 
 		if (!Enabled || !Visible)
 			return false;
-		if (Shift==SS_BUTTONLEFT)
+		if (Shift == SS_BUTTONLEFT)
 		{
-			IsMouseDown = true;
 			BorderStyle = BS_LOWERED;
 		}
-		Global::MouseCaptureControl = this;
 		return true;
 	}
 
 	bool Button::DoMouseUp(int X, int Y, SHIFTSTATE Shift)
 	{
 		Label::DoMouseUp(X,Y,Shift);
-		IsMouseDown = false;
 		BorderStyle = BS_RAISED;
-		ReleaseMouse();
 		return true;
 	}
 
@@ -1067,26 +1091,33 @@ namespace GraphicsUI
 		return false;
 	}
 
+	void Button::DoDpiChanged()
+	{
+		Padding = GetEntry()->GetLineHeight() / 2;
+		Padding.Top = Padding.Bottom = Padding.Left / 2;
+		Label::DoDpiChanged();
+	}
+
 	Control * Container::FindControlAtPosition(int x, int y)
 	{
 		if (Visible && IsPointInClient(x, y))
 		{
-			if (x <= Margin || y <= Margin || x >= Width - Margin || y >= Height - Margin)
+			if (x <= Padding.Left || y <= Padding.Top || x >= Width - Padding.Right || y >= Height - Padding.Bottom)
 				return this;
-			for (int i = Controls.Count() - 1; i >= 0; i--)
+			for (int i = controls.Count() - 1; i >= 0; i--)
 			{
-				if (Controls[i]->EventID != Global::EventGUID)
+				if (controls[i]->EventID != Global::EventGUID)
 				{
 					int dx = 0;
 					int dy = 0;
-					if (Controls[i]->DockStyle == dsNone || Controls[i]->DockStyle == dsFill)
+					if (controls[i]->DockStyle == dsNone || controls[i]->DockStyle == dsFill)
 					{
 						dx = clientRect.x;
 						dy = clientRect.y;
 					}
 					int nx = x - dx;
 					int ny = y - dy;
-					if (auto child = Controls[i]->FindControlAtPosition(nx - Controls[i]->Left, ny - Controls[i]->Top))
+					if (auto child = controls[i]->FindControlAtPosition(nx - controls[i]->Left, ny - controls[i]->Top))
 						return child;
 				}
 			}
@@ -1100,7 +1131,8 @@ namespace GraphicsUI
 	{
 		Type = CT_CONTAINER;
 		TabStop = false;
-		Margin = 0;
+		Padding = 0;
+		BorderStyle = BS_NONE;
 	}
 
 	Container::Container(Container * parent)
@@ -1108,50 +1140,75 @@ namespace GraphicsUI
 	{
 	}
 
-	Container::~Container()
+	Container::Container(Container * parent, ContainerLayoutType pLayout)
+		: Container(parent, true)
 	{
-			
+		layout = pLayout;
 	}
 
 	bool Container::DoClosePopup()
 	{
-		for (int i=0;i<Controls.Count(); i++)
-			Controls[i]->DoClosePopup();
+		for (int i=0;i<controls.Count(); i++)
+			controls[i]->DoClosePopup();
 		return false;
 	}
 
 	void Container::KillFocus()
 	{
-		for (int i = 0; i<Controls.Count(); i++)
+		for (int i = 0; i<controls.Count(); i++)
 		{
-			Controls[i]->KillFocus();
+			controls[i]->KillFocus();
 		}
 		Control::KillFocus();
+	}
+
+	void Container::SetLayout(ContainerLayoutType pLayout)
+	{
+		layout = pLayout;
+	}
+
+	void Container::DoDpiChanged()
+	{
+		if (layout == ContainerLayoutType::None)
+		{
+			float dpiScale = GetEntry()->GetDpiScale();
+			for (auto & child : controls)
+			{
+				child->Posit((int)(child->Left*dpiScale),
+					(int)(child->Top * dpiScale),
+					(int)(child->GetWidth()*dpiScale),
+					(int)(child->GetHeight() * dpiScale));
+			}
+		}
+		for (auto & child : controls)
+			child->DoDpiChanged();
+		
+		SizeChanged();
 	}
 
 	void Container::SetAlpha(unsigned char Alpha)
 	{
 		BackColor.A = Alpha;
-		for (int i=0; i<Controls.Count(); i++)
+		for (int i=0; i<controls.Count(); i++)
 		{
-			Controls[i]->BackColor.A = Alpha;
+			controls[i]->BackColor.A = Alpha;
 		}
 	}
 
 	void Container::AddChild(Control *nControl)
 	{
-		Controls.Add(nControl);
+		controls.Add(nControl);
 		nControl->Parent = this;
 	}
 
 	void Container::RemoveChild(Control *AControl)
 	{
-		for (int i=0; i<Controls.Count(); i++)
+		for (int i=0; i<controls.Count(); i++)
 		{
-			if (Controls[i] == AControl)
+			if (controls[i] == AControl)
 			{
-				Controls[i] = nullptr;
-				Controls.RemoveAt(i);
+				controls[i] = nullptr;
+				controls.RemoveAt(i);
 				break;
 			}
 		}
@@ -1160,12 +1217,12 @@ namespace GraphicsUI
 	void Container::DrawChildren(int absX, int absY)
 	{
 		auto entry = GetEntry();
-		entry->ClipRects->AddRect(Rect(absX, absY, Width, Height));
-		for (int i = 0; i<Controls.Count(); i++)
+		entry->ClipRects->AddRect(Rect(absX + Padding.Left, absY + Padding.Top, Width - Padding.Horizontal(), Height - Padding.Vertical()));
+		for (int i = 0; i<controls.Count(); i++)
 		{
-			if (Controls[i]->Visible)
+			if (controls[i]->Visible)
 			{
-				Control *ctrl = Controls[i].operator->();
+				Control *ctrl = controls[i].Ptr();
 				if (ctrl->Visible)
 				{
 					int dx = 0;
@@ -1197,44 +1254,93 @@ namespace GraphicsUI
 	void Container::ArrangeControls(Rect initalClientRect)
 	{
 		clientRect = initalClientRect;
-		clientRect.x = initalClientRect.x + Margin;
-		clientRect.y = initalClientRect.y + Margin;
-		clientRect.w -= Margin * 2;
-		clientRect.h -= Margin * 2;
-		for (int i=0; i<Controls.Count(); i++)
+		clientRect.x = initalClientRect.x + Padding.Left;
+		clientRect.y = initalClientRect.y + Padding.Top;
+		clientRect.w -= Padding.Horizontal();
+		clientRect.h -= Padding.Vertical();
+		for (int i=0; i < controls.Count(); i++)
 		{
-			if (!Controls[i]->Visible)
+			if (!controls[i]->Visible)
 				continue;
-			switch (Controls[i]->DockStyle)
+			switch (controls[i]->DockStyle)
 			{
 			case dsTop:
-				Controls[i]->Posit(clientRect.x, clientRect.y, clientRect.w, Controls[i]->GetHeight());
-				clientRect.y += Controls[i]->GetHeight();
-				clientRect.h -= Controls[i]->GetHeight();
+				controls[i]->Posit(clientRect.x, clientRect.y, clientRect.w, controls[i]->GetHeight());
+				clientRect.y += controls[i]->GetHeight();
+				clientRect.h -= controls[i]->GetHeight();
 				break;
 			case dsBottom:
-				Controls[i]->Posit(clientRect.x, clientRect.y+clientRect.h-Controls[i]->GetHeight(), clientRect.w,
-					Controls[i]->GetHeight());
-				clientRect.h -= Controls[i]->GetHeight();
+				controls[i]->Posit(clientRect.x, clientRect.y + clientRect.h - controls[i]->GetHeight(), clientRect.w,
+					controls[i]->GetHeight());
+				clientRect.h -= controls[i]->GetHeight();
 				break;
 			case dsLeft:
-				Controls[i]->Posit(clientRect.x, clientRect.y, Controls[i]->GetWidth(), clientRect.h);
-				clientRect.x += Controls[i]->GetWidth();
-				clientRect.w -= Controls[i]->GetWidth();
+				controls[i]->Posit(clientRect.x, clientRect.y, controls[i]->GetWidth(), clientRect.h);
+				clientRect.x += controls[i]->GetWidth();
+				clientRect.w -= controls[i]->GetWidth();
 				break;
 			case dsRight:
-				Controls[i]->Posit(clientRect.x+clientRect.w-Controls[i]->GetWidth(), clientRect.y,
-					Controls[i]->GetWidth(), clientRect.h);
-				clientRect.w -= Controls[i]->GetWidth();
+				controls[i]->Posit(clientRect.x + clientRect.w - controls[i]->GetWidth(), clientRect.y,
+					controls[i]->GetWidth(), clientRect.h);
+				clientRect.w -= controls[i]->GetWidth();
 				break;
 			}
 		}
-		for (int i=0; i<Controls.Count(); i++)
+		int layoutX = 0;
+		int layoutY = 0;
+		int maxHeight = 0;
+		for (int i = 0; i < controls.Count(); i++)
 		{
-			if (Controls[i]->DockStyle == dsFill)
+			if (controls[i]->DockStyle == dsFill)
 			{
-				Controls[i]->Posit(0,0, clientRect.w, clientRect.h);
+				controls[i]->Posit(0, 0, clientRect.w, clientRect.h);
 			}
+		}
+		if (layout == ContainerLayoutType::Flow || layout == ContainerLayoutType::Stack)
+		{
+			for (int i = 0; i < controls.Count(); i++)
+			{
+				if (controls[i]->DockStyle == dsNone)
+				{
+					if (layout == ContainerLayoutType::Stack ||
+						layoutX > 0 && layoutX + controls[i]->GetWidth() + controls[i]->Margin.Left > clientRect.w) // new line
+					{
+						layoutY += maxHeight;
+						layoutX = 0;
+						maxHeight = 0;
+					}
+					controls[i]->Left = layoutX + controls[i]->Margin.Left;
+					controls[i]->Top = layoutY + controls[i]->Margin.Top;
+					if (layout == ContainerLayoutType::Stack)
+					{
+						controls[i]->Posit(controls[i]->Left, controls[i]->Top, Width - Padding.Horizontal(), controls[i]->GetHeight());
+					}
+					layoutX += controls[i]->GetWidth() + controls[i]->Margin.Horizontal();
+					maxHeight = Math::Max(maxHeight, controls[i]->GetHeight() + controls[i]->Margin.Vertical());
+				}
+			}
+		}
+		if (AutoWidth || AutoHeight)
+		{
+			int nWidth = 0;
+			int nHeight = 0;
+			for (int i = 0; i < controls.Count(); i++)
+			{
+				int cw = controls[i]->GetWidth() + controls[i]->Left + controls[i]->Margin.Right;
+				int ch = controls[i]->GetHeight() + controls[i]->Top + controls[i]->Margin.Bottom;
+				if (controls[i]->DockStyle == dsLeft || controls[i]->DockStyle == dsRight)
+					ch -= clientRect.y;
+				if (controls[i]->DockStyle == dsTop || controls[i]->DockStyle == dsBottom)
+					cw -= clientRect.x;
+				if (cw > nWidth)
+					nWidth = cw;
+				if (ch > nHeight)
+					nHeight = ch;
+			}
+			nWidth += Padding.Horizontal();
+			nHeight += Padding.Vertical();
+			if (AutoWidth) Width = nWidth;
+			if (AutoHeight) Height = nHeight;
 		}
 	}
 
@@ -1293,20 +1399,15 @@ namespace GraphicsUI
 	void Container::InternalBroadcastMessage(UI_MsgArgs *Args)
 	{
 		this->HandleMessage(Args);
-		for (int i=Controls.Count()-1; i>=0; i--)
+		for (int i = controls.Count() - 1; i>=0; i--)
 		{
-			Container * ctn = dynamic_cast<Container *>(Controls[i].operator->());
+			Container * ctn = dynamic_cast<Container *>(controls[i].Ptr());
 			if (ctn)
 				ctn->InternalBroadcastMessage(Args);
 			else
-				Controls[i]->HandleMessage(Args);
+				controls[i]->HandleMessage(Args);
 		}
 			
-	}
-
-	FormStyle::FormStyle()
-	{
-
 	}
 
 	Form::Form(UIEntry * parent)
@@ -1323,6 +1424,7 @@ namespace GraphicsUI
 		DownPosX = DownPosY = 0;
 		Text = L"Form";
 		parent->Forms.Add(this);
+		this->content = nullptr;
 		btnClose = new Control(this);
 		lblTitle = new Label(this);
 		lblClose = new Label(this);
@@ -1336,17 +1438,14 @@ namespace GraphicsUI
 		btnClose->BackColor.A = 0;
 		formStyle = Global::Colors.DefaultFormStyle;
 		formStyle.TitleFont = parent->GetEntry()->System->LoadDefaultFont(GraphicsUI::DefaultFontType::Title);
-		formStyle.TitleBarHeight = (int)(parent->GetEntry()->GetLineHeight() * 1.2f);
-	
-		Left = Top = 20;
-		Height = Width = 200;
-		Margin = 5;
+		content = new Container(this);
+		content->DockStyle = dsFill;
+		content->BackColor.A = 0;
+		content->BorderStyle = BS_NONE;
 		FormStyleChanged();
 		SetText(Text);
-	}
-
-	Form::~Form()
-	{
+		Padding = 5;
+		Posit(20, 20, 200, 200);
 	}
 
 	void Form::SetText(String AText)
@@ -1374,14 +1473,53 @@ namespace GraphicsUI
 		formStyle.TitleBarDeactiveColors[3].A = Alpha;
 	}
 
+	void Form::AddChild(Control * ctrl)
+	{
+		if (!content)
+			Container::AddChild(ctrl);
+		else
+			content->AddChild(ctrl);
+	}
+
+	ContainerLayoutType Form::GetLayout()
+	{
+		return content->GetLayout();
+	}
+
+	void Form::SetLayout(ContainerLayoutType pLayout)
+	{
+		content->SetLayout(pLayout);
+	}
+
+	CoreLib::List<CoreLib::RefPtr<Control>>& Form::GetChildren()
+	{
+		return content->GetChildren();
+	}
+
+	Control * Form::FindControlAtPosition(int x, int y)
+	{
+		auto ctrl = Container::FindControlAtPosition(x, y);
+		if (ctrl)
+			return ctrl;
+		else
+		{
+			int additionalMargin = GetEntry()->GetLineHeight() / 2;
+			if (x <= -additionalMargin || x - Width >= additionalMargin ||
+				y <= -additionalMargin || y - Height >= additionalMargin)
+				return nullptr;
+			else
+				return this;
+		}
+	}
+
 	int Form::GetClientHeight()
 	{
-		return Height-Margin * 2-formStyle.TitleBarHeight;
+		return Height - Padding.Vertical() - GetTitleBarHeight();
 	}
 
 	int Form::GetClientWidth()
 	{
-		return Width - Margin * 2;
+		return Width - Padding.Horizontal();
 	}
 
 	ResizeMode Form::GetResizeHandleType(int x, int y)
@@ -1404,10 +1542,11 @@ namespace GraphicsUI
 
 	void Form::FormStyleChanged()
 	{
+		int titleHeight = GetTitleBarHeight();
 		lblTitle->SetFont(formStyle.TitleFont);
 		lblTitle->FontColor = formStyle.TitleBarFontColor;
 		lblClose->FontColor = formStyle.TitleBarFontColor;
-		btnClose->Posit(0,0,formStyle.TitleBarHeight-4,formStyle.TitleBarHeight-4);
+		btnClose->Posit(0, Padding.Top, titleHeight - Padding.Right, titleHeight - Padding.Right);
 		BackColor = formStyle.BackColor;
 		BorderColor = formStyle.BorderColor;
 		BorderStyle = BS_FLAT_;
@@ -1415,13 +1554,19 @@ namespace GraphicsUI
 		SizeChanged();
 	}
 
+	int Form::GetTitleBarHeight()
+	{
+		return (int)(GetEntry()->GetLineHeight() * formStyle.emTitleBarHeight);
+	}
+
 	void Form::SizeChanged()
 	{
-		btnClose->Posit(Width-formStyle.TitleBarHeight,3,formStyle.TitleBarHeight-4,formStyle.TitleBarHeight-4);
-		lblClose->Posit(Width-formStyle.TitleBarHeight+2,3,formStyle.TitleBarHeight-4,formStyle.TitleBarHeight-4);
+		int titleHeight = GetTitleBarHeight();
+		btnClose->Posit(Width- titleHeight, 3, titleHeight - 4, titleHeight - 4);
+		lblClose->Posit(Width- titleHeight + 2, 3, titleHeight - 4, titleHeight - 4);
 		Control::SizeChanged();
 		OnResize.Invoke(this);
-		ArrangeControls(Rect(1, 1 + formStyle.TitleBarHeight, Width - 2, Height - 2 - formStyle.TitleBarHeight));
+		ArrangeControls(Rect(1, 1 + titleHeight, Width - 2, Height - 2 - titleHeight));
 		
 	}
 
@@ -1448,9 +1593,10 @@ namespace GraphicsUI
 		Color *Color = Activated?formStyle.TitleBarColors :formStyle.TitleBarDeactiveColors; 
 		auto & graphics = entry->DrawCommands;
 		graphics.SolidBrushColor = Color[0];
-		graphics.FillRectangle(absX + 1, absY + 1, absX + Width - 1, absY + 1 + formStyle.TitleBarHeight);
-		entry->ClipRects->AddRect(Rect(absX,  absY, lblClose->Left - 24, formStyle.TitleBarHeight));
-		lblTitle->Draw(absX+8,absY+1+(formStyle.TitleBarHeight-lblTitle->GetHeight())/2);
+		int titleHeight = GetTitleBarHeight();
+		graphics.FillRectangle(absX + 1, absY + 1, absX + Width - 1, absY + 1 + titleHeight);
+		entry->ClipRects->AddRect(Rect(absX,  absY, lblClose->Left - 24, titleHeight));
+		lblTitle->Draw(absX+8,absY+1+(titleHeight - lblTitle->GetHeight())/2);
 		entry->ClipRects->PopRect();
 		//Draw close Button
 		if (ButtonClose)
@@ -1460,7 +1606,7 @@ namespace GraphicsUI
 		}
 
 		//Draw Controls
-		entry->ClipRects->AddRect(Rect(absX + Margin, absY + Margin + formStyle.TitleBarHeight, Width - Margin * 2, Height - Margin * 2 - formStyle.TitleBarHeight));
+		entry->ClipRects->AddRect(Rect(absX + Padding.Left, absY + Padding.Top + titleHeight, Width - Padding.Horizontal(), Height - Padding.Vertical() - titleHeight));
 		DrawChildren(absX, absY);
 		entry->ClipRects->PopRect();
 	}
@@ -1493,7 +1639,8 @@ namespace GraphicsUI
 		this->ReleaseMouse();
 		if (DownInButton)
 		{
-			if (X>Width-formStyle.TitleBarHeight && X<Width && Y>0 && Y<formStyle.TitleBarHeight+1)
+			int titleHeight = GetTitleBarHeight();
+			if (X > Width - titleHeight && X < Width && Y > 0 && Y < titleHeight + 1)
 			{
 				GetEntry()->CloseWindow(this);
 			}
@@ -1538,7 +1685,8 @@ namespace GraphicsUI
 		resizeMode = GetResizeHandleType(X, Y);
 		if (resizeMode == ResizeMode::None)
 		{
-			if (X > 3 && X < Width - formStyle.TitleBarHeight && Y > 0 && Y < formStyle.TitleBarHeight + 1)
+			int titleHeight = GetTitleBarHeight();
+			if (X > 3 && X < Width - titleHeight && Y > 0 && Y < titleHeight + 1)
 			{
 				DownInTitleBar = true;
 				Global::MouseCaptureControl = this;
@@ -1546,7 +1694,7 @@ namespace GraphicsUI
 			else
 			{
 				DownInTitleBar = false;
-				if (X > Width - formStyle.TitleBarHeight && X < Width - 2 && Y > 0 && Y < formStyle.TitleBarHeight + 1)
+				if (X > Width - titleHeight && X < Width - 2 && Y > 0 && Y < titleHeight + 1)
 				{
 					DownInButton = true;
 					Global::MouseCaptureControl = this;
@@ -1564,7 +1712,7 @@ namespace GraphicsUI
 	bool Form::DoMouseMove(int X, int Y)
 	{
 		const int MinWidth = 120;
-		const int MinHeight = formStyle.TitleBarHeight * 2;
+		const int MinHeight = GetTitleBarHeight() * 2;
 
 		if (!Enabled ||!Visible)
 			return false;
@@ -1653,12 +1801,12 @@ namespace GraphicsUI
 		CheckmarkLabel->Visible = false;
 		CheckmarkLabel->SetFont(pSystem->LoadDefaultFont(DefaultFontType::Symbol));
 		CheckmarkLabel->SetText(L"a");
-		lineHeight = font->MeasureString(L"M").h;
-		Global::SCROLLBAR_BUTTON_SIZE = (int)(GetLineHeight());
+		
 		ImeMessageHandler.Init(this);
 		ImeMessageHandler.ImeWindow->Visible = false;
 		ImeMessageHandler.ImeWindow->WindowWidth = WndWidth;
 		ImeMessageHandler.ImeWindow->WindowHeight = WndHeight;
+		DoDpiChanged();
 	}
 
 	void UIEntry::InternalBroadcastMessage(UI_MsgArgs *Args)
@@ -1668,7 +1816,7 @@ namespace GraphicsUI
 		{
 			ActiveForm->InternalBroadcastMessage(Args);
 		}
-		for (auto & ctrl : Controls)
+		for (auto & ctrl : controls)
 			if (dynamic_cast<Form*>(ctrl.Ptr()) == nullptr)
 			{
 				if (auto ctn = dynamic_cast<Container*>(ctrl.Ptr()))
@@ -1852,13 +2000,11 @@ namespace GraphicsUI
 		if (Global::MouseCaptureControl == nullptr)
 		{
 			DeactivateAllForms();
-			int cx = X - clientRect.x;
-			int cy = Y - clientRect.y;
 			for (int i = Forms.Count() - 1; i >= 0; i--)
 			{
 				Form *curForm = Forms[i];
-				if (curForm->Visible && curForm->Enabled && cx >= curForm->Left && cx <= curForm->Left + curForm->GetWidth() &&
-					cy >= curForm->Top && cy <= curForm->Top + curForm->GetHeight())
+				if (curForm->Visible && curForm->Enabled && (curForm == Global::PointedComponent || Global::PointedComponent &&
+					Global::PointedComponent->IsChildOf(curForm)))
 				{
 					ShowWindow(curForm);
 					nForm = curForm;
@@ -1924,19 +2070,22 @@ namespace GraphicsUI
 		auto pointedComp = FindControlAtPosition(X, Y);
 		if (pointedComp != Global::PointedComponent)
 		{
-			auto cur = Global::PointedComponent;
-			while (cur && !pointedComp->IsChildOf((Container*)cur))
+			if (!Global::MouseCaptureControl)
 			{
-				cur->DoMouseLeave();
-				cur = cur->Parent;
+				auto cur = Global::PointedComponent;
+				while (cur && !pointedComp->IsChildOf((Container*)cur))
+				{
+					cur->DoMouseLeave();
+					cur = cur->Parent;
+				}
+				auto cur2 = pointedComp;
+				while (cur2 != cur)
+				{
+					cur2->DoMouseEnter();
+					cur2 = cur2->Parent;
+				}
+				Global::PointedComponent = pointedComp;
 			}
-			auto cur2 = pointedComp;
-			while (cur2 != cur)
-			{
-				cur2->DoMouseEnter();
-				cur2 = cur2->Parent;
-			}
-			Global::PointedComponent = pointedComp;
 		}
 		Global::CursorPosX = X;
 		Global::CursorPosY = Y;
@@ -2088,11 +2237,22 @@ namespace GraphicsUI
 		}
 	}
 
+	void UIEntry::DoDpiChanged()
+	{
+		int nLineHeight = font->MeasureString(L"M").h;
+		if (lineHeight != 0)
+			dpiScale = nLineHeight / (float)lineHeight;
+		Global::DeviceLineHeight = lineHeight = nLineHeight;
+		Global::SCROLLBAR_BUTTON_SIZE = (int)(GetLineHeight());
+		CheckmarkLabel->DoDpiChanged();
+		Container::DoDpiChanged();
+	}
+
 	Control * FindNextFocus(Control * ctrl)
 	{
 		if (auto ctn = dynamic_cast<Container*>(ctrl))
 		{
-			for (auto & child : ctn->Controls)
+			for (auto & child : ctn->GetChildren())
 			{
 				if (child->Enabled && child->Visible)
 				{
@@ -2105,7 +2265,7 @@ namespace GraphicsUI
 				
 		}
 		auto parent = ctrl->Parent;
-		while (parent->Controls.Last() == ctrl)
+		while (parent->GetChildren().Last() == ctrl)
 		{
 			ctrl = parent;
 			parent = ctrl->Parent;
@@ -2114,15 +2274,15 @@ namespace GraphicsUI
 		}
 		if (parent)
 		{
-			int idx = parent->Controls.IndexOf(ctrl);
-			for (int i = idx + 1; i < parent->Controls.Count(); i++)
+			int idx = parent->GetChildren().IndexOf(ctrl);
+			for (int i = idx + 1; i < parent->GetChildren().Count(); i++)
 			{
-				if (parent->Controls[i]->Enabled && parent->Controls[i]->Visible)
+				if (parent->GetChildren()[i]->Enabled && parent->GetChildren()[i]->Visible)
 				{
-					if (parent->Controls[i]->TabStop)
-						return parent->Controls[i].Ptr();
+					if (parent->GetChildren()[i]->TabStop)
+						return parent->GetChildren()[i].Ptr();
 					else
-						return FindNextFocus(parent->Controls[i].Ptr());
+						return FindNextFocus(parent->GetChildren()[i].Ptr());
 				}
 			}
 		}
@@ -2131,11 +2291,11 @@ namespace GraphicsUI
 
 	Control * GetLastLeaf(Container * ctn)
 	{
-		if (ctn->Controls.Count() == 0)
+		if (ctn->GetChildren().Count() == 0)
 			return ctn;
-		for (int i = ctn->Controls.Count() - 1; i >= 0; i--)
+		for (int i = ctn->GetChildren().Count() - 1; i >= 0; i--)
 		{
-			auto ctrl = ctn->Controls[i].Ptr();
+			auto ctrl = ctn->GetChildren()[i].Ptr();
 			if (ctrl->Visible && ctrl->Enabled)
 			{
 				if ((ctrl->Type & CT_CONTAINER) != 0)
@@ -2152,7 +2312,7 @@ namespace GraphicsUI
 	Control * FindPreviousFocus(Control * ctrl)
 	{
 		auto parent = ctrl->Parent;
-		while (parent && parent->Controls.First() == ctrl)
+		while (parent && parent->GetChildren().First() == ctrl)
 		{
 			ctrl = parent;
 			parent = ctrl->Parent;
@@ -2161,14 +2321,14 @@ namespace GraphicsUI
 		}
 		if (parent)
 		{
-			int idx = parent->Controls.IndexOf(ctrl);
+			int idx = parent->GetChildren().IndexOf(ctrl);
 			for (int i = idx - 1; i >= 0; i--)
 			{
-				if (parent->Controls[i]->Enabled && parent->Controls[i]->Visible)
+				if (parent->GetChildren()[i]->Enabled && parent->GetChildren()[i]->Visible)
 				{
-					if (parent->Controls[i]->TabStop)
-						return parent->Controls[i].Ptr();
-					else if (auto ctn = dynamic_cast<Container*>(parent->Controls[i].Ptr()))
+					if (parent->GetChildren()[i]->TabStop)
+						return parent->GetChildren()[i].Ptr();
+					else if (auto ctn = dynamic_cast<Container*>(parent->GetChildren()[i].Ptr()))
 					{
 						auto last = GetLastLeaf(ctn);
 						if (last->Visible && last->Enabled && last->TabStop)
@@ -2238,7 +2398,7 @@ namespace GraphicsUI
 		drawChildren = false;
 		Container::Draw(absX,absY);
 		//Draw Forms
-		for (auto children : Controls)
+		for (auto children : controls)
 		{
 			if (children->Visible && children->Type != CT_FORM)
 			{
@@ -2280,7 +2440,9 @@ namespace GraphicsUI
 	{
 		while (Target && !Target->AcceptsFocus)
 			Target = Target->Parent;
-		if (FocusedControl &&FocusedControl != Target)
+		if (FocusedControl == Target)
+			return;
+		if (FocusedControl)
 		{
 			FocusedControl->LostFocus(Target);
 			KillFocus();
@@ -2345,9 +2507,9 @@ namespace GraphicsUI
 				if (auto rs = checkCtrl(Forms[i]))
 					return rs;
 			}
-			for (int i = Controls.Count() - 1; i >= 0; i--)
+			for (int i = controls.Count() - 1; i >= 0; i--)
 			{
-				if (auto rs = checkCtrl(Controls[i].Ptr()))
+				if (auto rs = checkCtrl(controls[i].Ptr()))
 					return rs;
 			}
 			return this;
@@ -2367,15 +2529,33 @@ namespace GraphicsUI
 		Checked = false;
 	}
 
-
-	void CheckBox::SetText(const CoreLib::String & pText)
+	CheckBox::CheckBox(Container * parent, const CoreLib::String & text, bool checked)
+		: CheckBox(parent)
 	{
-		Label::SetText(pText);
+		SetText(text);
+		Checked = checked;
+	}
+
+
+	void CheckBox::ComputeAutoSize()
+	{
 		if (AutoSize)
 		{
 			this->Width = TextWidth + (int)(GetEntry()->CheckmarkLabel->TextWidth * 1.5f) + 2;
 			this->Height = TextHeight + 1;
 		}
+	}
+
+	void CheckBox::DoDpiChanged()
+	{
+		Label::DoDpiChanged();
+		ComputeAutoSize();
+	}
+
+	void CheckBox::SetText(const CoreLib::String & pText)
+	{
+		Label::SetText(pText);
+		ComputeAutoSize();
 	}
 
 	void CheckBox::Draw(int absX, int absY)
@@ -2425,7 +2605,7 @@ namespace GraphicsUI
 		//Draw Caption
 		int textStart = checkBoxSize + checkBoxSize / 4;
 		BorderStyle = BS_NONE;
-		Label::Draw(absX+ textStart -Left, absY-Top);
+		Label::Draw(absX + textStart - Left, absY - Top);
 		BorderStyle = oldBorderStyle;
 		// Draw Focus Rect
 		if (IsFocused())
@@ -2488,9 +2668,9 @@ namespace GraphicsUI
 		{
 			if (Parent && (Parent->Type & CT_CONTAINER) != 0) // A type less then zero means the control is a container. 
 			{
-				for (int i=0; i<((Container * )Parent)->Controls.Count(); i++)
+				for (int i=0; i<((Container * )Parent)->GetChildren().Count(); i++)
 				{
-					Control * curControl = ((Container * )Parent)->Controls[i].operator->();
+					Control * curControl = ((Container * )Parent)->GetChildren()[i].Ptr();
 					if (curControl->Type == CT_RADIOBOX)
 					((RadioBox *)curControl)->Checked = false;
 				}
@@ -2508,8 +2688,8 @@ namespace GraphicsUI
 		absX = absX + Left;
 		absY = absY + Top;
 		auto entry = GetEntry();
-		int checkBoxSize = GetEntry()->GetLineHeight();
-		int rad = checkBoxSize / 2;
+		int checkBoxSize = GetEntry()->CheckmarkLabel->TextWidth;
+		int rad = checkBoxSize / 2 + 1;
 		int dotX = absX + rad;
 		int dotY = absY + (Height >> 1);
 		auto & graphics = entry->DrawCommands;
@@ -2622,6 +2802,7 @@ namespace GraphicsUI
 		time = CoreLib::Diagnostics::PerformanceCounter::Start();
 		CursorPos = 0;
 		KeyDown = false;
+		DoDpiChanged();
 	}
 
 	const String CustomTextBox::GetText()
@@ -2999,6 +3180,19 @@ namespace GraphicsUI
 		SelLength = FText.Length();
 	}
 
+	void CustomTextBox::Posit(int pLeft, int pTop, int pWidth, int /*pHeight*/)
+	{
+		Control::Posit(pLeft, pTop, pWidth, Height);
+	}
+
+	void CustomTextBox::DoDpiChanged()
+	{
+		Changed = true;
+		if (font)
+			Height = (int)(font->MeasureString(L"M").h * 1.2f);
+		Container::DoDpiChanged();
+	}
+
 	bool IsSeparatorChar(wchar_t ch)
 	{
 		bool isLetter = (ch >= '0' && ch <= '9' || ch >= 'a' && ch <= 'z' || ch >= 'A' && ch <= 'Z' || ch == '_');
@@ -3055,9 +3249,8 @@ namespace GraphicsUI
 		entry->ClipRects->PopRect();
 		String ls;
 		ls= FText.SubString(0, CursorPos);
-		int csX = font->MeasureString(ls).w;
+		
 		int spX=0,epX=0;
-		csX+=LabelOffset;
 		//Draw Selection Rect
 			
 		if ((IsFocused() || menu->Visible) && SelLength!=0)
@@ -3082,6 +3275,8 @@ namespace GraphicsUI
 		int tick = int(timePassed / CURSOR_FREQUENCY);
 		if (IsFocused() && ((tick&1)==0 || KeyDown))
 		{
+			int csX = font->MeasureString(ls).w;
+			csX += LabelOffset;
 			AbsCursorPosX = absX+csX;
 			AbsCursorPosY = absY+Height-TextBorderX;
 			graphics.PenColor = Color(255 - BackColor.R, 255 - BackColor.G, 255 - BackColor.B, 255);
@@ -3294,6 +3489,12 @@ namespace GraphicsUI
 			Slider->Posit(0, Global::SCROLLBAR_BUTTON_SIZE,Width,PageSize);
 		}
 		SetValue(Min,Max,Position, PageSize);
+	}
+
+	void ScrollBar::DoDpiChanged()
+	{
+		Container::DoDpiChanged();
+		SizeChanged();
 	}
 
 	int ScrollBar::GetOrientation()
@@ -3566,8 +3767,7 @@ namespace GraphicsUI
 		DownInItem = false;
 		HotTrack = false;
 		SelectedIndex= -1;
-		ItemHeight = 18;
-		Margin = 2;
+		Padding = 1;
 		SelectionColor = Global::Colors.SelectionColor;
 		HighLightColor = Global::Colors.HighlightColor;
 		HighLightForeColor = Global::Colors.HighlightForeColor;
@@ -3579,6 +3779,7 @@ namespace GraphicsUI
 		ScrollBar->SetOrientation(SO_VERTICAL);
 		ScrollBar->Visible = false;
 		BorderWidth = 2;
+		DoDpiChanged();
 	}
 
 	bool ListBox::ItemInSelection(Control *Item)
@@ -3731,6 +3932,14 @@ namespace GraphicsUI
 	{
 		this->ScrollBar->DoMouseLeave();
 		return false;
+	}
+
+	void ListBox::DoDpiChanged()
+	{
+		ItemHeight = 18;
+		if (font)
+			ItemHeight = (int)(font->MeasureString(L"M").h * 1.1f);
+		Container::DoDpiChanged();
 	}
 
 	bool ListBox::DoMouseMove(int X, int Y)
@@ -3977,6 +4186,7 @@ namespace GraphicsUI
 		TextBox = new GraphicsUI::TextBox(this);
 		BorderStyle = BS_FLAT_;
 		TextBox->BorderStyle = BS_NONE;
+		TextBox->BackColor.A = 0;
 		TextBox->AcceptsFocus = false;
 		TextBox->TabStop = false;
 		ShowList = false;
@@ -3986,9 +4196,8 @@ namespace GraphicsUI
 		SelectionColor = BackColor;
 		SelectionForeColor = FontColor;
 		UnfocusedSelectionColor = BackColor;
-		ButtonSize = Global::SCROLLBAR_BUTTON_SIZE;
 		BorderWidth = 1;
-
+		DoDpiChanged();
 	}
 
 	bool ComboBox::DoClosePopup()
@@ -3997,23 +4206,28 @@ namespace GraphicsUI
 		return false;
 	}
 
+
 	void ComboBox::SetSelectedIndex(int id)
 	{
 		ChangeSelectedItem(id);
 	}
 
+	void ComboBox::DoDpiChanged()
+	{
+		ListBox::DoDpiChanged();
+		Posit(Left, Top, Width, Global::SCROLLBAR_BUTTON_SIZE + BorderWidth * 4);
+	}
+
+	void ComboBox::Posit(int x, int y, int w, int)
+	{
+		ListBox::Posit(x, y, w, Global::SCROLLBAR_BUTTON_SIZE + BorderWidth * 4);
+	}
+
 	void ComboBox::SizeChanged()
 	{
-		TextBox->Posit(BorderWidth,0,Width-ButtonSize-BorderWidth*2, Height);
-		btnDrop->Posit(Width-ButtonSize-BorderWidth,BorderWidth,ButtonSize,Height - BorderWidth * 2);
+		TextBox->Posit(BorderWidth, 0, Width - Global::SCROLLBAR_BUTTON_SIZE - BorderWidth * 2, Height);
+		btnDrop->Posit(Width - Global::SCROLLBAR_BUTTON_SIZE - BorderWidth, BorderWidth, Global::SCROLLBAR_BUTTON_SIZE, Height - BorderWidth * 2);
 	}
-
-	void ComboBox::Posit(int left, int top, int width, int height)
-	{
-		height = Global::SCROLLBAR_BUTTON_SIZE + BorderWidth * 4;
-		Control::Posit(left, top, width, height);
-	}
-
 	void ComboBox::Draw(int absX, int absY)
 	{
 		Control::Draw(absX, absY);
@@ -4385,8 +4599,9 @@ namespace GraphicsUI
 		Type = CT_MENU;
 		TabStop = s == msMainMenu;
 		TopMost = true;
-		Height = (Margin*2);
-		Width = (Margin*2);
+		Padding = 0;
+		Height = Padding.Vertical();
+		Width = Padding.Horizontal();
 		BorderStyle = BS_NONE;
 		BorderColor = Global::Colors.MenuBorderColor;
 		BackColor = Global::Colors.MenuBackColor;
@@ -4408,6 +4623,8 @@ namespace GraphicsUI
 			else if (parent->Type == CT_FORM)
 				((Form*)parent)->MainMenu = this;
 		}
+		else
+			Padding = 2;
 	}
 
 	void Menu::SetFocus()
@@ -4415,6 +4632,12 @@ namespace GraphicsUI
 		if (style == msMainMenu)
 			lastFocusedCtrl = GetEntry()->FocusedControl;
 		Container::SetFocus();	
+	}
+
+	void Menu::DoDpiChanged()
+	{
+		Container::DoDpiChanged();
+		PositMenuItems();
 	}
 
 	void Menu::PopupSubMenu(Menu * subMenu, int x, int y)
@@ -4453,8 +4676,8 @@ namespace GraphicsUI
 	{
 		Items.Add(item);
 		item->Parent = this;
-		if (Controls.IndexOf(item) == -1)
-			Controls.Add(item);
+		if (controls.IndexOf(item) == -1)
+			controls.Add(item);
 		PositMenuItems();
 	}
 
@@ -4467,10 +4690,10 @@ namespace GraphicsUI
 			Items[fid] = 0;
 			Items.RemoveAt(fid);
 		}
-		fid = Controls.IndexOf(item);
+		fid = controls.IndexOf(item);
 		if (fid != -1)
 		{
-			Controls.RemoveAt(fid);
+			controls.RemoveAt(fid);
 		}
 		PositMenuItems();
 	}
@@ -4479,30 +4702,30 @@ namespace GraphicsUI
 	{
 		if (style == msPopup)
 		{
-			int cHeight = 0;
+			int cHeight = Padding.Top;
 			Width = 0;
 			ItemHeight = (int)(GetEntry()->GetLineHeight() * 1.5f);
 			for (int i=0; i<Items.Count(); i++)
 			{
 				if (!Items[i]->Visible)
 					continue;
-				int nWidth = Items[i]->MeasureWidth()+ItemHeight;
-				if (nWidth > Width)
-					Width = nWidth;
+				int nWidth = Items[i]->MeasureWidth() + ItemHeight;
+				if (nWidth + Padding.Horizontal() > Width)
+					Width = nWidth + Padding.Horizontal();
 				if (Items[i]->IsSeperator())
 					Items[i]->SetHeight(ItemHeight>>2);
 				else
 					Items[i]->SetHeight(ItemHeight);
 					
-				Items[i]->Left = 0;
+				Items[i]->Left = Padding.Left;
 				Items[i]->Top = cHeight;
 
 				cHeight += Items[i]->GetHeight();
 			}
-			Height = cHeight + Margin*2;
+			Height = cHeight + Padding.Bottom;
 			for (int i=0; i<Items.Count(); i++)
 			{
-				Items[i]->SetWidth(Width - Margin*2);
+				Items[i]->SetWidth(Width - Padding.Horizontal());
 			}
 		}
 		else
@@ -4572,17 +4795,16 @@ namespace GraphicsUI
 		for (auto & item : Items)
 			ItemHeight = Math::Max(ItemHeight, item->GetHeight());
 		graphics.SolidBrushColor = Global::Colors.MemuIconBackColor;
-		graphics.FillRectangle(0, Margin, ItemHeight + Margin, Height);
+		graphics.FillRectangle(Padding.Left, Padding.Top, ItemHeight + Padding.Left, Height - Padding.Bottom);
 		graphics.PenColor = Global::Colors.MenuBorderColor;
-		graphics.DrawRectangle(0,0,Width-1,Height-1);
-		graphics.DrawLine(ItemHeight+Margin, Margin, ItemHeight+Margin, Height-Margin);
+		graphics.DrawRectangle(0, 0, Width - 1, Height - 1);
+		graphics.DrawLine(ItemHeight+Padding.Left, Padding.Top, ItemHeight + Padding.Left, Height - Padding.Bottom - 1);
 		int cposY = 0;
-
 		for (int i =0; i<Items.Count(); i++)
 		{
 			int itemHeight = Items[i]->GetHeight();
-			graphics.SetRenderTransform(absX + Margin, absY + Margin + cposY);
-			Items[i]->DrawMenuItem(Width, ItemHeight);
+			graphics.SetRenderTransform(absX + Padding.Left, absY + Padding.Top + cposY);
+			Items[i]->DrawMenuItem(Width - Padding.Horizontal(), ItemHeight);
 			cposY += itemHeight;
 		}
 		graphics.SetRenderTransform(0, 0);
@@ -4633,6 +4855,8 @@ namespace GraphicsUI
 			enableMouseHover = false;
 			curSubMenu = nullptr;
 			ReleaseMouse();
+			if (Global::MouseCaptureControl && Global::MouseCaptureControl->IsChildOf(this))
+				Global::MouseCaptureControl = nullptr;
 		}
 	}
 
@@ -4640,8 +4864,8 @@ namespace GraphicsUI
 	{
 		Control::Draw(absX, absY);
 		auto entry = GetEntry();
-		int ox = absX + Left;
-		int oy = absY + Top;
+		int ox = absX + Left + Padding.Left;
+		int oy = absY + Top + Padding.Top;
 		int cposY = 0;
 		auto & graphics = entry->DrawCommands;
 		for (int i = 0; i < Items.Count(); i++)
@@ -4683,7 +4907,7 @@ namespace GraphicsUI
 			return false;
 		for (auto & item : Items)
 		{
-			if (X >= item->Left && X <= item->Left + item->Width &&
+			if (X >= item->Left && X < item->Left + item->Width &&
 				Y >= item->Top && Y < item->Top + item->Height)
 			{
 				item->Selected = true;
@@ -4717,7 +4941,7 @@ namespace GraphicsUI
 						if (style == Menu::msMainMenu)
 						{
 							CloseSubMenu();
-							PopupSubMenu(item->SubMenu, 0, Height);
+							PopupSubMenu(item->SubMenu, -item->Padding.Left, Height - item->Padding.Vertical());
 						}
 					}
 				}
@@ -4743,7 +4967,7 @@ namespace GraphicsUI
 		else
 		{
 			for (auto & item : Items)
-				if (X >= item->Left && X <= item->Left + item->Width &&
+				if (X >= item->Left && X < item->Left + item->Width &&
 					Y >= item->Top && Y <= item->Top + item->Height)
 					item->DoMouseDown(X - item->Left, Y - item->Top, Shift);
 			return true;
@@ -5115,6 +5339,7 @@ namespace GraphicsUI
 		Checked = false;
 		isButton = false;
 		accKey = 0;
+		DoDpiChanged();
 		if (!isSeperator)
 		{
 			lblText = new Label(this);
@@ -5150,13 +5375,12 @@ namespace GraphicsUI
 				if (SubMenu && SubMenu->Count())
 					rm = 8;
 				return lblText->TextWidth + 16 +
-					lblShortcut->TextWidth + 8 + Margin*2 + rm;
-					
+					lblShortcut->TextWidth + separatorHeading + Padding.Horizontal() + rm;
 			}
 		}
 		else
 		{
-			return lblText->TextWidth + Margin*2;
+			return lblText->TextWidth + separatorHeading + Padding.Horizontal();
 		}
 	}
 
@@ -5195,7 +5419,7 @@ namespace GraphicsUI
 		{
 			if (Parent)
 			{
-				((Menu *)Parent)->PopupSubMenu(SubMenu, Width - 2, 0);
+				((Menu *)Parent)->PopupSubMenu(SubMenu, Width - Padding.Left, -Padding.Top);
 			}
 		}
 		else
@@ -5293,31 +5517,26 @@ namespace GraphicsUI
 		}
 	}
 
-	void MenuItem::DrawMenuItem(int width, int height)
+	void MenuItem::DrawMenuItem(int width, int itemHeight)
 	{
 		auto entry = GetEntry();
 		auto & graphics = entry->DrawCommands;
 		if (isSeperator)
 		{
 			graphics.PenColor = Global::Colors.MenuItemDisabledForeColor;
-			graphics.DrawLine(height + Margin, Height >> 1, width-2, Height >> 1);
+			graphics.DrawLine(itemHeight + separatorHeading, Height >> 1, width, Height >> 1);
 		}
 		else
 		{
 			if (Selected || (SubMenu && SubMenu->Visible))
 			{
 				if (SubMenu && SubMenu->Visible)
-				{
 					graphics.SolidBrushColor = Global::Colors.ToolButtonBackColorPressed1;
-					graphics.FillRectangle(0, 0, width, height);
-				}
 				else
-				{
 					graphics.SolidBrushColor = Global::Colors.ToolButtonBackColorHighlight1;
-					graphics.FillRectangle(Left, 0, Left + Width, Height);
-				}
+				graphics.FillRectangle(0, 0, width, itemHeight);
 			}
-			int top = (height - lblText->GetHeight()+2)/2;
+			int top = (itemHeight - lblText->GetHeight())/2;
 			if (!Enabled)
 			{
 				lblText->FontColor = Global::Colors.MenuItemDisabledForeColor;
@@ -5336,14 +5555,15 @@ namespace GraphicsUI
 					lblShortcut->FontColor = Global::Colors.MenuItemForeColor;
 				}
 			}
-			lblText->Draw(height + Margin, top);
-			lblShortcut->Draw(width - Margin-8-lblShortcut->GetWidth(), top);
+			lblText->Draw(itemHeight + separatorHeading, top);
+			lblShortcut->Draw(width - Padding.Right - lblShortcut->GetWidth(), top);
 			if (SubMenu && SubMenu->Count())
 			{
-				int x1 = Width - 12;
-				int y1 = height/2 - 5;
+				int size = GetEntry()->GetLineHeight() >> 1;
+				int x1 = width - Padding.Right;
+				int y1 = itemHeight / 2 - size / 2;
 				graphics.SolidBrushColor = lblText->FontColor;
-				graphics.FillTriangle(x1, y1, x1 + 5, y1 + 5, x1, y1 + 10);
+				graphics.FillTriangle(x1, y1, x1 + size / 2, itemHeight / 2, x1, y1 + size);
 			}
 			if (Checked)
 			{
@@ -5353,15 +5573,15 @@ namespace GraphicsUI
 				else
 					graphics.SolidBrushColor = Global::Colors.ToolButtonBackColorHighlight1;
 				const int IconMargin = 2;
-				graphics.FillRectangle(0, 0, Height - IconMargin, Height-IconMargin);
+				graphics.FillRectangle(0, 0, itemHeight, itemHeight);
 				if (!Selected)
 				{
 					graphics.PenColor = Global::Colors.ToolButtonBorderHighLight;
 					graphics.DrawRectangle(IconMargin, IconMargin, Height - IconMargin, Height-IconMargin);
 				}
 				entry->CheckmarkLabel->FontColor = lblText->FontColor;
-				entry->CheckmarkLabel->Draw((Height- entry->CheckmarkLabel->GetHeight())/2 + 2,
-					(Height- entry->CheckmarkLabel->GetHeight())/2);
+				entry->CheckmarkLabel->Draw((itemHeight - entry->CheckmarkLabel->GetHeight())/2 + 2,
+					(itemHeight - entry->CheckmarkLabel->GetHeight())/2);
 			}
 			
 		}
@@ -5372,6 +5592,12 @@ namespace GraphicsUI
 		Control::HandleMessage(Args);
 	}
 
+	void MenuItem::DoDpiChanged()
+	{
+		Container::DoDpiChanged();
+		Padding.Left = Padding.Right = GetEntry()->GetLineHeight() / 2;
+	}
+
 	void MenuItem::Hit()
 	{
 		Menu * mn = (Menu*)Parent;
@@ -5379,9 +5605,9 @@ namespace GraphicsUI
 		if (Parent && SubMenu && SubMenu->Count())
 		{
 			if (isButton)
-				mn->PopupSubMenu(SubMenu, 0, Height);
+				mn->PopupSubMenu(SubMenu, -Padding.Left, Height - Padding.Vertical());
 			else
-				mn->PopupSubMenu(SubMenu, Width - 2, 0);
+				mn->PopupSubMenu(SubMenu, Width - Padding.Left, -Padding.Top);
 		}
 		else
 		{
@@ -5485,6 +5711,7 @@ namespace GraphicsUI
 		ShowText = false;
 		lblText = new Label(this);
 		bindButton = 0;
+		Padding = imageLabelPadding = GetEntry()->GetLineHeight() / 4;
 	}
 
 	void ToolButton::SetImage(IImage * bmp)
@@ -5535,13 +5762,13 @@ namespace GraphicsUI
 	int ToolButton::MeasureWidth()
 	{
 		int imgSize = image?image->GetWidth():0;
-		int textWidth = 4 + lblText->GetWidth();
+		int textWidth = imageLabelPadding + lblText->GetWidth();
 		if (ButtonStyle == bsNormal)
-			return imgSize + Margin * 2 + (ShowText?textWidth:0);
+			return imgSize + Padding.Horizontal() + (ShowText ? textWidth:0);
 		else if (ButtonStyle == bsDropDown)
 			return DropDownButtonWidth;
 		else
-			return 3;
+			return Padding.Horizontal();
 	}
 
 	int ToolButton::MeasureHeight()
@@ -5549,7 +5776,7 @@ namespace GraphicsUI
 		int imgSize = image?image->GetHeight():0;
 		if (lblText->GetHeight() > imgSize)
 			imgSize = lblText->GetHeight();
-		return imgSize + Margin * 2;
+		return imgSize + Padding.Vertical();
 	}
 
 	bool ToolButton::DoMouseDown(int X, int Y, SHIFTSTATE shift)
@@ -5640,7 +5867,7 @@ namespace GraphicsUI
 			{
 				if (image)
 				{
-					imgX += Margin;
+					imgX += imageLabelPadding;
 					imgY += (Height-image->GetHeight())/2;
 				}
 			}
@@ -5661,7 +5888,7 @@ namespace GraphicsUI
 			if (ShowText)
 			{
 				int imgw = (image?image->GetWidth():0);
-				lblText->Draw(imgX+imgw+Margin, absY + (Height-lblText->GetHeight())/2);
+				lblText->Draw(imgX + imgw + imageLabelPadding, absY + (Height-lblText->GetHeight())/2);
 			}
 
 		}
@@ -5686,7 +5913,7 @@ namespace GraphicsUI
 		MultiLine = false;
 		FullLineFill = true;
 		ShowText = false;
-		Orientation = Horizontal;
+		SetOrientation(Horizontal);
 	}
 
 	ToolButton * ToolStrip::AddButton(const String &text, IImage *bmp)
@@ -5714,6 +5941,22 @@ namespace GraphicsUI
 		return false;
 	}
 
+	void ToolStrip::SetOrientation(ToolStripOrientation ori)
+	{
+		orientation = ori;
+		Padding = 0;
+		if (orientation == Horizontal)
+		{
+			Padding.Left = GetEntry()->GetLineHeight() / 2;
+			Padding.Top = Padding.Bottom = Padding.Left / 2;
+		}
+		else
+		{
+			Padding.Top = GetEntry()->GetLineHeight() / 2;
+			Padding.Left = Padding.Right = Padding.Top / 2;
+		}
+	}
+
 	ToolButton * ToolStrip::GetButton(int id)
 	{
 		return buttons[id];
@@ -5732,8 +5975,8 @@ namespace GraphicsUI
 
 	void ToolStrip::PositButtons()
 	{
-		int left = LeftMargin;
-		if (Orientation == Horizontal)
+		int left = Padding.Left;
+		if (orientation == Horizontal)
 		{
 			if (!MultiLine)
 			{
@@ -5754,18 +5997,17 @@ namespace GraphicsUI
 				{
 					if (!buttons[i]->Visible)
 						continue;
-					buttons[i]->Posit(left, TopMargin, buttons[i]->MeasureWidth(), maxH);
+					buttons[i]->Posit(left, 0, buttons[i]->MeasureWidth(), maxH);
 					left += buttons[i]->GetWidth();
 				}
-				left += LeftMargin;
-				Width = left;
-				Height = maxH + TopMargin * 2;
+				Width = left + Padding.Right;
+				Height = maxH + Padding.Vertical();
 			}
 		}
 		else
 		{
 			int maxW = 0, maxH = 0;
-			int top = TopMargin;
+			int top = Padding.Top;
 			for (int i=0; i<buttons.Count(); i++)
 			{
 				buttons[i]->ShowText = ShowText;
@@ -5786,8 +6028,7 @@ namespace GraphicsUI
 				buttons[i]->Posit(0, top, w, buttons[i]->MeasureHeight());
 				top += buttons[i]->GetHeight();
 			}
-			top += TopMargin;
-			Height = top;
+			Height = top + Padding.Top;
 		}
 	}
 
@@ -5894,7 +6135,7 @@ namespace GraphicsUI
 	{
 		Control::Draw(absX, absY);
 		auto entry = GetEntry();
-		entry->ClipRects->PushRect(Rect(absX + Left, absY + Top, Width - text->TextHeight, Height));
+		entry->ClipRects->AddRect(Rect(absX + Left, absY + Top, Width - text->TextHeight, Height));
 		text->Draw(absX+Left, absY+Top + ((Height - text->TextHeight) >> 1));
 		entry->ClipRects->PopRect();
 	}
@@ -5902,10 +6143,8 @@ namespace GraphicsUI
 	StatusStrip::StatusStrip(Container * parent)
 		: Container(parent)
 	{
-		LeftMargin = 8;
-		TopMargin = 1;
 		DockStyle = dsBottom;
-		Height = (int)(GetEntry()->GetLineHeight() * 1.2f);
+		DoDpiChanged();
 	}
 
 	void StatusStrip::AddItem(GraphicsUI::StatusPanel *panel)
@@ -5927,7 +6166,7 @@ namespace GraphicsUI
 	void StatusStrip::PositItems()
 	{
 		int fc = 0;
-		int w = Width-LeftMargin;
+		int w = Width - Padding.Horizontal();
 		for (int i=0; i<panels.Count(); i++)
 		{
 			int cw = panels[i]->MeasureWidth();
@@ -5936,23 +6175,22 @@ namespace GraphicsUI
 			else
 				fc ++;
 		}
-		w-=LeftMargin;
 		if (fc == 0)
 			fc = 1;
 		int fw = w/fc;
-		int h = Height - TopMargin*2;
-		int left = LeftMargin;
+		int h = Height - Padding.Vertical();
+		int left = 0;
 		for (int i=0; i<panels.Count(); i++)
 		{
 			int cw = panels[i]->MeasureWidth();
 			if (cw != -1)
 			{
-				panels[i]->Posit(left, TopMargin, cw, h);
+				panels[i]->Posit(left, 0, cw, h);
 				left += cw;
 			}
 			else
 			{
-				panels[i]->Posit(left, TopMargin, fw, h);
+				panels[i]->Posit(left, 0, fw, h);
 				left += fw;
 			}
 		}
@@ -5996,6 +6234,15 @@ namespace GraphicsUI
 		return false;
 	}
 
+	void StatusStrip::DoDpiChanged()
+	{
+		Container::DoDpiChanged();
+		Padding.Top = Padding.Bottom = 0;
+		Padding.Left = Padding.Right = GetEntry()->GetLineHeight() / 2;
+		Height = (int)(GetEntry()->GetLineHeight() * 1.2f);
+		PositItems();
+	}
+
 	bool StatusStrip::DoMouseDown(int X, int Y, SHIFTSTATE Shift)
 	{
 		Control::DoMouseDown(X,Y,Shift);
@@ -6012,8 +6259,17 @@ namespace GraphicsUI
 		: Container(parent)
 	{
 		text = new Label(this);
+		text->Visible = false;
 		BorderStyle = BS_NONE;
 		parent->AddItem(this);
+		imageTextPadding = GetEntry()->GetLineHeight() / 2;
+		Padding = imageTextPadding;
+	}
+
+	TabPage::TabPage(TabControl * parent, CoreLib::String text)
+		: TabPage(parent)
+	{
+		SetText(text);
 	}
 
 	void TabPage::SetText(const String &_text)
@@ -6036,11 +6292,11 @@ namespace GraphicsUI
 		switch (style)
 		{
 		case TabControl::tsImage:
-			return (image?image->GetWidth():0)+LeftMargin*2;
+			return (image?image->GetWidth():0);
 		case TabControl::tsText:
-			return text->GetWidth() + LeftMargin * 2;
+			return text->GetWidth();
 		case TabControl::tsTextImage:
-			return text->GetWidth() + (image?image->GetWidth()+LeftMargin:0) + LeftMargin * 2;
+			return text->GetWidth() + (image?image->GetWidth() + imageTextPadding : 0);
 		default:
 			return 0;
 		}
@@ -6051,11 +6307,11 @@ namespace GraphicsUI
 		switch (style)
 		{
 		case TabControl::tsImage:
-			return (image?image->GetHeight():0)+TopMargin*2;
+			return (image?image->GetHeight():0);
 		case TabControl::tsText:
-			return text->GetHeight() + TopMargin * 2;
+			return text->GetHeight() + Padding.Vertical();
 		case TabControl::tsTextImage:
-			return Math::Max(text->GetHeight(), (image?image->GetHeight():0))+ TopMargin * 2;
+			return Math::Max(text->GetHeight(), (image?image->GetHeight():0));
 		default:
 			return 0;
 		}
@@ -6070,6 +6326,7 @@ namespace GraphicsUI
 		CanMove = false;
 		TabStyle = tsTextImage;
 		TabPosition = tpTop;
+		DoDpiChanged();
 	}
 
 	void TabControl::SetClient()
@@ -6141,30 +6398,30 @@ namespace GraphicsUI
 			return 0;
 	}
 
-	void TabPage::DrawHeader(int x, int y, int h, TabControl::_TabStyle style)
+	void TabPage::DrawHeader(int x, int y, int h, const MarginValues & headerPadding, TabControl::_TabStyle style)
 	{
 		switch (style)
 		{
 		case TabControl::tsTextImage:
 			{
-				int cw = x + LeftMargin;
+				int cw = x + headerPadding.Left;
 				if (image)
 				{
-					GetEntry()->DrawCommands.DrawImage(image.Ptr(), cw, y + TopMargin);
-					cw += image->GetWidth() + LeftMargin;
+					GetEntry()->DrawCommands.DrawImage(image.Ptr(), cw, y + headerPadding.Top);
+					cw += image->GetWidth() + imageTextPadding;
 				}
 				text->Draw(cw, y + (h-text->GetHeight())/2);
 			}
 			break;
 		case TabControl::tsText:
 			{
-				text->Draw(x+LeftMargin, y+TopMargin);
+				text->Draw(x + Padding.Left, y + Padding.Top);
 			}
 			break;
 		case TabControl::tsImage:
 			{
 				if (image)
-					GetEntry()->DrawCommands.DrawImage(image.Ptr(), x + LeftMargin, y + TopMargin);
+					GetEntry()->DrawCommands.DrawImage(image.Ptr(), x + headerPadding.Left, y + headerPadding.Top);
 			}
 			break;
 		}
@@ -6179,7 +6436,7 @@ namespace GraphicsUI
 			if (ch>h)
 				h = ch;
 		}
-		return h;
+		return h + HeaderPadding.Vertical();
 	}
 
 	int TabControl::HitTest(int X, int Y)
@@ -6196,7 +6453,7 @@ namespace GraphicsUI
 			int cw = 0;
 			for (int i=0; i<pages.Count(); i++)
 			{
-				int pw = pages[i]->MeasureWidth(TabStyle);
+				int pw = pages[i]->MeasureWidth(TabStyle) + HeaderPadding.Horizontal();
 				if (X>cw && X<=cw+pw)
 				{
 					return i;
@@ -6211,7 +6468,7 @@ namespace GraphicsUI
 
 	void TabControl::SizeChanged()
 	{
-		Container::SizeChanged();
+		Control::SizeChanged();
 		SetClient();
 	}
 
@@ -6243,10 +6500,17 @@ namespace GraphicsUI
 		return false;
 	}
 
+	void TabControl::DoDpiChanged()
+	{
+		Container::DoDpiChanged();
+		HeaderPadding.Left = HeaderPadding.Right = GetEntry()->GetLineHeight() / 2;
+		HeaderPadding.Top = HeaderPadding.Bottom = HeaderPadding.Left / 4;
+		headerHeight = MeasureHeight() + HeaderPadding.Vertical();
+	}
+
 	void TabControl::Draw(int absX, int absY)
 	{
 		SetClient();
-		headerHeight = MeasureHeight();
 		absX += Left;
 		absY += Top;
 		if (!Visible)
@@ -6268,7 +6532,7 @@ namespace GraphicsUI
 		int h0 = Height-headerHeight-1;
 		for (int i=0; i<pages.Count(); i++)
 		{
-			int pw = pages[i]->MeasureWidth(TabStyle);
+			int pw = pages[i]->MeasureWidth(TabStyle) + HeaderPadding.Horizontal();
 			if (cw + pw > maxWidth)
 				break;
 			if (SelectedIndex != i && highlightItem != i)
@@ -6288,13 +6552,13 @@ namespace GraphicsUI
 			{
 				graphics.FillRectangle(cw, 0, cw+pw, headerHeight);
 				graphics.DrawLine(cw,0,cw+pw,0);
-				graphics.DrawLine(cw,0, cw, headerHeight);
-				graphics.DrawLine(cw+pw,0, cw+pw, headerHeight);
+				graphics.DrawLine(cw,0, cw, headerHeight - 2);
+				graphics.DrawLine(cw+pw,0, cw+pw, headerHeight - 2);
 				if (SelectedIndex != i)
 				{
-					graphics.DrawLine(cw, headerHeight, cw+pw, headerHeight);
+					graphics.DrawLine(cw, headerHeight - 1, cw+pw, headerHeight - 1);
 				}
-				pages[i]->DrawHeader(cw, 0, headerHeight, TabStyle);
+				pages[i]->DrawHeader(cw, 0, headerHeight, HeaderPadding, TabStyle);
 			}
 			else
 			{
@@ -6306,7 +6570,7 @@ namespace GraphicsUI
 				{
 					graphics.DrawLine(cw,h0,cw+pw,h0);
 				}
-				pages[i]->DrawHeader(cw, h0, headerHeight, TabStyle);
+				pages[i]->DrawHeader(cw, h0, headerHeight, HeaderPadding, TabStyle);
 			}
 				
 			cw += pw;
@@ -6464,14 +6728,16 @@ namespace GraphicsUI
 		vscrollBar->DockStyle = dsRight;
 		vscrollBar->SmallChange = 30;
 		vscrollBar->OnChanged.Bind(this, &VScrollPanel::ScrollBar_Changed);
+		content->AutoHeight = true;
 		BorderStyle = content->BorderStyle = BS_NONE;
 		BackColor.A = content->BackColor.A = 0;
 	}
 	void VScrollPanel::SizeChanged()
 	{
-		int maxY = 0;
-		for (auto & ctrl : content->Controls)
-			maxY = Math::Max(ctrl->Top + ctrl->GetHeight(), maxY);
+		content->SizeChanged();
+		//for (auto & ctrl : content->GetChildren())
+		//	maxY = Math::Max(ctrl->Top + ctrl->GetHeight(), maxY);
+		int maxY = content->GetHeight();
 		auto entry = GetEntry();
 		vscrollBar->LargeChange = Math::Max(Height - 30, 10);
 		if (maxY > Height)
@@ -6534,11 +6800,19 @@ namespace GraphicsUI
 			}
 		}
 	}
+	ContainerLayoutType VScrollPanel::GetLayout()
+	{
+		return content->GetLayout();
+	}
+	void VScrollPanel::SetLayout(ContainerLayoutType pLayout)
+	{
+		content->SetLayout(pLayout);
+	}
 	void VScrollPanel::ClearChildren()
 	{
-		for (auto & child : content->Controls)
+		for (auto & child : content->GetChildren())
 			child = nullptr;
-		content->Controls.Clear();
+		content->GetChildren().Clear();
 	}
 	int VScrollPanel::GetClientWidth()
 	{
