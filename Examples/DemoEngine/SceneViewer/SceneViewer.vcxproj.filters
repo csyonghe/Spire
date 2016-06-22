@@ -32,4 +32,7 @@
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <Manifest Include="SceneViewer.exe.manifest" />
+  </ItemGroup>
 </Project>
