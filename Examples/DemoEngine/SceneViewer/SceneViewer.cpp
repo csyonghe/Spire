@@ -837,16 +837,19 @@ namespace SceneViewer
 	};
 }
 
-int main(int argc, char* argv[])
+int CALLBACK wWinMain(
+	_In_ HINSTANCE hInstance,
+	_In_ HINSTANCE hPrevInstance,
+	_In_ LPWSTR     lpCmdLine,
+	_In_ int       nCmdShow
+)
 {
-	ShowWindow(GetConsoleWindow(), SW_HIDE);
-
-	Application::Init();
+	Application::Init(hInstance, hPrevInstance, lpCmdLine, nCmdShow);
 	try
 	{
 		String sceneName;
-		if (argc == 2)
-			sceneName = argv[1];
+		CommandLineParser cmdParser(lpCmdLine);
+		sceneName = cmdParser.GetFileName();
 		
 		auto form = new SceneViewer::MainForm(L"");
 		if (sceneName.Length())
