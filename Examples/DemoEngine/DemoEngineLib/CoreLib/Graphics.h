@@ -630,6 +630,7 @@ namespace GraphicsUI
 		static int EventGUID;
 		static int HoverTimeThreshold;
 		static Control * PointedComponent;
+		static Control * MouseDownControl;
 		static Control * MouseCaptureControl;
 		static int CursorPosX;
 		static int CursorPosY;
@@ -657,7 +658,7 @@ namespace GraphicsUI
 		UIEntry * entryCache = nullptr;
 		IFont * font = nullptr;
 		Rect clientRect;
-		bool LastInClient, IsMouseDown = false;
+		bool LastInClient;
 		bool TopMost;
 		int Height, Width;
 		bool IsPointInClient(int X, int Y);
@@ -786,20 +787,20 @@ namespace GraphicsUI
 		virtual void RemoveChild(Control *AControl);
 		virtual void ArrangeControls(Rect initalClientRect);
 		virtual void InternalBroadcastMessage(UI_MsgArgs *Args);
-		virtual bool DoDblClick();
-		virtual bool DoMouseLeave();
-		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift);
-		virtual bool DoKeyUp(unsigned short Key, SHIFTSTATE Shift);
-		virtual bool DoKeyPress(unsigned short Key, SHIFTSTATE Shift);
+		virtual bool DoDblClick() override;
+		virtual bool DoMouseLeave() override;
+		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift)override;
+		virtual bool DoKeyUp(unsigned short Key, SHIFTSTATE Shift)override;
+		virtual bool DoKeyPress(unsigned short Key, SHIFTSTATE Shift)override;
 		virtual void DoFocusChange();
-		virtual void Draw(int absX, int absY);
+		virtual void Draw(int absX, int absY) override;
 		virtual void DrawChildren(int absX, int absY);
-		virtual void SizeChanged();
-		virtual bool DoClosePopup();
-		virtual void KillFocus();
+		virtual void SizeChanged() override;
+		virtual bool DoClosePopup() override;
+		virtual void KillFocus() override;
 		virtual ContainerLayoutType GetLayout() { return layout; }
 		virtual void SetLayout(ContainerLayoutType layout);
-		virtual void DoDpiChanged();
+		virtual void DoDpiChanged() override;
 	};
 
 	class Label;
@@ -894,6 +895,8 @@ namespace GraphicsUI
 
 	class Button: public Label
 	{
+	private:
+		bool IsMouseDown = false;
 	public:
 		Button(Container * parent);
 		Button(Container * parent, const CoreLib::String & text);
@@ -902,6 +905,7 @@ namespace GraphicsUI
 		virtual void Draw(int absX, int absY) override;
 		virtual bool DoMouseDown(int X, int Y, SHIFTSTATE Shift) override;
 		virtual bool DoMouseUp(int X, int Y, SHIFTSTATE Shift) override;
+		virtual bool DoMouseLeave() override;
 		virtual bool DoDblClick() override;
 		virtual bool DoKeyDown(unsigned short Key, SHIFTSTATE Shift) override;
 		virtual bool DoKeyUp(unsigned short Key, SHIFTSTATE Shift) override;

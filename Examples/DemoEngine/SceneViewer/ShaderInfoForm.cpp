@@ -1,8 +1,10 @@
 #include "ShaderInfoForm.h"
 
+#define EM(x) GraphicsUI::emToPixel(x)
+
 namespace SceneViewer
 {
-	const int columnWidth = 200;
+	const float columnWidth = 8.0f;
 
 	ShaderInfoForm::ShaderInfoForm(GraphicsUI::UIEntry * entry)
 		: GraphicsUI::Form(entry)
@@ -24,7 +26,7 @@ namespace SceneViewer
 		for (auto & child : contentBox->GetChildren())
 			child = nullptr;
 		contentBox->GetChildren().Clear();
-		const int leftMargin = 20;
+		const int leftMargin = EM(0.5f);
 		auto titleFont = GetEntry()->System->LoadDefaultFont(GraphicsUI::DefaultFontType::Title);
 		
 		int wid = 0;
@@ -35,7 +37,7 @@ namespace SceneViewer
 		{
 			auto worldLbl = new GraphicsUI::Label(contentBox);
 			worldLbl->AutoSize = true;
-			worldLbl->Posit(wid * columnWidth + 20, 10, 100, 30);
+			worldLbl->Posit(EM(wid * columnWidth + 0.5f), EM(0.5f), EM(columnWidth), EM(1.1f));
 			worldLbl->SetText(w.Key);
 			worldLbl->SetWidth(worldLbl->GetWidth() + 8);
 			worldLbl->FontColor = GraphicsUI::Color(255, 255, 255);
@@ -61,7 +63,7 @@ namespace SceneViewer
 				compLbl->Posit(0, 0, 100, 30);
 				compLbl->SetText(comp);
 				int x, y;
-				if (curX + compLbl->GetWidth() + 8 < columnWidth)
+				if (curX > leftMargin && curX + compLbl->GetWidth() + EM(0.5f) < columnWidth)
 				{
 					x = curX;
 				}
@@ -70,16 +72,16 @@ namespace SceneViewer
 					curRow++;
 					x = curX = leftMargin;
 				}
-				y = curRow * lineHeight + 50;
+				y = curRow * lineHeight + EM(1.5f);
 				compLbl->BorderColor.A = 0;
 				compLbl->BackColor = GraphicsUI::Color(90,90,90,160);
 				compLbl->FontColor = isInInterface ? GraphicsUI::Color(255, 220, 128) : GraphicsUI::Color(255, 255, 255);
-				compLbl->Left = curX + wid * columnWidth;
+				compLbl->Left = curX + wid * EM(columnWidth);
 				compLbl->Top = y;
 				
-				compLbl->SetWidth(Math::Min(compLbl->GetWidth() + 4, (wid + 1) * columnWidth - 10 - compLbl->Left));
+				compLbl->SetWidth(Math::Min(compLbl->GetWidth() + 4, (wid + 1) * EM(columnWidth) - EM(0.2f) - compLbl->Left));
 				compLbl->BorderStyle = GraphicsUI::BS_FLAT_;
-				curX += compLbl->GetWidth() + 12;
+				curX += compLbl->GetWidth() + EM(0.5f);
 				maxY = Math::Max(y + lineHeight, maxY);
 				maxX = Math::Max(compLbl->Left + compLbl->GetWidth(), maxX);
 			}
@@ -88,7 +90,7 @@ namespace SceneViewer
 		for (int i = 1; i < metaData.Worlds.Count(); i++)
 		{
 			auto line = new GraphicsUI::Line(contentBox);
-			line->Posit(i * columnWidth + 10, 0, 1, maxY);
+			line->Posit(i * EM(columnWidth) + EM(0.2f), 0, 1, maxY);
 		}
 		contentBox->SetWidth(maxX);
 		contentBox->SetHeight(maxY);
@@ -104,7 +106,7 @@ namespace SceneViewer
 			offsetY += dy;
 			lastX = x;
 			lastY = y;
-			int xBound = -Math::Max(0, (metaData.Worlds.Count() - 1)) * columnWidth;
+			int xBound = -Math::Max(0, (metaData.Worlds.Count() - 1)) * EM(columnWidth);
 			if (offsetX < xBound)
 				offsetX = xBound;
 			if (offsetY < -maxY + this->GetClientHeight())

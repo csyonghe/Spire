@@ -1670,6 +1670,8 @@ namespace GraphicsUI
 
 	Control * Global::PointedComponent = nullptr;
 	Control * Global::MouseCaptureControl = nullptr;
+	Control * Global::MouseDownControl = nullptr;
+
 
 	Control * lastFocusedCtrl = 0;
 
@@ -2283,11 +2285,6 @@ namespace GraphicsUI
 			return false;
 		if (IsPointInClient(X,Y))
 		{
-			if (Shift == SS_BUTTONLEFT)
-			{
-				IsMouseDown = true;
-				Global::MouseCaptureControl = this;
-			}
 			GetEntry()->System->SwitchCursor(Cursor);
 			UI_MsgArgs Args;UIMouseEventArgs Data;
 			Args.Sender = this;	Args.Type = MSG_UI_MOUSEDOWN;
@@ -2304,19 +2301,17 @@ namespace GraphicsUI
 	{
 		if (!Enabled || !Visible)
 			return false;
-			
-		if (IsPointInClient(X,Y))
-		{
-			if (IsMouseDown && (Shift & SS_BUTTONLEFT) && Visible)
-				DoClick();
-		}
-		IsMouseDown = false;
 		UI_MsgArgs Args;UIMouseEventArgs Data;
 		Args.Sender = this;	Args.Type = MSG_UI_MOUSEUP;
 		Data.Shift = Shift;	Data.X = X;	Data.Y = Y;
 		Args.Data = &Data;
 		BroadcastMessage(&Args);
-		ReleaseMouse();
+		if (this == Global::MouseDownControl)
+		{
+			Args.Sender = this; Args.Type = MSG_UI_CLICK;
+			Args.Data = nullptr;
+			BroadcastMessage(&Args);
+		}
 		return false;
 	}
 
@@ -2694,6 +2689,7 @@ namespace GraphicsUI
 			return false;
 		if (Shift == SS_BUTTONLEFT)
 		{
+			IsMouseDown = true;
 			BorderStyle = BS_LOWERED;
 		}
 		return true;
@@ -2702,6 +2698,14 @@ namespace GraphicsUI
 	bool Button::DoMouseUp(int X, int Y, SHIFTSTATE Shift)
 	{
 		Label::DoMouseUp(X,Y,Shift);
+		IsMouseDown = false;
+		BorderStyle = BS_RAISED;
+		return true;
+	}
+
+	bool Button::DoMouseLeave()
+	{
+		IsMouseDown = false;
 		BorderStyle = BS_RAISED;
 		return true;
 	}
@@ -3505,9 +3509,14 @@ namespace GraphicsUI
 			{
 				if (Forms.Count())
 				{
-					auto window = Forms.First();
-					//window->SetFocus();
-					ShowWindow(window);
+					for (int i = 0; i < Forms.Count(); i++)
+					{
+						if (Forms[i]->Visible && Forms[i]->Enabled)
+						{
+							ShowWindow(Forms[i]);
+							break;
+						}
+					}
 				}
 			}
 			else
@@ -3650,6 +3659,7 @@ namespace GraphicsUI
 				ActiveForm = 0;
 			}
 		}
+		Global::MouseDownControl = Global::MouseCaptureControl ? Global::MouseCaptureControl : Global::PointedComponent;
 		Global::EventGUID ++;
 		bool processed = false;
 		BroadcastMouseMessage(controlStack, X, Y, [&](Control* ctrl, int x, int y)
@@ -3905,6 +3915,8 @@ namespace GraphicsUI
 		if (parent)
 		{
 			int idx = parent->GetChildren().IndexOf(ctrl);
+			if (idx == -1)
+				return nullptr;
 			for (int i = idx + 1; i < parent->GetChildren().Count(); i++)
 			{
 				if (parent->GetChildren()[i]->Enabled && parent->GetChildren()[i]->Visible)
