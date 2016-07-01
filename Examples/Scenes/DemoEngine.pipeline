@@ -83,4 +83,10 @@ pipeline EnginePipeline
     import textureImport(precomputeTex->shadowFs) using vert_uv;
 }
 
+module Shadow
+{
+    require vec3 pos;
+    public @(fs*, lqfs*) float shadow = computeShadow(pos);
+}
+
 using "Utils.shader";

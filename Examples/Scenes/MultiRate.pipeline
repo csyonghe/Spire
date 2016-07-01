@@ -132,4 +132,12 @@ pipeline MultiRatePipeline
     import textureImport(lowRes->fs) using screenCoord;
 }
 
+
+module Shadow
+{
+    require vec3 pos;
+    public @fs* float shadow = computeShadow(pos);
+}
+
+
 using "Utils.shader";

@@ -174,24 +174,47 @@ class UniformGLSLImportOperatorHandler : public GLSLImportOperatorHandler
 	{
 		if (block->Entries.Count() == 0)
 			return;
-		sb << L"layout(std140";
-		String strIndex;
-		if (block->Attributes.TryGetValue(L"Index", strIndex))
-			sb << L", binding = " << strIndex;
-		if (ctx.BackendArguments.ContainsKey(L"command_list"))
-			sb << L", commandBindableNV";
-		sb << L") ";
-		sb << L"uniform " << block->Name << L"\n{\n";
+		bool useBindlessTexture = ctx.BackendArguments.ContainsKey(L"bindless_texture");
+		int activeEntryCount = 0;
 		for (auto & ent : block->Entries)
 		{
-			sb << ent.Value.Type->ToString() << L" " << ent.Key << L";\n";
+			if (useBindlessTexture || !ent.Value.Type->IsTexture())
+				activeEntryCount++;
 		}
-		sb << L"} blk" << block->Name << L";\n";
+		if (activeEntryCount)
+		{
+			sb << L"layout(std140";
+			String strIndex;
+			if (block->Attributes.TryGetValue(L"Index", strIndex))
+				sb << L", binding = " << strIndex;
+			if (ctx.BackendArguments.ContainsKey(L"command_list"))
+				sb << L", commandBindableNV";
+			sb << L") ";
+			sb << L"uniform " << block->Name << L"\n{\n";
+			for (auto & ent : block->Entries)
+			{
+				if (!useBindlessTexture && ent.Value.Type->IsTexture())
+					continue;
+				sb << ent.Value.Type->ToString() << L" " << ent.Key << L";\n";
+			}
+			sb << L"} blk" << block->Name << L";\n";
+		}
+		if (!useBindlessTexture)
+		{
+			for (auto & ent : block->Entries)
+			{
+				if (ent.Value.Type->IsTexture())
+					sb << L"uniform " << ent.Value.Type->ToString() << L" " << ent.Key << L";\n";
+			}
+		}
 	}
 	virtual void GenerateInterfaceLocalDefinition(StringBuilder & /*sb*/, ImportInstruction * instr, const ImportOperatorContext & ctx) override
 	{
 		auto block = ctx.SourceWorld->WorldOutput;
-		instr->Name = L"blk" + block->Name + L"." + instr->ComponentName;
+		if (ctx.BackendArguments.ContainsKey(L"bindless_texture") || !instr->Type->IsTexture())
+			instr->Name = L"blk" + block->Name + L"." + instr->ComponentName;
+		else
+			instr->Name = instr->ComponentName;
 	}
 };
 
