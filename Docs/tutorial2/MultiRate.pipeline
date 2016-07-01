@@ -28,29 +28,29 @@ pipeline MultiRatePipeline
     // compiled into a glsl vertex shader, and use texSpaceVert component as gl_Position
     // the "export standardExport" clause means that the output of this world should be
     // defined as standard "out" terms in the generated shader.
-    world objSurfaceVs: "glsl(vertex:texSpaceVert)" using texSpaceVert export standardExport;
+    world objSurfaceVs: "glsl(vertex:texSpaceVert;bindless_texture)" using texSpaceVert export standardExport;
    
     // objSurface world: corresponds to the fragment shader of object space shading phase.
     // the clause "export fragmentExport" means that the output of this world should be
     // declared as standard "out" terms in the generated shader, and informs the compiler
     // that the output of this world would be stored in textures.
     [InterfaceBlock: "ObjSpaceInput:5"]
-    world objSurface : "glsl" export fragmentExport;
+    world objSurface : "glsl;bindless_texture" export fragmentExport;
     
     // lowResVs world: the vertex shader for half resolution rendering phase.
-    world lowResVs : "glsl(vertex:projCoord;command_list)" using projCoord export standardExport;
+    world lowResVs : "glsl(vertex:projCoord;command_list;bindless_texture)" using projCoord export standardExport;
     
     // lowRes world: the fragment shader for half resolution rendering phase.
     [InterfaceBlock : "LowResInput:6"]
-    world lowRes : "glsl(command_list)" export fragmentExport;
+    world lowRes : "glsl(command_list;bindless_texture)" export fragmentExport;
     
     // vs world: correpond to vertex shader for the full resolution shading phase.
     // the "command_list" option informs the compiler that the shader will be used along with
     //  the NV_COMMAND_LIST OpenGL extension.
-    world vs : "glsl(vertex:projCoord;command_list)" using projCoord export standardExport;
+    world vs : "glsl(vertex:projCoord;command_list;bindless_texture)" using projCoord export standardExport;
     
     // fs world: correspond to the fragment shader for the full resolution shading phase.
-    world fs : "glsl(command_list)" export fragmentExport;
+    world fs : "glsl(command_list;bindless_texture)" export fragmentExport;
     
     // require all shaders written against this pipeline to provide a component named projCoord
     //    at vs and lowRes world. This will be used as the gl_Position output.

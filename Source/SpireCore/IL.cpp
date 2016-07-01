@@ -13,6 +13,8 @@ namespace Spire
 		{
 			if (str == L"int")
 				return ILBaseType::Int;
+			else if (str == L"uint")
+				return ILBaseType::UInt;
 			if (str == L"float")
 				return ILBaseType::Float;
 			if (str == L"vec2")
@@ -55,6 +57,8 @@ namespace Spire
 		{
 			if (type == ILBaseType::Int)
 				return 4;
+			if (type == ILBaseType::UInt)
+				return 4;
 			else if (type == ILBaseType::Int2)
 				return 8;
 			else if (type == ILBaseType::Int3)
@@ -88,6 +92,8 @@ namespace Spire
 		int AlignmentOfBaseType(ILBaseType type)
 		{
 			if (type == ILBaseType::Int)
+				return 4;
+			else if (type == ILBaseType::UInt)
 				return 4;
 			else if (type == ILBaseType::Int2)
 				return 8;
@@ -123,6 +129,8 @@ namespace Spire
 		{
 			if (type == ILBaseType::Int)
 				return L"int";
+			else if (type == ILBaseType::UInt)
+				return L"uint";
 			else if (type == ILBaseType::Int2)
 				return L"ivec2";
 			else if (type == ILBaseType::Int3)

@@ -219,7 +219,9 @@ namespace Spire
 			Function = 64,
 			Bool = 128,
 			Shader = 256,
-			Error = 512
+			UInt = 512,
+			Error = 1024,
+
 		};
 
 		inline const wchar_t * BaseTypeToString(BaseType t)
@@ -340,6 +342,7 @@ namespace Spire
 			}
 
 			static ExpressionType Bool;
+			static ExpressionType UInt;
 			static ExpressionType Int;
 			static ExpressionType Int2;
 			static ExpressionType Int3;
@@ -461,25 +464,27 @@ namespace Spire
 			ExpressionType ToExpressionType()
 			{
 				ExpressionType expType;
-				if (TypeName == "int")
+				if (TypeName == L"int")
 					expType.BaseType = BaseType::Int;
-				else if (TypeName == "float")
+				else if (TypeName == L"uint")
+					expType.BaseType = BaseType::UInt;
+				else if (TypeName == L"float")
 					expType.BaseType = BaseType::Float;
-				else if (TypeName == "ivec2")
+				else if (TypeName == L"ivec2")
 					expType.BaseType = BaseType::Int2;
-				else if (TypeName == "ivec3")
+				else if (TypeName == L"ivec3")
 					expType.BaseType = BaseType::Int3;
-				else if (TypeName == "ivec4")
+				else if (TypeName == L"ivec4")
 					expType.BaseType = BaseType::Int4;
-				else if (TypeName == "vec2")
+				else if (TypeName == L"vec2")
 					expType.BaseType = BaseType::Float2;
-				else if (TypeName == "vec3")
+				else if (TypeName == L"vec3")
 					expType.BaseType = BaseType::Float3;
-				else if (TypeName == "vec4")
+				else if (TypeName == L"vec4")
 					expType.BaseType = BaseType::Float4;
-				else if (TypeName == "mat3" || TypeName == L"mat3x3")
+				else if (TypeName == L"mat3" || TypeName == L"mat3x3")
 					expType.BaseType = BaseType::Float3x3;
-				else if (TypeName == "mat4" || TypeName == L"mat4x4")
+				else if (TypeName == L"mat4" || TypeName == L"mat4x4")
 					expType.BaseType = BaseType::Float4x4;
 				else if (TypeName == L"sampler2D")
 					expType.BaseType = BaseType::Texture2D;
@@ -489,7 +494,7 @@ namespace Spire
 					expType.BaseType = BaseType::TextureShadow;
 				else if (TypeName == L"samplerCubeShadow")
 					expType.BaseType = BaseType::TextureCubeShadow;
-				else if (TypeName == "void")
+				else if (TypeName == L"void")
 					expType.BaseType = BaseType::Void;
 				expType.ArrayLength = ArrayLength;
 				expType.IsArray = IsArray;
@@ -1378,6 +1383,7 @@ namespace Spire
 			TextureShadow = 49,
 			TextureCube = 50,
 			TextureCubeShadow = 51,
+			UInt = 512,
 		};
 
 		ILBaseType ILBaseTypeFromString(String str);
@@ -4272,6 +4278,7 @@ namespace Spire
 				: pos(0), tokens(_tokens), errors(_errors), fileName(_fileName)
 			{
 				typeNames.Add(L"int");
+				typeNames.Add(L"uint");
 				typeNames.Add(L"float");
 				typeNames.Add(L"void");
 				typeNames.Add(L"ivec2");

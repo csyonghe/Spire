@@ -100,7 +100,7 @@ module Lighting
     require vec3 lightDir;
     require vec3 lightColor;
     require vec3 cameraPos;
-    float shadow = computeShadow(pos);
+    @(fs*, lqfs*) float shadow = computeShadow(pos);
     float brightness = clamp(dot(lightDir, normal), 0.0, 1.0) * shadow;
     vec3 view = normalize(cameraPos - pos);
     inline float roughness_in = lightParam.x;

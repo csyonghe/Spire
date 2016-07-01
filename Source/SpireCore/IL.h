@@ -20,6 +20,7 @@ namespace Spire
 			TextureShadow = 49,
 			TextureCube = 50,
 			TextureCubeShadow = 51,
+			UInt = 512,
 		};
 
 		ILBaseType ILBaseTypeFromString(String str);

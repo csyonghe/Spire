@@ -751,6 +751,12 @@ namespace Spire
 						expr->Type = leftType;
 					else if (rightType.IsVectorType() && leftType == GetVectorBaseType(rightType.BaseType))
 						expr->Type = rightType;
+					else if ((rightType == ExpressionType::Float && leftType == ExpressionType::Int) ||
+						(leftType == ExpressionType::Float && rightType == ExpressionType::Int))
+						expr->Type = ExpressionType::Float;
+					else if ((leftType == ExpressionType::UInt && rightType == ExpressionType::Int) ||
+						(leftType == ExpressionType::Int && rightType == ExpressionType::UInt))
+						expr->Type = ExpressionType::Int;
 					else
 						expr->Type = ExpressionType::Error;
 					break;
@@ -769,6 +775,9 @@ namespace Spire
 							expr->Type = leftType;
 						else if (rightType.IsVectorType() && leftType == GetVectorBaseType(rightType.BaseType))
 							expr->Type = rightType;
+						else if ((rightType == ExpressionType::Float && (leftType == ExpressionType::Int || leftType == ExpressionType::UInt)) ||
+							(leftType == ExpressionType::Float && (rightType == ExpressionType::Int || rightType == ExpressionType::UInt)))
+							expr->Type = ExpressionType::Float;
 						else
 							expr->Type = ExpressionType::Error;
 					}
@@ -787,12 +796,18 @@ namespace Spire
 						&& leftType.BaseType != BaseType::Shader &&
 						GetVectorBaseType(leftType.BaseType) != BaseType::Float)
 						expr->Type = (expr->Operator == Operator::And || expr->Operator == Operator::Or ? ExpressionType::Bool : leftType);
+					else if ((leftType == ExpressionType::UInt && rightType == ExpressionType::Int) ||
+						(leftType == ExpressionType::Int && rightType == ExpressionType::UInt))
+						expr->Type = leftType;
 					else
 						expr->Type = ExpressionType::Error;
 					break;
 				case Operator::Neq:
 				case Operator::Eql:
 					if (leftType == rightType && !leftType.IsArray && !leftType.IsTextureType() && leftType.BaseType != BaseType::Shader)
+						expr->Type = ExpressionType::Bool;
+					else if ((leftType == ExpressionType::Int || leftType == ExpressionType::UInt) &&
+						(rightType == ExpressionType::Int || rightType == ExpressionType::UInt))
 						expr->Type = ExpressionType::Bool;
 					else
 						expr->Type = ExpressionType::Error;
@@ -801,7 +816,8 @@ namespace Spire
 				case Operator::Geq:
 				case Operator::Less:
 				case Operator::Leq:
-					if (leftType == ExpressionType::Int && rightType == ExpressionType::Int)
+					if ((leftType == ExpressionType::Int || leftType == ExpressionType::UInt) && 
+						(rightType == ExpressionType::Int || rightType == ExpressionType::UInt))
 						expr->Type = ExpressionType::Bool;
 					else if (leftType == ExpressionType::Float && rightType == ExpressionType::Float)
 						expr->Type = ExpressionType::Bool;
@@ -817,7 +833,9 @@ namespace Spire
 					if (!leftType.IsLeftValue && leftType != ExpressionType::Error)
 						Error(30011, L"left of '=' is not an l-value.", expr->LeftExpression.Ptr());
 					expr->LeftExpression->Access = ExpressionAccess::Write;
-					if (leftType == rightType)
+					if (leftType == rightType || 
+						((leftType == ExpressionType::Float || leftType==ExpressionType::Int || leftType==ExpressionType::UInt) && 
+						 (rightType == ExpressionType::Float || rightType == ExpressionType::Int || rightType == ExpressionType::UInt)))
 						expr->Type = ExpressionType::Void;
 					else
 						expr->Type = ExpressionType::Error;

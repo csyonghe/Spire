@@ -2289,6 +2289,9 @@ namespace Spire
 				case ILBaseType::Int:
 					sbCode << L"int";
 					break;
+				case ILBaseType::UInt:
+					sbCode << L"uint";
+					break;
 				case ILBaseType::Int2:
 					sbCode << L"ivec2";
 					break;
@@ -2431,6 +2434,7 @@ namespace Spire
 		private:
 			String vertexOutputName;
 			bool useNVCommandList = false;
+			bool bindlessTexture = false;
 			CompiledWorld * currentWorld = nullptr;
 		private:
 			String GetFunctionCallName(String name)
@@ -3057,7 +3061,9 @@ namespace Spire
 				CompiledShaderSource rs;
 				CodeGenContext context;
 				context.Result = &result;
-				context.GlobalHeader << L"#version 450\n#extension GL_ARB_bindless_texture: require\n#extension GL_NV_gpu_shader5 : require\n";
+				context.GlobalHeader << L"#version 450\n";
+				if (bindlessTexture)
+					context.GlobalHeader << L"#extension GL_ARB_bindless_texture: require\n#extension GL_NV_gpu_shader5 : require\n";
 				if (useNVCommandList)
 					context.GlobalHeader << L"#extension GL_NV_command_list: require\n";
 				context.ImportOperatorHandlers = opHandlers;
@@ -3207,6 +3213,7 @@ namespace Spire
 				if (!args.TryGetValue(L"vertex", vertexOutputName))
 					vertexOutputName = L"";
 				useNVCommandList = args.ContainsKey(L"command_list");
+				bindlessTexture = args.ContainsKey(L"bindless_texture");
 			}
 		};
 
@@ -3231,6 +3238,8 @@ namespace Spire
 		{
 			if (str == L"int")
 				return ILBaseType::Int;
+			else if (str == L"uint")
+				return ILBaseType::UInt;
 			if (str == L"float")
 				return ILBaseType::Float;
 			if (str == L"vec2")
@@ -3273,6 +3282,8 @@ namespace Spire
 		{
 			if (type == ILBaseType::Int)
 				return 4;
+			if (type == ILBaseType::UInt)
+				return 4;
 			else if (type == ILBaseType::Int2)
 				return 8;
 			else if (type == ILBaseType::Int3)
@@ -3306,6 +3317,8 @@ namespace Spire
 		int AlignmentOfBaseType(ILBaseType type)
 		{
 			if (type == ILBaseType::Int)
+				return 4;
+			else if (type == ILBaseType::UInt)
 				return 4;
 			else if (type == ILBaseType::Int2)
 				return 8;
@@ -3341,6 +3354,8 @@ namespace Spire
 		{
 			if (type == ILBaseType::Int)
 				return L"int";
+			else if (type == ILBaseType::UInt)
+				return L"uint";
 			else if (type == ILBaseType::Int2)
 				return L"ivec2";
 			else if (type == ILBaseType::Int3)
@@ -6596,6 +6611,12 @@ namespace Spire
 						expr->Type = leftType;
 					else if (rightType.IsVectorType() && leftType == GetVectorBaseType(rightType.BaseType))
 						expr->Type = rightType;
+					else if ((rightType == ExpressionType::Float && leftType == ExpressionType::Int) ||
+						(leftType == ExpressionType::Float && rightType == ExpressionType::Int))
+						expr->Type = ExpressionType::Float;
+					else if ((leftType == ExpressionType::UInt && rightType == ExpressionType::Int) ||
+						(leftType == ExpressionType::Int && rightType == ExpressionType::UInt))
+						expr->Type = ExpressionType::Int;
 					else
 						expr->Type = ExpressionType::Error;
 					break;
@@ -6614,6 +6635,9 @@ namespace Spire
 							expr->Type = leftType;
 						else if (rightType.IsVectorType() && leftType == GetVectorBaseType(rightType.BaseType))
 							expr->Type = rightType;
+						else if ((rightType == ExpressionType::Float && (leftType == ExpressionType::Int || leftType == ExpressionType::UInt)) ||
+							(leftType == ExpressionType::Float && (rightType == ExpressionType::Int || rightType == ExpressionType::UInt)))
+							expr->Type = ExpressionType::Float;
 						else
 							expr->Type = ExpressionType::Error;
 					}
@@ -6632,12 +6656,18 @@ namespace Spire
 						&& leftType.BaseType != BaseType::Shader &&
 						GetVectorBaseType(leftType.BaseType) != BaseType::Float)
 						expr->Type = (expr->Operator == Operator::And || expr->Operator == Operator::Or ? ExpressionType::Bool : leftType);
+					else if ((leftType == ExpressionType::UInt && rightType == ExpressionType::Int) ||
+						(leftType == ExpressionType::Int && rightType == ExpressionType::UInt))
+						expr->Type = leftType;
 					else
 						expr->Type = ExpressionType::Error;
 					break;
 				case Operator::Neq:
 				case Operator::Eql:
 					if (leftType == rightType && !leftType.IsArray && !leftType.IsTextureType() && leftType.BaseType != BaseType::Shader)
+						expr->Type = ExpressionType::Bool;
+					else if ((leftType == ExpressionType::Int || leftType == ExpressionType::UInt) &&
+						(rightType == ExpressionType::Int || rightType == ExpressionType::UInt))
 						expr->Type = ExpressionType::Bool;
 					else
 						expr->Type = ExpressionType::Error;
@@ -6646,7 +6676,8 @@ namespace Spire
 				case Operator::Geq:
 				case Operator::Less:
 				case Operator::Leq:
-					if (leftType == ExpressionType::Int && rightType == ExpressionType::Int)
+					if ((leftType == ExpressionType::Int || leftType == ExpressionType::UInt) && 
+						(rightType == ExpressionType::Int || rightType == ExpressionType::UInt))
 						expr->Type = ExpressionType::Bool;
 					else if (leftType == ExpressionType::Float && rightType == ExpressionType::Float)
 						expr->Type = ExpressionType::Bool;
@@ -6662,7 +6693,9 @@ namespace Spire
 					if (!leftType.IsLeftValue && leftType != ExpressionType::Error)
 						Error(30011, L"left of '=' is not an l-value.", expr->LeftExpression.Ptr());
 					expr->LeftExpression->Access = ExpressionAccess::Write;
-					if (leftType == rightType)
+					if (leftType == rightType || 
+						((leftType == ExpressionType::Float || leftType==ExpressionType::Int || leftType==ExpressionType::UInt) && 
+						 (rightType == ExpressionType::Float || rightType == ExpressionType::Int || rightType == ExpressionType::UInt)))
 						expr->Type = ExpressionType::Void;
 					else
 						expr->Type = ExpressionType::Error;
@@ -7383,11 +7416,14 @@ namespace Spire
 							return;
 						// emit target code
 						EnumerableHashSet<String> symbolsToGen;
-						for (auto & shader : units[0].SyntaxNode->Shaders)
-							if (!shader->IsModule)
-								symbolsToGen.Add(shader->Name.Content);
-						for (auto & func : units[0].SyntaxNode->Functions)
-							symbolsToGen.Add(func->Name);
+						for (auto & unit : units)
+						{
+							for (auto & shader : unit.SyntaxNode->Shaders)
+								if (!shader->IsModule)
+									symbolsToGen.Add(shader->Name.Content);
+							for (auto & func : unit.SyntaxNode->Functions)
+								symbolsToGen.Add(func->Name);
+						}
 						auto IsSymbolToGen = [&](String & shaderName)
 						{
 							if (symbolsToGen.Contains(shaderName))
@@ -8305,6 +8341,7 @@ namespace Spire
 	{
 		ExpressionType ExpressionType::Bool(Compiler::BaseType::Bool);
 		ExpressionType ExpressionType::Int(Compiler::BaseType::Int);
+		ExpressionType ExpressionType::UInt(Compiler::BaseType::UInt);
 		ExpressionType ExpressionType::Float(Compiler::BaseType::Float);
 		ExpressionType ExpressionType::Int2(Compiler::BaseType::Int2);
 		ExpressionType ExpressionType::Float2(Compiler::BaseType::Float2);
@@ -8332,6 +8369,9 @@ namespace Spire
 			{
 			case Compiler::BaseType::Int:
 				res.Append(L"int");
+				break;
+			case Compiler::BaseType::UInt:
+				res.Append(L"uint");
 				break;
 			case Compiler::BaseType::Float:
 				res.Append(L"float");

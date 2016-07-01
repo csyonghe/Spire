@@ -281,11 +281,14 @@ namespace Spire
 							return;
 						// emit target code
 						EnumerableHashSet<String> symbolsToGen;
-						for (auto & shader : units[0].SyntaxNode->Shaders)
-							if (!shader->IsModule)
-								symbolsToGen.Add(shader->Name.Content);
-						for (auto & func : units[0].SyntaxNode->Functions)
-							symbolsToGen.Add(func->Name);
+						for (auto & unit : units)
+						{
+							for (auto & shader : unit.SyntaxNode->Shaders)
+								if (!shader->IsModule)
+									symbolsToGen.Add(shader->Name.Content);
+							for (auto & func : unit.SyntaxNode->Functions)
+								symbolsToGen.Add(func->Name);
+						}
 						auto IsSymbolToGen = [&](String & shaderName)
 						{
 							if (symbolsToGen.Contains(shaderName))

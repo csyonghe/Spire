@@ -7,6 +7,7 @@ namespace Spire
 	{
 		ExpressionType ExpressionType::Bool(Compiler::BaseType::Bool);
 		ExpressionType ExpressionType::Int(Compiler::BaseType::Int);
+		ExpressionType ExpressionType::UInt(Compiler::BaseType::UInt);
 		ExpressionType ExpressionType::Float(Compiler::BaseType::Float);
 		ExpressionType ExpressionType::Int2(Compiler::BaseType::Int2);
 		ExpressionType ExpressionType::Float2(Compiler::BaseType::Float2);
@@ -34,6 +35,9 @@ namespace Spire
 			{
 			case Compiler::BaseType::Int:
 				res.Append(L"int");
+				break;
+			case Compiler::BaseType::UInt:
+				res.Append(L"uint");
 				break;
 			case Compiler::BaseType::Float:
 				res.Append(L"float");

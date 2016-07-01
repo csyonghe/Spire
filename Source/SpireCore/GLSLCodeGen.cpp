@@ -17,6 +17,9 @@ namespace Spire
 				case ILBaseType::Int:
 					sbCode << L"int";
 					break;
+				case ILBaseType::UInt:
+					sbCode << L"uint";
+					break;
 				case ILBaseType::Int2:
 					sbCode << L"ivec2";
 					break;
@@ -159,6 +162,7 @@ namespace Spire
 		private:
 			String vertexOutputName;
 			bool useNVCommandList = false;
+			bool bindlessTexture = false;
 			CompiledWorld * currentWorld = nullptr;
 		private:
 			String GetFunctionCallName(String name)
@@ -785,7 +789,9 @@ namespace Spire
 				CompiledShaderSource rs;
 				CodeGenContext context;
 				context.Result = &result;
-				context.GlobalHeader << L"#version 450\n#extension GL_ARB_bindless_texture: require\n#extension GL_NV_gpu_shader5 : require\n";
+				context.GlobalHeader << L"#version 450\n";
+				if (bindlessTexture)
+					context.GlobalHeader << L"#extension GL_ARB_bindless_texture: require\n#extension GL_NV_gpu_shader5 : require\n";
 				if (useNVCommandList)
 					context.GlobalHeader << L"#extension GL_NV_command_list: require\n";
 				context.ImportOperatorHandlers = opHandlers;
@@ -935,6 +941,7 @@ namespace Spire
 				if (!args.TryGetValue(L"vertex", vertexOutputName))
 					vertexOutputName = L"";
 				useNVCommandList = args.ContainsKey(L"command_list");
+				bindlessTexture = args.ContainsKey(L"bindless_texture");
 			}
 		};
 

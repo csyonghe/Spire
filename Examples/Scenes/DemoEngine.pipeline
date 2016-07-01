@@ -11,17 +11,17 @@ pipeline EnginePipeline
     [InterfaceBlock: "modelTransform:0"]
     input world modelTransform;
     [Packed]
-    world precomputeVert : "glsl" export bufferExport;
+    world precomputeVert : "glsl(bindless_texture)" export bufferExport;
     [InterfaceBlockIndex: "7"]
-    world precomputeUniform : "glsl" export bufferExport;
-    world precomputeTexVs : "glsl(vertex:texSpaceVert)" using texSpaceVert export standardExport;
+    world precomputeUniform : "glsl(bindless_texture)" export bufferExport;
+    world precomputeTexVs : "glsl(vertex:texSpaceVert;bindless_texture)" using texSpaceVert export standardExport;
     [InterfaceBlock: "PrebakedAssets:3"]
-    world precomputeTex : "glsl" export fragmentExport;
-    world shadowVs : "glsl(vertex:projCoord;command_list)" using projCoord export standardExport;
-    world shadowFs : "glsl(command_list)" using opacity, projCoord export fragmentExport;
-    world vs : "glsl(vertex:projCoord;command_list)" using projCoord export standardExport;
-    world lqfs : "glsl(command_list)" using opacity export fragmentExport;
-    world fs : "glsl(command_list)" using opacity export fragmentExport;
+    world precomputeTex : "glsl(bindless_texture)" export fragmentExport;
+    world shadowVs : "glsl(vertex:projCoord;command_list;bindless_texture)" using projCoord export standardExport;
+    world shadowFs : "glsl(command_list;bindless_texture)" using opacity, projCoord export fragmentExport;
+    world vs : "glsl(vertex:projCoord;command_list;bindless_texture)" using projCoord export standardExport;
+    world lqfs : "glsl(command_list;bindless_texture)" using opacity export fragmentExport;
+    world fs : "glsl(command_list;bindless_texture)" using opacity export fragmentExport;
     
     // * means compute the component at the specified world
     require @(vs*, shadowVs*) vec4 projCoord; 
