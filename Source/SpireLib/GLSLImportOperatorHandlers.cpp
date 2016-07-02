@@ -201,10 +201,14 @@ class UniformGLSLImportOperatorHandler : public GLSLImportOperatorHandler
 		}
 		if (!useBindlessTexture)
 		{
+			int bindPoint = 0;
 			for (auto & ent : block->Entries)
 			{
 				if (ent.Value.Type->IsTexture())
-					sb << L"uniform " << ent.Value.Type->ToString() << L" " << ent.Key << L";\n";
+				{
+					sb << L"layout(binding = " << bindPoint << L") uniform " << ent.Value.Type->ToString() << L" " << ent.Key << L";\n";
+					bindPoint++;
+				}
 			}
 		}
 	}
