@@ -245,7 +245,7 @@ namespace SpireLib
 			writer << L"interface " << ublock.Key << L" size " << ublock.Value.Size << L"\n{\n";
 			for (auto & entry : ublock.Value.Entries)
 			{
-				writer << ILBaseTypeToString(entry.Type) << L" " << entry.Name << L" : " << entry.Offset << L"," << entry.Size;
+				writer << entry.Type->ToString() << L" " << entry.Name << L" : " << entry.Offset << L"," << entry.Size;
 				if (entry.Attributes.Count())
 				{
 					writer << L"\n{\n";
@@ -350,7 +350,7 @@ namespace SpireLib
 				while (!parser.LookAhead(L"}") && !parser.IsEnd())
 				{
 					InterfaceBlockEntry entry;
-					entry.Type = ILBaseTypeFromString(parser.ReadWord());
+					entry.Type = TypeFromString(parser);
 					entry.Name = parser.ReadWord();
 					parser.Read(L":");
 					entry.Offset = parser.ReadInt();

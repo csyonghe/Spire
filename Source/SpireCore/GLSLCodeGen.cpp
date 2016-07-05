@@ -320,6 +320,14 @@ namespace Spire
 							printDefault = false;
 						}
 					}
+					else if (auto structType = dynamic_cast<ILStructType*>(op0->Type.Ptr()))
+					{
+						if (auto c = dynamic_cast<ILConstOperand*>(op1))
+						{
+							ctx.Body << L"." << structType->Members[c->IntValues[0]].FieldName;
+						}
+						printDefault = false;
+					}
 					if (printDefault)
 					{
 						ctx.Body << L"[";
@@ -637,17 +645,31 @@ namespace Spire
 
 			void PrintUpdateInstr(CodeGenContext & ctx, MemberUpdateInstruction * instr)
 			{
+				auto genCode = [&](String varName, ILType * srcType, ILOperand * op1, ILOperand * op2)
+				{
+					ctx.Body << varName;
+					if (auto structType = dynamic_cast<ILStructType*>(srcType))
+					{
+						ctx.Body << L".";
+						ctx.Body << structType->Members[dynamic_cast<ILConstOperand*>(op1)->IntValues[0]].FieldName;
+					}
+					else
+					{
+						ctx.Body << L"[";
+						PrintOp(ctx, op1);
+						ctx.Body << L"]";
+					}
+					ctx.Body << L" = ";
+					PrintOp(ctx, op2);
+					ctx.Body << L";\n";
+				};
 				if (auto srcInstr = dynamic_cast<ILInstruction*>(instr->Operands[0].Ptr()))
 				{
 					if (srcInstr->Users.Count() == 1)
 					{
 						auto srcName = srcInstr->Name;
 						while (ctx.SubstituteNames.TryGetValue(srcName, srcName));
-						ctx.Body << srcName << L"[";
-						PrintOp(ctx, instr->Operands[1].Ptr());
-						ctx.Body << L"] = ";
-						PrintOp(ctx, instr->Operands[2].Ptr());
-						ctx.Body << L";\n";
+						genCode(srcName, srcInstr->Type.Ptr(), instr->Operands[1].Ptr(), instr->Operands[2].Ptr());
 						ctx.SubstituteNames[instr->Name] = srcName;
 						return;
 					}
@@ -656,11 +678,7 @@ namespace Spire
 				ctx.Body << varName << L" = ";
 				PrintOp(ctx, instr->Operands[0].Ptr());
 				ctx.Body << L";\n";
-				ctx.Body << varName << L"[";
-				PrintOp(ctx, instr->Operands[1].Ptr());
-				ctx.Body << L"] = ";
-				PrintOp(ctx, instr->Operands[2].Ptr());
-				ctx.Body << L";\n";
+				genCode(varName, instr->Operands[0]->Type.Ptr(), instr->Operands[1].Ptr(), instr->Operands[2].Ptr());
 			}
 
 			void PrintInstrExpr(CodeGenContext & ctx, ILInstruction & instr)
@@ -835,6 +853,18 @@ namespace Spire
 				NamingCounter = 0;
 				shaderWorld->Code->NameAllInstructions();
 				GenerateCode(context, shaderWorld->Code.Ptr());
+				
+				for (auto & st : result.Program->Structs)
+				{
+					context.GlobalHeader << L"struct " << st->TypeName << L"\n{\n";
+					for (auto & f : st->Members)
+					{
+						context.GlobalHeader << f.Type->ToString();
+						context.GlobalHeader << " " << f.FieldName << L";\n";
+					}
+					context.GlobalHeader << L"};\n";
+				}
+				
 				rs.GlobalHeader = context.GlobalHeader.ProduceString();
 
 				StringBuilder funcSB;

@@ -2,6 +2,7 @@
 #define RASTER_RENDERER_IL_H
 
 #include "../CoreLib/Basic.h"
+#include "../CoreLib/Parser.h"
 
 namespace Spire
 {
@@ -22,11 +23,7 @@ namespace Spire
 			TextureCubeShadow = 51,
 			UInt = 512,
 		};
-
-		ILBaseType ILBaseTypeFromString(String str);
-		String ILBaseTypeToString(ILBaseType str);
 		int SizeofBaseType(ILBaseType type);
-		int AlignmentOfBaseType(ILBaseType type);
 		int RoundToAlignment(int offset, int alignment);
 		extern int NamingCounter;
 		class ILType : public Object
@@ -47,7 +44,11 @@ namespace Spire
 			virtual ILType * Clone() = 0;
 			virtual String ToString() = 0;
 			virtual bool Equals(ILType* type) = 0;
+			virtual int GetSize() = 0;
+			virtual int GetAlignment() = 0;
 		};
+
+		RefPtr<ILType> TypeFromString(CoreLib::Text::Parser & parser);
 
 		class ILBasicType : public ILType
 		{
@@ -77,12 +78,108 @@ namespace Spire
 			}
 			virtual String ToString() override
 			{
-				return ILBaseTypeToString(Type);
+				if (Type == ILBaseType::Int)
+					return L"int";
+				else if (Type == ILBaseType::UInt)
+					return L"uint";
+				else if (Type == ILBaseType::Int2)
+					return L"ivec2";
+				else if (Type == ILBaseType::Int3)
+					return L"ivec3";
+				else if (Type == ILBaseType::Int4)
+					return L"ivec4";
+				else if (Type == ILBaseType::Float)
+					return L"float";
+				else if (Type == ILBaseType::Float2)
+					return L"vec2";
+				else if (Type == ILBaseType::Float3)
+					return L"vec3";
+				else if (Type == ILBaseType::Float4)
+					return L"vec4";
+				else if (Type == ILBaseType::Float3x3)
+					return L"mat3";
+				else if (Type == ILBaseType::Float4x4)
+					return L"mat4";
+				else if (Type == ILBaseType::Texture2D)
+					return L"sampler2D";
+				else if (Type == ILBaseType::TextureCube)
+					return L"samplerCube";
+				else if (Type == ILBaseType::TextureCubeShadow)
+					return L"samplerCubeShadow";
+				else if (Type == ILBaseType::TextureShadow)
+					return L"sampler2DShadow";
+				else
+					return L"?unkown";
+			}
+			virtual int GetAlignment() override
+			{
+				switch (Type)
+				{
+				case ILBaseType::Int:
+					return 4;
+				case ILBaseType::UInt:
+					return 4;
+				case ILBaseType::Int2:
+					return 8;
+				case ILBaseType::Int3:
+					return 16;
+				case ILBaseType::Int4:
+					return 16;
+				case ILBaseType::Float:
+					return 4;
+				case ILBaseType::Float2:
+					return 8;
+				case  ILBaseType::Float3:
+					return 16;
+				case ILBaseType::Float4:
+					return 16;
+				case ILBaseType::Float3x3:
+					return 16;
+				case  ILBaseType::Float4x4:
+					return 16;
+				case ILBaseType::Texture2D:
+					return 8;
+				case ILBaseType::TextureCube:
+					return 8;
+				case ILBaseType::TextureCubeShadow:
+					return 8;
+				case ILBaseType::TextureShadow:
+					return 8;
+				default:
+					return 0;
+				}
+			}
+			virtual int GetSize() override
+			{
+				switch (Type)
+				{
+				case ILBaseType::Float:
+				case ILBaseType::Int:
+				case ILBaseType::UInt:
+					return 4;
+				case ILBaseType::Float2:
+				case ILBaseType::Int2:
+					return 8;
+				case ILBaseType::Int3:
+				case ILBaseType::Float3:
+					return 12;
+				case ILBaseType::Int4:
+				case ILBaseType::Float4:
+					return 16;
+				case ILBaseType::Float3x3:
+					return 48;
+				case ILBaseType::Float4x4:
+					return 64;
+				case ILBaseType::Texture2D:
+				case ILBaseType::TextureCube:
+				case ILBaseType::TextureCubeShadow:
+				case ILBaseType::TextureShadow:
+					return 8;
+				default:
+					return 0;
+				}
 			}
 		};
-
-		
-
 
 		class ILArrayType : public ILType
 		{
@@ -105,8 +202,37 @@ namespace Spire
 			}
 			virtual String ToString() override
 			{
-				return L"Array<" + BaseType->ToString() + L", " + String(ArrayLength) + L">";
+				if (ArrayLength > 0)
+					return BaseType->ToString() + L"[" + String(ArrayLength) + L"]";
+				else
+					return BaseType->ToString() + L"[]";
 			}
+			virtual int GetSize() override
+			{
+				return BaseType->GetSize() * ArrayLength;
+			}
+			virtual int GetAlignment() override
+			{
+				return BaseType->GetAlignment();
+			}
+		};
+
+		class ILStructType : public ILType
+		{
+		public:
+			String TypeName;
+			class ILStructField
+			{
+			public:
+				RefPtr<ILType> Type;
+				String FieldName;
+			};
+			List<ILStructField> Members;
+			virtual ILType * Clone() override;
+			virtual String ToString() override;
+			virtual bool Equals(ILType * type) override;
+			virtual int GetSize() override;
+			virtual int GetAlignment() override;
 		};
 
 		class ILOperand;
@@ -715,7 +841,7 @@ namespace Spire
 				}
 			}
 
-			ImportInstruction(int argSize, String compName, ImportOperatorDefSyntaxNode * importOp, CompiledWorld * srcWorld, ILType * type)
+			ImportInstruction(int argSize, String compName, ImportOperatorDefSyntaxNode * importOp, CompiledWorld * srcWorld, RefPtr<ILType> type)
 				:ImportInstruction(argSize)
 			{
 				this->ComponentName = compName;
@@ -787,7 +913,7 @@ namespace Spire
 		{
 		public:
 			int ArgId;
-			FetchArgInstruction(ILType * type)
+			FetchArgInstruction(RefPtr<ILType> type)
 			{
 				this->Type = type;
 				ArgId = 0;
@@ -1435,6 +1561,15 @@ namespace Spire
 					default:
 						throw InvalidOperationException(L"Unsupported aggregate type.");
 					}
+				}
+				else if (auto structType = dynamic_cast<ILStructType*>(v0->Type.Ptr()))
+				{
+					auto cv1 = dynamic_cast<ILConstOperand*>(v1);
+					if (!cv1)
+						throw InvalidProgramException(L"member field access offset is not constant.");
+					if (cv1->IntValues[0] < 0 || cv1->IntValues[0] >= structType->Members.Count())
+						throw InvalidProgramException(L"member field access offset out of bounds.");
+					Type = structType->Members[cv1->IntValues[0]].Type;
 				}
 			}
 			virtual String ToString() override

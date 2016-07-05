@@ -478,7 +478,7 @@ namespace Spire
 			}
 			return result;
 		}
-		bool CheckComponentImplementationConsistency(ErrorWriter * err, ShaderComponentSymbol * comp, ShaderComponentImplSymbol * impl)
+		bool SymbolTable::CheckComponentImplementationConsistency(ErrorWriter * err, ShaderComponentSymbol * comp, ShaderComponentImplSymbol * impl)
 		{
 			bool rs = true;
 			if (impl->SyntaxNode->Rate)
@@ -524,7 +524,7 @@ namespace Spire
 					rs = false;
 					break;
 				}
-				if (impl->SyntaxNode->Type->ToExpressionType() != cimpl->SyntaxNode->Type->ToExpressionType())
+				if (impl->SyntaxNode->Type->ToExpressionType(this) != cimpl->SyntaxNode->Type->ToExpressionType(this))
 				{
 					err->Error(33021, L"\'" + comp->Name + L"\': inconsistent signature.\nsee previous definition at " + cimpl->SyntaxNode->Position.ToString(), impl->SyntaxNode->Position);
 					rs = false;

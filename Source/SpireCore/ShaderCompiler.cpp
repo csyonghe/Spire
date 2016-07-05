@@ -273,6 +273,8 @@ namespace Spire
 							return;
 						// generate IL code
 						RefPtr<ICodeGenerator> codeGen = CreateCodeGenerator(&symTable, result);
+						for (auto & s : programSyntaxNode->Structs)
+							codeGen->ProcessStruct(s.Ptr());
 						for (auto & func : programSyntaxNode->Functions)
 							codeGen->ProcessFunction(func.Ptr());
 						for (auto & shader : shaderClosures)

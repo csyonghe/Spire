@@ -22,15 +22,12 @@ namespace Spire
 			{}
 			virtual void ProcessFunction(FunctionSyntaxNode * func) = 0;
 			virtual void ProcessShader(ShaderClosure * shader) = 0;
+			virtual void ProcessStruct(StructSyntaxNode * st) = 0;
 		};
 
-		SyntaxVisitor * CreateComponentDependencyVisitor(SymbolTable * symbols, ShaderSymbol * currentShader, 
-			ShaderComponentSymbol * compSym,
-			ErrorWriter * err,
-			EnumerableHashSet<ShaderComponentSymbol *> & _dependentComponents,
-			Dictionary<ShaderComponentSymbol*, SyntaxNode*> & _referenceNodes);
 		SyntaxVisitor * CreateSemanticsVisitor(SymbolTable * symbols, ErrorWriter * err);
 		ICodeGenerator * CreateCodeGenerator(SymbolTable * symbols, CompileResult & result);
+		RefPtr<ILType> TranslateExpressionType(const ExpressionType & type);
 	}
 }
 

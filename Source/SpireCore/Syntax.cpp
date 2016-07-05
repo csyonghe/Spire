@@ -1,5 +1,6 @@
 #include "Syntax.h"
 #include "SyntaxVisitors.h"
+#include "SymbolTable.h"
 
 namespace Spire
 {
@@ -25,6 +26,20 @@ namespace Spire
 			if (Parent)
 				return Parent->FindVariable(name, variable);
 			return false;
+		}
+
+		int ExpressionType::GetSize()
+		{
+			int baseSize = GetVectorSize(BaseType);
+			if (BaseType == Compiler::BaseType::Texture2D || BaseType == Compiler::BaseType::TextureCube ||
+				BaseType == Compiler::BaseType::TextureCubeShadow || BaseType == Compiler::BaseType::TextureShadow)
+				baseSize = sizeof(void*) / sizeof(int);
+			else if (BaseType == Compiler::BaseType::Struct)
+				baseSize = Struct->Type->GetSize();
+			if (ArrayLength == 0)
+				return baseSize;
+			else
+				return ArrayLength*baseSize;
 		}
 
 		CoreLib::Basic::String ExpressionType::ToString()
@@ -84,10 +99,10 @@ namespace Spire
 				{
 					if (i > 0)
 						res.Append(L",");
-					res.Append(Func->Parameters[i]->Type->ToExpressionType().ToString());
+					res.Append(Func->Parameters[i]->Type->ToString());
 				}
 				res.Append(L") => ");
-				res.Append(Func->ReturnType->ToExpressionType().ToString());
+				res.Append(Func->ReturnType->ToString());
 				break;
 			case Compiler::BaseType::Shader:
 				res.Append(Shader->SyntaxNode->Name.Content);
@@ -115,6 +130,9 @@ namespace Spire
 		ProgramSyntaxNode * ProgramSyntaxNode::Clone(CloneContext & ctx)
 		{
 			auto rs = CloneSyntaxNodeFields(new ProgramSyntaxNode(*this), ctx);
+			rs->Structs.Clear();
+			for (auto & x : Structs)
+				rs->Structs.Add(x->Clone(ctx));
 			rs->Functions.Clear();
 			for (auto & x : Functions)
 				rs->Functions.Add(x->Clone(ctx));
@@ -432,6 +450,62 @@ namespace Spire
 			rs->IsArray = false;		
 			return rs;
 		}
+		ExpressionType TypeSyntaxNode::ToExpressionType(SymbolTable * symTable, ErrorWriter * errWriter)
+		{
+			ExpressionType expType;
+			if (TypeName == L"int")
+				expType.BaseType = BaseType::Int;
+			else if (TypeName == L"uint")
+				expType.BaseType = BaseType::UInt;
+			else if (TypeName == L"float")
+				expType.BaseType = BaseType::Float;
+			else if (TypeName == L"ivec2")
+				expType.BaseType = BaseType::Int2;
+			else if (TypeName == L"ivec3")
+				expType.BaseType = BaseType::Int3;
+			else if (TypeName == L"ivec4")
+				expType.BaseType = BaseType::Int4;
+			else if (TypeName == L"vec2")
+				expType.BaseType = BaseType::Float2;
+			else if (TypeName == L"vec3")
+				expType.BaseType = BaseType::Float3;
+			else if (TypeName == L"vec4")
+				expType.BaseType = BaseType::Float4;
+			else if (TypeName == L"mat3" || TypeName == L"mat3x3")
+				expType.BaseType = BaseType::Float3x3;
+			else if (TypeName == L"mat4" || TypeName == L"mat4x4")
+				expType.BaseType = BaseType::Float4x4;
+			else if (TypeName == L"sampler2D")
+				expType.BaseType = BaseType::Texture2D;
+			else if (TypeName == L"samplerCube")
+				expType.BaseType = BaseType::TextureCube;
+			else if (TypeName == L"sampler2DShadow")
+				expType.BaseType = BaseType::TextureShadow;
+			else if (TypeName == L"samplerCubeShadow")
+				expType.BaseType = BaseType::TextureCubeShadow;
+			else if (TypeName == L"void")
+				expType.BaseType = BaseType::Void;
+			else
+			{
+				expType.BaseType = BaseType::Struct;
+				RefPtr<StructSymbol> ssym;
+				if (symTable->Structs.TryGetValue(TypeName, ssym))
+				{
+					expType.Struct = ssym.Ptr();
+				}
+				else
+				{
+					if (errWriter)
+					{
+						errWriter->Error(31040, L"undefined type name: '" + TypeName + L"'.", Position);
+					}
+					return ExpressionType::Error;
+				}
+			}
+			expType.ArrayLength = ArrayLength;
+			expType.IsArray = IsArray;
+			return expType;
+		}
 		void ComponentSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
 			visitor->VisitComponent(this);
@@ -521,6 +595,14 @@ namespace Spire
 			auto rs = CloneSyntaxNodeFields(new ImportStatementSyntaxNode(*this), ctx);
 			rs->Import = Import->Clone(ctx);
 			return rs;
+		}
+		void StructField::Accept(SyntaxVisitor * visitor)
+		{
+			visitor->VisitStructField(this);
+		}
+		void StructSyntaxNode::Accept(SyntaxVisitor * visitor)
+		{
+			visitor->VisitStruct(this);
 		}
 	}
 }

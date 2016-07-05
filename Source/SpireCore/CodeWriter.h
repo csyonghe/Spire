@@ -197,7 +197,7 @@ namespace Spire
 				cfgNode.Last()->InsertTail(instr);
 				return instr;
 			}
-			FetchArgInstruction * FetchArg(ILType * type, int argId)
+			FetchArgInstruction * FetchArg(RefPtr<ILType> type, int argId)
 			{
 				auto instr = new FetchArgInstruction(type);
 				cfgNode.Last()->InsertTail(instr);

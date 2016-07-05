@@ -114,7 +114,7 @@ namespace Spire
 		{
 		public:
 			CoreLib::Basic::String Name;
-			Spire::Compiler::ILBaseType Type;
+			RefPtr<Spire::Compiler::ILType> Type;
 			EnumerableDictionary<String, String> Attributes;
 
 			int GetHashCode()
@@ -180,6 +180,7 @@ namespace Spire
 			RefPtr<ConstantPool> ConstantPool = new Compiler::ConstantPool();
 			List<RefPtr<CompiledShader>> Shaders;
 			List<RefPtr<CompiledFunction>> Functions;
+			List<RefPtr<ILStructType>> Structs;
 		};
 
 		class ShaderChoiceValue

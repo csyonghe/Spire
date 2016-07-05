@@ -591,6 +591,33 @@ namespace Spire
 {
 	namespace Compiler
 	{
+		RefPtr<ILType> TranslateExpressionType(const ExpressionType & type)
+		{
+			RefPtr<ILType> resultType = 0;
+			if (type.BaseType == BaseType::Struct)
+			{
+				resultType = type.Struct->Type;
+			}
+			else
+			{
+				auto base = new ILBasicType();
+				base->Type = (ILBaseType)type.BaseType;
+				if (type.BaseType == BaseType::Bool)
+				{
+					base->Type = ILBaseType::Int;
+				}
+				resultType = base;
+			}
+			if (type.IsArray)
+			{
+				auto nArrType = new ILArrayType();
+				nArrType->BaseType = resultType;
+				nArrType->ArrayLength = type.ArrayLength;
+				resultType = nArrType;
+			}
+			return resultType;
+		}
+
 		class CodeGenerator : public ICodeGenerator
 		{
 		private:
@@ -603,34 +630,7 @@ namespace Spire
 			List<ILOperand*> exprStack;
 			CodeWriter codeWriter;
 			ScopeDictionary<String, ILOperand*> variables;
-			ILType * TranslateExpressionType(const ExpressionType & type)
-			{
-				ILType * resultType = 0;
-				auto base = new ILBasicType();
-				base->Type = (ILBaseType)type.BaseType;
-				resultType = base;
-				if (type.BaseType == BaseType::Bool)
-				{
-					base->Type = ILBaseType::Int;
-				}
-
-				if (type.IsArray)
-				{
-					ILArrayType * arrType = dynamic_cast<ILArrayType*>(resultType);
-					if (resultType)
-					{
-						arrType->ArrayLength *= type.ArrayLength;
-					}
-					else
-					{
-						auto nArrType = new ILArrayType();
-						nArrType->BaseType = resultType;
-						nArrType->ArrayLength = type.ArrayLength;
-						resultType = nArrType;
-					}
-				}
-				return resultType;
-			}
+			
 			void PushStack(ILOperand * op)
 			{
 				exprStack.Add(op);
@@ -661,13 +661,12 @@ namespace Spire
 			FetchArgInstruction * FetchArg(const ExpressionType & etype, int argId)
 			{
 				auto type = TranslateExpressionType(etype);
-				auto arrType = dynamic_cast<ILArrayType*>(type);
+				auto arrType = dynamic_cast<ILArrayType*>(type.Ptr());
 				FetchArgInstruction * varOp = 0;
 				if (arrType)
 				{
 					auto baseType = arrType->BaseType.Release();
 					varOp = codeWriter.FetchArg(baseType, argId);
-					delete type;
 				}
 				else
 				{
@@ -689,9 +688,17 @@ namespace Spire
 			virtual void VisitProgram(ProgramSyntaxNode *) override
 			{
 			}
+			virtual void VisitStruct(StructSyntaxNode * st) override
+			{
+				result.Program->Structs.Add(symTable->Structs[st->Name.Content]()->Type);
+			}
 			virtual void ProcessFunction(FunctionSyntaxNode * func) override
 			{
 				VisitFunction(func);
+			}
+			virtual void ProcessStruct(StructSyntaxNode * st) override
+			{
+				VisitStruct(st);
 			}
 			virtual void ProcessShader(ShaderClosure * shader) override
 			{
@@ -1052,20 +1059,20 @@ namespace Spire
 					for (auto & entry : block.Value->Entries)
 					{
 						InterfaceBlockEntry ment;
-						ment.Type = dynamic_cast<ILBasicType*>(entry.Value.Type.Ptr())->Type;
+						ment.Type = entry.Value.Type;
 						ment.Name = entry.Key;
 						ment.Attributes = entry.Value.LayoutAttribs;
 						if (!pack)
-							offset = RoundToAlignment(offset, AlignmentOfBaseType(ment.Type));
+							offset = RoundToAlignment(offset, ment.Type->GetAlignment());
 						ment.Offset = offset;
 						entry.Value.Offset = offset;
-						ment.Size = SizeofBaseType(ment.Type);
+						ment.Size = ment.Type->GetSize();
 						offset += ment.Size;
 						blockMeta.Entries.Add(ment);
 					}
 					block.Value->Size = offset;
 					if (!pack && block.Value->Entries.Count() > 0)
-						block.Value->Size = RoundToAlignment(offset, AlignmentOfBaseType(dynamic_cast<ILBasicType*>((*(block.Value->Entries.begin())).Value.Type.Ptr())->Type));
+						block.Value->Size = RoundToAlignment(offset, (*(block.Value->Entries.begin())).Value.Type->GetAlignment());
 					blockMeta.Size = block.Value->Size;
 					compiledShader->MetaData.InterfaceBlocks[blockMeta.Name] = blockMeta;
 				}
@@ -1111,7 +1118,7 @@ namespace Spire
 				if (currentComponentImpl->SyntaxNode->Expression)
 				{
 					currentComponentImpl->SyntaxNode->Expression->Accept(this);
-					Assign(currentComponentImpl->SyntaxNode->Type->ToExpressionType(), allocVar, exprStack.Last());
+					Assign(currentComponentImpl->SyntaxNode->Type->ToExpressionType(symTable, nullptr), allocVar, exprStack.Last());
 					if (currentWorld->WorldOutput->Entries.ContainsKey(currentComponent->UniqueName))
 					{
 						auto exp = new ExportInstruction(currentComponent->UniqueName, currentWorld->ExportOperator.Content, currentWorld,
@@ -1134,14 +1141,14 @@ namespace Spire
 				RefPtr<CompiledFunction> func = new CompiledFunction();
 				result.Program->Functions.Add(func);
 				func->Name = function->InternalName;
-				func->ReturnType = TranslateExpressionType(function->ReturnType->ToExpressionType());
+				func->ReturnType = TranslateExpressionType(function->ReturnType->ToExpressionType(symTable, nullptr));
 				variables.PushScope();
 				codeWriter.PushNode();
 				int id = 0;
 				for (auto &param : function->Parameters)
 				{
-					func->Parameters.Add(param->Name, TranslateExpressionType(param->Type->ToExpressionType()));
-					auto op = FetchArg(param->Type->ToExpressionType(), ++id);
+					func->Parameters.Add(param->Name, TranslateExpressionType(param->Type->ToExpressionType(symTable, nullptr)));
+					auto op = FetchArg(param->Type->ToExpressionType(symTable, nullptr), ++id);
 					op->Name = String(L"p_") + param->Name;
 					variables.Add(param->Name, op);
 				}
@@ -1191,7 +1198,7 @@ namespace Spire
 				variables.PushScope();
 				if (stmt->TypeDef)
 				{
-					AllocVarInstruction * varOp = AllocVar(stmt->TypeDef->ToExpressionType());
+					AllocVarInstruction * varOp = AllocVar(stmt->TypeDef->ToExpressionType(symTable));
 					varOp->Name = L"v_" + stmt->IterationVariable.Content;
 					variables.Add(stmt->IterationVariable.Content, varOp);
 				}
@@ -1199,7 +1206,7 @@ namespace Spire
 				if (!variables.TryGetValue(stmt->IterationVariable.Content, iterVar))
 					throw InvalidProgramException(L"Iteration variable not found in variables dictionary. This should have been checked by semantics analyzer.");
 				stmt->InitialExpression->Accept(this);
-				Assign(stmt->TypeDef->ToExpressionType(), iterVar, PopStack());
+				Assign(stmt->TypeDef->ToExpressionType(symTable), iterVar, PopStack());
 
 				codeWriter.PushNode();
 				stmt->EndExpression->Accept(this);
@@ -1223,7 +1230,7 @@ namespace Spire
 				}
 				auto afterVal = new AddInstruction(new LoadInstruction(iterVar), stepVal);
 				codeWriter.Insert(afterVal);
-				Assign(stmt->TypeDef->ToExpressionType(), iterVar, afterVal);
+				Assign(stmt->TypeDef->ToExpressionType(symTable), iterVar, afterVal);
 				instr->SideEffectCode = codeWriter.PopNode();
 
 				codeWriter.PushNode();
@@ -1312,13 +1319,13 @@ namespace Spire
 			{
 				for (auto & v : stmt->Variables)
 				{
-					AllocVarInstruction * varOp = AllocVar(stmt->Type->ToExpressionType());
+					AllocVarInstruction * varOp = AllocVar(stmt->Type->ToExpressionType(symTable));
 					varOp->Name = L"v" + String(NamingCounter++) + L"_" + v->Name;
 					variables.Add(v->Name, varOp);
 					if (v->Expression)
 					{
 						v->Expression->Accept(this);
-						Assign(stmt->Type->ToExpressionType(), varOp, PopStack());
+						Assign(stmt->Type->ToExpressionType(symTable), varOp, PopStack());
 					}
 				}
 			}
@@ -1534,6 +1541,18 @@ namespace Spire
 							}
 							codeWriter.Store(rs, tmp);
 							PushStack(codeWriter.Load(rs));
+						}
+					}
+					else if (expr->BaseExpression->Type.BaseType == BaseType::Struct)
+					{
+						if (expr->Access == ExpressionAccess::Read)
+						{
+							int id = expr->BaseExpression->Type.Struct->SyntaxNode->FindField(expr->MemberName);
+							GenerateIndexExpression(base, result.Program->ConstantPool->CreateConstant(id),
+								expr->Access == ExpressionAccess::Read);
+						}
+						else
+						{
 						}
 					}
 					else
@@ -2592,6 +2611,14 @@ namespace Spire
 							printDefault = false;
 						}
 					}
+					else if (auto structType = dynamic_cast<ILStructType*>(op0->Type.Ptr()))
+					{
+						if (auto c = dynamic_cast<ILConstOperand*>(op1))
+						{
+							ctx.Body << L"." << structType->Members[c->IntValues[0]].FieldName;
+						}
+						printDefault = false;
+					}
 					if (printDefault)
 					{
 						ctx.Body << L"[";
@@ -2909,17 +2936,31 @@ namespace Spire
 
 			void PrintUpdateInstr(CodeGenContext & ctx, MemberUpdateInstruction * instr)
 			{
+				auto genCode = [&](String varName, ILType * srcType, ILOperand * op1, ILOperand * op2)
+				{
+					ctx.Body << varName;
+					if (auto structType = dynamic_cast<ILStructType*>(srcType))
+					{
+						ctx.Body << L".";
+						ctx.Body << structType->Members[dynamic_cast<ILConstOperand*>(op1)->IntValues[0]].FieldName;
+					}
+					else
+					{
+						ctx.Body << L"[";
+						PrintOp(ctx, op1);
+						ctx.Body << L"]";
+					}
+					ctx.Body << L" = ";
+					PrintOp(ctx, op2);
+					ctx.Body << L";\n";
+				};
 				if (auto srcInstr = dynamic_cast<ILInstruction*>(instr->Operands[0].Ptr()))
 				{
 					if (srcInstr->Users.Count() == 1)
 					{
 						auto srcName = srcInstr->Name;
 						while (ctx.SubstituteNames.TryGetValue(srcName, srcName));
-						ctx.Body << srcName << L"[";
-						PrintOp(ctx, instr->Operands[1].Ptr());
-						ctx.Body << L"] = ";
-						PrintOp(ctx, instr->Operands[2].Ptr());
-						ctx.Body << L";\n";
+						genCode(srcName, srcInstr->Type.Ptr(), instr->Operands[1].Ptr(), instr->Operands[2].Ptr());
 						ctx.SubstituteNames[instr->Name] = srcName;
 						return;
 					}
@@ -2928,11 +2969,7 @@ namespace Spire
 				ctx.Body << varName << L" = ";
 				PrintOp(ctx, instr->Operands[0].Ptr());
 				ctx.Body << L";\n";
-				ctx.Body << varName << L"[";
-				PrintOp(ctx, instr->Operands[1].Ptr());
-				ctx.Body << L"] = ";
-				PrintOp(ctx, instr->Operands[2].Ptr());
-				ctx.Body << L";\n";
+				genCode(varName, instr->Operands[0]->Type.Ptr(), instr->Operands[1].Ptr(), instr->Operands[2].Ptr());
 			}
 
 			void PrintInstrExpr(CodeGenContext & ctx, ILInstruction & instr)
@@ -3107,6 +3144,18 @@ namespace Spire
 				NamingCounter = 0;
 				shaderWorld->Code->NameAllInstructions();
 				GenerateCode(context, shaderWorld->Code.Ptr());
+				
+				for (auto & st : result.Program->Structs)
+				{
+					context.GlobalHeader << L"struct " << st->TypeName << L"\n{\n";
+					for (auto & f : st->Members)
+					{
+						context.GlobalHeader << f.Type->ToString();
+						context.GlobalHeader << " " << f.FieldName << L";\n";
+					}
+					context.GlobalHeader << L"};\n";
+				}
+				
 				rs.GlobalHeader = context.GlobalHeader.ProduceString();
 
 				StringBuilder funcSB;
@@ -3234,39 +3283,56 @@ namespace Spire
 	{
 		using namespace CoreLib::IO;
 
-		ILBaseType ILBaseTypeFromString(String str)
+		RefPtr<ILType> BaseTypeFromString(CoreLib::Text::Parser & parser)
 		{
-			if (str == L"int")
-				return ILBaseType::Int;
-			else if (str == L"uint")
-				return ILBaseType::UInt;
-			if (str == L"float")
-				return ILBaseType::Float;
-			if (str == L"vec2")
-				return ILBaseType::Float2;
-			if (str == L"vec3")
-				return ILBaseType::Float3;
-			if (str == L"vec4")
-				return ILBaseType::Float4;
-			if (str == L"ivec2")
-				return ILBaseType::Int2;
-			if (str == L"mat3")
-				return ILBaseType::Float3x3;
-			if (str == L"mat4")
-				return ILBaseType::Float4x4;
-			if (str == L"ivec3")
-				return ILBaseType::Int3;
-			if (str == L"ivec4")
-				return ILBaseType::Int4;
-			if (str == L"sampler2D")
-				return ILBaseType::Texture2D;
-			if (str == L"sampler2DShadow")
-				return ILBaseType::TextureShadow;
-			if (str == L"samplerCube")
-				return ILBaseType::TextureCube;
-			if (str == L"samplerCubeShadow")
-				return ILBaseType::TextureCubeShadow;
-			return ILBaseType::Int;
+			if (parser.LookAhead(L"int"))
+				return new ILBasicType(ILBaseType::Int);
+			else if (parser.LookAhead(L"uint"))
+				return new ILBasicType(ILBaseType::UInt);
+			if (parser.LookAhead(L"float"))
+				return new ILBasicType(ILBaseType::Float);
+			if (parser.LookAhead(L"vec2"))
+				return new ILBasicType(ILBaseType::Float2);
+			if (parser.LookAhead(L"vec3"))
+				return new ILBasicType(ILBaseType::Float3);
+			if (parser.LookAhead(L"vec4"))
+				return new ILBasicType(ILBaseType::Float4);
+			if (parser.LookAhead(L"ivec2"))
+				return new ILBasicType(ILBaseType::Int2);
+			if (parser.LookAhead(L"mat3"))
+				return new ILBasicType(ILBaseType::Float3x3);
+			if (parser.LookAhead(L"mat4"))
+				return new ILBasicType(ILBaseType::Float4x4);
+			if (parser.LookAhead(L"ivec3"))
+				return new ILBasicType(ILBaseType::Int3);
+			if (parser.LookAhead(L"ivec4"))
+				return new ILBasicType(ILBaseType::Int4);
+			if (parser.LookAhead(L"sampler2D"))
+				return new ILBasicType(ILBaseType::Texture2D);
+			if (parser.LookAhead(L"sampler2DShadow"))
+				return new ILBasicType(ILBaseType::TextureShadow);
+			if (parser.LookAhead(L"samplerCube"))
+				return new ILBasicType(ILBaseType::TextureCube);
+			if (parser.LookAhead(L"samplerCubeShadow"))
+				return new ILBasicType(ILBaseType::TextureCubeShadow);
+			return nullptr;
+		}
+
+		RefPtr<ILType> TypeFromString(CoreLib::Text::Parser & parser)
+		{
+			auto result = BaseTypeFromString(parser);
+			parser.ReadToken();
+			while (parser.LookAhead(L"["))
+			{
+				parser.ReadToken();
+				RefPtr<ILArrayType> newResult = new ILArrayType();
+				newResult->BaseType = result;
+				if (!parser.LookAhead(L"]"))
+					newResult->ArrayLength = parser.ReadInt();
+				result = newResult;
+				parser.Read(L"]");
+			}
+			return result;
 		}
 
 		int RoundToAlignment(int offset, int alignment)
@@ -3313,79 +3379,6 @@ namespace Spire
 			else
 				return 0;
 		}
-
-		int AlignmentOfBaseType(ILBaseType type)
-		{
-			if (type == ILBaseType::Int)
-				return 4;
-			else if (type == ILBaseType::UInt)
-				return 4;
-			else if (type == ILBaseType::Int2)
-				return 8;
-			else if (type == ILBaseType::Int3)
-				return 16;
-			else if (type == ILBaseType::Int4)
-				return 16;
-			else if (type == ILBaseType::Float)
-				return 4;
-			else if (type == ILBaseType::Float2)
-				return 8;
-			else if (type == ILBaseType::Float3)
-				return 16;
-			else if (type == ILBaseType::Float4)
-				return 16;
-			else if (type == ILBaseType::Float3x3)
-				return 16;
-			else if (type == ILBaseType::Float4x4)
-				return 16;
-			else if (type == ILBaseType::Texture2D)
-				return 8;
-			else if (type == ILBaseType::TextureCube)
-				return 8;
-			else if (type == ILBaseType::TextureCubeShadow)
-				return 8;
-			else if (type == ILBaseType::TextureShadow)
-				return 8;
-			else
-				return 0;
-		}
-
-		String ILBaseTypeToString(ILBaseType type)
-		{
-			if (type == ILBaseType::Int)
-				return L"int";
-			else if (type == ILBaseType::UInt)
-				return L"uint";
-			else if (type == ILBaseType::Int2)
-				return L"ivec2";
-			else if (type == ILBaseType::Int3)
-				return L"ivec3";
-			else if (type == ILBaseType::Int4)
-				return L"ivec4";
-			else if (type == ILBaseType::Float)
-				return L"float";
-			else if (type == ILBaseType::Float2)
-				return L"vec2";
-			else if (type == ILBaseType::Float3)
-				return L"vec3";
-			else if (type == ILBaseType::Float4)
-				return L"vec4";
-			else if (type == ILBaseType::Float3x3)
-				return L"mat3";
-			else if (type == ILBaseType::Float4x4)
-				return L"mat4";
-			else if (type == ILBaseType::Texture2D)
-				return L"sampler2D";
-			else if (type == ILBaseType::TextureCube)
-				return L"samplerCube";
-			else if (type == ILBaseType::TextureCubeShadow)
-				return L"samplerCubeShadow";
-			else if (type == ILBaseType::TextureShadow)
-				return L"sampler2DShadow";
-			else
-				return L"?unkown";
-		}
-
 		bool ILType::IsInt()
 		{
 			auto basicType = dynamic_cast<ILBasicType*>(this);
@@ -3746,6 +3739,59 @@ namespace Spire
 		void ExportInstruction::Accept(InstructionVisitor * visitor)
 		{
 			visitor->VisitExportInstruction(this);
+		}
+		ILType * ILStructType::Clone()
+		{
+			auto rs = new ILStructType(*this);
+			rs->Members.Clear();
+			for (auto & m : Members)
+			{
+				ILStructField f;
+				f.FieldName = m.FieldName;
+				f.Type = m.Type->Clone();
+				rs->Members.Add(f);
+			}
+			return rs;
+		}
+		String ILStructType::ToString()
+		{
+			return TypeName;
+		}
+		bool ILStructType::Equals(ILType * type)
+		{
+			auto st = dynamic_cast<ILStructType*>(type);
+			if (st && st->TypeName == this->TypeName)
+				return true;
+			return false;
+		}
+		void Align(int & ptr, int alignment)
+		{
+			if (ptr % alignment != 0)
+			{
+				ptr = (ptr / alignment + 1) * alignment;
+			}
+		}
+		int ILStructType::GetSize()
+		{
+			int rs = 0;
+			for (auto & m : Members)
+			{
+				int size = m.Type->GetSize();
+				int alignment = m.Type->GetAlignment();
+				Align(rs, alignment);
+				rs += size;
+			}
+			return rs;
+		}
+		int ILStructType::GetAlignment()
+		{
+			int rs = 1;
+			for (auto & m : Members)
+			{
+				int alignment = m.Type->GetAlignment();
+				rs = Math::Max(rs, alignment);
+			}
+			return rs;
 		}
 }
 }
@@ -4649,6 +4695,8 @@ namespace Spire
 							program->Shaders.Add(ParseShader());
 						else if (LookAheadToken(L"pipeline"))
 							program->Pipelines.Add(ParsePipeline());
+						else if (LookAheadToken(L"struct"))
+							program->Structs.Add(ParseStruct());
 						else if (LookAheadToken(L"using"))
 						{
 							ReadToken(L"using");
@@ -4656,7 +4704,7 @@ namespace Spire
 							ReadToken(TokenType::Semicolon);
 						}
 						else if (IsTypeKeyword() || LookAheadToken(L"inline") || LookAheadToken(L"extern")
-							|| LookAheadToken(L"__intrinsic"))
+							|| LookAheadToken(L"__intrinsic") || LookAheadToken(TokenType::Identifier))
 							program->Functions.Add(ParseFunction());
 						else if (LookAheadToken(TokenType::Semicolon))
 							ReadToken(TokenType::Semicolon);
@@ -5068,6 +5116,33 @@ namespace Spire
 			return function;
 		}
 
+		RefPtr<StructSyntaxNode> Parser::ParseStruct()
+		{
+			RefPtr<StructSyntaxNode> rs = new StructSyntaxNode();
+			FillPosition(rs.Ptr());
+			ReadToken(L"struct");
+			rs->Name = ReadToken(TokenType::Identifier);
+			ReadToken(L"{");
+			while (!LookAheadToken(L"}") && pos < tokens.Count())
+			{
+				RefPtr<TypeSyntaxNode> type = ParseType();
+				do
+				{
+					RefPtr<StructField> field = new StructField();
+					FillPosition(field.Ptr());
+					field->Type = type;
+					field->Name = ReadToken(TokenType::Identifier);
+					rs->Fields.Add(field);
+					if (!LookAheadToken(TokenType::Comma))
+						break;
+					ReadToken(TokenType::Comma);
+				} while (pos < tokens.Count());
+				ReadToken(TokenType::Semicolon);
+			}
+			ReadToken(L"}");
+			return rs;
+		}
+
 		RefPtr<StatementSyntaxNode> Parser::ParseStatement()
 		{
 			RefPtr<StatementSyntaxNode> statement;
@@ -5089,10 +5164,32 @@ namespace Spire
 				statement = ParseContinueStatement();
 			else if (LookAheadToken(TokenType::KeywordReturn))
 				statement = ParseReturnStatement();
-			else if ((LookAheadToken(TokenType::Identifier) && LookAheadToken(TokenType::Identifier, 1)) || LookAheadToken(L"using"))
+			else if (LookAheadToken(L"using") || (LookAheadToken(L"public") && LookAheadToken(L"using", 1)))
 				statement = ParseImportStatement();
 			else if (LookAheadToken(TokenType::Identifier))
-				statement = ParseExpressionStatement();
+			{
+				int startPos = pos;
+				bool isVarDeclr = false;
+				try
+				{
+					RefPtr<TypeSyntaxNode> type = ParseType();
+					if (LookAheadToken(TokenType::Identifier))
+					{
+						type = nullptr;
+						pos = startPos;
+						statement = ParseVarDeclrStatement();
+						isVarDeclr = true;
+					}
+				}
+				catch (...)
+				{
+				}
+				if (!isVarDeclr)
+				{
+					pos = startPos;
+					statement = ParseExpressionStatement();
+				}
+			}
 			else if (LookAheadToken(TokenType::Semicolon))
 			{
 				statement = new EmptyStatementSyntaxNode();
@@ -5343,7 +5440,10 @@ namespace Spire
 			RefPtr<TypeSyntaxNode> type = new TypeSyntaxNode();
 		
 			FillPosition(type.Ptr());
-			type->TypeName = ReadTypeKeyword().Content;
+			if (LookAheadToken(TokenType::Identifier))
+				type->TypeName = ReadToken(TokenType::Identifier).Content;
+			else
+				type->TypeName = ReadTypeKeyword().Content;
 	
 			if (LookAheadToken(TokenType::OpLess))
 			{
@@ -5355,7 +5455,10 @@ namespace Spire
 			{
 				ReadToken(TokenType::LBracket);
 				type->IsArray = true;
-				type->ArrayLength = atoi(ReadToken(TokenType::IntLiterial).Content.ToMultiByteString());
+				if (LookAheadToken(TokenType::IntLiterial))
+					type->ArrayLength = atoi(ReadToken(TokenType::IntLiterial).Content.ToMultiByteString());
+				else
+					type->ArrayLength = 0;
 				ReadToken(TokenType::RBracket);
 			}
 			return type;
@@ -5864,6 +5967,10 @@ namespace Spire
 {
 	namespace Compiler
 	{
+		bool IsNumeric(BaseType t)
+		{
+			return t == BaseType::Int || t == BaseType::Float || t == BaseType::UInt;
+		}
 		class SemanticsVisitor : public SyntaxVisitor
 		{
 			ProgramSyntaxNode * program = nullptr;
@@ -6299,7 +6406,7 @@ namespace Spire
 					compSym = new ShaderComponentSymbol();
 					compSym->Type = new Type();
 					compSym->Name = comp->Name.Content;
-					compSym->Type->DataType = comp->Type->ToExpressionType();
+					compSym->Type->DataType = comp->Type->ToExpressionType(symbolTable, err);
 					components.Add(comp->Name.Content, compSym);
 				}
 				else
@@ -6307,7 +6414,7 @@ namespace Spire
 					if (comp->IsParam)
 						Error(33029, L"\'" + compImpl->SyntaxNode->Name.Content + L"\': requirement clash with previous definition.",
 							compImpl->SyntaxNode.Ptr());
-					CheckComponentImplementationConsistency(err, compSym.Ptr(), compImpl.Ptr());
+					symbolTable->CheckComponentImplementationConsistency(err, compSym.Ptr(), compImpl.Ptr());
 				}
 				compSym->Implementations.Add(compImpl);
 			}
@@ -6316,6 +6423,16 @@ namespace Spire
 				HashSet<String> funcNames;
 				this->program = programNode;
 				this->function = nullptr;
+				for (auto & s : program->Structs)
+				{
+					RefPtr<StructSymbol> ssym = new StructSymbol();
+					ssym->Name = s->Name.Content;
+					ssym->SyntaxNode = s;
+					ssym->Type = new ILStructType();
+					symbolTable->Structs.Add(s->Name.Content, ssym);
+				}
+				for (auto & s : program->Structs)
+					VisitStruct(s.Ptr());
 				for (auto & pipeline : program->Pipelines)
 				{
 					VisitPipeline(pipeline.Ptr());
@@ -6329,7 +6446,7 @@ namespace Spire
 						argList << L"(";
 						for (auto & param : func->Parameters)
 						{
-							argList << param->Type->ToExpressionType().ToString();
+							argList << param->Type->ToExpressionType(symbolTable, err).ToString();
 							if (param != func->Parameters.Last())
 								argList << L", ";
 						}
@@ -6396,6 +6513,22 @@ namespace Spire
 				symbolTable->Shaders = _Move(newShaderSymbols);
 			}
 
+			virtual void VisitStruct(StructSyntaxNode * structNode) override
+			{
+				RefPtr<StructSymbol> st;
+				if (symbolTable->Structs.TryGetValue(structNode->Name.Content, st))
+				{
+					st->Type->TypeName = structNode->Name.Content;
+					for (auto node : structNode->Fields)
+					{
+						ILStructType::ILStructField f;
+						f.FieldName = node->Name.Content;
+						f.Type = TranslateExpressionType(node->Type->ToExpressionType(symbolTable, err));
+						st->Type->Members.Add(f);
+					}
+				}
+			}
+
 			virtual void VisitFunction(FunctionSyntaxNode *functionNode) override
 			{
 				if (!functionNode->IsExtern)
@@ -6411,7 +6544,7 @@ namespace Spire
 			void VisitFunctionDeclaration(FunctionSyntaxNode *functionNode)
 			{
 				this->function = functionNode;
-				auto returnType = functionNode->ReturnType->ToExpressionType();
+				auto returnType = functionNode->ReturnType->ToExpressionType(symbolTable, err);
 				if(returnType.BaseType == BaseType::Void && returnType.IsArray)
 					Error(30024, L"function return type can not be 'void' array.", functionNode->ReturnType.Ptr());
 				StringBuilder internalName;
@@ -6425,7 +6558,7 @@ namespace Spire
 						paraNames.Add(para->Name);
 					VariableEntry varEntry;
 					varEntry.Name = para->Name;
-					varEntry.Type.DataType = para->Type->ToExpressionType();
+					varEntry.Type.DataType = para->Type->ToExpressionType(symbolTable, err);
 					functionNode->Scope->Variables.AddIfNotExists(varEntry.Name, varEntry);
 					if (varEntry.Type.DataType.BaseType == BaseType::Void)
 						Error(30016, L"'void' can not be parameter type.", para.Ptr());
@@ -6476,7 +6609,7 @@ namespace Spire
 					VariableEntry varEntry;
 					varEntry.IsComponent = false;
 					varEntry.Name = stmt->IterationVariable.Content;
-					varEntry.Type.DataType = stmt->TypeDef->ToExpressionType();
+					varEntry.Type.DataType = stmt->TypeDef->ToExpressionType(symbolTable, err);
 					stmt->Scope->Variables.AddIfNotExists(stmt->IterationVariable.Content, varEntry);
 				}
 				if (!stmt->Scope->FindVariable(stmt->IterationVariable.Content, iterVar))
@@ -6528,7 +6661,7 @@ namespace Spire
 				}
 				if (!stmt->Expression)
 				{
-					if (function && function->ReturnType->ToExpressionType() != ExpressionType::Void)
+					if (function && function->ReturnType->ToExpressionType(symbolTable, err) != ExpressionType::Void)
 						Error(30006, L"'return' should have an expression.", stmt);
 				}
 				else
@@ -6536,10 +6669,10 @@ namespace Spire
 					stmt->Expression->Accept(this);
 					if (stmt->Expression->Type != ExpressionType::Error)
 					{
-						if (function && stmt->Expression->Type != function->ReturnType->ToExpressionType())
+						if (function && stmt->Expression->Type != function->ReturnType->ToExpressionType(symbolTable, err))
 							Error(30007, L"expression type '" + stmt->Expression->Type.ToString()
 								+ L"' does not match function's return type '"
-								+ function->ReturnType->ToExpressionType().ToString() + L"'", stmt);
+								+ function->ReturnType->ToExpressionType(symbolTable, err).ToString() + L"'", stmt);
 						if (currentComp && stmt->Expression->Type != currentComp->Type->DataType)
 						{
 							Error(30007, L"expression type '" + stmt->Expression->Type.ToString()
@@ -6551,7 +6684,7 @@ namespace Spire
 			}
 			virtual void VisitVarDeclrStatement(VarDeclrStatementSyntaxNode *stmt) override
 			{
-				if (stmt->Type->ToExpressionType().IsTextureType())
+				if (stmt->Type->ToExpressionType(symbolTable, err).IsTextureType())
 				{
 					Error(30033, L"cannot declare a local variable of 'texture' type.", stmt);
 				}
@@ -6562,7 +6695,7 @@ namespace Spire
 					if (stmt->Scope->Variables.ContainsKey(para->Name))
 						Error(30008, L"variable " + para->Name + L" already defined.", para.Ptr());
 
-					varDeclr.Type.DataType = stmt->Type->ToExpressionType();
+					varDeclr.Type.DataType = stmt->Type->ToExpressionType(symbolTable, err);
 					if (varDeclr.Type.DataType.BaseType == BaseType::Void)
 						Error(30009, L"invalid type 'void'.", stmt);
 					if (varDeclr.Type.DataType.IsArray && varDeclr.Type.DataType.ArrayLength <= 0)
@@ -6572,7 +6705,10 @@ namespace Spire
 					if (para->Expression != NULL)
 					{
 						para->Expression->Accept(this);
-						if (para->Expression->Type != varDeclr.Type.DataType && para->Expression->Type != ExpressionType::Error)
+						if (para->Expression->Type != varDeclr.Type.DataType &&
+							!(para->Expression->Type.IsIntegral() && varDeclr.Type.DataType.IsIntegral()) &&
+							!(para->Expression->Type == ExpressionType::Float && varDeclr.Type.DataType == ExpressionType::Int)
+							&& para->Expression->Type != ExpressionType::Error)
 						{
 							Error(30019, L"type mismatch \'" + para->Expression->Type.ToString() + L"\' and \'" +
 								varDeclr.Type.DataType.ToString() + L"\'", para.Ptr());
@@ -6611,11 +6747,10 @@ namespace Spire
 						expr->Type = leftType;
 					else if (rightType.IsVectorType() && leftType == GetVectorBaseType(rightType.BaseType))
 						expr->Type = rightType;
-					else if ((rightType == ExpressionType::Float && leftType == ExpressionType::Int) ||
-						(leftType == ExpressionType::Float && rightType == ExpressionType::Int))
+					else if ((rightType == ExpressionType::Float && leftType.IsIntegral()) ||
+						(leftType == ExpressionType::Float && rightType.IsIntegral()))
 						expr->Type = ExpressionType::Float;
-					else if ((leftType == ExpressionType::UInt && rightType == ExpressionType::Int) ||
-						(leftType == ExpressionType::Int && rightType == ExpressionType::UInt))
+					else if (leftType.IsIntegral() && rightType.IsIntegral())
 						expr->Type = ExpressionType::Int;
 					else
 						expr->Type = ExpressionType::Error;
@@ -6656,8 +6791,7 @@ namespace Spire
 						&& leftType.BaseType != BaseType::Shader &&
 						GetVectorBaseType(leftType.BaseType) != BaseType::Float)
 						expr->Type = (expr->Operator == Operator::And || expr->Operator == Operator::Or ? ExpressionType::Bool : leftType);
-					else if ((leftType == ExpressionType::UInt && rightType == ExpressionType::Int) ||
-						(leftType == ExpressionType::Int && rightType == ExpressionType::UInt))
+					else if (leftType.IsIntegral() && rightType.IsIntegral())
 						expr->Type = leftType;
 					else
 						expr->Type = ExpressionType::Error;
@@ -6693,10 +6827,12 @@ namespace Spire
 					if (!leftType.IsLeftValue && leftType != ExpressionType::Error)
 						Error(30011, L"left of '=' is not an l-value.", expr->LeftExpression.Ptr());
 					expr->LeftExpression->Access = ExpressionAccess::Write;
-					if (leftType == rightType || 
-						((leftType == ExpressionType::Float || leftType==ExpressionType::Int || leftType==ExpressionType::UInt) && 
-						 (rightType == ExpressionType::Float || rightType == ExpressionType::Int || rightType == ExpressionType::UInt)))
+					if (leftType == rightType ||
+						((leftType == ExpressionType::Float || leftType == ExpressionType::Int || leftType == ExpressionType::UInt) &&
+						(rightType == ExpressionType::Float || rightType == ExpressionType::Int || rightType == ExpressionType::UInt)))
 						expr->Type = ExpressionType::Void;
+					else if (leftType.IsIntegral() && rightType.IsIntegral())
+						expr->Type = leftType;
 					else
 						expr->Type = ExpressionType::Error;
 					break;
@@ -6746,7 +6882,11 @@ namespace Spire
 					}
 				}
 				if (expr->BaseExpression->Type.IsArray)
-					expr->Type.BaseType = expr->BaseExpression->Type.BaseType;
+				{
+					expr->Type = expr->BaseExpression->Type;
+					expr->Type.IsArray = false;
+					expr->Type.ArrayLength = 0;
+				}
 				else
 				{
 					if (expr->BaseExpression->Type.BaseType == BaseType::Float3x3)
@@ -6765,7 +6905,7 @@ namespace Spire
 					return false;
 				for (int i = 0; i < functionNode->Parameters.Count(); i++)
 				{
-					if (functionNode->Parameters[i]->Type->ToExpressionType() != args[i]->Type)
+					if (functionNode->Parameters[i]->Type->ToExpressionType(symbolTable, err) != args[i]->Type)
 						return false;
 				}
 				return true;
@@ -6809,7 +6949,7 @@ namespace Spire
 								for (int i = 0; i < expr->Arguments.Count(); i++)
 								{
 									auto argType = expr->Arguments[i]->Type;
-									auto paramType = f.Value->SyntaxNode->Parameters[i]->Type->ToExpressionType();
+									auto paramType = f.Value->SyntaxNode->Parameters[i]->Type->ToExpressionType(symbolTable, err);
 									if (argType == paramType)
 										continue;
 									else if (argType.ArrayLength == paramType.ArrayLength
@@ -6846,7 +6986,7 @@ namespace Spire
 						if (currentFunc)
 							currentFunc->ReferencedFunctions.Add(funcName);
 					}
-					expr->Type = func->SyntaxNode->ReturnType->ToExpressionType();
+					expr->Type = func->SyntaxNode->ReturnType->ToExpressionType(symbolTable, err);
 				}
 			}
 
@@ -6988,15 +7128,13 @@ namespace Spire
 			virtual void VisitTypeCastExpression(TypeCastExpressionSyntaxNode * expr) override
 			{
 				expr->Expression->Accept(this);
-				auto targetType = expr->TargetType->ToExpressionType();
+				auto targetType = expr->TargetType->ToExpressionType(symbolTable, err);
 				
 				if (expr->Expression->Type != ExpressionType::Error)
 				{
 					if (expr->Expression->Type.IsArray)
 						expr->Type = ExpressionType::Error;
-					else if ((GetVectorBaseType(expr->Expression->Type.BaseType) != BaseType::Int && GetVectorBaseType(expr->Expression->Type.BaseType) != BaseType::Float)
-						||
-						(GetVectorBaseType(targetType.BaseType) != BaseType::Int && GetVectorBaseType(targetType.BaseType) != BaseType::Float))
+					else if (!IsNumeric(GetVectorBaseType(expr->Expression->Type.BaseType)) || !IsNumeric(GetVectorBaseType(targetType.BaseType)))
 						expr->Type = ExpressionType::Error;
 					else if (targetType.BaseType == BaseType::Void || expr->Expression->Type.BaseType == BaseType::Void)
 						expr->Type = ExpressionType::Error;
@@ -7117,6 +7255,18 @@ namespace Spire
 					}
 					else
 						expr->Type = ExpressionType::Error;
+				}
+				else if (baseType.BaseType == BaseType::Struct && baseType.Struct)
+				{
+					int id = baseType.Struct->SyntaxNode->FindField(expr->MemberName);
+					if (id == -1)
+					{
+						expr->Type = ExpressionType::Error;
+						Error(30027, L"\'" + expr->MemberName + L"\' is not a member of \'" +
+							baseType.Struct->Name + L"\'.", expr);
+					}
+					else
+						expr->Type = baseType.Struct->SyntaxNode->Fields[id]->Type->ToExpressionType(symbolTable, err);
 				}
 				else
 					expr->Type = ExpressionType::Error;
@@ -7408,6 +7558,8 @@ namespace Spire
 							return;
 						// generate IL code
 						RefPtr<ICodeGenerator> codeGen = CreateCodeGenerator(&symTable, result);
+						for (auto & s : programSyntaxNode->Structs)
+							codeGen->ProcessStruct(s.Ptr());
 						for (auto & func : programSyntaxNode->Functions)
 							codeGen->ProcessFunction(func.Ptr());
 						for (auto & shader : shaderClosures)
@@ -8179,7 +8331,7 @@ namespace Spire
 			}
 			return result;
 		}
-		bool CheckComponentImplementationConsistency(ErrorWriter * err, ShaderComponentSymbol * comp, ShaderComponentImplSymbol * impl)
+		bool SymbolTable::CheckComponentImplementationConsistency(ErrorWriter * err, ShaderComponentSymbol * comp, ShaderComponentImplSymbol * impl)
 		{
 			bool rs = true;
 			if (impl->SyntaxNode->Rate)
@@ -8225,7 +8377,7 @@ namespace Spire
 					rs = false;
 					break;
 				}
-				if (impl->SyntaxNode->Type->ToExpressionType() != cimpl->SyntaxNode->Type->ToExpressionType())
+				if (impl->SyntaxNode->Type->ToExpressionType(this) != cimpl->SyntaxNode->Type->ToExpressionType(this))
 				{
 					err->Error(33021, L"\'" + comp->Name + L"\': inconsistent signature.\nsee previous definition at " + cimpl->SyntaxNode->Position.ToString(), impl->SyntaxNode->Position);
 					rs = false;
@@ -8361,6 +8513,20 @@ namespace Spire
 			return false;
 		}
 
+		int ExpressionType::GetSize()
+		{
+			int baseSize = GetVectorSize(BaseType);
+			if (BaseType == Compiler::BaseType::Texture2D || BaseType == Compiler::BaseType::TextureCube ||
+				BaseType == Compiler::BaseType::TextureCubeShadow || BaseType == Compiler::BaseType::TextureShadow)
+				baseSize = sizeof(void*) / sizeof(int);
+			else if (BaseType == Compiler::BaseType::Struct)
+				baseSize = Struct->Type->GetSize();
+			if (ArrayLength == 0)
+				return baseSize;
+			else
+				return ArrayLength*baseSize;
+		}
+
 		CoreLib::Basic::String ExpressionType::ToString()
 		{
 			CoreLib::Basic::StringBuilder res;
@@ -8418,10 +8584,10 @@ namespace Spire
 				{
 					if (i > 0)
 						res.Append(L",");
-					res.Append(Func->Parameters[i]->Type->ToExpressionType().ToString());
+					res.Append(Func->Parameters[i]->Type->ToString());
 				}
 				res.Append(L") => ");
-				res.Append(Func->ReturnType->ToExpressionType().ToString());
+				res.Append(Func->ReturnType->ToString());
 				break;
 			case Compiler::BaseType::Shader:
 				res.Append(Shader->SyntaxNode->Name.Content);
@@ -8449,6 +8615,9 @@ namespace Spire
 		ProgramSyntaxNode * ProgramSyntaxNode::Clone(CloneContext & ctx)
 		{
 			auto rs = CloneSyntaxNodeFields(new ProgramSyntaxNode(*this), ctx);
+			rs->Structs.Clear();
+			for (auto & x : Structs)
+				rs->Structs.Add(x->Clone(ctx));
 			rs->Functions.Clear();
 			for (auto & x : Functions)
 				rs->Functions.Add(x->Clone(ctx));
@@ -8766,6 +8935,62 @@ namespace Spire
 			rs->IsArray = false;		
 			return rs;
 		}
+		ExpressionType TypeSyntaxNode::ToExpressionType(SymbolTable * symTable, ErrorWriter * errWriter)
+		{
+			ExpressionType expType;
+			if (TypeName == L"int")
+				expType.BaseType = BaseType::Int;
+			else if (TypeName == L"uint")
+				expType.BaseType = BaseType::UInt;
+			else if (TypeName == L"float")
+				expType.BaseType = BaseType::Float;
+			else if (TypeName == L"ivec2")
+				expType.BaseType = BaseType::Int2;
+			else if (TypeName == L"ivec3")
+				expType.BaseType = BaseType::Int3;
+			else if (TypeName == L"ivec4")
+				expType.BaseType = BaseType::Int4;
+			else if (TypeName == L"vec2")
+				expType.BaseType = BaseType::Float2;
+			else if (TypeName == L"vec3")
+				expType.BaseType = BaseType::Float3;
+			else if (TypeName == L"vec4")
+				expType.BaseType = BaseType::Float4;
+			else if (TypeName == L"mat3" || TypeName == L"mat3x3")
+				expType.BaseType = BaseType::Float3x3;
+			else if (TypeName == L"mat4" || TypeName == L"mat4x4")
+				expType.BaseType = BaseType::Float4x4;
+			else if (TypeName == L"sampler2D")
+				expType.BaseType = BaseType::Texture2D;
+			else if (TypeName == L"samplerCube")
+				expType.BaseType = BaseType::TextureCube;
+			else if (TypeName == L"sampler2DShadow")
+				expType.BaseType = BaseType::TextureShadow;
+			else if (TypeName == L"samplerCubeShadow")
+				expType.BaseType = BaseType::TextureCubeShadow;
+			else if (TypeName == L"void")
+				expType.BaseType = BaseType::Void;
+			else
+			{
+				expType.BaseType = BaseType::Struct;
+				RefPtr<StructSymbol> ssym;
+				if (symTable->Structs.TryGetValue(TypeName, ssym))
+				{
+					expType.Struct = ssym.Ptr();
+				}
+				else
+				{
+					if (errWriter)
+					{
+						errWriter->Error(31040, L"undefined type name: '" + TypeName + L"'.", Position);
+					}
+					return ExpressionType::Error;
+				}
+			}
+			expType.ArrayLength = ArrayLength;
+			expType.IsArray = IsArray;
+			return expType;
+		}
 		void ComponentSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
 			visitor->VisitComponent(this);
@@ -8855,6 +9080,14 @@ namespace Spire
 			auto rs = CloneSyntaxNodeFields(new ImportStatementSyntaxNode(*this), ctx);
 			rs->Import = Import->Clone(ctx);
 			return rs;
+		}
+		void StructField::Accept(SyntaxVisitor * visitor)
+		{
+			visitor->VisitStructField(this);
+		}
+		void StructSyntaxNode::Accept(SyntaxVisitor * visitor)
+		{
+			visitor->VisitStruct(this);
 		}
 	}
 }
@@ -9497,7 +9730,7 @@ namespace SpireLib
 			writer << L"interface " << ublock.Key << L" size " << ublock.Value.Size << L"\n{\n";
 			for (auto & entry : ublock.Value.Entries)
 			{
-				writer << ILBaseTypeToString(entry.Type) << L" " << entry.Name << L" : " << entry.Offset << L"," << entry.Size;
+				writer << entry.Type->ToString() << L" " << entry.Name << L" : " << entry.Offset << L"," << entry.Size;
 				if (entry.Attributes.Count())
 				{
 					writer << L"\n{\n";
@@ -9602,7 +9835,7 @@ namespace SpireLib
 				while (!parser.LookAhead(L"}") && !parser.IsEnd())
 				{
 					InterfaceBlockEntry entry;
-					entry.Type = ILBaseTypeFromString(parser.ReadWord());
+					entry.Type = TypeFromString(parser);
 					entry.Name = parser.ReadWord();
 					parser.Read(L":");
 					entry.Offset = parser.ReadInt();

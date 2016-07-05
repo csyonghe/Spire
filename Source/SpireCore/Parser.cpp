@@ -133,6 +133,8 @@ namespace Spire
 							program->Shaders.Add(ParseShader());
 						else if (LookAheadToken(L"pipeline"))
 							program->Pipelines.Add(ParsePipeline());
+						else if (LookAheadToken(L"struct"))
+							program->Structs.Add(ParseStruct());
 						else if (LookAheadToken(L"using"))
 						{
 							ReadToken(L"using");
@@ -140,7 +142,7 @@ namespace Spire
 							ReadToken(TokenType::Semicolon);
 						}
 						else if (IsTypeKeyword() || LookAheadToken(L"inline") || LookAheadToken(L"extern")
-							|| LookAheadToken(L"__intrinsic"))
+							|| LookAheadToken(L"__intrinsic") || LookAheadToken(TokenType::Identifier))
 							program->Functions.Add(ParseFunction());
 						else if (LookAheadToken(TokenType::Semicolon))
 							ReadToken(TokenType::Semicolon);
@@ -552,6 +554,33 @@ namespace Spire
 			return function;
 		}
 
+		RefPtr<StructSyntaxNode> Parser::ParseStruct()
+		{
+			RefPtr<StructSyntaxNode> rs = new StructSyntaxNode();
+			FillPosition(rs.Ptr());
+			ReadToken(L"struct");
+			rs->Name = ReadToken(TokenType::Identifier);
+			ReadToken(L"{");
+			while (!LookAheadToken(L"}") && pos < tokens.Count())
+			{
+				RefPtr<TypeSyntaxNode> type = ParseType();
+				do
+				{
+					RefPtr<StructField> field = new StructField();
+					FillPosition(field.Ptr());
+					field->Type = type;
+					field->Name = ReadToken(TokenType::Identifier);
+					rs->Fields.Add(field);
+					if (!LookAheadToken(TokenType::Comma))
+						break;
+					ReadToken(TokenType::Comma);
+				} while (pos < tokens.Count());
+				ReadToken(TokenType::Semicolon);
+			}
+			ReadToken(L"}");
+			return rs;
+		}
+
 		RefPtr<StatementSyntaxNode> Parser::ParseStatement()
 		{
 			RefPtr<StatementSyntaxNode> statement;
@@ -573,10 +602,32 @@ namespace Spire
 				statement = ParseContinueStatement();
 			else if (LookAheadToken(TokenType::KeywordReturn))
 				statement = ParseReturnStatement();
-			else if ((LookAheadToken(TokenType::Identifier) && LookAheadToken(TokenType::Identifier, 1)) || LookAheadToken(L"using"))
+			else if (LookAheadToken(L"using") || (LookAheadToken(L"public") && LookAheadToken(L"using", 1)))
 				statement = ParseImportStatement();
 			else if (LookAheadToken(TokenType::Identifier))
-				statement = ParseExpressionStatement();
+			{
+				int startPos = pos;
+				bool isVarDeclr = false;
+				try
+				{
+					RefPtr<TypeSyntaxNode> type = ParseType();
+					if (LookAheadToken(TokenType::Identifier))
+					{
+						type = nullptr;
+						pos = startPos;
+						statement = ParseVarDeclrStatement();
+						isVarDeclr = true;
+					}
+				}
+				catch (...)
+				{
+				}
+				if (!isVarDeclr)
+				{
+					pos = startPos;
+					statement = ParseExpressionStatement();
+				}
+			}
 			else if (LookAheadToken(TokenType::Semicolon))
 			{
 				statement = new EmptyStatementSyntaxNode();
@@ -827,7 +878,10 @@ namespace Spire
 			RefPtr<TypeSyntaxNode> type = new TypeSyntaxNode();
 		
 			FillPosition(type.Ptr());
-			type->TypeName = ReadTypeKeyword().Content;
+			if (LookAheadToken(TokenType::Identifier))
+				type->TypeName = ReadToken(TokenType::Identifier).Content;
+			else
+				type->TypeName = ReadTypeKeyword().Content;
 	
 			if (LookAheadToken(TokenType::OpLess))
 			{
@@ -839,7 +893,10 @@ namespace Spire
 			{
 				ReadToken(TokenType::LBracket);
 				type->IsArray = true;
-				type->ArrayLength = atoi(ReadToken(TokenType::IntLiterial).Content.ToMultiByteString());
+				if (LookAheadToken(TokenType::IntLiterial))
+					type->ArrayLength = atoi(ReadToken(TokenType::IntLiterial).Content.ToMultiByteString());
+				else
+					type->ArrayLength = 0;
 				ReadToken(TokenType::RBracket);
 			}
 			return type;

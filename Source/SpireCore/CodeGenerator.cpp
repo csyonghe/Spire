@@ -8,6 +8,33 @@ namespace Spire
 {
 	namespace Compiler
 	{
+		RefPtr<ILType> TranslateExpressionType(const ExpressionType & type)
+		{
+			RefPtr<ILType> resultType = 0;
+			if (type.BaseType == BaseType::Struct)
+			{
+				resultType = type.Struct->Type;
+			}
+			else
+			{
+				auto base = new ILBasicType();
+				base->Type = (ILBaseType)type.BaseType;
+				if (type.BaseType == BaseType::Bool)
+				{
+					base->Type = ILBaseType::Int;
+				}
+				resultType = base;
+			}
+			if (type.IsArray)
+			{
+				auto nArrType = new ILArrayType();
+				nArrType->BaseType = resultType;
+				nArrType->ArrayLength = type.ArrayLength;
+				resultType = nArrType;
+			}
+			return resultType;
+		}
+
 		class CodeGenerator : public ICodeGenerator
 		{
 		private:
@@ -20,34 +47,7 @@ namespace Spire
 			List<ILOperand*> exprStack;
 			CodeWriter codeWriter;
 			ScopeDictionary<String, ILOperand*> variables;
-			ILType * TranslateExpressionType(const ExpressionType & type)
-			{
-				ILType * resultType = 0;
-				auto base = new ILBasicType();
-				base->Type = (ILBaseType)type.BaseType;
-				resultType = base;
-				if (type.BaseType == BaseType::Bool)
-				{
-					base->Type = ILBaseType::Int;
-				}
-
-				if (type.IsArray)
-				{
-					ILArrayType * arrType = dynamic_cast<ILArrayType*>(resultType);
-					if (resultType)
-					{
-						arrType->ArrayLength *= type.ArrayLength;
-					}
-					else
-					{
-						auto nArrType = new ILArrayType();
-						nArrType->BaseType = resultType;
-						nArrType->ArrayLength = type.ArrayLength;
-						resultType = nArrType;
-					}
-				}
-				return resultType;
-			}
+			
 			void PushStack(ILOperand * op)
 			{
 				exprStack.Add(op);
@@ -78,13 +78,12 @@ namespace Spire
 			FetchArgInstruction * FetchArg(const ExpressionType & etype, int argId)
 			{
 				auto type = TranslateExpressionType(etype);
-				auto arrType = dynamic_cast<ILArrayType*>(type);
+				auto arrType = dynamic_cast<ILArrayType*>(type.Ptr());
 				FetchArgInstruction * varOp = 0;
 				if (arrType)
 				{
 					auto baseType = arrType->BaseType.Release();
 					varOp = codeWriter.FetchArg(baseType, argId);
-					delete type;
 				}
 				else
 				{
@@ -106,9 +105,17 @@ namespace Spire
 			virtual void VisitProgram(ProgramSyntaxNode *) override
 			{
 			}
+			virtual void VisitStruct(StructSyntaxNode * st) override
+			{
+				result.Program->Structs.Add(symTable->Structs[st->Name.Content]()->Type);
+			}
 			virtual void ProcessFunction(FunctionSyntaxNode * func) override
 			{
 				VisitFunction(func);
+			}
+			virtual void ProcessStruct(StructSyntaxNode * st) override
+			{
+				VisitStruct(st);
 			}
 			virtual void ProcessShader(ShaderClosure * shader) override
 			{
@@ -469,20 +476,20 @@ namespace Spire
 					for (auto & entry : block.Value->Entries)
 					{
 						InterfaceBlockEntry ment;
-						ment.Type = dynamic_cast<ILBasicType*>(entry.Value.Type.Ptr())->Type;
+						ment.Type = entry.Value.Type;
 						ment.Name = entry.Key;
 						ment.Attributes = entry.Value.LayoutAttribs;
 						if (!pack)
-							offset = RoundToAlignment(offset, AlignmentOfBaseType(ment.Type));
+							offset = RoundToAlignment(offset, ment.Type->GetAlignment());
 						ment.Offset = offset;
 						entry.Value.Offset = offset;
-						ment.Size = SizeofBaseType(ment.Type);
+						ment.Size = ment.Type->GetSize();
 						offset += ment.Size;
 						blockMeta.Entries.Add(ment);
 					}
 					block.Value->Size = offset;
 					if (!pack && block.Value->Entries.Count() > 0)
-						block.Value->Size = RoundToAlignment(offset, AlignmentOfBaseType(dynamic_cast<ILBasicType*>((*(block.Value->Entries.begin())).Value.Type.Ptr())->Type));
+						block.Value->Size = RoundToAlignment(offset, (*(block.Value->Entries.begin())).Value.Type->GetAlignment());
 					blockMeta.Size = block.Value->Size;
 					compiledShader->MetaData.InterfaceBlocks[blockMeta.Name] = blockMeta;
 				}
@@ -528,7 +535,7 @@ namespace Spire
 				if (currentComponentImpl->SyntaxNode->Expression)
 				{
 					currentComponentImpl->SyntaxNode->Expression->Accept(this);
-					Assign(currentComponentImpl->SyntaxNode->Type->ToExpressionType(), allocVar, exprStack.Last());
+					Assign(currentComponentImpl->SyntaxNode->Type->ToExpressionType(symTable, nullptr), allocVar, exprStack.Last());
 					if (currentWorld->WorldOutput->Entries.ContainsKey(currentComponent->UniqueName))
 					{
 						auto exp = new ExportInstruction(currentComponent->UniqueName, currentWorld->ExportOperator.Content, currentWorld,
@@ -551,14 +558,14 @@ namespace Spire
 				RefPtr<CompiledFunction> func = new CompiledFunction();
 				result.Program->Functions.Add(func);
 				func->Name = function->InternalName;
-				func->ReturnType = TranslateExpressionType(function->ReturnType->ToExpressionType());
+				func->ReturnType = TranslateExpressionType(function->ReturnType->ToExpressionType(symTable, nullptr));
 				variables.PushScope();
 				codeWriter.PushNode();
 				int id = 0;
 				for (auto &param : function->Parameters)
 				{
-					func->Parameters.Add(param->Name, TranslateExpressionType(param->Type->ToExpressionType()));
-					auto op = FetchArg(param->Type->ToExpressionType(), ++id);
+					func->Parameters.Add(param->Name, TranslateExpressionType(param->Type->ToExpressionType(symTable, nullptr)));
+					auto op = FetchArg(param->Type->ToExpressionType(symTable, nullptr), ++id);
 					op->Name = String(L"p_") + param->Name;
 					variables.Add(param->Name, op);
 				}
@@ -608,7 +615,7 @@ namespace Spire
 				variables.PushScope();
 				if (stmt->TypeDef)
 				{
-					AllocVarInstruction * varOp = AllocVar(stmt->TypeDef->ToExpressionType());
+					AllocVarInstruction * varOp = AllocVar(stmt->TypeDef->ToExpressionType(symTable));
 					varOp->Name = L"v_" + stmt->IterationVariable.Content;
 					variables.Add(stmt->IterationVariable.Content, varOp);
 				}
@@ -616,7 +623,7 @@ namespace Spire
 				if (!variables.TryGetValue(stmt->IterationVariable.Content, iterVar))
 					throw InvalidProgramException(L"Iteration variable not found in variables dictionary. This should have been checked by semantics analyzer.");
 				stmt->InitialExpression->Accept(this);
-				Assign(stmt->TypeDef->ToExpressionType(), iterVar, PopStack());
+				Assign(stmt->TypeDef->ToExpressionType(symTable), iterVar, PopStack());
 
 				codeWriter.PushNode();
 				stmt->EndExpression->Accept(this);
@@ -640,7 +647,7 @@ namespace Spire
 				}
 				auto afterVal = new AddInstruction(new LoadInstruction(iterVar), stepVal);
 				codeWriter.Insert(afterVal);
-				Assign(stmt->TypeDef->ToExpressionType(), iterVar, afterVal);
+				Assign(stmt->TypeDef->ToExpressionType(symTable), iterVar, afterVal);
 				instr->SideEffectCode = codeWriter.PopNode();
 
 				codeWriter.PushNode();
@@ -729,13 +736,13 @@ namespace Spire
 			{
 				for (auto & v : stmt->Variables)
 				{
-					AllocVarInstruction * varOp = AllocVar(stmt->Type->ToExpressionType());
+					AllocVarInstruction * varOp = AllocVar(stmt->Type->ToExpressionType(symTable));
 					varOp->Name = L"v" + String(NamingCounter++) + L"_" + v->Name;
 					variables.Add(v->Name, varOp);
 					if (v->Expression)
 					{
 						v->Expression->Accept(this);
-						Assign(stmt->Type->ToExpressionType(), varOp, PopStack());
+						Assign(stmt->Type->ToExpressionType(symTable), varOp, PopStack());
 					}
 				}
 			}
@@ -951,6 +958,18 @@ namespace Spire
 							}
 							codeWriter.Store(rs, tmp);
 							PushStack(codeWriter.Load(rs));
+						}
+					}
+					else if (expr->BaseExpression->Type.BaseType == BaseType::Struct)
+					{
+						if (expr->Access == ExpressionAccess::Read)
+						{
+							int id = expr->BaseExpression->Type.Struct->SyntaxNode->FindField(expr->MemberName);
+							GenerateIndexExpression(base, result.Program->ConstantPool->CreateConstant(id),
+								expr->Access == ExpressionAccess::Read);
+						}
+						else
+						{
 						}
 					}
 					else

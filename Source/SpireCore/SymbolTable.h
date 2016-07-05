@@ -3,6 +3,7 @@
 
 #include "../CoreLib/Basic.h"
 #include "Syntax.h"
+#include "IL.h"
 
 namespace Spire
 {
@@ -200,15 +201,25 @@ namespace Spire
 
 		class CompileResult;
 
+		class StructSymbol
+		{
+		public:
+			String Name;
+			RefPtr<StructSyntaxNode> SyntaxNode;
+			RefPtr<ILStructType> Type;
+		};
+
 		class SymbolTable
 		{
 		public:
 			EnumerableDictionary<String, RefPtr<FunctionSymbol>> Functions;
 			EnumerableDictionary<String, RefPtr<ShaderSymbol>> Shaders;
 			EnumerableDictionary<String, RefPtr<PipelineSymbol>> Pipelines;
+			EnumerableDictionary<String, RefPtr<StructSymbol>> Structs;
 			List<ShaderSymbol*> ShaderDependenceOrder;
 			bool SortShaders(); // return true if success, return false if dependency is cyclic
 			void EvalFunctionReferenceClosure();
+			bool CheckComponentImplementationConsistency(ErrorWriter * err, ShaderComponentSymbol * comp, ShaderComponentImplSymbol * impl);
 		};
 
 		class GUID
@@ -220,7 +231,6 @@ namespace Spire
 			static int Next();
 		};
 
-		bool CheckComponentImplementationConsistency(ErrorWriter * err, ShaderComponentSymbol * comp, ShaderComponentImplSymbol * impl);
 
 		template<typename T, typename GetDependencyFunc>
 		void DependencySort(List<T> & list, const GetDependencyFunc & getDep)

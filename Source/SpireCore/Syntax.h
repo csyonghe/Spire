@@ -39,7 +39,8 @@ namespace Spire
 			Bool = 128,
 			Shader = 256,
 			UInt = 512,
-			Error = 1024,
+			Struct = 1024,
+			Error = 2048,
 
 		};
 
@@ -102,8 +103,11 @@ namespace Spire
 		{
 			return type == BaseType::Texture2D || type == BaseType::TextureCube || type == BaseType::TextureCubeShadow || type == BaseType::TextureShadow;
 		}
+		class SymbolTable;
 		class ShaderSymbol;
+		class StructSymbol;
 		class ShaderClosure;
+		class StructSyntaxNode;
 		class ExpressionType
 		{
 		public:
@@ -115,6 +119,7 @@ namespace Spire
 			ShaderSymbol * Shader = nullptr;
 			ShaderClosure * ShaderClosure = nullptr;
 			FunctionSyntaxNode * Func = nullptr;
+			StructSymbol * Struct = nullptr;
 			ExpressionType GetBaseType()
 			{
 				ExpressionType rs;
@@ -135,21 +140,15 @@ namespace Spire
 				IsLeftValue = false;
 				IsReference = false;
 			}
+			bool IsIntegral()
+			{
+				return !IsArray && (BaseType == Compiler::BaseType::Int || BaseType == Compiler::BaseType::UInt);
+			}
 			bool IsTextureType()
 			{
 				return !IsArray && (BaseType == Compiler::BaseType::Texture2D || BaseType == Compiler::BaseType::TextureCube || BaseType == Compiler::BaseType::TextureCubeShadow || BaseType == Compiler::BaseType::TextureShadow);
 			}
-			int GetSize()
-			{
-				int baseSize = GetVectorSize(BaseType);
-				if (BaseType == Compiler::BaseType::Texture2D || BaseType == Compiler::BaseType::TextureCube ||
-					BaseType == Compiler::BaseType::TextureCubeShadow || BaseType == Compiler::BaseType::TextureShadow)
-					baseSize = sizeof(void*) / sizeof(int);
-				if (ArrayLength == 0)
-					return baseSize;
-				else
-					return ArrayLength*baseSize;
-			}
+			int GetSize();
 			ExpressionType(Spire::Compiler::BaseType baseType)
 			{
 				BaseType = baseType;
@@ -179,7 +178,8 @@ namespace Spire
 						type.IsArray == IsArray &&
 						type.ArrayLength == ArrayLength &&
 						type.Func == Func &&
-						type.Shader == Shader);
+						type.Shader == Shader &&
+						type.Struct == Struct);
 			}
 
 			bool operator != (const ExpressionType & type)
@@ -280,51 +280,66 @@ namespace Spire
 			
 			static TypeSyntaxNode * FromExpressionType(ExpressionType t);
 
-			ExpressionType ToExpressionType()
-			{
-				ExpressionType expType;
-				if (TypeName == L"int")
-					expType.BaseType = BaseType::Int;
-				else if (TypeName == L"uint")
-					expType.BaseType = BaseType::UInt;
-				else if (TypeName == L"float")
-					expType.BaseType = BaseType::Float;
-				else if (TypeName == L"ivec2")
-					expType.BaseType = BaseType::Int2;
-				else if (TypeName == L"ivec3")
-					expType.BaseType = BaseType::Int3;
-				else if (TypeName == L"ivec4")
-					expType.BaseType = BaseType::Int4;
-				else if (TypeName == L"vec2")
-					expType.BaseType = BaseType::Float2;
-				else if (TypeName == L"vec3")
-					expType.BaseType = BaseType::Float3;
-				else if (TypeName == L"vec4")
-					expType.BaseType = BaseType::Float4;
-				else if (TypeName == L"mat3" || TypeName == L"mat3x3")
-					expType.BaseType = BaseType::Float3x3;
-				else if (TypeName == L"mat4" || TypeName == L"mat4x4")
-					expType.BaseType = BaseType::Float4x4;
-				else if (TypeName == L"sampler2D")
-					expType.BaseType = BaseType::Texture2D;
-				else if (TypeName == L"samplerCube")
-					expType.BaseType = BaseType::TextureCube;
-				else if (TypeName == L"sampler2DShadow")
-					expType.BaseType = BaseType::TextureShadow;
-				else if (TypeName == L"samplerCubeShadow")
-					expType.BaseType = BaseType::TextureCubeShadow;
-				else if (TypeName == L"void")
-					expType.BaseType = BaseType::Void;
-				expType.ArrayLength = ArrayLength;
-				expType.IsArray = IsArray;
-				return expType;
-			}
+			ExpressionType ToExpressionType(SymbolTable * symTable, ErrorWriter * errWriter = nullptr);
 			virtual TypeSyntaxNode * Clone(CloneContext & ctx)
 			{
 				return CloneSyntaxNodeFields(new TypeSyntaxNode(*this), ctx);
 			}
+			String ToString()
+			{
+				StringBuilder rs;
+				rs << TypeName;
+				if (IsArray)
+				{
+					rs << L"[";
+					if (ArrayLength > 0)
+						rs << ArrayLength;
+					rs << L"]";
+				}
+				return rs.ProduceString();
+			}
 		};
 
+		class StructField : public SyntaxNode
+		{
+		public:
+			RefPtr<TypeSyntaxNode> Type;
+			Token Name;
+			StructField()
+			{}
+			virtual void Accept(SyntaxVisitor * visitor);
+			virtual StructField * Clone(CloneContext & ctx) override
+			{
+				auto rs = CloneSyntaxNodeFields(new StructField(*this), ctx);
+				rs->Type = Type->Clone(ctx);
+				return rs;
+			}
+		};
+
+		class StructSyntaxNode : public SyntaxNode
+		{
+		public:
+			List<RefPtr<StructField>> Fields;
+			Token Name;
+			virtual void Accept(SyntaxVisitor * visitor);
+			int FindField(String name)
+			{
+				for (int i = 0; i < Fields.Count(); i++)
+				{
+					if (Fields[i]->Name.Content == name)
+						return i;
+				}
+				return -1;
+			}
+			virtual StructSyntaxNode * Clone(CloneContext & ctx) override
+			{
+				auto rs = CloneSyntaxNodeFields(new StructSyntaxNode(*this), ctx);
+				rs->Fields.Clear();
+				for (auto & f : Fields)
+					rs->Fields.Add(f->Clone(ctx));
+				return rs;
+			}
+		};
 
 		enum class ExpressionAccess
 		{
@@ -644,11 +659,13 @@ namespace Spire
 			List<RefPtr<FunctionSyntaxNode>> Functions;
 			List<RefPtr<PipelineSyntaxNode>> Pipelines;
 			List<RefPtr<ShaderSyntaxNode>> Shaders;
+			List<RefPtr<StructSyntaxNode>> Structs;
 			void Include(ProgramSyntaxNode * other)
 			{
 				Functions.AddRange(other->Functions);
 				Pipelines.AddRange(other->Pipelines);
 				Shaders.AddRange(other->Shaders);
+				Structs.AddRange(other->Structs);
 			}
 			virtual void Accept(SyntaxVisitor * visitor) override;
 			virtual ProgramSyntaxNode * Clone(CloneContext & ctx) override;
@@ -779,6 +796,15 @@ namespace Spire
 					param->Accept(this);
 				if (func->Body)
 					func->Body->Accept(this);
+			}
+			virtual void VisitStruct(StructSyntaxNode * s)
+			{
+				for (auto & f : s->Fields)
+					f->Accept(this);
+			}
+			virtual void VisitStructField(StructField * f)
+			{
+				f->Type->Accept(this);
 			}
 			virtual void VisitBlockStatement(BlockStatementSyntaxNode* stmt)
 			{

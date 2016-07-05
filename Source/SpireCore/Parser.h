@@ -87,6 +87,7 @@ namespace Spire
 			RefPtr<ImportStatementSyntaxNode>		ParseImportStatement();
 			RefPtr<ImportOperatorDefSyntaxNode>		ParseImportOperator();
 			RefPtr<FunctionSyntaxNode>				ParseFunction();
+			RefPtr<StructSyntaxNode>				ParseStruct();
 			RefPtr<StatementSyntaxNode>				ParseStatement();
 			RefPtr<BlockStatementSyntaxNode>		ParseBlockStatement();
 			RefPtr<VarDeclrStatementSyntaxNode>		ParseVarDeclrStatement();

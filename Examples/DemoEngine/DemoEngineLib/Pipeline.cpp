@@ -161,7 +161,7 @@ namespace DemoEngine
 									val.IntValues[k] = 0;
 							}
 
-							if (entry.Type != Spire::Compiler::ILBaseType::Float3x3)
+							if (dynamic_cast<ILBasicType*>(entry.Type.Ptr())->Type != Spire::Compiler::ILBaseType::Float3x3)
 							{
 								buffer.AddRange((unsigned char*)val.IntValues, entry.Size);
 							}
@@ -1237,7 +1237,7 @@ namespace DemoEngine
 			VertexDataType type = VertexDataType::Float;
 			int components = 1;
 			bool normalize = false;
-			switch (comp.Type)
+			switch (dynamic_cast<Spire::Compiler::ILBasicType*>(comp.Type.Ptr())->Type)
 			{
 			case ILBaseType::Float:
 				components = 1;
@@ -1252,7 +1252,7 @@ namespace DemoEngine
 				components = 4;
 				break;
 			default:
-				throw NotImplementedException(L"Engine does not support precomputing vertex attributes of type " + ILBaseTypeToString(comp.Type));
+				throw NotImplementedException(L"Engine does not support precomputing vertex attributes of type " + comp.Type->ToString());
 			}
 			rsMesh->Attributes.Add(VertexAttribute(comp.Name, type, components, normalize));
 		}

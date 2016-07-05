@@ -2,6 +2,7 @@
 #include "../CoreLib/LibIO.h"
 #include "Syntax.h"
 #include "CompiledProgram.h"
+#include "../CoreLib/Parser.h"
 
 namespace Spire
 {
@@ -9,39 +10,56 @@ namespace Spire
 	{
 		using namespace CoreLib::IO;
 
-		ILBaseType ILBaseTypeFromString(String str)
+		RefPtr<ILType> BaseTypeFromString(CoreLib::Text::Parser & parser)
 		{
-			if (str == L"int")
-				return ILBaseType::Int;
-			else if (str == L"uint")
-				return ILBaseType::UInt;
-			if (str == L"float")
-				return ILBaseType::Float;
-			if (str == L"vec2")
-				return ILBaseType::Float2;
-			if (str == L"vec3")
-				return ILBaseType::Float3;
-			if (str == L"vec4")
-				return ILBaseType::Float4;
-			if (str == L"ivec2")
-				return ILBaseType::Int2;
-			if (str == L"mat3")
-				return ILBaseType::Float3x3;
-			if (str == L"mat4")
-				return ILBaseType::Float4x4;
-			if (str == L"ivec3")
-				return ILBaseType::Int3;
-			if (str == L"ivec4")
-				return ILBaseType::Int4;
-			if (str == L"sampler2D")
-				return ILBaseType::Texture2D;
-			if (str == L"sampler2DShadow")
-				return ILBaseType::TextureShadow;
-			if (str == L"samplerCube")
-				return ILBaseType::TextureCube;
-			if (str == L"samplerCubeShadow")
-				return ILBaseType::TextureCubeShadow;
-			return ILBaseType::Int;
+			if (parser.LookAhead(L"int"))
+				return new ILBasicType(ILBaseType::Int);
+			else if (parser.LookAhead(L"uint"))
+				return new ILBasicType(ILBaseType::UInt);
+			if (parser.LookAhead(L"float"))
+				return new ILBasicType(ILBaseType::Float);
+			if (parser.LookAhead(L"vec2"))
+				return new ILBasicType(ILBaseType::Float2);
+			if (parser.LookAhead(L"vec3"))
+				return new ILBasicType(ILBaseType::Float3);
+			if (parser.LookAhead(L"vec4"))
+				return new ILBasicType(ILBaseType::Float4);
+			if (parser.LookAhead(L"ivec2"))
+				return new ILBasicType(ILBaseType::Int2);
+			if (parser.LookAhead(L"mat3"))
+				return new ILBasicType(ILBaseType::Float3x3);
+			if (parser.LookAhead(L"mat4"))
+				return new ILBasicType(ILBaseType::Float4x4);
+			if (parser.LookAhead(L"ivec3"))
+				return new ILBasicType(ILBaseType::Int3);
+			if (parser.LookAhead(L"ivec4"))
+				return new ILBasicType(ILBaseType::Int4);
+			if (parser.LookAhead(L"sampler2D"))
+				return new ILBasicType(ILBaseType::Texture2D);
+			if (parser.LookAhead(L"sampler2DShadow"))
+				return new ILBasicType(ILBaseType::TextureShadow);
+			if (parser.LookAhead(L"samplerCube"))
+				return new ILBasicType(ILBaseType::TextureCube);
+			if (parser.LookAhead(L"samplerCubeShadow"))
+				return new ILBasicType(ILBaseType::TextureCubeShadow);
+			return nullptr;
+		}
+
+		RefPtr<ILType> TypeFromString(CoreLib::Text::Parser & parser)
+		{
+			auto result = BaseTypeFromString(parser);
+			parser.ReadToken();
+			while (parser.LookAhead(L"["))
+			{
+				parser.ReadToken();
+				RefPtr<ILArrayType> newResult = new ILArrayType();
+				newResult->BaseType = result;
+				if (!parser.LookAhead(L"]"))
+					newResult->ArrayLength = parser.ReadInt();
+				result = newResult;
+				parser.Read(L"]");
+			}
+			return result;
 		}
 
 		int RoundToAlignment(int offset, int alignment)
@@ -88,79 +106,6 @@ namespace Spire
 			else
 				return 0;
 		}
-
-		int AlignmentOfBaseType(ILBaseType type)
-		{
-			if (type == ILBaseType::Int)
-				return 4;
-			else if (type == ILBaseType::UInt)
-				return 4;
-			else if (type == ILBaseType::Int2)
-				return 8;
-			else if (type == ILBaseType::Int3)
-				return 16;
-			else if (type == ILBaseType::Int4)
-				return 16;
-			else if (type == ILBaseType::Float)
-				return 4;
-			else if (type == ILBaseType::Float2)
-				return 8;
-			else if (type == ILBaseType::Float3)
-				return 16;
-			else if (type == ILBaseType::Float4)
-				return 16;
-			else if (type == ILBaseType::Float3x3)
-				return 16;
-			else if (type == ILBaseType::Float4x4)
-				return 16;
-			else if (type == ILBaseType::Texture2D)
-				return 8;
-			else if (type == ILBaseType::TextureCube)
-				return 8;
-			else if (type == ILBaseType::TextureCubeShadow)
-				return 8;
-			else if (type == ILBaseType::TextureShadow)
-				return 8;
-			else
-				return 0;
-		}
-
-		String ILBaseTypeToString(ILBaseType type)
-		{
-			if (type == ILBaseType::Int)
-				return L"int";
-			else if (type == ILBaseType::UInt)
-				return L"uint";
-			else if (type == ILBaseType::Int2)
-				return L"ivec2";
-			else if (type == ILBaseType::Int3)
-				return L"ivec3";
-			else if (type == ILBaseType::Int4)
-				return L"ivec4";
-			else if (type == ILBaseType::Float)
-				return L"float";
-			else if (type == ILBaseType::Float2)
-				return L"vec2";
-			else if (type == ILBaseType::Float3)
-				return L"vec3";
-			else if (type == ILBaseType::Float4)
-				return L"vec4";
-			else if (type == ILBaseType::Float3x3)
-				return L"mat3";
-			else if (type == ILBaseType::Float4x4)
-				return L"mat4";
-			else if (type == ILBaseType::Texture2D)
-				return L"sampler2D";
-			else if (type == ILBaseType::TextureCube)
-				return L"samplerCube";
-			else if (type == ILBaseType::TextureCubeShadow)
-				return L"samplerCubeShadow";
-			else if (type == ILBaseType::TextureShadow)
-				return L"sampler2DShadow";
-			else
-				return L"?unkown";
-		}
-
 		bool ILType::IsInt()
 		{
 			auto basicType = dynamic_cast<ILBasicType*>(this);
@@ -521,6 +466,59 @@ namespace Spire
 		void ExportInstruction::Accept(InstructionVisitor * visitor)
 		{
 			visitor->VisitExportInstruction(this);
+		}
+		ILType * ILStructType::Clone()
+		{
+			auto rs = new ILStructType(*this);
+			rs->Members.Clear();
+			for (auto & m : Members)
+			{
+				ILStructField f;
+				f.FieldName = m.FieldName;
+				f.Type = m.Type->Clone();
+				rs->Members.Add(f);
+			}
+			return rs;
+		}
+		String ILStructType::ToString()
+		{
+			return TypeName;
+		}
+		bool ILStructType::Equals(ILType * type)
+		{
+			auto st = dynamic_cast<ILStructType*>(type);
+			if (st && st->TypeName == this->TypeName)
+				return true;
+			return false;
+		}
+		void Align(int & ptr, int alignment)
+		{
+			if (ptr % alignment != 0)
+			{
+				ptr = (ptr / alignment + 1) * alignment;
+			}
+		}
+		int ILStructType::GetSize()
+		{
+			int rs = 0;
+			for (auto & m : Members)
+			{
+				int size = m.Type->GetSize();
+				int alignment = m.Type->GetAlignment();
+				Align(rs, alignment);
+				rs += size;
+			}
+			return rs;
+		}
+		int ILStructType::GetAlignment()
+		{
+			int rs = 1;
+			for (auto & m : Members)
+			{
+				int alignment = m.Type->GetAlignment();
+				rs = Math::Max(rs, alignment);
+			}
+			return rs;
 		}
 }
 }

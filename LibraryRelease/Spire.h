@@ -220,7 +220,8 @@ namespace Spire
 			Bool = 128,
 			Shader = 256,
 			UInt = 512,
-			Error = 1024,
+			Struct = 1024,
+			Error = 2048,
 
 		};
 
@@ -283,8 +284,11 @@ namespace Spire
 		{
 			return type == BaseType::Texture2D || type == BaseType::TextureCube || type == BaseType::TextureCubeShadow || type == BaseType::TextureShadow;
 		}
+		class SymbolTable;
 		class ShaderSymbol;
+		class StructSymbol;
 		class ShaderClosure;
+		class StructSyntaxNode;
 		class ExpressionType
 		{
 		public:
@@ -296,6 +300,7 @@ namespace Spire
 			ShaderSymbol * Shader = nullptr;
 			ShaderClosure * ShaderClosure = nullptr;
 			FunctionSyntaxNode * Func = nullptr;
+			StructSymbol * Struct = nullptr;
 			ExpressionType GetBaseType()
 			{
 				ExpressionType rs;
@@ -316,21 +321,15 @@ namespace Spire
 				IsLeftValue = false;
 				IsReference = false;
 			}
+			bool IsIntegral()
+			{
+				return !IsArray && (BaseType == Compiler::BaseType::Int || BaseType == Compiler::BaseType::UInt);
+			}
 			bool IsTextureType()
 			{
 				return !IsArray && (BaseType == Compiler::BaseType::Texture2D || BaseType == Compiler::BaseType::TextureCube || BaseType == Compiler::BaseType::TextureCubeShadow || BaseType == Compiler::BaseType::TextureShadow);
 			}
-			int GetSize()
-			{
-				int baseSize = GetVectorSize(BaseType);
-				if (BaseType == Compiler::BaseType::Texture2D || BaseType == Compiler::BaseType::TextureCube ||
-					BaseType == Compiler::BaseType::TextureCubeShadow || BaseType == Compiler::BaseType::TextureShadow)
-					baseSize = sizeof(void*) / sizeof(int);
-				if (ArrayLength == 0)
-					return baseSize;
-				else
-					return ArrayLength*baseSize;
-			}
+			int GetSize();
 			ExpressionType(Spire::Compiler::BaseType baseType)
 			{
 				BaseType = baseType;
@@ -360,7 +359,8 @@ namespace Spire
 						type.IsArray == IsArray &&
 						type.ArrayLength == ArrayLength &&
 						type.Func == Func &&
-						type.Shader == Shader);
+						type.Shader == Shader &&
+						type.Struct == Struct);
 			}
 
 			bool operator != (const ExpressionType & type)
@@ -461,51 +461,66 @@ namespace Spire
 			
 			static TypeSyntaxNode * FromExpressionType(ExpressionType t);
 
-			ExpressionType ToExpressionType()
-			{
-				ExpressionType expType;
-				if (TypeName == L"int")
-					expType.BaseType = BaseType::Int;
-				else if (TypeName == L"uint")
-					expType.BaseType = BaseType::UInt;
-				else if (TypeName == L"float")
-					expType.BaseType = BaseType::Float;
-				else if (TypeName == L"ivec2")
-					expType.BaseType = BaseType::Int2;
-				else if (TypeName == L"ivec3")
-					expType.BaseType = BaseType::Int3;
-				else if (TypeName == L"ivec4")
-					expType.BaseType = BaseType::Int4;
-				else if (TypeName == L"vec2")
-					expType.BaseType = BaseType::Float2;
-				else if (TypeName == L"vec3")
-					expType.BaseType = BaseType::Float3;
-				else if (TypeName == L"vec4")
-					expType.BaseType = BaseType::Float4;
-				else if (TypeName == L"mat3" || TypeName == L"mat3x3")
-					expType.BaseType = BaseType::Float3x3;
-				else if (TypeName == L"mat4" || TypeName == L"mat4x4")
-					expType.BaseType = BaseType::Float4x4;
-				else if (TypeName == L"sampler2D")
-					expType.BaseType = BaseType::Texture2D;
-				else if (TypeName == L"samplerCube")
-					expType.BaseType = BaseType::TextureCube;
-				else if (TypeName == L"sampler2DShadow")
-					expType.BaseType = BaseType::TextureShadow;
-				else if (TypeName == L"samplerCubeShadow")
-					expType.BaseType = BaseType::TextureCubeShadow;
-				else if (TypeName == L"void")
-					expType.BaseType = BaseType::Void;
-				expType.ArrayLength = ArrayLength;
-				expType.IsArray = IsArray;
-				return expType;
-			}
+			ExpressionType ToExpressionType(SymbolTable * symTable, ErrorWriter * errWriter = nullptr);
 			virtual TypeSyntaxNode * Clone(CloneContext & ctx)
 			{
 				return CloneSyntaxNodeFields(new TypeSyntaxNode(*this), ctx);
 			}
+			String ToString()
+			{
+				StringBuilder rs;
+				rs << TypeName;
+				if (IsArray)
+				{
+					rs << L"[";
+					if (ArrayLength > 0)
+						rs << ArrayLength;
+					rs << L"]";
+				}
+				return rs.ProduceString();
+			}
 		};
 
+		class StructField : public SyntaxNode
+		{
+		public:
+			RefPtr<TypeSyntaxNode> Type;
+			Token Name;
+			StructField()
+			{}
+			virtual void Accept(SyntaxVisitor * visitor);
+			virtual StructField * Clone(CloneContext & ctx) override
+			{
+				auto rs = CloneSyntaxNodeFields(new StructField(*this), ctx);
+				rs->Type = Type->Clone(ctx);
+				return rs;
+			}
+		};
+
+		class StructSyntaxNode : public SyntaxNode
+		{
+		public:
+			List<RefPtr<StructField>> Fields;
+			Token Name;
+			virtual void Accept(SyntaxVisitor * visitor);
+			int FindField(String name)
+			{
+				for (int i = 0; i < Fields.Count(); i++)
+				{
+					if (Fields[i]->Name.Content == name)
+						return i;
+				}
+				return -1;
+			}
+			virtual StructSyntaxNode * Clone(CloneContext & ctx) override
+			{
+				auto rs = CloneSyntaxNodeFields(new StructSyntaxNode(*this), ctx);
+				rs->Fields.Clear();
+				for (auto & f : Fields)
+					rs->Fields.Add(f->Clone(ctx));
+				return rs;
+			}
+		};
 
 		enum class ExpressionAccess
 		{
@@ -825,11 +840,13 @@ namespace Spire
 			List<RefPtr<FunctionSyntaxNode>> Functions;
 			List<RefPtr<PipelineSyntaxNode>> Pipelines;
 			List<RefPtr<ShaderSyntaxNode>> Shaders;
+			List<RefPtr<StructSyntaxNode>> Structs;
 			void Include(ProgramSyntaxNode * other)
 			{
 				Functions.AddRange(other->Functions);
 				Pipelines.AddRange(other->Pipelines);
 				Shaders.AddRange(other->Shaders);
+				Structs.AddRange(other->Structs);
 			}
 			virtual void Accept(SyntaxVisitor * visitor) override;
 			virtual ProgramSyntaxNode * Clone(CloneContext & ctx) override;
@@ -960,6 +977,15 @@ namespace Spire
 					param->Accept(this);
 				if (func->Body)
 					func->Body->Accept(this);
+			}
+			virtual void VisitStruct(StructSyntaxNode * s)
+			{
+				for (auto & f : s->Fields)
+					f->Accept(this);
+			}
+			virtual void VisitStructField(StructField * f)
+			{
+				f->Type->Accept(this);
 			}
 			virtual void VisitBlockStatement(BlockStatementSyntaxNode* stmt)
 			{
@@ -1096,270 +1122,6 @@ namespace Spire
 #endif
 
 /***********************************************************************
-CORE\SYMBOLTABLE.H
-***********************************************************************/
-#ifndef RASTER_RENDERER_SYMBOL_TABLE_H
-#define RASTER_RENDERER_SYMBOL_TABLE_H
-
-
-namespace Spire
-{
-	namespace Compiler
-	{
-		
-		class FunctionSymbol
-		{
-		public:
-			FunctionSyntaxNode * SyntaxNode;
-			EnumerableHashSet<String> ReferencedFunctions;
-		};
-		class ShaderComponentSymbol;
-		class ShaderComponentImplSymbol : public Object
-		{
-		public:
-			String AlternateName;
-			EnumerableHashSet<String> Worlds, ExportWorlds, SrcPinnedWorlds;
-			RefPtr<ComponentSyntaxNode> SyntaxNode;
-			EnumerableHashSet<ShaderComponentSymbol *> DependentComponents;
-			EnumerableDictionary<ShaderComponentSymbol *, CodePosition> ComponentReferencePositions;
-			ShaderComponentImplSymbol() = default;
-			ShaderComponentImplSymbol(const ShaderComponentImplSymbol & other)
-			{
-				AlternateName = other.AlternateName;
-				Worlds = other.Worlds;
-				ExportWorlds = other.ExportWorlds;
-				SrcPinnedWorlds = other.SrcPinnedWorlds;
-				CloneContext ctx;
-				SyntaxNode = other.SyntaxNode->Clone(ctx);
-			}
-		};
-
-		class ShaderComponentSymbol : public Object
-		{
-		public:
-			bool IsDceEntryPoint = false;
-			String Name, UniqueName, UniqueKey;
-			List<String> ChoiceNames;
-			EnumerableHashSet<ShaderComponentSymbol *> DependentComponents, UserComponents;
-			List<RefPtr<ShaderComponentImplSymbol>> Implementations;
-			RefPtr<Type> Type;
-			bool IsParam()
-			{
-				for (auto & impl : Implementations)
-					if (impl->SyntaxNode->IsParam)
-						return true;
-				return false;
-			}
-			ShaderComponentSymbol() = default;
-			ShaderComponentSymbol(const ShaderComponentSymbol & other)
-			{
-				Type = new Spire::Compiler::Type(*other.Type);
-				for (auto &impl : other.Implementations)
-					this->Implementations.Add(new ShaderComponentImplSymbol(*impl));
-				this->Name = other.Name;
-			}
-		};
-		
-		class WorldSymbol
-		{
-		public:
-			bool IsAbstract = false;
-			WorldSyntaxNode * SyntaxNode = nullptr;
-		};
-
-		class PipelineSymbol;
-
-		class ComponentDefinitionIR
-		{
-		public:
-			ShaderComponentSymbol * Component;
-			ShaderComponentImplSymbol * Implementation;
-			String World;
-			bool IsEntryPoint = false;
-			EnumerableHashSet<ComponentDefinitionIR*> Users, Dependency; // Bidirectional dependency;
-		};
-		
-		class ShaderClosure;
-
-		class ShaderIR
-		{
-		public:
-			ShaderClosure * Shader;
-			List<RefPtr<ComponentDefinitionIR>> Definitions;
-			EnumerableDictionary<String, EnumerableDictionary<String, ComponentDefinitionIR*>> DefinitionsByComponent;
-			void EliminateDeadCode(); // returns remaining definitions in reverse dependency order
-			void ResolveComponentReference(); // resolve reference and build dependency map
-			List<ShaderComponentSymbol*> GetComponentDependencyOrder();
-			template<typename ShouldRemoveFunc>
-			void RemoveDefinitions(const ShouldRemoveFunc &shouldRemove)
-			{
-				List<RefPtr<ComponentDefinitionIR>> newDefinitions;
-				for (auto & def : Definitions)
-				{
-					if (!shouldRemove(def.Ptr()))
-					{
-						newDefinitions.Add(def);
-					}
-				}
-				Definitions = _Move(newDefinitions);
-				for (auto & kv : DefinitionsByComponent)
-				{
-					for (auto & def : kv.Value)
-						if (shouldRemove(def.Value))
-							kv.Value.Remove(def.Key);
-				}
-			}
-
-		};
-		
-		class ShaderSymbol;
-
-		class ShaderUsing
-		{
-		public:
-			ShaderSymbol * Shader;
-			bool IsPublic;
-		};
-
-		class ShaderSymbol
-		{
-		public:
-			bool IsAbstract = false;
-			ShaderSyntaxNode * SyntaxNode = nullptr;
-			PipelineSymbol * Pipeline = nullptr;
-			EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>> Components;
-			List<ShaderComponentSymbol*> GetComponentDependencyOrder();
-			EnumerableHashSet<ShaderSymbol*> DependentShaders;
-			List<ShaderUsing> ShaderUsings;
-			EnumerableDictionary<String, ShaderUsing> ShaderObjects;
-			void SortComponents(List<ShaderComponentSymbol*> & comps);
-			struct ComponentReference
-			{
-				ShaderComponentSymbol * Component;
-				bool IsAccessible = false;
-			};
-			ComponentReference ResolveComponentReference(String compName, bool topLevel = true);
-		};
-
-		class ShaderClosure : public Object
-		{
-		public:
-			ShaderClosure * Parent = nullptr;
-			CodePosition Position;
-			PipelineSymbol * Pipeline = nullptr;
-			bool IsInPlace = false;
-			bool IsPublic = false;
-			String Name;
-			CodePosition UsingPosition;
-			Dictionary<String, RefPtr<ShaderComponentSymbol>> RefMap;
-			EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>> Components;
-			EnumerableDictionary<String, ShaderComponentSymbol *> AllComponents;
-			EnumerableDictionary<String, RefPtr<ShaderClosure>> SubClosures;
-			RefPtr<ShaderComponentSymbol> FindComponent(String name, bool findInPrivate = false);
-			RefPtr<ShaderClosure> FindClosure(String name);
-			List<ShaderComponentSymbol*> GetDependencyOrder();
-			RefPtr<ShaderIR> IR;
-		};
-
-		class ImportPath
-		{
-		public:
-			class Node
-			{
-			public:
-				String TargetWorld;
-				ImportOperatorDefSyntaxNode * ImportOperator;
-				Node() = default;
-				Node(String world, ImportOperatorDefSyntaxNode * imp)
-					: TargetWorld(world), ImportOperator(imp)
-				{}
-			};
-			List<Node> Nodes;
-		};
-
-		class PipelineSymbol
-		{
-		private:
-			List<String> WorldTopologyOrder;
-		public:
-			PipelineSyntaxNode * SyntaxNode;
-			EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>> Components;
-			EnumerableDictionary<String, EnumerableHashSet<String>> ReachableWorlds;
-			EnumerableDictionary<String, EnumerableHashSet<String>> WorldDependency;
-			EnumerableDictionary<String, WorldSymbol> Worlds;
-			bool IsAbstractWorld(String world);
-			bool IsWorldReachable(EnumerableHashSet<String> & src, String targetWorld);
-			bool IsWorldReachable(String src, String targetWorld);
-			bool IsWorldDirectlyReachable(String src, String targetWorld);
-			List<String> & GetWorldTopologyOrder();
-			List<ImportPath> FindImportOperatorChain(String worldSrc, String worldDest);
-			List<ImportOperatorDefSyntaxNode*> GetImportOperatorsFromSourceWorld(String worldSrc);
-		};
-
-		class CompileResult;
-
-		class SymbolTable
-		{
-		public:
-			EnumerableDictionary<String, RefPtr<FunctionSymbol>> Functions;
-			EnumerableDictionary<String, RefPtr<ShaderSymbol>> Shaders;
-			EnumerableDictionary<String, RefPtr<PipelineSymbol>> Pipelines;
-			List<ShaderSymbol*> ShaderDependenceOrder;
-			bool SortShaders(); // return true if success, return false if dependency is cyclic
-			void EvalFunctionReferenceClosure();
-		};
-
-		class GUID
-		{
-		private:
-			static int currentGUID;
-		public:
-			static void Clear();
-			static int Next();
-		};
-
-		bool CheckComponentImplementationConsistency(ErrorWriter * err, ShaderComponentSymbol * comp, ShaderComponentImplSymbol * impl);
-
-		template<typename T, typename GetDependencyFunc>
-		void DependencySort(List<T> & list, const GetDependencyFunc & getDep)
-		{
-			HashSet<T> allSymbols, addedSymbols;
-			for (auto & comp : list)
-				allSymbols.Add(comp);
-			List<T> sorted;
-			bool changed = true;
-			while (changed)
-			{
-				changed = false;
-				for (auto & comp : list)
-				{
-					if (!addedSymbols.Contains(comp))
-					{
-						bool isFirst = true;
-						auto && dependency = getDep(comp);
-						for (auto & dep : dependency)
-							if (allSymbols.Contains(dep) && !addedSymbols.Contains(dep))
-							{
-								isFirst = false;
-								break;
-							}
-						if (isFirst)
-						{
-							addedSymbols.Add(comp);
-							sorted.Add(comp);
-							changed = true;
-						}
-					}
-				}
-			}
-			list = _Move(sorted);
-		}
-
-	}
-}
-#endif
-
-/***********************************************************************
 CORE\IL.H
 ***********************************************************************/
 #ifndef RASTER_RENDERER_IL_H
@@ -1385,11 +1147,7 @@ namespace Spire
 			TextureCubeShadow = 51,
 			UInt = 512,
 		};
-
-		ILBaseType ILBaseTypeFromString(String str);
-		String ILBaseTypeToString(ILBaseType str);
 		int SizeofBaseType(ILBaseType type);
-		int AlignmentOfBaseType(ILBaseType type);
 		int RoundToAlignment(int offset, int alignment);
 		extern int NamingCounter;
 		class ILType : public Object
@@ -1410,7 +1168,11 @@ namespace Spire
 			virtual ILType * Clone() = 0;
 			virtual String ToString() = 0;
 			virtual bool Equals(ILType* type) = 0;
+			virtual int GetSize() = 0;
+			virtual int GetAlignment() = 0;
 		};
+
+		RefPtr<ILType> TypeFromString(CoreLib::Text::Parser & parser);
 
 		class ILBasicType : public ILType
 		{
@@ -1440,12 +1202,108 @@ namespace Spire
 			}
 			virtual String ToString() override
 			{
-				return ILBaseTypeToString(Type);
+				if (Type == ILBaseType::Int)
+					return L"int";
+				else if (Type == ILBaseType::UInt)
+					return L"uint";
+				else if (Type == ILBaseType::Int2)
+					return L"ivec2";
+				else if (Type == ILBaseType::Int3)
+					return L"ivec3";
+				else if (Type == ILBaseType::Int4)
+					return L"ivec4";
+				else if (Type == ILBaseType::Float)
+					return L"float";
+				else if (Type == ILBaseType::Float2)
+					return L"vec2";
+				else if (Type == ILBaseType::Float3)
+					return L"vec3";
+				else if (Type == ILBaseType::Float4)
+					return L"vec4";
+				else if (Type == ILBaseType::Float3x3)
+					return L"mat3";
+				else if (Type == ILBaseType::Float4x4)
+					return L"mat4";
+				else if (Type == ILBaseType::Texture2D)
+					return L"sampler2D";
+				else if (Type == ILBaseType::TextureCube)
+					return L"samplerCube";
+				else if (Type == ILBaseType::TextureCubeShadow)
+					return L"samplerCubeShadow";
+				else if (Type == ILBaseType::TextureShadow)
+					return L"sampler2DShadow";
+				else
+					return L"?unkown";
+			}
+			virtual int GetAlignment() override
+			{
+				switch (Type)
+				{
+				case ILBaseType::Int:
+					return 4;
+				case ILBaseType::UInt:
+					return 4;
+				case ILBaseType::Int2:
+					return 8;
+				case ILBaseType::Int3:
+					return 16;
+				case ILBaseType::Int4:
+					return 16;
+				case ILBaseType::Float:
+					return 4;
+				case ILBaseType::Float2:
+					return 8;
+				case  ILBaseType::Float3:
+					return 16;
+				case ILBaseType::Float4:
+					return 16;
+				case ILBaseType::Float3x3:
+					return 16;
+				case  ILBaseType::Float4x4:
+					return 16;
+				case ILBaseType::Texture2D:
+					return 8;
+				case ILBaseType::TextureCube:
+					return 8;
+				case ILBaseType::TextureCubeShadow:
+					return 8;
+				case ILBaseType::TextureShadow:
+					return 8;
+				default:
+					return 0;
+				}
+			}
+			virtual int GetSize() override
+			{
+				switch (Type)
+				{
+				case ILBaseType::Float:
+				case ILBaseType::Int:
+				case ILBaseType::UInt:
+					return 4;
+				case ILBaseType::Float2:
+				case ILBaseType::Int2:
+					return 8;
+				case ILBaseType::Int3:
+				case ILBaseType::Float3:
+					return 12;
+				case ILBaseType::Int4:
+				case ILBaseType::Float4:
+					return 16;
+				case ILBaseType::Float3x3:
+					return 48;
+				case ILBaseType::Float4x4:
+					return 64;
+				case ILBaseType::Texture2D:
+				case ILBaseType::TextureCube:
+				case ILBaseType::TextureCubeShadow:
+				case ILBaseType::TextureShadow:
+					return 8;
+				default:
+					return 0;
+				}
 			}
 		};
-
-		
-
 
 		class ILArrayType : public ILType
 		{
@@ -1468,8 +1326,37 @@ namespace Spire
 			}
 			virtual String ToString() override
 			{
-				return L"Array<" + BaseType->ToString() + L", " + String(ArrayLength) + L">";
+				if (ArrayLength > 0)
+					return BaseType->ToString() + L"[" + String(ArrayLength) + L"]";
+				else
+					return BaseType->ToString() + L"[]";
 			}
+			virtual int GetSize() override
+			{
+				return BaseType->GetSize() * ArrayLength;
+			}
+			virtual int GetAlignment() override
+			{
+				return BaseType->GetAlignment();
+			}
+		};
+
+		class ILStructType : public ILType
+		{
+		public:
+			String TypeName;
+			class ILStructField
+			{
+			public:
+				RefPtr<ILType> Type;
+				String FieldName;
+			};
+			List<ILStructField> Members;
+			virtual ILType * Clone() override;
+			virtual String ToString() override;
+			virtual bool Equals(ILType * type) override;
+			virtual int GetSize() override;
+			virtual int GetAlignment() override;
 		};
 
 		class ILOperand;
@@ -2078,7 +1965,7 @@ namespace Spire
 				}
 			}
 
-			ImportInstruction(int argSize, String compName, ImportOperatorDefSyntaxNode * importOp, CompiledWorld * srcWorld, ILType * type)
+			ImportInstruction(int argSize, String compName, ImportOperatorDefSyntaxNode * importOp, CompiledWorld * srcWorld, RefPtr<ILType> type)
 				:ImportInstruction(argSize)
 			{
 				this->ComponentName = compName;
@@ -2150,7 +2037,7 @@ namespace Spire
 		{
 		public:
 			int ArgId;
-			FetchArgInstruction(ILType * type)
+			FetchArgInstruction(RefPtr<ILType> type)
 			{
 				this->Type = type;
 				ArgId = 0;
@@ -2798,6 +2685,15 @@ namespace Spire
 					default:
 						throw InvalidOperationException(L"Unsupported aggregate type.");
 					}
+				}
+				else if (auto structType = dynamic_cast<ILStructType*>(v0->Type.Ptr()))
+				{
+					auto cv1 = dynamic_cast<ILConstOperand*>(v1);
+					if (!cv1)
+						throw InvalidProgramException(L"member field access offset is not constant.");
+					if (cv1->IntValues[0] < 0 || cv1->IntValues[0] >= structType->Members.Count())
+						throw InvalidProgramException(L"member field access offset out of bounds.");
+					Type = structType->Members[cv1->IntValues[0]].Type;
 				}
 			}
 			virtual String ToString() override
@@ -3506,6 +3402,279 @@ namespace Spire
 #endif
 
 /***********************************************************************
+CORE\SYMBOLTABLE.H
+***********************************************************************/
+#ifndef RASTER_RENDERER_SYMBOL_TABLE_H
+#define RASTER_RENDERER_SYMBOL_TABLE_H
+
+
+namespace Spire
+{
+	namespace Compiler
+	{
+		
+		class FunctionSymbol
+		{
+		public:
+			FunctionSyntaxNode * SyntaxNode;
+			EnumerableHashSet<String> ReferencedFunctions;
+		};
+		class ShaderComponentSymbol;
+		class ShaderComponentImplSymbol : public Object
+		{
+		public:
+			String AlternateName;
+			EnumerableHashSet<String> Worlds, ExportWorlds, SrcPinnedWorlds;
+			RefPtr<ComponentSyntaxNode> SyntaxNode;
+			EnumerableHashSet<ShaderComponentSymbol *> DependentComponents;
+			EnumerableDictionary<ShaderComponentSymbol *, CodePosition> ComponentReferencePositions;
+			ShaderComponentImplSymbol() = default;
+			ShaderComponentImplSymbol(const ShaderComponentImplSymbol & other)
+			{
+				AlternateName = other.AlternateName;
+				Worlds = other.Worlds;
+				ExportWorlds = other.ExportWorlds;
+				SrcPinnedWorlds = other.SrcPinnedWorlds;
+				CloneContext ctx;
+				SyntaxNode = other.SyntaxNode->Clone(ctx);
+			}
+		};
+
+		class ShaderComponentSymbol : public Object
+		{
+		public:
+			bool IsDceEntryPoint = false;
+			String Name, UniqueName, UniqueKey;
+			List<String> ChoiceNames;
+			EnumerableHashSet<ShaderComponentSymbol *> DependentComponents, UserComponents;
+			List<RefPtr<ShaderComponentImplSymbol>> Implementations;
+			RefPtr<Type> Type;
+			bool IsParam()
+			{
+				for (auto & impl : Implementations)
+					if (impl->SyntaxNode->IsParam)
+						return true;
+				return false;
+			}
+			ShaderComponentSymbol() = default;
+			ShaderComponentSymbol(const ShaderComponentSymbol & other)
+			{
+				Type = new Spire::Compiler::Type(*other.Type);
+				for (auto &impl : other.Implementations)
+					this->Implementations.Add(new ShaderComponentImplSymbol(*impl));
+				this->Name = other.Name;
+			}
+		};
+		
+		class WorldSymbol
+		{
+		public:
+			bool IsAbstract = false;
+			WorldSyntaxNode * SyntaxNode = nullptr;
+		};
+
+		class PipelineSymbol;
+
+		class ComponentDefinitionIR
+		{
+		public:
+			ShaderComponentSymbol * Component;
+			ShaderComponentImplSymbol * Implementation;
+			String World;
+			bool IsEntryPoint = false;
+			EnumerableHashSet<ComponentDefinitionIR*> Users, Dependency; // Bidirectional dependency;
+		};
+		
+		class ShaderClosure;
+
+		class ShaderIR
+		{
+		public:
+			ShaderClosure * Shader;
+			List<RefPtr<ComponentDefinitionIR>> Definitions;
+			EnumerableDictionary<String, EnumerableDictionary<String, ComponentDefinitionIR*>> DefinitionsByComponent;
+			void EliminateDeadCode(); // returns remaining definitions in reverse dependency order
+			void ResolveComponentReference(); // resolve reference and build dependency map
+			List<ShaderComponentSymbol*> GetComponentDependencyOrder();
+			template<typename ShouldRemoveFunc>
+			void RemoveDefinitions(const ShouldRemoveFunc &shouldRemove)
+			{
+				List<RefPtr<ComponentDefinitionIR>> newDefinitions;
+				for (auto & def : Definitions)
+				{
+					if (!shouldRemove(def.Ptr()))
+					{
+						newDefinitions.Add(def);
+					}
+				}
+				Definitions = _Move(newDefinitions);
+				for (auto & kv : DefinitionsByComponent)
+				{
+					for (auto & def : kv.Value)
+						if (shouldRemove(def.Value))
+							kv.Value.Remove(def.Key);
+				}
+			}
+
+		};
+		
+		class ShaderSymbol;
+
+		class ShaderUsing
+		{
+		public:
+			ShaderSymbol * Shader;
+			bool IsPublic;
+		};
+
+		class ShaderSymbol
+		{
+		public:
+			bool IsAbstract = false;
+			ShaderSyntaxNode * SyntaxNode = nullptr;
+			PipelineSymbol * Pipeline = nullptr;
+			EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>> Components;
+			List<ShaderComponentSymbol*> GetComponentDependencyOrder();
+			EnumerableHashSet<ShaderSymbol*> DependentShaders;
+			List<ShaderUsing> ShaderUsings;
+			EnumerableDictionary<String, ShaderUsing> ShaderObjects;
+			void SortComponents(List<ShaderComponentSymbol*> & comps);
+			struct ComponentReference
+			{
+				ShaderComponentSymbol * Component;
+				bool IsAccessible = false;
+			};
+			ComponentReference ResolveComponentReference(String compName, bool topLevel = true);
+		};
+
+		class ShaderClosure : public Object
+		{
+		public:
+			ShaderClosure * Parent = nullptr;
+			CodePosition Position;
+			PipelineSymbol * Pipeline = nullptr;
+			bool IsInPlace = false;
+			bool IsPublic = false;
+			String Name;
+			CodePosition UsingPosition;
+			Dictionary<String, RefPtr<ShaderComponentSymbol>> RefMap;
+			EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>> Components;
+			EnumerableDictionary<String, ShaderComponentSymbol *> AllComponents;
+			EnumerableDictionary<String, RefPtr<ShaderClosure>> SubClosures;
+			RefPtr<ShaderComponentSymbol> FindComponent(String name, bool findInPrivate = false);
+			RefPtr<ShaderClosure> FindClosure(String name);
+			List<ShaderComponentSymbol*> GetDependencyOrder();
+			RefPtr<ShaderIR> IR;
+		};
+
+		class ImportPath
+		{
+		public:
+			class Node
+			{
+			public:
+				String TargetWorld;
+				ImportOperatorDefSyntaxNode * ImportOperator;
+				Node() = default;
+				Node(String world, ImportOperatorDefSyntaxNode * imp)
+					: TargetWorld(world), ImportOperator(imp)
+				{}
+			};
+			List<Node> Nodes;
+		};
+
+		class PipelineSymbol
+		{
+		private:
+			List<String> WorldTopologyOrder;
+		public:
+			PipelineSyntaxNode * SyntaxNode;
+			EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>> Components;
+			EnumerableDictionary<String, EnumerableHashSet<String>> ReachableWorlds;
+			EnumerableDictionary<String, EnumerableHashSet<String>> WorldDependency;
+			EnumerableDictionary<String, WorldSymbol> Worlds;
+			bool IsAbstractWorld(String world);
+			bool IsWorldReachable(EnumerableHashSet<String> & src, String targetWorld);
+			bool IsWorldReachable(String src, String targetWorld);
+			bool IsWorldDirectlyReachable(String src, String targetWorld);
+			List<String> & GetWorldTopologyOrder();
+			List<ImportPath> FindImportOperatorChain(String worldSrc, String worldDest);
+			List<ImportOperatorDefSyntaxNode*> GetImportOperatorsFromSourceWorld(String worldSrc);
+		};
+
+		class CompileResult;
+
+		class StructSymbol
+		{
+		public:
+			String Name;
+			RefPtr<StructSyntaxNode> SyntaxNode;
+			RefPtr<ILStructType> Type;
+		};
+
+		class SymbolTable
+		{
+		public:
+			EnumerableDictionary<String, RefPtr<FunctionSymbol>> Functions;
+			EnumerableDictionary<String, RefPtr<ShaderSymbol>> Shaders;
+			EnumerableDictionary<String, RefPtr<PipelineSymbol>> Pipelines;
+			EnumerableDictionary<String, RefPtr<StructSymbol>> Structs;
+			List<ShaderSymbol*> ShaderDependenceOrder;
+			bool SortShaders(); // return true if success, return false if dependency is cyclic
+			void EvalFunctionReferenceClosure();
+			bool CheckComponentImplementationConsistency(ErrorWriter * err, ShaderComponentSymbol * comp, ShaderComponentImplSymbol * impl);
+		};
+
+		class GUID
+		{
+		private:
+			static int currentGUID;
+		public:
+			static void Clear();
+			static int Next();
+		};
+
+
+		template<typename T, typename GetDependencyFunc>
+		void DependencySort(List<T> & list, const GetDependencyFunc & getDep)
+		{
+			HashSet<T> allSymbols, addedSymbols;
+			for (auto & comp : list)
+				allSymbols.Add(comp);
+			List<T> sorted;
+			bool changed = true;
+			while (changed)
+			{
+				changed = false;
+				for (auto & comp : list)
+				{
+					if (!addedSymbols.Contains(comp))
+					{
+						bool isFirst = true;
+						auto && dependency = getDep(comp);
+						for (auto & dep : dependency)
+							if (allSymbols.Contains(dep) && !addedSymbols.Contains(dep))
+							{
+								isFirst = false;
+								break;
+							}
+						if (isFirst)
+						{
+							addedSymbols.Add(comp);
+							sorted.Add(comp);
+							changed = true;
+						}
+					}
+				}
+			}
+			list = _Move(sorted);
+		}
+
+	}
+}
+#endif
+
+/***********************************************************************
 CORE\COMPILEDPROGRAM.H
 ***********************************************************************/
 #ifndef BAKER_SL_COMPILED_PROGRAM_H
@@ -3620,7 +3789,7 @@ namespace Spire
 		{
 		public:
 			CoreLib::Basic::String Name;
-			Spire::Compiler::ILBaseType Type;
+			RefPtr<Spire::Compiler::ILType> Type;
 			EnumerableDictionary<String, String> Attributes;
 
 			int GetHashCode()
@@ -3686,6 +3855,7 @@ namespace Spire
 			RefPtr<ConstantPool> ConstantPool = new Compiler::ConstantPool();
 			List<RefPtr<CompiledShader>> Shaders;
 			List<RefPtr<CompiledFunction>> Functions;
+			List<RefPtr<ILStructType>> Structs;
 		};
 
 		class ShaderChoiceValue
@@ -3939,15 +4109,12 @@ namespace Spire
 			{}
 			virtual void ProcessFunction(FunctionSyntaxNode * func) = 0;
 			virtual void ProcessShader(ShaderClosure * shader) = 0;
+			virtual void ProcessStruct(StructSyntaxNode * st) = 0;
 		};
 
-		SyntaxVisitor * CreateComponentDependencyVisitor(SymbolTable * symbols, ShaderSymbol * currentShader, 
-			ShaderComponentSymbol * compSym,
-			ErrorWriter * err,
-			EnumerableHashSet<ShaderComponentSymbol *> & _dependentComponents,
-			Dictionary<ShaderComponentSymbol*, SyntaxNode*> & _referenceNodes);
 		SyntaxVisitor * CreateSemanticsVisitor(SymbolTable * symbols, ErrorWriter * err);
 		ICodeGenerator * CreateCodeGenerator(SymbolTable * symbols, CompileResult & result);
+		RefPtr<ILType> TranslateExpressionType(const ExpressionType & type);
 	}
 }
 
@@ -4208,7 +4375,7 @@ namespace Spire
 				cfgNode.Last()->InsertTail(instr);
 				return instr;
 			}
-			FetchArgInstruction * FetchArg(ILType * type, int argId)
+			FetchArgInstruction * FetchArg(RefPtr<ILType> type, int argId)
 			{
 				auto instr = new FetchArgInstruction(type);
 				cfgNode.Last()->InsertTail(instr);
@@ -4316,6 +4483,7 @@ namespace Spire
 			RefPtr<ImportStatementSyntaxNode>		ParseImportStatement();
 			RefPtr<ImportOperatorDefSyntaxNode>		ParseImportOperator();
 			RefPtr<FunctionSyntaxNode>				ParseFunction();
+			RefPtr<StructSyntaxNode>				ParseStruct();
 			RefPtr<StatementSyntaxNode>				ParseStatement();
 			RefPtr<BlockStatementSyntaxNode>		ParseBlockStatement();
 			RefPtr<VarDeclrStatementSyntaxNode>		ParseVarDeclrStatement();
