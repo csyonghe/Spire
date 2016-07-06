@@ -1214,14 +1214,14 @@ namespace DemoEngine
 		Spire::Compiler::WorldMetaData wmeta;
 		if (!shaderLibs[tech.ShaderId]->MetaData.Worlds.TryGetValue(L"precomputeVert", wmeta))
 		{
-			tech.PrebakedMesh = tech.SourceMesh;
+			tech.PrebakedMesh = tech.SourceMesh.Ptr();
 			return;
 		}
 	
 		RefPtr<DeviceMesh> rsMesh;
 		if (gpuShaders[tech.ShaderId].PrebakedVertices.TryGetValue(inst.GUID, rsMesh))
 		{
-			tech.PrebakedMesh = rsMesh;
+			tech.PrebakedMesh = rsMesh.Ptr();
 			return;
 		}
 
@@ -1230,7 +1230,7 @@ namespace DemoEngine
 		rsMesh->Bounds = tech.SourceMesh->Bounds;
 		rsMesh->IndexBuffer = tech.SourceMesh->IndexBuffer;
 		rsMesh->IndexCount = tech.SourceMesh->IndexCount;
-		tech.PrebakedMesh = rsMesh;
+		tech.PrebakedMesh = rsMesh.Ptr();
 		gpuShaders[tech.ShaderId].PrebakedVertices[inst.GUID] = rsMesh;
 		for (auto & comp : shaderLibs[tech.ShaderId]->MetaData.InterfaceBlocks[wmeta.OutputBlock].GetValue().Entries)
 		{

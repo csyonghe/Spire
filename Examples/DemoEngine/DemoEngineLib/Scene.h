@@ -11,7 +11,8 @@ namespace DemoEngine
 	{
 		float LodDistance = 0.0f;
 		int ShaderId = 0;
-		RefPtr<DeviceMesh> SourceMesh, PrebakedMesh;
+		RefPtr<DeviceMesh> SourceMesh;
+		DeviceMesh * PrebakedMesh = nullptr;
 		List<GL::Texture2D> ObjSpaceTextures;
 		GL::RenderBuffer DepthRenderBuffer;
 		GL::FrameBuffer ObjSpaceFBO;

@@ -179,7 +179,7 @@ namespace SceneViewer
 	void ChoiceForm::Recompile()
 	{
 		SetCursor(LoadCursor(NULL, IDC_WAIT));
-		
+		glFinish();
 		auto schedule = GenerateSchedule(existingChoices, additionalAttribs);
 		if (currentShaderName.Length())
 			choiceControl->RecompileShader(currentShaderName, schedule);

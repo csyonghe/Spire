@@ -41,6 +41,7 @@ namespace SceneViewer
 		float time;
 		bool foveated = false;
 		bool stereo = false;
+		bool disableOutput = false;
 		float FOV = 75.0f;
 		bool advanceTime;
 		float nearPlane = 5.0f;
@@ -156,14 +157,18 @@ namespace SceneViewer
 
 		void OnCommandOutput(const String & /*text*/)
 		{
-			MainLoop(this, EventArgs());
+			if (!disableOutput)
+				MainLoop(this, EventArgs());
 		}
 
 		void ShaderChanged()
 		{
 			if (scene)
 			{
+				disableOutput = true;
 				bool rs = scene->RecompileShader(shaderEditorForm->shaderName, L"");
+				disableOutput = false;
+
 				if (choiceForm)
 					choiceForm->Update();
 				if (rs)
@@ -830,8 +835,11 @@ namespace SceneViewer
 		}
 		virtual void RecompileShader(String shader, const String & schedule) override
 		{
+			disableOutput = true;
+
 			if (scene)
 				scene->RecompileShader(shader, schedule);
+			disableOutput = false;
 		}
 
 		virtual EnumerableDictionary<String, GL::Texture2D> GetPrecomputedTextures(String shader) override
