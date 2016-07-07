@@ -115,6 +115,15 @@ namespace Spire
 				return false;
 		}
 
+		bool ILType::IsIntegral()
+		{
+			auto basicType = dynamic_cast<ILBasicType*>(this);
+			if (basicType)
+				return basicType->Type == ILBaseType::Int || basicType->Type == ILBaseType::Int2 || basicType->Type == ILBaseType::Int3 || basicType->Type == ILBaseType::Int4 || basicType->Type == ILBaseType::UInt;
+			else
+				return false;
+		}
+
 		bool ILType::IsFloat()
 		{
 			auto basicType = dynamic_cast<ILBasicType*>(this);

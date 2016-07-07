@@ -137,6 +137,13 @@ __intrinsic ivec4 ivec4(int x, int y, int z, int w);
 __intrinsic ivec4 ivec4(ivec3 v, int w);
 __intrinsic ivec4 ivec4(ivec2 v, int z, int w);
 __intrinsic ivec4 ivec4(ivec2 v, ivec2 w);
+__intrinsic int int(uint val);
+__intrinsic int int(float val);
+__intrinsic uint uint(uint val);
+__intrinsic uint uint(float val);
+__intrinsic float float(int val);
+__intrinsic float float(uint val);
+
 __intrinsic mat3 transpose(mat3 in);
 __intrinsic mat4 transpose(mat4 in);
 #line_reset#

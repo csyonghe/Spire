@@ -712,6 +712,8 @@ namespace Spire
 					w->ExportOperator = world.Value.SyntaxNode->ExportOperator;
 					auto outputBlock = new InterfaceBlock();
 					outputBlock->Name = world.Key;
+					for (auto & attrib : world.Value.SyntaxNode->LayoutAttributes)
+						outputBlock->Attributes[attrib.Key] = attrib.Value;
 					world.Value.SyntaxNode->LayoutAttributes.TryGetValue(L"InterfaceBlock", outputBlock->Name);
 					if (outputBlock->Name.Contains(L":"))
 					{
@@ -727,6 +729,7 @@ namespace Spire
 						outputBlock->Attributes[L"Index"] = strIdx;
 					if (world.Value.SyntaxNode->LayoutAttributes.ContainsKey(L"Packed"))
 						outputBlock->Attributes[L"Packed"] = L"1";
+					
 					w->WorldOutput = outputBlock;
 					compiledShader->InterfaceBlocks[outputBlock->Name] = outputBlock;
 					w->Attributes = world.Value.SyntaxNode->LayoutAttributes;
@@ -1199,7 +1202,7 @@ namespace Spire
 				if (stmt->TypeDef)
 				{
 					AllocVarInstruction * varOp = AllocVar(stmt->TypeDef->ToExpressionType(symTable));
-					varOp->Name = L"v_" + stmt->IterationVariable.Content;
+					varOp->Name = L"v_" + String(NamingCounter++) + stmt->IterationVariable.Content;
 					variables.Add(stmt->IterationVariable.Content, varOp);
 				}
 				ILOperand * iterVar = nullptr;
@@ -1211,7 +1214,7 @@ namespace Spire
 				codeWriter.PushNode();
 				stmt->EndExpression->Accept(this);
 				auto val = PopStack();
-				codeWriter.Insert(new CmpleInstruction(new LoadInstruction(iterVar), val));
+				codeWriter.Insert(new CmpleInstruction(codeWriter.Load(iterVar), val));
 				instr->ConditionCode = codeWriter.PopNode();
 
 				codeWriter.PushNode();
@@ -1228,7 +1231,7 @@ namespace Spire
 					else
 						stepVal = result.Program->ConstantPool->CreateConstant(1);
 				}
-				auto afterVal = new AddInstruction(new LoadInstruction(iterVar), stepVal);
+				auto afterVal = new AddInstruction(codeWriter.Load(iterVar), stepVal);
 				codeWriter.Insert(afterVal);
 				Assign(stmt->TypeDef->ToExpressionType(symTable), iterVar, afterVal);
 				instr->SideEffectCode = codeWriter.PopNode();
@@ -2299,77 +2302,16 @@ namespace Spire
 {
 	namespace Compiler
 	{
-		void PrintBaseType(StringBuilder & sbCode, ILType* type)
+		void PrintType(StringBuilder & sbCode, ILType* type)
 		{
-			if (auto baseType = dynamic_cast<ILBasicType*>(type))
-			{
-				switch (baseType->Type)
-				{
-				case ILBaseType::Int:
-					sbCode << L"int";
-					break;
-				case ILBaseType::UInt:
-					sbCode << L"uint";
-					break;
-				case ILBaseType::Int2:
-					sbCode << L"ivec2";
-					break;
-				case ILBaseType::Int3:
-					sbCode << L"ivec3";
-					break;
-				case ILBaseType::Int4:
-					sbCode << L"ivec4";
-					break;
-				case ILBaseType::Float:
-					sbCode << L"float";
-					break;
-				case ILBaseType::Float2:
-					sbCode << L"vec2";
-					break;
-				case ILBaseType::Float3:
-					sbCode << L"vec3";
-					break;
-				case ILBaseType::Float4:
-					sbCode << L"vec4";
-					break;
-				case ILBaseType::Float3x3:
-					sbCode << L"mat3";
-					break;
-				case ILBaseType::Float4x4:
-					sbCode << L"mat4";
-					break;
-				case ILBaseType::Texture2D:
-					sbCode << L"sampler2D";
-					break;
-				case ILBaseType::TextureCube:
-					sbCode << L"samplerCube";
-					break;
-				case ILBaseType::TextureShadow:
-					sbCode << L"sampler2DShadow";
-					break;
-				case ILBaseType::TextureCubeShadow:
-					sbCode << L"samplerCubeShadow";
-					break;
-				default:
-					throw NotImplementedException(L"unkown base type.");
-				}
-			}
-			else
-				throw NotImplementedException(L"unkown base type.");
+			sbCode << type->ToString();
 		}
 
 		void PrintDef(StringBuilder & sbCode, ILType* type, const String & name)
 		{
-			if (auto arrType = dynamic_cast<ILArrayType*>(type))
-			{
-				PrintDef(sbCode, arrType->BaseType.Ptr(), name + L"[" + arrType->ArrayLength + L"]");
-			}
-			else if (dynamic_cast<ILBasicType*>(type))
-			{
-				PrintBaseType(sbCode, type);
-				sbCode << L" ";
-				sbCode << name;
-			}
+			PrintType(sbCode, type);
+			sbCode << L" ";
+			sbCode << name;
 		}
 
 		class CodeGenContext
@@ -3212,7 +3154,7 @@ namespace Spire
 			{
 				auto retType = function->ReturnType.Ptr();
 				if (retType)
-					PrintBaseType(sbCode, retType);
+					PrintType(sbCode, retType);
 				else
 					sbCode << L"void";
 				sbCode << L" " << GetFuncOriginalName(function->Name) << L"(";
@@ -3256,7 +3198,7 @@ namespace Spire
 				return sbCode.ProduceString();
 			}
 			EnumerableDictionary<String, String> backendArguments;
-			virtual void SetParameters(EnumerableDictionary<String, String> & args) override
+			virtual void SetParameters(const EnumerableDictionary<String, String> & args) override
 			{
 				backendArguments = args;
 				if (!args.TryGetValue(L"vertex", vertexOutputName))
@@ -3384,6 +3326,15 @@ namespace Spire
 			auto basicType = dynamic_cast<ILBasicType*>(this);
 			if (basicType)
 				return basicType->Type == ILBaseType::Int;
+			else
+				return false;
+		}
+
+		bool ILType::IsIntegral()
+		{
+			auto basicType = dynamic_cast<ILBasicType*>(this);
+			if (basicType)
+				return basicType->Type == ILBaseType::Int || basicType->Type == ILBaseType::Int2 || basicType->Type == ILBaseType::Int3 || basicType->Type == ILBaseType::Int4 || basicType->Type == ILBaseType::UInt;
 			else
 				return false;
 		}
@@ -4581,6 +4532,16 @@ namespace Spire
 			return tokens[pos++];
 		}
 
+		Token & Parser::ReadToken()
+		{
+			if (pos >= tokens.Count())
+			{
+				errors.Add(CompileError(String(L" Unexpected end of file."), 20001, CodePosition(0, 0, fileName)));
+				throw 0;
+			}
+			return tokens[pos++];
+		}
+
 		Token & Parser::ReadToken(TokenType type)
 		{
 			if (pos >= tokens.Count())
@@ -5086,7 +5047,7 @@ namespace Spire
 			try
 			{
 				FillPosition(function.Ptr());
-				Token & name = ReadToken(TokenType::Identifier);
+				Token name = ReadToken();
 				function->Name = name.Content;
 				ReadToken(TokenType::LParent);
 				while(pos < tokens.Count() && tokens[pos].Type != TokenType::RParent)
@@ -6706,7 +6667,7 @@ namespace Spire
 					{
 						para->Expression->Accept(this);
 						if (para->Expression->Type != varDeclr.Type.DataType &&
-							!(para->Expression->Type.IsIntegral() && varDeclr.Type.DataType.IsIntegral()) &&
+							!(para->Expression->Type.IsIntegral() && varDeclr.Type.DataType == ExpressionType::Float) &&
 							!(para->Expression->Type == ExpressionType::Float && varDeclr.Type.DataType == ExpressionType::Int)
 							&& para->Expression->Type != ExpressionType::Error)
 						{
@@ -6747,8 +6708,8 @@ namespace Spire
 						expr->Type = leftType;
 					else if (rightType.IsVectorType() && leftType == GetVectorBaseType(rightType.BaseType))
 						expr->Type = rightType;
-					else if ((rightType == ExpressionType::Float && leftType.IsIntegral()) ||
-						(leftType == ExpressionType::Float && rightType.IsIntegral()))
+					else if ((rightType == ExpressionType::Float && leftType == ExpressionType::Int) ||
+						(leftType == ExpressionType::Float && leftType == ExpressionType::Int))
 						expr->Type = ExpressionType::Float;
 					else if (leftType.IsIntegral() && rightType.IsIntegral())
 						expr->Type = ExpressionType::Int;
@@ -6770,8 +6731,8 @@ namespace Spire
 							expr->Type = leftType;
 						else if (rightType.IsVectorType() && leftType == GetVectorBaseType(rightType.BaseType))
 							expr->Type = rightType;
-						else if ((rightType == ExpressionType::Float && (leftType == ExpressionType::Int || leftType == ExpressionType::UInt)) ||
-							(leftType == ExpressionType::Float && (rightType == ExpressionType::Int || rightType == ExpressionType::UInt)))
+						else if ((rightType == ExpressionType::Float && leftType == ExpressionType::Int) ||
+							(leftType == ExpressionType::Float && rightType == ExpressionType::Int))
 							expr->Type = ExpressionType::Float;
 						else
 							expr->Type = ExpressionType::Error;
@@ -6828,7 +6789,7 @@ namespace Spire
 						Error(30011, L"left of '=' is not an l-value.", expr->LeftExpression.Ptr());
 					expr->LeftExpression->Access = ExpressionAccess::Write;
 					if (leftType == rightType ||
-						((leftType == ExpressionType::Float || leftType == ExpressionType::Int || leftType == ExpressionType::UInt) &&
+						(leftType == ExpressionType::Float &&
 						(rightType == ExpressionType::Float || rightType == ExpressionType::Int || rightType == ExpressionType::UInt)))
 						expr->Type = ExpressionType::Void;
 					else if (leftType.IsIntegral() && rightType.IsIntegral())
@@ -6875,7 +6836,7 @@ namespace Spire
 						Error(30013, L"'[]' can only index on arrays and strings.", expr);
 						expr->Type = ExpressionType::Error;
 					}
-					if (expr->IndexExpression->Type != ExpressionType::Int)
+					if (expr->IndexExpression->Type != ExpressionType::Int && expr->IndexExpression->Type != ExpressionType::UInt)
 					{
 						Error(30014, L"index expression must evaluate to int.", expr);
 						expr->Type = ExpressionType::Error;
@@ -7606,7 +7567,10 @@ namespace Spire
 									}
 									else
 									{
-										backend->SetParameters(world.Value->BackendParameters);
+										auto args = world.Value->BackendParameters;
+										for (auto & arg : options.BackendArguments)
+											args[arg.Key] = args[arg.Value];
+										backend->SetParameters(args);
 										Dictionary<String, ImportOperatorHandler*> importHandlers;
 										Dictionary<String, ExportOperatorHandler*> beExportHandlers;
 
@@ -7845,6 +7809,13 @@ __intrinsic ivec4 ivec4(int x, int y, int z, int w);
 __intrinsic ivec4 ivec4(ivec3 v, int w);
 __intrinsic ivec4 ivec4(ivec2 v, int z, int w);
 __intrinsic ivec4 ivec4(ivec2 v, ivec2 w);
+__intrinsic int int(uint val);
+__intrinsic int int(float val);
+__intrinsic uint uint(uint val);
+__intrinsic uint uint(float val);
+__intrinsic float float(int val);
+__intrinsic float float(uint val);
+
 __intrinsic mat3 transpose(mat3 in);
 __intrinsic mat4 transpose(mat4 in);
 #line_reset#
@@ -9122,6 +9093,8 @@ class StandardGLSLImportOperatorHandler : public GLSLImportOperatorHandler
 		sb << L"in " << block->Name << L"\n{\n";
 		for (auto & ent : block->Entries)
 		{
+			if (ent.Value.Type->IsIntegral())
+				sb << L"flat ";
 			sb << ent.Value.Type->ToString() << L" " << ent.Key << L";\n";
 		}
 		sb << L"} blk" << block->Name << L";\n";
@@ -9277,6 +9250,10 @@ class UniformGLSLImportOperatorHandler : public GLSLImportOperatorHandler
 			if (useBindlessTexture || !ent.Value.Type->IsTexture())
 				activeEntryCount++;
 		}
+		String bufferType = L"uniform";
+		if (block->Attributes.ContainsKey(L"ShaderStorageBlock"))
+			bufferType = L"buffer";
+
 		if (activeEntryCount)
 		{
 			sb << L"layout(std140";
@@ -9286,7 +9263,8 @@ class UniformGLSLImportOperatorHandler : public GLSLImportOperatorHandler
 			if (ctx.BackendArguments.ContainsKey(L"command_list"))
 				sb << L", commandBindableNV";
 			sb << L") ";
-			sb << L"uniform " << block->Name << L"\n{\n";
+			sb << bufferType;
+			sb << L" " << block->Name << L"\n{\n";
 			for (auto & ent : block->Entries)
 			{
 				if (!useBindlessTexture && ent.Value.Type->IsTexture())
@@ -9298,6 +9276,9 @@ class UniformGLSLImportOperatorHandler : public GLSLImportOperatorHandler
 		if (!useBindlessTexture)
 		{
 			int bindPoint = 0;
+			String bindingStart;
+			if (ctx.BackendArguments.TryGetValue(L"TextureBindingStart", bindingStart))
+				bindPoint = StringToInt(bindingStart);
 			for (auto & ent : block->Entries)
 			{
 				if (ent.Value.Type->IsTexture())
@@ -9384,6 +9365,8 @@ class StandardGLSLExportOperatorHandler : public ExportOperatorHandler
 		sb << L"out " << block->Name << L"\n{\n";
 		for (auto & ent : block->Entries)
 		{
+			if (ent.Value.Type->IsIntegral())
+				sb << L"flat ";
 			sb << ent.Value.Type->ToString() << L" " << ent.Key << L";\n";
 		}
 		sb << L"} blk" << block->Name << L";\n";

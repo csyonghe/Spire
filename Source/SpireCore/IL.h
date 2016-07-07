@@ -30,6 +30,7 @@ namespace Spire
 		{
 		public:
 			bool IsInt();
+			bool IsIntegral();
 			bool IsFloat();
 			bool IsIntVector();
 			bool IsFloatVector();

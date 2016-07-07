@@ -26,6 +26,8 @@ class StandardGLSLImportOperatorHandler : public GLSLImportOperatorHandler
 		sb << L"in " << block->Name << L"\n{\n";
 		for (auto & ent : block->Entries)
 		{
+			if (ent.Value.Type->IsIntegral())
+				sb << L"flat ";
 			sb << ent.Value.Type->ToString() << L" " << ent.Key << L";\n";
 		}
 		sb << L"} blk" << block->Name << L";\n";
@@ -181,6 +183,10 @@ class UniformGLSLImportOperatorHandler : public GLSLImportOperatorHandler
 			if (useBindlessTexture || !ent.Value.Type->IsTexture())
 				activeEntryCount++;
 		}
+		String bufferType = L"uniform";
+		if (block->Attributes.ContainsKey(L"ShaderStorageBlock"))
+			bufferType = L"buffer";
+
 		if (activeEntryCount)
 		{
 			sb << L"layout(std140";
@@ -190,7 +196,8 @@ class UniformGLSLImportOperatorHandler : public GLSLImportOperatorHandler
 			if (ctx.BackendArguments.ContainsKey(L"command_list"))
 				sb << L", commandBindableNV";
 			sb << L") ";
-			sb << L"uniform " << block->Name << L"\n{\n";
+			sb << bufferType;
+			sb << L" " << block->Name << L"\n{\n";
 			for (auto & ent : block->Entries)
 			{
 				if (!useBindlessTexture && ent.Value.Type->IsTexture())
@@ -202,6 +209,9 @@ class UniformGLSLImportOperatorHandler : public GLSLImportOperatorHandler
 		if (!useBindlessTexture)
 		{
 			int bindPoint = 0;
+			String bindingStart;
+			if (ctx.BackendArguments.TryGetValue(L"TextureBindingStart", bindingStart))
+				bindPoint = StringToInt(bindingStart);
 			for (auto & ent : block->Entries)
 			{
 				if (ent.Value.Type->IsTexture())
@@ -288,6 +298,8 @@ class StandardGLSLExportOperatorHandler : public ExportOperatorHandler
 		sb << L"out " << block->Name << L"\n{\n";
 		for (auto & ent : block->Entries)
 		{
+			if (ent.Value.Type->IsIntegral())
+				sb << L"flat ";
 			sb << ent.Value.Type->ToString() << L" " << ent.Key << L";\n";
 		}
 		sb << L"} blk" << block->Name << L";\n";

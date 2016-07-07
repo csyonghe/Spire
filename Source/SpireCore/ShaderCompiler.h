@@ -23,6 +23,7 @@ namespace Spire
 		{
 		public:
 			CompilerMode Mode = CompilerMode::ProduceShader;
+			EnumerableDictionary<String, String> BackendArguments;
 			String ScheduleSource, ScheduleFileName;
 			String SymbolToCompile;
 		};

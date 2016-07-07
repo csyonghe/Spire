@@ -1154,6 +1154,7 @@ namespace Spire
 		{
 		public:
 			bool IsInt();
+			bool IsIntegral();
 			bool IsFloat();
 			bool IsIntVector();
 			bool IsFloatVector();
@@ -4012,7 +4013,7 @@ namespace Spire
 			virtual CompiledShaderSource GenerateShaderWorld(CompileResult & result, SymbolTable * symbols, CompiledWorld * shader,
 				Dictionary<String, ImportOperatorHandler *> & opHandlers,
 				Dictionary<String, ExportOperatorHandler *> & exportHandlers) = 0;
-			virtual void SetParameters(EnumerableDictionary<String, String> & arguments) = 0;
+			virtual void SetParameters(const EnumerableDictionary<String, String> & arguments) = 0;
 		};
 
 		CodeGenBackend * CreateGLSLCodeGen();
@@ -4044,6 +4045,7 @@ namespace Spire
 		{
 		public:
 			CompilerMode Mode = CompilerMode::ProduceShader;
+			EnumerableDictionary<String, String> BackendArguments;
 			String ScheduleSource, ScheduleFileName;
 			String SymbolToCompile;
 		};
@@ -4465,6 +4467,7 @@ namespace Spire
 			}
 			RefPtr<ProgramSyntaxNode> Parse();
 		private:
+			Token & ReadToken();
 			Token & ReadToken(TokenType type);
 			Token & ReadToken(const wchar_t * string);
 			bool LookAheadToken(TokenType type, int offset = 0);

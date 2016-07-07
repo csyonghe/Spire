@@ -8,77 +8,16 @@ namespace Spire
 {
 	namespace Compiler
 	{
-		void PrintBaseType(StringBuilder & sbCode, ILType* type)
+		void PrintType(StringBuilder & sbCode, ILType* type)
 		{
-			if (auto baseType = dynamic_cast<ILBasicType*>(type))
-			{
-				switch (baseType->Type)
-				{
-				case ILBaseType::Int:
-					sbCode << L"int";
-					break;
-				case ILBaseType::UInt:
-					sbCode << L"uint";
-					break;
-				case ILBaseType::Int2:
-					sbCode << L"ivec2";
-					break;
-				case ILBaseType::Int3:
-					sbCode << L"ivec3";
-					break;
-				case ILBaseType::Int4:
-					sbCode << L"ivec4";
-					break;
-				case ILBaseType::Float:
-					sbCode << L"float";
-					break;
-				case ILBaseType::Float2:
-					sbCode << L"vec2";
-					break;
-				case ILBaseType::Float3:
-					sbCode << L"vec3";
-					break;
-				case ILBaseType::Float4:
-					sbCode << L"vec4";
-					break;
-				case ILBaseType::Float3x3:
-					sbCode << L"mat3";
-					break;
-				case ILBaseType::Float4x4:
-					sbCode << L"mat4";
-					break;
-				case ILBaseType::Texture2D:
-					sbCode << L"sampler2D";
-					break;
-				case ILBaseType::TextureCube:
-					sbCode << L"samplerCube";
-					break;
-				case ILBaseType::TextureShadow:
-					sbCode << L"sampler2DShadow";
-					break;
-				case ILBaseType::TextureCubeShadow:
-					sbCode << L"samplerCubeShadow";
-					break;
-				default:
-					throw NotImplementedException(L"unkown base type.");
-				}
-			}
-			else
-				throw NotImplementedException(L"unkown base type.");
+			sbCode << type->ToString();
 		}
 
 		void PrintDef(StringBuilder & sbCode, ILType* type, const String & name)
 		{
-			if (auto arrType = dynamic_cast<ILArrayType*>(type))
-			{
-				PrintDef(sbCode, arrType->BaseType.Ptr(), name + L"[" + arrType->ArrayLength + L"]");
-			}
-			else if (dynamic_cast<ILBasicType*>(type))
-			{
-				PrintBaseType(sbCode, type);
-				sbCode << L" ";
-				sbCode << name;
-			}
+			PrintType(sbCode, type);
+			sbCode << L" ";
+			sbCode << name;
 		}
 
 		class CodeGenContext
@@ -921,7 +860,7 @@ namespace Spire
 			{
 				auto retType = function->ReturnType.Ptr();
 				if (retType)
-					PrintBaseType(sbCode, retType);
+					PrintType(sbCode, retType);
 				else
 					sbCode << L"void";
 				sbCode << L" " << GetFuncOriginalName(function->Name) << L"(";
@@ -965,7 +904,7 @@ namespace Spire
 				return sbCode.ProduceString();
 			}
 			EnumerableDictionary<String, String> backendArguments;
-			virtual void SetParameters(EnumerableDictionary<String, String> & args) override
+			virtual void SetParameters(const EnumerableDictionary<String, String> & args) override
 			{
 				backendArguments = args;
 				if (!args.TryGetValue(L"vertex", vertexOutputName))

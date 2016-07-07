@@ -69,6 +69,7 @@ namespace Spire
 			}
 			RefPtr<ProgramSyntaxNode> Parse();
 		private:
+			Token & ReadToken();
 			Token & ReadToken(TokenType type);
 			Token & ReadToken(const wchar_t * string);
 			bool LookAheadToken(TokenType type, int offset = 0);

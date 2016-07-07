@@ -129,6 +129,8 @@ namespace Spire
 					w->ExportOperator = world.Value.SyntaxNode->ExportOperator;
 					auto outputBlock = new InterfaceBlock();
 					outputBlock->Name = world.Key;
+					for (auto & attrib : world.Value.SyntaxNode->LayoutAttributes)
+						outputBlock->Attributes[attrib.Key] = attrib.Value;
 					world.Value.SyntaxNode->LayoutAttributes.TryGetValue(L"InterfaceBlock", outputBlock->Name);
 					if (outputBlock->Name.Contains(L":"))
 					{
@@ -144,6 +146,7 @@ namespace Spire
 						outputBlock->Attributes[L"Index"] = strIdx;
 					if (world.Value.SyntaxNode->LayoutAttributes.ContainsKey(L"Packed"))
 						outputBlock->Attributes[L"Packed"] = L"1";
+					
 					w->WorldOutput = outputBlock;
 					compiledShader->InterfaceBlocks[outputBlock->Name] = outputBlock;
 					w->Attributes = world.Value.SyntaxNode->LayoutAttributes;
@@ -616,7 +619,7 @@ namespace Spire
 				if (stmt->TypeDef)
 				{
 					AllocVarInstruction * varOp = AllocVar(stmt->TypeDef->ToExpressionType(symTable));
-					varOp->Name = L"v_" + stmt->IterationVariable.Content;
+					varOp->Name = L"v_" + String(NamingCounter++) + stmt->IterationVariable.Content;
 					variables.Add(stmt->IterationVariable.Content, varOp);
 				}
 				ILOperand * iterVar = nullptr;
@@ -628,7 +631,7 @@ namespace Spire
 				codeWriter.PushNode();
 				stmt->EndExpression->Accept(this);
 				auto val = PopStack();
-				codeWriter.Insert(new CmpleInstruction(new LoadInstruction(iterVar), val));
+				codeWriter.Insert(new CmpleInstruction(codeWriter.Load(iterVar), val));
 				instr->ConditionCode = codeWriter.PopNode();
 
 				codeWriter.PushNode();
@@ -645,7 +648,7 @@ namespace Spire
 					else
 						stepVal = result.Program->ConstantPool->CreateConstant(1);
 				}
-				auto afterVal = new AddInstruction(new LoadInstruction(iterVar), stepVal);
+				auto afterVal = new AddInstruction(codeWriter.Load(iterVar), stepVal);
 				codeWriter.Insert(afterVal);
 				Assign(stmt->TypeDef->ToExpressionType(symTable), iterVar, afterVal);
 				instr->SideEffectCode = codeWriter.PopNode();

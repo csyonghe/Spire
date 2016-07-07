@@ -19,6 +19,16 @@ namespace Spire
 			return tokens[pos++];
 		}
 
+		Token & Parser::ReadToken()
+		{
+			if (pos >= tokens.Count())
+			{
+				errors.Add(CompileError(String(L" Unexpected end of file."), 20001, CodePosition(0, 0, fileName)));
+				throw 0;
+			}
+			return tokens[pos++];
+		}
+
 		Token & Parser::ReadToken(TokenType type)
 		{
 			if (pos >= tokens.Count())
@@ -524,7 +534,7 @@ namespace Spire
 			try
 			{
 				FillPosition(function.Ptr());
-				Token & name = ReadToken(TokenType::Identifier);
+				Token name = ReadToken();
 				function->Name = name.Content;
 				ReadToken(TokenType::LParent);
 				while(pos < tokens.Count() && tokens[pos].Type != TokenType::RParent)

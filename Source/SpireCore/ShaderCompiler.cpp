@@ -321,7 +321,10 @@ namespace Spire
 									}
 									else
 									{
-										backend->SetParameters(world.Value->BackendParameters);
+										auto args = world.Value->BackendParameters;
+										for (auto & arg : options.BackendArguments)
+											args[arg.Key] = args[arg.Value];
+										backend->SetParameters(args);
 										Dictionary<String, ImportOperatorHandler*> importHandlers;
 										Dictionary<String, ExportOperatorHandler*> beExportHandlers;
 

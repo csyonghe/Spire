@@ -744,7 +744,7 @@ namespace Spire
 					{
 						para->Expression->Accept(this);
 						if (para->Expression->Type != varDeclr.Type.DataType &&
-							!(para->Expression->Type.IsIntegral() && varDeclr.Type.DataType.IsIntegral()) &&
+							!(para->Expression->Type.IsIntegral() && varDeclr.Type.DataType == ExpressionType::Float) &&
 							!(para->Expression->Type == ExpressionType::Float && varDeclr.Type.DataType == ExpressionType::Int)
 							&& para->Expression->Type != ExpressionType::Error)
 						{
@@ -785,8 +785,8 @@ namespace Spire
 						expr->Type = leftType;
 					else if (rightType.IsVectorType() && leftType == GetVectorBaseType(rightType.BaseType))
 						expr->Type = rightType;
-					else if ((rightType == ExpressionType::Float && leftType.IsIntegral()) ||
-						(leftType == ExpressionType::Float && rightType.IsIntegral()))
+					else if ((rightType == ExpressionType::Float && leftType == ExpressionType::Int) ||
+						(leftType == ExpressionType::Float && leftType == ExpressionType::Int))
 						expr->Type = ExpressionType::Float;
 					else if (leftType.IsIntegral() && rightType.IsIntegral())
 						expr->Type = ExpressionType::Int;
@@ -808,8 +808,8 @@ namespace Spire
 							expr->Type = leftType;
 						else if (rightType.IsVectorType() && leftType == GetVectorBaseType(rightType.BaseType))
 							expr->Type = rightType;
-						else if ((rightType == ExpressionType::Float && (leftType == ExpressionType::Int || leftType == ExpressionType::UInt)) ||
-							(leftType == ExpressionType::Float && (rightType == ExpressionType::Int || rightType == ExpressionType::UInt)))
+						else if ((rightType == ExpressionType::Float && leftType == ExpressionType::Int) ||
+							(leftType == ExpressionType::Float && rightType == ExpressionType::Int))
 							expr->Type = ExpressionType::Float;
 						else
 							expr->Type = ExpressionType::Error;
@@ -866,7 +866,7 @@ namespace Spire
 						Error(30011, L"left of '=' is not an l-value.", expr->LeftExpression.Ptr());
 					expr->LeftExpression->Access = ExpressionAccess::Write;
 					if (leftType == rightType ||
-						((leftType == ExpressionType::Float || leftType == ExpressionType::Int || leftType == ExpressionType::UInt) &&
+						(leftType == ExpressionType::Float &&
 						(rightType == ExpressionType::Float || rightType == ExpressionType::Int || rightType == ExpressionType::UInt)))
 						expr->Type = ExpressionType::Void;
 					else if (leftType.IsIntegral() && rightType.IsIntegral())
@@ -913,7 +913,7 @@ namespace Spire
 						Error(30013, L"'[]' can only index on arrays and strings.", expr);
 						expr->Type = ExpressionType::Error;
 					}
-					if (expr->IndexExpression->Type != ExpressionType::Int)
+					if (expr->IndexExpression->Type != ExpressionType::Int && expr->IndexExpression->Type != ExpressionType::UInt)
 					{
 						Error(30014, L"index expression must evaluate to int.", expr);
 						expr->Type = ExpressionType::Error;

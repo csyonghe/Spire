@@ -51,7 +51,7 @@ namespace Spire
 			virtual CompiledShaderSource GenerateShaderWorld(CompileResult & result, SymbolTable * symbols, CompiledWorld * shader,
 				Dictionary<String, ImportOperatorHandler *> & opHandlers,
 				Dictionary<String, ExportOperatorHandler *> & exportHandlers) = 0;
-			virtual void SetParameters(EnumerableDictionary<String, String> & arguments) = 0;
+			virtual void SetParameters(const EnumerableDictionary<String, String> & arguments) = 0;
 		};
 
 		CodeGenBackend * CreateGLSLCodeGen();
