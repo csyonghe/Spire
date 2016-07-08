@@ -1,7 +1,7 @@
 ﻿/***********************************************************************
 
 Spire - The MIT License (MIT)
-Copyright (c) 2016, Yong He
+Copyright (c) 2016, Carnegie Mellon University
 
 Permission is hereby granted, free of charge, to any person obtaining a 
 copy of this software and associated documentation files (the "Software"), 
@@ -6309,6 +6309,27 @@ namespace Spire
 				}
 				this->currentShader = nullptr;
 			}
+
+			bool MatchType_ValueReceiver(ExpressionType receiverType, ExpressionType valueType)
+			{
+				if (receiverType == valueType)
+					return true;
+				if (receiverType.IsIntegral() && valueType == ExpressionType::Int)
+					return true;
+				if (receiverType == ExpressionType::Float && valueType.IsIntegral())
+					return true;
+				if (receiverType.IsVectorType() && valueType.IsVectorType())
+				{
+					if (GetVectorBaseType(receiverType.BaseType) == BaseType::Float &&
+						GetVectorSize(receiverType.BaseType) == GetVectorSize(valueType.BaseType))
+						return true;
+					if (GetVectorBaseType(receiverType.BaseType) == BaseType::UInt &&
+						GetVectorBaseType(valueType.BaseType) == BaseType::Int &&
+						GetVectorSize(receiverType.BaseType) == GetVectorSize(valueType.BaseType))
+						return true;
+				}
+				return false;
+			}
 			virtual void VisitComponent(ComponentSyntaxNode * comp) override
 			{
 				this->currentCompNode = comp;
@@ -6318,7 +6339,7 @@ namespace Spire
 				if (comp->Expression)
 				{
 					comp->Expression->Accept(this);
-					if (comp->Expression->Type != compSym->Type->DataType && comp->Expression->Type != ExpressionType::Error)
+					if (!MatchType_ValueReceiver(compSym->Type->DataType, comp->Expression->Type) && comp->Expression->Type != ExpressionType::Error)
 						Error(30019, L"type mismatch \'" + comp->Expression->Type.ToString() + L"\' and \'" +
 							currentComp->Type->DataType.ToString() + L"\'", comp->Name);
 				}
@@ -6630,11 +6651,11 @@ namespace Spire
 					stmt->Expression->Accept(this);
 					if (stmt->Expression->Type != ExpressionType::Error)
 					{
-						if (function && stmt->Expression->Type != function->ReturnType->ToExpressionType(symbolTable, err))
+						if (function && !MatchType_ValueReceiver(function->ReturnType->ToExpressionType(symbolTable, err), stmt->Expression->Type))
 							Error(30007, L"expression type '" + stmt->Expression->Type.ToString()
 								+ L"' does not match function's return type '"
 								+ function->ReturnType->ToExpressionType(symbolTable, err).ToString() + L"'", stmt);
-						if (currentComp && stmt->Expression->Type != currentComp->Type->DataType)
+						if (currentComp && !MatchType_ValueReceiver(currentComp->Type->DataType, stmt->Expression->Type))
 						{
 							Error(30007, L"expression type '" + stmt->Expression->Type.ToString()
 								+ L"' does not match component's type '"
@@ -6666,9 +6687,7 @@ namespace Spire
 					if (para->Expression != NULL)
 					{
 						para->Expression->Accept(this);
-						if (para->Expression->Type != varDeclr.Type.DataType &&
-							!(para->Expression->Type.IsIntegral() && varDeclr.Type.DataType == ExpressionType::Float) &&
-							!(para->Expression->Type == ExpressionType::Float && varDeclr.Type.DataType == ExpressionType::Int)
+						if (!MatchType_ValueReceiver(varDeclr.Type.DataType, para->Expression->Type)
 							&& para->Expression->Type != ExpressionType::Error)
 						{
 							Error(30019, L"type mismatch \'" + para->Expression->Type.ToString() + L"\' and \'" +
@@ -6788,12 +6807,8 @@ namespace Spire
 					if (!leftType.IsLeftValue && leftType != ExpressionType::Error)
 						Error(30011, L"left of '=' is not an l-value.", expr->LeftExpression.Ptr());
 					expr->LeftExpression->Access = ExpressionAccess::Write;
-					if (leftType == rightType ||
-						(leftType == ExpressionType::Float &&
-						(rightType == ExpressionType::Float || rightType == ExpressionType::Int || rightType == ExpressionType::UInt)))
+					if (MatchType_ValueReceiver(leftType, rightType))
 						expr->Type = ExpressionType::Void;
-					else if (leftType.IsIntegral() && rightType.IsIntegral())
-						expr->Type = leftType;
 					else
 						expr->Type = ExpressionType::Error;
 					break;
@@ -6913,9 +6928,7 @@ namespace Spire
 									auto paramType = f.Value->SyntaxNode->Parameters[i]->Type->ToExpressionType(symbolTable, err);
 									if (argType == paramType)
 										continue;
-									else if (argType.ArrayLength == paramType.ArrayLength
-										&& GetVectorBaseType(argType.BaseType) == BaseType::Int && GetVectorBaseType(paramType.BaseType) == BaseType::Float &&
-										GetVectorSize(argType.BaseType) == GetVectorSize(argType.BaseType))
+									else if (MatchType_ValueReceiver(paramType, argType))
 										continue;
 									else
 									{
