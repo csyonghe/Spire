@@ -105,7 +105,6 @@ namespace DemoEngine
 	}
 	void EnginePipeline::InitializeShader(int shaderId)
 	{
-		uiprintf(L"Initializing material %d\n", shaderId);
 		BuildUniformBuffer(shaderId);
 		Precompute(shaderId);
 		AllocObjectSpaceBuffers(shaderId);

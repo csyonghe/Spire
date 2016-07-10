@@ -155,6 +155,7 @@
     <ClCompile Include="CoreLib\Graphics.cpp" />
     <ClCompile Include="CoreLib\Imaging.cpp" />
     <ClCompile Include="CoreLib\LibGL.cpp" />
+    <ClCompile Include="CoreLib\LibUI.cpp" />
     <ClCompile Include="CoreLib\WinForm.cpp" />
     <ClCompile Include="DeviceMarshalling.cpp" />
     <ClCompile Include="DeviceResourcePool.cpp" />
@@ -178,6 +179,7 @@
     <ClInclude Include="CoreLib\Graphics.h" />
     <ClInclude Include="CoreLib\Imaging.h" />
     <ClInclude Include="CoreLib\LibGL.h" />
+    <ClInclude Include="CoreLib\LibUI.h" />
     <ClInclude Include="CoreLib\WinForm.h" />
     <ClInclude Include="DeviceMarshalling.h" />
     <ClInclude Include="GpuShaderStore.h" />

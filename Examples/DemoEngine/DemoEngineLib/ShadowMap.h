@@ -11,7 +11,7 @@ namespace DemoEngine
 	{
 	public:
 		CoreLib::Procedure<const VectorMath::Matrix4 &, int> DrawShadowMap;
-		bool Enabled = true;
+		bool Enabled = false;
 
 		virtual void BindShadowMapResources() = 0;
 		virtual void BindShadowMapResources(GL::CommandBuffer & cmdBuffer) = 0;

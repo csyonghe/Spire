@@ -27,9 +27,9 @@ DEALINGS IN THE SOFTWARE.
 WARNING: This is an automatically generated file.
 ***********************************************************************/
 #include "Basic.h"
-#include "Graphics.h"
 #include "Imaging.h"
 #include "WinForm.h"
+#include "LibUI.h"
 
 /***********************************************************************
 NVCOMMANDLIST.H

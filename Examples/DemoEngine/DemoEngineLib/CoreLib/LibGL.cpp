@@ -609,13 +609,7 @@ namespace GraphicsUI
 		}
 		void DrawText(const CoreLib::String & text, int X, int Y)
 		{
-			RECT R;
-			R.left = X;
-			R.top = Y;
-			R.right = X + 10240;
-			R.bottom = 1024;
-			::DrawText(Handle, text.Buffer(), text.Length(), &R, DT_SINGLELINE | DT_EDITCONTROL);
-			//(::TextOut(Handle, X, Y, text.Buffer(), text.Length()));
+			(::TextOut(Handle, X, Y, text.Buffer(), text.Length()));
 		}
 		/*int DrawText(const CoreLib::String & text, int X, int Y, int W)
 		{

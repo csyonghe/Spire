@@ -63,7 +63,7 @@ namespace SceneViewer
 				compLbl->Posit(0, 0, 100, 30);
 				compLbl->SetText(comp);
 				int x, y;
-				if (curX > leftMargin && curX + compLbl->GetWidth() + EM(0.5f) < columnWidth)
+				if (curX > leftMargin && curX + compLbl->GetWidth() + EM(0.5f) < EM(columnWidth))
 				{
 					x = curX;
 				}

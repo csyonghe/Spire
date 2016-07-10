@@ -91,6 +91,9 @@
     <ClInclude Include="CoreLib\glew\wglew.h">
       <Filter>CoreLib\glew</Filter>
     </ClInclude>
+    <ClInclude Include="CoreLib\LibUI.h">
+      <Filter>CoreLib</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ModelResource.cpp">
@@ -161,6 +164,9 @@
     </ClCompile>
     <ClCompile Include="CoreLib\glew\glew.c">
       <Filter>CoreLib\glew</Filter>
+    </ClCompile>
+    <ClCompile Include="CoreLib\LibUI.cpp">
+      <Filter>CoreLib</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

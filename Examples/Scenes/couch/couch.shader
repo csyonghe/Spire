@@ -15,7 +15,7 @@ shader Couch
     
     inline vec3 mask = texture(maskMap, vert_uv).xyz;
     
-    vec3 Normal
+    @(precomputeUniform, precomputeTex, fs) vec3 Normal
     {
         vec2 macroNormalCoord = vert_uv * 0.372;
         vec3 macroNormal = (texture(leatherNormalMap, macroNormalCoord).xyz*2.0-vec3(1.0,1.0,1.0)) * vec3(0.274,0.274, 0.0);
@@ -27,12 +27,12 @@ shader Couch
     inline vec3 specTex = texture(leatherSpecularMap, normalCoord).xyz;
     inline float wearFactor = mask.z * 0.381;
     
-    float Roughness = mix(mix(mix(0.2, mix(mix(0.659,2.01, specTex.x), 
+    @(precomputeUniform, precomputeTex, fs) float Roughness = mix(mix(mix(0.2, mix(mix(0.659,2.01, specTex.x), 
                                 -0.154, wearFactor), mask.x), 0.0, mask.y), 0.0, aoTex.y);
     float Metallic = mix(0.5,0.1, specTex.x);
     float Specular = 1.0;
     [RGB8]
-    vec3 Albedo
+    @(precomputeUniform, precomputeTex, fs) vec3 Albedo
     {
         float ao = aoTex.x;
         vec3 Color1 = vec3(0.0,0.0,0.0);

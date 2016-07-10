@@ -3,6 +3,7 @@
 
 #include "CoreLib/WinForm.h"
 #include "CoreLib/Graphics.h"
+#include "CoreLib/LibUI.h"
 #include "CoreLib/LibGL.h"
 #include "Spire.h"
 

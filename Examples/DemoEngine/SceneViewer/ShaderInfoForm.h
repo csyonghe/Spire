@@ -2,7 +2,7 @@
 #define SHADER_INFO_FORM_H
 
 #include "CoreLib/WinForm.h"
-#include "CoreLib/Graphics.h"
+#include "CoreLib/LibUI.h"
 #include "Spire.h"
 
 using namespace CoreLib::WinForm;
