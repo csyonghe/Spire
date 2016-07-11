@@ -101,5 +101,8 @@
     <ClCompile Include="Closure.cpp">
       <Filter>Front End</Filter>
     </ClCompile>
+    <ClCompile Include="SpirVCodeGen.cpp">
+      <Filter>Back End</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

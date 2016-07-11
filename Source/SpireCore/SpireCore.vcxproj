@@ -255,6 +255,7 @@
     <ClCompile Include="ShaderCompiler.cpp" />
     <ClCompile Include="Parser.cpp" />
     <ClCompile Include="SemanticsVisitor.cpp" />
+    <ClCompile Include="SpirVCodeGen.cpp" />
     <ClCompile Include="SymbolTable.cpp" />
     <ClCompile Include="StdInclude.cpp" />
     <ClCompile Include="Syntax.cpp" />

@@ -307,7 +307,7 @@ namespace Spire
 			Token Name;
 			StructField()
 			{}
-			virtual void Accept(SyntaxVisitor * visitor);
+			virtual void Accept(SyntaxVisitor * visitor) override;
 			virtual StructField * Clone(CloneContext & ctx) override
 			{
 				auto rs = CloneSyntaxNodeFields(new StructField(*this), ctx);
@@ -321,7 +321,7 @@ namespace Spire
 		public:
 			List<RefPtr<StructField>> Fields;
 			Token Name;
-			virtual void Accept(SyntaxVisitor * visitor);
+			virtual void Accept(SyntaxVisitor * visitor) override;
 			int FindField(String name)
 			{
 				for (int i = 0; i < Fields.Count(); i++)

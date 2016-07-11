@@ -411,6 +411,7 @@ namespace Spire
 			ShaderCompilerImpl()
 			{
 				backends.Add(L"glsl", CreateGLSLCodeGen());
+				backends.Add(L"spirv", CreateSpirVCodeGen());
 			}
 		};
 
