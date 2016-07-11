@@ -187,6 +187,7 @@
   <ItemGroup>
     <ClInclude Include="ChoiceControl.h" />
     <ClInclude Include="DemoRecording.h" />
+    <ClInclude Include="PerformanceForm.h" />
     <ClInclude Include="ShaderEditorForm.h" />
     <ClInclude Include="ShaderInfoForm.h" />
   </ItemGroup>

@@ -48,9 +48,10 @@ module TangentSpaceTransform
     require vec3 vNormal;
     require vec3 vTangent;
     require vec3 vBiTangent;
-    public vec3 normal = normalize(normal_in.x * vTangent 
-        + normal_in.y * vBiTangent 
-        + normal_in.z * vNormal);
+    inline vec3 signed_n = normal_in * 2.0 - 1.0;
+    public vec3 normal = normalize(signed_n.x * vTangent 
+        + signed_n.y * vBiTangent 
+        + signed_n.z * vNormal);
 }
 
 extern float computeShadow(vec3 worldPos);
@@ -180,7 +181,9 @@ module Footer
     require vec3 lightColor;
     require vec3 cameraPos;
     using normalTransform = TangentSpaceTransform(Normal);
-    using lighting = Lighting(normalTransform.normal, Albedo, vec3(Roughness, Metallic, Specular));
+    [Storage:"RGB8"]
+    vec3 lightParam = vec3(Roughness, Metallic, Specular);
+    using lighting = Lighting(normalTransform.normal, Albedo, lightParam);
     public float opacity = 1.0;
     
     float fog

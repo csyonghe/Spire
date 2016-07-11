@@ -31,6 +31,9 @@
     <ClInclude Include="ShaderEditorForm.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="PerformanceForm.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Manifest Include="SceneViewer.exe.manifest" />

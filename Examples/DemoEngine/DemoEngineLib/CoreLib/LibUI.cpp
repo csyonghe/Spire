@@ -2509,6 +2509,8 @@ namespace GraphicsUI
 		{
 			auto checkCtrl = [&](Control * ctrl) -> Control*
 			{
+				if (!ctrl->Visible)
+					return nullptr;
 				int dx = 0;
 				int dy = 0;
 				if (ctrl->DockStyle == dsNone || ctrl->DockStyle == dsFill)

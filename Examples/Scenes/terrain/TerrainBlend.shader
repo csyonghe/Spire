@@ -119,13 +119,14 @@ shader TerrainBlend
     vec3 Albedo = baseColor;
  
     [TextureResolution: "32"]
+    [Storage:"RGB8"]
 	vec3 Normal
     {
         vec3 ground_rock_n = texture(ground_pebble_Nmap, vert_pos.xz * groundRockTiling).xyz;
         vec3 rockGrassN = mix(rock.Normal, grass.Normal, rockGrass_mixFactor);
         vec3 terrainBlendN = mix(rockGrassN, soil.Normal, ground_soild_mixFactor);
         vec3 terrainSnowBlendN = mix(terrainBlendN, snow.Normal, snow_mixFactor);
-        return mix(ground_rock_n, terrainSnowBlendN, ground_rock_mixFactor)*2.0 - 1.0;
+        return mix(ground_rock_n, terrainSnowBlendN, ground_rock_mixFactor);
     }
 	
     [Storage:"R8"]

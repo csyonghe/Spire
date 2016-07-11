@@ -20,7 +20,7 @@ shader Couch
         vec2 macroNormalCoord = vert_uv * 0.372;
         vec3 macroNormal = (texture(leatherNormalMap, macroNormalCoord).xyz*2.0-vec3(1.0,1.0,1.0)) * vec3(0.274,0.274, 0.0);
         vec3 leatherNormal = (texture(leatherNormalMap, normalCoord).xyz*2.0-vec3(1.0,1.0,1.0)) * vec3(1.0,1.0,0.0);
-        return normalize(texture(baseNormalMap, vert_uv).xyz*2.0-vec3(1.0,1.0,1.0) + (leatherNormal + macroNormal)*mask.x);
+        return normalize(texture(baseNormalMap, vert_uv).xyz*2.0-vec3(1.0,1.0,1.0) + (leatherNormal + macroNormal)*mask.x) * 0.5 + 0.5;
     }
     
     inline vec3 aoTex = texture(aoMap, vert_uv).xyz;

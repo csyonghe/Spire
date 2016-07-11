@@ -8,6 +8,7 @@
 #include "DemoRecording.h"
 #include "ShaderInfoForm.h"
 #include "ShaderEditorForm.h"
+#include "PerformanceForm.h"
 
 using namespace CoreLib::WinForm;
 using namespace CoreLib::Diagnostics;
@@ -32,6 +33,7 @@ namespace SceneViewer
 		ChoiceForm * choiceForm = nullptr;
 		ShaderInfoForm * shaderInfoForm = nullptr;
 		ShaderEditorForm * shaderEditorForm = nullptr;
+		PerformanceForm * perfForm = nullptr;
 		RefPtr<CameraCurve> curveRecording;
 		String currentView = L"color";
 		CameraControl camera;
@@ -110,6 +112,10 @@ namespace SceneViewer
 			shaderInfoMenu->SetText(L"Shader &Info");
 			shaderInfoMenu->OnClick.Bind(this, &MainForm::ShaderInfoViewMenu_Clicked);
 			shaderInfoMenu->SetShortcutText(L"F3");
+			auto perfMenu = new MenuItem(viewMenu);
+			perfMenu->SetText(L"&Performance");
+			perfMenu->SetShortcutText(L"F4");
+			perfMenu->OnClick.Bind(this, &MainForm::PerfMenu_Clicked);
 			(new MenuItem(viewMenu))->SetType(WinForm::MenuItem::mitSeperator);
 			auto toggleFoveatedMenu = new MenuItem(viewMenu);
 			toggleFoveatedMenu->SetText(L"Toggle &Foveated Rendering");
@@ -130,6 +136,8 @@ namespace SceneViewer
 			this->RegisterAccel(Accelerator(0, VK_F1), commandMenu);
 			this->RegisterAccel(Accelerator(0, VK_F2), choiceExplorerMenu);
 			this->RegisterAccel(Accelerator(0, VK_F3), shaderInfoMenu);
+			this->RegisterAccel(Accelerator(0, VK_F4), perfMenu);
+
 
 
 			this->RegisterAccel(Accelerator(Accelerator::Ctrl, L'O'), openMenu);
@@ -153,6 +161,8 @@ namespace SceneViewer
 			shaderEditorForm = new ShaderEditorForm(uiEntry.Ptr(), uiSystemInterface->LoadFont(GraphicsUI::Font(L"Consolas", 13)));
 			shaderEditorForm->OnShaderChange.Bind(this, &MainForm::ShaderChanged);
 			uiEntry->CloseWindow(shaderEditorForm);
+
+			perfForm = new PerformanceForm(uiEntry.Ptr(), uiSystemInterface.Ptr());
 		}
 
 		void OnCommandOutput(const String & /*text*/)
@@ -222,6 +232,11 @@ namespace SceneViewer
 		void ConsoleViewMenu_Clicked(Object * , EventArgs )
 		{
 			uiEntry->ShowWindow(cmdForm);
+		}
+
+		void PerfMenu_Clicked(Object *, EventArgs)
+		{
+			uiEntry->ShowWindow(perfForm);
 		}
 
 		void ShaderInfoViewMenu_Clicked(Object *, EventArgs)
@@ -803,7 +818,7 @@ namespace SceneViewer
 						static auto timePointP = PerformanceCounter::Start();
 						float dtimeP = (float)PerformanceCounter::ToSeconds(PerformanceCounter::End(timePointP)) * (1.0f / 128);
 						timePointP = PerformanceCounter::Start();
-						SetText(L"Scene Viewer - " + String(dtimeP*1000.0f, L"%.2g").PadLeft(L' ', 7) + L"ms");
+						perfForm->Update(dtimeP*1000.0f);
 					}
 				}
 				else
