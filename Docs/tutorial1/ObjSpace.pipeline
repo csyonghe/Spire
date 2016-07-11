@@ -34,7 +34,7 @@ pipeline ObjSpacePipeline
     // declared as standard "out" terms in the generated shader, and informs the compiler
     // that the output of this world would be stored in textures.
     [InterfaceBlock: "ObjSpaceInput:5"]
-    world objSurface : "glsl" export fragmentExport;
+    world objSurface : "glsl(bindless_texture)" export fragmentExport;
     
     // vs world: correpond to vertex shader for the full resolution shading phase.
     // the "command_list" option informs the compiler that the shader will be used along with

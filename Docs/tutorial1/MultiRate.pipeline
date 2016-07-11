@@ -35,7 +35,7 @@ pipeline MultiRatePipeline
     // declared as standard "out" terms in the generated shader, and informs the compiler
     // that the output of this world would be stored in textures.
     [InterfaceBlock: "ObjSpaceInput:5"]
-    world objSurface : "glsl;bindless_texture" export fragmentExport;
+    world objSurface : "glsl(bindless_texture)" export fragmentExport;
     
     // lowResVs world: the vertex shader for half resolution rendering phase.
     world lowResVs : "glsl(vertex:projCoord;command_list;bindless_texture)" using projCoord export standardExport;
