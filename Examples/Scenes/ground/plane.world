@@ -1,8 +1,6 @@
 mesh "plane.vtx"
 {
-	shader "Plane_BaseMaterialHQ.cse" src "plane.shader", 0.0
-	shader "Plane_BaseMaterialLod1.cse" src "plane.shader", 100.0
-	shader "Plane_BaseMaterialLod2.cse" src "plane.shader", 200.0
+	shader "Plane.cse" src "plane.shader", 0.0
     
 	instance
 	{
