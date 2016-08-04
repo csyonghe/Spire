@@ -19,6 +19,7 @@ namespace SceneViewer
 		virtual List<Spire::Compiler::ShaderChoice> GetChoices(String shader, const EnumerableDictionary<String, Spire::Compiler::ShaderChoiceValue> & existingChoices) = 0;
 		virtual void RecompileShader(String shader, const String & schedule) = 0;
 		virtual GL::Texture2D RenderFrame() = 0;
+		virtual void UpdateWindow() = 0;
 		virtual EnumerableDictionary<String, GL::Texture2D> GetPrecomputedTextures(String shader) = 0;
 	};
 

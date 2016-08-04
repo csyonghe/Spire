@@ -464,12 +464,22 @@ namespace CoreLib
 			lexer.Parse(cmdLine, stream);
 		}
 	
-		String CommandLineParser::GetFileName()
+		String CommandLineParser::GetFileName(bool ignoreFirst)
 		{
-			if (stream.Count() && stream.FirstNode()->Value.TypeID != 1)
-				return stream.FirstNode()->Value.Str;
+			if (ignoreFirst)
+			{
+				if (stream.Count() > 1 && stream.FirstNode()->GetNext()->Value.TypeID == 1)
+					return stream.FirstNode()->GetNext()->Value.Str;
+				else
+					return L"";
+			}
 			else
-				return L"";
+			{
+				if (stream.Count() && stream.FirstNode()->Value.TypeID != 1)
+					return stream.FirstNode()->Value.Str;
+				else
+					return L"";
+			}
 		}
 
 		bool CommandLineParser::OptionExists(const String & opt)

@@ -8,26 +8,29 @@ shader Ocean
     // ray 
     inline vec3 ori = cameraPos;
     inline vec3 dir = -view;
-    
+    inline int iterGeom : lq = 0;
+    inline int iterGeom : hq = 3;
+    inline int iterDetail :lq = 2;
+    inline int iterDetail : hq = 5;
+   
     // tracing
-    [TextureResolution:"2048"]    
     vec3 p
     {
         int NUM_STEPS = 8;
         vec3 rs;
         float tm = 0.0;
         float tx = 2000.0;    
-        float hx = map(ori + dir * tx, time);
+        float hx = map(ori + dir * tx, time, iterGeom);
         if(hx > 0.0) 
             rs = ori + dir * tx;
         else
         {
-            float hm = map(ori + dir * tm, time);    
+            float hm = map(ori + dir * tm, time, iterGeom);    
             float tmid = 0.0;
             for(int i = 0:1:NUM_STEPS) {
                 tmid = mix(tm,tx, hm/(hm-hx));                   
                 rs = ori + dir * tmid;                   
-                float hmid = map(rs, time);
+                float hmid = map(rs, time, iterGeom);
                 if(hmid < 0.0) {
                     tx = tmid;
                     hx = hmid;
@@ -43,7 +46,7 @@ shader Ocean
     vec3 dist = p - ori;
     float EPSILON_NRM	= 0.00005;
     [TextureResolution:"2048"]    
-    vec3 n = getNormal(p, dot(dist,dist) * EPSILON_NRM, time);
+    vec3 n = getNormal(p, dot(dist,dist) * EPSILON_NRM, time, iterDetail);
     vec3 light = normalize(vec3(0.0,1.0,0.8)); 
              
     // color
@@ -59,7 +62,7 @@ shader Ocean
     [DepthOutput]
     out @fs float depthOut = (terrainProjPos.z/terrainProjPos.w)*0.5 + 0.5;
     float opacity = 1.0;
-    vec4 outputColor = waterColor;
+    vec4 outputColor = waterColor;//vec4(length(p-cameraPos)*0.011, p.y*0.7,0.0,1.0);//vec4(n.xzy*0.5 + 0.5, 1.0);//waterColor;
     
 }
 
@@ -105,11 +108,11 @@ float sea_octave(vec2 uv, float choppy) {
     return pow(1.0-pow(wv.x * wv.y,0.65),choppy);
 }
 
-float map(vec3 p, float seaTime) {
+float map(vec3 p, float seaTime, int iterGeom) {
     float SEA_FREQ = 0.16;
     float SEA_HEIGHT = 0.6;
     float SEA_CHOPPY = 4.0;
-    int ITER_GEOMETRY = 3; 
+    int ITER_GEOMETRY = iterGeom; 
     
     float freq = SEA_FREQ;
     float amp = SEA_HEIGHT;
@@ -129,11 +132,11 @@ float map(vec3 p, float seaTime) {
     return p.y - h;
 }
 
-float map_detailed(vec3 p, float seaTime) {
+float map_detailed(vec3 p, float seaTime, int iterDetail) {
     float SEA_FREQ = 0.16;
     float SEA_HEIGHT = 0.6;
     float SEA_CHOPPY = 4.0;
-    int ITER_FRAGMENT = 5;
+    int ITER_FRAGMENT = iterDetail;
     
     float freq = SEA_FREQ;
     float amp = SEA_HEIGHT;
@@ -175,11 +178,11 @@ vec3 getSeaColor(vec3 p, vec3 n, vec3 l, vec3 eye, vec3 dist) {
 }
 
 // tracing
-vec3 getNormal(vec3 p, float eps, float seaTime) {
+vec3 getNormal(vec3 p, float eps, float seaTime, int iterDetail) {
     vec3 n;
-    n.y = map_detailed(p, seaTime);    
-    n.x = map_detailed(vec3(p.x+eps,p.y,p.z), seaTime) - n.y;
-    n.z = map_detailed(vec3(p.x,p.y,p.z+eps), seaTime) - n.y;
+    n.y = map_detailed(p, seaTime, iterDetail);    
+    n.x = map_detailed(vec3(p.x+eps,p.y,p.z), seaTime, iterDetail) - n.y;
+    n.z = map_detailed(vec3(p.x,p.y,p.z+eps), seaTime, iterDetail) - n.y;
     n.y = eps;
     return normalize(n);
 }

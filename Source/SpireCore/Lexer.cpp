@@ -27,7 +27,7 @@ namespace Spire
 					ch == L'!' || ch == L'^' || ch == L'&' || ch == L'(' || ch == L')' ||
 					ch == L'=' || ch == L'{' || ch == L'}' || ch == L'[' || ch == L']' ||
 					ch == L'|' || ch == L';' || ch == L',' || ch == L'.' || ch == L'<' ||
-					ch == L'>' || ch == L'~' || ch == L'@' || ch == L':';
+					ch == L'>' || ch == L'~' || ch == L'@' || ch == L':' || ch == L'?';
 		}
 
 		TokenType GetKeywordTokenType(const String & str)
@@ -163,6 +163,10 @@ namespace Spire
 						InsertToken(TokenType::OpBitAnd, L"&");
 						pos++;
 					}
+					break;
+				case L'^':
+					InsertToken(TokenType::OpBitXor, L"^");
+					pos++;
 					break;
 				case L'>':
 					if (nextChar == L'>')

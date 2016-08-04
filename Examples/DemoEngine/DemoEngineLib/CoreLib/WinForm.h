@@ -328,7 +328,7 @@ namespace CoreLib
 			LexStream stream;
 		public:
 			CommandLineParser(const String & cmdLine);
-			String GetFileName();
+			String GetFileName(bool ignoreFirst = false);
 			bool OptionExists(const String & opt);
 			String GetOptionValue(const String & opt);
 			String GetToken(int id);

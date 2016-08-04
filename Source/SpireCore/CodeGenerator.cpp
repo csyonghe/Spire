@@ -600,7 +600,7 @@ namespace Spire
 			}
 			virtual void VisitDoWhileStatement(DoWhileStatementSyntaxNode* stmt) override
 			{
-				RefPtr<WhileInstruction> instr = new DoInstruction();
+				RefPtr<DoInstruction> instr = new DoInstruction();
 				variables.PushScope();
 				codeWriter.PushNode();
 				stmt->Predicate->Accept(this);
@@ -718,7 +718,7 @@ namespace Spire
 				auto v0 = PopStack();
 				expr->Expr1->Accept(this);
 				auto v1 = PopStack();
-				codeWriter.Select(predOp, v0, v1);
+				PushStack(codeWriter.Select(predOp, v0, v1));
 			}
 			ILOperand * EnsureBoolType(ILOperand * op, ExpressionType type)
 			{

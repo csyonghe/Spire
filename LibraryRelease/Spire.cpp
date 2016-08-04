@@ -1183,7 +1183,7 @@ namespace Spire
 			}
 			virtual void VisitDoWhileStatement(DoWhileStatementSyntaxNode* stmt) override
 			{
-				RefPtr<WhileInstruction> instr = new DoInstruction();
+				RefPtr<DoInstruction> instr = new DoInstruction();
 				variables.PushScope();
 				codeWriter.PushNode();
 				stmt->Predicate->Accept(this);
@@ -1301,7 +1301,7 @@ namespace Spire
 				auto v0 = PopStack();
 				expr->Expr1->Accept(this);
 				auto v1 = PopStack();
-				codeWriter.Select(predOp, v0, v1);
+				PushStack(codeWriter.Select(predOp, v0, v1));
 			}
 			ILOperand * EnsureBoolType(ILOperand * op, ExpressionType type)
 			{
@@ -3874,7 +3874,7 @@ namespace Spire
 					ch == L'!' || ch == L'^' || ch == L'&' || ch == L'(' || ch == L')' ||
 					ch == L'=' || ch == L'{' || ch == L'}' || ch == L'[' || ch == L']' ||
 					ch == L'|' || ch == L';' || ch == L',' || ch == L'.' || ch == L'<' ||
-					ch == L'>' || ch == L'~' || ch == L'@' || ch == L':';
+					ch == L'>' || ch == L'~' || ch == L'@' || ch == L':' || ch == L'?';
 		}
 
 		TokenType GetKeywordTokenType(const String & str)
@@ -4010,6 +4010,10 @@ namespace Spire
 						InsertToken(TokenType::OpBitAnd, L"&");
 						pos++;
 					}
+					break;
+				case L'^':
+					InsertToken(TokenType::OpBitXor, L"^");
+					pos++;
 					break;
 				case L'>':
 					if (nextChar == L'>')
@@ -8261,13 +8265,7 @@ namespace Spire
 						// in the second pass, examine all the rest definitions
 						for (auto & depWorld : depWorlds)
 						{
-							bool isPinned = false;
-							for (auto existingDef : dep->Type->PinnedWorlds)
-								if (existingDef.StartsWith(depWorld))
-								{
-									isPinned = true;
-									break;
-								}
+							bool isPinned = dep->Type->PinnedWorlds.Contains(depWorld);
 							if ((pass == 0 && !isPinned) || (pass == 1 && isPinned)) continue;
 							ComponentDefinitionIR * depDef;
 							if (depDefs.TryGetValue(depWorld, depDef))

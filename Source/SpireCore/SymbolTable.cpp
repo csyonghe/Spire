@@ -394,13 +394,7 @@ namespace Spire
 						// in the second pass, examine all the rest definitions
 						for (auto & depWorld : depWorlds)
 						{
-							bool isPinned = false;
-							for (auto existingDef : dep->Type->PinnedWorlds)
-								if (existingDef.StartsWith(depWorld))
-								{
-									isPinned = true;
-									break;
-								}
+							bool isPinned = dep->Type->PinnedWorlds.Contains(depWorld);
 							if ((pass == 0 && !isPinned) || (pass == 1 && isPinned)) continue;
 							ComponentDefinitionIR * depDef;
 							if (depDefs.TryGetValue(depWorld, depDef))

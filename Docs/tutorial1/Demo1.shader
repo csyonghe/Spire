@@ -36,7 +36,7 @@ shader Demo1Shader
     // here we require the mesh provides a unique parameterization stored in vert_uv
     vec4 texSpaceVert = vec4(vert_uv*2.0 - vec2(1.0), 0.0, 1.0);                    
     
-    vec2 uv = vert_uv * 4.0; // tile the texture
+    vec2 uv = vert_uv * 2.0; // tile the texture
     vec3 albedo = texture(ground_pebble_map, uv).xyz;
     
     // compute normal from normal map

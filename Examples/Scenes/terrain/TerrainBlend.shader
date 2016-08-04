@@ -111,14 +111,14 @@ shader TerrainBlend
         vec3 terrainSnowBlendAlbedo = mix(terrainBlend, snow.Albedo, snow_mixFactor);
         return mix(ground_rock_albedo, terrainSnowBlendAlbedo, ground_rock_mixFactor);
 	}
-    [TextureResolution: "64"]
+    [TextureResolution: "128"]
     [Storage:"RGB8"]
     @precomputeTex vec3 Albedo = baseColor*1.16;
     @precomputeUniform vec3 Albedo = baseColor * 1.15;
     @lqfs vec3 Albedo = baseColor*1.16;
     vec3 Albedo = baseColor;
  
-    [TextureResolution: "32"]
+    [TextureResolution: "128"]
     [Storage:"RGB8"]
 	vec3 Normal
     {

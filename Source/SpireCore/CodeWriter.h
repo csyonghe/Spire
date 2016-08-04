@@ -48,9 +48,11 @@ namespace Spire
 				else
 					Store(dest, Load(src));
 			}
-			void Select(ILOperand * cond, ILOperand * v0, ILOperand * v1)
+			ILOperand * Select(ILOperand * cond, ILOperand * v0, ILOperand * v1)
 			{
-				cfgNode.Last()->InsertTail(new SelectInstruction(cond, v0, v1));
+				auto rs = new SelectInstruction(cond, v0, v1);
+				cfgNode.Last()->InsertTail(rs);
+				return rs;
 			}
 			ILOperand * BitAnd(ILOperand * v0, ILOperand * v1)
 			{

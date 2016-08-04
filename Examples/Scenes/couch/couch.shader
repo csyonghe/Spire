@@ -48,6 +48,18 @@ shader Couch
             Color3, mask.y), SeamColor, aoTex.y) * ao;
     }
     
-    using Footer;
+    using normalTransform = TangentSpaceTransform(Normal);
+    @(precomputeUniform, precomputeTex, fs) vec3 surfaceMaterial = vec3(Roughness, Metallic, Specular);
+    using lighting = Lighting(normalTransform.normal, Albedo, surfaceMaterial);
+    public float opacity = 1.0;
+    
+    float fog
+    {
+        float fogDensity = 0.0002;
+        float viewDist = length(cameraPos - pos);
+        return 1.0/exp2(viewDist*fogDensity);
+    }
+    vec4 fogColor = vec4(0.54, 0.58, 0.67, 1.0);
+    public vec4 outputColor = mix(fogColor, vec4(lighting.result, opacity), fog);
 }
 

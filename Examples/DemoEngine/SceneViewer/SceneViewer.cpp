@@ -132,6 +132,19 @@ namespace SceneViewer
 			freezeTimeMenu->SetShortcutText(L"F");
 			freezeTimeMenu->OnClick.Bind(this, &MainForm::FreezeTimeMenu_Clicked);
 
+			auto demoMenu = new MenuItem(mainMenu);
+			demoMenu->SetText(L"&Demo");
+
+			auto demo1Menu = new MenuItem(demoMenu);
+			demo1Menu->SetText(L"Demo &1");
+			demo1Menu->OnClick.Bind([this](auto, auto) {LoadDemo1(); });
+			auto demo2Menu = new MenuItem(demoMenu);
+			demo2Menu->SetText(L"Demo &2");
+			demo2Menu->OnClick.Bind([this](auto, auto) {LoadDemo2(); });
+			auto demo3Menu = new MenuItem(demoMenu);
+			demo3Menu->SetText(L"Demo &3");
+			demo3Menu->OnClick.Bind([this](auto, auto) {LoadDemo3(); });
+
 			this->SetMainMenu(mainMenu);
 			this->RegisterAccel(Accelerator(0, VK_F1), commandMenu);
 			this->RegisterAccel(Accelerator(0, VK_F2), choiceExplorerMenu);
@@ -152,6 +165,7 @@ namespace SceneViewer
 			cmdForm->OnCommand.Bind(this, &MainForm::OnCommand);
 			cmdForm->Left = 10;
 			cmdForm->Top = GetClientHeight() - 80;
+			uiEntry->CloseWindow(cmdForm);
 			cmdWriter = new GraphicsUI::UICommandLineWriter(cmdForm);
 			cmdWriter->OnWriteText.Bind(this, &MainForm::OnCommandOutput);
 			CoreLib::IO::SetCommandLineWriter(cmdWriter.Ptr());
@@ -171,6 +185,27 @@ namespace SceneViewer
 				MainLoop(this, EventArgs());
 		}
 
+		void LoadDemo1()
+		{
+			LoadScene(L"Scenes/ocean/ocean.world");
+		}
+
+		void LoadDemo2()
+		{
+			LoadScene(L"Scenes/terrain/terrain.world");
+		}
+
+		void LoadDemo3()
+		{
+			LoadScene(L"Scenes/couch/couch_autotuneDemo.world");
+		}
+
+		void UpdateShaderPerf()
+		{
+			if (scene)
+				perfForm->Update((float)MeasurePerformance());
+		}
+
 		void ShaderChanged()
 		{
 			if (scene)
@@ -188,6 +223,7 @@ namespace SceneViewer
 					shaderEditorForm->pnlStatus->SetText(L"Compilation failed. See command prompt for details.");
 					uiEntry->ShowWindow(cmdForm);
 				}
+				UpdateShaderPerf();
 			}
 		}
 
@@ -257,6 +293,10 @@ namespace SceneViewer
 			if (shaderInfoForm && scene)
 			{
 				shaderInfoForm->Update(scene->GetShaderMetaData(shaderName));
+			}
+			if (scene)
+			{
+				UpdateShaderPerf();
 			}
 		}
 
@@ -431,6 +471,7 @@ namespace SceneViewer
 					auto fileName = parser.ReadStringLiteral();
 					IO::BinaryReader reader(new IO::FileStream(fileName, IO::FileMode::Open));
 					reader.Read(&camera.Cam, 1);
+					UpdateShaderPerf();
 				}
 				else if (parser.LookAhead(L"newrec"))
 				{
@@ -663,6 +704,10 @@ namespace SceneViewer
 				{
 					FreezeTimeMenu_Clicked(freezeTimeMenu, EventArgs());
 				}
+				if (GetAsyncKeyState('R') || GetAsyncKeyState(L'r'))
+				{
+					time = 0.0f;
+				}
 				if (GetAsyncKeyState('P') || GetAsyncKeyState(L'p'))
 				{
 					PrintPerformance();
@@ -699,7 +744,7 @@ namespace SceneViewer
 				choiceForm->Update();
 			SetCursor(LoadCursor(NULL, IDC_ARROW));
 			InitViews();
-			OnCommand(L"loadcam \"cam0.cam\"");
+			OnCommand(L"loadcam " + CoreLib::Text::Parser::EscapeStringLiteral(Path::Combine(Path::GetDirectoryName(fileName), L"cam0.cam")));
 		}
 		void InitViews()
 		{
@@ -757,17 +802,26 @@ namespace SceneViewer
 		}
 		double MeasurePerformance()
 		{
-			for (int i = 0; i < 10; i++)
-				MainLoop(nullptr, EventArgs());
-			LARGE_INTEGER start, end, freq;
-			QueryPerformanceCounter(&start);
-			for (int i = 0; i < 100; i++)
-				MainLoop(nullptr, EventArgs());
-			QueryPerformanceCounter(&end);
-			QueryPerformanceFrequency(&freq);
-			double vtime = (end.QuadPart - start.QuadPart) / (double)freq.QuadPart * 10.0;
-			printf("%lf\n", vtime);
-			return vtime;
+			double rs = 10000.0f;
+			for (int p = 0; p < 25; p++)
+			{
+				RenderFrame();
+				glFinish();
+			}
+			for (int p = 0; p < 10; p++)
+			{
+				LARGE_INTEGER start, end, freq;
+				glFinish();
+				QueryPerformanceCounter(&start);
+				for (int i = 0; i < 10; i++)
+					RenderFrame();
+				glFinish();
+				QueryPerformanceCounter(&end);
+				QueryPerformanceFrequency(&freq);
+				double vtime = (end.QuadPart - start.QuadPart) / (double)freq.QuadPart * 100.0;
+				rs = Math::Min(rs, vtime);
+			}
+			return rs;
 		}
 		void RenderTargetItemMenu_Clicked(Object * sender, EventArgs e)
 		{
@@ -779,6 +833,10 @@ namespace SceneViewer
 			view.FOV = FOV;
 			view.zMin = nearPlane;
 			view.zMax = 40000.0f;
+		}
+		void UpdateWindow() override
+		{
+			glContext->SwapBuffers();
 		}
 		GL::Texture2D RenderFrame() override
 		{
@@ -798,6 +856,7 @@ namespace SceneViewer
 		}
 		void MainLoop(Object *, EventArgs e)
 		{
+			static float frameRenderTime = 0.0f;
 			static float dtime = 0.0f;
 			static auto timePoint = PerformanceCounter::Start();
 			dtime = (float)PerformanceCounter::ToSeconds(PerformanceCounter::End(timePoint));
@@ -811,15 +870,6 @@ namespace SceneViewer
 				if (scene)
 				{
 					RenderFrame();
-					static int frames = 0;
-					frames++;
-					if ((frames & 127) == 0)
-					{
-						static auto timePointP = PerformanceCounter::Start();
-						float dtimeP = (float)PerformanceCounter::ToSeconds(PerformanceCounter::End(timePointP)) * (1.0f / 128);
-						timePointP = PerformanceCounter::Start();
-						perfForm->Update(dtimeP*1000.0f);
-					}
 				}
 				else
 				{
@@ -867,20 +917,23 @@ namespace SceneViewer
 		}
 	};
 }
-
-int CALLBACK wWinMain(
-	_In_ HINSTANCE hInstance,
-	_In_ HINSTANCE hPrevInstance,
-	_In_ LPWSTR     lpCmdLine,
-	_In_ int       nCmdShow
-)
+//
+//int CALLBACK wWinMain(
+//	_In_ HINSTANCE hInstance,
+//	_In_ HINSTANCE hPrevInstance,
+//	_In_ LPWSTR     lpCmdLine,
+//	_In_ int       nCmdShow
+//)
+//{
+//	Application::Init(hInstance, hPrevInstance, lpCmdLine, nCmdShow);
+int main()
 {
-	Application::Init(hInstance, hPrevInstance, lpCmdLine, nCmdShow);
+	Application::Init();
 	try
 	{
 		String sceneName;
-		CommandLineParser cmdParser(lpCmdLine);
-		sceneName = cmdParser.GetFileName();
+		CommandLineParser cmdParser(GetCommandLine());
+		sceneName = cmdParser.GetFileName(true);
 		
 		auto form = new SceneViewer::MainForm(L"");
 		if (sceneName.Length())

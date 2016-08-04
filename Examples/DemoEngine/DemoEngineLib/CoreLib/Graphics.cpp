@@ -212,7 +212,7 @@ namespace CoreLib
 						}
 					}
 					else if (word == L"MESH_MTLID")
-						f.MaterialId = parser.ReadInt();
+						f.MaterialId = parser.ReadInt() - 1;
 					else if (word == L"MESH_FACE")
 					{
 						parser.Back(2);

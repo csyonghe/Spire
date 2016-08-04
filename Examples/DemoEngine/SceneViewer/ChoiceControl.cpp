@@ -225,8 +225,9 @@ namespace SceneViewer
 				choiceControl->RecompileShader(currentShaderName, schedule);
 				// render 1000 frames and measure time
 				float minTime = 1e30f;
-				for (int f = 0; f < 5; f++)
+				for (int f = 0; f < 20; f++)
 				{
+					glFinish();
 					auto timeP = CoreLib::Diagnostics::PerformanceCounter::Start();
 					for (int i = 0; i < 10; i++)
 					{
@@ -238,6 +239,9 @@ namespace SceneViewer
 					if (time < minTime)
 						minTime = time;
 				}
+
+
+				choiceControl->UpdateWindow();
 				auto frameData = ReadFrameData(choiceControl->RenderFrame());
 				float error = MeasureError(referenceFrame, frameData);
 				float value = 0;
@@ -293,6 +297,7 @@ namespace SceneViewer
 			}
 			disableChoiceChangeCapture = false;
 			Recompile();
+			ShaderChanged(currentShaderName);
 		}
 			
 	}

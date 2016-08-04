@@ -10,7 +10,7 @@ using namespace GL;
 using namespace Spire::Compiler;
 using namespace SpireLib;
 
-#define USE_COMMAND_LIST
+//#define USE_COMMAND_LIST
 
 namespace DemoEngine
 {
@@ -725,7 +725,7 @@ namespace DemoEngine
 				cellSpace = (float)parser.ReadDouble();
 				auto heightScale = (float)parser.ReadDouble();
 
-				terrain.Init(engine->GetHardwareRenderer(), cellSpace, heightScale, heightMap);
+				terrain.Init(engine->GetHardwareRenderer(), cellSpace, heightScale, Path::Combine(dir, heightMap));
 				
 				parser.Read(L"{");
 				while (!parser.LookAhead(L"}"))
@@ -787,7 +787,7 @@ namespace DemoEngine
 			{
 				DrawableInstance obj;
 				auto meshName = parser.ReadStringLiteral();
-				auto mesh = LoadMesh(meshName);
+				auto mesh = LoadMesh(Path::Combine(dir, meshName));
 				obj.Position.SetZero();
 				parser.Read(L"{");
 				while (!parser.LookAhead(L"}"))
@@ -906,7 +906,7 @@ namespace DemoEngine
 			}
 			else if (fieldName == L"sky")
 			{
-				background = new Background(engine, parser.ReadStringLiteral());
+				background = new Background(engine, Path::Combine(dir, parser.ReadStringLiteral()));
 			}
 		}
 
