@@ -734,6 +734,11 @@ namespace Spire
 					{
 						context.Body << L"continue;\n";
 					}
+					else if (instr.Is<DiscardInstruction>())
+					{
+						if (currentWorld->ExportOperator.Content == L"fragmentExport")
+							context.Body << L"discard;\n";
+					}
 					else
 						PrintInstr(context, instr);
 				}

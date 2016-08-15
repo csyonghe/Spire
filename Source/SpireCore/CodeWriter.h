@@ -125,6 +125,12 @@ namespace Spire
 				cfgNode.Last()->InsertTail(instr);
 				return instr;
 			}
+			DiscardInstruction * Discard()
+			{
+				auto instr = new DiscardInstruction();
+				cfgNode.Last()->InsertTail(instr);
+				return instr;
+			}
 			MemberUpdateInstruction * Update(ILOperand * dest, ILOperand * offset, ILOperand * value)
 			{
 				auto instr = new MemberUpdateInstruction(dest, offset, value);

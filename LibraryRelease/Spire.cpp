@@ -1317,7 +1317,10 @@ namespace Spire
 				else
 					return op;
 			}
-			
+			virtual void VisitDiscardStatement(DiscardStatementSyntaxNode *) override
+			{
+				codeWriter.Discard();
+			}
 			virtual void VisitVarDeclrStatement(VarDeclrStatementSyntaxNode* stmt) override
 			{
 				for (auto & v : stmt->Variables)
@@ -1395,18 +1398,23 @@ namespace Spire
 						rs = new OrInstruction();
 						break;
 					case Operator::BitAnd:
+					case Operator::AndAssign:
 						rs = new BitAndInstruction();
 						break;
 					case Operator::BitOr:
+					case Operator::OrAssign:
 						rs = new BitOrInstruction();
 						break;
 					case Operator::BitXor:
+					case Operator::XorAssign:
 						rs = new BitXorInstruction();
 						break;
 					case Operator::Lsh:
+					case Operator::LshAssign:
 						rs = new ShlInstruction();
 						break;
 					case Operator::Rsh:
+					case Operator::RshAssign:
 						rs = new ShrInstruction();
 						break;
 					case Operator::Eql:
@@ -1442,6 +1450,11 @@ namespace Spire
 					case Operator::MulAssign:
 					case Operator::DivAssign:
 					case Operator::ModAssign:
+					case Operator::LshAssign:
+					case Operator::RshAssign:
+					case Operator::AndAssign:
+					case Operator::OrAssign:
+					case Operator::XorAssign:
 					{
 						expr->LeftExpression->Access = ExpressionAccess::Write;
 						expr->LeftExpression->Accept(this);
@@ -3028,6 +3041,11 @@ namespace Spire
 					{
 						context.Body << L"continue;\n";
 					}
+					else if (instr.Is<DiscardInstruction>())
+					{
+						if (currentWorld->ExportOperator.Content == L"fragmentExport")
+							context.Body << L"discard;\n";
+					}
 					else
 						PrintInstr(context, instr);
 				}
@@ -3744,6 +3762,10 @@ namespace Spire
 			}
 			return rs;
 		}
+		void DiscardInstruction::Accept(InstructionVisitor * visitor)
+		{
+			visitor->VisitDiscardInstruction(this);
+		}
 }
 }
 
@@ -3906,6 +3928,7 @@ namespace Spire
 			{
 				wchar_t curChar = str[pos];
 				wchar_t nextChar = (pos < str.Length()-1)? str[pos + 1] : L'\0';
+				wchar_t nextNextChar = (pos < str.Length() - 2) ? str[pos + 2] : L'\0';
 				auto InsertToken = [&](TokenType type, const String & ct)
 				{
 					tokens.Add(Token(type, ct, line, col + pos, fileName));
@@ -3993,6 +4016,11 @@ namespace Spire
 						InsertToken(TokenType::OpOr, L"||");
 						pos += 2;
 					}
+					else if (nextChar == L'=')
+					{
+						InsertToken(TokenType::OpOrAssign, L"|=");
+						pos += 2;
+					}
 					else
 					{
 						InsertToken(TokenType::OpBitOr, L"|");
@@ -4005,6 +4033,11 @@ namespace Spire
 						InsertToken(TokenType::OpAnd, L"&&");
 						pos += 2;
 					}
+					else if (nextChar == L'=')
+					{
+						InsertToken(TokenType::OpAndAssign, L"&=");
+						pos += 2;
+					}
 					else
 					{
 						InsertToken(TokenType::OpBitAnd, L"&");
@@ -4012,14 +4045,30 @@ namespace Spire
 					}
 					break;
 				case L'^':
-					InsertToken(TokenType::OpBitXor, L"^");
-					pos++;
+					if (nextChar == L'=')
+					{
+						InsertToken(TokenType::OpXorAssign, L"^=");
+						pos += 2;
+					}
+					else
+					{
+						InsertToken(TokenType::OpBitXor, L"^");
+						pos++;
+					}
 					break;
 				case L'>':
 					if (nextChar == L'>')
 					{
-						InsertToken(TokenType::OpRsh, L">>");
-						pos += 2;
+						if (nextNextChar == L'=')
+						{
+							InsertToken(TokenType::OpShrAssign, L">>=");
+							pos += 3;
+						}
+						else
+						{
+							InsertToken(TokenType::OpRsh, L">>");
+							pos += 2;
+						}
 					}
 					else if (nextChar == L'=')
 					{
@@ -4035,8 +4084,16 @@ namespace Spire
 				case L'<':
 					if (nextChar == L'<')
 					{
-						InsertToken(TokenType::OpLsh, L"<<");
-						pos += 2;
+						if (nextNextChar == L'=')
+						{
+							InsertToken(TokenType::OpShlAssign, L"<<=");
+							pos += 3;
+						}
+						else
+						{
+							InsertToken(TokenType::OpLsh, L"<<");
+							pos += 2;
+						}
 					}
 					else if (nextChar == L'=')
 					{
@@ -5131,6 +5188,13 @@ namespace Spire
 				statement = ParseReturnStatement();
 			else if (LookAheadToken(L"using") || (LookAheadToken(L"public") && LookAheadToken(L"using", 1)))
 				statement = ParseImportStatement();
+			else if (LookAheadToken(L"discard"))
+			{
+				statement = new DiscardStatementSyntaxNode();
+				FillPosition(statement.Ptr());
+				ReadToken(L"discard");
+				ReadToken(TokenType::Semicolon);
+			}
 			else if (LookAheadToken(TokenType::Identifier))
 			{
 				int startPos = pos;
@@ -5452,6 +5516,11 @@ namespace Spire
 			case TokenType::OpAddAssign:
 			case TokenType::OpSubAssign:
 			case TokenType::OpModAssign:
+			case TokenType::OpShlAssign:
+			case TokenType::OpShrAssign:
+			case TokenType::OpOrAssign:
+			case TokenType::OpAndAssign:
+			case TokenType::OpXorAssign:
 				return 0;
 			case TokenType::OpOr:
 				return 2;
@@ -5502,6 +5571,16 @@ namespace Spire
 				return Operator::DivAssign;
 			case TokenType::OpModAssign:
 				return Operator::ModAssign;
+			case TokenType::OpShlAssign:
+				return Operator::LshAssign;
+			case TokenType::OpShrAssign:
+				return Operator::RshAssign;
+			case TokenType::OpOrAssign:
+				return Operator::OrAssign;
+			case TokenType::OpAndAssign:
+				return Operator::AddAssign;
+			case TokenType::OpXorAssign:
+				return Operator::XorAssign;
 			case TokenType::OpOr:
 				return Operator::Or;
 			case TokenType::OpAnd:
@@ -6714,49 +6793,125 @@ namespace Spire
 			{
 				stmt->Expression->Accept(this);
 			}
+			bool MatchType_BinaryImplicit(ExpressionType & resultType, ExpressionType leftType, ExpressionType rightType)
+			{
+				if (leftType == rightType && !leftType.IsTextureType())
+				{
+					resultType = leftType;
+					return true;
+				}
+				else if (leftType.IsVectorType() && rightType == GetVectorBaseType(leftType.BaseType))
+				{
+					resultType = leftType;
+					return true;
+				}
+				else if (rightType.IsVectorType() && leftType == GetVectorBaseType(rightType.BaseType))
+				{
+					resultType = rightType;
+					return true;
+				}
+				else if ((rightType == ExpressionType::Float && leftType == ExpressionType::Int) ||
+					(leftType == ExpressionType::Float && rightType == ExpressionType::Int))
+				{
+					resultType = ExpressionType::Float;
+					return true;
+				}
+				else if ((rightType == ExpressionType::Float2 && leftType == ExpressionType::Int2) ||
+					(leftType == ExpressionType::Float2 && rightType == ExpressionType::Int2))
+				{
+					resultType = ExpressionType::Float2;
+					return true;
+				}
+				else if ((rightType == ExpressionType::Float3 && leftType == ExpressionType::Int3) ||
+					(leftType == ExpressionType::Float3 && rightType == ExpressionType::Int3))
+				{
+					resultType = ExpressionType::Float3;
+					return true;
+				}
+				else if ((rightType == ExpressionType::Float4 && leftType == ExpressionType::Int4) ||
+					(leftType == ExpressionType::Float4 && rightType == ExpressionType::Int4))
+				{
+					resultType = ExpressionType::Float4;
+					return true;
+				}
+				else if ((rightType == ExpressionType::Float && leftType == ExpressionType::UInt) ||
+					(leftType == ExpressionType::Float && rightType == ExpressionType::UInt))
+				{
+					resultType = ExpressionType::Float;
+					return true;
+				}
+				else if ((rightType == ExpressionType::Float2 && leftType == ExpressionType::UInt2) ||
+					(leftType == ExpressionType::Float2 && rightType == ExpressionType::UInt2))
+				{
+					resultType = ExpressionType::Float2;
+					return true;
+				}
+				else if ((rightType == ExpressionType::Float3 && leftType == ExpressionType::UInt3) ||
+					(leftType == ExpressionType::Float3 && rightType == ExpressionType::UInt3))
+				{
+					resultType = ExpressionType::Float3;
+					return true;
+				}
+				else if ((rightType == ExpressionType::Float4 && leftType == ExpressionType::UInt4) ||
+					(leftType == ExpressionType::Float4 && rightType == ExpressionType::UInt4))
+				{
+					resultType = ExpressionType::Float4;
+					return true;
+				}
+				else if ((rightType == ExpressionType::Int && leftType == ExpressionType::UInt) ||
+					(leftType == ExpressionType::Int && rightType == ExpressionType::UInt))
+				{
+					resultType = ExpressionType::Int;
+					return true;
+				}
+				else if ((rightType == ExpressionType::Int2 && leftType == ExpressionType::UInt2) ||
+					(leftType == ExpressionType::Int2 && rightType == ExpressionType::UInt2))
+				{
+					resultType = ExpressionType::Int2;
+					return true;
+				}
+				else if ((rightType == ExpressionType::Int3 && leftType == ExpressionType::UInt3) ||
+					(leftType == ExpressionType::Int3 && rightType == ExpressionType::UInt3))
+				{
+					resultType = ExpressionType::Int3;
+					return true;
+				}
+				else if ((rightType == ExpressionType::Int4 && leftType == ExpressionType::UInt4) ||
+					(leftType == ExpressionType::Int4 && rightType == ExpressionType::UInt4))
+				{
+					resultType = ExpressionType::Int4;
+					return true;
+				}
+				return false;
+			}
 			virtual void VisitBinaryExpression(BinaryExpressionSyntaxNode *expr) override
 			{
 				expr->LeftExpression->Accept(this);
 				expr->RightExpression->Accept(this);
 				auto & leftType = expr->LeftExpression->Type;
 				auto & rightType = expr->RightExpression->Type;
+				ExpressionType matchedType;
 				switch (expr->Operator)
 				{
 				case Operator::Add:
 				case Operator::Sub:
 				case Operator::Div:
-					if (leftType == rightType && !leftType.IsArray && !leftType.IsTextureType() && leftType.BaseType != BaseType::Shader)
-						expr->Type = leftType;
-					else if (leftType.IsVectorType() && rightType == GetVectorBaseType(leftType.BaseType))
-						expr->Type = leftType;
-					else if (rightType.IsVectorType() && leftType == GetVectorBaseType(rightType.BaseType))
-						expr->Type = rightType;
-					else if ((rightType == ExpressionType::Float && leftType == ExpressionType::Int) ||
-						(leftType == ExpressionType::Float && leftType == ExpressionType::Int))
-						expr->Type = ExpressionType::Float;
-					else if (leftType.IsIntegral() && rightType.IsIntegral())
-						expr->Type = ExpressionType::Int;
+					if (MatchType_BinaryImplicit(matchedType, leftType, rightType))
+						expr->Type = matchedType;
 					else
 						expr->Type = ExpressionType::Error;
 					break;
 				case Operator::Mul:
 					if (!leftType.IsArray && leftType.BaseType != BaseType::Shader)
 					{
-						if (leftType == rightType && !leftType.IsTextureType())
-							expr->Type = leftType;
+						if (MatchType_BinaryImplicit(matchedType, leftType, rightType))
+							expr->Type = matchedType;
 						else if ((leftType.BaseType == BaseType::Float3x3 && rightType == ExpressionType::Float3) ||
 							(leftType.BaseType == BaseType::Float3 && rightType.BaseType == BaseType::Float3x3))
 							expr->Type = ExpressionType::Float3;
 						else if ((leftType.BaseType == BaseType::Float4x4 && rightType == ExpressionType::Float4) ||
 							(leftType.BaseType == BaseType::Float4 && rightType.BaseType == BaseType::Float4x4))
 							expr->Type = ExpressionType::Float4;
-						else if (leftType.IsVectorType() && rightType == GetVectorBaseType(leftType.BaseType))
-							expr->Type = leftType;
-						else if (rightType.IsVectorType() && leftType == GetVectorBaseType(rightType.BaseType))
-							expr->Type = rightType;
-						else if ((rightType == ExpressionType::Float && leftType == ExpressionType::Int) ||
-							(leftType == ExpressionType::Float && rightType == ExpressionType::Int))
-							expr->Type = ExpressionType::Float;
 						else
 							expr->Type = ExpressionType::Error;
 					}
@@ -6787,6 +6942,11 @@ namespace Spire
 					else if ((leftType == ExpressionType::Int || leftType == ExpressionType::UInt) &&
 						(rightType == ExpressionType::Int || rightType == ExpressionType::UInt))
 						expr->Type = ExpressionType::Bool;
+					else if (leftType.IsIntegral() && rightType.IsIntegral())
+						expr->Type = ExpressionType::Bool;
+					else if (leftType == ExpressionType::Float && rightType.IsIntegral() ||
+						leftType.IsIntegral() && rightType == ExpressionType::Float)
+						expr->Type = ExpressionType::Bool;
 					else
 						expr->Type = ExpressionType::Error;
 					break;
@@ -6799,6 +6959,9 @@ namespace Spire
 						expr->Type = ExpressionType::Bool;
 					else if (leftType == ExpressionType::Float && rightType == ExpressionType::Float)
 						expr->Type = ExpressionType::Bool;
+					else if (leftType == ExpressionType::Float && rightType.IsIntegral() ||
+						leftType.IsIntegral() && rightType == ExpressionType::Float)
+						expr->Type = ExpressionType::Bool;
 					else
 						expr->Type = ExpressionType::Error;
 					break;
@@ -6808,8 +6971,24 @@ namespace Spire
 				case Operator::DivAssign:
 				case Operator::SubAssign:
 				case Operator::ModAssign:
+				case Operator::AndAssign:
+				case Operator::OrAssign:
+				case Operator::XorAssign:
+				case Operator::LshAssign:
+				case Operator::RshAssign:
 					if (!leftType.IsLeftValue && leftType != ExpressionType::Error)
 						Error(30011, L"left of '=' is not an l-value.", expr->LeftExpression.Ptr());
+					if (expr->Operator == Operator::AndAssign ||
+						expr->Operator == Operator::OrAssign ||
+						expr->Operator == Operator::XorAssign ||
+						expr->Operator == Operator::LshAssign ||
+						expr->Operator == Operator::RshAssign)
+					{
+						if (!(leftType.IsIntegral() && rightType.IsIntegral()))
+						{
+							Error(30041, L"bit operation: operand must be integral type.", expr);
+						}
+					}
 					expr->LeftExpression->Access = ExpressionAccess::Write;
 					if (MatchType_ValueReceiver(leftType, rightType))
 						expr->Type = ExpressionType::Void;
@@ -7206,7 +7385,7 @@ namespace Spire
 							if (vecLen == 9)
 								expr->Type.BaseType = (BaseType)((int)GetVectorBaseType(baseType.BaseType) + 2);
 							else if (vecLen == 16)
-								expr->Type.BaseType = (BaseType)((int)GetVectorBaseType(baseType.BaseType) + 15);
+								expr->Type.BaseType = (BaseType)((int)GetVectorBaseType(baseType.BaseType) + 3);
 							else
 							{
 								expr->Type.BaseType = (BaseType)((int)GetVectorBaseType(baseType.BaseType) + children.Count() - 1);
@@ -7761,14 +7940,47 @@ __intrinsic float abs(float v);
 __intrinsic vec2 abs(vec2 v);
 __intrinsic vec3 abs(vec3 v);
 __intrinsic vec4 abs(vec4 v);
+
 __intrinsic float exp(float v);
+__intrinsic vec2 exp(vec2 v);
+__intrinsic vec3 exp(vec3 v);
+__intrinsic vec4 exp(vec4 v);
+
 __intrinsic float log(float v);
+__intrinsic vec2 log(vec2 v);
+__intrinsic vec3 log(vec3 v);
+__intrinsic vec4 log(vec4 v);
+
 __intrinsic float exp2(float v);
+__intrinsic vec2 exp2(vec2 v);
+__intrinsic vec3 exp2(vec3 v);
+__intrinsic vec4 exp2(vec4 v);
+
 __intrinsic float log2(float v);
+__intrinsic vec2 log2(vec2 v);
+__intrinsic vec3 log2(vec3 v);
+__intrinsic vec4 log2(vec4 v);
+
 __intrinsic float asin(float v);
+__intrinsic vec2 asin(vec2 v);
+__intrinsic vec3 asin(vec3 v);
+__intrinsic vec4 asin(vec4 v);
+
 __intrinsic float acos(float v);
+__intrinsic vec2 acos(vec2 v);
+__intrinsic vec3 acos(vec3 v);
+__intrinsic vec4 acos(vec4 v);
+
 __intrinsic float atan(float v);
+__intrinsic vec2 atan(vec2 v);
+__intrinsic vec3 atan(vec3 v);
+__intrinsic vec4 atan(vec4 v);
+
 __intrinsic float sign(float x);
+__intrinsic vec2 sign(vec2 x);
+__intrinsic vec3 sign(vec3 x);
+__intrinsic vec4 sign(vec4 x);
+
 __intrinsic float pow(float base, float e);
 __intrinsic vec2 pow(vec2 base, vec2 e);
 __intrinsic vec3 pow(vec3 base, vec3 e);
@@ -7856,12 +8068,41 @@ __intrinsic ivec4 ivec4(int x, int y, int z, int w);
 __intrinsic ivec4 ivec4(ivec3 v, int w);
 __intrinsic ivec4 ivec4(ivec2 v, int z, int w);
 __intrinsic ivec4 ivec4(ivec2 v, ivec2 w);
+
+__intrinsic uvec2 uvec2(uint x, uint y);
+__intrinsic uvec3 uvec3(uint x, uint y, uint z);
+__intrinsic uvec3 uvec3(uvec2 v, uint z);
+__intrinsic uvec4 uvec4(uint x, uint y, uint z, uint w);
+__intrinsic uvec4 uvec4(uvec3 v, uint w);
+__intrinsic uvec4 uvec4(uvec2 v, uint z, uint w);
+__intrinsic uvec4 uvec4(uvec2 v, uvec2 w);
+
 __intrinsic int int(uint val);
 __intrinsic int int(float val);
-__intrinsic uint uint(uint val);
+__intrinsic ivec2 ivec2(uvec2 val);
+__intrinsic ivec2 ivec2(vec2 val);
+__intrinsic ivec3 ivec3(uvec3 val);
+__intrinsic ivec3 ivec3(vec3 val);
+__intrinsic ivec4 ivec4(uvec4 val);
+__intrinsic ivec4 ivec4(vec4 val);
+
+__intrinsic uint uint(int val);
 __intrinsic uint uint(float val);
+__intrinsic uvec2 uvec2(ivec2 val);
+__intrinsic uvec2 uvec2(vec2 val);
+__intrinsic uvec3 uvec3(ivec3 val);
+__intrinsic uvec3 uvec3(vec3 val);
+__intrinsic uvec4 uvec4(ivec4 val);
+__intrinsic uvec4 uvec4(vec4 val);
+
 __intrinsic float float(int val);
 __intrinsic float float(uint val);
+__intrinsic vec2 vec2(ivec2 val);
+__intrinsic vec2 vec2(uvec2 val);
+__intrinsic vec3 vec3(ivec3 val);
+__intrinsic vec3 vec3(uvec3 val);
+__intrinsic vec4 vec4(ivec4 val);
+__intrinsic vec4 vec4(uvec4 val);
 
 __intrinsic mat3 transpose(mat3 in);
 __intrinsic mat4 transpose(mat4 in);
@@ -8506,6 +8747,10 @@ namespace Spire
 		ExpressionType ExpressionType::Bool(Compiler::BaseType::Bool);
 		ExpressionType ExpressionType::Int(Compiler::BaseType::Int);
 		ExpressionType ExpressionType::UInt(Compiler::BaseType::UInt);
+		ExpressionType ExpressionType::UInt2(Compiler::BaseType::UInt2);
+		ExpressionType ExpressionType::UInt3(Compiler::BaseType::UInt3);
+		ExpressionType ExpressionType::UInt4(Compiler::BaseType::UInt4);
+
 		ExpressionType ExpressionType::Float(Compiler::BaseType::Float);
 		ExpressionType ExpressionType::Int2(Compiler::BaseType::Int2);
 		ExpressionType ExpressionType::Float2(Compiler::BaseType::Float2);
@@ -8962,6 +9207,12 @@ namespace Spire
 				expType.BaseType = BaseType::Int3;
 			else if (TypeName == L"ivec4")
 				expType.BaseType = BaseType::Int4;
+			else if (TypeName == L"uvec2")
+				expType.BaseType = BaseType::UInt2;
+			else if (TypeName == L"uvec3")
+				expType.BaseType = BaseType::UInt3;
+			else if (TypeName == L"uvec4")
+				expType.BaseType = BaseType::UInt4;
 			else if (TypeName == L"vec2")
 				expType.BaseType = BaseType::Float2;
 			else if (TypeName == L"vec3")
@@ -9101,7 +9352,16 @@ namespace Spire
 		{
 			visitor->VisitStruct(this);
 		}
-	}
+		void DiscardStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
+		{
+			visitor->VisitDiscardStatement(this);
+		}
+		DiscardStatementSyntaxNode * DiscardStatementSyntaxNode::Clone(CloneContext & ctx)
+		{
+			auto rs = CloneSyntaxNodeFields(new DiscardStatementSyntaxNode(*this), ctx);
+			return rs;
+		}
+}
 }
 
 /***********************************************************************

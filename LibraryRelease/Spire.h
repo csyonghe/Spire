@@ -147,6 +147,7 @@ namespace Spire
 			OpEql, OpNeq, OpGreater, OpLess, OpGeq, OpLeq,
 			OpAnd, OpOr, OpBitXor, OpBitAnd, OpBitOr,
 			OpInc, OpDec, OpAddAssign, OpSubAssign, OpMulAssign, OpDivAssign, OpModAssign,
+			OpShlAssign, OpShrAssign, OpOrAssign, OpAndAssign, OpXorAssign,
 			
 			QuestionMark, Colon, RightArrow, At,
 		};
@@ -211,6 +212,7 @@ namespace Spire
 			Void = 0,
 			Int = 16, Int2 = 17, Int3 = 18, Int4 = 19,
 			Float = 32, Float2 = 33, Float3 = 34, Float4 = 35,
+			UInt = 512, UInt2 = 513, UInt3 = 514, UInt4 = 515,
 			Float3x3 = 40, Float4x4 = 47,
 			Texture2D = 48,
 			TextureShadow = 49,
@@ -219,7 +221,6 @@ namespace Spire
 			Function = 64,
 			Bool = 128,
 			Shader = 256,
-			UInt = 512,
 			Struct = 1024,
 			Error = 2048,
 
@@ -342,6 +343,9 @@ namespace Spire
 
 			static ExpressionType Bool;
 			static ExpressionType UInt;
+			static ExpressionType UInt2;
+			static ExpressionType UInt3;
+			static ExpressionType UInt4;
 			static ExpressionType Int;
 			static ExpressionType Int2;
 			static ExpressionType Int3;
@@ -592,7 +596,8 @@ namespace Spire
 			BitAnd, BitXor, BitOr,
 			And,
 			Or,
-			Assign, AddAssign, SubAssign, MulAssign, DivAssign, ModAssign
+			Assign, AddAssign, SubAssign, MulAssign, DivAssign, ModAssign,
+			LshAssign, RshAssign, OrAssign, AndAssign, XorAssign
 		};
 		
 		class UnaryExpressionSyntaxNode : public ExpressionSyntaxNode
@@ -675,6 +680,13 @@ namespace Spire
 			List<RefPtr<StatementSyntaxNode>> Statements;
 			virtual void Accept(SyntaxVisitor * visitor);
 			virtual BlockStatementSyntaxNode * Clone(CloneContext & ctx);
+		};
+
+		class DiscardStatementSyntaxNode : public StatementSyntaxNode
+		{
+		public:
+			virtual void Accept(SyntaxVisitor * visitor);
+			virtual DiscardStatementSyntaxNode * Clone(CloneContext & ctx);
 		};
 
 		class VariableDeclr
@@ -983,6 +995,8 @@ namespace Spire
 				for (auto & f : s->Fields)
 					f->Accept(this);
 			}
+			virtual void VisitDiscardStatement(DiscardStatementSyntaxNode *)
+			{}
 			virtual void VisitStructField(StructField * f)
 			{
 				f->Type->Accept(this);
@@ -1145,7 +1159,7 @@ namespace Spire
 			TextureShadow = 49,
 			TextureCube = 50,
 			TextureCubeShadow = 51,
-			UInt = 512,
+			UInt = 512, UInt2 = 513, UInt3 = 514, UInt4 = 515,
 		};
 		int SizeofBaseType(ILBaseType type);
 		int RoundToAlignment(int offset, int alignment);
@@ -1207,6 +1221,12 @@ namespace Spire
 					return L"int";
 				else if (Type == ILBaseType::UInt)
 					return L"uint";
+				else if (Type == ILBaseType::UInt2)
+					return L"uvec2";
+				else if (Type == ILBaseType::UInt3)
+					return L"uvec3";
+				else if (Type == ILBaseType::UInt4)
+					return L"uvec4";
 				else if (Type == ILBaseType::Int2)
 					return L"ivec2";
 				else if (Type == ILBaseType::Int3)
@@ -1245,10 +1265,13 @@ namespace Spire
 				case ILBaseType::UInt:
 					return 4;
 				case ILBaseType::Int2:
+				case ILBaseType::UInt2:
 					return 8;
 				case ILBaseType::Int3:
+				case ILBaseType::UInt3:
 					return 16;
 				case ILBaseType::Int4:
+				case ILBaseType::UInt4:
 					return 16;
 				case ILBaseType::Float:
 					return 4;
@@ -1284,12 +1307,15 @@ namespace Spire
 					return 4;
 				case ILBaseType::Float2:
 				case ILBaseType::Int2:
+				case ILBaseType::UInt2:
 					return 8;
 				case ILBaseType::Int3:
 				case ILBaseType::Float3:
+				case ILBaseType::UInt3:
 					return 12;
 				case ILBaseType::Int4:
 				case ILBaseType::Float4:
+				case ILBaseType::UInt4:
 					return 16;
 				case ILBaseType::Float3x3:
 					return 48;
@@ -1708,6 +1734,12 @@ namespace Spire
 						sb << L"ivec3(" << IntValues[0] << L", " << IntValues[1] << L", " << IntValues[2] << L")";
 					else if (baseType->Type == ILBaseType::Int4)
 						sb << L"ivec4(" << IntValues[0] << L", " << IntValues[1] << L", " << IntValues[2] << L", " << IntValues[3] << L")";
+					else if (baseType->Type == ILBaseType::UInt2)
+						sb << L"uvec2(" << IntValues[0] << L", " << IntValues[1] << L")";
+					else if (baseType->Type == ILBaseType::UInt3)
+						sb << L"uvec3(" << IntValues[0] << L", " << IntValues[1] << L", " << IntValues[2] << L")";
+					else if (baseType->Type == ILBaseType::UInt4)
+						sb << L"uvec4(" << IntValues[0] << L", " << IntValues[1] << L", " << IntValues[2] << L", " << IntValues[3] << L")";
 					return sb.ToString();
 				}
 				else
@@ -2683,6 +2715,11 @@ namespace Spire
 					case ILBaseType::Int4:
 						Type = new ILBasicType(ILBaseType::Int);
 						break;
+					case ILBaseType::UInt2:
+					case ILBaseType::UInt3:
+					case ILBaseType::UInt4:
+						Type = new ILBasicType(ILBaseType::UInt);
+						break;
 					default:
 						throw InvalidOperationException(L"Unsupported aggregate type.");
 					}
@@ -3167,6 +3204,32 @@ namespace Spire
 			virtual void Accept(InstructionVisitor * visitor) override;
 		};
 
+		class DiscardInstruction : public ILInstruction
+		{
+		public:
+			virtual bool IsDeterministic() override
+			{
+				return true;
+			}
+			virtual bool HasSideEffect() override
+			{
+				return true;
+			}
+			virtual String ToString() override
+			{
+				return  L"discard";
+			}
+			virtual String GetOperatorString() override
+			{
+				return L"discard";
+			}
+			virtual DiscardInstruction * Clone() override
+			{
+				return new DiscardInstruction(*this);
+			}
+			virtual void Accept(InstructionVisitor * visitor) override;
+		};
+
 		// store(dest, value)
 		class StoreInstruction : public BinaryInstruction
 		{
@@ -3270,7 +3333,6 @@ namespace Spire
 			virtual void VisitBitXorInstruction(BitXorInstruction *){}
 			virtual void VisitShlInstruction(ShlInstruction *){}
 			virtual void VisitShrInstruction(ShrInstruction *){}
-
 			virtual void VisitBitNotInstruction(BitNotInstruction *){}
 			virtual void VisitNotInstruction(NotInstruction *){}
 			virtual void VisitCmpeqlInstruction(CmpeqlInstruction *){}
@@ -3297,6 +3359,7 @@ namespace Spire
 			virtual void VisitSelectInstruction(SelectInstruction *){}
 			virtual void VisitCallInstruction(CallInstruction *){}
 			virtual void VisitSwitchInstruction(SwitchInstruction *){}
+			virtual void VisitDiscardInstruction(DiscardInstruction *) {}
 
 			virtual void VisitPhiInstruction(PhiInstruction *){}
 		};
@@ -3910,6 +3973,7 @@ namespace Spire
 			String GlobalDefinitions;
 			String LocalDeclarations;
 			String MainCode;
+			List<unsigned char> BinaryCode;
 			CoreLib::Basic::EnumerableDictionary<CoreLib::String, CoreLib::String> ComponentAccessNames;
 			String GetAllCodeGLSL(String additionalHeader, String additionalGlobalDeclaration, String preambleCode, String epilogCode);
 			String GetAllCodeGLSL()
@@ -4306,6 +4370,12 @@ namespace Spire
 				cfgNode.Last()->InsertTail(instr);
 				return instr;
 			}
+			DiscardInstruction * Discard()
+			{
+				auto instr = new DiscardInstruction();
+				cfgNode.Last()->InsertTail(instr);
+				return instr;
+			}
 			MemberUpdateInstruction * Update(ILOperand * dest, ILOperand * offset, ILOperand * value)
 			{
 				auto instr = new MemberUpdateInstruction(dest, offset, value);
@@ -4456,6 +4526,9 @@ namespace Spire
 				typeNames.Add(L"ivec2");
 				typeNames.Add(L"ivec3");
 				typeNames.Add(L"ivec4");
+				typeNames.Add(L"uvec2");
+				typeNames.Add(L"uvec3");
+				typeNames.Add(L"uvec4");
 				typeNames.Add(L"vec2");
 				typeNames.Add(L"vec3");
 				typeNames.Add(L"vec4");

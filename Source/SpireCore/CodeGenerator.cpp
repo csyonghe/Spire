@@ -734,7 +734,10 @@ namespace Spire
 				else
 					return op;
 			}
-			
+			virtual void VisitDiscardStatement(DiscardStatementSyntaxNode *) override
+			{
+				codeWriter.Discard();
+			}
 			virtual void VisitVarDeclrStatement(VarDeclrStatementSyntaxNode* stmt) override
 			{
 				for (auto & v : stmt->Variables)
@@ -812,18 +815,23 @@ namespace Spire
 						rs = new OrInstruction();
 						break;
 					case Operator::BitAnd:
+					case Operator::AndAssign:
 						rs = new BitAndInstruction();
 						break;
 					case Operator::BitOr:
+					case Operator::OrAssign:
 						rs = new BitOrInstruction();
 						break;
 					case Operator::BitXor:
+					case Operator::XorAssign:
 						rs = new BitXorInstruction();
 						break;
 					case Operator::Lsh:
+					case Operator::LshAssign:
 						rs = new ShlInstruction();
 						break;
 					case Operator::Rsh:
+					case Operator::RshAssign:
 						rs = new ShrInstruction();
 						break;
 					case Operator::Eql:
@@ -859,6 +867,11 @@ namespace Spire
 					case Operator::MulAssign:
 					case Operator::DivAssign:
 					case Operator::ModAssign:
+					case Operator::LshAssign:
+					case Operator::RshAssign:
+					case Operator::AndAssign:
+					case Operator::OrAssign:
+					case Operator::XorAssign:
 					{
 						expr->LeftExpression->Access = ExpressionAccess::Write;
 						expr->LeftExpression->Accept(this);

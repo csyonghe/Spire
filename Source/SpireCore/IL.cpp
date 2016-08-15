@@ -529,5 +529,9 @@ namespace Spire
 			}
 			return rs;
 		}
+		void DiscardInstruction::Accept(InstructionVisitor * visitor)
+		{
+			visitor->VisitDiscardInstruction(this);
+		}
 }
 }

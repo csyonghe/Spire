@@ -27,6 +27,7 @@ namespace SceneViewer
 	class MainForm : public GLForm, IChoiceControl
 	{
 	private:
+		bool lockCamY = false;
 		RefPtr<DeviceResourcePool> resourcePool;
 		RefPtr<EnginePipeline> scene;
 		GraphicsUI::CommandForm * cmdForm = nullptr;
@@ -716,6 +717,10 @@ namespace SceneViewer
 				{
 					ToggleShadowMapMenu_Clicked(this, EventArgs());
 				}
+				if (GetAsyncKeyState('Y') || GetAsyncKeyState(L'y'))
+				{
+					lockCamY = !lockCamY;
+				}
 			}
 		}
 		void PrintPerformance()
@@ -863,7 +868,12 @@ namespace SceneViewer
 			timePoint = PerformanceCounter::Start();
 			if (Focused() && uiEntry->FocusedControl == nullptr)
 			{
+				float oldY = 0.0f;
+				if (lockCamY)
+					oldY = camera.Cam.pos.y;
 				camera.HandleKeys(dtime);
+				if (lockCamY)
+					camera.Cam.pos.y = oldY;
 			}
 			if (glContext)
 			{

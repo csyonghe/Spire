@@ -614,6 +614,13 @@ namespace Spire
 				statement = ParseReturnStatement();
 			else if (LookAheadToken(L"using") || (LookAheadToken(L"public") && LookAheadToken(L"using", 1)))
 				statement = ParseImportStatement();
+			else if (LookAheadToken(L"discard"))
+			{
+				statement = new DiscardStatementSyntaxNode();
+				FillPosition(statement.Ptr());
+				ReadToken(L"discard");
+				ReadToken(TokenType::Semicolon);
+			}
 			else if (LookAheadToken(TokenType::Identifier))
 			{
 				int startPos = pos;
@@ -935,6 +942,11 @@ namespace Spire
 			case TokenType::OpAddAssign:
 			case TokenType::OpSubAssign:
 			case TokenType::OpModAssign:
+			case TokenType::OpShlAssign:
+			case TokenType::OpShrAssign:
+			case TokenType::OpOrAssign:
+			case TokenType::OpAndAssign:
+			case TokenType::OpXorAssign:
 				return 0;
 			case TokenType::OpOr:
 				return 2;
@@ -985,6 +997,16 @@ namespace Spire
 				return Operator::DivAssign;
 			case TokenType::OpModAssign:
 				return Operator::ModAssign;
+			case TokenType::OpShlAssign:
+				return Operator::LshAssign;
+			case TokenType::OpShrAssign:
+				return Operator::RshAssign;
+			case TokenType::OpOrAssign:
+				return Operator::OrAssign;
+			case TokenType::OpAndAssign:
+				return Operator::AddAssign;
+			case TokenType::OpXorAssign:
+				return Operator::XorAssign;
 			case TokenType::OpOr:
 				return Operator::Or;
 			case TokenType::OpAnd:

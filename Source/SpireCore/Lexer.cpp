@@ -59,6 +59,7 @@ namespace Spire
 			{
 				wchar_t curChar = str[pos];
 				wchar_t nextChar = (pos < str.Length()-1)? str[pos + 1] : L'\0';
+				wchar_t nextNextChar = (pos < str.Length() - 2) ? str[pos + 2] : L'\0';
 				auto InsertToken = [&](TokenType type, const String & ct)
 				{
 					tokens.Add(Token(type, ct, line, col + pos, fileName));
@@ -146,6 +147,11 @@ namespace Spire
 						InsertToken(TokenType::OpOr, L"||");
 						pos += 2;
 					}
+					else if (nextChar == L'=')
+					{
+						InsertToken(TokenType::OpOrAssign, L"|=");
+						pos += 2;
+					}
 					else
 					{
 						InsertToken(TokenType::OpBitOr, L"|");
@@ -158,6 +164,11 @@ namespace Spire
 						InsertToken(TokenType::OpAnd, L"&&");
 						pos += 2;
 					}
+					else if (nextChar == L'=')
+					{
+						InsertToken(TokenType::OpAndAssign, L"&=");
+						pos += 2;
+					}
 					else
 					{
 						InsertToken(TokenType::OpBitAnd, L"&");
@@ -165,14 +176,30 @@ namespace Spire
 					}
 					break;
 				case L'^':
-					InsertToken(TokenType::OpBitXor, L"^");
-					pos++;
+					if (nextChar == L'=')
+					{
+						InsertToken(TokenType::OpXorAssign, L"^=");
+						pos += 2;
+					}
+					else
+					{
+						InsertToken(TokenType::OpBitXor, L"^");
+						pos++;
+					}
 					break;
 				case L'>':
 					if (nextChar == L'>')
 					{
-						InsertToken(TokenType::OpRsh, L">>");
-						pos += 2;
+						if (nextNextChar == L'=')
+						{
+							InsertToken(TokenType::OpShrAssign, L">>=");
+							pos += 3;
+						}
+						else
+						{
+							InsertToken(TokenType::OpRsh, L">>");
+							pos += 2;
+						}
 					}
 					else if (nextChar == L'=')
 					{
@@ -188,8 +215,16 @@ namespace Spire
 				case L'<':
 					if (nextChar == L'<')
 					{
-						InsertToken(TokenType::OpLsh, L"<<");
-						pos += 2;
+						if (nextNextChar == L'=')
+						{
+							InsertToken(TokenType::OpShlAssign, L"<<=");
+							pos += 3;
+						}
+						else
+						{
+							InsertToken(TokenType::OpLsh, L"<<");
+							pos += 2;
+						}
 					}
 					else if (nextChar == L'=')
 					{

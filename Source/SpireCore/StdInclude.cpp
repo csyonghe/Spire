@@ -42,14 +42,47 @@ __intrinsic float abs(float v);
 __intrinsic vec2 abs(vec2 v);
 __intrinsic vec3 abs(vec3 v);
 __intrinsic vec4 abs(vec4 v);
+
 __intrinsic float exp(float v);
+__intrinsic vec2 exp(vec2 v);
+__intrinsic vec3 exp(vec3 v);
+__intrinsic vec4 exp(vec4 v);
+
 __intrinsic float log(float v);
+__intrinsic vec2 log(vec2 v);
+__intrinsic vec3 log(vec3 v);
+__intrinsic vec4 log(vec4 v);
+
 __intrinsic float exp2(float v);
+__intrinsic vec2 exp2(vec2 v);
+__intrinsic vec3 exp2(vec3 v);
+__intrinsic vec4 exp2(vec4 v);
+
 __intrinsic float log2(float v);
+__intrinsic vec2 log2(vec2 v);
+__intrinsic vec3 log2(vec3 v);
+__intrinsic vec4 log2(vec4 v);
+
 __intrinsic float asin(float v);
+__intrinsic vec2 asin(vec2 v);
+__intrinsic vec3 asin(vec3 v);
+__intrinsic vec4 asin(vec4 v);
+
 __intrinsic float acos(float v);
+__intrinsic vec2 acos(vec2 v);
+__intrinsic vec3 acos(vec3 v);
+__intrinsic vec4 acos(vec4 v);
+
 __intrinsic float atan(float v);
+__intrinsic vec2 atan(vec2 v);
+__intrinsic vec3 atan(vec3 v);
+__intrinsic vec4 atan(vec4 v);
+
 __intrinsic float sign(float x);
+__intrinsic vec2 sign(vec2 x);
+__intrinsic vec3 sign(vec3 x);
+__intrinsic vec4 sign(vec4 x);
+
 __intrinsic float pow(float base, float e);
 __intrinsic vec2 pow(vec2 base, vec2 e);
 __intrinsic vec3 pow(vec3 base, vec3 e);
@@ -137,12 +170,41 @@ __intrinsic ivec4 ivec4(int x, int y, int z, int w);
 __intrinsic ivec4 ivec4(ivec3 v, int w);
 __intrinsic ivec4 ivec4(ivec2 v, int z, int w);
 __intrinsic ivec4 ivec4(ivec2 v, ivec2 w);
+
+__intrinsic uvec2 uvec2(uint x, uint y);
+__intrinsic uvec3 uvec3(uint x, uint y, uint z);
+__intrinsic uvec3 uvec3(uvec2 v, uint z);
+__intrinsic uvec4 uvec4(uint x, uint y, uint z, uint w);
+__intrinsic uvec4 uvec4(uvec3 v, uint w);
+__intrinsic uvec4 uvec4(uvec2 v, uint z, uint w);
+__intrinsic uvec4 uvec4(uvec2 v, uvec2 w);
+
 __intrinsic int int(uint val);
 __intrinsic int int(float val);
-__intrinsic uint uint(uint val);
+__intrinsic ivec2 ivec2(uvec2 val);
+__intrinsic ivec2 ivec2(vec2 val);
+__intrinsic ivec3 ivec3(uvec3 val);
+__intrinsic ivec3 ivec3(vec3 val);
+__intrinsic ivec4 ivec4(uvec4 val);
+__intrinsic ivec4 ivec4(vec4 val);
+
+__intrinsic uint uint(int val);
 __intrinsic uint uint(float val);
+__intrinsic uvec2 uvec2(ivec2 val);
+__intrinsic uvec2 uvec2(vec2 val);
+__intrinsic uvec3 uvec3(ivec3 val);
+__intrinsic uvec3 uvec3(vec3 val);
+__intrinsic uvec4 uvec4(ivec4 val);
+__intrinsic uvec4 uvec4(vec4 val);
+
 __intrinsic float float(int val);
 __intrinsic float float(uint val);
+__intrinsic vec2 vec2(ivec2 val);
+__intrinsic vec2 vec2(uvec2 val);
+__intrinsic vec3 vec3(ivec3 val);
+__intrinsic vec3 vec3(uvec3 val);
+__intrinsic vec4 vec4(ivec4 val);
+__intrinsic vec4 vec4(uvec4 val);
 
 __intrinsic mat3 transpose(mat3 in);
 __intrinsic mat4 transpose(mat4 in);
