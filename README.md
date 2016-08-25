@@ -30,4 +30,4 @@ Also explore Examples/Scenes directory for more interesting shaders!
 
 
 ##Targeting SPIRV for Vulkan
-New: take a look at our [VulkanEngine](https://github.com/csyonghe/Spire/tree/master/Examples/VulkanEngine) project to learn how Spire can be used to build your engine's shading system, and how to use Spire to generate SPIRV shader code for Vulkan.
+New: take a look at our [VulkanEngine](https://github.com/csyonghe/Spire/tree/master/Examples/VulkanEngine) project to learn how to build a shading system that uses Spire's services to generate low level shader code for different platforms (SPIRV for Vulkan and GLSL for OpenGL).
