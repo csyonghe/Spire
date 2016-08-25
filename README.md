@@ -1,5 +1,5 @@
 # Spire
-Spire is a shading language and compiler framework that facilitates rapid exploration of shader optimization choices (such as frequency reduction and algorithmic approximation) afforded by modern real-time graphics engines. The current implementation of the Spire compiler can generate either GLSL or SPIR-V output for use with GL and Vulkan based engines.
+Spire is a shading language and compiler framework that facilitates modular shader authoring and rapid exploration of shader optimization choices (such as frequency reduction and algorithmic approximation) afforded by modern real-time graphics engines. The current implementation of the Spire compiler can generate either GLSL or SPIR-V output for use with OpenGL and Vulkan based engines.
 
 Paper: http://graphics.cs.cmu.edu/projects/spire/
 
@@ -29,5 +29,5 @@ Also explore Examples/Scenes directory for more interesting shaders!
 ![](https://github.com/csyonghe/Spire/blob/master/Docs/sceneGallery.jpg)
 
 
-##Targeting SPIRV for Vulkan
-New: take a look at our [VulkanEngine](https://github.com/csyonghe/Spire/tree/master/Examples/VulkanEngine) project to learn how to build a shading system that uses Spire's services to generate low level shader code for different platforms (SPIRV for Vulkan and GLSL for OpenGL).
+##Targeting SPIR-V for Vulkan
+New: take a look at our [VulkanEngine](https://github.com/csyonghe/Spire/tree/master/Examples/VulkanEngine) project to learn how to build a shading system that uses Spire's services to generate low level shader code for different platforms (SPIR-V for Vulkan and GLSL for OpenGL).
