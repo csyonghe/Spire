@@ -11,3 +11,6 @@ By default, the engine uses OpenGL as the rendering API, to use Vulkan and SPIRV
 GameEngine.exe -dir "$(SolutionDir)ExampleGame" -enginedir "$(SolutionDir)EngineContent" -vk -gpu 0
 ```
 If your system has more than one GPU installed, you can change the -gpu argument to another index to use a different GPU.
+
+
+Developers: Yong He and Teguh Hofstee.
