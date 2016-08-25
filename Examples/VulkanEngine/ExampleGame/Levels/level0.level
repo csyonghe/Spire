@@ -1,0 +1,59 @@
+Camera
+{
+    name "FreeCam"
+    position [0.0 120.0 220.0]
+    orientation [0.0 -0.3 0.0] // yaw, pitch, roll
+	zfar 1000.0
+	znear 0.5
+	fov 30.0
+}
+
+FreeRoamCameraController
+{
+    name "CamControl"
+    TargetCamera "FreeCam"
+    Speed 100.0
+}
+StaticMesh
+{
+    name "floor"
+    mesh "plane.mesh"
+    material
+    {
+        shader "DefaultPattern.shader"
+    }
+}
+
+StaticMesh
+{
+    name "couch"
+    mesh "SM_Couch.mesh"
+    material
+    {
+        shader "SM_Couch.shader"
+        var maskMap = texture["T_Couch_Mask.TGA"]
+        var leatherNormalMap = texture["T_Leather_N.TGA"]
+        var baseNormalMap = texture["T_Couch_N.TGA"]
+        var aoMap = texture["T_Couch_AO.TGA"]
+        var leatherSpecularMap = texture["T_Leather_S.TGA"]
+        var leatherMap = texture["T_Leather_D.TGA"]
+    }
+    transform [0.0 0.0 -1.0 0.0
+               0.0 1.0 0.0 0.0
+               1.0 0.0 0.0 0.0
+               0.0 0.0 -150.0 1.0]
+}
+
+
+SkeletalMesh
+{
+    name "hero"
+    mesh "hero/HeroTPP.mesh"
+    Skeleton "hero/HeroTPP.skeleton"
+    SimpleAnimation "hero/Run_Fwd.anim"
+    material
+    {
+        shader "Hero.shader"
+        var albedoMap = texture["Hero/Chr_FPS_D.TGA"]
+    }
+}

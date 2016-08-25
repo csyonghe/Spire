@@ -1,0 +1,99 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="GameEngineCore.cpp" />
+    <ClCompile Include="Mesh.cpp" />
+    <ClCompile Include="AnimationSynthesizer.cpp" />
+    <ClCompile Include="Skeleton.cpp" />
+    <ClCompile Include="Engine.cpp" />
+    <ClCompile Include="VulkanAPI\vkel.c">
+      <Filter>Vulkan API</Filter>
+    </ClCompile>
+    <ClCompile Include="..\CoreLib\LibGL\glew\glew.c">
+      <Filter>OpenGL API</Filter>
+    </ClCompile>
+    <ClCompile Include="Spire\Spire.cpp">
+      <Filter>Spire</Filter>
+    </ClCompile>
+    <ClCompile Include="Camera.cpp" />
+    <ClCompile Include="Level.cpp" />
+    <ClCompile Include="SkeletalMeshActor.cpp" />
+    <ClCompile Include="StaticMeshActor.cpp" />
+    <ClCompile Include="Actor.cpp" />
+    <ClCompile Include="Material.cpp" />
+    <ClCompile Include="DynamicVariable.cpp" />
+    <ClCompile Include="InputDispatcher.cpp" />
+    <ClCompile Include="HardwareInputInterface.cpp" />
+    <ClCompile Include="FreeRoamCameraController.cpp" />
+    <ClCompile Include="TextureCompressor.cpp" />
+    <ClCompile Include="TextureTool\LibSquish.cpp" />
+    <ClCompile Include="VulkanHardwareRenderer.cpp">
+      <Filter>Vulkan API</Filter>
+    </ClCompile>
+    <ClCompile Include="Renderer.cpp" />
+    <ClCompile Include="GLAPI\GLHardwareRenderer.cpp">
+      <Filter>GL API</Filter>
+    </ClCompile>
+    <ClCompile Include="HardwareApiFactory.cpp" />
+    <ClCompile Include="UISystem_Windows.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Mesh.h" />
+    <ClInclude Include="Level.h" />
+    <ClInclude Include="AnimationSynthesizer.h" />
+    <ClInclude Include="Skeleton.h" />
+    <ClInclude Include="Actor.h" />
+    <ClInclude Include="Material.h" />
+    <ClInclude Include="DynamicVariable.h" />
+    <ClInclude Include="Engine.h" />
+    <ClInclude Include="VulkanAPI\vk_cpp.hpp">
+      <Filter>Vulkan API</Filter>
+    </ClInclude>
+    <ClInclude Include="VulkanAPI\vkel.h">
+      <Filter>Vulkan API</Filter>
+    </ClInclude>
+    <ClInclude Include="..\CoreLib\LibGL\glew\glew.h">
+      <Filter>OpenGL API</Filter>
+    </ClInclude>
+    <ClInclude Include="..\CoreLib\LibGL\glew\glxew.h">
+      <Filter>OpenGL API</Filter>
+    </ClInclude>
+    <ClInclude Include="..\CoreLib\LibGL\glew\wglew.h">
+      <Filter>OpenGL API</Filter>
+    </ClInclude>
+    <ClInclude Include="Spire\Basic.h">
+      <Filter>Spire</Filter>
+    </ClInclude>
+    <ClInclude Include="Spire\Spire.h">
+      <Filter>Spire</Filter>
+    </ClInclude>
+    <ClInclude Include="Camera.h" />
+    <ClInclude Include="SkeletalMeshActor.h" />
+    <ClInclude Include="StaticMeshActor.h" />
+    <ClInclude Include="InputDispatcher.h" />
+    <ClInclude Include="HardwareInputInterface.h" />
+    <ClInclude Include="Common.h" />
+    <ClInclude Include="FreeRoamCameraController.h" />
+    <ClInclude Include="TextureCompressor.h" />
+    <ClInclude Include="TextureTool\LibSquish.h" />
+    <ClInclude Include="HardwareRenderer.h" />
+    <ClInclude Include="Renderer.h" />
+    <ClInclude Include="RenderContext.h" />
+    <ClInclude Include="HardwareApiFactory.h" />
+    <ClInclude Include="UISystem_Windows.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Vulkan API">
+      <UniqueIdentifier>{f375156a-adb5-480f-a4fb-48b8eefc1bb7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="OpenGL API">
+      <UniqueIdentifier>{4250cc45-c1d6-4d42-b563-dd64dfac0a01}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Spire">
+      <UniqueIdentifier>{740d680c-1f53-439f-b533-c02cdb37fa06}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="GL API">
+      <UniqueIdentifier>{cf8b8a6b-92d1-41a9-a172-5e08804be4fa}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

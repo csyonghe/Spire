@@ -3,6 +3,8 @@
 Spire - The MIT License (MIT)
 Copyright (c) 2016, Carnegie Mellon University
 
+Developers: Yong He, Haomin Long
+
 Permission is hereby granted, free of charge, to any person obtaining a 
 copy of this software and associated documentation files (the "Software"), 
 to deal in the Software without restriction, including without limitation 
@@ -1331,7 +1333,8 @@ namespace CoreLib
 			}
 		};
 
-		int StringToInt(const String & str);
+		int StringToInt(const String & str, int radix = 10);
+		unsigned int StringToUInt(const String & str, int radix = 10);
 		double StringToDouble(const String & str);
 
 		
@@ -5213,6 +5216,15 @@ namespace CoreLib
 						return -StringToInt(token.Str);
 					else
 						return StringToInt(token.Str);
+				}
+				throw TextFormatException(L"Text parsing error: int expected.");
+			}
+			unsigned int ReadUInt()
+			{
+				auto token = ReadToken();
+				if (token.TypeID == TokenType_Int)
+				{
+					return StringToUInt(token.Str);
 				}
 				throw TextFormatException(L"Text parsing error: int expected.");
 			}

@@ -172,7 +172,7 @@ namespace Spire
 									if (parser.LookAhead(L":"))
 									{
 										parser.Read(L":");
-										auto value = parser.ReadWord();
+										auto value = parser.ReadToken().Str;
 										w->BackendParameters[param] = value;
 									}
 									else

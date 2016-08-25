@@ -189,7 +189,11 @@ class UniformGLSLImportOperatorHandler : public GLSLImportOperatorHandler
 
 		if (activeEntryCount)
 		{
-			sb << L"layout(std140";
+			sb << L"layout(";
+			if (bufferType == L"buffer")
+				sb << L"std430";
+			else
+				sb << L"std140";
 			String strIndex;
 			if (block->Attributes.TryGetValue(L"Index", strIndex))
 				sb << L", binding = " << strIndex;

@@ -16,6 +16,12 @@ namespace Spire
 				return new ILBasicType(ILBaseType::Int);
 			else if (parser.LookAhead(L"uint"))
 				return new ILBasicType(ILBaseType::UInt);
+			else if (parser.LookAhead(L"uvec2"))
+				return new ILBasicType(ILBaseType::UInt2);
+			else if (parser.LookAhead(L"uvec3"))
+				return new ILBasicType(ILBaseType::UInt3);
+			else if (parser.LookAhead(L"uvec4"))
+				return new ILBasicType(ILBaseType::UInt4);
 			if (parser.LookAhead(L"float"))
 				return new ILBasicType(ILBaseType::Float);
 			if (parser.LookAhead(L"vec2"))
@@ -42,6 +48,8 @@ namespace Spire
 				return new ILBasicType(ILBaseType::TextureCube);
 			if (parser.LookAhead(L"samplerCubeShadow"))
 				return new ILBasicType(ILBaseType::TextureCubeShadow);
+			if (parser.LookAhead(L"bool"))
+				return new ILBasicType(ILBaseType::Bool);
 			return nullptr;
 		}
 
@@ -77,6 +85,12 @@ namespace Spire
 				return 4;
 			if (type == ILBaseType::UInt)
 				return 4;
+			if (type == ILBaseType::UInt2)
+				return 8;
+			if (type == ILBaseType::UInt3)
+				return 12;
+			if (type == ILBaseType::UInt4)
+				return 16;
 			else if (type == ILBaseType::Int2)
 				return 8;
 			else if (type == ILBaseType::Int3)
@@ -103,9 +117,21 @@ namespace Spire
 				return 8;
 			else if (type == ILBaseType::TextureShadow)
 				return 8;
+			else if (type == ILBaseType::Bool)
+				return 4;
 			else
 				return 0;
 		}
+
+		bool ILType::IsBool()
+		{
+			auto basicType = dynamic_cast<ILBasicType*>(this);
+			if (basicType)
+				return basicType->Type == ILBaseType::Bool;
+			else
+				return false;
+		}
+
 		bool ILType::IsInt()
 		{
 			auto basicType = dynamic_cast<ILBasicType*>(this);
@@ -115,11 +141,21 @@ namespace Spire
 				return false;
 		}
 
+		bool ILType::IsUInt()
+		{
+			auto basicType = dynamic_cast<ILBasicType*>(this);
+			if (basicType)
+				return basicType->Type == ILBaseType::UInt;
+			else
+				return false;
+		}
+
 		bool ILType::IsIntegral()
 		{
 			auto basicType = dynamic_cast<ILBasicType*>(this);
 			if (basicType)
-				return basicType->Type == ILBaseType::Int || basicType->Type == ILBaseType::Int2 || basicType->Type == ILBaseType::Int3 || basicType->Type == ILBaseType::Int4 || basicType->Type == ILBaseType::UInt;
+				return basicType->Type == ILBaseType::Int || basicType->Type == ILBaseType::Int2 || basicType->Type == ILBaseType::Int3 || basicType->Type == ILBaseType::Int4 
+				|| basicType->Type == ILBaseType::UInt || basicType->Type == ILBaseType::UInt2 || basicType->Type == ILBaseType::UInt3 || basicType->Type == ILBaseType::UInt4;
 			else
 				return false;
 		}
@@ -138,6 +174,15 @@ namespace Spire
 			auto basicType = dynamic_cast<ILBasicType*>(this);
 			if (basicType)
 				return basicType->Type == ILBaseType::Int2 || basicType->Type == ILBaseType::Int3 || basicType->Type == ILBaseType::Int4;
+			else
+				return false;
+		}
+
+		bool ILType::IsUIntVector()
+		{
+			auto basicType = dynamic_cast<ILBasicType*>(this);
+			if (basicType)
+				return basicType->Type == ILBaseType::UInt2 || basicType->Type == ILBaseType::UInt3 || basicType->Type == ILBaseType::UInt4;
 			else
 				return false;
 		}
@@ -188,12 +233,15 @@ namespace Spire
 				{
 				case ILBaseType::Int2:
 				case ILBaseType::Float2:
+				case ILBaseType::UInt2:
 					return 2;
 				case ILBaseType::Int3:
 				case ILBaseType::Float3:
+				case ILBaseType::UInt3:
 					return 3;
 				case ILBaseType::Int4:
 				case ILBaseType::Float4:
+				case ILBaseType::UInt4:
 					return 4;
 				case ILBaseType::Float3x3:
 					return 9;
@@ -456,7 +504,8 @@ namespace Spire
 		String ImportInstruction::ToString()
 		{
 			StringBuilder rs;
-			rs << Name << L" = import<" << ImportOperator->Name.Content << ">[" << ComponentName << L"@" << SourceWorld->WorldName << L"](";
+			//__DEBUG__: ImportOperator->Name.Content will cause error, so replaced it with N/A
+			rs << Name << L" = import<" << L"N/A" << ">[" << ComponentName << L"@" << SourceWorld->WorldName << L"](";
 			for (auto & arg : Arguments)
 			{
 				rs << arg->ToString() << L", ";

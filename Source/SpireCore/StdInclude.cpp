@@ -136,7 +136,7 @@ __intrinsic vec3 clamp(vec3 v, vec3 v1, vec3 v2);
 __intrinsic vec4 clamp(vec4 v, vec4 v1, vec4 v2);
 
 __intrinsic vec3 reflect(vec3 I, vec3 N);
-__intrinsic vec3 reflect(vec3 I, vec3 N, float eta);
+__intrinsic vec3 refract(vec3 I, vec3 N, float eta);
 
 __intrinsic float length(vec2 v);
 __intrinsic float length(vec3 v);
@@ -152,6 +152,8 @@ __intrinsic vec4 mix(vec4 v0, vec4 v1, vec4 t);
 __intrinsic vec2 mix(vec2 v0, vec2 v1, vec2 t);
 __intrinsic mat3 mat3(vec3 a, vec3 b, vec3 c);
 __intrinsic mat3 mat3(float a0, float a1, float a2, float a3, float a4, float a5, float a6, float a7, float a8);
+__intrinsic mat4 mat4(vec4 a, vec4 b, vec4 c, vec4 d);
+__intrinsic mat4 mat4(float a0, float a1, float a2, float a3, float a4, float a5, float a6, float a7, float a8, float a9, float a10, float a11, float a12, float a13, float a14, float a15);
 __intrinsic vec3 cross(vec3 v1, vec3 v2);
 __intrinsic vec2 vec2(float v);
 __intrinsic vec3 vec3(float v);

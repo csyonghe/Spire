@@ -79,7 +79,7 @@ namespace Spire
 				{
 					auto name = GenerateCodeName(op->Name, L"");
 					PrintDef(Header, op->Type.Ptr(), name);
-					if (op->Type->IsInt())
+					if (op->Type->IsInt() || op->Type->IsUInt())
 					{
 						Header << L" = 0;";
 					}
@@ -307,32 +307,32 @@ namespace Spire
 				else if (instr->Is<CmpeqlInstruction>())
 				{
 					op = L"==";
-					ctx.Body << L"int";
+					//ctx.Body << L"int";
 				}
 				else if (instr->Is<CmpgeInstruction>())
 				{
 					op = L">=";
-					ctx.Body << L"int";
+					//ctx.Body << L"int";
 				}
 				else if (instr->Is<CmpgtInstruction>())
 				{
 					op = L">";
-					ctx.Body << L"int";
+					//ctx.Body << L"int";
 				}
 				else if (instr->Is<CmpleInstruction>())
 				{
 					op = L"<=";
-					ctx.Body << L"int";
+					//ctx.Body << L"int";
 				}
 				else if (instr->Is<CmpltInstruction>())
 				{
 					op = L"<";
-					ctx.Body << L"int";
+					//ctx.Body << L"int";
 				}
 				else if (instr->Is<CmpneqInstruction>())
 				{
 					op = L"!=";
-					ctx.Body << L"int";
+					//ctx.Body << L"int";
 				}
 				else if (instr->Is<AndInstruction>())
 				{

@@ -62,6 +62,15 @@ namespace CoreLib
 				}
 				throw TextFormatException(L"Text parsing error: int expected.");
 			}
+			unsigned int ReadUInt()
+			{
+				auto token = ReadToken();
+				if (token.TypeID == TokenType_Int)
+				{
+					return StringToUInt(token.Str);
+				}
+				throw TextFormatException(L"Text parsing error: int expected.");
+			}
 			double ReadDouble()
 			{
 				auto token = ReadToken();

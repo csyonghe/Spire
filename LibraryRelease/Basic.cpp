@@ -3,6 +3,8 @@
 Spire - The MIT License (MIT)
 Copyright (c) 2016, Carnegie Mellon University
 
+Developers: Yong He, Haomin Long
+
 Permission is hereby granted, free of charge, to any person obtaining a 
 copy of this software and associated documentation files (the "Software"), 
 to deal in the Software without restriction, including without limitation 
@@ -213,10 +215,14 @@ namespace CoreLib
 			return StringConcat(op1.buffer.Ptr(), op1.length, op2.buffer.Ptr(), op2.length);
 		}
 
-		int StringToInt(const String & str)
+		int StringToInt(const String & str, int radix)
 		{
-			return (int)wcstol(str.Buffer(), NULL, 10);
+			return (int)wcstol(str.Buffer(), NULL, radix);
 			//return (int)_wcstoi64(str.Buffer(), NULL, 10);
+		}
+		unsigned int StringToUInt(const String & str, int radix)
+		{
+			return (unsigned int)wcstoul(str.Buffer(), NULL, radix);
 		}
 		double StringToDouble(const String & str)
 		{
