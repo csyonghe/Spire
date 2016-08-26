@@ -903,7 +903,7 @@ namespace GLL
 			if (persistentMapping)
 			{
 				glDeleteBuffers(1, &Handle);
-				glCreateBuffers(1, &Handle);
+				glGenBuffers(1, &Handle);
 				glBindBuffer(BindTarget, Handle);
 				glNamedBufferStorage(Handle, sizeInBytes, data, GL_MAP_PERSISTENT_BIT | GL_MAP_READ_BIT | GL_MAP_WRITE_BIT | GL_MAP_COHERENT_BIT);
 				glBindBuffer(BindTarget, 0);
@@ -2309,9 +2309,12 @@ namespace GLL
 				glGenTextures(1, &handle);
 				glBindTexture(GL_TEXTURE_2D, handle);
 			}
-			glTextureParameteri(handle, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glTextureParameteri(handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-			glTextureParameterf(handle, GL_TEXTURE_MAX_ANISOTROPY_EXT, 8.0f);
+			glBindTexture(GL_TEXTURE_2D, handle);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 8.0f);
+			glBindTexture(GL_TEXTURE_2D, 0);
+
 			auto rs = new Texture2D();
 			rs->Handle = handle;
 			rs->BindTarget = GL_TEXTURE_2D;
@@ -2328,9 +2331,13 @@ namespace GLL
 				glGenTextures(1, &handle);
 				glBindTexture(GL_TEXTURE_CUBE_MAP, handle);
 			}
-			glTextureParameteri(handle, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glTextureParameteri(handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glBindTexture(GL_TEXTURE_CUBE_MAP, handle);
+
+			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 			//glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAX_ANISOTROPY_EXT, 8.0f);
+			glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+
 			auto rs = TextureCube();
 			rs.Handle = handle;
 			rs.BindTarget = GL_TEXTURE_CUBE_MAP;

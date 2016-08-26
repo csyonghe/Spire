@@ -13,7 +13,7 @@
 #include "TextureCompressor.h"
 #include <fstream>
 
-#define DEFERRED 0
+#define DEFERRED 1
 const wchar_t* lightingString = DEFERRED ? L"DeferredLighting" : L"ForwardLighting";
 
 using namespace CoreLib;

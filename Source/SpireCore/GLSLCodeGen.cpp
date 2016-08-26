@@ -751,7 +751,7 @@ namespace Spire
 				CompiledShaderSource rs;
 				CodeGenContext context;
 				context.Result = &result;
-				context.GlobalHeader << L"#version 450\n";
+				context.GlobalHeader << L"#version 440\n";
 				if (bindlessTexture)
 					context.GlobalHeader << L"#extension GL_ARB_bindless_texture: require\n#extension GL_NV_gpu_shader5 : require\n";
 				if (useNVCommandList)

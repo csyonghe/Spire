@@ -94,6 +94,19 @@ namespace Spire
 			eSubpassData = 6
 		};
 
+		enum class ImageOperands
+		{
+			None = 0,
+			Bias = 0x1,
+			Lod = 0x2,
+			Grad = 0x4,
+			ConstOffset = 0x8,
+			Offset = 0x10,
+			ConstOffsets = 0x20,
+			Sample = 0x40,
+			MinLod = 0x80
+		};
+
 		String StorageClassToString(StorageClass store)
 		{
 			switch (store)
@@ -260,6 +273,33 @@ namespace Spire
 				return L"SubpassData";
 			default:
 				throw NotImplementedException(L"unknown Builtin");
+			}
+		}
+
+		String ImageOperandsToString(ImageOperands io)
+		{
+			switch (io)
+			{
+			case ImageOperands::None:
+				return L"None";
+			case ImageOperands::Bias:
+				return L"Bias";
+			case ImageOperands::Lod:
+				return L"Lod";
+			case ImageOperands::Grad:
+				return L"Grad";
+			case ImageOperands::ConstOffset:
+				return L"ConstOffset";
+			case ImageOperands::Offset:
+				return L"Offset";
+			case ImageOperands::ConstOffsets:
+				return L"ConstOffsets";
+			case ImageOperands::Sample:
+				return L"Sample";
+			case ImageOperands::MinLod:
+				return L"MinLod";
+			default:
+				throw NotImplementedException(L"unknown Image Operands");
 			}
 		}
 
@@ -1129,6 +1169,18 @@ namespace Spire
 				streamFunctionBody.Add(compositeID);
 				streamFunctionBody.Add(index);
 			}
+			void OpCompositeInsert(const int ID, const int typeID, const int objectID, const int compositeID, const int index)
+			{
+				sbTextFunctionBody << LR"(%)" << ID << LR"( = OpCompositeInsert %)"
+					<< typeID << LR"( %)" << objectID << LR"( %)" << compositeID << LR"( )" << index << EndLine;
+
+				streamFunctionBody.Add(82 + (6 << 16));
+				streamFunctionBody.Add(typeID);
+				streamFunctionBody.Add(ID);
+				streamFunctionBody.Add(objectID);
+				streamFunctionBody.Add(compositeID);
+				streamFunctionBody.Add(index);
+			}
 			void OpExtInst(const int ID, const int typeID, const int instrNumber, const List<int> &Arguments)
 			{
 				sbTextFunctionBody << LR"(%)" << ID << LR"( = OpExtInst %)" << typeID << LR"( %1 )";
@@ -1201,29 +1253,175 @@ namespace Spire
 				streamFunctionBody.Add(structID);
 				streamFunctionBody.Add(indexID);
 			}
-			void OpImageSampleImplicitLod(const int ID, const int typeID, const int textureID, const int coordinateID)
+			void OpImageSampleImplicitLod(
+				const int ID, 
+				const int typeID, 
+				const int textureID, 
+				const int coordinateID,
+				const int Bias = -1)
 			{
 				sbTextFunctionBody << LR"(%)" << ID << LR"( = OpImageSampleImplicitLod %)"
-					<< typeID << LR"( %)" << textureID << LR"( %)" << coordinateID << EndLine;
+					<< typeID << LR"( %)" << textureID << LR"( %)" << coordinateID;
+				if (Bias != -1)
+					sbTextFunctionBody << LR"( Bias %)" << Bias;
+				sbTextFunctionBody << EndLine;
 
-				streamFunctionBody.Add(87 + (5 << 16));
+				int len = 5;
+				int IO = 0;
+				if (Bias != -1)
+				{
+					len++;
+					IO |= (int)ImageOperands::Bias;
+				}
+				if (IO)
+					len++;
+				streamFunctionBody.Add(87 + (len << 16));
 				streamFunctionBody.Add(typeID);
 				streamFunctionBody.Add(ID);
 				streamFunctionBody.Add(textureID);
 				streamFunctionBody.Add(coordinateID);
+				if (IO)
+					streamFunctionBody.Add(IO);
+				if (Bias != -1)
+					streamFunctionBody.Add(Bias);
 			}
-			void OpImageSampleExplicitLod(const int ID, const int typeID, const int textureID, const int coordinateID, const int LodID)
+			void OpImageSampleExplicitLod(
+				const int ID, 
+				const int typeID, 
+				const int textureID, 
+				const int coordinateID, 
+				const int LodID,
+				const int Bias = -1,
+				const int GradX = -1, 
+				const int GradY = -1)
 			{
 				sbTextFunctionBody << LR"(%)" << ID << LR"( = OpImageSampleExplicitLod %)"
-					<< typeID << LR"( %)" << textureID << LR"( %)" << coordinateID
-					<< LR"( Lod %)" << LodID << EndLine;
+					<< typeID << LR"( %)" << textureID << LR"( %)" << coordinateID;
+				if (Bias != -1)
+					sbTextFunctionBody << LR"( Bias %)" << Bias;
+				if (GradX != -1)
+					sbTextFunctionBody << LR"( Grad %)" << GradX << LR"( %)" << GradY;
+				else
+					sbTextFunctionBody << LR"( Lod %)" << LodID;
+				sbTextFunctionBody << EndLine;
 
-				streamFunctionBody.Add(88 + (7 << 16));
+				int IO = 0;
+				int len = 5;
+				if (Bias != -1)
+				{
+					IO |= (int)ImageOperands::Bias;
+					len++;
+				}
+				if (GradX != -1) {
+					IO |= (int)ImageOperands::Grad;
+					len += 2;
+				}
+				else
+				{
+					IO |= (int)ImageOperands::Lod;
+					len++;
+				}
+				if (IO)
+					len++;
+				streamFunctionBody.Add(88 + (len << 16));
 				streamFunctionBody.Add(typeID);
 				streamFunctionBody.Add(ID);
 				streamFunctionBody.Add(textureID);
 				streamFunctionBody.Add(coordinateID);
-				streamFunctionBody.Add(0x2);		//image operand: Lod
+				if (IO)
+					streamFunctionBody.Add(IO);
+				if (Bias != -1)
+					streamFunctionBody.Add(Bias);
+				if (GradX != -1)
+				{
+					streamFunctionBody.Add(GradX);
+					streamFunctionBody.Add(GradY);
+				}
+				else
+					streamFunctionBody.Add(LodID);
+			}
+			void OpImageSampleDrefImplicitLod(
+				const int ID,
+				const int typeID,
+				const int textureID,
+				const int coordinateID,
+				const int DrefID)
+			{
+				sbTextFunctionBody << LR"(%)" << ID << LR"( = OpImageSampleDrefImplicitLod %)"
+					<< typeID << LR"( %)" << textureID << LR"( %)" << coordinateID << LR"( %)" << DrefID;
+				sbTextFunctionBody << EndLine;
+
+				int len = 6;
+				streamFunctionBody.Add(89 + (len << 16));
+				streamFunctionBody.Add(typeID);
+				streamFunctionBody.Add(ID);
+				streamFunctionBody.Add(textureID);
+				streamFunctionBody.Add(coordinateID);
+				streamFunctionBody.Add(DrefID);
+			}
+			void OpImageSampleDrefExplicitLod(
+				const int ID,
+				const int typeID,
+				const int textureID,
+				const int coordinateID, 
+				const int DrefID,
+				const int LodID)
+			{
+				sbTextFunctionBody << LR"(%)" << ID << LR"( = OpImageSampleDrefExplicitLod %)"
+					<< typeID << LR"( %)" << textureID << LR"( %)" << coordinateID << LR"( %)" << DrefID;
+				sbTextFunctionBody << LR"( Lod %)" << LodID;
+				sbTextFunctionBody << EndLine;
+
+				int len = 8;
+				streamFunctionBody.Add(90 + (len << 16));
+				streamFunctionBody.Add(typeID);
+				streamFunctionBody.Add(ID);
+				streamFunctionBody.Add(textureID);
+				streamFunctionBody.Add(coordinateID);
+				streamFunctionBody.Add(DrefID);
+				streamFunctionBody.Add((int)ImageOperands::Lod);
+				streamFunctionBody.Add(LodID);
+			}
+			void OpImageSampleProjDrefImplicitLod(
+				const int ID,
+				const int typeID,
+				const int textureID,
+				const int coordinateID,
+				const int DrefID) 
+			{
+				sbTextFunctionBody << LR"(%)" << ID << LR"( = OpImageSampleProjDrefImplicitLod %)"
+					<< typeID << LR"( %)" << textureID << LR"( %)" << coordinateID << LR"( %)" << DrefID;
+				sbTextFunctionBody << EndLine;
+
+				int len = 6;
+				streamFunctionBody.Add(93 + (len << 16));
+				streamFunctionBody.Add(typeID);
+				streamFunctionBody.Add(ID);
+				streamFunctionBody.Add(textureID);
+				streamFunctionBody.Add(coordinateID);
+				streamFunctionBody.Add(DrefID);
+			}
+			void OpImageSampleProjDrefExplicitLod(
+				const int ID,
+				const int typeID,
+				const int textureID,
+				const int coordinateID,
+				const int DrefID,
+				const int LodID)
+			{
+				sbTextFunctionBody << LR"(%)" << ID << LR"( = OpImageSampleProjDrefExplicitLod %)"
+					<< typeID << LR"( %)" << textureID << LR"( %)" << coordinateID << LR"( %)" << DrefID;
+				sbTextFunctionBody << LR"( Lod %)" << LodID;
+				sbTextFunctionBody << EndLine;
+
+				int len = 8;
+				streamFunctionBody.Add(94 + (len << 16));
+				streamFunctionBody.Add(typeID);
+				streamFunctionBody.Add(ID);
+				streamFunctionBody.Add(textureID);
+				streamFunctionBody.Add(coordinateID);
+				streamFunctionBody.Add(DrefID);
+				streamFunctionBody.Add((int)ImageOperands::Lod);
 				streamFunctionBody.Add(LodID);
 			}
 			void OpConvertSToF(const int ID, const int typeID, const int operandID)
@@ -2051,6 +2249,16 @@ namespace Spire
 				return CurrentID;
 			}
 
+			int AddInstrCompositeInsert(RefPtr<ILType> Type, int ID, int index, int op)
+			{
+				//ID[index] = op
+				int typeID = DefineType(Type);
+				++CurrentID;
+				CodeGen.OpCompositeInsert(CurrentID, typeID, op, ID, index);
+				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(CurrentID, Type, 0, typeID);
+				return CurrentID;
+			}
+
 			int AddInstrExtInst(ILOperand* op, RefPtr<ILType> Type, int instrNumber, List<int> Arguments)
 			{
 				int typeID = DefineType(Type);
@@ -2276,26 +2484,100 @@ namespace Spire
 				return CurrentID;
 			}
 
-			int AddInstrTexture(ILOperand *op, int textureID, int coordinateID, ExecutionModel currentExecutionModel) {
+			int AddInstrTexture(
+				ILOperand *op, 
+				int textureID, 
+				int coordinateID, 
+				ExecutionModel currentExecutionModel,
+				int Bias = -1,
+				int GradX = -1,
+				int GradY = -1)
+			{
 				RefPtr<ILType> typeIL = GetBasicTypeFromString(L"vec4");
 				int typeID = DefineType(typeIL);
-				int zeroID = AddInstrConstantInt(GetBasicTypeFromString(L"int"), 0);
+
+				++CurrentID;
+				if (currentExecutionModel == ExecutionModel::Fragment && GradX == -1)
+				{
+					//implicit LOD
+					CodeGen.OpImageSampleImplicitLod(CurrentID, typeID, textureID, coordinateID, Bias);
+				}
+				else
+				{
+					//explicit LOD
+					int zeroID = AddInstrConstantInt(GetBasicTypeFromString(L"int"), 0);
+					CodeGen.OpImageSampleExplicitLod(CurrentID, typeID, textureID, coordinateID, zeroID, Bias, GradX, GradY);
+				}
+				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(
+					CurrentID,
+					typeIL,
+					op,
+					typeID
+				);
+				UpdateValue(op, CurrentID);
+
+				return CurrentID;
+			}
+
+			int AddInstrTextureShadow(
+				ILOperand *op, 
+				int textureID, 
+				int coordinateID, 
+				ExecutionModel currentExecutionModel) 
+			{
+				RefPtr<ILType> typeIL = GetBasicTypeFromString(L"vec4");
+				int typeID = DefineType(typeIL);
+
+				int veclen = IDInfos[coordinateID]().GetILType()->GetVectorSize();
+				int DrefID = AddInstrCompositeExtract(coordinateID, GetTypeFromString(L"float"), veclen-1);
 
 				++CurrentID;
 				if (currentExecutionModel == ExecutionModel::Fragment)
 				{
 					//implicit LOD
-					/*FunctionBody << LR"(%)" << CurrentID << LR"( = OpImageSampleImplicitLod %)"
-					<< typeID << LR"( %)" << textureID << LR"( %)" << coordinateID << EndLine;*/
-					CodeGen.OpImageSampleImplicitLod(CurrentID, typeID, textureID, coordinateID);
+					CodeGen.OpImageSampleDrefImplicitLod(CurrentID, typeID, textureID, coordinateID, DrefID);
 				}
 				else
 				{
 					//explicit LOD
-					/*FunctionBody << LR"(%)" << CurrentID << LR"( = OpImageSampleExplicitLod %)"
-					<< typeID << LR"( %)" << textureID << LR"( %)" << coordinateID
-					<< LR"( Lod %)" << zeroID << EndLine;*/
-					CodeGen.OpImageSampleExplicitLod(CurrentID, typeID, textureID, coordinateID, zeroID);
+					int zeroID = AddInstrConstantInt(GetBasicTypeFromString(L"int"), 0);
+					CodeGen.OpImageSampleDrefExplicitLod(CurrentID, typeID, textureID, coordinateID, DrefID, zeroID);
+				}
+				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(
+					CurrentID,
+					typeIL,
+					op,
+					typeID
+				);
+				UpdateValue(op, CurrentID);
+
+				return CurrentID;
+			}
+
+			int AddInstrTexture2DShadowProj(
+				ILOperand *op,
+				int textureID,
+				int coordinateID,	////coordinateID: u, v, depth, q
+				ExecutionModel currentExecutionModel)
+			{
+				RefPtr<ILType> typeIL = GetBasicTypeFromString(L"vec4");
+				int typeID = DefineType(typeIL);
+
+				int DrefID = AddInstrCompositeExtract(coordinateID, GetTypeFromString(L"float"), 2);
+				int qID = AddInstrCompositeExtract(coordinateID, GetTypeFromString(L"float"), 3);
+				int NewCoordinateID = AddInstrCompositeInsert(IDInfos[coordinateID]().GetILType(), coordinateID, 2, qID);
+
+				++CurrentID;
+				if (currentExecutionModel == ExecutionModel::Fragment)
+				{
+					//implicit LOD
+					CodeGen.OpImageSampleProjDrefImplicitLod(CurrentID, typeID, textureID, NewCoordinateID, DrefID);
+				}
+				else
+				{
+					//explicit LOD
+					int zeroID = AddInstrConstantInt(GetBasicTypeFromString(L"int"), 0);
+					CodeGen.OpImageSampleProjDrefExplicitLod(CurrentID, typeID, textureID, NewCoordinateID, DrefID, zeroID);
 				}
 				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(
 					CurrentID,
@@ -3030,11 +3312,23 @@ namespace Spire
 				{
 					if (instr->Arguments[0]->Type->IsNonShadowTexture())
 					{
-						if (instr->Arguments[1]->Type->GetVectorSize() == 2)
+						if (instr->Arguments[0]->Type->ToString() == L"sampler2D")
+						{
+							//*** no bias!!!
+							//__intrinsic vec4 texture(sampler2D tex, vec2 coord);
+							ctx.AddInstrTexture(
+								(ILOperand*)instr,
+								GetOperandValue(instr->Arguments[0].Ptr()),
+								GetOperandValue(instr->Arguments[1].Ptr()),
+								currentExecutionModel
+							);
+							return;
+						}
+						else if (instr->Arguments[0]->Type->ToString() == L"samplerCube")
 						{
 							if (instr->Arguments.Count() == 2)
 							{
-								//__intrinsic vec4 texture(sampler2D tex, vec2 coord);
+								//__intrinsic vec4 texture(samplerCube tex, vec3 coord);
 								ctx.AddInstrTexture(
 									(ILOperand*)instr,
 									GetOperandValue(instr->Arguments[0].Ptr()),
@@ -3043,23 +3337,16 @@ namespace Spire
 								);
 								return;
 							}
-							else
-							{
-								//__intrinsic vec4 texture(sampler2D tex, vec2 coord, vec2 dPdx, vec2 dPdy);
-								return;
-							}
-						}
-						else
-						{
-							//instr->Arguments[1]->Type->GetVectorSize() == 3
-							if (instr->Arguments.Count() == 2)
-							{
-								//__intrinsic vec4 texture(samplerCube tex, vec3 coord);
-								return;
-							}
-							else
+							else 
 							{
 								//__intrinsic vec4 texture(samplerCube tex, vec3 coord, float bias);
+								ctx.AddInstrTexture(
+									(ILOperand*)instr,
+									GetOperandValue(instr->Arguments[0].Ptr()),
+									GetOperandValue(instr->Arguments[1].Ptr()),
+									currentExecutionModel,
+									GetOperandValue(instr->Arguments[2].Ptr())
+								);
 								return;
 							}
 						}
@@ -3067,43 +3354,46 @@ namespace Spire
 					else
 					{
 						//instr->Arguments[0]->Type->IsShadowTexture
-						if (instr->Arguments[1]->Type->GetVectorSize() == 3)
-						{
-							//__intrinsic float texture(sampler2DShadow tex, vec3 coord);
-							return;
-						}
-						else
-						{
-							//__intrinsic float texture(samplerCubeShadow tex, vec4 coord);
-							return;
-						}
+							
+						//__intrinsic float texture(sampler2DShadow tex, vec3 coord);
+						//__intrinsic float texture(samplerCubeShadow tex, vec4 coord);
+						ctx.AddInstrTextureShadow(
+							(ILOperand*)instr,
+							GetOperandValue(instr->Arguments[0].Ptr()),
+							GetOperandValue(instr->Arguments[1].Ptr()),
+							currentExecutionModel
+						);
+						return;
 					}
 				}
 
 				if (callName == L"textureGrad")
 				{
-					if (instr->Arguments[1]->Type->GetVectorSize() == 2)
-					{
-						//__intrinsic vec4 textureGrad(sampler2D tex, vec2 coord, vec2 dPdx, vec2 dPdy);
-						return;
-					}
-					else
-					{
-						//__intrinsic vec4 textureGrad(samplerCube tex, vec3 coord, vec3 dPdx, vec3 dPdy);
-						return;
-					}
+					//__intrinsic vec4 textureGrad(sampler2D tex, vec2 coord, vec2 dPdx, vec2 dPdy);
+					//__intrinsic vec4 textureGrad(samplerCube tex, vec3 coord, vec3 dPdx, vec3 dPdy);
+					ctx.AddInstrTexture(
+						(ILOperand*)instr,
+						GetOperandValue(instr->Arguments[0].Ptr()),
+						GetOperandValue(instr->Arguments[1].Ptr()),
+						currentExecutionModel,
+						-1,	//Bias
+						GetOperandValue(instr->Arguments[2].Ptr()),
+						GetOperandValue(instr->Arguments[3].Ptr())
+					);
+					return;
 				}
 
 				if (callName == L"textureProj")
 				{
-					if (instr->Arguments[1]->Type->GetVectorSize() == 4)
+					if (instr->Arguments[0]->Type->ToString() == L"sampler2DShadow")
 					{
 						//__intrinsic float textureProj(sampler2DShadow tex, vec4 coord);
-						return;
-					}
-					else
-					{
-						//???
+						ctx.AddInstrTexture2DShadowProj(
+							(ILOperand*)instr,
+							GetOperandValue(instr->Arguments[0].Ptr()),
+							GetOperandValue(instr->Arguments[1].Ptr()),
+							currentExecutionModel
+							);
 						return;
 					}
 				}
@@ -3669,12 +3959,15 @@ namespace Spire
 					int textureStorageID = ctx.InterfaceNameToID[instr->ComponentName];
 					auto textureTypeIL = ctx.IDInfos[textureStorageID]().GetILType();
 					int textureValueID = ctx.AddInstrLoad(textureStorageID, textureTypeIL, MemoryAccess::None);
-					int operandID = ctx.AddInstrTexture(
+
+					int operandID = -1;
+					operandID = ctx.AddInstrTexture(
 						0,
 						textureValueID,
 						GetOperandValue(instr->Arguments[0].Ptr()),
 						currentExecutionModel
 					);
+
 					operandID = ctx.ConvertBasicType(
 						operandID,
 						ctx.IDInfos[operandID]().GetILType(),
@@ -4567,7 +4860,7 @@ namespace Spire
 
 				ctx.PopScope();
 
-				ctx.GenerateDebugInformation();
+				//ctx.GenerateDebugInformation();
 				
 				/*printf("%s\n", currentWorld->WorldName.ToMultiByteString());
 				for (int i = 0; i <= ctx.CurrentID; i++)

@@ -110,7 +110,6 @@ __intrinsic vec3 smoothstep(vec3 e0, vec3 e1, vec3 v);
 __intrinsic vec4 smoothstep(vec4 e0, vec4 e1, vec4 v);
 __intrinsic vec4 texture(sampler2D tex, vec2 coord);
 __intrinsic vec4 texture(samplerCube tex, vec3 coord);
-__intrinsic vec4 texture(sampler2D tex, vec2 coord, vec2 dPdx, vec2 dPdy);
 __intrinsic vec4 textureGrad(sampler2D tex, vec2 coord, vec2 dPdx, vec2 dPdy);
 __intrinsic vec4 textureGrad(samplerCube tex, vec3 coord, vec3 dPdx, vec3 dPdy);
 __intrinsic vec4 texture(samplerCube tex, vec3 coord, float bias);
