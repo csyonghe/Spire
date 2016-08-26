@@ -1,4 +1,6 @@
 #Vulkan Engine
+Developers: Yong He and Teguh Hofstee
+##Introduction
 
 This is an engine that uses both Vulkan and OpenGL as the rendering API. The engine uses Spire as its shading language, and use Spire compiler to generate GLSL code for the OpenGL renderer as well as SPIRV for the Vulkan renderer.
 
@@ -12,5 +14,10 @@ GameEngine.exe -dir "$(SolutionDir)ExampleGame" -enginedir "$(SolutionDir)Engine
 ```
 If your system has more than one GPU installed, you can change the -gpu argument to another index to use a different GPU.
 
+##Platform Compatibility Status
+OpenGL renderer: runs on NVIDIA, AMD and Intel GPUs.
 
-Developers: Yong He and Teguh Hofstee.
+Vulkan renderer: runs on NVIDIA GPUs.
+
+
+
