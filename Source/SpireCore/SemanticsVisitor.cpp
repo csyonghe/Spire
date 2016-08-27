@@ -246,6 +246,38 @@ namespace Spire
 					currentShader->Components.TryGetValue(comp->Name.Content, compSym);
 					currentComp = compSym.Ptr();
 					SyntaxVisitor::VisitComponent(comp);
+					if (compSym->Type->DataType.Struct != nullptr || compSym->Type->DataType.IsArray ||
+						compSym->Type->DataType.IsTextureType())
+					{
+						bool valid = true;
+						bool isInStorageBuffer = true;
+						if (comp->Rate)
+						{
+							for (auto & w : comp->Rate->Worlds)
+							{
+								auto world = currentShader->Pipeline->Worlds.TryGetValue(w.World.Content);
+								if (world)
+								{
+									if (!world->IsAbstract)
+										valid = false;
+									isInStorageBuffer = isInStorageBuffer && world->SyntaxNode->LayoutAttributes.ContainsKey(L"ShaderStorageBlock");
+								}
+							}
+						}
+						else 
+							valid = false;
+						if (!valid)
+						{
+							Error(33035, L"\'" + compSym->Name + L"\': sampler, struct and array types only allowed in input worlds.", comp->Name);
+						}
+						else
+						{
+							if (!isInStorageBuffer && compSym->Type->DataType.Struct != nullptr)
+							{
+								Error(33036, L"\'" + compSym->Name + L"\': struct must only be defined in a input world with [ShaderStorageBlock] attribute.", comp->Name);
+							}
+						}
+					}
 					currentComp = nullptr;
 				}
 				virtual void VisitImport(ImportSyntaxNode * import) override

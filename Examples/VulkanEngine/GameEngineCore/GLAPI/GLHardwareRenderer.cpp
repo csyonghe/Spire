@@ -1628,7 +1628,7 @@ namespace GLL
 				hrc = tempOpenGLContext; // If we didn't have support for OpenGL 3.x and up, use the OpenGL 2.1 context
 			}
 
-			int glVersion[2] = { 4, 4 }; // Set some default values for the version
+			int glVersion[2] = { 0, 0 }; // Set some default values for the version
 			glGetIntegerv(GL_MAJOR_VERSION, &glVersion[0]); // Get back the OpenGL MAJOR version we are using
 			glGetIntegerv(GL_MINOR_VERSION, &glVersion[1]); // Get back the OpenGL MAJOR version we are using
 

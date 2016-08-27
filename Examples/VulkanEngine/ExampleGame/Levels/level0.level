@@ -3,9 +3,9 @@ Camera
     name "FreeCam"
     position [0.0 120.0 220.0]
     orientation [0.0 -0.3 0.0] // yaw, pitch, roll
-	zfar 1000.0
-	znear 0.5
-	fov 30.0
+    znear 0.5
+    zfar 1000.0
+    fov 30.0
 }
 
 FreeRoamCameraController
@@ -13,15 +13,6 @@ FreeRoamCameraController
     name "CamControl"
     TargetCamera "FreeCam"
     Speed 100.0
-}
-StaticMesh
-{
-    name "floor"
-    mesh "plane.mesh"
-    material
-    {
-        shader "DefaultPattern.shader"
-    }
 }
 
 StaticMesh
@@ -44,6 +35,15 @@ StaticMesh
                0.0 0.0 -150.0 1.0]
 }
 
+StaticMesh
+{
+    name "floor"
+    mesh "plane.mesh"
+    material
+    {
+        shader "DefaultPattern.shader"
+    }
+}
 
 SkeletalMesh
 {

@@ -6303,6 +6303,38 @@ namespace Spire
 					currentShader->Components.TryGetValue(comp->Name.Content, compSym);
 					currentComp = compSym.Ptr();
 					SyntaxVisitor::VisitComponent(comp);
+					if (compSym->Type->DataType.Struct != nullptr || compSym->Type->DataType.IsArray ||
+						compSym->Type->DataType.IsTextureType())
+					{
+						bool valid = true;
+						bool isInStorageBuffer = true;
+						if (comp->Rate)
+						{
+							for (auto & w : comp->Rate->Worlds)
+							{
+								auto world = currentShader->Pipeline->Worlds.TryGetValue(w.World.Content);
+								if (world)
+								{
+									if (!world->IsAbstract)
+										valid = false;
+									isInStorageBuffer = isInStorageBuffer && world->SyntaxNode->LayoutAttributes.ContainsKey(L"ShaderStorageBlock");
+								}
+							}
+						}
+						else 
+							valid = false;
+						if (!valid)
+						{
+							Error(33035, L"\'" + compSym->Name + L"\': sampler, struct and array types only allowed in input worlds.", comp->Name);
+						}
+						else
+						{
+							if (!isInStorageBuffer && compSym->Type->DataType.Struct != nullptr)
+							{
+								Error(33036, L"\'" + compSym->Name + L"\': struct must only be defined in a input world with [ShaderStorageBlock] attribute.", comp->Name);
+							}
+						}
+					}
 					currentComp = nullptr;
 				}
 				virtual void VisitImport(ImportSyntaxNode * import) override
@@ -8288,6 +8320,72 @@ namespace Spire
 			return TypeFromString(parser);
 		}
 
+		//UniformOrBuffer - 0: none; 1: uniform; 2: buffer 
+		int GetBaseAlignment(ILType* Type, int UniformOrBuffer)
+		{
+			auto RoundUpTo = [](int x, int r)
+			{
+				if (x%r)
+					x += r - x%r;
+				return x;
+			};
+			if (auto basicType = dynamic_cast<ILBasicType*>(Type))
+			{
+				return Type->GetAlignment();
+			}
+			else if (auto arrayType = dynamic_cast<ILArrayType*>(Type))
+			{
+				int elementAlignment = GetBaseAlignment(arrayType->BaseType.Ptr(), UniformOrBuffer);
+				if (UniformOrBuffer == 1)
+					elementAlignment = RoundUpTo(elementAlignment, 16);
+				return elementAlignment;
+			}
+			else if (auto structType = dynamic_cast<ILStructType*>(Type))
+			{
+				int maxAlignment = -1;
+				for (auto &member : structType->Members)
+				{
+					int memberAlignment = GetBaseAlignment(member.Type.Ptr(), UniformOrBuffer);
+					maxAlignment = std::max(maxAlignment, memberAlignment);
+				}
+				if (UniformOrBuffer == 1)
+					maxAlignment = RoundUpTo(maxAlignment, 16);
+				return maxAlignment;
+			}
+			return -1;
+		}
+
+		int GetSize(ILType* Type, int UniformOrBuffer)
+		{
+			auto RoundUpTo = [](int x, int r)
+			{
+				if (x%r)
+					x += r - x%r;
+				return x;
+			};
+
+			if (auto basicType = dynamic_cast<ILBasicType*>(Type))
+			{
+				return Type->GetSize();
+			}
+			else if (auto arrayType = dynamic_cast<ILArrayType*>(Type))
+			{
+				return Type->GetSize();
+			}
+			else if (auto structType = dynamic_cast<ILStructType*>(Type))
+			{
+				int rs = 0;
+				for (auto &member : structType->Members)
+				{
+					int memberAlignment = GetBaseAlignment(member.Type.Ptr(), UniformOrBuffer);
+					rs = RoundUpTo(rs, memberAlignment);
+					rs += member.Type->GetSize();
+				}
+				return rs;
+			}
+			return 0;
+		}
+
 		enum class IDClass
 		{
 			None,
@@ -8314,17 +8412,23 @@ namespace Spire
 			ILOperand *op;
 		public:
 			IDInfo()
-				:available(false) {
+				:available(false)
+			{
 			}
 
-			static IDInfo CreateIDInfoForTypeofValue(int ID, RefPtr<ILType> typeIL)
+			//
+			static IDInfo CreateIDInfoForTypeofValue(int ID, RefPtr<ILType> typeIL, int UniformOrBuffer = 0)
 			{
 				IDInfo ret;
 				ret.available = true;
 				ret.idClass = IDClass::TypeofValue;
 				ret.ID = ID;
-				if (typeIL)
+				if (typeIL) 
+				{
 					ret.typeName = typeIL->ToString();
+					if (UniformOrBuffer)
+						ret.typeName = ret.typeName + L"#" + UniformOrBuffer;
+				}
 				ret.typeID = ID;
 				ret.typeIL = typeIL;
 				return ret;
@@ -9746,7 +9850,8 @@ namespace Spire
 					}
 				}
 
-				if (typeName == L"float" || typeName.StartsWith(L"vec") || typeName.StartsWith(L"mat")) {
+				if (typeName == L"float" || typeName.StartsWith(L"vec") || typeName.StartsWith(L"mat"))
+				{
 					DefineBasicType(new ILBasicType(ILBaseType::Float));
 
 					if (typeName == L"float")
@@ -9887,7 +9992,9 @@ namespace Spire
 				return id;
 			}
 
-			int DefineType(RefPtr<ILType> Type) {
+			//UniformOrBuffer - 0: none; 1: uniform; 2: buffer 
+			int DefineType(RefPtr<ILType> Type, int UniformOrBuffer = 0)
+			{
 				if (!Type)
 				{
 					if (TypeNameToID.ContainsKey(L"void"))
@@ -9899,16 +10006,13 @@ namespace Spire
 					IDInfos[CurrentID] = IDInfo::CreateIDInfoForTypeofValue(CurrentID, nullptr);
 					return CurrentID;
 				}
-
-				if (TypeNameToID.ContainsKey(Type->ToString()))
-					return TypeNameToID[Type->ToString()];
 				int id = -1;
 				if (auto ArrayType = dynamic_cast<ILArrayType*>(Type.Ptr()))
 				{
-					/*RefPtr<ILType> floatTypeIL = new ILBasicType(ILBaseType::Float);
-					int floatTypeID = DefineBasicType(ctx, floatTypeIL);
-					int lengthID = ++CurrentID;
-					TypeDefinition << LR"(%)" << lengthID << LR"( = OpConstant %)" << floatTypeID << LR"( )" << ArrayType->ArrayLength << EndLine;*/
+					String IndexName = Type->ToString();
+					if (UniformOrBuffer != 0)
+						IndexName = IndexName + L"#" + UniformOrBuffer;
+					//array type: redefinition is allowed, 
 
 					if (ArrayType->ArrayLength != 0)
 					{
@@ -9916,57 +10020,91 @@ namespace Spire
 						RefPtr<ILType> intTypeIL = new ILBasicType(ILBaseType::Int);
 						int lengthID = AddInstrConstantInt(intTypeIL, ArrayType->ArrayLength);
 
-						int elementTypeID = DefineType(ArrayType->BaseType);
+						int elementTypeID = DefineType(ArrayType->BaseType, UniformOrBuffer);
 						++CurrentID;
-						//TypeDefinition << LR"(%)" << CurrentID << LR"( = OpTypeArray %)" << elementTypeID << LR"( %)" << lengthID << EndLine;
 						CodeGen.OpTypeArray(CurrentID, elementTypeID, lengthID);
-						TypeNameToID[ArrayType->ToString()] = CurrentID;
+						TypeNameToID[IndexName] = CurrentID;
+						IDInfos[CurrentID] = IDInfo::CreateIDInfoForTypeofValue(CurrentID, Type, UniformOrBuffer);
 						id = CurrentID;
-						IDInfos[id] = IDInfo::CreateIDInfoForTypeofValue(id, Type);
 					}
-					else {
+					else
+					{
 						//dynamic array
-						int elementTypeID = DefineType(ArrayType->BaseType);
+						int elementTypeID = DefineType(ArrayType->BaseType, UniformOrBuffer);
 						++CurrentID;
 						CodeGen.OpTypeRuntimeArray(CurrentID, elementTypeID);
-						TypeNameToID[ArrayType->ToString()] = CurrentID;
+						TypeNameToID[IndexName] = CurrentID;
+						IDInfos[CurrentID] = IDInfo::CreateIDInfoForTypeofValue(CurrentID, Type, UniformOrBuffer);
 						id = CurrentID;
-						IDInfos[id] = IDInfo::CreateIDInfoForTypeofValue(id, Type);
+					}
+
+					if (UniformOrBuffer != 0)
+					{
+						int Stride = GetSize(ArrayType, UniformOrBuffer);
+						CodeGen.OpDecorate(id, Decoration::ArrayStride, Stride);
 					}
 				}
 				if (auto StructType = dynamic_cast<ILStructType*>(Type.Ptr()))
 				{
-					for (auto & member : StructType->Members)
-						DefineType(member.Type);
-					/*TypeDefinition << LR"(%)" << CurrentID << LR"( = OpTypeStruct)";
-					for (auto & member : StructType->Members)
-					TypeDefinition << LR"( %)" << DefineType(ctx, member.Type);
-					TypeDefinition << EndLine;*/
+					String IndexName = Type->ToString();
+					if (UniformOrBuffer != 0)
+						IndexName = IndexName + L"#" + UniformOrBuffer;
+					if (TypeNameToID.ContainsKey(IndexName))
+						return TypeNameToID[IndexName];
+
 					List<int> memberIDList;
 					for (auto & member : StructType->Members)
-						memberIDList.Add(DefineType(member.Type));
+						memberIDList.Add(DefineType(member.Type, UniformOrBuffer));
 					++CurrentID;
 					CodeGen.OpTypeStruct(CurrentID, memberIDList);
-					TypeNameToID[StructType->TypeName] = CurrentID;
+					TypeNameToID[IndexName] = CurrentID;
+					IDInfos[CurrentID] = IDInfo::CreateIDInfoForTypeofValue(CurrentID, Type, UniformOrBuffer);
 					id = CurrentID;
-					IDInfos[id] = IDInfo::CreateIDInfoForTypeofValue(id, Type);
+
+					if (UniformOrBuffer != 0)
+					{
+						int Offset = 0;
+						int Index = 0;
+						for (auto & MemberTypeID : memberIDList)
+						{
+							RefPtr<ILType> MemberType = IDInfos[MemberTypeID]().GetILType();
+
+							int BaseAlignment = GetBaseAlignment(MemberType.Ptr(), UniformOrBuffer);
+
+							//round up to baseAlignment
+							if (Offset % BaseAlignment)
+								Offset += BaseAlignment - Offset % BaseAlignment;
+
+							AddInstrMemberDecorate(id, Index, Decoration::Offset, Offset);
+
+							if (MemberType->IsFloatMatrix())
+							{
+								AddInstrMemberDecorate(id, Index, Decoration::ColMajor);
+								AddInstrMemberDecorate(id, Index, Decoration::MatrixStride, 16);
+							}
+
+							Offset += GetSize(MemberType.Ptr(), UniformOrBuffer);
+							Index++;
+						}
+					}
 				}
 				if (auto BasicType = dynamic_cast<ILBasicType*>(Type.Ptr()))
 				{
+					if (TypeNameToID.ContainsKey(Type->ToString()))
+						return TypeNameToID[Type->ToString()];
 					id = DefineBasicType(Type);
 				}
 				return id;
 			}
 
-			int DefineTypePointer(RefPtr<ILType> Type, StorageClass store) {
-				String PointerName = Type->ToString() + L"$" + StorageClassToString(store);
+			int DefineTypePointer(RefPtr<ILType> Type, StorageClass store, int UniformOrBuffer = 0)
+			{
+				String PointerName = Type->ToString() + L"$" + StorageClassToString(store) + L"#" + UniformOrBuffer;
 				if (TypeStorageToTypePointerID.ContainsKey(PointerName))
 					return TypeStorageToTypePointerID[PointerName]();
 
-				int basetypeID = DefineType(Type);
+				int basetypeID = DefineType(Type, UniformOrBuffer);
 				++CurrentID;
-				/*TypeDefinition << LR"(%)" << CurrentID << LR"( = OpTypePointer )" << StorageClassToString(store)
-				<< LR"( %)" << basetypeID << EndLine;*/
 				CodeGen.OpTypePointer(CurrentID, store, basetypeID);
 				TypeStorageToTypePointerID[PointerName] = CurrentID;
 				IDInfos[CurrentID] = IDInfo::CreateIDInfoForTypeofPointer(CurrentID, Type, basetypeID, store);
@@ -10192,14 +10330,19 @@ namespace Spire
 				return;
 			}
 
-			int AddInstrVariableDeclaration(ILOperand *op, RefPtr<ILType> type, StorageClass store)
+			int AddInstrVariableDeclaration(ILOperand *op, RefPtr<ILType> type, StorageClass store, int UniformOrBuffer = 0)
 			{
-				int typeID = DefineTypePointer(type, store);
+				int typeID = DefineTypePointer(type, store, UniformOrBuffer);
 				++CurrentID;
 				CodeGen.OpVariable(CurrentID, typeID, store);
 				UpdateVariable(op, CurrentID);
+
+				String IndexName = type->ToString();
+				if (UniformOrBuffer)
+					IndexName = IndexName + L"#" + UniformOrBuffer;
+
 				IDInfos[CurrentID] =
-					IDInfo::CreateIDInfoForPointer(CurrentID, op, typeID, type, TypeNameToID[type->ToString()], store);
+					IDInfo::CreateIDInfoForPointer(CurrentID, op, typeID, type, TypeNameToID[IndexName], store);
 				return CurrentID;
 			}
 
@@ -10937,12 +11080,13 @@ namespace Spire
 				CodeGen.OpFunctionEnd();
 			}
 
-			void AddInstrEntryPoint(ExecutionModel EM, int entryID, const List<int>& interfaceIDs )
+			void AddInstrEntryPoint(ExecutionModel EM, int entryID, const List<int>& interfaceIDs)
 			{
 				CodeGen.OpEntryPoint(EM, entryID, interfaceIDs);
 			}
 
-			void AddInstrExecutionMode(int ID, ExecutionMode EM) {
+			void AddInstrExecutionMode(int ID, ExecutionMode EM) 
+			{
 				CodeGen.OpExecutionMode(ID, EM);
 			}
 
@@ -11024,7 +11168,8 @@ namespace Spire
 			void GenerateDebugInformation()
 			{
 				for (int i = 1; i <= CurrentID; i++)
-					if (IDInfos.ContainsKey(i) && IDInfos[i]().IsAvailable()) {
+					if (IDInfos.ContainsKey(i) && IDInfos[i]().IsAvailable())
+					{
 						ILOperand *op = IDInfos[i]().GetOp();
 
 						switch (IDInfos[i]().GetClass())
@@ -11467,7 +11612,8 @@ namespace Spire
 				op0ValueID = ctx.ConvertBasicType(op0ValueID, ctx.IDInfos[op0ValueID]().GetILType(), instr->Type);
 				RefPtr<ILType> op0ILType = ctx.IDInfos[op0ValueID]().GetILType();
 
-				if (instr->Is<Float2IntInstruction>() || instr->Is<Int2FloatInstruction>() || instr->Is<CopyInstruction>()) {
+				if (instr->Is<Float2IntInstruction>() || instr->Is<Int2FloatInstruction>() || instr->Is<CopyInstruction>())
+				{
 					ctx.UpdateValue((ILOperand*)instr, op0ValueID);
 					return;
 				}
@@ -11476,7 +11622,8 @@ namespace Spire
 				//must be put before `++ctx.CurrentID`
 
 				++ctx.CurrentID;
-				if (instr->Is<NegInstruction>()) {
+				if (instr->Is<NegInstruction>())
+				{
 					if (op0ILType->IsFloat() || op0ILType->IsFloatVector())
 						ctx.AddInstrFnegate((ILOperand*)instr, ctx.CurrentID, instrTypeID, op0ValueID);
 					else if (op0ILType->IsInt() || op0ILType->IsIntVector())
@@ -11507,6 +11654,7 @@ namespace Spire
 				{
 					int op0ID = ctx.FindVariableID(op0); // should be a pointer 
 					int op1ID = GetOperandValue(op1);
+					op1ID = ctx.ConvertBasicType(op1ID, ctx.IDInfos[op1ID]().GetILType(), ctx.IDInfos[op0ID]().GetILType());
 					ctx.AddInstrStore((ILOperand*)instr, op0ID, op1ID);
 					return;
 				}
@@ -12207,7 +12355,8 @@ namespace Spire
 
 			void GenerateCode(CFGNode * code, int givenLabel = -1, bool LoopReturn = false)
 			{
-				if (givenLabel == -1) {
+				if (givenLabel == -1)
+				{
 					++ctx.CurrentID; //label ID
 					ctx.AddInstrLabel_AtFunctionBody(ctx.CurrentID);
 				}
@@ -12274,27 +12423,6 @@ namespace Spire
 							if (ctx.VariableNameToValueID[name] == id)
 								ctx.VariableNameToValueID[name] = -1;
 								*/
-			}
-
-			int GetBaseAlignment(ILType* type, bool roundTo16)
-			{
-				int baseAlignment = type->GetAlignment();
-
-				if (roundTo16)
-				{
-					bool need = false;
-					if (auto _tmp1 = dynamic_cast<ILArrayType*>(type))
-						need = true;
-					if (auto _tmp2 = dynamic_cast<ILStructType*>(type))
-						need = true;
-					if (need)
-					{
-						if (baseAlignment % 16)
-							baseAlignment += 16 - baseAlignment % 16;
-					}
-				}
-
-				return baseAlignment;
 			}
 
 			void ProcessInterfaces(
@@ -12381,83 +12509,41 @@ namespace Spire
 							if (!ent.Value.Type->IsTexture())
 								nonTextureCount++;
 
-						bool IsUniform = true; //true-uniform buffer; false-shader storage buffer
+						int TypeOfStruct = 1; //1: uniform buffer; 2: shader storage buffer; 0: not a buffer
 						if (block->Attributes.ContainsKey(L"ShaderStorageBlock"))
-							IsUniform = false;
+							TypeOfStruct = 2;
 
 						if (nonTextureCount)
 						{
 							RefPtr<ILStructType> structIL = new ILStructType();
 							structIL->TypeName = block->Name;
-							List<int> memberTypeIDs;
 
 							for (auto & ent : block->Entries)
 								if (!ent.Value.Type->IsTexture())
 								{
-									if (dynamic_cast<ILStructType*>(ent.Value.Type.Ptr()))
-										throw InvalidOperationException(L"uniform block is not allowed to contain structs: " + ent.Value.Type->ToString());
-									memberTypeIDs.Add(ctx.DefineType(ent.Value.Type));
 									ILStructType::ILStructField field;
 									field.Type = ent.Value.Type;
 									field.FieldName = ent.Value.Name;
 									structIL->Members.Add(field);
 								}
 
-							int structTypeID = ctx.DefineType(structIL);
-							int structVariableID = ctx.AddInstrVariableDeclaration(0, structIL, StorageClass::Uniform);
+							int structTypeID = ctx.DefineType(structIL, TypeOfStruct);
+							int structVariableID = ctx.AddInstrVariableDeclaration(0, structIL, StorageClass::Uniform, TypeOfStruct);
 							ctx.InterfaceNameToID[block->Name] = structVariableID;
 
-							if (IsUniform)
+							if (TypeOfStruct == 1)
 							{
-								//CodeGen.OpDecorate(structTypeID, Decoration::Block);
 								ctx.AddInstrDecorate(structTypeID, Decoration::Block);
 							}
-							else
+							else // TypeOfStruct == 2
 							{
-								//CodeGen.OpDecorate(structTypeID, Decoration::BufferBlock);
 								ctx.AddInstrDecorate(structTypeID, Decoration::BufferBlock);
 							}
 
-							int offset = 0;
-							int id = 0;
-							for (auto & memberTypeID : memberTypeIDs)
-							{
-								RefPtr<ILType> typeIL = ctx.IDInfos[memberTypeID]().GetILType();
-
-								int baseAlignment = GetBaseAlignment(typeIL.Ptr(), IsUniform);
-
-								//round up to baseAlignment
-								if (offset % baseAlignment)
-									offset += baseAlignment - offset % baseAlignment;
-
-								//CodeGen.OpMemberDecorate(structTypeID, id, Decoration::Offset, offset);
-								ctx.AddInstrMemberDecorate(structTypeID, id, Decoration::Offset, offset);
-
-								if (typeIL->IsFloatMatrix())
-								{
-									//CodeGen.OpMemberDecorate(structTypeID, id, Decoration::ColMajor);
-									//CodeGen.OpMemberDecorate(structTypeID, id, Decoration::MatrixStride, 16);
-									ctx.AddInstrMemberDecorate(structTypeID, id, Decoration::ColMajor);
-									ctx.AddInstrMemberDecorate(structTypeID, id, Decoration::MatrixStride, 16);
-								}
-								else if (auto _tmp3 = dynamic_cast<ILArrayType*>(typeIL.Ptr()))
-								{
-									//CodeGen.OpMemberDecorate(structTypeID, id, Decoration::ArrayStride, GetBaseAlignment(_tmp3->BaseType.Ptr(), IsUniform));
-									ctx.AddInstrMemberDecorate(structTypeID, id, Decoration::ArrayStride, GetBaseAlignment(_tmp3->BaseType.Ptr(), IsUniform));
-								}
-
-								offset += typeIL->GetSize();
-								id++;
-							}
-
-							//CodeGen.OpDecorate(structVariableID, Decoration::DescriptorSet, 0);
 							ctx.AddInstrDecorate(structVariableID, Decoration::DescriptorSet, 0);
 							String strIndex;
 							if (block->Attributes.TryGetValue(L"Index", strIndex))
-							{
-								//CodeGen.OpDecorate(structVariableID, Decoration::Binding, StringToInt(strIndex));
 								ctx.AddInstrDecorate(structVariableID, Decoration::Binding, StringToInt(strIndex));
-							}
 						}
 
 						int bindPoint = 0;
@@ -12776,7 +12862,7 @@ namespace Spire
 
 				ctx.PopScope();
 
-				//ctx.GenerateDebugInformation();
+				ctx.GenerateDebugInformation();
 				
 				/*printf("%s\n", currentWorld->WorldName.ToMultiByteString());
 				for (int i = 0; i <= ctx.CurrentID; i++)
@@ -12798,6 +12884,8 @@ namespace Spire
 				rs.OutputDeclarations = L"spirv";
 
 				currentWorld = nullptr;
+
+				//CoreLib::IO::File::WriteAllText(currentWorld->WorldName + L"-IL.txt", );
 
 				return rs;
 			}
