@@ -3,8 +3,6 @@
 Spire - The MIT License (MIT)
 Copyright (c) 2016, Carnegie Mellon University
 
-Developers: Yong He, Haomin Long
-
 Permission is hereby granted, free of charge, to any person obtaining a 
 copy of this software and associated documentation files (the "Software"), 
 to deal in the Software without restriction, including without limitation 
@@ -114,6 +112,7 @@ namespace Spire
 			{
 				return errors.Count();
 			}
+			ErrorWriter & operator = (const ErrorWriter & other) = delete;
 		};
 	}
 }
@@ -4124,6 +4123,7 @@ namespace Spire
 				: Arguments(args), BackendArguments(backendArgs), SourceWorld(srcWorld), DestWorld(destWorld),
 				 Result(result), CodeGenContext(codeGenContext)
 			{}
+			ImportOperatorContext & operator = (const ImportOperatorContext & other) = delete;
 		};
 		class ImportOperatorHandler : public CoreLib::Object
 		{

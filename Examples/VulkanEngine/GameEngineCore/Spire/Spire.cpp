@@ -3,8 +3,6 @@
 Spire - The MIT License (MIT)
 Copyright (c) 2016, Carnegie Mellon University
 
-Developers: Yong He, Haomin Long
-
 Permission is hereby granted, free of charge, to any person obtaining a 
 copy of this software and associated documentation files (the "Software"), 
 to deal in the Software without restriction, including without limitation 
@@ -681,7 +679,10 @@ namespace Spire
 				List<KeyValuePair<String, ComponentDefinition>> entries;
 				for (auto & kv : block->Entries)
 					entries.Add(kv);
-				entries.Sort([](const auto & v0, const auto & v1) {return v0.Value.OrderingStr < v1.Value.OrderingStr; });
+				entries.Sort([](const KeyValuePair<String, ComponentDefinition> & v0, const KeyValuePair<String, ComponentDefinition> & v1) 
+				{
+					return v0.Value.OrderingStr < v1.Value.OrderingStr; 
+				});
 				block->Entries.Clear();
 				for (auto & kv : entries)
 					block->Entries.Add(kv.Key, kv.Value);
@@ -702,6 +703,22 @@ namespace Spire
 			{
 				VisitStruct(st);
 			}
+			struct ThroughVar
+			{
+				bool Export = false;
+				String InputName, OutputName;
+				String InputWorldName;
+				ImportOperatorDefSyntaxNode * ImportOperator;
+				ComponentDefinitionIR * Component;
+				int GetHashCode()
+				{
+					return PointerHash<1>().GetHashCode(Component);
+				}
+				bool operator == (const ThroughVar & other)
+				{
+					return Component == other.Component;
+				}
+			};
 			virtual void ProcessShader(ShaderClosure * shader) override
 			{
 				currentShader = shader;
@@ -782,22 +799,7 @@ namespace Spire
 				}
 
 				Dictionary<String, List<ComponentDefinitionIR*>> worldComps;
-				struct ThroughVar
-				{
-					bool Export = false;
-					String InputName, OutputName;
-					String InputWorldName;
-					ImportOperatorDefSyntaxNode * ImportOperator;
-					ComponentDefinitionIR * Component;
-					int GetHashCode()
-					{
-						return PointerHash<1>().GetHashCode(Component);
-					}
-					bool operator == (const ThroughVar & other)
-					{
-						return Component == other.Component;
-					}
-				};
+				
 				Dictionary<String, EnumerableHashSet<ThroughVar>> worldThroughVars;
 				for (auto & world : shader->Pipeline->Worlds)
 				{
@@ -859,7 +861,7 @@ namespace Spire
 						{
 							if (userWorld == srcWorld)
 								return;
-							auto path = currentShader->Pipeline->FindImportOperatorChain(srcWorld, userWorld);
+							auto path = this->currentShader->Pipeline->FindImportOperatorChain(srcWorld, userWorld);
 							if (path.Count() == 0)
 								throw InvalidProgramException(L"no import exists, this should have been checked by semantics analyzer.");
 							for (int i = 0; i < path[0].Nodes.Count(); i++)
@@ -8828,7 +8830,8 @@ namespace Spire
 				int oldSize = stream.Count();
 				stream.SetSize(oldSize + (bytes.Count() >> 2));
 				memcpy(stream.Buffer() + oldSize, bytes.Buffer(), bytes.Count());
-				stream.Add(0);
+				if (padding==0)
+					stream.Add(0);
 				return stream.Count() - oldSize;
 			}
 			void OpEntryPoint(const ExecutionModel currentExecutionModel, const int entryID, const List<int> &interfaceIDs)
@@ -9816,7 +9819,6 @@ namespace Spire
 					if (typeName == L"int")
 					{
 						++CurrentID;
-						//TypeDefinition << LR"(%)" <<  << LR"( = OpTypeInt 32 1)" << EndLine;
 						CodeGen.OpTypeInt(CurrentID, 32, 1);
 						TypeNameToID[typeName] = CurrentID;
 					}
@@ -9824,8 +9826,6 @@ namespace Spire
 					if (typeName.StartsWith(L"ivec"))
 					{
 						++CurrentID;
-						/*TypeDefinition << LR"(%)" <<  << LR"( = OpTypeVector %)" <<
-						TypeNameToID[L"int"]() << LR"( )" << typeName[4] << EndLine;*/
 						CodeGen.OpTypeVector(CurrentID, TypeNameToID[L"int"](), StringToInt(typeName[4]));
 						TypeNameToID[typeName] = CurrentID;
 					}
@@ -9837,7 +9837,6 @@ namespace Spire
 
 					if (typeName == L"uint") {
 						++CurrentID;
-						//TypeDefinition << LR"(%)" <<  << LR"( = OpTypeInt 32 0)" << EndLine;
 						CodeGen.OpTypeInt(CurrentID, 32, 0);
 						TypeNameToID[typeName] = CurrentID;
 					}
@@ -9857,7 +9856,6 @@ namespace Spire
 					if (typeName == L"float")
 					{
 						++CurrentID;
-						//TypeDefinition << LR"(%)" <<  << LR"( = OpTypeFloat 32)" << EndLine;
 						CodeGen.OpTypeFloat(CurrentID, 32);
 						TypeNameToID[typeName] = CurrentID;
 					}
@@ -9865,8 +9863,6 @@ namespace Spire
 					if (typeName.StartsWith(L"vec"))
 					{
 						++CurrentID;
-						/*TypeDefinition << LR"(%)" <<  << LR"( = OpTypeVector %)" <<
-						TypeNameToID[L"float"]() << LR"( )" << typeName[3] << EndLine;*/
 						CodeGen.OpTypeVector(CurrentID, TypeNameToID[L"float"](), StringToInt(typeName[3]));
 						TypeNameToID[typeName] = CurrentID;
 					}
@@ -9875,8 +9871,6 @@ namespace Spire
 					{
 						DefineBasicType(new ILBasicType(ILBaseType::Float3));
 						++CurrentID;
-						/*TypeDefinition << LR"(%)" <<  << LR"( = OpTypeMatrix %)" <<
-						TypeNameToID[L"vec3"]() << LR"( 3)" << EndLine;*/
 						CodeGen.OpTypeMatrix(CurrentID, TypeNameToID[L"vec3"](), 3);
 						TypeNameToID[typeName] = CurrentID;
 					}
@@ -9885,8 +9879,6 @@ namespace Spire
 					{
 						DefineBasicType(new ILBasicType(ILBaseType::Float4));
 						++CurrentID;
-						/*TypeDefinition << LR"(%)" << ++CurrentID << LR"( = OpTypeMatrix %)" <<
-						TypeNameToID[L"vec4"]() << LR"( 4)" << EndLine;*/
 						CodeGen.OpTypeMatrix(CurrentID, TypeNameToID[L"vec4"](), 4);
 						TypeNameToID[typeName] = CurrentID;
 					}
@@ -9899,33 +9891,22 @@ namespace Spire
 					DefineBasicType(new ILBasicType(ILBaseType::Float));
 
 					++CurrentID;
-					/*TypeDefinition << LR"(%)" <<  << LR"( = OpTypeImage %)" << TypeNameToID[L"float"]()
-					<< LR"( 2D 0 0 0 1 Unknown)" << EndLine;*/
 					CodeGen.OpTypeImage(CurrentID, TypeNameToID[L"float"](), Dim::e2D, 0);
-
 					int tmp = CurrentID;
+
 					++CurrentID;
-					//TypeDefinition << LR"(%)" <<  << LR"( = OpTypeSampledImage %)" << tmp << EndLine;
 					CodeGen.OpTypeSampledImage(CurrentID, tmp);
 					TypeNameToID[typeName] = CurrentID;
 				}
 
 				if (typeName == L"samplerCube")
 				{
-					/*
-					DefineBasicType(ctx, new ILBasicType(ILBaseType::Float));
-					TypeDefinition << LR"(%)" << ++CurrentID << LR"( = OpTypeImage %)" << TypeNameToID[L"float"]()
-					<< LR"( Cube 0 0 0 1 Unknown)" << EndLine;
-					int tmp = CurrentID;
-					TypeDefinition << LR"(%)" << ++CurrentID << LR"( = OpTypeSampledImage %)" << tmp << EndLine;
-					TypeNameToID[typeName] = CurrentID;
-					*/
 					DefineBasicType(new ILBasicType(ILBaseType::Float));
 
 					++CurrentID;
 					CodeGen.OpTypeImage(CurrentID, TypeNameToID[L"float"](), Dim::eCube, 0);
-
 					int tmp = CurrentID;
+
 					++CurrentID;
 					CodeGen.OpTypeSampledImage(CurrentID, tmp);
 					TypeNameToID[typeName] = CurrentID;
@@ -9933,20 +9914,12 @@ namespace Spire
 
 				if (typeName == L"samplerCubeShadow")
 				{
-					/*
-					DefineBasicType(ctx, new ILBasicType(ILBaseType::Float));
-					TypeDefinition << LR"(%)" << ++CurrentID << LR"( = OpTypeImage %)" << TypeNameToID[L"float"]()
-					<< LR"( Cube 1 0 0 1 Unknown)" << EndLine;
-					int tmp = CurrentID;
-					TypeDefinition << LR"(%)" << ++CurrentID << LR"( = OpTypeSampledImage %)" << tmp << EndLine;
-					TypeNameToID[typeName] = CurrentID;
-					*/
 					DefineBasicType(new ILBasicType(ILBaseType::Float));
 
 					++CurrentID;
 					CodeGen.OpTypeImage(CurrentID, TypeNameToID[L"float"](), Dim::eCube, 1);
-
 					int tmp = CurrentID;
+
 					++CurrentID;
 					CodeGen.OpTypeSampledImage(CurrentID, tmp);
 					TypeNameToID[typeName] = CurrentID;
@@ -9954,20 +9927,12 @@ namespace Spire
 
 				if (typeName == L"sampler2DShadow")
 				{
-					/*
-					DefineBasicType(ctx, new ILBasicType(ILBaseType::Float));
-					TypeDefinition << LR"(%)" << ++CurrentID << LR"( = OpTypeImage %)" << TypeNameToID[L"float"]()
-					<< LR"( 2D 1 0 0 1 Unknown)" << EndLine;
-					int tmp = CurrentID;
-					TypeDefinition << LR"(%)" << ++CurrentID << LR"( = OpTypeSampledImage %)" << tmp << EndLine;
-					TypeNameToID[typeName] = CurrentID;
-					*/
 					DefineBasicType(new ILBasicType(ILBaseType::Float));
 
 					++CurrentID;
 					CodeGen.OpTypeImage(CurrentID, TypeNameToID[L"float"](), Dim::e2D, 1);
-
 					int tmp = CurrentID;
+
 					++CurrentID;
 					CodeGen.OpTypeSampledImage(CurrentID, tmp);
 					TypeNameToID[typeName] = CurrentID;
@@ -9976,7 +9941,6 @@ namespace Spire
 				if (typeName == L"bool")
 				{
 					++CurrentID;
-					//TypeDefinition << LR"(%)" <<  << LR"( = OpTypeBool)" << EndLine;
 					CodeGen.OpTypeBool(CurrentID);
 					TypeNameToID[typeName] = CurrentID;
 				}
@@ -10006,13 +9970,14 @@ namespace Spire
 					IDInfos[CurrentID] = IDInfo::CreateIDInfoForTypeofValue(CurrentID, nullptr);
 					return CurrentID;
 				}
-				int id = -1;
+				int RetID = -1;
 				if (auto ArrayType = dynamic_cast<ILArrayType*>(Type.Ptr()))
 				{
 					String IndexName = Type->ToString();
 					if (UniformOrBuffer != 0)
 						IndexName = IndexName + L"#" + UniformOrBuffer;
-					//array type: redefinition is allowed, 
+					if (TypeNameToID.ContainsKey(IndexName))
+						return TypeNameToID[IndexName];
 
 					if (ArrayType->ArrayLength != 0)
 					{
@@ -10025,7 +9990,7 @@ namespace Spire
 						CodeGen.OpTypeArray(CurrentID, elementTypeID, lengthID);
 						TypeNameToID[IndexName] = CurrentID;
 						IDInfos[CurrentID] = IDInfo::CreateIDInfoForTypeofValue(CurrentID, Type, UniformOrBuffer);
-						id = CurrentID;
+						RetID = CurrentID;
 					}
 					else
 					{
@@ -10035,13 +10000,13 @@ namespace Spire
 						CodeGen.OpTypeRuntimeArray(CurrentID, elementTypeID);
 						TypeNameToID[IndexName] = CurrentID;
 						IDInfos[CurrentID] = IDInfo::CreateIDInfoForTypeofValue(CurrentID, Type, UniformOrBuffer);
-						id = CurrentID;
+						RetID = CurrentID;
 					}
 
 					if (UniformOrBuffer != 0)
 					{
-						int Stride = GetSize(ArrayType, UniformOrBuffer);
-						CodeGen.OpDecorate(id, Decoration::ArrayStride, Stride);
+						int Stride = GetSize(ArrayType->BaseType.Ptr(), UniformOrBuffer);
+						CodeGen.OpDecorate(RetID, Decoration::ArrayStride, Stride);
 					}
 				}
 				if (auto StructType = dynamic_cast<ILStructType*>(Type.Ptr()))
@@ -10059,8 +10024,9 @@ namespace Spire
 					CodeGen.OpTypeStruct(CurrentID, memberIDList);
 					TypeNameToID[IndexName] = CurrentID;
 					IDInfos[CurrentID] = IDInfo::CreateIDInfoForTypeofValue(CurrentID, Type, UniformOrBuffer);
-					id = CurrentID;
+					RetID = CurrentID;
 
+					//generate decoration for struct layout
 					if (UniformOrBuffer != 0)
 					{
 						int Offset = 0;
@@ -10075,26 +10041,35 @@ namespace Spire
 							if (Offset % BaseAlignment)
 								Offset += BaseAlignment - Offset % BaseAlignment;
 
-							AddInstrMemberDecorate(id, Index, Decoration::Offset, Offset);
+							AddInstrMemberDecorate(RetID, Index, Decoration::Offset, Offset);
 
 							if (MemberType->IsFloatMatrix())
 							{
-								AddInstrMemberDecorate(id, Index, Decoration::ColMajor);
-								AddInstrMemberDecorate(id, Index, Decoration::MatrixStride, 16);
+								AddInstrMemberDecorate(RetID, Index, Decoration::ColMajor);
+								AddInstrMemberDecorate(RetID, Index, Decoration::MatrixStride, 16);
 							}
 
 							Offset += GetSize(MemberType.Ptr(), UniformOrBuffer);
 							Index++;
 						}
 					}
+
+					//generate debug information
+					CodeGen.OpName(RetID, Type->ToString());
+					int index = 0;
+					for (auto &member : StructType->Members)
+					{
+						CodeGen.OpMemberName(RetID, index, member.FieldName);
+						index++;
+					}
 				}
 				if (auto BasicType = dynamic_cast<ILBasicType*>(Type.Ptr()))
 				{
 					if (TypeNameToID.ContainsKey(Type->ToString()))
 						return TypeNameToID[Type->ToString()];
-					id = DefineBasicType(Type);
+					RetID = DefineBasicType(Type);
 				}
-				return id;
+				return RetID;
 			}
 
 			int DefineTypePointer(RefPtr<ILType> Type, StorageClass store, int UniformOrBuffer = 0)
@@ -10158,9 +10133,7 @@ namespace Spire
 			{
 				int typeID = DefineType(Type);
 				++CurrentID;
-				/*TypeDefinition << LR"(%)" << CurrentID << LR"( = OpConstant %)"
-				<< TypeNameToID[Type->ToString()]() << LR"( )" << FloatToString(f) << EndLine;*/
-				CodeGen.OpConstantFloat(CurrentID, TypeNameToID[Type->ToString()](), f);
+				CodeGen.OpConstantFloat(CurrentID, typeID, f);
 				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(CurrentID, Type, 0, typeID);
 				return CurrentID;
 			}
@@ -10172,9 +10145,7 @@ namespace Spire
 
 				int typeID = DefineType(Type);
 				++CurrentID;
-				/*TypeDefinition << LR"(%)" << CurrentID << LR"( = OpConstant %)"
-				<< TypeNameToID[Type->ToString()]() << LR"( )" << i << EndLine;*/
-				CodeGen.OpConstantInt(CurrentID, TypeNameToID[Type->ToString()](), i);
+				CodeGen.OpConstantInt(CurrentID, typeID, i);
 				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(CurrentID, Type, 0, typeID);
 				Dictionary_ConstantIntToID[i] = CurrentID;
 				return CurrentID;
@@ -10187,9 +10158,7 @@ namespace Spire
 
 				int typeID = DefineType(Type);
 				++CurrentID;
-				/*TypeDefinition << LR"(%)" << CurrentID << LR"( = OpConstant %)"
-				<< TypeNameToID[Type->ToString()]() << LR"( )" << i << EndLine;*/
-				CodeGen.OpConstantUInt(CurrentID, TypeNameToID[Type->ToString()](), i);
+				CodeGen.OpConstantUInt(CurrentID, typeID, i);
 				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(CurrentID, Type, 0, typeID);
 				Dictionary_ConstantUIntToID[i] = CurrentID;
 				return CurrentID;
@@ -10205,12 +10174,6 @@ namespace Spire
 					elementIDs.Add(AddInstrConstantFloat(elementType, f[i]));
 
 				++CurrentID;
-				/*
-				TypeDefinition << LR"(%)" << CurrentID << LR"( = OpConstantComposite %)" << typeID;
-				for (auto & id : elementIDs)
-				TypeDefinition << LR"( %)" << id;
-				TypeDefinition << EndLine;
-				*/
 				CodeGen.OpConstantComposite(CurrentID, typeID, elementIDs);
 
 				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(CurrentID, Type, 0, typeID);
@@ -10227,12 +10190,6 @@ namespace Spire
 					elementIDs.Add(AddInstrConstantInt(elementType, v[i]));
 
 				++CurrentID;
-				/*
-				TypeDefinition << LR"(%)" << CurrentID << LR"( = OpConstantComposite %)" << typeID;
-				for (auto & id : elementIDs)
-				TypeDefinition << LR"( %)" << id;
-				TypeDefinition << EndLine;
-				*/
 				CodeGen.OpConstantComposite(CurrentID, typeID, elementIDs);
 
 				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(CurrentID, Type, 0, typeID);
@@ -10324,25 +10281,21 @@ namespace Spire
 			}
 
 			void AddInstrStore(ILOperand *op, int op0, int op1) {
-				//FunctionBody << LR"(OpStore %)" << op0 << LR"( %)" << op1 << EndLine;
 				CodeGen.OpStore(op0, op1);
 				UpdateValue(op, op1);
 				return;
 			}
 
-			int AddInstrVariableDeclaration(ILOperand *op, RefPtr<ILType> type, StorageClass store, int UniformOrBuffer = 0)
+			int AddInstrVariableDeclaration(ILOperand *op, RefPtr<ILType> typeIL, StorageClass store, String DebugName = L"", int UniformOrBuffer = 0)
 			{
-				int typeID = DefineTypePointer(type, store, UniformOrBuffer);
+				int typeID = DefineTypePointer(typeIL, store, UniformOrBuffer);
 				++CurrentID;
 				CodeGen.OpVariable(CurrentID, typeID, store);
 				UpdateVariable(op, CurrentID);
-
-				String IndexName = type->ToString();
-				if (UniformOrBuffer)
-					IndexName = IndexName + L"#" + UniformOrBuffer;
-
 				IDInfos[CurrentID] =
-					IDInfo::CreateIDInfoForPointer(CurrentID, op, typeID, type, TypeNameToID[IndexName], store);
+					IDInfo::CreateIDInfoForPointer(CurrentID, op, typeID, typeIL, IDInfos[typeID]().GetBaseTypeID(), store);
+				//Debug Information
+				CodeGen.OpName(CurrentID, DebugName!=L""? DebugName : (op?op->Name:L""));
 				return CurrentID;
 			}
 
@@ -10398,7 +10351,7 @@ namespace Spire
 						op,
 						memberTypeID,
 						memberTypeIL,
-						TypeNameToID[memberTypeIL->ToString()],
+						IDInfos[memberTypeID]().GetBaseTypeID(),
 						IDInfos[ID]().GetStorageClass()
 					);
 				UpdateVariable(op, CurrentID);
@@ -10421,7 +10374,6 @@ namespace Spire
 				*/
 				CodeGen.OpAccessChain(CurrentID, memberTypeID, ID, indexID);
 
-				String variableName = IDInfos[ID]().GetName() + L"." + structType->Members[index].FieldName;
 				UpdateVariable(op, CurrentID);
 				IDInfos[CurrentID] =
 					IDInfo::CreateIDInfoForPointer(
@@ -10429,7 +10381,7 @@ namespace Spire
 						op,
 						memberTypeID,
 						memberBasetypeIL,
-						TypeNameToID[memberBasetypeIL->ToString()],
+						IDInfos[memberTypeID]().GetBaseTypeID(),
 						IDInfos[ID]().GetStorageClass()
 					);
 				return CurrentID;
@@ -10441,7 +10393,7 @@ namespace Spire
 				ILStructType* structIL = dynamic_cast<ILStructType*>(IDInfos[structID]().GetILType().Ptr());
 				if (!structIL)
 					throw InvalidProgramException(L"can not convert to ILStruct in AddInstrAccessChain_StructMember()");
-				int index = structIL->Members.FindFirst([&](auto member)
+				int index = structIL->Members.FindFirst([&](ILStructType::ILStructField member)
 				{
 					return member.FieldName == memberName;
 				});
@@ -10454,7 +10406,7 @@ namespace Spire
 				ILStructType* structIL = dynamic_cast<ILStructType*>(IDInfos[structID]().GetILType().Ptr());
 				if (!structIL)
 					throw InvalidProgramException(L"can not convert to ILStruct in AddInstrAccessChain_StructMember()");
-				int index = structIL->Members.FindFirst([&](auto member)
+				int index = structIL->Members.FindFirst([&](ILStructType::ILStructField member)
 				{
 					return member.FieldName == memberName;
 				});
@@ -10467,17 +10419,17 @@ namespace Spire
 				if (!Type)
 					throw InvalidProgramException(L"empty type in AddInstrAccessChain_ArrayMember()");
 				auto arrayType = dynamic_cast<ILArrayType*>(Type.Ptr());
-				int typeID = DefineTypePointer(arrayType->BaseType, IDInfos[ID]().GetStorageClass()); //it's a pointer
+				int baseTypeID = DefineTypePointer(arrayType->BaseType, IDInfos[ID]().GetStorageClass()); //it's a pointer
 
 				++CurrentID;
-				CodeGen.OpAccessChain(CurrentID, typeID, ID, indexID);
+				CodeGen.OpAccessChain(CurrentID, baseTypeID, ID, indexID);
 				IDInfos[CurrentID] =
 					IDInfo::CreateIDInfoForPointer(
 						CurrentID,
 						op,
-						typeID,
+						baseTypeID,
 						arrayType->BaseType,
-						TypeNameToID[arrayType->BaseType->ToString()],
+						IDInfos[baseTypeID]().GetBaseTypeID(),
 						IDInfos[ID]().GetStorageClass()
 					);
 				UpdateVariable(op, CurrentID);
@@ -10485,21 +10437,18 @@ namespace Spire
 				return CurrentID;
 			}
 
-			int AddInstrLoad(int variableID, RefPtr<ILType> Type, MemoryAccess ma)
+			int AddInstrLoad(int variableID, MemoryAccess ma)
 			{
 				++CurrentID;
-				int typeID = TypeNameToID[Type->ToString()];
-				/*
-				FunctionBody << LR"(%)" << CurrentID << LR"( = OpLoad %)" << typeID << LR"( %)"
-				<< variableID << LR"( )" << MemoryAccessToString(ma) << EndLine;
-				*/
-				CodeGen.OpLoad(CurrentID, typeID, variableID, ma);
+				RefPtr<ILType> Type = IDInfos[variableID]().GetILType();
+				int TypeID = IDInfos[variableID]().GetBaseTypeID();
+				CodeGen.OpLoad(CurrentID, TypeID, variableID, ma);
 				IDInfos[CurrentID]
 					= IDInfo::CreateIDInfoForValue(
 						CurrentID,
 						Type,
 						0,
-						typeID);
+						TypeID);
 				return CurrentID;
 			}
 
@@ -11050,13 +10999,15 @@ namespace Spire
 				CodeGen.OpMemberDecorate(ID, index, deco, ID1);
 			}
 
-			void AddInstrFunction(int funcID, int returnTypeID, int funcTypeID) 
+			void AddInstrFunction(int funcID, int returnTypeID, int funcTypeID, String funcName) 
 			{
+				CodeGen.OpName(funcID, funcName);
 				CodeGen.OpFunction(funcID, returnTypeID, funcTypeID);
 			}
 
-			void AddInstrFunctionParameter(ILOperand *op, int paramID, int typeID)
+			void AddInstrFunctionParameter(ILOperand *op, int paramID, int typeID, String DebugName)
 			{
+				CodeGen.OpName(paramID, DebugName);
 				CodeGen.OpFunctionParameter(paramID, typeID);
 				IDInfos[paramID] = IDInfo::CreateIDInfoForPointer(
 					paramID,
@@ -11163,44 +11114,6 @@ namespace Spire
 			void ProduceFunction()
 			{
 				CodeGen.ProduceFunction();
-			}
-
-			void GenerateDebugInformation()
-			{
-				for (int i = 1; i <= CurrentID; i++)
-					if (IDInfos.ContainsKey(i) && IDInfos[i]().IsAvailable())
-					{
-						ILOperand *op = IDInfos[i]().GetOp();
-
-						switch (IDInfos[i]().GetClass())
-						{
-						case IDClass::Value:
-							break;
-						case IDClass::Pointer:
-							CodeGen.OpName(i, L"[var] " + (op?op->Name:L"empty") );
-							break;
-						case IDClass::Function:
-							CodeGen.OpName(i, L"[func] " + (IDInfos[i]().GetFunc() ? IDInfos[i]().GetFunc()->Name : L"main"));
-							break;
-						case IDClass::TypeofPointer:
-							CodeGen.OpName(i,
-								L"[pointer type] " 
-								+ IDInfos[i]().GetILType()->ToString() 
-								+ L"(" 
-								+ StorageClassToString(IDInfos[i]().GetStorageClass())
-								+ L")"
-							);
-							break;
-						case IDClass::TypeofValue:
-							CodeGen.OpName(i, L"[basic type] " 
-								+ (IDInfos[i]().GetILType() ? IDInfos[i]().GetILType()->ToString() : L"void")
-							);
-							break;
-						default:
-							;
-						}
-
-					}
 			}
 
 			List<unsigned int> ProduceWordStream()
@@ -11510,7 +11423,7 @@ namespace Spire
 					List<int> args;
 					for (auto & arg : instr->Arguments) {
 						int valueID = GetOperandValue(arg.Ptr());
-						int paramID = ctx.AddInstrVariableDeclaration(0, arg->Type, StorageClass::Function);
+						int paramID = ctx.AddInstrVariableDeclaration(0, arg->Type, StorageClass::Function, L"param");
 						// the name of the parameter must be empty; or may conflict with non-param variables
 						ctx.AddInstrStore(0, paramID, valueID);
 						args.Add(paramID);
@@ -11652,6 +11565,23 @@ namespace Spire
 				//-------------------------------------Store Instruction------------------------------------------
 				if (instr->Is<StoreInstruction>())
 				{
+					if (auto structType = dynamic_cast<ILStructType*>(op0->Type.Ptr()))
+					{
+						int op0ID = ctx.FindVariableID(op0);
+						int op1ID = ctx.FindVariableID(op1);
+						int index = 0;
+						for (int i = 0; i < structType->Members.Count(); i++)
+						{
+							int indexID = ctx.AddInstrConstantInt(GetTypeFromString(L"int"), index);
+							int dest = ctx.AddInstrAccessChain_StructMember(0, op0->Type, op0ID, indexID, index);
+							int pSrc = ctx.AddInstrAccessChain_StructMember(0, op1->Type, op1ID, indexID, index);
+							int vSrc = ctx.AddInstrLoad(pSrc, MemoryAccess::None);
+							ctx.AddInstrStore(0, dest, vSrc);
+							index++;
+						}
+						return;
+					}
+
 					int op0ID = ctx.FindVariableID(op0); // should be a pointer 
 					int op1ID = GetOperandValue(op1);
 					op1ID = ctx.ConvertBasicType(op1ID, ctx.IDInfos[op1ID]().GetILType(), ctx.IDInfos[op0ID]().GetILType());
@@ -11669,7 +11599,7 @@ namespace Spire
 						{
 							//if op1 is constant, take that as index of vector 
 							int memberID = ctx.AddInstrAccessChain_VectorMember((ILOperand*)instr, fatherID, -1, c->IntValues[0]);
-							int retID = ctx.AddInstrLoad(memberID, instr->Type, MemoryAccess::None);
+							int retID = ctx.AddInstrLoad(memberID, MemoryAccess::None);
 							ctx.UpdateValue((ILOperand*)instr, retID);
 							return;
 						}
@@ -11677,7 +11607,7 @@ namespace Spire
 						{
 							//if op1 is not constant, compute it
 							int memberID = ctx.AddInstrAccessChain_VectorMember((ILOperand*)instr, fatherID, GetOperandValue(op1), -1);
-							int retID = ctx.AddInstrLoad(memberID, instr->Type, MemoryAccess::None);
+							int retID = ctx.AddInstrLoad(memberID, MemoryAccess::None);
 							ctx.UpdateValue((ILOperand*)instr, retID);
 							return;
 						}
@@ -11689,7 +11619,7 @@ namespace Spire
 							//index of struct must be constant
 							int indexID = GetOperandValue(c);
 							int memberID = ctx.AddInstrAccessChain_StructMember((ILOperand*)instr, op0->Type, fatherID, indexID, c->IntValues[0]);
-							int retID = ctx.AddInstrLoad(memberID, instr->Type, MemoryAccess::None);
+							int retID = ctx.AddInstrLoad(memberID, MemoryAccess::None);
 							ctx.UpdateValue((ILOperand*)instr, retID);
 							return;
 						}
@@ -11699,7 +11629,7 @@ namespace Spire
 					else if (auto arrayType = dynamic_cast<ILArrayType*>(op0->Type.Ptr()))
 					{
 						int memberID = ctx.AddInstrAccessChain_ArrayMember((ILOperand*)instr, op0->Type, fatherID, GetOperandValue(op1));
-						int retID = ctx.AddInstrLoad(memberID, arrayType->BaseType, MemoryAccess::None);
+						int retID = ctx.AddInstrLoad(memberID, MemoryAccess::None);
 						ctx.UpdateValue((ILOperand*)instr, retID);
 						return;
 					}
@@ -12021,8 +11951,7 @@ namespace Spire
 				else if (instr->ImportOperator->Name.Content == L"textureImport")
 				{
 					int textureStorageID = ctx.InterfaceNameToID[instr->ComponentName];
-					auto textureTypeIL = ctx.IDInfos[textureStorageID]().GetILType();
-					int textureValueID = ctx.AddInstrLoad(textureStorageID, textureTypeIL, MemoryAccess::None);
+					int textureValueID = ctx.AddInstrLoad(textureStorageID, MemoryAccess::None);
 
 					int operandID = -1;
 					operandID = ctx.AddInstrTexture(
@@ -12469,7 +12398,7 @@ namespace Spire
 						}
 
 						int structTypeID = ctx.DefineType(structIL);
-						int structVariableID = ctx.AddInstrVariableDeclaration(0, structIL, StorageClass::Input);
+						int structVariableID = ctx.AddInstrVariableDeclaration(0, structIL, StorageClass::Input, L"blk" + block->Name);
 						ctx.InterfaceNameToID[block->Name] = structVariableID;
 
 						//ctx.AddInstrDecorate(structTypeID, Decoration::Block);
@@ -12491,7 +12420,7 @@ namespace Spire
 						int location = 0;
 						for (auto & ent : block->Entries)
 						{
-							int entID = ctx.AddInstrVariableDeclaration(0, ent.Value.Type, StorageClass::Input);
+							int entID = ctx.AddInstrVariableDeclaration(0, ent.Value.Type, StorageClass::Input, ent.Key);
 							interfaceIDs.Add(entID);
 							ctx.InterfaceNameToID[ent.Value.Name] = entID;
 							ctx.AddInstrDecorate(entID, Decoration::Location, location);
@@ -12528,7 +12457,7 @@ namespace Spire
 								}
 
 							int structTypeID = ctx.DefineType(structIL, TypeOfStruct);
-							int structVariableID = ctx.AddInstrVariableDeclaration(0, structIL, StorageClass::Uniform, TypeOfStruct);
+							int structVariableID = ctx.AddInstrVariableDeclaration(0, structIL, StorageClass::Uniform, L"blk" + block->Name, TypeOfStruct);
 							ctx.InterfaceNameToID[block->Name] = structVariableID;
 
 							if (TypeOfStruct == 1)
@@ -12554,7 +12483,7 @@ namespace Spire
 						for (auto & ent : block->Entries)
 							if (ent.Value.Type->IsTexture())
 							{
-								int entID = ctx.AddInstrVariableDeclaration(0, ent.Value.Type, StorageClass::UniformConstant);
+								int entID = ctx.AddInstrVariableDeclaration(0, ent.Value.Type, StorageClass::UniformConstant, ent.Key);
 								ctx.InterfaceNameToID[ent.Value.Name] = entID;
 								ctx.AddInstrDecorate(entID, Decoration::DescriptorSet, 0);
 								ctx.AddInstrDecorate(entID, Decoration::Binding, bindPoint);
@@ -12570,7 +12499,7 @@ namespace Spire
 							bindPoint = StringToInt(strIndex);
 						for (auto & ent : block->Entries)
 						{
-							int entID = ctx.AddInstrVariableDeclaration(0, ent.Value.Type, StorageClass::UniformConstant);
+							int entID = ctx.AddInstrVariableDeclaration(0, ent.Value.Type, StorageClass::UniformConstant, ent.Key);
 							ctx.InterfaceNameToID[ent.Value.Name] = entID;
 							ctx.AddInstrDecorate(entID, Decoration::DescriptorSet, 0);
 							ctx.AddInstrDecorate(entID, Decoration::Binding, bindPoint);
@@ -12589,7 +12518,7 @@ namespace Spire
 					for (auto & ent : currentWorld->WorldOutput->Entries)
 						if (!ent.Value.LayoutAttribs.ContainsKey(L"DepthOutput"))
 						{
-							int entID = ctx.AddInstrVariableDeclaration(0, ent.Value.Type, StorageClass::Output);
+							int entID = ctx.AddInstrVariableDeclaration(0, ent.Value.Type, StorageClass::Output, ent.Key);
 							ctx.InterfaceNameToID[ent.Value.Name] = entID;
 							interfaceIDs.Add(entID);
 							ctx.AddInstrDecorate(entID, Decoration::Location, location);
@@ -12598,7 +12527,7 @@ namespace Spire
 						else
 						{
 							DepthReplacing = true;
-							int entID = ctx.AddInstrVariableDeclaration(0, ent.Value.Type, StorageClass::Output);
+							int entID = ctx.AddInstrVariableDeclaration(0, ent.Value.Type, StorageClass::Output, L"gl_FragDepth");
 							ctx.InterfaceNameToID[L"gl_FragDepth"] = entID;
 							interfaceIDs.Add(entID);
 							ctx.AddInstrDecorate(entID, Decoration::BuiltIn, (int)BuiltIn::FragDepth);
@@ -12628,7 +12557,7 @@ namespace Spire
 					}
 
 					int structTypeID = ctx.DefineType(structIL);
-					int structVariableID = ctx.AddInstrVariableDeclaration(0, structIL, StorageClass::Output);
+					int structVariableID = ctx.AddInstrVariableDeclaration(0, structIL, StorageClass::Output, L"blk" + block->Name);
 					ctx.InterfaceNameToID[block->Name] = structVariableID;
 
 					//ctx.AddInstrDecorate(structTypeID, Decoration::Block);
@@ -12717,7 +12646,7 @@ namespace Spire
 							int funcID = ctx.FunctionNameToFunctionID[func->Name]();
 							int funcTypeID = ctx.FunctionNameToFunctionTypeID[func->Name]();
 
-							ctx.AddInstrFunction(funcID, ctx.DefineType(func->ReturnType), funcTypeID);
+							ctx.AddInstrFunction(funcID, ctx.DefineType(func->ReturnType), funcTypeID, GetFuncOriginalName(funcName));
 
 							for (auto & instr : *func->Code)
 								if (auto arg = instr.As<FetchArgInstruction>())
@@ -12728,7 +12657,7 @@ namespace Spire
 											ctx.DefineType(arg->Type);
 											int typeID = ctx.DefineTypePointer(arg->Type, StorageClass::Function);
 											int paramID = ++ctx.CurrentID;
-											ctx.AddInstrFunctionParameter((ILOperand*)&instr, paramID, typeID);
+											ctx.AddInstrFunctionParameter((ILOperand*)&instr, paramID, typeID, arg->Name);
 											/*
 											ctx.IDInfos[paramID] = IDInfo::CreateIDInfoForPointer(
 												paramID,
@@ -12797,7 +12726,7 @@ namespace Spire
 						structIL->Members.Add(f4);
 
 						int structTypeID = ctx.DefineType(structIL);
-						int structVariableID = ctx.AddInstrVariableDeclaration(0, structIL, StorageClass::Output);
+						int structVariableID = ctx.AddInstrVariableDeclaration(0, structIL, StorageClass::Output, L"gl_PerVertex");
 						ctx.InterfaceNameToID[L"gl_PerVertex"] = structVariableID;
 
 						ctx.AddInstrDecorate(structTypeID, Decoration::Block);
@@ -12829,7 +12758,7 @@ namespace Spire
 				}
 
 				//MainFunction
-				ctx.AddInstrFunction(ctx.MainFunctionID, ctx.TypeNameToID[L"void"](), ctx.MainFunctionTypeID);
+				ctx.AddInstrFunction(ctx.MainFunctionID, ctx.TypeNameToID[L"void"](), ctx.MainFunctionTypeID, L"main");
 
 				++ctx.CurrentID;
 				ctx.AddInstrLabel_AtFunctionHeader(ctx.CurrentID);
@@ -12861,8 +12790,6 @@ namespace Spire
 				ctx.ProduceFunction();
 
 				ctx.PopScope();
-
-				ctx.GenerateDebugInformation();
 				
 				/*printf("%s\n", currentWorld->WorldName.ToMultiByteString());
 				for (int i = 0; i <= ctx.CurrentID; i++)
