@@ -881,8 +881,12 @@ namespace Spire
 				int oldSize = stream.Count();
 				stream.SetSize(oldSize + (bytes.Count() >> 2));
 				memcpy(stream.Buffer() + oldSize, bytes.Buffer(), bytes.Count());
+<<<<<<< HEAD
 				if (padding==0)
 					stream.Add(0);
+=======
+				stream.Add(0);
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 				return stream.Count() - oldSize;
 			}
 			void OpEntryPoint(const ExecutionModel currentExecutionModel, const int entryID, const List<int> &interfaceIDs)
@@ -1870,6 +1874,10 @@ namespace Spire
 					if (typeName == L"int")
 					{
 						++CurrentID;
+<<<<<<< HEAD
+=======
+						//TypeDefinition << LR"(%)" <<  << LR"( = OpTypeInt 32 1)" << EndLine;
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 						CodeGen.OpTypeInt(CurrentID, 32, 1);
 						TypeNameToID[typeName] = CurrentID;
 					}
@@ -1877,6 +1885,11 @@ namespace Spire
 					if (typeName.StartsWith(L"ivec"))
 					{
 						++CurrentID;
+<<<<<<< HEAD
+=======
+						/*TypeDefinition << LR"(%)" <<  << LR"( = OpTypeVector %)" <<
+						TypeNameToID[L"int"]() << LR"( )" << typeName[4] << EndLine;*/
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 						CodeGen.OpTypeVector(CurrentID, TypeNameToID[L"int"](), StringToInt(typeName[4]));
 						TypeNameToID[typeName] = CurrentID;
 					}
@@ -1888,6 +1901,10 @@ namespace Spire
 
 					if (typeName == L"uint") {
 						++CurrentID;
+<<<<<<< HEAD
+=======
+						//TypeDefinition << LR"(%)" <<  << LR"( = OpTypeInt 32 0)" << EndLine;
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 						CodeGen.OpTypeInt(CurrentID, 32, 0);
 						TypeNameToID[typeName] = CurrentID;
 					}
@@ -1907,6 +1924,10 @@ namespace Spire
 					if (typeName == L"float")
 					{
 						++CurrentID;
+<<<<<<< HEAD
+=======
+						//TypeDefinition << LR"(%)" <<  << LR"( = OpTypeFloat 32)" << EndLine;
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 						CodeGen.OpTypeFloat(CurrentID, 32);
 						TypeNameToID[typeName] = CurrentID;
 					}
@@ -1914,6 +1935,11 @@ namespace Spire
 					if (typeName.StartsWith(L"vec"))
 					{
 						++CurrentID;
+<<<<<<< HEAD
+=======
+						/*TypeDefinition << LR"(%)" <<  << LR"( = OpTypeVector %)" <<
+						TypeNameToID[L"float"]() << LR"( )" << typeName[3] << EndLine;*/
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 						CodeGen.OpTypeVector(CurrentID, TypeNameToID[L"float"](), StringToInt(typeName[3]));
 						TypeNameToID[typeName] = CurrentID;
 					}
@@ -1922,6 +1948,11 @@ namespace Spire
 					{
 						DefineBasicType(new ILBasicType(ILBaseType::Float3));
 						++CurrentID;
+<<<<<<< HEAD
+=======
+						/*TypeDefinition << LR"(%)" <<  << LR"( = OpTypeMatrix %)" <<
+						TypeNameToID[L"vec3"]() << LR"( 3)" << EndLine;*/
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 						CodeGen.OpTypeMatrix(CurrentID, TypeNameToID[L"vec3"](), 3);
 						TypeNameToID[typeName] = CurrentID;
 					}
@@ -1930,6 +1961,11 @@ namespace Spire
 					{
 						DefineBasicType(new ILBasicType(ILBaseType::Float4));
 						++CurrentID;
+<<<<<<< HEAD
+=======
+						/*TypeDefinition << LR"(%)" << ++CurrentID << LR"( = OpTypeMatrix %)" <<
+						TypeNameToID[L"vec4"]() << LR"( 4)" << EndLine;*/
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 						CodeGen.OpTypeMatrix(CurrentID, TypeNameToID[L"vec4"](), 4);
 						TypeNameToID[typeName] = CurrentID;
 					}
@@ -1942,22 +1978,48 @@ namespace Spire
 					DefineBasicType(new ILBasicType(ILBaseType::Float));
 
 					++CurrentID;
+<<<<<<< HEAD
 					CodeGen.OpTypeImage(CurrentID, TypeNameToID[L"float"](), Dim::e2D, 0);
 					int tmp = CurrentID;
 
 					++CurrentID;
+=======
+					/*TypeDefinition << LR"(%)" <<  << LR"( = OpTypeImage %)" << TypeNameToID[L"float"]()
+					<< LR"( 2D 0 0 0 1 Unknown)" << EndLine;*/
+					CodeGen.OpTypeImage(CurrentID, TypeNameToID[L"float"](), Dim::e2D, 0);
+
+					int tmp = CurrentID;
+					++CurrentID;
+					//TypeDefinition << LR"(%)" <<  << LR"( = OpTypeSampledImage %)" << tmp << EndLine;
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 					CodeGen.OpTypeSampledImage(CurrentID, tmp);
 					TypeNameToID[typeName] = CurrentID;
 				}
 
 				if (typeName == L"samplerCube")
 				{
+<<<<<<< HEAD
+=======
+					/*
+					DefineBasicType(ctx, new ILBasicType(ILBaseType::Float));
+					TypeDefinition << LR"(%)" << ++CurrentID << LR"( = OpTypeImage %)" << TypeNameToID[L"float"]()
+					<< LR"( Cube 0 0 0 1 Unknown)" << EndLine;
+					int tmp = CurrentID;
+					TypeDefinition << LR"(%)" << ++CurrentID << LR"( = OpTypeSampledImage %)" << tmp << EndLine;
+					TypeNameToID[typeName] = CurrentID;
+					*/
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 					DefineBasicType(new ILBasicType(ILBaseType::Float));
 
 					++CurrentID;
 					CodeGen.OpTypeImage(CurrentID, TypeNameToID[L"float"](), Dim::eCube, 0);
+<<<<<<< HEAD
 					int tmp = CurrentID;
 
+=======
+
+					int tmp = CurrentID;
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 					++CurrentID;
 					CodeGen.OpTypeSampledImage(CurrentID, tmp);
 					TypeNameToID[typeName] = CurrentID;
@@ -1965,12 +2027,28 @@ namespace Spire
 
 				if (typeName == L"samplerCubeShadow")
 				{
+<<<<<<< HEAD
+=======
+					/*
+					DefineBasicType(ctx, new ILBasicType(ILBaseType::Float));
+					TypeDefinition << LR"(%)" << ++CurrentID << LR"( = OpTypeImage %)" << TypeNameToID[L"float"]()
+					<< LR"( Cube 1 0 0 1 Unknown)" << EndLine;
+					int tmp = CurrentID;
+					TypeDefinition << LR"(%)" << ++CurrentID << LR"( = OpTypeSampledImage %)" << tmp << EndLine;
+					TypeNameToID[typeName] = CurrentID;
+					*/
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 					DefineBasicType(new ILBasicType(ILBaseType::Float));
 
 					++CurrentID;
 					CodeGen.OpTypeImage(CurrentID, TypeNameToID[L"float"](), Dim::eCube, 1);
+<<<<<<< HEAD
 					int tmp = CurrentID;
 
+=======
+
+					int tmp = CurrentID;
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 					++CurrentID;
 					CodeGen.OpTypeSampledImage(CurrentID, tmp);
 					TypeNameToID[typeName] = CurrentID;
@@ -1978,12 +2056,28 @@ namespace Spire
 
 				if (typeName == L"sampler2DShadow")
 				{
+<<<<<<< HEAD
+=======
+					/*
+					DefineBasicType(ctx, new ILBasicType(ILBaseType::Float));
+					TypeDefinition << LR"(%)" << ++CurrentID << LR"( = OpTypeImage %)" << TypeNameToID[L"float"]()
+					<< LR"( 2D 1 0 0 1 Unknown)" << EndLine;
+					int tmp = CurrentID;
+					TypeDefinition << LR"(%)" << ++CurrentID << LR"( = OpTypeSampledImage %)" << tmp << EndLine;
+					TypeNameToID[typeName] = CurrentID;
+					*/
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 					DefineBasicType(new ILBasicType(ILBaseType::Float));
 
 					++CurrentID;
 					CodeGen.OpTypeImage(CurrentID, TypeNameToID[L"float"](), Dim::e2D, 1);
+<<<<<<< HEAD
 					int tmp = CurrentID;
 
+=======
+
+					int tmp = CurrentID;
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 					++CurrentID;
 					CodeGen.OpTypeSampledImage(CurrentID, tmp);
 					TypeNameToID[typeName] = CurrentID;
@@ -1992,6 +2086,10 @@ namespace Spire
 				if (typeName == L"bool")
 				{
 					++CurrentID;
+<<<<<<< HEAD
+=======
+					//TypeDefinition << LR"(%)" <<  << LR"( = OpTypeBool)" << EndLine;
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 					CodeGen.OpTypeBool(CurrentID);
 					TypeNameToID[typeName] = CurrentID;
 				}
@@ -2021,14 +2119,22 @@ namespace Spire
 					IDInfos[CurrentID] = IDInfo::CreateIDInfoForTypeofValue(CurrentID, nullptr);
 					return CurrentID;
 				}
+<<<<<<< HEAD
 				int RetID = -1;
+=======
+				int id = -1;
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 				if (auto ArrayType = dynamic_cast<ILArrayType*>(Type.Ptr()))
 				{
 					String IndexName = Type->ToString();
 					if (UniformOrBuffer != 0)
 						IndexName = IndexName + L"#" + UniformOrBuffer;
+<<<<<<< HEAD
 					if (TypeNameToID.ContainsKey(IndexName))
 						return TypeNameToID[IndexName];
+=======
+					//array type: redefinition is allowed, 
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 
 					if (ArrayType->ArrayLength != 0)
 					{
@@ -2041,7 +2147,11 @@ namespace Spire
 						CodeGen.OpTypeArray(CurrentID, elementTypeID, lengthID);
 						TypeNameToID[IndexName] = CurrentID;
 						IDInfos[CurrentID] = IDInfo::CreateIDInfoForTypeofValue(CurrentID, Type, UniformOrBuffer);
+<<<<<<< HEAD
 						RetID = CurrentID;
+=======
+						id = CurrentID;
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 					}
 					else
 					{
@@ -2051,13 +2161,22 @@ namespace Spire
 						CodeGen.OpTypeRuntimeArray(CurrentID, elementTypeID);
 						TypeNameToID[IndexName] = CurrentID;
 						IDInfos[CurrentID] = IDInfo::CreateIDInfoForTypeofValue(CurrentID, Type, UniformOrBuffer);
+<<<<<<< HEAD
 						RetID = CurrentID;
+=======
+						id = CurrentID;
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 					}
 
 					if (UniformOrBuffer != 0)
 					{
+<<<<<<< HEAD
 						int Stride = GetSize(ArrayType->BaseType.Ptr(), UniformOrBuffer);
 						CodeGen.OpDecorate(RetID, Decoration::ArrayStride, Stride);
+=======
+						int Stride = GetSize(ArrayType, UniformOrBuffer);
+						CodeGen.OpDecorate(id, Decoration::ArrayStride, Stride);
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 					}
 				}
 				if (auto StructType = dynamic_cast<ILStructType*>(Type.Ptr()))
@@ -2075,9 +2194,14 @@ namespace Spire
 					CodeGen.OpTypeStruct(CurrentID, memberIDList);
 					TypeNameToID[IndexName] = CurrentID;
 					IDInfos[CurrentID] = IDInfo::CreateIDInfoForTypeofValue(CurrentID, Type, UniformOrBuffer);
+<<<<<<< HEAD
 					RetID = CurrentID;
 
 					//generate decoration for struct layout
+=======
+					id = CurrentID;
+
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 					if (UniformOrBuffer != 0)
 					{
 						int Offset = 0;
@@ -2092,18 +2216,28 @@ namespace Spire
 							if (Offset % BaseAlignment)
 								Offset += BaseAlignment - Offset % BaseAlignment;
 
+<<<<<<< HEAD
 							AddInstrMemberDecorate(RetID, Index, Decoration::Offset, Offset);
 
 							if (MemberType->IsFloatMatrix())
 							{
 								AddInstrMemberDecorate(RetID, Index, Decoration::ColMajor);
 								AddInstrMemberDecorate(RetID, Index, Decoration::MatrixStride, 16);
+=======
+							AddInstrMemberDecorate(id, Index, Decoration::Offset, Offset);
+
+							if (MemberType->IsFloatMatrix())
+							{
+								AddInstrMemberDecorate(id, Index, Decoration::ColMajor);
+								AddInstrMemberDecorate(id, Index, Decoration::MatrixStride, 16);
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 							}
 
 							Offset += GetSize(MemberType.Ptr(), UniformOrBuffer);
 							Index++;
 						}
 					}
+<<<<<<< HEAD
 
 					//generate debug information
 					CodeGen.OpName(RetID, Type->ToString());
@@ -2113,14 +2247,22 @@ namespace Spire
 						CodeGen.OpMemberName(RetID, index, member.FieldName);
 						index++;
 					}
+=======
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 				}
 				if (auto BasicType = dynamic_cast<ILBasicType*>(Type.Ptr()))
 				{
 					if (TypeNameToID.ContainsKey(Type->ToString()))
 						return TypeNameToID[Type->ToString()];
+<<<<<<< HEAD
 					RetID = DefineBasicType(Type);
 				}
 				return RetID;
+=======
+					id = DefineBasicType(Type);
+				}
+				return id;
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 			}
 
 			int DefineTypePointer(RefPtr<ILType> Type, StorageClass store, int UniformOrBuffer = 0)
@@ -2184,7 +2326,13 @@ namespace Spire
 			{
 				int typeID = DefineType(Type);
 				++CurrentID;
+<<<<<<< HEAD
 				CodeGen.OpConstantFloat(CurrentID, typeID, f);
+=======
+				/*TypeDefinition << LR"(%)" << CurrentID << LR"( = OpConstant %)"
+				<< TypeNameToID[Type->ToString()]() << LR"( )" << FloatToString(f) << EndLine;*/
+				CodeGen.OpConstantFloat(CurrentID, TypeNameToID[Type->ToString()](), f);
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(CurrentID, Type, 0, typeID);
 				return CurrentID;
 			}
@@ -2196,7 +2344,13 @@ namespace Spire
 
 				int typeID = DefineType(Type);
 				++CurrentID;
+<<<<<<< HEAD
 				CodeGen.OpConstantInt(CurrentID, typeID, i);
+=======
+				/*TypeDefinition << LR"(%)" << CurrentID << LR"( = OpConstant %)"
+				<< TypeNameToID[Type->ToString()]() << LR"( )" << i << EndLine;*/
+				CodeGen.OpConstantInt(CurrentID, TypeNameToID[Type->ToString()](), i);
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(CurrentID, Type, 0, typeID);
 				Dictionary_ConstantIntToID[i] = CurrentID;
 				return CurrentID;
@@ -2209,7 +2363,13 @@ namespace Spire
 
 				int typeID = DefineType(Type);
 				++CurrentID;
+<<<<<<< HEAD
 				CodeGen.OpConstantUInt(CurrentID, typeID, i);
+=======
+				/*TypeDefinition << LR"(%)" << CurrentID << LR"( = OpConstant %)"
+				<< TypeNameToID[Type->ToString()]() << LR"( )" << i << EndLine;*/
+				CodeGen.OpConstantUInt(CurrentID, TypeNameToID[Type->ToString()](), i);
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(CurrentID, Type, 0, typeID);
 				Dictionary_ConstantUIntToID[i] = CurrentID;
 				return CurrentID;
@@ -2225,6 +2385,15 @@ namespace Spire
 					elementIDs.Add(AddInstrConstantFloat(elementType, f[i]));
 
 				++CurrentID;
+<<<<<<< HEAD
+=======
+				/*
+				TypeDefinition << LR"(%)" << CurrentID << LR"( = OpConstantComposite %)" << typeID;
+				for (auto & id : elementIDs)
+				TypeDefinition << LR"( %)" << id;
+				TypeDefinition << EndLine;
+				*/
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 				CodeGen.OpConstantComposite(CurrentID, typeID, elementIDs);
 
 				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(CurrentID, Type, 0, typeID);
@@ -2241,6 +2410,15 @@ namespace Spire
 					elementIDs.Add(AddInstrConstantInt(elementType, v[i]));
 
 				++CurrentID;
+<<<<<<< HEAD
+=======
+				/*
+				TypeDefinition << LR"(%)" << CurrentID << LR"( = OpConstantComposite %)" << typeID;
+				for (auto & id : elementIDs)
+				TypeDefinition << LR"( %)" << id;
+				TypeDefinition << EndLine;
+				*/
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 				CodeGen.OpConstantComposite(CurrentID, typeID, elementIDs);
 
 				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(CurrentID, Type, 0, typeID);
@@ -2332,11 +2510,16 @@ namespace Spire
 			}
 
 			void AddInstrStore(ILOperand *op, int op0, int op1) {
+<<<<<<< HEAD
+=======
+				//FunctionBody << LR"(OpStore %)" << op0 << LR"( %)" << op1 << EndLine;
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 				CodeGen.OpStore(op0, op1);
 				UpdateValue(op, op1);
 				return;
 			}
 
+<<<<<<< HEAD
 			int AddInstrVariableDeclaration(ILOperand *op, RefPtr<ILType> typeIL, StorageClass store, String DebugName = L"", int UniformOrBuffer = 0)
 			{
 				int typeID = DefineTypePointer(typeIL, store, UniformOrBuffer);
@@ -2347,6 +2530,21 @@ namespace Spire
 					IDInfo::CreateIDInfoForPointer(CurrentID, op, typeID, typeIL, IDInfos[typeID]().GetBaseTypeID(), store);
 				//Debug Information
 				CodeGen.OpName(CurrentID, DebugName!=L""? DebugName : (op?op->Name:L""));
+=======
+			int AddInstrVariableDeclaration(ILOperand *op, RefPtr<ILType> type, StorageClass store, int UniformOrBuffer = 0)
+			{
+				int typeID = DefineTypePointer(type, store, UniformOrBuffer);
+				++CurrentID;
+				CodeGen.OpVariable(CurrentID, typeID, store);
+				UpdateVariable(op, CurrentID);
+
+				String IndexName = type->ToString();
+				if (UniformOrBuffer)
+					IndexName = IndexName + L"#" + UniformOrBuffer;
+
+				IDInfos[CurrentID] =
+					IDInfo::CreateIDInfoForPointer(CurrentID, op, typeID, type, TypeNameToID[IndexName], store);
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 				return CurrentID;
 			}
 
@@ -2402,7 +2600,11 @@ namespace Spire
 						op,
 						memberTypeID,
 						memberTypeIL,
+<<<<<<< HEAD
 						IDInfos[memberTypeID]().GetBaseTypeID(),
+=======
+						TypeNameToID[memberTypeIL->ToString()],
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 						IDInfos[ID]().GetStorageClass()
 					);
 				UpdateVariable(op, CurrentID);
@@ -2425,6 +2627,10 @@ namespace Spire
 				*/
 				CodeGen.OpAccessChain(CurrentID, memberTypeID, ID, indexID);
 
+<<<<<<< HEAD
+=======
+				String variableName = IDInfos[ID]().GetName() + L"." + structType->Members[index].FieldName;
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 				UpdateVariable(op, CurrentID);
 				IDInfos[CurrentID] =
 					IDInfo::CreateIDInfoForPointer(
@@ -2432,7 +2638,11 @@ namespace Spire
 						op,
 						memberTypeID,
 						memberBasetypeIL,
+<<<<<<< HEAD
 						IDInfos[memberTypeID]().GetBaseTypeID(),
+=======
+						TypeNameToID[memberBasetypeIL->ToString()],
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 						IDInfos[ID]().GetStorageClass()
 					);
 				return CurrentID;
@@ -2444,7 +2654,11 @@ namespace Spire
 				ILStructType* structIL = dynamic_cast<ILStructType*>(IDInfos[structID]().GetILType().Ptr());
 				if (!structIL)
 					throw InvalidProgramException(L"can not convert to ILStruct in AddInstrAccessChain_StructMember()");
+<<<<<<< HEAD
 				int index = structIL->Members.FindFirst([&](ILStructType::ILStructField member)
+=======
+				int index = structIL->Members.FindFirst([&](auto member)
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 				{
 					return member.FieldName == memberName;
 				});
@@ -2457,7 +2671,11 @@ namespace Spire
 				ILStructType* structIL = dynamic_cast<ILStructType*>(IDInfos[structID]().GetILType().Ptr());
 				if (!structIL)
 					throw InvalidProgramException(L"can not convert to ILStruct in AddInstrAccessChain_StructMember()");
+<<<<<<< HEAD
 				int index = structIL->Members.FindFirst([&](ILStructType::ILStructField member)
+=======
+				int index = structIL->Members.FindFirst([&](auto member)
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 				{
 					return member.FieldName == memberName;
 				});
@@ -2470,17 +2688,30 @@ namespace Spire
 				if (!Type)
 					throw InvalidProgramException(L"empty type in AddInstrAccessChain_ArrayMember()");
 				auto arrayType = dynamic_cast<ILArrayType*>(Type.Ptr());
+<<<<<<< HEAD
 				int baseTypeID = DefineTypePointer(arrayType->BaseType, IDInfos[ID]().GetStorageClass()); //it's a pointer
 
 				++CurrentID;
 				CodeGen.OpAccessChain(CurrentID, baseTypeID, ID, indexID);
+=======
+				int typeID = DefineTypePointer(arrayType->BaseType, IDInfos[ID]().GetStorageClass()); //it's a pointer
+
+				++CurrentID;
+				CodeGen.OpAccessChain(CurrentID, typeID, ID, indexID);
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 				IDInfos[CurrentID] =
 					IDInfo::CreateIDInfoForPointer(
 						CurrentID,
 						op,
+<<<<<<< HEAD
 						baseTypeID,
 						arrayType->BaseType,
 						IDInfos[baseTypeID]().GetBaseTypeID(),
+=======
+						typeID,
+						arrayType->BaseType,
+						TypeNameToID[arrayType->BaseType->ToString()],
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 						IDInfos[ID]().GetStorageClass()
 					);
 				UpdateVariable(op, CurrentID);
@@ -2488,18 +2719,34 @@ namespace Spire
 				return CurrentID;
 			}
 
+<<<<<<< HEAD
 			int AddInstrLoad(int variableID, MemoryAccess ma)
 			{
 				++CurrentID;
 				RefPtr<ILType> Type = IDInfos[variableID]().GetILType();
 				int TypeID = IDInfos[variableID]().GetBaseTypeID();
 				CodeGen.OpLoad(CurrentID, TypeID, variableID, ma);
+=======
+			int AddInstrLoad(int variableID, RefPtr<ILType> Type, MemoryAccess ma)
+			{
+				++CurrentID;
+				int typeID = TypeNameToID[Type->ToString()];
+				/*
+				FunctionBody << LR"(%)" << CurrentID << LR"( = OpLoad %)" << typeID << LR"( %)"
+				<< variableID << LR"( )" << MemoryAccessToString(ma) << EndLine;
+				*/
+				CodeGen.OpLoad(CurrentID, typeID, variableID, ma);
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 				IDInfos[CurrentID]
 					= IDInfo::CreateIDInfoForValue(
 						CurrentID,
 						Type,
 						0,
+<<<<<<< HEAD
 						TypeID);
+=======
+						typeID);
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 				return CurrentID;
 			}
 
@@ -3050,6 +3297,7 @@ namespace Spire
 				CodeGen.OpMemberDecorate(ID, index, deco, ID1);
 			}
 
+<<<<<<< HEAD
 			void AddInstrFunction(int funcID, int returnTypeID, int funcTypeID, String funcName) 
 			{
 				CodeGen.OpName(funcID, funcName);
@@ -3059,6 +3307,15 @@ namespace Spire
 			void AddInstrFunctionParameter(ILOperand *op, int paramID, int typeID, String DebugName)
 			{
 				CodeGen.OpName(paramID, DebugName);
+=======
+			void AddInstrFunction(int funcID, int returnTypeID, int funcTypeID) 
+			{
+				CodeGen.OpFunction(funcID, returnTypeID, funcTypeID);
+			}
+
+			void AddInstrFunctionParameter(ILOperand *op, int paramID, int typeID)
+			{
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 				CodeGen.OpFunctionParameter(paramID, typeID);
 				IDInfos[paramID] = IDInfo::CreateIDInfoForPointer(
 					paramID,
@@ -3167,6 +3424,47 @@ namespace Spire
 				CodeGen.ProduceFunction();
 			}
 
+<<<<<<< HEAD
+=======
+			void GenerateDebugInformation()
+			{
+				for (int i = 1; i <= CurrentID; i++)
+					if (IDInfos.ContainsKey(i) && IDInfos[i]().IsAvailable())
+					{
+						ILOperand *op = IDInfos[i]().GetOp();
+
+						switch (IDInfos[i]().GetClass())
+						{
+						case IDClass::Value:
+							break;
+						case IDClass::Pointer:
+							CodeGen.OpName(i, L"[var] " + (op?op->Name:L"empty") );
+							break;
+						case IDClass::Function:
+							CodeGen.OpName(i, L"[func] " + (IDInfos[i]().GetFunc() ? IDInfos[i]().GetFunc()->Name : L"main"));
+							break;
+						case IDClass::TypeofPointer:
+							CodeGen.OpName(i,
+								L"[pointer type] " 
+								+ IDInfos[i]().GetILType()->ToString() 
+								+ L"(" 
+								+ StorageClassToString(IDInfos[i]().GetStorageClass())
+								+ L")"
+							);
+							break;
+						case IDClass::TypeofValue:
+							CodeGen.OpName(i, L"[basic type] " 
+								+ (IDInfos[i]().GetILType() ? IDInfos[i]().GetILType()->ToString() : L"void")
+							);
+							break;
+						default:
+							;
+						}
+
+					}
+			}
+
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 			List<unsigned int> ProduceWordStream()
 			{
 				return CodeGen.ProduceWordStream(CurrentID);
@@ -3474,7 +3772,11 @@ namespace Spire
 					List<int> args;
 					for (auto & arg : instr->Arguments) {
 						int valueID = GetOperandValue(arg.Ptr());
+<<<<<<< HEAD
 						int paramID = ctx.AddInstrVariableDeclaration(0, arg->Type, StorageClass::Function, L"param");
+=======
+						int paramID = ctx.AddInstrVariableDeclaration(0, arg->Type, StorageClass::Function);
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 						// the name of the parameter must be empty; or may conflict with non-param variables
 						ctx.AddInstrStore(0, paramID, valueID);
 						args.Add(paramID);
@@ -3616,6 +3918,7 @@ namespace Spire
 				//-------------------------------------Store Instruction------------------------------------------
 				if (instr->Is<StoreInstruction>())
 				{
+<<<<<<< HEAD
 					if (auto structType = dynamic_cast<ILStructType*>(op0->Type.Ptr()))
 					{
 						int op0ID = ctx.FindVariableID(op0);
@@ -3633,6 +3936,8 @@ namespace Spire
 						return;
 					}
 
+=======
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 					int op0ID = ctx.FindVariableID(op0); // should be a pointer 
 					int op1ID = GetOperandValue(op1);
 					op1ID = ctx.ConvertBasicType(op1ID, ctx.IDInfos[op1ID]().GetILType(), ctx.IDInfos[op0ID]().GetILType());
@@ -3650,7 +3955,11 @@ namespace Spire
 						{
 							//if op1 is constant, take that as index of vector 
 							int memberID = ctx.AddInstrAccessChain_VectorMember((ILOperand*)instr, fatherID, -1, c->IntValues[0]);
+<<<<<<< HEAD
 							int retID = ctx.AddInstrLoad(memberID, MemoryAccess::None);
+=======
+							int retID = ctx.AddInstrLoad(memberID, instr->Type, MemoryAccess::None);
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 							ctx.UpdateValue((ILOperand*)instr, retID);
 							return;
 						}
@@ -3658,7 +3967,11 @@ namespace Spire
 						{
 							//if op1 is not constant, compute it
 							int memberID = ctx.AddInstrAccessChain_VectorMember((ILOperand*)instr, fatherID, GetOperandValue(op1), -1);
+<<<<<<< HEAD
 							int retID = ctx.AddInstrLoad(memberID, MemoryAccess::None);
+=======
+							int retID = ctx.AddInstrLoad(memberID, instr->Type, MemoryAccess::None);
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 							ctx.UpdateValue((ILOperand*)instr, retID);
 							return;
 						}
@@ -3670,7 +3983,11 @@ namespace Spire
 							//index of struct must be constant
 							int indexID = GetOperandValue(c);
 							int memberID = ctx.AddInstrAccessChain_StructMember((ILOperand*)instr, op0->Type, fatherID, indexID, c->IntValues[0]);
+<<<<<<< HEAD
 							int retID = ctx.AddInstrLoad(memberID, MemoryAccess::None);
+=======
+							int retID = ctx.AddInstrLoad(memberID, instr->Type, MemoryAccess::None);
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 							ctx.UpdateValue((ILOperand*)instr, retID);
 							return;
 						}
@@ -3680,7 +3997,11 @@ namespace Spire
 					else if (auto arrayType = dynamic_cast<ILArrayType*>(op0->Type.Ptr()))
 					{
 						int memberID = ctx.AddInstrAccessChain_ArrayMember((ILOperand*)instr, op0->Type, fatherID, GetOperandValue(op1));
+<<<<<<< HEAD
 						int retID = ctx.AddInstrLoad(memberID, MemoryAccess::None);
+=======
+						int retID = ctx.AddInstrLoad(memberID, arrayType->BaseType, MemoryAccess::None);
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 						ctx.UpdateValue((ILOperand*)instr, retID);
 						return;
 					}
@@ -4002,7 +4323,12 @@ namespace Spire
 				else if (instr->ImportOperator->Name.Content == L"textureImport")
 				{
 					int textureStorageID = ctx.InterfaceNameToID[instr->ComponentName];
+<<<<<<< HEAD
 					int textureValueID = ctx.AddInstrLoad(textureStorageID, MemoryAccess::None);
+=======
+					auto textureTypeIL = ctx.IDInfos[textureStorageID]().GetILType();
+					int textureValueID = ctx.AddInstrLoad(textureStorageID, textureTypeIL, MemoryAccess::None);
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 
 					int operandID = -1;
 					operandID = ctx.AddInstrTexture(
@@ -4103,6 +4429,7 @@ namespace Spire
 			}
 
 			void PrintFetchArgInstr(FetchArgInstruction * instr)
+<<<<<<< HEAD
 			{
 				if (instr->ArgId == 0)
 				{
@@ -4868,6 +5195,775 @@ namespace Spire
 				return rs;
 			}
 
+=======
+			{
+				if (instr->ArgId == 0)
+				{
+					ctx.ReturnID = ctx.AddInstrVariableDeclaration((ILOperand*)instr, instr->Type, StorageClass::Function);
+				}
+			}
+
+			void PrintInstr(ILInstruction & instr)
+			{
+				if (auto binInstr = instr.As<BinaryInstruction>())
+					PrintBinaryInstr(binInstr);
+				else if (auto allocVar = instr.As<AllocVarInstruction>())
+					PrintAllocVarInstr(allocVar, StorageClass::Function);
+				else if (auto call = instr.As<CallInstruction>())
+					PrintCallInstr(call);
+				else if (auto exportInstr = instr.As<ExportInstruction>())
+					PrintExportInstr(exportInstr);
+				else if (auto import = instr.As<ImportInstruction>())
+					PrintImportInstr(import);
+				else if (auto update = instr.As<MemberUpdateInstruction>())
+					PrintUpdateInstr(update);
+				else if (auto unaryInstr = instr.As<UnaryInstruction>())
+					PrintUnaryInstr(unaryInstr);
+				else if (auto select = instr.As<SelectInstruction>())
+					PrintSelectInstr(select);
+				else if (auto fetchArg = instr.As<FetchArgInstruction>()) //for function: return instruction
+					PrintFetchArgInstr(fetchArg);
+				else
+					throw NotImplementedException(L"unsupported instruction in PrintInstr()" + instr.ToString());
+			}
+
+			void PrintIf(IfInstruction * instr)
+			{
+				int operandID = GetOperandValue(instr->Operand.Ptr());
+				operandID = ctx.ConvertBasicType(
+					operandID,
+					ctx.IDInfos[operandID]().GetILType(),
+					GetBasicTypeFromString(L"bool"));
+
+				int TrueLabel = ++ctx.CurrentID;
+				int FalseLabel = ++ctx.CurrentID;
+				int MergeLabel = ++ctx.CurrentID;
+
+				ctx.AddInstrSelectionMerge(MergeLabel);
+				ctx.AddInstrBranchConditional(operandID, TrueLabel, FalseLabel);
+
+				ctx.PushScope();
+				ctx.AddInstrLabel_AtFunctionBody(TrueLabel);
+				GenerateCode(instr->TrueCode.Ptr(), TrueLabel);
+				ctx.AddInstrBranch(MergeLabel);
+				ctx.PopScope();
+
+				ctx.PushScope();
+				ctx.AddInstrLabel_AtFunctionBody(FalseLabel);
+				if (instr->FalseCode)
+					GenerateCode(instr->FalseCode.Ptr(), FalseLabel);
+				ctx.AddInstrBranch(MergeLabel);
+				ctx.PopScope();
+
+				ctx.AddInstrLabel_AtFunctionBody(MergeLabel);
+			}
+
+			void PrintFor(ForInstruction * instr)
+			{
+				int HeaderBlockLabel = ++ctx.CurrentID;
+				int ConditionBlockLabel = ++ctx.CurrentID;
+				int BodyBlockLabel = ++ctx.CurrentID;
+				int UpdateBlockLabel = ++ctx.CurrentID;
+				int MergeBlockLabel = ++ctx.CurrentID;
+
+				//ctx.FunctionBody << LR"(OpBranch %)" << HeaderBlockLabel << EndLine;
+				ctx.AddInstrBranch(HeaderBlockLabel);
+
+				// header block
+				/*ctx.FunctionBody << LR"(%)" << HeaderBlockLabel << LR"( = OpLabel)" << EndLine;
+				ctx.FunctionBody << LR"(OpLoopMerge %)" << MergeBlockLabel << LR"( %)" << UpdateBlockLabel << LR"( None)" << EndLine;
+				ctx.FunctionBody << LR"(OpBranch %)" << ConditionBlockLabel << EndLine;*/
+				ctx.AddInstrLabel_AtFunctionBody(HeaderBlockLabel);
+				ctx.AddInstrLoopMerge(MergeBlockLabel, UpdateBlockLabel);
+				ctx.AddInstrBranch(ConditionBlockLabel);
+
+				// condition block
+				//ctx.FunctionBody << LR"(%)" << ConditionBlockLabel << LR"( = OpLabel)" << EndLine;
+				ctx.PushScope();
+				ctx.AddInstrLabel_AtFunctionBody(ConditionBlockLabel);
+				GenerateCode(instr->ConditionCode.Ptr(), ConditionBlockLabel);
+				int conditionID = GetOperandValue(instr->ConditionCode->GetLastInstruction());
+				conditionID = ctx.ConvertBasicType(
+					conditionID,
+					ctx.IDInfos[conditionID]().GetILType(),
+					GetBasicTypeFromString(L"bool"));
+				//ctx.FunctionBody << LR"(OpBranchConditional %)" << conditionID << LR"( %)" << BodyBlockLabel << LR"( %)" << MergeBlockLabel << EndLine;
+				ctx.AddInstrBranchConditional(conditionID, BodyBlockLabel, MergeBlockLabel);
+				ctx.PopScope();
+
+				// body block
+				//ctx.FunctionBody << LR"(%)" << BodyBlockLabel << LR"( = OpLabel)" << EndLine;
+				ctx.PushScope();
+				ctx.AddInstrLabel_AtFunctionBody(BodyBlockLabel);
+				ctx.StackMergeBlock.Add(MergeBlockLabel);
+				ctx.StackContinueBlock.Add(UpdateBlockLabel);
+				GenerateCode(instr->BodyCode.Ptr(), BodyBlockLabel);
+				ctx.StackMergeBlock.RemoveAt(ctx.StackMergeBlock.Count() - 1);
+				ctx.StackContinueBlock.RemoveAt(ctx.StackContinueBlock.Count() - 1);
+				//ctx.FunctionBody << LR"(OpBranch %)" << UpdateBlockLabel << EndLine;
+				ctx.AddInstrBranch(UpdateBlockLabel);
+				ctx.PopScope();
+
+				// update block
+				//ctx.FunctionBody << LR"(%)" << UpdateBlockLabel << LR"( = OpLabel)" << EndLine;
+				ctx.PushScope();
+				ctx.AddInstrLabel_AtFunctionBody(UpdateBlockLabel);
+				GenerateCode(instr->SideEffectCode.Ptr(), UpdateBlockLabel);
+				//ctx.FunctionBody << LR"(OpBranch %)" << HeaderBlockLabel << EndLine;
+				ctx.AddInstrBranch(HeaderBlockLabel);
+				ctx.PopScope();
+
+				// merge block
+				//ctx.FunctionBody << LR"(%)" << MergeBlockLabel << LR"( = OpLabel)" << EndLine;
+				ctx.AddInstrLabel_AtFunctionBody(MergeBlockLabel);
+			}
+
+			void PrintWhileDo(WhileInstruction * instr)
+			{
+				int HeaderBlockLabel = ++ctx.CurrentID;
+				int ConditionBlockLabel = ++ctx.CurrentID;
+				int BodyBlockLabel = ++ctx.CurrentID;
+				int UpdateBlockLabel = ++ctx.CurrentID;
+				int MergeBlockLabel = ++ctx.CurrentID;
+
+				//ctx.FunctionBody << LR"(OpBranch %)" << HeaderBlockLabel << EndLine;
+				ctx.AddInstrBranch(HeaderBlockLabel);
+
+				// header block
+				/*ctx.FunctionBody << LR"(%)" << HeaderBlockLabel << LR"( = OpLabel)" << EndLine;
+				ctx.FunctionBody << LR"(OpLoopMerge %)" << MergeBlockLabel << LR"( %)" << UpdateBlockLabel << LR"( None)" << EndLine;
+				ctx.FunctionBody << LR"(OpBranch %)" << ConditionBlockLabel << EndLine;*/
+				ctx.AddInstrLabel_AtFunctionBody(HeaderBlockLabel);
+				ctx.AddInstrLoopMerge(MergeBlockLabel, UpdateBlockLabel);
+				ctx.AddInstrBranch(ConditionBlockLabel);
+
+				// condition block
+				//ctx.FunctionBody << LR"(%)" << ConditionBlockLabel << LR"( = OpLabel)" << EndLine;
+				ctx.PushScope();
+				ctx.AddInstrLabel_AtFunctionBody(ConditionBlockLabel);
+				GenerateCode(instr->ConditionCode.Ptr(), ConditionBlockLabel, true);
+				int conditionID = GetOperandValue(instr->ConditionCode->GetLastInstruction()->As<ReturnInstruction>()->Operand.Ptr());
+				conditionID = ctx.ConvertBasicType(
+					conditionID,
+					ctx.IDInfos[conditionID]().GetILType(),
+					GetBasicTypeFromString(L"bool")
+				);
+				//ctx.FunctionBody << LR"(OpBranchConditional %)" << conditionID << LR"( %)" << BodyBlockLabel << LR"( %)" << MergeBlockLabel << EndLine;
+				ctx.AddInstrBranchConditional(conditionID, BodyBlockLabel, MergeBlockLabel);
+				ctx.PopScope();
+
+				// body block
+				//ctx.FunctionBody << LR"(%)" << BodyBlockLabel << LR"( = OpLabel)" << EndLine;
+				ctx.PushScope();
+				ctx.AddInstrLabel_AtFunctionBody(BodyBlockLabel);
+				ctx.StackMergeBlock.Add(MergeBlockLabel);
+				ctx.StackContinueBlock.Add(UpdateBlockLabel);
+				GenerateCode(instr->BodyCode.Ptr(), BodyBlockLabel);
+				ctx.StackMergeBlock.RemoveAt(ctx.StackMergeBlock.Count() - 1);
+				ctx.StackContinueBlock.RemoveAt(ctx.StackContinueBlock.Count() - 1);
+				//ctx.FunctionBody << LR"(OpBranch %)" << UpdateBlockLabel << EndLine;
+				ctx.AddInstrBranch(UpdateBlockLabel);
+				ctx.PopScope();
+
+				// update block (empty)
+				//ctx.FunctionBody << LR"(%)" << UpdateBlockLabel << LR"( = OpLabel)" << EndLine;
+				ctx.AddInstrLabel_AtFunctionBody(UpdateBlockLabel);
+				//ctx.FunctionBody << LR"(OpBranch %)" << HeaderBlockLabel << EndLine;
+				ctx.AddInstrBranch(HeaderBlockLabel);
+
+				// merge block
+				//ctx.FunctionBody << LR"(%)" << MergeBlockLabel << LR"( = OpLabel)" << EndLine
+				ctx.AddInstrLabel_AtFunctionBody(MergeBlockLabel);
+			}
+
+			void PrintDoWhile(DoInstruction * instr)
+			{
+				int HeaderBlockLabel = ++ctx.CurrentID;
+				int BodyBlockLabel = ++ctx.CurrentID;
+				int ConditionBlockLabel = ++ctx.CurrentID;
+				int MergeBlockLabel = ++ctx.CurrentID;
+
+				//ctx.FunctionBody << LR"(OpBranch %)" << HeaderBlockLabel << EndLine;
+				ctx.AddInstrBranch(HeaderBlockLabel);
+
+				// header block
+				/*ctx.FunctionBody << LR"(%)" << HeaderBlockLabel << LR"( = OpLabel)" << EndLine;
+				ctx.FunctionBody << LR"(OpLoopMerge %)" << MergeBlockLabel << LR"( %)" << ConditionBlockLabel << LR"( None)" << EndLine;
+				ctx.FunctionBody << LR"(OpBranch %)" << BodyBlockLabel << EndLine;*/
+				ctx.AddInstrLabel_AtFunctionBody(HeaderBlockLabel);
+				ctx.AddInstrLoopMerge(MergeBlockLabel, ConditionBlockLabel);
+				ctx.AddInstrBranch(BodyBlockLabel);
+
+				// body block
+				//ctx.FunctionBody << LR"(%)" << BodyBlockLabel << LR"( = OpLabel)" << EndLine;
+				ctx.PushScope();
+				ctx.AddInstrLabel_AtFunctionBody(BodyBlockLabel);
+				ctx.StackMergeBlock.Add(MergeBlockLabel);
+				ctx.StackContinueBlock.Add(ConditionBlockLabel);
+				GenerateCode(instr->BodyCode.Ptr(), BodyBlockLabel);
+				ctx.StackMergeBlock.RemoveAt(ctx.StackMergeBlock.Count() - 1);
+				ctx.StackContinueBlock.RemoveAt(ctx.StackContinueBlock.Count() - 1);
+				//ctx.FunctionBody << LR"(OpBranch %)" << ConditionBlockLabel << EndLine;
+				ctx.AddInstrBranch(ConditionBlockLabel);
+				ctx.PopScope();
+
+				// condition block
+				//ctx.FunctionBody << LR"(%)" << ConditionBlockLabel << LR"( = OpLabel)" << EndLine;
+				ctx.PushScope();
+				ctx.AddInstrLabel_AtFunctionBody(ConditionBlockLabel);
+				GenerateCode(instr->ConditionCode.Ptr(), ConditionBlockLabel, true);
+				int conditionID = GetOperandValue(instr->ConditionCode->GetLastInstruction()->As<ReturnInstruction>()->Operand.Ptr());
+				conditionID = ctx.ConvertBasicType(
+					conditionID,
+					ctx.IDInfos[conditionID]().GetILType(),
+					GetBasicTypeFromString(L"bool")
+				);
+				//ctx.FunctionBody << LR"(OpBranchConditional %)" << conditionID << LR"( %)" << HeaderBlockLabel << LR"( %)" << MergeBlockLabel << EndLine;
+				ctx.AddInstrBranchConditional(conditionID, HeaderBlockLabel, MergeBlockLabel);
+				ctx.PopScope();
+
+				// merge block
+				ctx.AddInstrLabel_AtFunctionBody(MergeBlockLabel);
+			}
+
+			void GenerateCode(CFGNode * code, int givenLabel = -1, bool LoopReturn = false)
+			{
+				if (givenLabel == -1)
+				{
+					++ctx.CurrentID; //label ID
+					ctx.AddInstrLabel_AtFunctionBody(ctx.CurrentID);
+				}
+
+				List<int> usedID;
+				for (auto & instr : *code)
+				{
+
+					if (auto ifInstr = instr.As<IfInstruction>())
+					{
+						PrintIf(ifInstr);
+					}
+					else if (auto forInstr = instr.As<ForInstruction>())
+					{
+						PrintFor(forInstr);
+					}
+					else if (auto doInstr = instr.As<DoInstruction>())
+					{
+						PrintDoWhile(doInstr);
+					}
+					else if (auto whileInstr = instr.As<WhileInstruction>())
+					{
+						PrintWhileDo(whileInstr);
+					}
+					else if (auto ret = instr.As<ReturnInstruction>())
+					{
+						if (!LoopReturn)
+						{
+							if (ret->Operand)
+								ctx.AddInstrReturnValue(GetOperandValue(ret->Operand.Ptr()));
+							else
+								ctx.AddInstrReturn();
+							ctx.AddInstrLabel_AtFunctionBody(++ctx.CurrentID);
+						}
+					}
+					else if (instr.Is<BreakInstruction>())
+					{
+						ctx.AddInstrBranch(ctx.StackMergeBlock.Last());
+						ctx.AddInstrLabel_AtFunctionBody(++ctx.CurrentID);
+					}
+					else if (instr.Is<ContinueInstruction>())
+					{
+						ctx.AddInstrBranch(ctx.StackContinueBlock.Last());
+						ctx.AddInstrLabel_AtFunctionBody(++ctx.CurrentID);
+					}
+					else if (instr.Is<DiscardInstruction>())
+					{
+						ctx.AddInstrKill();
+						ctx.AddInstrLabel_AtFunctionBody(++ctx.CurrentID);
+					}
+					else
+					{
+						//printf("%s\n", (instr.ToString().ToMultiByteString()));
+
+						//int LastUsedID = ctx.CurrentID;
+						PrintInstr(instr);
+						//for (int id = LastUsedID + 1; id <= ctx.CurrentID; id++) usedID.Add(id);
+					}
+				}
+				/*
+				for (auto & id : usedID)
+					if (ctx.ValueIDToVariableNames.ContainsKey(id))
+						for (auto & name : ctx.ValueIDToVariableNames[id]())
+							if (ctx.VariableNameToValueID[name] == id)
+								ctx.VariableNameToValueID[name] = -1;
+								*/
+			}
+
+			void ProcessInterfaces(
+				List<int> & interfaceIDs,
+				CompiledWorld * shaderWorld,
+				Dictionary<String,
+				ImportOperatorHandler*>& opHandlers,
+				bool &DepthReplacing)
+			{
+
+				//for input interface
+				ctx.ImportOperatorHandlers = opHandlers;
+				for (auto & inputBlock : shaderWorld->WorldInputs)
+				{
+					auto block = inputBlock.Value.Block;
+					if (!block->UserWorlds.Contains(shaderWorld->WorldName))
+						continue;
+					String impOpName = inputBlock.Value.ImportOperator.Name.Content;
+
+					if (impOpName == L"standardImport")
+					{
+						//1. Since this input block is a struct in SPIR-V, we'd better define a corresponding ILStruct for it (that's structIL)
+						//2. Define type for each member
+						//3. Define struct using members' type provided by step 2
+						//4. Decorate the struct with 'block' and members of it with an optional 'flat'
+						//5. Make this struct available to shader program!
+
+						if (block->Entries.Count() == 0)
+							return;
+
+						RefPtr<ILStructType> structIL = new ILStructType();
+						structIL->TypeName = block->Name;
+						List<int> memberTypeIDs;
+
+						for (auto & ent : block->Entries)
+						{
+							if (dynamic_cast<ILStructType*>(ent.Value.Type.Ptr()))
+								throw InvalidOperationException(L"input block is not allowed to contain structs: " + ent.Value.Type->ToString());
+							memberTypeIDs.Add(ctx.DefineType(ent.Value.Type));
+							ILStructType::ILStructField field;
+							field.Type = ent.Value.Type;
+							field.FieldName = ent.Value.Name;
+							structIL->Members.Add(field);
+						}
+
+						int structTypeID = ctx.DefineType(structIL);
+						int structVariableID = ctx.AddInstrVariableDeclaration(0, structIL, StorageClass::Input);
+						ctx.InterfaceNameToID[block->Name] = structVariableID;
+
+						//ctx.AddInstrDecorate(structTypeID, Decoration::Block);
+						ctx.AddInstrDecorate(structTypeID, Decoration::Location, 0);
+
+						int idx = 0;
+						for (auto & ent : block->Entries)
+						{
+							if (ent.Value.Type->IsIntegral())
+								ctx.AddInstrMemberDecorate(structTypeID, idx, Decoration::Flat);
+							idx++;
+						}
+
+						interfaceIDs.Add(structVariableID);
+					}
+
+					else if (impOpName == L"vertexImport")
+					{
+						int location = 0;
+						for (auto & ent : block->Entries)
+						{
+							int entID = ctx.AddInstrVariableDeclaration(0, ent.Value.Type, StorageClass::Input);
+							interfaceIDs.Add(entID);
+							ctx.InterfaceNameToID[ent.Value.Name] = entID;
+							ctx.AddInstrDecorate(entID, Decoration::Location, location);
+							location++;
+						}
+					}
+
+					else if (impOpName == L"uniformImport")
+					{
+						if (block->Entries.Count() == 0)
+							return;
+
+						int nonTextureCount = 0;
+						for (auto & ent : block->Entries)
+							if (!ent.Value.Type->IsTexture())
+								nonTextureCount++;
+
+						int TypeOfStruct = 1; //1: uniform buffer; 2: shader storage buffer; 0: not a buffer
+						if (block->Attributes.ContainsKey(L"ShaderStorageBlock"))
+							TypeOfStruct = 2;
+
+						if (nonTextureCount)
+						{
+							RefPtr<ILStructType> structIL = new ILStructType();
+							structIL->TypeName = block->Name;
+
+							for (auto & ent : block->Entries)
+								if (!ent.Value.Type->IsTexture())
+								{
+									ILStructType::ILStructField field;
+									field.Type = ent.Value.Type;
+									field.FieldName = ent.Value.Name;
+									structIL->Members.Add(field);
+								}
+
+							int structTypeID = ctx.DefineType(structIL, TypeOfStruct);
+							int structVariableID = ctx.AddInstrVariableDeclaration(0, structIL, StorageClass::Uniform, TypeOfStruct);
+							ctx.InterfaceNameToID[block->Name] = structVariableID;
+
+							if (TypeOfStruct == 1)
+							{
+								ctx.AddInstrDecorate(structTypeID, Decoration::Block);
+							}
+							else // TypeOfStruct == 2
+							{
+								ctx.AddInstrDecorate(structTypeID, Decoration::BufferBlock);
+							}
+
+							ctx.AddInstrDecorate(structVariableID, Decoration::DescriptorSet, 0);
+							String strIndex;
+							if (block->Attributes.TryGetValue(L"Index", strIndex))
+								ctx.AddInstrDecorate(structVariableID, Decoration::Binding, StringToInt(strIndex));
+						}
+
+						int bindPoint = 0;
+						String bindingStart;
+						if (backendArguments.TryGetValue(L"TextureBindingStart", bindingStart))
+							bindPoint = StringToInt(bindingStart);
+
+						for (auto & ent : block->Entries)
+							if (ent.Value.Type->IsTexture())
+							{
+								int entID = ctx.AddInstrVariableDeclaration(0, ent.Value.Type, StorageClass::UniformConstant);
+								ctx.InterfaceNameToID[ent.Value.Name] = entID;
+								ctx.AddInstrDecorate(entID, Decoration::DescriptorSet, 0);
+								ctx.AddInstrDecorate(entID, Decoration::Binding, bindPoint);
+								bindPoint++;
+							}
+					}
+
+					else if (impOpName == L"textureImport")
+					{
+						int bindPoint = 0;
+						String strIndex;
+						if (block->Attributes.TryGetValue(L"Index", strIndex))
+							bindPoint = StringToInt(strIndex);
+						for (auto & ent : block->Entries)
+						{
+							int entID = ctx.AddInstrVariableDeclaration(0, ent.Value.Type, StorageClass::UniformConstant);
+							ctx.InterfaceNameToID[ent.Value.Name] = entID;
+							ctx.AddInstrDecorate(entID, Decoration::DescriptorSet, 0);
+							ctx.AddInstrDecorate(entID, Decoration::Binding, bindPoint);
+							bindPoint++;
+						}
+					}
+
+					else
+						throw NotImplementedException(L"not implemented input interface: " + impOpName);
+				}
+
+				//for output interface
+				if (currentWorld->ExportOperator.Content == L"fragmentExport")
+				{
+					int location = 0;
+					for (auto & ent : currentWorld->WorldOutput->Entries)
+						if (!ent.Value.LayoutAttribs.ContainsKey(L"DepthOutput"))
+						{
+							int entID = ctx.AddInstrVariableDeclaration(0, ent.Value.Type, StorageClass::Output);
+							ctx.InterfaceNameToID[ent.Value.Name] = entID;
+							interfaceIDs.Add(entID);
+							ctx.AddInstrDecorate(entID, Decoration::Location, location);
+							location++;
+						}
+						else
+						{
+							DepthReplacing = true;
+							int entID = ctx.AddInstrVariableDeclaration(0, ent.Value.Type, StorageClass::Output);
+							ctx.InterfaceNameToID[L"gl_FragDepth"] = entID;
+							interfaceIDs.Add(entID);
+							ctx.AddInstrDecorate(entID, Decoration::BuiltIn, (int)BuiltIn::FragDepth);
+						}
+				}
+
+				else if (currentWorld->ExportOperator.Content == L"standardExport")
+				{
+
+					auto block = currentWorld->WorldOutput;
+					if (block->Entries.Count() == 0)
+						return;
+
+					RefPtr<ILStructType> structIL = new ILStructType();
+					structIL->TypeName = block->Name;
+					List<int> memberTypeIDs;
+
+					for (auto & ent : block->Entries)
+					{
+						if (dynamic_cast<ILStructType*>(ent.Value.Type.Ptr()))
+							throw InvalidOperationException(L"output block is not allowed to contain structs: " + ent.Value.Type->ToString());
+						memberTypeIDs.Add(ctx.DefineType(ent.Value.Type));
+						ILStructType::ILStructField field;
+						field.Type = ent.Value.Type;
+						field.FieldName = ent.Value.Name;
+						structIL->Members.Add(field);
+					}
+
+					int structTypeID = ctx.DefineType(structIL);
+					int structVariableID = ctx.AddInstrVariableDeclaration(0, structIL, StorageClass::Output);
+					ctx.InterfaceNameToID[block->Name] = structVariableID;
+
+					//ctx.AddInstrDecorate(structTypeID, Decoration::Block);
+					ctx.AddInstrDecorate(structTypeID, Decoration::Location, 0);
+
+					int idx = 0;
+					for (auto & ent : block->Entries)
+					{
+						if (ent.Value.Type->IsIntegral())
+							ctx.AddInstrMemberDecorate(structTypeID, idx, Decoration::Flat);
+						idx++;
+					}
+
+					interfaceIDs.Add(structVariableID);
+				}
+
+				else
+					throw NotImplementedException(L"not implemented output interface: " + currentWorld->ExportOperator.Content);
+
+			}
+
+			ExecutionModel currentExecutionModel = ExecutionModel::Invalid;
+
+			virtual CompiledShaderSource GenerateShaderWorld(CompileResult & result, SymbolTable * /*symbols*/, CompiledWorld * shaderWorld, Dictionary<String, ImportOperatorHandler*>& opHandlers, Dictionary<String, ExportOperatorHandler*>& exportHandlers) override
+			{
+				ctx.Clear();
+
+				currentWorld = shaderWorld;
+				CompiledShaderSource rs;
+				ctx.Result = &result;
+				ctx.ImportOperatorHandlers = opHandlers;
+				ctx.ExportOperatorHandlers = exportHandlers;
+
+				currentExecutionModel = ExecutionModel::Invalid;
+				if (currentWorld->ExportOperator.Content == L"fragmentExport")
+					currentExecutionModel = ExecutionModel::Fragment;
+				else if (currentWorld->BackendParameters.ContainsKey(L"vertex"))
+					currentExecutionModel = ExecutionModel::Vertex;
+				else if (currentWorld->ExportOperator.Content == L"bufferExport")
+					currentExecutionModel = ExecutionModel::GLCompute;
+
+				if (ExecutionModel::Invalid == currentExecutionModel)
+					throw InvalidOperationException(L"invalid execution model for shader world: " + currentWorld->WorldName);
+
+				ctx.CurrentID = 1;
+
+				ctx.CodeGen.Init();
+				ctx.CodeGen.ProgramHeader();
+
+				//add Main function type definition
+				ctx.MainFunctionTypeID = ctx.AddInstrTypeFunction(nullptr, List<RefPtr<ILType>>(), nullptr);
+
+				//add all functions type definition
+				for (auto funcName : shaderWorld->ReferencedFunctions)
+				{
+					for (auto &func : result.Program->Functions)
+					{
+						if (func->Name == funcName)
+						{
+							List<RefPtr<ILType>> args;
+							for (auto & instr : *func->Code)
+								if (auto arg = instr.As<FetchArgInstruction>())
+									if (arg->ArgId != 0)
+									{
+										args.Add(arg->Type);
+									}
+							ctx.AddInstrTypeFunction(func.Ptr(), args, func->ReturnType);
+							ctx.FunctionNameToFunctionID[func->Name] = ++ctx.CurrentID; 
+							//this is reserverd for the result ID of the OpFunction instruction! 
+						}
+					}
+				}
+
+				//add all functions definition
+				for (auto funcName : shaderWorld->ReferencedFunctions)
+				{
+					for (auto &func : result.Program->Functions)
+					{
+						if (func->Name == funcName)
+						{
+
+							ctx.ClearBuffer();
+
+							ctx.PushScope();
+
+							int funcID = ctx.FunctionNameToFunctionID[func->Name]();
+							int funcTypeID = ctx.FunctionNameToFunctionTypeID[func->Name]();
+
+							ctx.AddInstrFunction(funcID, ctx.DefineType(func->ReturnType), funcTypeID);
+
+							for (auto & instr : *func->Code)
+								if (auto arg = instr.As<FetchArgInstruction>())
+									if (arg->ArgId != 0)
+									{
+										if (!ctx.ParameterNameToID.ContainsKey((ILOperand*)&instr))
+										{
+											ctx.DefineType(arg->Type);
+											int typeID = ctx.DefineTypePointer(arg->Type, StorageClass::Function);
+											int paramID = ++ctx.CurrentID;
+											ctx.AddInstrFunctionParameter((ILOperand*)&instr, paramID, typeID);
+											/*
+											ctx.IDInfos[paramID] = IDInfo::CreateIDInfoForPointer(
+												paramID,
+												arg->Name,
+												typeID,
+												arg->Type,
+												baseTypeID,
+												StorageClass::Function
+											);
+											ctx.ParameterNameToID[arg->Name] = paramID;
+											ctx.UpdateVariable(arg->Name, paramID);
+											*/
+										}
+									}
+
+							++ctx.CurrentID;
+							ctx.AddInstrLabel_AtFunctionHeader(ctx.CurrentID);
+
+							func->Code->NameAllInstructions();
+							GenerateCode(func->Code.Ptr(), ctx.CurrentID);
+
+							ctx.AddInstrReturn();
+							ctx.AddInstrFunctionEnd();
+
+							ctx.ProduceFunction();
+
+							ctx.PopScope();
+						}
+					}
+				}
+
+				ctx.ClearBuffer();
+
+				ctx.PushScope();
+
+				List<int> interfaceIDs;
+				bool DepthReplacing = false;
+				ProcessInterfaces(interfaceIDs, shaderWorld, opHandlers, DepthReplacing);
+
+				ctx.MainFunctionID = ++ctx.CurrentID;
+
+				//for gl_Position
+				if (vertexOutputName.Length())
+				{
+					CompiledComponent ccomp;
+					if (currentWorld->LocalComponents.TryGetValue(vertexOutputName, ccomp))
+					{
+						RefPtr<ILStructType> structIL = new ILStructType();
+						structIL->TypeName = L"gl_PerVertex";
+
+						ILStructType::ILStructField f1;
+						f1.Type = GetBasicTypeFromString(L"vec4");
+						f1.FieldName = L"gl_Position";
+						structIL->Members.Add(f1);
+						ILStructType::ILStructField f2;
+						f2.Type = GetTypeFromString(L"float");
+						f2.FieldName = L"gl_PointSize";
+						structIL->Members.Add(f2);
+						ILStructType::ILStructField f3;
+						f3.Type = GetTypeFromString(L"float[1]");
+						f3.FieldName = L"gl_ClipDistance";
+						structIL->Members.Add(f3);
+						ILStructType::ILStructField f4;
+						f4.Type = GetTypeFromString(L"float[1]");
+						f4.FieldName = L"gl_CullDistance";
+						structIL->Members.Add(f4);
+
+						int structTypeID = ctx.DefineType(structIL);
+						int structVariableID = ctx.AddInstrVariableDeclaration(0, structIL, StorageClass::Output);
+						ctx.InterfaceNameToID[L"gl_PerVertex"] = structVariableID;
+
+						ctx.AddInstrDecorate(structTypeID, Decoration::Block);
+						ctx.AddInstrMemberDecorate(structTypeID, 0, Decoration::BuiltIn, (int)BuiltIn::Position);
+						ctx.AddInstrMemberDecorate(structTypeID, 1, Decoration::BuiltIn, (int)BuiltIn::PointSize);
+						ctx.AddInstrMemberDecorate(structTypeID, 2, Decoration::BuiltIn, (int)BuiltIn::ClipDistance);
+						ctx.AddInstrMemberDecorate(structTypeID, 3, Decoration::BuiltIn, (int)BuiltIn::CullDistance);
+
+						interfaceIDs.Add(structVariableID);
+					}
+					else
+						throw InvalidOperationException(L"can not find vertexOutputName");
+				}
+
+				//Entry Point
+				ctx.AddInstrEntryPoint(currentExecutionModel, ctx.MainFunctionID, interfaceIDs);
+
+				//execution mode
+				if (currentExecutionModel == ExecutionModel::Fragment)
+				{
+					//CodeGen.OpExecutionMode(ctx.MainFunctionID, ExecutionMode::OriginUpperLeft);
+					ctx.AddInstrExecutionMode(ctx.MainFunctionID, ExecutionMode::OriginUpperLeft);
+				}
+
+				if (DepthReplacing)
+				{
+					//CodeGen.OpExecutionMode(ctx.MainFunctionID, ExecutionMode::DepthReplacing);
+					ctx.AddInstrExecutionMode(ctx.MainFunctionID, ExecutionMode::DepthReplacing);
+				}
+
+				//MainFunction
+				ctx.AddInstrFunction(ctx.MainFunctionID, ctx.TypeNameToID[L"void"](), ctx.MainFunctionTypeID);
+
+				++ctx.CurrentID;
+				ctx.AddInstrLabel_AtFunctionHeader(ctx.CurrentID);
+
+				shaderWorld->Code->NameAllInstructions();
+				GenerateCode(shaderWorld->Code.Ptr(), ctx.CurrentID);
+
+				if (vertexOutputName.Length())
+				{
+					CompiledComponent ccomp;
+					if (currentWorld->LocalComponents.TryGetValue(vertexOutputName, ccomp))
+					{
+						int valueID = ctx.AddInstrLoad(nullptr, ccomp.CodeOperand, MemoryAccess::None);
+						int gl_PositionID = ctx.AddInstrAccessChain_StructMember(
+							0,
+							ctx.InterfaceNameToID[L"gl_PerVertex"],
+							L"gl_Position"
+						);
+						ctx.AddInstrStore(0, gl_PositionID, valueID);
+					}
+					else
+						throw InvalidOperationException(L"can not find vertexOutputName");
+				}
+
+				//MainFunction End
+				ctx.AddInstrReturn();
+				ctx.AddInstrFunctionEnd();
+
+				ctx.ProduceFunction();
+
+				ctx.PopScope();
+
+				ctx.GenerateDebugInformation();
+				
+				/*printf("%s\n", currentWorld->WorldName.ToMultiByteString());
+				for (int i = 0; i <= ctx.CurrentID; i++)
+					if (ctx.IDInfos.ContainsKey(i))
+					{
+						if (ctx.IDInfos[i]().GetClass() == IDClass::Pointer)
+						{
+							printf("%d\t- %s\n", i, ctx.IDInfos[i]().GetName().ToMultiByteString());
+						}
+					}
+				printf("\n");*/
+
+				auto binaryForm = ctx.ProduceWordStream();
+				rs.BinaryCode.SetSize(binaryForm.Count() * sizeof(unsigned int));
+				memcpy(rs.BinaryCode.Buffer(), binaryForm.Buffer(), rs.BinaryCode.Count());
+
+				rs.MainCode = ctx.ProduceTextCode();
+
+				rs.OutputDeclarations = L"spirv";
+
+				currentWorld = nullptr;
+
+				//CoreLib::IO::File::WriteAllText(currentWorld->WorldName + L"-IL.txt", );
+
+				return rs;
+			}
+
+>>>>>>> c2012fd6615068688c9f90a9726ce3e75afcca1b
 			virtual void SetParameters(const EnumerableDictionary<String, String>& arguments) override
 			{
 				backendArguments = arguments;

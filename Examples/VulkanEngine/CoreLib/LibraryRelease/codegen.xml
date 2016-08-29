@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<codegen>
+  <license name="license.txt"/>
+  <folders>
+    <folder path="..\" />
+  </folders>
+  <categories>
+    <category name="Basic" pattern="\">
+      <except pattern="\LibraryRelease\"/>
+      <except pattern="\Graphics\"/>
+      <except pattern="\Imaging\"/>
+      <except pattern="\WinForm\"/>
+      <except pattern="\LibGL\"/>
+      <except pattern="\LibUI\"/>
+    </category>
+    <category name="Graphics" pattern="\Graphics\" >
+	    <except pattern="\LibraryRelease\"/>
+    </category>
+    <category name="Imaging" pattern="\Imaging\" >
+	    <except pattern="\LibraryRelease\"/>
+    </category>
+    <category name="WinForm" pattern="\WinForm\" >
+	    <except pattern="\LibraryRelease\"/>
+    </category>
+    <category name="LibGL" pattern="\LibGL\">
+	    <except pattern="\LibraryRelease\"/>
+      <except pattern="\glew\"/>
+    </category>
+     <category name="LibUI" pattern="\LibUI\">
+	    <except pattern="\LibraryRelease\"/>
+    </category>
+  </categories>
+  <output path=".">
+    <codepair category="Basic" filename="Basic" generate="true"/>
+    <codepair category="Graphics" filename="Graphics" generate="true"/>
+    <codepair category="Imaging" filename="Imaging" generate="true"/>
+    <codepair category="WinForm" filename="WinForm" generate="true"/>
+    <codepair category="LibGL" filename="LibGL" generate="true"/>
+    <codepair category="LibUI" filename="LibUI" generate="true"/>
+    
+  </output>
+</codegen>
