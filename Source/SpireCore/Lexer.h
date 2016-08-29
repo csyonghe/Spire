@@ -26,6 +26,7 @@ namespace Spire
 			OpEql, OpNeq, OpGreater, OpLess, OpGeq, OpLeq,
 			OpAnd, OpOr, OpBitXor, OpBitAnd, OpBitOr,
 			OpInc, OpDec, OpAddAssign, OpSubAssign, OpMulAssign, OpDivAssign, OpModAssign,
+			OpShlAssign, OpShrAssign, OpOrAssign, OpAndAssign, OpXorAssign,
 			
 			QuestionMark, Colon, RightArrow, At,
 		};

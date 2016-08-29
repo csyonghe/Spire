@@ -79,7 +79,7 @@ namespace Spire
 				{
 					auto name = GenerateCodeName(op->Name, L"");
 					PrintDef(Header, op->Type.Ptr(), name);
-					if (op->Type->IsInt())
+					if (op->Type->IsInt() || op->Type->IsUInt())
 					{
 						Header << L" = 0;";
 					}
@@ -307,32 +307,32 @@ namespace Spire
 				else if (instr->Is<CmpeqlInstruction>())
 				{
 					op = L"==";
-					ctx.Body << L"int";
+					//ctx.Body << L"int";
 				}
 				else if (instr->Is<CmpgeInstruction>())
 				{
 					op = L">=";
-					ctx.Body << L"int";
+					//ctx.Body << L"int";
 				}
 				else if (instr->Is<CmpgtInstruction>())
 				{
 					op = L">";
-					ctx.Body << L"int";
+					//ctx.Body << L"int";
 				}
 				else if (instr->Is<CmpleInstruction>())
 				{
 					op = L"<=";
-					ctx.Body << L"int";
+					//ctx.Body << L"int";
 				}
 				else if (instr->Is<CmpltInstruction>())
 				{
 					op = L"<";
-					ctx.Body << L"int";
+					//ctx.Body << L"int";
 				}
 				else if (instr->Is<CmpneqInstruction>())
 				{
 					op = L"!=";
-					ctx.Body << L"int";
+					//ctx.Body << L"int";
 				}
 				else if (instr->Is<AndInstruction>())
 				{
@@ -734,6 +734,11 @@ namespace Spire
 					{
 						context.Body << L"continue;\n";
 					}
+					else if (instr.Is<DiscardInstruction>())
+					{
+						if (currentWorld->ExportOperator.Content == L"fragmentExport")
+							context.Body << L"discard;\n";
+					}
 					else
 						PrintInstr(context, instr);
 				}
@@ -746,7 +751,7 @@ namespace Spire
 				CompiledShaderSource rs;
 				CodeGenContext context;
 				context.Result = &result;
-				context.GlobalHeader << L"#version 450\n";
+				context.GlobalHeader << L"#version 440\n";
 				if (bindlessTexture)
 					context.GlobalHeader << L"#extension GL_ARB_bindless_texture: require\n#extension GL_NV_gpu_shader5 : require\n";
 				if (useNVCommandList)

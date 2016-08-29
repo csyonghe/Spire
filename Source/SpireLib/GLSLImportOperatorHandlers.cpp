@@ -189,7 +189,11 @@ class UniformGLSLImportOperatorHandler : public GLSLImportOperatorHandler
 
 		if (activeEntryCount)
 		{
-			sb << L"layout(std140";
+			sb << L"layout(";
+			if (bufferType == L"buffer")
+				sb << L"std430";
+			else
+				sb << L"std140";
 			String strIndex;
 			if (block->Attributes.TryGetValue(L"Index", strIndex))
 				sb << L", binding = " << strIndex;
@@ -202,7 +206,12 @@ class UniformGLSLImportOperatorHandler : public GLSLImportOperatorHandler
 			{
 				if (!useBindlessTexture && ent.Value.Type->IsTexture())
 					continue;
-				sb << ent.Value.Type->ToString() << L" " << ent.Key << L";\n";
+				// work around for intel: variable length arrays must declared with Type VarName[] syntax.
+				auto typeStr = ent.Value.Type->ToString();
+				if (typeStr.EndsWith(L"[]"))
+					sb << typeStr.SubString(0, typeStr.Length() - 2) << L" " << ent.Key << L"[];\n";
+				else
+					sb << typeStr << L" " << ent.Key << L";\n";
 			}
 			sb << L"} blk" << block->Name << L";\n";
 		}

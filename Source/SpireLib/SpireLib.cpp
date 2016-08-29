@@ -35,7 +35,24 @@ namespace SpireLib
 		{
 			auto worldName = parser.ReadWord();
 			CompiledShaderSource compiledSrc;
-			compiledSrc.ParseFromGLSL(getShaderSource());
+			if (parser.LookAhead(L"binary"))
+			{
+				parser.ReadToken();
+				parser.Read(L"{");
+				while (!parser.LookAhead(L"}") && !parser.IsEnd())
+				{
+					auto val = parser.ReadUInt();
+					compiledSrc.BinaryCode.AddRange((unsigned char*)&val, sizeof(unsigned int));
+					if (parser.LookAhead(L","))
+						parser.ReadToken();
+				}
+				parser.Read(L"}");
+			}
+			if (parser.LookAhead(L"text"))
+			{
+				parser.ReadToken();
+				compiledSrc.ParseFromGLSL(getShaderSource());
+			}
 			sources[worldName] = compiledSrc;
 		}
 	}
@@ -263,8 +280,21 @@ namespace SpireLib
 		for (auto & src : Sources)
 		{
 			writer << src.Key << EndLine;
-			writer << L"{" << EndLine;
+			if (src.Value.BinaryCode.Count())
+			{
+				writer << L"binary" << EndLine << L"{" << EndLine;
+				auto binaryBuffer = (unsigned int*)src.Value.BinaryCode.Buffer();
+				for (int i = 0; i < src.Value.BinaryCode.Count() / 4; i++)
+				{
+					writer << String((long long)binaryBuffer[i]) << L",";
+					if ((i+1) % 10)
+						writer << EndLine;
+				}
+				writer << EndLine << L"}" << EndLine;
+			}
+			writer << L"text" << EndLine << L"{" << EndLine;
 			writer << src.Value.GetAllCodeGLSL() << EndLine;
+
 			writer << L"}" << EndLine;
 		}
 		writer << L"}" << EndLine;
@@ -303,9 +333,7 @@ namespace SpireLib
 				ReadSource(Sources, parser, src);
 				parser.Read(L"}");
 			}
-			else if (fieldName == L"binary")
-			{
-			}
+			
 			else if (fieldName == L"world")
 			{
 				WorldMetaData world;

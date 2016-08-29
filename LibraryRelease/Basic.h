@@ -1331,7 +1331,8 @@ namespace CoreLib
 			}
 		};
 
-		int StringToInt(const String & str);
+		int StringToInt(const String & str, int radix = 10);
+		unsigned int StringToUInt(const String & str, int radix = 10);
 		double StringToDouble(const String & str);
 
 		
@@ -5216,6 +5217,15 @@ namespace CoreLib
 				}
 				throw TextFormatException(L"Text parsing error: int expected.");
 			}
+			unsigned int ReadUInt()
+			{
+				auto token = ReadToken();
+				if (token.TypeID == TokenType_Int)
+				{
+					return StringToUInt(token.Str);
+				}
+				throw TextFormatException(L"Text parsing error: int expected.");
+			}
 			double ReadDouble()
 			{
 				auto token = ReadToken();
@@ -5789,7 +5799,7 @@ namespace CoreLib
 					}
 					int codePoint = 0;
 					int leading = get(0);
-					int mask = 0b10000000;
+					int mask = 0x80;
 					int count = 0;
 					while (leading & mask)
 					{
@@ -5800,7 +5810,7 @@ namespace CoreLib
 					for (int i = 1; i <= count - 1; i++)
 					{
 						codePoint <<= 6;
-						codePoint += (get(i) & 0b111111);
+						codePoint += (get(i) & 0x3F);
 					}
 #ifdef _WIN32
 					if (codePoint <= 0xD7FF || (codePoint >= 0xE000 && codePoint <= 0xFFFF))

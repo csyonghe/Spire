@@ -81,6 +81,7 @@ namespace Spire
 			{
 				return errors.Count();
 			}
+			ErrorWriter & operator = (const ErrorWriter & other) = delete;
 		};
 	}
 }

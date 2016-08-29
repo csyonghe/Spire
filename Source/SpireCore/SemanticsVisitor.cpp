@@ -246,6 +246,38 @@ namespace Spire
 					currentShader->Components.TryGetValue(comp->Name.Content, compSym);
 					currentComp = compSym.Ptr();
 					SyntaxVisitor::VisitComponent(comp);
+					if (compSym->Type->DataType.Struct != nullptr || compSym->Type->DataType.IsArray ||
+						compSym->Type->DataType.IsTextureType())
+					{
+						bool valid = true;
+						bool isInStorageBuffer = true;
+						if (comp->Rate)
+						{
+							for (auto & w : comp->Rate->Worlds)
+							{
+								auto world = currentShader->Pipeline->Worlds.TryGetValue(w.World.Content);
+								if (world)
+								{
+									if (!world->IsAbstract)
+										valid = false;
+									isInStorageBuffer = isInStorageBuffer && world->SyntaxNode->LayoutAttributes.ContainsKey(L"ShaderStorageBlock");
+								}
+							}
+						}
+						else 
+							valid = false;
+						if (!valid)
+						{
+							Error(33035, L"\'" + compSym->Name + L"\': sampler, struct and array types only allowed in input worlds.", comp->Name);
+						}
+						else
+						{
+							if (!isInStorageBuffer && compSym->Type->DataType.Struct != nullptr)
+							{
+								Error(33036, L"\'" + compSym->Name + L"\': struct must only be defined in a input world with [ShaderStorageBlock] attribute.", comp->Name);
+							}
+						}
+					}
 					currentComp = nullptr;
 				}
 				virtual void VisitImport(ImportSyntaxNode * import) override
@@ -787,49 +819,125 @@ namespace Spire
 			{
 				stmt->Expression->Accept(this);
 			}
+			bool MatchType_BinaryImplicit(ExpressionType & resultType, ExpressionType leftType, ExpressionType rightType)
+			{
+				if (leftType == rightType && !leftType.IsTextureType())
+				{
+					resultType = leftType;
+					return true;
+				}
+				else if (leftType.IsVectorType() && rightType == GetVectorBaseType(leftType.BaseType))
+				{
+					resultType = leftType;
+					return true;
+				}
+				else if (rightType.IsVectorType() && leftType == GetVectorBaseType(rightType.BaseType))
+				{
+					resultType = rightType;
+					return true;
+				}
+				else if ((rightType == ExpressionType::Float && leftType == ExpressionType::Int) ||
+					(leftType == ExpressionType::Float && rightType == ExpressionType::Int))
+				{
+					resultType = ExpressionType::Float;
+					return true;
+				}
+				else if ((rightType == ExpressionType::Float2 && leftType == ExpressionType::Int2) ||
+					(leftType == ExpressionType::Float2 && rightType == ExpressionType::Int2))
+				{
+					resultType = ExpressionType::Float2;
+					return true;
+				}
+				else if ((rightType == ExpressionType::Float3 && leftType == ExpressionType::Int3) ||
+					(leftType == ExpressionType::Float3 && rightType == ExpressionType::Int3))
+				{
+					resultType = ExpressionType::Float3;
+					return true;
+				}
+				else if ((rightType == ExpressionType::Float4 && leftType == ExpressionType::Int4) ||
+					(leftType == ExpressionType::Float4 && rightType == ExpressionType::Int4))
+				{
+					resultType = ExpressionType::Float4;
+					return true;
+				}
+				else if ((rightType == ExpressionType::Float && leftType == ExpressionType::UInt) ||
+					(leftType == ExpressionType::Float && rightType == ExpressionType::UInt))
+				{
+					resultType = ExpressionType::Float;
+					return true;
+				}
+				else if ((rightType == ExpressionType::Float2 && leftType == ExpressionType::UInt2) ||
+					(leftType == ExpressionType::Float2 && rightType == ExpressionType::UInt2))
+				{
+					resultType = ExpressionType::Float2;
+					return true;
+				}
+				else if ((rightType == ExpressionType::Float3 && leftType == ExpressionType::UInt3) ||
+					(leftType == ExpressionType::Float3 && rightType == ExpressionType::UInt3))
+				{
+					resultType = ExpressionType::Float3;
+					return true;
+				}
+				else if ((rightType == ExpressionType::Float4 && leftType == ExpressionType::UInt4) ||
+					(leftType == ExpressionType::Float4 && rightType == ExpressionType::UInt4))
+				{
+					resultType = ExpressionType::Float4;
+					return true;
+				}
+				else if ((rightType == ExpressionType::Int && leftType == ExpressionType::UInt) ||
+					(leftType == ExpressionType::Int && rightType == ExpressionType::UInt))
+				{
+					resultType = ExpressionType::Int;
+					return true;
+				}
+				else if ((rightType == ExpressionType::Int2 && leftType == ExpressionType::UInt2) ||
+					(leftType == ExpressionType::Int2 && rightType == ExpressionType::UInt2))
+				{
+					resultType = ExpressionType::Int2;
+					return true;
+				}
+				else if ((rightType == ExpressionType::Int3 && leftType == ExpressionType::UInt3) ||
+					(leftType == ExpressionType::Int3 && rightType == ExpressionType::UInt3))
+				{
+					resultType = ExpressionType::Int3;
+					return true;
+				}
+				else if ((rightType == ExpressionType::Int4 && leftType == ExpressionType::UInt4) ||
+					(leftType == ExpressionType::Int4 && rightType == ExpressionType::UInt4))
+				{
+					resultType = ExpressionType::Int4;
+					return true;
+				}
+				return false;
+			}
 			virtual void VisitBinaryExpression(BinaryExpressionSyntaxNode *expr) override
 			{
 				expr->LeftExpression->Accept(this);
 				expr->RightExpression->Accept(this);
 				auto & leftType = expr->LeftExpression->Type;
 				auto & rightType = expr->RightExpression->Type;
+				ExpressionType matchedType;
 				switch (expr->Operator)
 				{
 				case Operator::Add:
 				case Operator::Sub:
 				case Operator::Div:
-					if (leftType == rightType && !leftType.IsArray && !leftType.IsTextureType() && leftType.BaseType != BaseType::Shader)
-						expr->Type = leftType;
-					else if (leftType.IsVectorType() && rightType == GetVectorBaseType(leftType.BaseType))
-						expr->Type = leftType;
-					else if (rightType.IsVectorType() && leftType == GetVectorBaseType(rightType.BaseType))
-						expr->Type = rightType;
-					else if ((rightType == ExpressionType::Float && leftType == ExpressionType::Int) ||
-						(leftType == ExpressionType::Float && leftType == ExpressionType::Int))
-						expr->Type = ExpressionType::Float;
-					else if (leftType.IsIntegral() && rightType.IsIntegral())
-						expr->Type = ExpressionType::Int;
+					if (MatchType_BinaryImplicit(matchedType, leftType, rightType))
+						expr->Type = matchedType;
 					else
 						expr->Type = ExpressionType::Error;
 					break;
 				case Operator::Mul:
 					if (!leftType.IsArray && leftType.BaseType != BaseType::Shader)
 					{
-						if (leftType == rightType && !leftType.IsTextureType())
-							expr->Type = leftType;
+						if (MatchType_BinaryImplicit(matchedType, leftType, rightType))
+							expr->Type = matchedType;
 						else if ((leftType.BaseType == BaseType::Float3x3 && rightType == ExpressionType::Float3) ||
 							(leftType.BaseType == BaseType::Float3 && rightType.BaseType == BaseType::Float3x3))
 							expr->Type = ExpressionType::Float3;
 						else if ((leftType.BaseType == BaseType::Float4x4 && rightType == ExpressionType::Float4) ||
 							(leftType.BaseType == BaseType::Float4 && rightType.BaseType == BaseType::Float4x4))
 							expr->Type = ExpressionType::Float4;
-						else if (leftType.IsVectorType() && rightType == GetVectorBaseType(leftType.BaseType))
-							expr->Type = leftType;
-						else if (rightType.IsVectorType() && leftType == GetVectorBaseType(rightType.BaseType))
-							expr->Type = rightType;
-						else if ((rightType == ExpressionType::Float && leftType == ExpressionType::Int) ||
-							(leftType == ExpressionType::Float && rightType == ExpressionType::Int))
-							expr->Type = ExpressionType::Float;
 						else
 							expr->Type = ExpressionType::Error;
 					}
@@ -860,6 +968,11 @@ namespace Spire
 					else if ((leftType == ExpressionType::Int || leftType == ExpressionType::UInt) &&
 						(rightType == ExpressionType::Int || rightType == ExpressionType::UInt))
 						expr->Type = ExpressionType::Bool;
+					else if (leftType.IsIntegral() && rightType.IsIntegral())
+						expr->Type = ExpressionType::Bool;
+					else if (leftType == ExpressionType::Float && rightType.IsIntegral() ||
+						leftType.IsIntegral() && rightType == ExpressionType::Float)
+						expr->Type = ExpressionType::Bool;
 					else
 						expr->Type = ExpressionType::Error;
 					break;
@@ -872,6 +985,9 @@ namespace Spire
 						expr->Type = ExpressionType::Bool;
 					else if (leftType == ExpressionType::Float && rightType == ExpressionType::Float)
 						expr->Type = ExpressionType::Bool;
+					else if (leftType == ExpressionType::Float && rightType.IsIntegral() ||
+						leftType.IsIntegral() && rightType == ExpressionType::Float)
+						expr->Type = ExpressionType::Bool;
 					else
 						expr->Type = ExpressionType::Error;
 					break;
@@ -881,8 +997,24 @@ namespace Spire
 				case Operator::DivAssign:
 				case Operator::SubAssign:
 				case Operator::ModAssign:
+				case Operator::AndAssign:
+				case Operator::OrAssign:
+				case Operator::XorAssign:
+				case Operator::LshAssign:
+				case Operator::RshAssign:
 					if (!leftType.IsLeftValue && leftType != ExpressionType::Error)
 						Error(30011, L"left of '=' is not an l-value.", expr->LeftExpression.Ptr());
+					if (expr->Operator == Operator::AndAssign ||
+						expr->Operator == Operator::OrAssign ||
+						expr->Operator == Operator::XorAssign ||
+						expr->Operator == Operator::LshAssign ||
+						expr->Operator == Operator::RshAssign)
+					{
+						if (!(leftType.IsIntegral() && rightType.IsIntegral()))
+						{
+							Error(30041, L"bit operation: operand must be integral type.", expr);
+						}
+					}
 					expr->LeftExpression->Access = ExpressionAccess::Write;
 					if (MatchType_ValueReceiver(leftType, rightType))
 						expr->Type = ExpressionType::Void;
@@ -1279,7 +1411,7 @@ namespace Spire
 							if (vecLen == 9)
 								expr->Type.BaseType = (BaseType)((int)GetVectorBaseType(baseType.BaseType) + 2);
 							else if (vecLen == 16)
-								expr->Type.BaseType = (BaseType)((int)GetVectorBaseType(baseType.BaseType) + 15);
+								expr->Type.BaseType = (BaseType)((int)GetVectorBaseType(baseType.BaseType) + 3);
 							else
 							{
 								expr->Type.BaseType = (BaseType)((int)GetVectorBaseType(baseType.BaseType) + children.Count() - 1);

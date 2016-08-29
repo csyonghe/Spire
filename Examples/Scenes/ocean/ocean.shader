@@ -8,7 +8,7 @@ shader Ocean
     // ray 
     inline vec3 ori = cameraPos;
     inline vec3 dir = -view;
-    inline int iterGeom : lq = 0;
+    inline int iterGeom : lq = 2;
     inline int iterGeom : hq = 3;
     inline int iterDetail :lq = 2;
     inline int iterDetail : hq = 5;

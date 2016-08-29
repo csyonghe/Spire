@@ -16,13 +16,15 @@ namespace Spire
 			EnumerableDictionary<String, String> & BackendArguments;
 			CompiledWorld * SourceWorld, * DestWorld;
 			CompileResult & Result;
+			void * CodeGenContext = nullptr;
 			ImportOperatorContext(EnumerableDictionary<String, String> & args,
 				EnumerableDictionary<String, String> & backendArgs,
 				CompiledWorld * destWorld,
-				CompileResult & result, CompiledWorld * srcWorld)
+				CompileResult & result, CompiledWorld * srcWorld, void * codeGenContext = nullptr)
 				: Arguments(args), BackendArguments(backendArgs), SourceWorld(srcWorld), DestWorld(destWorld),
-				 Result(result)
+				 Result(result), CodeGenContext(codeGenContext)
 			{}
+			ImportOperatorContext & operator = (const ImportOperatorContext & other) = delete;
 		};
 		class ImportOperatorHandler : public CoreLib::Object
 		{

@@ -96,7 +96,10 @@ namespace Spire
 				List<KeyValuePair<String, ComponentDefinition>> entries;
 				for (auto & kv : block->Entries)
 					entries.Add(kv);
-				entries.Sort([](const auto & v0, const auto & v1) {return v0.Value.OrderingStr < v1.Value.OrderingStr; });
+				entries.Sort([](const KeyValuePair<String, ComponentDefinition> & v0, const KeyValuePair<String, ComponentDefinition> & v1) 
+				{
+					return v0.Value.OrderingStr < v1.Value.OrderingStr; 
+				});
 				block->Entries.Clear();
 				for (auto & kv : entries)
 					block->Entries.Add(kv.Key, kv.Value);
@@ -117,6 +120,22 @@ namespace Spire
 			{
 				VisitStruct(st);
 			}
+			struct ThroughVar
+			{
+				bool Export = false;
+				String InputName, OutputName;
+				String InputWorldName;
+				ImportOperatorDefSyntaxNode * ImportOperator;
+				ComponentDefinitionIR * Component;
+				int GetHashCode()
+				{
+					return PointerHash<1>().GetHashCode(Component);
+				}
+				bool operator == (const ThroughVar & other)
+				{
+					return Component == other.Component;
+				}
+			};
 			virtual void ProcessShader(ShaderClosure * shader) override
 			{
 				currentShader = shader;
@@ -172,7 +191,7 @@ namespace Spire
 									if (parser.LookAhead(L":"))
 									{
 										parser.Read(L":");
-										auto value = parser.ReadWord();
+										auto value = parser.ReadToken().Str;
 										w->BackendParameters[param] = value;
 									}
 									else
@@ -197,22 +216,7 @@ namespace Spire
 				}
 
 				Dictionary<String, List<ComponentDefinitionIR*>> worldComps;
-				struct ThroughVar
-				{
-					bool Export = false;
-					String InputName, OutputName;
-					String InputWorldName;
-					ImportOperatorDefSyntaxNode * ImportOperator;
-					ComponentDefinitionIR * Component;
-					int GetHashCode()
-					{
-						return PointerHash<1>().GetHashCode(Component);
-					}
-					bool operator == (const ThroughVar & other)
-					{
-						return Component == other.Component;
-					}
-				};
+				
 				Dictionary<String, EnumerableHashSet<ThroughVar>> worldThroughVars;
 				for (auto & world : shader->Pipeline->Worlds)
 				{
@@ -274,7 +278,7 @@ namespace Spire
 						{
 							if (userWorld == srcWorld)
 								return;
-							auto path = currentShader->Pipeline->FindImportOperatorChain(srcWorld, userWorld);
+							auto path = this->currentShader->Pipeline->FindImportOperatorChain(srcWorld, userWorld);
 							if (path.Count() == 0)
 								throw InvalidProgramException(L"no import exists, this should have been checked by semantics analyzer.");
 							for (int i = 0; i < path[0].Nodes.Count(); i++)
@@ -734,7 +738,10 @@ namespace Spire
 				else
 					return op;
 			}
-			
+			virtual void VisitDiscardStatement(DiscardStatementSyntaxNode *) override
+			{
+				codeWriter.Discard();
+			}
 			virtual void VisitVarDeclrStatement(VarDeclrStatementSyntaxNode* stmt) override
 			{
 				for (auto & v : stmt->Variables)
@@ -812,18 +819,23 @@ namespace Spire
 						rs = new OrInstruction();
 						break;
 					case Operator::BitAnd:
+					case Operator::AndAssign:
 						rs = new BitAndInstruction();
 						break;
 					case Operator::BitOr:
+					case Operator::OrAssign:
 						rs = new BitOrInstruction();
 						break;
 					case Operator::BitXor:
+					case Operator::XorAssign:
 						rs = new BitXorInstruction();
 						break;
 					case Operator::Lsh:
+					case Operator::LshAssign:
 						rs = new ShlInstruction();
 						break;
 					case Operator::Rsh:
+					case Operator::RshAssign:
 						rs = new ShrInstruction();
 						break;
 					case Operator::Eql:
@@ -859,6 +871,11 @@ namespace Spire
 					case Operator::MulAssign:
 					case Operator::DivAssign:
 					case Operator::ModAssign:
+					case Operator::LshAssign:
+					case Operator::RshAssign:
+					case Operator::AndAssign:
+					case Operator::OrAssign:
+					case Operator::XorAssign:
 					{
 						expr->LeftExpression->Access = ExpressionAccess::Write;
 						expr->LeftExpression->Accept(this);

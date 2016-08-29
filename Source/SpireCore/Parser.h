@@ -55,6 +55,9 @@ namespace Spire
 				typeNames.Add(L"ivec2");
 				typeNames.Add(L"ivec3");
 				typeNames.Add(L"ivec4");
+				typeNames.Add(L"uvec2");
+				typeNames.Add(L"uvec3");
+				typeNames.Add(L"uvec4");
 				typeNames.Add(L"vec2");
 				typeNames.Add(L"vec3");
 				typeNames.Add(L"vec4");

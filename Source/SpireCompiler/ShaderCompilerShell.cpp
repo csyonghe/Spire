@@ -1,5 +1,6 @@
 ﻿#include "CoreLib/LibIO.h"
 #include "SpireLib.h"
+#include <fstream>
 
 using namespace CoreLib::Basic;
 using namespace CoreLib::IO;

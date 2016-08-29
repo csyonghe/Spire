@@ -682,7 +682,8 @@ namespace CoreLib
 			}
 		};
 
-		int StringToInt(const String & str);
+		int StringToInt(const String & str, int radix = 10);
+		unsigned int StringToUInt(const String & str, int radix = 10);
 		double StringToDouble(const String & str);
 
 		

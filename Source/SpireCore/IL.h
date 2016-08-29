@@ -21,7 +21,8 @@ namespace Spire
 			TextureShadow = 49,
 			TextureCube = 50,
 			TextureCubeShadow = 51,
-			UInt = 512,
+			UInt = 512, UInt2 = 513, UInt3 = 514, UInt4 = 515,
+			Bool
 		};
 		int SizeofBaseType(ILBaseType type);
 		int RoundToAlignment(int offset, int alignment);
@@ -29,15 +30,22 @@ namespace Spire
 		class ILType : public Object
 		{
 		public:
+			bool IsBool();
 			bool IsInt();
+			bool IsUInt();
 			bool IsIntegral();
 			bool IsFloat();
+			bool IsScalar()
+			{
+				return IsInt() || IsUInt() || IsFloat();
+			}
 			bool IsIntVector();
+			bool IsUIntVector();
 			bool IsFloatVector();
 			bool IsFloatMatrix();
 			bool IsVector()
 			{
-				return IsIntVector() || IsFloatVector();
+				return IsIntVector() || IsUIntVector() || IsFloatVector();
 			}
 			bool IsTexture();
 			bool IsNonShadowTexture();
@@ -83,6 +91,12 @@ namespace Spire
 					return L"int";
 				else if (Type == ILBaseType::UInt)
 					return L"uint";
+				else if (Type == ILBaseType::UInt2)
+					return L"uvec2";
+				else if (Type == ILBaseType::UInt3)
+					return L"uvec3";
+				else if (Type == ILBaseType::UInt4)
+					return L"uvec4";
 				else if (Type == ILBaseType::Int2)
 					return L"ivec2";
 				else if (Type == ILBaseType::Int3)
@@ -109,6 +123,8 @@ namespace Spire
 					return L"samplerCubeShadow";
 				else if (Type == ILBaseType::TextureShadow)
 					return L"sampler2DShadow";
+				else if (Type == ILBaseType::Bool)
+					return L"bool";
 				else
 					return L"?unkown";
 			}
@@ -121,10 +137,13 @@ namespace Spire
 				case ILBaseType::UInt:
 					return 4;
 				case ILBaseType::Int2:
+				case ILBaseType::UInt2:
 					return 8;
 				case ILBaseType::Int3:
+				case ILBaseType::UInt3:
 					return 16;
 				case ILBaseType::Int4:
+				case ILBaseType::UInt4:
 					return 16;
 				case ILBaseType::Float:
 					return 4;
@@ -160,12 +179,15 @@ namespace Spire
 					return 4;
 				case ILBaseType::Float2:
 				case ILBaseType::Int2:
+				case ILBaseType::UInt2:
 					return 8;
 				case ILBaseType::Int3:
 				case ILBaseType::Float3:
+				case ILBaseType::UInt3:
 					return 12;
 				case ILBaseType::Int4:
 				case ILBaseType::Float4:
+				case ILBaseType::UInt4:
 					return 16;
 				case ILBaseType::Float3x3:
 					return 48;
@@ -584,6 +606,12 @@ namespace Spire
 						sb << L"ivec3(" << IntValues[0] << L", " << IntValues[1] << L", " << IntValues[2] << L")";
 					else if (baseType->Type == ILBaseType::Int4)
 						sb << L"ivec4(" << IntValues[0] << L", " << IntValues[1] << L", " << IntValues[2] << L", " << IntValues[3] << L")";
+					else if (baseType->Type == ILBaseType::UInt2)
+						sb << L"uvec2(" << IntValues[0] << L", " << IntValues[1] << L")";
+					else if (baseType->Type == ILBaseType::UInt3)
+						sb << L"uvec3(" << IntValues[0] << L", " << IntValues[1] << L", " << IntValues[2] << L")";
+					else if (baseType->Type == ILBaseType::UInt4)
+						sb << L"uvec4(" << IntValues[0] << L", " << IntValues[1] << L", " << IntValues[2] << L", " << IntValues[3] << L")";
 					return sb.ToString();
 				}
 				else
@@ -1039,6 +1067,20 @@ namespace Spire
 					return Current == iter.Current;
 				}
 			};
+
+			String ToString() {
+				StringBuilder sb;
+				bool first = true;
+				auto pintr = begin();
+				while (pintr != end()) {
+					if (!first)
+						sb << EndLine;
+					first = false;
+					sb << pintr.Current->ToString();
+					pintr++;
+				}
+				return sb.ToString();
+			}
 
 			Iterator begin() const
 			{
@@ -1559,6 +1601,11 @@ namespace Spire
 					case ILBaseType::Int4:
 						Type = new ILBasicType(ILBaseType::Int);
 						break;
+					case ILBaseType::UInt2:
+					case ILBaseType::UInt3:
+					case ILBaseType::UInt4:
+						Type = new ILBasicType(ILBaseType::UInt);
+						break;
 					default:
 						throw InvalidOperationException(L"Unsupported aggregate type.");
 					}
@@ -2043,6 +2090,32 @@ namespace Spire
 			virtual void Accept(InstructionVisitor * visitor) override;
 		};
 
+		class DiscardInstruction : public ILInstruction
+		{
+		public:
+			virtual bool IsDeterministic() override
+			{
+				return true;
+			}
+			virtual bool HasSideEffect() override
+			{
+				return true;
+			}
+			virtual String ToString() override
+			{
+				return  L"discard";
+			}
+			virtual String GetOperatorString() override
+			{
+				return L"discard";
+			}
+			virtual DiscardInstruction * Clone() override
+			{
+				return new DiscardInstruction(*this);
+			}
+			virtual void Accept(InstructionVisitor * visitor) override;
+		};
+
 		// store(dest, value)
 		class StoreInstruction : public BinaryInstruction
 		{
@@ -2146,7 +2219,6 @@ namespace Spire
 			virtual void VisitBitXorInstruction(BitXorInstruction *){}
 			virtual void VisitShlInstruction(ShlInstruction *){}
 			virtual void VisitShrInstruction(ShrInstruction *){}
-
 			virtual void VisitBitNotInstruction(BitNotInstruction *){}
 			virtual void VisitNotInstruction(NotInstruction *){}
 			virtual void VisitCmpeqlInstruction(CmpeqlInstruction *){}
@@ -2173,6 +2245,7 @@ namespace Spire
 			virtual void VisitSelectInstruction(SelectInstruction *){}
 			virtual void VisitCallInstruction(CallInstruction *){}
 			virtual void VisitSwitchInstruction(SwitchInstruction *){}
+			virtual void VisitDiscardInstruction(DiscardInstruction *) {}
 
 			virtual void VisitPhiInstruction(PhiInstruction *){}
 		};
@@ -2195,6 +2268,16 @@ namespace Spire
 					return BodyCode.Ptr();
 				return nullptr;
 			}
+			//__DEBUG__
+			virtual String ToString()override {
+				StringBuilder sb;
+				sb << L"for (; " << ConditionCode->ToString() << L"; ";
+				sb << SideEffectCode->ToString() << L")" << EndLine;
+				sb << L"{" << EndLine;
+				sb << BodyCode->ToString() << EndLine;
+				sb << L"}" << EndLine;
+				return sb.ProduceString();
+			}
 		};
 		class IfInstruction : public UnaryInstruction
 		{
@@ -2215,6 +2298,22 @@ namespace Spire
 					return FalseCode.Ptr();
 				return nullptr;
 			}
+			//__DEBUG__
+			virtual String ToString()override {
+				StringBuilder sb;
+				sb << L"if (" << Operand->ToString() << L")" << EndLine;
+				sb << L"{" << EndLine;
+				sb << TrueCode->ToString() << EndLine;
+				sb << L"}" << EndLine;
+				if (FalseCode)
+				{
+					sb << L"else" << EndLine;
+					sb << L"{" << EndLine;
+					sb << FalseCode->ToString() << EndLine;
+					sb << L"}" << EndLine;
+				}
+				return sb.ProduceString();
+			}
 		};
 		class WhileInstruction : public ILInstruction
 		{
@@ -2231,6 +2330,15 @@ namespace Spire
 				else if (i == 1)
 					return BodyCode.Ptr();
 				return nullptr;
+			}
+			//__DEBUG__
+			virtual String ToString() override {
+				StringBuilder sb;
+				sb << L"while (" << ConditionCode->ToString() << L")" << EndLine;
+				sb << L"{" << EndLine;
+				sb << BodyCode->ToString();
+				sb << L"}" << EndLine;
+				return sb.ProduceString();
 			}
 		};
 		class DoInstruction : public ILInstruction
@@ -2249,6 +2357,15 @@ namespace Spire
 					return BodyCode.Ptr();
 				return nullptr;
 			}
+			//__DEBUG__
+			virtual String ToString() override {
+				StringBuilder sb;
+				sb << L"{" << EndLine;
+				sb << BodyCode->ToString();
+				sb << L"}" << EndLine;
+				sb << L"while (" << ConditionCode->ToString() << L")" << EndLine;
+				return sb.ProduceString();
+			}
 		};
 		class ReturnInstruction : public UnaryInstruction
 		{
@@ -2257,6 +2374,10 @@ namespace Spire
 				:UnaryInstruction()
 			{
 				Operand = op;
+			}
+			//__DEBUG__
+			virtual String ToString() override {
+				return L"return " + Operand->ToString() + L";";
 			}
 		};
 		class BreakInstruction : public ILInstruction

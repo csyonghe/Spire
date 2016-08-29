@@ -30,6 +30,7 @@ namespace Spire
 			Void = 0,
 			Int = 16, Int2 = 17, Int3 = 18, Int4 = 19,
 			Float = 32, Float2 = 33, Float3 = 34, Float4 = 35,
+			UInt = 512, UInt2 = 513, UInt3 = 514, UInt4 = 515,
 			Float3x3 = 40, Float4x4 = 47,
 			Texture2D = 48,
 			TextureShadow = 49,
@@ -38,7 +39,6 @@ namespace Spire
 			Function = 64,
 			Bool = 128,
 			Shader = 256,
-			UInt = 512,
 			Struct = 1024,
 			Error = 2048,
 
@@ -161,6 +161,9 @@ namespace Spire
 
 			static ExpressionType Bool;
 			static ExpressionType UInt;
+			static ExpressionType UInt2;
+			static ExpressionType UInt3;
+			static ExpressionType UInt4;
 			static ExpressionType Int;
 			static ExpressionType Int2;
 			static ExpressionType Int3;
@@ -411,7 +414,8 @@ namespace Spire
 			BitAnd, BitXor, BitOr,
 			And,
 			Or,
-			Assign, AddAssign, SubAssign, MulAssign, DivAssign, ModAssign
+			Assign, AddAssign, SubAssign, MulAssign, DivAssign, ModAssign,
+			LshAssign, RshAssign, OrAssign, AndAssign, XorAssign
 		};
 		
 		class UnaryExpressionSyntaxNode : public ExpressionSyntaxNode
@@ -494,6 +498,13 @@ namespace Spire
 			List<RefPtr<StatementSyntaxNode>> Statements;
 			virtual void Accept(SyntaxVisitor * visitor);
 			virtual BlockStatementSyntaxNode * Clone(CloneContext & ctx);
+		};
+
+		class DiscardStatementSyntaxNode : public StatementSyntaxNode
+		{
+		public:
+			virtual void Accept(SyntaxVisitor * visitor);
+			virtual DiscardStatementSyntaxNode * Clone(CloneContext & ctx);
 		};
 
 		class VariableDeclr
@@ -802,6 +813,8 @@ namespace Spire
 				for (auto & f : s->Fields)
 					f->Accept(this);
 			}
+			virtual void VisitDiscardStatement(DiscardStatementSyntaxNode *)
+			{}
 			virtual void VisitStructField(StructField * f)
 			{
 				f->Type->Accept(this);

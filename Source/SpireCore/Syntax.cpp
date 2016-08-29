@@ -9,6 +9,10 @@ namespace Spire
 		ExpressionType ExpressionType::Bool(Compiler::BaseType::Bool);
 		ExpressionType ExpressionType::Int(Compiler::BaseType::Int);
 		ExpressionType ExpressionType::UInt(Compiler::BaseType::UInt);
+		ExpressionType ExpressionType::UInt2(Compiler::BaseType::UInt2);
+		ExpressionType ExpressionType::UInt3(Compiler::BaseType::UInt3);
+		ExpressionType ExpressionType::UInt4(Compiler::BaseType::UInt4);
+
 		ExpressionType ExpressionType::Float(Compiler::BaseType::Float);
 		ExpressionType ExpressionType::Int2(Compiler::BaseType::Int2);
 		ExpressionType ExpressionType::Float2(Compiler::BaseType::Float2);
@@ -465,6 +469,12 @@ namespace Spire
 				expType.BaseType = BaseType::Int3;
 			else if (TypeName == L"ivec4")
 				expType.BaseType = BaseType::Int4;
+			else if (TypeName == L"uvec2")
+				expType.BaseType = BaseType::UInt2;
+			else if (TypeName == L"uvec3")
+				expType.BaseType = BaseType::UInt3;
+			else if (TypeName == L"uvec4")
+				expType.BaseType = BaseType::UInt4;
 			else if (TypeName == L"vec2")
 				expType.BaseType = BaseType::Float2;
 			else if (TypeName == L"vec3")
@@ -604,5 +614,14 @@ namespace Spire
 		{
 			visitor->VisitStruct(this);
 		}
-	}
+		void DiscardStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
+		{
+			visitor->VisitDiscardStatement(this);
+		}
+		DiscardStatementSyntaxNode * DiscardStatementSyntaxNode::Clone(CloneContext & ctx)
+		{
+			auto rs = CloneSyntaxNodeFields(new DiscardStatementSyntaxNode(*this), ctx);
+			return rs;
+		}
+}
 }

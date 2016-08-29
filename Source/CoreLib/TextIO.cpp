@@ -31,29 +31,29 @@ namespace CoreLib
 						result.Add((char)codePoint);
 					else if (codePoint <= 0x7FF)
 					{
-						unsigned char byte = (unsigned char)(0b11000000 + (codePoint >> 6));
+						unsigned char byte = (unsigned char)(0xC0 + (codePoint >> 6));
 						result.Add((char)byte);
-						byte = 0b10000000 + (codePoint & 0b111111);
+						byte = 0x80 + (codePoint & 0x3F);
 						result.Add((char)byte);
 					}
 					else if (codePoint <= 0xFFFF)
 					{
-						unsigned char byte = (unsigned char)(0b11100000 + (codePoint >> 12));
+						unsigned char byte = (unsigned char)(0xE0 + (codePoint >> 12));
 						result.Add((char)byte);
-						byte = (unsigned char)(0b10000000 + ((codePoint >> 6) & (0b111111)));
+						byte = (unsigned char)(0x80 + ((codePoint >> 6) & (0x3F)));
 						result.Add((char)byte);
-						byte = (unsigned char)(0b10000000 + (codePoint & 0b111111));
+						byte = (unsigned char)(0x80 + (codePoint & 0x3F));
 						result.Add((char)byte);
 					}
 					else
 					{
-						unsigned char byte = (unsigned char)(0b11110000 + (codePoint >> 18));
+						unsigned char byte = (unsigned char)(0xF0 + (codePoint >> 18));
 						result.Add((char)byte);
-						byte = (unsigned char)(0b10000000 + ((codePoint >> 12) & 0b111111));
+						byte = (unsigned char)(0x80 + ((codePoint >> 12) & 0x3F));
 						result.Add((char)byte);
-						byte = (unsigned char)(0b10000000 + ((codePoint >> 6) & 0b111111));
+						byte = (unsigned char)(0x80 + ((codePoint >> 6) & 0x3F));
 						result.Add((char)byte);
-						byte = (unsigned char)(0b10000000 + (codePoint & 0b111111));
+						byte = (unsigned char)(0x80 + (codePoint & 0x3F));
 						result.Add((char)byte);
 					}
 				}
@@ -75,7 +75,7 @@ namespace CoreLib
 					if (reverseOrder)
 					{
 						unsigned char firstByte = ch >> 8;
-						unsigned char lastByte = ch & 0b1111'1111;
+						unsigned char lastByte = ch & 0xFF;
 						result.Add((char)firstByte);
 						result.Add((char)lastByte);
 					}

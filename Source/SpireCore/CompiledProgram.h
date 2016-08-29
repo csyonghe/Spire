@@ -234,6 +234,7 @@ namespace Spire
 			String GlobalDefinitions;
 			String LocalDeclarations;
 			String MainCode;
+			List<unsigned char> BinaryCode;
 			CoreLib::Basic::EnumerableDictionary<CoreLib::String, CoreLib::String> ComponentAccessNames;
 			String GetAllCodeGLSL(String additionalHeader, String additionalGlobalDeclaration, String preambleCode, String epilogCode);
 			String GetAllCodeGLSL()
