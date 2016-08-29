@@ -50,6 +50,7 @@ namespace Spire
 			{
 				typeNames.Add(L"int");
 				typeNames.Add(L"uint");
+				typeNames.Add(L"bool");
 				typeNames.Add(L"float");
 				typeNames.Add(L"void");
 				typeNames.Add(L"ivec2");

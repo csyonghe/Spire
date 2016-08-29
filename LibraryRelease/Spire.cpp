@@ -13737,6 +13737,9 @@ namespace Spire
 			case Compiler::BaseType::UInt:
 				res.Append(L"uint");
 				break;
+			case Compiler::BaseType::Bool:
+				res.Append(L"bool");
+				break;
 			case Compiler::BaseType::Float:
 				res.Append(L"float");
 				break;
@@ -14174,6 +14177,8 @@ namespace Spire
 				expType.BaseType = BaseType::TextureCubeShadow;
 			else if (TypeName == L"void")
 				expType.BaseType = BaseType::Void;
+			else if (TypeName == L"bool")
+				expType.BaseType = BaseType::Bool;
 			else
 			{
 				expType.BaseType = BaseType::Struct;

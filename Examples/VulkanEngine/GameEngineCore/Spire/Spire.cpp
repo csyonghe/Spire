@@ -3,6 +3,8 @@
 Spire - The MIT License (MIT)
 Copyright (c) 2016, Carnegie Mellon University
 
+Developers: Yong He, Haomin Long
+
 Permission is hereby granted, free of charge, to any person obtaining a 
 copy of this software and associated documentation files (the "Software"), 
 to deal in the Software without restriction, including without limitation 
@@ -13735,6 +13737,9 @@ namespace Spire
 			case Compiler::BaseType::UInt:
 				res.Append(L"uint");
 				break;
+			case Compiler::BaseType::Bool:
+				res.Append(L"bool");
+				break;
 			case Compiler::BaseType::Float:
 				res.Append(L"float");
 				break;
@@ -14172,6 +14177,8 @@ namespace Spire
 				expType.BaseType = BaseType::TextureCubeShadow;
 			else if (TypeName == L"void")
 				expType.BaseType = BaseType::Void;
+			else if (TypeName == L"bool")
+				expType.BaseType = BaseType::Bool;
 			else
 			{
 				expType.BaseType = BaseType::Struct;
