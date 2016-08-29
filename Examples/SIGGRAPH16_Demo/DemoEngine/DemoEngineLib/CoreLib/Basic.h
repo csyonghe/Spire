@@ -1108,7 +1108,8 @@ namespace CoreLib
 			}
 		};
 
-		int StringToInt(const String & str);
+		int StringToInt(const String & str, int radix = 10);
+		unsigned int StringToUInt(const String & str, int radix = 10);
 		double StringToDouble(const String & str);
 
 		
@@ -7721,6 +7722,15 @@ namespace CoreLib
 						return -StringToInt(token.Str);
 					else
 						return StringToInt(token.Str);
+				}
+				throw TextFormatException(L"Text parsing error: int expected.");
+			}
+			unsigned int ReadUInt()
+			{
+				auto token = ReadToken();
+				if (token.TypeID == TokenType_Int)
+				{
+					return StringToUInt(token.Str);
 				}
 				throw TextFormatException(L"Text parsing error: int expected.");
 			}

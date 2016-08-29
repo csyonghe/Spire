@@ -72,7 +72,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>../;../../../LibraryRelease/;CoreLib/</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../;../../../../LibraryRelease/;CoreLib/</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PreprocessorDefinitions>_MBCS;NO_VECTOR_CONSTRUCTORS;%(PreprocessorDefinitions);GLEW_STATIC</PreprocessorDefinitions>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
@@ -89,7 +89,7 @@
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>../;../../../LibraryRelease/;CoreLib/</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../;../../../../LibraryRelease/;CoreLib/</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PreprocessorDefinitions>_MBCS;NO_VECTOR_CONSTRUCTORS;%(PreprocessorDefinitions);GLEW_STATIC</PreprocessorDefinitions>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
@@ -109,7 +109,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>../;../../../LibraryRelease/;CoreLib/</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../;../../../../LibraryRelease/;CoreLib/</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PreprocessorDefinitions>_MBCS;NO_VECTOR_CONSTRUCTORS;%(PreprocessorDefinitions);GLEW_STATIC</PreprocessorDefinitions>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
@@ -130,7 +130,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>../;../../../LibraryRelease/;CoreLib/</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../;../../../../LibraryRelease/;CoreLib/</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PreprocessorDefinitions>_MBCS;NO_VECTOR_CONSTRUCTORS;%(PreprocessorDefinitions);GLEW_STATIC</PreprocessorDefinitions>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
@@ -146,7 +146,7 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\LibraryRelease\Spire.cpp" />
+    <ClCompile Include="..\..\..\..\LibraryRelease\Spire.cpp" />
     <ClCompile Include="Background.cpp" />
     <ClCompile Include="CameraControl.cpp" />
     <ClCompile Include="CascadedShadowMap.cpp" />
@@ -170,7 +170,7 @@
     <ClCompile Include="PTexMipmapBuilder.cpp" />
     <ClCompile Include="Scene.cpp" />
     <ClCompile Include="VRContext.cpp" />
-    <ClInclude Include="..\..\..\LibraryRelease\Spire.h" />
+    <ClInclude Include="..\..\..\..\LibraryRelease\Spire.h" />
     <ClInclude Include="CameraControl.h" />
     <ClInclude Include="CoreLib\Basic.h" />
     <ClInclude Include="CoreLib\glew\glew.h" />

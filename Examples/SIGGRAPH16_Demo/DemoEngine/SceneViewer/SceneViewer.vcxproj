@@ -86,7 +86,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions);GLEW_STATIC</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <AdditionalIncludeDirectories>../;../../../LibraryRelease/;../DemoEngineLib/;../DemoEngineLib/CoreLib/</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../;../../../../LibraryRelease/;../DemoEngineLib/;../DemoEngineLib/CoreLib/</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
     </ClCompile>
     <Link>
@@ -107,7 +107,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions);GLEW_STATIC</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <AdditionalIncludeDirectories>../;../../../LibraryRelease/;../DemoEngineLib/;../DemoEngineLib/CoreLib/</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../;../../../../LibraryRelease/;../DemoEngineLib/;../DemoEngineLib/CoreLib/</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
       <FloatingPointModel>Fast</FloatingPointModel>
     </ClCompile>
@@ -131,7 +131,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions);GLEW_STATIC</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalIncludeDirectories>../;../../../LibraryRelease/;../DemoEngineLib/;../DemoEngineLib/CoreLib/</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../;../../../../LibraryRelease/;../DemoEngineLib/;../DemoEngineLib/CoreLib/</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
     </ClCompile>
     <Link>
@@ -156,7 +156,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions);GLEW_STATIC</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalIncludeDirectories>../;../../../LibraryRelease/;../DemoEngineLib/;../DemoEngineLib/CoreLib/</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>../;../../../../LibraryRelease/;../DemoEngineLib/;../DemoEngineLib/CoreLib/</AdditionalIncludeDirectories>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
       <FloatingPointModel>Fast</FloatingPointModel>

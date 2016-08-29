@@ -214,10 +214,14 @@ namespace CoreLib
 			return StringConcat(op1.buffer.Ptr(), op1.length, op2.buffer.Ptr(), op2.length);
 		}
 
-		int StringToInt(const String & str)
+		int StringToInt(const String & str, int radix)
 		{
-			return (int)wcstol(str.Buffer(), NULL, 10);
+			return (int)wcstol(str.Buffer(), NULL, radix);
 			//return (int)_wcstoi64(str.Buffer(), NULL, 10);
+		}
+		unsigned int StringToUInt(const String & str, int radix)
+		{
+			return (unsigned int)wcstoul(str.Buffer(), NULL, radix);
 		}
 		double StringToDouble(const String & str)
 		{

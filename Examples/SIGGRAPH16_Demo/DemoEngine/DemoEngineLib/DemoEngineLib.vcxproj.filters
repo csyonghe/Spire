@@ -79,9 +79,6 @@
     <ClInclude Include="CoreLib\WinForm.h">
       <Filter>CoreLib</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\LibraryRelease\Spire.h">
-      <Filter>Spire</Filter>
-    </ClInclude>
     <ClInclude Include="CoreLib\glew\glew.h">
       <Filter>CoreLib\glew</Filter>
     </ClInclude>
@@ -93,6 +90,9 @@
     </ClInclude>
     <ClInclude Include="CoreLib\LibUI.h">
       <Filter>CoreLib</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\LibraryRelease\Spire.h">
+      <Filter>HardwareRenderer</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -159,15 +159,13 @@
     <ClCompile Include="CoreLib\WinForm.cpp">
       <Filter>CoreLib</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\LibraryRelease\Spire.cpp">
-      <Filter>Spire</Filter>
-    </ClCompile>
     <ClCompile Include="CoreLib\glew\glew.c">
       <Filter>CoreLib\glew</Filter>
     </ClCompile>
     <ClCompile Include="CoreLib\LibUI.cpp">
       <Filter>CoreLib</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\LibraryRelease\Spire.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="CoreLib\corelib.natvis">
