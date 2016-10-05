@@ -310,7 +310,7 @@ module PN_Tessellation
     float vPow2 = pow(v, 2);
     float wPow2 = pow(w, 2);
 
-    public @tes vec3 objPos = indexImport(WorldPos_B300, 0) * wPow3 +
+    public @tes float3 objPos = indexImport(WorldPos_B300, 0) * wPow3 +
                     indexImport(WorldPos_B030, 0) * uPow3 +
                     indexImport(WorldPos_B003, 0) * vPow3 +
                     indexImport(WorldPos_B210, 0) * 3.0 * wPow2 * u +

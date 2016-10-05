@@ -4,7 +4,7 @@ const wchar_t * VertexShaderIncludeString = LR"(
 __builtin out vec4 gl_Position;
 )";
 
-const wchar_t * LibIncludeString = LR"(
+const char * LibIncludeString = R"(
 __intrinsic float dFdx(float v);
 __intrinsic float dFdy(float v);
 __intrinsic float fwidth(float v);
@@ -209,5 +209,6 @@ __intrinsic vec4 vec4(uvec4 val);
 
 __intrinsic mat3 transpose(mat3 in);
 __intrinsic mat4 transpose(mat4 in);
+
 #line_reset#
 )";

@@ -9,6 +9,35 @@ namespace Spire
 		{
 			return t == BaseType::Int || t == BaseType::Float || t == BaseType::UInt;
 		}
+
+		String TranslateHLSLTypeNames(String name)
+		{
+			if (name == L"float2")
+				return L"vec2";
+			else if (name == L"float3")
+				return L"vec3";
+			else if (name == L"float4")
+				return L"vec4";
+			else if (name == L"int2")
+				return L"ivec2";
+			else if (name == L"int3")
+				return L"ivec3";
+			else if (name == L"int4")
+				return L"ivec4";
+			else if (name == L"uint2")
+				return L"uvec2";
+			else if (name == L"uint3")
+				return L"uvec3";
+			else if (name == L"uint4")
+				return L"uvec4";
+			else if (name == L"float3x3")
+				return L"mat3";
+			else if (name == L"float4x4")
+				return L"mat4";
+			else
+				return name;
+		}
+
 		class SemanticsVisitor : public SyntaxVisitor
 		{
 			ProgramSyntaxNode * program = nullptr;
@@ -1324,6 +1353,7 @@ namespace Spire
 			}
 			virtual RefPtr<ExpressionSyntaxNode> VisitInvokeExpression(InvokeExpressionSyntaxNode *expr) override
 			{
+				expr->FunctionExpr->Variable = TranslateHLSLTypeNames(expr->FunctionExpr->Variable);
 				for (auto & arg : expr->Arguments)
 					arg = arg->Accept(this).As<ExpressionSyntaxNode>();
 
