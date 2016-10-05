@@ -94,12 +94,12 @@
     </Expand>
 </Type>
 
-<Type Name="CoreLib::Basic::RefPtr&lt;*,*&gt;">
+<Type Name="CoreLib::Basic::RefPtrImpl&lt;*,*,*&gt;">
     <SmartPointer Usage="Minimal">pointer</SmartPointer>
     <DisplayString Condition="pointer == 0">empty</DisplayString>
     <DisplayString Condition="pointer != 0">RefPtr {*pointer}</DisplayString>
     <Expand>
-        <Item Condition="pointer != 0" Name="[ptr]">pointer</Item>
+      <ExpandedItem>pointer</ExpandedItem>
     </Expand>
 </Type>
 </AutoVisualizer>

@@ -40,8 +40,8 @@ namespace Spire
 			Bool = 128,
 			Shader = 256,
 			Struct = 1024,
-			Error = 2048,
-
+			Record = 2048,
+			Error = 4096,
 		};
 
 		inline const wchar_t * BaseTypeToString(BaseType t)
@@ -99,109 +99,176 @@ namespace Spire
 			return (BaseType)(((int)type) & (~15));
 		}
 
-		inline bool IsTextureType(BaseType type)
-		{
-			return type == BaseType::Texture2D || type == BaseType::TextureCube || type == BaseType::TextureCubeShadow || type == BaseType::TextureShadow;
-		}
 		class SymbolTable;
 		class ShaderSymbol;
 		class StructSymbol;
 		class ShaderClosure;
 		class StructSyntaxNode;
-		class ExpressionType
+
+		class BasicExpressionType;
+		class ArrayExpressionType;
+		class GenericExpressionType;
+
+		class ExpressionType : public Object
+		{
+		public:
+			static RefPtr<ExpressionType> Bool;
+			static RefPtr<ExpressionType> UInt;
+			static RefPtr<ExpressionType> UInt2;
+			static RefPtr<ExpressionType> UInt3;
+			static RefPtr<ExpressionType> UInt4;
+			static RefPtr<ExpressionType> Int;
+			static RefPtr<ExpressionType> Int2;
+			static RefPtr<ExpressionType> Int3;
+			static RefPtr<ExpressionType> Int4;
+			static RefPtr<ExpressionType> Float;
+			static RefPtr<ExpressionType> Float2;
+			static RefPtr<ExpressionType> Float3;
+			static RefPtr<ExpressionType> Float4;
+			static RefPtr<ExpressionType> Void;
+			static RefPtr<ExpressionType> Error;
+		public:
+			virtual String ToString() const = 0;
+			virtual int GetSize() const = 0;
+			virtual bool IsIntegral() const = 0;
+			virtual bool Equals(const ExpressionType * type) const = 0;
+			virtual bool IsVectorType() const = 0;
+			virtual bool IsArray() const = 0;
+			virtual bool IsGenericType(String typeName) const = 0;
+			virtual BasicExpressionType * AsBasicType() const = 0;
+			virtual ArrayExpressionType * AsArrayType() const = 0;
+			virtual GenericExpressionType * AsGenericType() const = 0;
+			virtual ExpressionType * Clone() = 0;
+			bool IsTexture() const;
+			bool IsStruct() const;
+			bool IsShader() const;
+			static void Init();
+			static void Finalize();
+		};
+
+		class BasicExpressionType : public ExpressionType
 		{
 		public:
 			bool IsLeftValue;
 			bool IsReference;
 			BaseType BaseType;
-			bool IsArray = false;
-			int ArrayLength = 0;
 			ShaderSymbol * Shader = nullptr;
 			ShaderClosure * ShaderClosure = nullptr;
 			FunctionSyntaxNode * Func = nullptr;
 			StructSymbol * Struct = nullptr;
-			ExpressionType GetBaseType()
-			{
-				ExpressionType rs;
-				rs.IsLeftValue = IsLeftValue;
-				rs.BaseType = BaseType;
-				rs.IsArray = false;
-				rs.IsReference = false;
-				rs.ArrayLength = 0;
-				rs.Func = Func;
-				return rs;
-			}
-			ExpressionType()
+			String RecordTypeName;
+
+			BasicExpressionType()
 			{
 				BaseType = Compiler::BaseType::Int;
-				ArrayLength = 0;
-				IsArray = false;
 				Func = 0;
 				IsLeftValue = false;
 				IsReference = false;
 			}
-			bool IsIntegral()
-			{
-				return !IsArray && (BaseType == Compiler::BaseType::Int || BaseType == Compiler::BaseType::UInt);
-			}
-			bool IsTextureType()
-			{
-				return !IsArray && (BaseType == Compiler::BaseType::Texture2D || BaseType == Compiler::BaseType::TextureCube || BaseType == Compiler::BaseType::TextureCubeShadow || BaseType == Compiler::BaseType::TextureShadow);
-			}
-			int GetSize();
-			ExpressionType(Spire::Compiler::BaseType baseType)
+			BasicExpressionType(Compiler::BaseType baseType)
 			{
 				BaseType = baseType;
-				ArrayLength = 0;
-				IsArray = false;
 				Func = 0;
 				IsLeftValue = false;
 				IsReference = false;
 			}
-
-			static ExpressionType Bool;
-			static ExpressionType UInt;
-			static ExpressionType UInt2;
-			static ExpressionType UInt3;
-			static ExpressionType UInt4;
-			static ExpressionType Int;
-			static ExpressionType Int2;
-			static ExpressionType Int3;
-			static ExpressionType Int4;
-			static ExpressionType Float;
-			static ExpressionType Float2;
-			static ExpressionType Float3;
-			static ExpressionType Float4;
-			static ExpressionType Void;
-			static ExpressionType Error;
-
-			bool operator == (const ExpressionType & type)
+			BasicExpressionType(ShaderSymbol * shaderSym, Compiler::ShaderClosure * closure)
 			{
-				return (type.BaseType == BaseType &&
-						type.IsArray == IsArray &&
-						type.ArrayLength == ArrayLength &&
-						type.Func == Func &&
-						type.Shader == Shader &&
-						type.Struct == Struct);
+				this->BaseType = BaseType::Shader;
+				this->ShaderClosure = closure;
+				this->Shader = shaderSym;
 			}
-
-			bool operator != (const ExpressionType & type)
+			virtual bool IsIntegral() const override;
+			virtual int GetSize() const override;
+			virtual bool Equals(const ExpressionType * type) const override;
+			virtual bool IsVectorType() const override;
+			virtual bool IsArray() const override;
+			virtual CoreLib::Basic::String ToString() const override;
+			virtual ExpressionType * Clone() override;
+			virtual bool IsGenericType(String typeName) const override
 			{
-				return !(this->operator==(type));
+				return false;
 			}
-
-			bool IsVectorType()
+			virtual BasicExpressionType * AsBasicType() const override
 			{
-				return (!IsArray) && (IsVector(BaseType));
+				return const_cast<BasicExpressionType*>(this);
 			}
+			virtual ArrayExpressionType * AsArrayType() const override
+			{
+				return nullptr;
+			}
+			virtual GenericExpressionType * AsGenericType() const override
+			{
+				return nullptr;
+			}
+		};
 
-			CoreLib::Basic::String ToString();
+		class ArrayExpressionType : public ExpressionType
+		{
+		public:
+			RefPtr<ExpressionType> BaseType;
+			int ArrayLength = 0;
+			virtual bool IsIntegral() const override;
+			virtual bool IsArray() const override;
+
+			virtual int GetSize() const override;
+			virtual bool Equals(const ExpressionType * type) const override;
+			virtual bool IsVectorType() const override;
+			virtual CoreLib::Basic::String ToString() const override;
+			virtual ExpressionType * Clone() override;
+			virtual bool IsGenericType(String typeName) const override
+			{
+				return false;
+			}
+			virtual BasicExpressionType * AsBasicType() const override
+			{
+				return nullptr;
+			}
+			virtual ArrayExpressionType * AsArrayType() const override
+			{
+				return const_cast<ArrayExpressionType*>(this);
+			}
+			virtual GenericExpressionType * AsGenericType() const override
+			{
+				return nullptr;
+			}
+		};
+
+		class GenericExpressionType : public ExpressionType
+		{
+		public:
+			RefPtr<ExpressionType> BaseType;
+			String GenericTypeName;
+			virtual bool IsIntegral() const override;
+			virtual int GetSize() const override;
+			virtual bool IsArray() const override;
+
+			virtual bool Equals(const ExpressionType * type) const override;
+			virtual bool IsVectorType() const override;
+			virtual CoreLib::Basic::String ToString() const override;
+			virtual ExpressionType * Clone() override;
+			virtual bool IsGenericType(String typeName) const override
+			{
+				return GenericTypeName == typeName;
+			}
+			virtual BasicExpressionType * AsBasicType() const override
+			{
+				return nullptr;
+			}
+			virtual ArrayExpressionType * AsArrayType() const override
+			{
+				return nullptr;
+			}
+			virtual GenericExpressionType * AsGenericType() const override
+			{
+				return const_cast<GenericExpressionType*>(this);
+			}
 		};
 		
 		class Type
 		{
 		public:
-			ExpressionType DataType;
+			RefPtr<ExpressionType> DataType;
 			// ContrainedWorlds: Implementation must be defined at at least one of of these worlds in order to satisfy global dependency
 			// FeasibleWorlds: The component can be computed at any of these worlds
 			EnumerableHashSet<String> ConstrainedWorlds, FeasibleWorlds;
@@ -234,7 +301,7 @@ namespace Spire
 			Dictionary<Spire::Compiler::Scope*, RefPtr<Spire::Compiler::Scope>> ScopeTranslateTable;
 		};
 
-		class SyntaxNode : public Object
+		class SyntaxNode : public RefObject
 		{
 		protected:
 			template<typename T>
@@ -256,65 +323,76 @@ namespace Spire
 					
 				}
 				target->Position = this->Position;
-				Tags = this->Tags;
+				target->Tags = this->Tags;
 				return target;
 			}
 		public:
 			EnumerableDictionary<String, RefPtr<Object>> Tags;
 			CodePosition Position;
 			RefPtr<Scope> Scope;
-			virtual void Accept(SyntaxVisitor * visitor) = 0;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) = 0;
 			virtual SyntaxNode * Clone(CloneContext & ctx) = 0;
 		};
 
 		class TypeSyntaxNode : public SyntaxNode
 		{
 		public:
-			bool IsArray;
-			String TypeName;
-			int ArrayLength;
-			String GenericBaseType;
-			virtual void Accept(SyntaxVisitor * visitor);
-			TypeSyntaxNode()
-			{
-				ArrayLength = 0;
-				IsArray = false;
-			}
-			
-			static TypeSyntaxNode * FromExpressionType(ExpressionType t);
+			static RefPtr<TypeSyntaxNode> FromExpressionType(ExpressionType * t);
+			virtual TypeSyntaxNode * Clone(CloneContext & ctx) = 0;
+		};
 
-			ExpressionType ToExpressionType(SymbolTable * symTable, ErrorWriter * errWriter = nullptr);
-			virtual TypeSyntaxNode * Clone(CloneContext & ctx)
+		class BasicTypeSyntaxNode : public TypeSyntaxNode
+		{
+		public:
+			String TypeName;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
+			virtual BasicTypeSyntaxNode * Clone(CloneContext & ctx)
 			{
-				return CloneSyntaxNodeFields(new TypeSyntaxNode(*this), ctx);
+				return CloneSyntaxNodeFields(new BasicTypeSyntaxNode(*this), ctx);
 			}
-			String ToString()
+		};
+
+		class ArrayTypeSyntaxNode : public TypeSyntaxNode
+		{
+		public:
+			RefPtr<TypeSyntaxNode> BaseType;
+			int ArrayLength;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
+			virtual ArrayTypeSyntaxNode * Clone(CloneContext & ctx)
 			{
-				StringBuilder rs;
-				rs << TypeName;
-				if (IsArray)
-				{
-					rs << L"[";
-					if (ArrayLength > 0)
-						rs << ArrayLength;
-					rs << L"]";
-				}
-				return rs.ProduceString();
+				auto rs = CloneSyntaxNodeFields(new ArrayTypeSyntaxNode(*this), ctx);
+				rs->BaseType = BaseType->Clone(ctx);
+				return rs;
+			}
+		};
+
+		class GenericTypeSyntaxNode : public TypeSyntaxNode
+		{
+		public:
+			RefPtr<TypeSyntaxNode> BaseType;
+			String GenericTypeName;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
+			virtual GenericTypeSyntaxNode * Clone(CloneContext & ctx)
+			{
+				auto rs = CloneSyntaxNodeFields(new GenericTypeSyntaxNode(*this), ctx);
+				rs->BaseType = BaseType->Clone(ctx);
+				return rs;
 			}
 		};
 
 		class StructField : public SyntaxNode
 		{
 		public:
-			RefPtr<TypeSyntaxNode> Type;
+			RefPtr<TypeSyntaxNode> TypeNode;
+			RefPtr<ExpressionType> Type;
 			Token Name;
 			StructField()
 			{}
-			virtual void Accept(SyntaxVisitor * visitor) override;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual StructField * Clone(CloneContext & ctx) override
 			{
 				auto rs = CloneSyntaxNodeFields(new StructField(*this), ctx);
-				rs->Type = Type->Clone(ctx);
+				rs->TypeNode = TypeNode->Clone(ctx);
 				return rs;
 			}
 		};
@@ -324,7 +402,7 @@ namespace Spire
 		public:
 			List<RefPtr<StructField>> Fields;
 			Token Name;
-			virtual void Accept(SyntaxVisitor * visitor) override;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			int FindField(String name)
 			{
 				for (int i = 0; i < Fields.Count(); i++)
@@ -352,30 +430,59 @@ namespace Spire
 		class ExpressionSyntaxNode : public SyntaxNode
 		{
 		public:
-			ExpressionType Type;
+			RefPtr<ExpressionType> Type;
 			ExpressionAccess Access;
 			ExpressionSyntaxNode()
 			{
 				Access = ExpressionAccess::Read;
 			}
 			ExpressionSyntaxNode(const ExpressionSyntaxNode & expr) = default;
+			virtual ExpressionSyntaxNode* Clone(CloneContext & ctx) = 0;
+		};
+
+		class StatementSyntaxNode : public SyntaxNode
+		{
+		public:
+			virtual StatementSyntaxNode* Clone(CloneContext & ctx) = 0;
+		};
+
+		class BlockStatementSyntaxNode : public StatementSyntaxNode
+		{
+		public:
+			List<RefPtr<StatementSyntaxNode>> Statements;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
+			virtual BlockStatementSyntaxNode * Clone(CloneContext & ctx);
 		};
 
 		class ParameterSyntaxNode : public SyntaxNode
 		{
 		public:
-			RefPtr<TypeSyntaxNode> Type;
+			RefPtr<TypeSyntaxNode> TypeNode;
+			RefPtr<ExpressionType> Type;
 			String Name;
 			RefPtr<ExpressionSyntaxNode> Expr;
-			virtual void Accept(SyntaxVisitor * visitor);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
 			virtual ParameterSyntaxNode * Clone(CloneContext & ctx);
+		};
+
+		class ImportOperatorDefSyntaxNode : public SyntaxNode
+		{
+		public:
+			Token Name;
+			Token SourceWorld, DestWorld;
+			List<RefPtr<ParameterSyntaxNode>> Parameters;
+			RefPtr<BlockStatementSyntaxNode> Body;
+			EnumerableDictionary<String, String> LayoutAttributes;
+			List<String> Usings;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual ImportOperatorDefSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class ChoiceValueSyntaxNode : public ExpressionSyntaxNode
 		{
 		public:
 			String WorldName, AlternateName;
-			virtual void Accept(SyntaxVisitor *) {}
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) { return this; }
 			virtual ChoiceValueSyntaxNode * Clone(CloneContext & ctx);
 		};
 
@@ -383,7 +490,7 @@ namespace Spire
 		{
 		public:
 			String Variable;
-			virtual void Accept(SyntaxVisitor * visitor);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
 			virtual VarExpressionSyntaxNode * Clone(CloneContext & ctx);
 		};
 
@@ -400,7 +507,7 @@ namespace Spire
 				int IntValue;
 				float FloatValue;
 			};
-			virtual void Accept(SyntaxVisitor * visitor);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
 			virtual ConstantExpressionSyntaxNode * Clone(CloneContext & ctx);
 		};
 
@@ -418,12 +525,23 @@ namespace Spire
 			LshAssign, RshAssign, OrAssign, AndAssign, XorAssign
 		};
 		
+		class ImportExpressionSyntaxNode : public ExpressionSyntaxNode
+		{
+		public:
+			RefPtr<ExpressionSyntaxNode> Component;
+			String ComponentUniqueName; // filled by RsolveDependence
+			RefPtr<ImportOperatorDefSyntaxNode> ImportOperatorDef; // filled by semantics
+			List<RefPtr<ExpressionSyntaxNode>> Arguments;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual ImportExpressionSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
 		class UnaryExpressionSyntaxNode : public ExpressionSyntaxNode
 		{
 		public:
 			Operator Operator;
 			RefPtr<ExpressionSyntaxNode> Expression;
-			virtual void Accept(SyntaxVisitor * visitor);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
 			virtual UnaryExpressionSyntaxNode * Clone(CloneContext & ctx);
 		};
 		
@@ -433,7 +551,7 @@ namespace Spire
 			Operator Operator;
 			RefPtr<ExpressionSyntaxNode> LeftExpression;
 			RefPtr<ExpressionSyntaxNode> RightExpression;
-			virtual void Accept(SyntaxVisitor * visitor);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
 			virtual BinaryExpressionSyntaxNode * Clone(CloneContext & ctx);
 		};
 
@@ -443,7 +561,7 @@ namespace Spire
 			RefPtr<ExpressionSyntaxNode> BaseExpression;
 			RefPtr<ExpressionSyntaxNode> IndexExpression;
 			virtual IndexExpressionSyntaxNode * Clone(CloneContext & ctx);
-			virtual void Accept(SyntaxVisitor * visitor);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
 		};
 
 		class MemberExpressionSyntaxNode : public ExpressionSyntaxNode
@@ -451,7 +569,7 @@ namespace Spire
 		public:
 			RefPtr<ExpressionSyntaxNode> BaseExpression;
 			String MemberName;
-			virtual void Accept(SyntaxVisitor * visitor);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
 			virtual MemberExpressionSyntaxNode * Clone(CloneContext & ctx);
 		};
 
@@ -460,7 +578,7 @@ namespace Spire
 		public:
 			RefPtr<VarExpressionSyntaxNode> FunctionExpr;
 			List<RefPtr<ExpressionSyntaxNode>> Arguments;
-			virtual void Accept(SyntaxVisitor * visitor);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
 			virtual InvokeExpressionSyntaxNode * Clone(CloneContext & ctx);
 		};
 
@@ -469,7 +587,7 @@ namespace Spire
 		public:
 			RefPtr<TypeSyntaxNode> TargetType;
 			RefPtr<ExpressionSyntaxNode> Expression;
-			virtual void Accept(SyntaxVisitor * visitor);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
 			virtual TypeCastExpressionSyntaxNode * Clone(CloneContext & ctx);
 		};
 
@@ -477,40 +595,29 @@ namespace Spire
 		{
 		public:
 			RefPtr<ExpressionSyntaxNode> SelectorExpr, Expr0, Expr1;
-			virtual void Accept(SyntaxVisitor * visitor);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
 			virtual SelectExpressionSyntaxNode * Clone(CloneContext & ctx);
 		};
 
-		class StatementSyntaxNode : public SyntaxNode
-		{
-		};
 
 		class EmptyStatementSyntaxNode : public StatementSyntaxNode
 		{
 		public:
-			virtual void Accept(SyntaxVisitor * visitor);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
 			virtual EmptyStatementSyntaxNode * Clone(CloneContext & ctx);
-		};
-
-		class BlockStatementSyntaxNode : public StatementSyntaxNode
-		{
-		public:
-			List<RefPtr<StatementSyntaxNode>> Statements;
-			virtual void Accept(SyntaxVisitor * visitor);
-			virtual BlockStatementSyntaxNode * Clone(CloneContext & ctx);
 		};
 
 		class DiscardStatementSyntaxNode : public StatementSyntaxNode
 		{
 		public:
-			virtual void Accept(SyntaxVisitor * visitor);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
 			virtual DiscardStatementSyntaxNode * Clone(CloneContext & ctx);
 		};
 
 		class VariableDeclr
 		{
 		public:
-			ExpressionType Type;
+			RefPtr<ExpressionType> Type;
 			String Name;
 
 			bool operator ==(const VariableDeclr & var)
@@ -526,14 +633,15 @@ namespace Spire
 		{
 		public:
 			String Name, InternalName;
-			RefPtr<TypeSyntaxNode> ReturnType;
+			RefPtr<ExpressionType> ReturnType;
+			RefPtr<TypeSyntaxNode> ReturnTypeNode;
 			List<RefPtr<ParameterSyntaxNode>> Parameters;
 			RefPtr<BlockStatementSyntaxNode> Body;
 			List<VariableDeclr> Variables;
 			bool IsInline;
 			bool IsExtern;
 			bool HasSideEffect;
-			virtual void Accept(SyntaxVisitor * visitor);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
 			FunctionSyntaxNode()
 			{
 				IsInline = false;
@@ -548,17 +656,18 @@ namespace Spire
 		{
 			String Name;
 			RefPtr<ExpressionSyntaxNode> Expression;
-			virtual void Accept(SyntaxVisitor * visitor);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
 			virtual Variable * Clone(CloneContext & ctx);
 		};
 
 		class VarDeclrStatementSyntaxNode : public StatementSyntaxNode
 		{
 		public:
-			RefPtr<TypeSyntaxNode> Type;
+			RefPtr<TypeSyntaxNode> TypeNode;
+			RefPtr<ExpressionType> Type;
 			String LayoutString;
 			List<RefPtr<Variable>> Variables;
-			virtual void Accept(SyntaxVisitor * visitor);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
 			virtual VarDeclrStatementSyntaxNode * Clone(CloneContext & ctx);
 		};
 
@@ -567,30 +676,43 @@ namespace Spire
 		public:
 			Token World;
 			bool Pinned = false;
+			RateWorld() {}
+			RateWorld(String world)
+			{
+				World.Content = world;
+				World.Type = TokenType::Identifier;
+			}
 		};
 
 		class RateSyntaxNode : public SyntaxNode
 		{
 		public:
 			List<RateWorld> Worlds;
-			virtual void Accept(SyntaxVisitor *) override {}
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) 
+			{
+				return this;
+			}
 			virtual RateSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class ShaderMemberNode : public SyntaxNode
-		{};
+		{
+		public:
+			virtual ShaderMemberNode * Clone(CloneContext & ctx) = 0;
+		};
 
 		class ComponentSyntaxNode : public ShaderMemberNode
 		{
 		public:
-			bool IsOutput = false, IsPublic = false, IsInline = false, IsParam = false;
-			RefPtr<TypeSyntaxNode> Type;
+			bool IsOutput = false, IsPublic = false, IsInline = false, IsParam = false, IsInput = false;
+			RefPtr<TypeSyntaxNode> TypeNode;
+			RefPtr<ExpressionType> Type;
 			RefPtr<RateSyntaxNode> Rate;
 			Token Name, AlternateName;
 			EnumerableDictionary<String, String> LayoutAttributes;
 			RefPtr<BlockStatementSyntaxNode> BlockStatement;
 			RefPtr<ExpressionSyntaxNode> Expression;
-			virtual void Accept(SyntaxVisitor * visitor) override;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ComponentSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
@@ -599,24 +721,19 @@ namespace Spire
 		public:
 			bool IsAbstract = false;
 			Token Name;
-			Token ExportOperator;
-			String TargetMachine;
-			List<Token> Usings;
 			EnumerableDictionary<String, String> LayoutAttributes;
-			virtual void Accept(SyntaxVisitor *) override {}
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override { return this; }
 			virtual WorldSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class ImportOperatorDefSyntaxNode : public SyntaxNode
+		class StageSyntaxNode : public SyntaxNode
 		{
 		public:
 			Token Name;
-			Token SourceWorld, DestWorld;
-			List<Token> Usings;
-			EnumerableDictionary<String, String> LayoutAttributes;
-			EnumerableDictionary<String, String> Arguments;
-			virtual void Accept(SyntaxVisitor *) override {}
-			virtual ImportOperatorDefSyntaxNode * Clone(CloneContext & ctx) override;
+			Token StageType;
+			EnumerableDictionary<String, Token> Attributes;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override { return this; }
+			virtual StageSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 		
 		class PipelineSyntaxNode : public SyntaxNode
@@ -625,8 +742,9 @@ namespace Spire
 			Token Name;
 			List<RefPtr<WorldSyntaxNode>> Worlds;
 			List<RefPtr<ImportOperatorDefSyntaxNode>> ImportOperators;
+			List<RefPtr<StageSyntaxNode>> Stages;
 			List<RefPtr<ComponentSyntaxNode>> AbstractComponents;
-			virtual void Accept(SyntaxVisitor *) override {}
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override { return this; }
 			virtual PipelineSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
@@ -635,7 +753,7 @@ namespace Spire
 		public:
 			RefPtr<ExpressionSyntaxNode> Expression;
 			Token ArgumentName;
-			virtual void Accept(SyntaxVisitor *) override;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override;
 			virtual ImportArgumentSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
@@ -647,7 +765,7 @@ namespace Spire
 			Token ShaderName;
 			Token ObjectName;
 			List<RefPtr<ImportArgumentSyntaxNode>> Arguments;
-			virtual void Accept(SyntaxVisitor *) override;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override;
 			virtual ImportSyntaxNode * Clone(CloneContext & ctx) override;
 
 		};
@@ -659,7 +777,7 @@ namespace Spire
 			Token Pipeline;
 			List<RefPtr<ShaderMemberNode>> Members;
 			bool IsModule = false;
-			virtual void Accept(SyntaxVisitor * visitor) override;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ShaderSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
@@ -678,7 +796,7 @@ namespace Spire
 				Shaders.AddRange(other->Shaders);
 				Structs.AddRange(other->Structs);
 			}
-			virtual void Accept(SyntaxVisitor * visitor) override;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ProgramSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
@@ -686,7 +804,7 @@ namespace Spire
 		{
 		public:
 			RefPtr<ImportSyntaxNode> Import;
-			virtual void Accept(SyntaxVisitor * visitor) override;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ImportStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
@@ -696,7 +814,7 @@ namespace Spire
 			RefPtr<ExpressionSyntaxNode> Predicate;
 			RefPtr<StatementSyntaxNode> PositiveStatement;
 			RefPtr<StatementSyntaxNode> NegativeStatement;
-			virtual void Accept(SyntaxVisitor * visitor) override;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual IfStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
@@ -704,11 +822,12 @@ namespace Spire
 		{
 		public:
 			RefPtr<TypeSyntaxNode> TypeDef;
+			RefPtr<ExpressionType> IterationVariableType;
 			Token IterationVariable;
 
 			RefPtr<ExpressionSyntaxNode> InitialExpression, StepExpression, EndExpression;
 			RefPtr<StatementSyntaxNode> Statement;
-			virtual void Accept(SyntaxVisitor * visitor) override;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ForStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
@@ -717,7 +836,7 @@ namespace Spire
 		public:
 			RefPtr<ExpressionSyntaxNode> Predicate;
 			RefPtr<StatementSyntaxNode> Statement;
-			virtual void Accept(SyntaxVisitor * visitor) override;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual WhileStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
@@ -726,21 +845,21 @@ namespace Spire
 		public:
 			RefPtr<StatementSyntaxNode> Statement;
 			RefPtr<ExpressionSyntaxNode> Predicate;
-			virtual void Accept(SyntaxVisitor * visitor) override;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual DoWhileStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class BreakStatementSyntaxNode : public StatementSyntaxNode
 		{
 		public:
-			virtual void Accept(SyntaxVisitor * visitor) override;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual BreakStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class ContinueStatementSyntaxNode : public StatementSyntaxNode
 		{
 		public:
-			virtual void Accept(SyntaxVisitor * visitor) override;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ContinueStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
@@ -748,7 +867,7 @@ namespace Spire
 		{
 		public:
 			RefPtr<ExpressionSyntaxNode> Expression;
-			virtual void Accept(SyntaxVisitor * visitor) override;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ReturnStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
@@ -756,7 +875,7 @@ namespace Spire
 		{
 		public:
 			RefPtr<ExpressionSyntaxNode> Expression;
-			virtual void Accept(SyntaxVisitor * visitor) override;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ExpressionStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
@@ -784,167 +903,239 @@ namespace Spire
 			SyntaxVisitor(ErrorWriter * pErr)
 				: err(pErr)
 			{}
-			virtual void VisitProgram(ProgramSyntaxNode * program)
+			virtual RefPtr<ProgramSyntaxNode> VisitProgram(ProgramSyntaxNode* program)
 			{
-				program->Functions.ForEach([&](RefPtr<FunctionSyntaxNode> f){f->Accept(this);});
+				for (auto & f : program->Functions)
+					f = f->Accept(this).As<FunctionSyntaxNode>();
+				for (auto & shader : program->Shaders)
+					shader = shader->Accept(this).As<ShaderSyntaxNode>();
+				return program;
 			}
-			virtual void VisitShader(ShaderSyntaxNode * shader)
+			virtual RefPtr<ShaderSyntaxNode> VisitShader(ShaderSyntaxNode * shader)
 			{
 				for (auto & comp : shader->Members)
-					comp->Accept(this);
+					comp = comp->Accept(this).As<ShaderMemberNode>();
+				return shader;
 			}
-			virtual void VisitComponent(ComponentSyntaxNode * comp)
+			virtual RefPtr<ComponentSyntaxNode> VisitComponent(ComponentSyntaxNode * comp);
+			virtual RefPtr<FunctionSyntaxNode> VisitFunction(FunctionSyntaxNode* func)
 			{
-				if (comp->Expression)
-					comp->Expression->Accept(this);
-				if (comp->BlockStatement)
-					comp->BlockStatement->Accept(this);
-			}
-			virtual void VisitFunction(FunctionSyntaxNode* func)
-			{
-				func->ReturnType->Accept(this);
+				func->ReturnTypeNode = func->ReturnTypeNode->Accept(this).As<TypeSyntaxNode>();
 				for (auto & param : func->Parameters)
-					param->Accept(this);
+					param = param->Accept(this).As<ParameterSyntaxNode>();
 				if (func->Body)
-					func->Body->Accept(this);
+					func->Body = func->Body->Accept(this).As<BlockStatementSyntaxNode>();
+				return func;
 			}
-			virtual void VisitStruct(StructSyntaxNode * s)
+			virtual RefPtr<StructSyntaxNode> VisitStruct(StructSyntaxNode * s)
 			{
 				for (auto & f : s->Fields)
-					f->Accept(this);
+					f = f->Accept(this).As<StructField>();
+				return s;
 			}
-			virtual void VisitDiscardStatement(DiscardStatementSyntaxNode *)
-			{}
-			virtual void VisitStructField(StructField * f)
+			virtual RefPtr<StatementSyntaxNode> VisitDiscardStatement(DiscardStatementSyntaxNode * stmt)
 			{
-				f->Type->Accept(this);
+				return stmt;
 			}
-			virtual void VisitBlockStatement(BlockStatementSyntaxNode* stmt)
+			virtual RefPtr<StructField> VisitStructField(StructField * f)
+			{
+				f->TypeNode = f->TypeNode->Accept(this).As<TypeSyntaxNode>();
+				return f;
+			}
+			virtual RefPtr<StatementSyntaxNode> VisitBlockStatement(BlockStatementSyntaxNode* stmt)
 			{
 				for (auto & s : stmt->Statements)
-					s->Accept(this);
+					s = s->Accept(this).As<StatementSyntaxNode>();
+				return stmt;
 			}
-			virtual void VisitBreakStatement(BreakStatementSyntaxNode*){}
-			virtual void VisitContinueStatement(ContinueStatementSyntaxNode*){}
+			virtual RefPtr<StatementSyntaxNode> VisitBreakStatement(BreakStatementSyntaxNode* stmt)
+			{
+				return stmt;
+			}
+			virtual RefPtr<StatementSyntaxNode> VisitContinueStatement(ContinueStatementSyntaxNode* stmt)
+			{
+				return stmt;
+			}
 
-			virtual void VisitDoWhileStatement(DoWhileStatementSyntaxNode* stmt)
+			virtual RefPtr<StatementSyntaxNode> VisitDoWhileStatement(DoWhileStatementSyntaxNode* stmt)
 			{
 				if (stmt->Predicate)
-					stmt->Predicate->Accept(this);
+					stmt->Predicate = stmt->Predicate->Accept(this).As<ExpressionSyntaxNode>();
 				if (stmt->Statement)
-					stmt->Statement->Accept(this);
+					stmt->Statement = stmt->Statement->Accept(this).As<StatementSyntaxNode>();
+				return stmt;
 			}
-			virtual void VisitEmptyStatement(EmptyStatementSyntaxNode*){}
-			virtual void VisitForStatement(ForStatementSyntaxNode* stmt)
+			virtual RefPtr<StatementSyntaxNode> VisitEmptyStatement(EmptyStatementSyntaxNode* stmt)
+			{
+				return stmt;
+			}
+			virtual RefPtr<StatementSyntaxNode> VisitForStatement(ForStatementSyntaxNode* stmt)
 			{
 				if (stmt->InitialExpression)
-					stmt->InitialExpression->Accept(this);
+					stmt->InitialExpression = stmt->InitialExpression->Accept(this).As<ExpressionSyntaxNode>();
 				if (stmt->StepExpression)
-					stmt->StepExpression->Accept(this);
+					stmt->StepExpression = stmt->StepExpression->Accept(this).As<ExpressionSyntaxNode>();
 				if (stmt->EndExpression)
-					stmt->EndExpression->Accept(this);
+					stmt->EndExpression = stmt->EndExpression->Accept(this).As<ExpressionSyntaxNode>();
 				if (stmt->Statement)
-					stmt->Statement->Accept(this);
+					stmt->Statement = stmt->Statement->Accept(this).As<StatementSyntaxNode>();
+				return stmt;
 			}
-			virtual void VisitIfStatement(IfStatementSyntaxNode* stmt)
+			virtual RefPtr<StatementSyntaxNode> VisitIfStatement(IfStatementSyntaxNode* stmt)
 			{
 				if (stmt->Predicate)
-					stmt->Predicate->Accept(this);
+					stmt->Predicate = stmt->Predicate->Accept(this).As<ExpressionSyntaxNode>();
 				if (stmt->PositiveStatement)
-					stmt->PositiveStatement->Accept(this);
+					stmt->PositiveStatement = stmt->PositiveStatement->Accept(this).As<StatementSyntaxNode>();
 				if (stmt->NegativeStatement)
-					stmt->NegativeStatement->Accept(this);
+					stmt->NegativeStatement = stmt->NegativeStatement->Accept(this).As<StatementSyntaxNode>();
+				return stmt;
 			}
-			virtual void VisitReturnStatement(ReturnStatementSyntaxNode* stmt)
+			virtual RefPtr<StatementSyntaxNode> VisitReturnStatement(ReturnStatementSyntaxNode* stmt)
 			{
 				if (stmt->Expression)
-					stmt->Expression->Accept(this);
+					stmt->Expression = stmt->Expression->Accept(this).As<ExpressionSyntaxNode>();
+				return stmt;
 			}
-			virtual void VisitVarDeclrStatement(VarDeclrStatementSyntaxNode* stmt)
+			virtual RefPtr<StatementSyntaxNode> VisitVarDeclrStatement(VarDeclrStatementSyntaxNode* stmt)
 			{
 				for (auto & var : stmt->Variables)
-					var->Accept(this);
+					var = var->Accept(this).As<Variable>();
+				return stmt;
 			}
-			virtual void VisitWhileStatement(WhileStatementSyntaxNode* stmt)
+			virtual RefPtr<StatementSyntaxNode> VisitWhileStatement(WhileStatementSyntaxNode* stmt)
 			{
 				if (stmt->Predicate)
-					stmt->Predicate->Accept(this);
+					stmt->Predicate = stmt->Predicate->Accept(this).As<ExpressionSyntaxNode>();
 				if (stmt->Statement)
-					stmt->Statement->Accept(this);
+					stmt->Statement = stmt->Statement->Accept(this).As<StatementSyntaxNode>();
+				return stmt;
 			}
-			virtual void VisitExpressionStatement(ExpressionStatementSyntaxNode* stmt)
+			virtual RefPtr<StatementSyntaxNode> VisitExpressionStatement(ExpressionStatementSyntaxNode* stmt)
 			{
 				if (stmt->Expression)
-					stmt->Expression->Accept(this);
+					stmt->Expression = stmt->Expression->Accept(this).As<ExpressionSyntaxNode>();
+				return stmt;
 			}
 
-			virtual void VisitBinaryExpression(BinaryExpressionSyntaxNode* expr)
+			virtual RefPtr<ExpressionSyntaxNode> VisitBinaryExpression(BinaryExpressionSyntaxNode* expr)
 			{
 				if (expr->LeftExpression)
-					expr->LeftExpression->Accept(this);
+					expr->LeftExpression = expr->LeftExpression->Accept(this).As<ExpressionSyntaxNode>();
 				if (expr->RightExpression)
-					expr->RightExpression->Accept(this);
+					expr->RightExpression = expr->RightExpression->Accept(this).As<ExpressionSyntaxNode>();
+				return expr;
 			}
-			virtual void VisitConstantExpression(ConstantExpressionSyntaxNode*) {}
-			virtual void VisitIndexExpression(IndexExpressionSyntaxNode* expr)
+			virtual RefPtr<ExpressionSyntaxNode> VisitConstantExpression(ConstantExpressionSyntaxNode* expr)
+			{
+				return expr;
+			}
+			virtual RefPtr<ExpressionSyntaxNode> VisitIndexExpression(IndexExpressionSyntaxNode* expr)
 			{
 				if (expr->BaseExpression)
-					expr->BaseExpression->Accept(this);
+					expr->BaseExpression = expr->BaseExpression->Accept(this).As<ExpressionSyntaxNode>();
 				if (expr->IndexExpression)
-					expr->IndexExpression->Accept(this);
+					expr->IndexExpression = expr->IndexExpression->Accept(this).As<ExpressionSyntaxNode>();
+				return expr;
 			}
-			virtual void VisitMemberExpression(MemberExpressionSyntaxNode * stmt)
+			virtual RefPtr<ExpressionSyntaxNode> VisitMemberExpression(MemberExpressionSyntaxNode * stmt)
 			{
 				if (stmt->BaseExpression)
-					stmt->BaseExpression->Accept(this);
+					stmt->BaseExpression = stmt->BaseExpression->Accept(this).As<ExpressionSyntaxNode>();
+				return stmt;
 			}
-			virtual void VisitInvokeExpression(InvokeExpressionSyntaxNode* stmt)
+			virtual RefPtr<ExpressionSyntaxNode> VisitInvokeExpression(InvokeExpressionSyntaxNode* stmt)
 			{
 				for (auto & arg : stmt->Arguments)
-					arg->Accept(this);
+					arg = arg->Accept(this).As<ExpressionSyntaxNode>();
+				return stmt;
 			}
-			virtual void VisitTypeCastExpression(TypeCastExpressionSyntaxNode * stmt)
+			virtual RefPtr<ExpressionSyntaxNode> VisitImportExpression(ImportExpressionSyntaxNode * expr)
+			{
+				for (auto & arg : expr->Arguments)
+					arg = arg->Accept(this).As<ExpressionSyntaxNode>();
+				return expr;
+			}
+			virtual RefPtr<ExpressionSyntaxNode> VisitTypeCastExpression(TypeCastExpressionSyntaxNode * stmt)
 			{
 				if (stmt->Expression)
-					stmt->Expression->Accept(this);
+					stmt->Expression = stmt->Expression->Accept(this).As<ExpressionSyntaxNode>();
+				return stmt->Expression;
 			}
-			virtual void VisitSelectExpression(SelectExpressionSyntaxNode * expr)
+			virtual RefPtr<ExpressionSyntaxNode> VisitSelectExpression(SelectExpressionSyntaxNode * expr)
 			{
 				if (expr->SelectorExpr)
-					expr->SelectorExpr->Accept(this);
+					expr->SelectorExpr = expr->SelectorExpr->Accept(this).As<ExpressionSyntaxNode>();
 				if (expr->Expr0)
-					expr->Expr0->Accept(this);
+					expr->Expr0 = expr->Expr0->Accept(this).As<ExpressionSyntaxNode>();
 				if (expr->Expr1)
-					expr->Expr1->Accept(this);
+					expr->Expr1 = expr->Expr1->Accept(this).As<ExpressionSyntaxNode>();
+				return expr;
 			}
-			virtual void VisitUnaryExpression(UnaryExpressionSyntaxNode* expr)
+			virtual RefPtr<ExpressionSyntaxNode> VisitUnaryExpression(UnaryExpressionSyntaxNode* expr)
 			{
 				if (expr->Expression)
-					expr->Expression->Accept(this);
+					expr->Expression = expr->Expression->Accept(this).As<ExpressionSyntaxNode>();
+				return expr;
 			}
-			virtual void VisitVarExpression(VarExpressionSyntaxNode*){}
-			virtual void VisitParameter(ParameterSyntaxNode*){}
-			virtual void VisitType(TypeSyntaxNode*){}
-			virtual void VisitDeclrVariable(Variable* dclr)
+			virtual RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode* expr)
+			{
+				return expr;
+			}
+			virtual RefPtr<PipelineSyntaxNode> VisitPipeline(PipelineSyntaxNode * pipe)
+			{
+				for (auto & comp : pipe->AbstractComponents)
+					comp = comp->Accept(this).As<ComponentSyntaxNode>();
+				for (auto & imp : pipe->ImportOperators)
+					imp = imp->Accept(this).As<ImportOperatorDefSyntaxNode>();
+				return pipe;
+			}
+			virtual RefPtr<ImportOperatorDefSyntaxNode> VisitImportOperatorDef(ImportOperatorDefSyntaxNode * imp)
+			{
+				imp->Body = imp->Body->Accept(this).As<BlockStatementSyntaxNode>();
+				return imp;
+			}
+			virtual RefPtr<ParameterSyntaxNode> VisitParameter(ParameterSyntaxNode* param)
+			{
+				return param;
+			}
+			virtual RefPtr<TypeSyntaxNode> VisitBasicType(BasicTypeSyntaxNode* type)
+			{
+				return type;
+			}
+			virtual RefPtr<TypeSyntaxNode> VisitArrayType(ArrayTypeSyntaxNode* type)
+			{
+				return type;
+			}
+			virtual RefPtr<TypeSyntaxNode> VisitGenericType(GenericTypeSyntaxNode* type)
+			{
+				return type;
+			}
+
+			virtual RefPtr<Variable> VisitDeclrVariable(Variable* dclr)
 			{
 				if (dclr->Expression)
-					dclr->Expression->Accept(this);
+					dclr->Expression = dclr->Expression->Accept(this).As<ExpressionSyntaxNode>();
+				return dclr;
 			}
-			virtual void VisitImport(ImportSyntaxNode* imp)
+			virtual RefPtr<ImportSyntaxNode> VisitImport(ImportSyntaxNode* imp)
 			{
 				for (auto & arg : imp->Arguments)
 					if (arg->Expression)
-						arg->Expression->Accept(this);
+						arg->Expression = arg->Expression->Accept(this).As<ExpressionSyntaxNode>();
+				return imp;
 			}
-			virtual void VisitImportStatement(ImportStatementSyntaxNode* stmt)
+			virtual RefPtr<StatementSyntaxNode> VisitImportStatement(ImportStatementSyntaxNode* stmt)
 			{
 				if (stmt->Import)
-					stmt->Import->Accept(this);
+					stmt->Import = stmt->Import->Accept(this).As<ImportSyntaxNode>();
+				return stmt;
 			}
-			virtual void VisitImportArgument(ImportArgumentSyntaxNode * arg)
+			virtual RefPtr<ImportArgumentSyntaxNode> VisitImportArgument(ImportArgumentSyntaxNode * arg)
 			{
 				if (arg->Expression)
-					arg->Expression->Accept(this);
+					arg->Expression = arg->Expression->Accept(this).As<ExpressionSyntaxNode>();
+				return arg;
 			}
 
 		};

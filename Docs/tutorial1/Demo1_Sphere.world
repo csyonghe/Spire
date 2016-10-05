@@ -1,0 +1,14 @@
+mesh  "sphere.vtx"
+{
+    shader "Demo1Shader.cse" src "Demo1.shader", 0.0
+    instance
+    {
+    uniform texture2D ground_pebble_map = "assets/SM_ground_gravel_a_d.TGA";
+    uniform texture2D ground_pebble_Nmap = "assets/SM_ground_gravel_a_n.TGA";
+    
+    uniform mat4 modelMatrix = (1.0 0.0 0.0 0.0
+		                            0.0 1.0 0.0 0.0
+									0.0 0.0 1.0 0.0
+									0.0 0.0 0.0 1.0);
+    }
+}

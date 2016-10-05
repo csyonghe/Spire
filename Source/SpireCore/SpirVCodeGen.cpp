@@ -13,6 +13,7 @@ namespace Spire
 {
 	namespace Compiler
 	{
+
 		enum class ExecutionModel
 		{
 			Invalid = 777,
@@ -25,12 +26,76 @@ namespace Spire
 			Kernel = 6
 		};
 
+		String ExecutionModelToString(ExecutionModel em)
+		{
+			switch (em)
+			{
+			case ExecutionModel::Invalid:
+				return L"invalid";
+			case ExecutionModel::Vertex:
+				return L"Vertex";
+			case ExecutionModel::TessellationControl:
+				return L"TessellationControl";
+			case ExecutionModel::TessellationEvaluation:
+				return L"TessellationEvaluation";
+			case ExecutionModel::Geometry:
+				return L"Geometry";
+			case ExecutionModel::Fragment:
+				return L"Fragment";
+			case ExecutionModel::GLCompute:
+				return L"GLCompute";
+			case ExecutionModel::Kernel:
+				return L"Kernel";
+			default:
+				throw NotImplementedException(L"unknown ExecutionModel");
+			}
+		}
+
 		enum class ExecutionMode
 		{
 			Invalid = 777,
+			Invocations = 0,
+			PixelCenterInteger = 6,
 			OriginUpperLeft = 7,
-			DepthReplacing = 12
+			OriginLowerLeft = 8,
+			EarlyFragmentTests = 9,
+			DepthReplacing = 12,
+			DepthGreater = 14,
+			DepthLess = 15,
+			DepthUnchanged = 16,
+			LocalSize = 17
 		};
+
+		String ExecutionModeToString(ExecutionMode em)
+		{
+			switch (em)
+			{
+			case ExecutionMode::Invalid:
+				return L"invalid";
+			case ExecutionMode::Invocations:
+				return L"Invocations";
+			case ExecutionMode::PixelCenterInteger:
+				return L"PixelCenterInteger";
+			case ExecutionMode::OriginUpperLeft:
+				return L"OriginUpperLeft";
+			case ExecutionMode::OriginLowerLeft:
+				return L"OriginLowerLeft";
+			case ExecutionMode::EarlyFragmentTests:
+				return L"EarlyFragmentTests";
+			case ExecutionMode::DepthReplacing:
+				return L"DepthReplacing";
+			case ExecutionMode::DepthGreater:
+				return L"DepthGreater";
+			case ExecutionMode::DepthLess:
+				return L"DepthLess";
+			case ExecutionMode::DepthUnchanged:
+				return L"DepthUnchanged";
+			case ExecutionMode::LocalSize:
+				return L"LocalSize";
+			default:
+				throw NotImplementedException(L"unknown ExecutionMode");
+			}
+		}
 
 		enum class StorageClass
 		{
@@ -47,65 +112,6 @@ namespace Spire
 			PushConstant = 9,
 			AtomicCounter = 10,
 			Image = 11
-		};
-
-		enum class MemoryAccess
-		{
-			None = 0, //0x0
-			Volatile = 1, //0x1
-			Aligned = 2, //0x2
-			Nontemporal = 4 //0x4
-		};
-
-		enum class Decoration
-		{
-			Invalid = 777,
-			Block = 2,
-			BufferBlock = 3,
-			RowMajor = 4,
-			ColMajor = 5,
-			ArrayStride = 6,
-			MatrixStride = 7,
-			BuiltIn = 11,
-			Flat = 14,
-			Location = 30,
-			Binding = 33,
-			DescriptorSet = 34,
-			Offset = 35
-		};
-
-		enum class BuiltIn
-		{
-			Invalid = 777,
-			Position = 0,
-			PointSize = 1,
-			ClipDistance = 3,
-			CullDistance = 4,
-			FragDepth = 22
-		};
-
-		enum class Dim
-		{
-			e1D = 0,
-			e2D = 1,
-			e3D = 2,
-			eCube = 3,
-			eRect = 4,
-			eBuffer = 5,
-			eSubpassData = 6
-		};
-
-		enum class ImageOperands
-		{
-			None = 0,
-			Bias = 0x1,
-			Lod = 0x2,
-			Grad = 0x4,
-			ConstOffset = 0x8,
-			Offset = 0x10,
-			ConstOffsets = 0x20,
-			Sample = 0x40,
-			MinLod = 0x80
 		};
 
 		String StorageClassToString(StorageClass store)
@@ -141,6 +147,14 @@ namespace Spire
 			}
 		}
 
+		enum class MemoryAccess
+		{
+			None = 0, //0x0
+			Volatile = 1, //0x1
+			Aligned = 2, //0x2
+			Nontemporal = 4 //0x4
+		};
+
 		String MemoryAccessToString(MemoryAccess ma)
 		{
 			switch (ma)
@@ -158,45 +172,25 @@ namespace Spire
 			}
 		}
 
-		String ExecutionModelToString(ExecutionModel em)
+		enum class Decoration
 		{
-			switch (em)
-			{
-			case ExecutionModel::Invalid:
-				return L"invalid";
-			case ExecutionModel::Vertex:
-				return L"Vertex";
-			case ExecutionModel::TessellationControl:
-				return L"TessellationControl";
-			case ExecutionModel::TessellationEvaluation:
-				return L"TessellationEvaluation";
-			case ExecutionModel::Geometry:
-				return L"Geometry";
-			case ExecutionModel::Fragment:
-				return L"Fragment";
-			case ExecutionModel::GLCompute:
-				return L"GLCompute";
-			case ExecutionModel::Kernel:
-				return L"Kernel";
-			default:
-				throw NotImplementedException(L"unknown ExecutionModel");
-			}
-		}
-
-		String ExecutionModeToString(ExecutionMode em)
-		{
-			switch (em)
-			{
-			case ExecutionMode::Invalid:
-				return L"invalid";
-			case ExecutionMode::OriginUpperLeft:
-				return L"OriginUpperLeft";
-			case ExecutionMode::DepthReplacing:
-				return L"DepthReplacing";
-			default:
-				throw NotImplementedException(L"unknown ExecutionMode");
-			}
-		}
+			Invalid = 777,
+			Block = 2,
+			BufferBlock = 3,
+			RowMajor = 4,
+			ColMajor = 5,
+			ArrayStride = 6,
+			MatrixStride = 7,
+			BuiltIn = 11,
+			Flat = 14,
+			Constant = 22,
+			Location = 30,
+			Component = 31,
+			Index = 32,
+			Binding = 33,
+			DescriptorSet = 34,
+			Offset = 35
+		};
 
 		String DecorationToString(Decoration d)
 		{
@@ -220,8 +214,14 @@ namespace Spire
 				return L"BuiltIn";
 			case Decoration::Flat:
 				return L"Flat";
+			case Decoration::Constant:
+				return L"Constant";
 			case Decoration::Location:
 				return L"Location";
+			case Decoration::Component:
+				return L"Component";
+			case Decoration::Index:
+				return L"Index";
 			case Decoration::Binding:
 				return L"Binding";
 			case Decoration::DescriptorSet:
@@ -232,6 +232,18 @@ namespace Spire
 				throw NotImplementedException(L"unknown Decoration");
 			}
 		}
+
+		enum class BuiltIn
+		{
+			Invalid = 777,
+			Position = 0,
+			PointSize = 1,
+			ClipDistance = 3,
+			CullDistance = 4,
+			FragDepth = 22,
+			WorkgroupSize = 25,
+			GlobalInvocationId = 28
+		};
 
 		String BuiltinToString(BuiltIn b)
 		{
@@ -249,10 +261,25 @@ namespace Spire
 				return L"CullDistance";
 			case BuiltIn::FragDepth:
 				return L"FragDepth";
+			case BuiltIn::WorkgroupSize:
+				return L"WorkgroupSize";
+			case BuiltIn::GlobalInvocationId:
+				return L"GlobalInvocationId";
 			default:
 				throw NotImplementedException(L"unknown Builtin");
 			}
 		}
+
+		enum class Dim
+		{
+			e1D = 0,
+			e2D = 1,
+			e3D = 2,
+			eCube = 3,
+			eRect = 4,
+			eBuffer = 5,
+			eSubpassData = 6
+		};
 
 		String DimToString(Dim b)
 		{
@@ -276,6 +303,19 @@ namespace Spire
 				throw NotImplementedException(L"unknown Builtin");
 			}
 		}
+
+		enum class ImageOperands
+		{
+			None = 0,
+			Bias = 0x1,
+			Lod = 0x2,
+			Grad = 0x4,
+			ConstOffset = 0x8,
+			Offset = 0x10,
+			ConstOffsets = 0x20,
+			Sample = 0x40,
+			MinLod = 0x80
+		};
 
 		String ImageOperandsToString(ImageOperands io)
 		{
@@ -349,6 +389,19 @@ namespace Spire
 			return ret;
 		}
 
+		String GetFuncOriginalName(const String & name)
+		{
+			String originalName;
+			int splitPos = name.IndexOf(L'@');
+			if (splitPos == 0)
+				return name;
+			if (splitPos != -1)
+				originalName = name.SubString(0, splitPos);
+			else
+				originalName = name;
+			return originalName;
+		}
+
 		String SpirVFloatToString(float v)
 		{
 			String rs(v, L"%.12e");
@@ -357,14 +410,13 @@ namespace Spire
 			return rs;
 		};
 
-		RefPtr<ILBasicType> GetBasicTypeFromString(String s)
+		String SpirVUIntToString(unsigned int i)
 		{
-			CoreLib::Text::Parser parser(s);
-			RefPtr<ILType> ret = TypeFromString(parser);
-			RefPtr<ILBasicType> ret2 = nullptr;
-			if (auto c = dynamic_cast<ILBasicType*>(ret.Ptr()))
-				ret2 = ret;
-			return ret2;
+			String s;
+			if (i >> 31)
+				s = s + L"1";
+			s = s + int(i & 0x7fffffff);
+			return s;
 		}
 
 		RefPtr<ILType> GetTypeFromString(String s)
@@ -423,7 +475,7 @@ namespace Spire
 			}
 			else if (auto arrayType = dynamic_cast<ILArrayType*>(Type))
 			{
-				return Type->GetSize();
+				return GetSize(arrayType->BaseType.Ptr(), UniformOrBuffer) * arrayType->ArrayLength;
 			}
 			else if (auto structType = dynamic_cast<ILStructType*>(Type))
 			{
@@ -432,7 +484,7 @@ namespace Spire
 				{
 					int memberAlignment = GetBaseAlignment(member.Type.Ptr(), UniformOrBuffer);
 					rs = RoundUpTo(rs, memberAlignment);
-					rs += member.Type->GetSize();
+					rs += GetSize(member.Type.Ptr(), UniformOrBuffer);
 				}
 				return rs;
 			}
@@ -476,6 +528,7 @@ namespace Spire
 				ret.available = true;
 				ret.idClass = IDClass::TypeofValue;
 				ret.ID = ID;
+				ret.typeName = L"";
 				if (typeIL) 
 				{
 					ret.typeName = typeIL->ToString();
@@ -493,7 +546,10 @@ namespace Spire
 				ret.available = true;
 				ret.idClass = IDClass::Value;
 				ret.ID = ID;
-				//ret.variableName = variableName;
+				if (op)
+					ret.variableName = op->Name;
+				else
+					ret.variableName = L"";
 				ret.op = op;
 				ret.typeName = typeIL->ToString();
 				ret.typeID = typeID;
@@ -508,6 +564,10 @@ namespace Spire
 				ret.idClass = IDClass::Pointer;
 				ret.ID = ID;
 				ret.op = op;
+				if (op)
+					ret.variableName = op->Name;
+				else
+					ret.variableName = L"";
 				ret.typeName = basetypeIL->ToString();
 				ret.typeID = typeID;
 				ret.baseTypeID = basetypeID;
@@ -554,27 +614,32 @@ namespace Spire
 				if (!available) return IDClass::None;
 				return idClass;
 			}
-			bool isType()
+			bool IsTypeofValue()
 			{
 				if (!available) return false;
 				return idClass == IDClass::TypeofValue;
 			}
-			bool isValue()
+			bool IsValue()
 			{
 				if (!available) return false;
 				return idClass == IDClass::Value;
 			}
-			bool isPointer()
+			bool IsPointer()
 			{
 				if (!available) return false;
 				return idClass == IDClass::Pointer;
 			}
-			bool isFunction()
+			bool IsTypeofPointer()
+			{
+				if (!available) return false;
+				return idClass == IDClass::TypeofPointer;
+			}
+			bool IsFunction()
 			{
 				if (!available) return false;
 				return idClass == IDClass::Function;
 			}
-			String GetName()
+			String GetVariableName()
 			{
 				if (!available) return L"";
 				return variableName;
@@ -589,6 +654,11 @@ namespace Spire
 				if (!available) return -1;
 				return typeID;
 			}
+			int GetBaseTypeID()
+			{
+				if (!available) return -1;
+				return baseTypeID;
+			}
 			RefPtr<ILType> GetILType()
 			{
 				if (!available) return nullptr;
@@ -598,11 +668,6 @@ namespace Spire
 			{
 				if (!available) return StorageClass::Invalid;
 				return store;
-			}
-			int GetBaseTypeID()
-			{
-				if (!available) return -1;
-				return baseTypeID;
 			}
 			CompiledFunction * GetFunc()
 			{
@@ -662,15 +727,15 @@ namespace Spire
 				sbTextFunctionVariable.Clear();
 				sbTextFunctionBody.Clear();
 			}
-			void Init()
+			void Initiate()
 			{
 				Clear();
 
 				streamHeader.Add(0x07230203); // magic number
 				streamHeader.Add(0x00010000); // version 
-				streamHeader.Add(0x00080001);		  // register number
+				streamHeader.Add(0x00080001); // register number
 				streamHeader.Add(0x0000ffff); // ID bound
-				streamHeader.Add(0x00000000);		  // reserveds
+				streamHeader.Add(0x00000000); // reserved
 			}
 			void ProduceFunction()
 			{
@@ -820,6 +885,7 @@ namespace Spire
 			}
 			void OpPhi(const int ID, const int typeID, const List<int> branches)
 			{
+				//<branches>: (variable1, parent branch1), (variable2, parent branch2), ...
 				sbTextFunctionBody << LR"(%)" << ID << LR"( = OpPhi %)" << typeID;
 				for (const auto & x : branches)
 					sbTextFunctionBody << LR"( %)" << x;
@@ -857,7 +923,7 @@ namespace Spire
 
 				streamFunctionBody.Add(253 + (1 << 16));
 			}
-			void OpReturnValue(const int &ID)
+			void OpReturnValue(const int ID)
 			{
 				sbTextFunctionBody << LR"(OpReturnValue %)" << ID << EndLine;
 
@@ -903,17 +969,33 @@ namespace Spire
 					streamHeader.Add(id);
 				streamHeader[len_i] = (15) + ((1 + 1 + NameLen + 1 + interfaceIDs.Count()) << 16);
 			}
-			void OpExecutionMode(const int entryID, const ExecutionMode mode)
+			void OpExecutionMode(const int entryID, const ExecutionMode mode, const int op1, const int op2, const int op3)
 			{
-				sbTextHeader << LR"(OpExecutionMode %)" << entryID << LR"( )" << ExecutionModeToString(mode) << EndLine;
+				bool LocalSize = false;
+				if (mode == ExecutionMode::LocalSize)
+					LocalSize = true;
 
-				streamHeader.Add(16 + (3 << 16));
+				sbTextHeader << LR"(OpExecutionMode %)" << entryID << LR"( )" << ExecutionModeToString(mode);
+				if (LocalSize)
+					sbTextHeader << op1 << op2 << op3;
+				sbTextHeader << EndLine;
+
+				int len = 3;
+				if (LocalSize)
+					len += 3;
+				streamHeader.Add(16 + (len << 16));
 				streamHeader.Add(entryID);
 				streamHeader.Add((int)mode);
+				if (LocalSize) {
+					streamHeader.Add(op1);
+					streamHeader.Add(op2);
+					streamHeader.Add(op3);
+				}
 			}
 			int Decorate(const Decoration deco, int op1 = 0)
 			{
 				int len = 0;
+				sbTextAnnotation << L" " << DecorationToString(deco);
 				streamAnnotation.Add((int)deco);
 				len++;
 				if (deco == Decoration::Location ||
@@ -938,7 +1020,7 @@ namespace Spire
 			}
 			void OpDecorate(const int ID, const Decoration deco, int op1 = 0)
 			{
-				sbTextAnnotation << LR"(OpDecorate %)" << ID << LR"( )" << DecorationToString(deco);
+				sbTextAnnotation << LR"(OpDecorate %)" << ID;
 
 				int len_i = streamAnnotation.Count();
 				streamAnnotation.Add(0);
@@ -950,7 +1032,7 @@ namespace Spire
 			}
 			void OpMemberDecorate(const int ID, const int memberIndex, const Decoration deco, int op1 = 0)
 			{
-				sbTextAnnotation << LR"(OpMemberDecorate %)" << ID << LR"( )" << memberIndex << LR"( )" << DecorationToString(deco);
+				sbTextAnnotation << LR"(OpMemberDecorate %)" << ID << LR"( )" << memberIndex;
 
 				int len_i = streamAnnotation.Count();
 				streamAnnotation.Add(0);
@@ -1198,7 +1280,7 @@ namespace Spire
 			void OpConstantUInt(const int ID, const int typeID, const unsigned int i)
 			{
 				sbTextTypeDefinition << LR"(%)" << ID << LR"( = OpConstant %)" << typeID << LR"( )";
-				sbTextTypeDefinition << int(i / 100) << int(i % 100);
+				sbTextTypeDefinition << SpirVUIntToString(i);
 				sbTextTypeDefinition << EndLine;
 
 				streamTypeDefinition.Add(43 + (4 << 16));
@@ -1600,7 +1682,7 @@ namespace Spire
 				streamTypeDefinition.Add(25 + (9 << 16));
 				streamTypeDefinition.Add(ID);
 				streamTypeDefinition.Add(sampledTypeID);
-				streamTypeDefinition.Add((int)d);		//Dim
+				streamTypeDefinition.Add((int)d);			//Dim
 				streamTypeDefinition.Add(depth);			//depth
 				streamTypeDefinition.Add(0);				//arrayed
 				streamTypeDefinition.Add(0);				//MS
@@ -1730,12 +1812,9 @@ namespace Spire
 			}
 		};
 
-		class CodeGenContext_SPIRV
+		class SpirVCodeGenContext
 		{
 		public:
-			Dictionary<String, ImportOperatorHandler *> ImportOperatorHandlers;
-			Dictionary<String, ExportOperatorHandler *> ExportOperatorHandlers;
-
 			CompileResult * Result = nullptr;
 
 			int CurrentID = 0;
@@ -1743,7 +1822,7 @@ namespace Spire
 			int MainFunctionReturnTypeID = 0;
 			int MainFunctionTypeID = 0;
 			int ReturnID = -1;
-			Dictionary<String, int> TypeNameToID;				// 'int' - 1, 'vec4' - 2
+			Dictionary<String, int> TypeNameToID;					// 'int' - 1, 'vec4' - 2
 			Dictionary<String, int> TypeStorageToTypePointerID;		// 'uint Function' - 5, 'mat3 Uniform' - 6
 			Dictionary<String, int> FunctionNameToFunctionTypeID;
 			Dictionary<String, int> FunctionNameToFunctionID;
@@ -2033,8 +2112,7 @@ namespace Spire
 					if (ArrayType->ArrayLength != 0)
 					{
 						//normal constant-length array
-						RefPtr<ILType> intTypeIL = new ILBasicType(ILBaseType::Int);
-						int lengthID = AddInstrConstantInt(intTypeIL, ArrayType->ArrayLength);
+						int lengthID = AddInstrConstantInt(ArrayType->ArrayLength);
 
 						int elementTypeID = DefineType(ArrayType->BaseType, UniformOrBuffer);
 						++CurrentID;
@@ -2161,11 +2239,12 @@ namespace Spire
 				return functionTypeID;
 			}
 
-			int AddInstrConstantBool(RefPtr<ILType> Type, int value)
+			int AddInstrConstantBool(int value)
 			{
 				if (Dictionary_ConstantBoolToID.ContainsKey(value != 0))
 					return Dictionary_ConstantBoolToID[value != 0].GetValue();
 
+				auto Type = GetTypeFromString(L"bool");
 				int typeID = DefineType(Type);
 				++CurrentID;
 				/*
@@ -2180,8 +2259,9 @@ namespace Spire
 				return CurrentID;
 			}
 
-			int AddInstrConstantFloat(RefPtr<ILType> Type, float f)
+			int AddInstrConstantFloat(float f)
 			{
+				auto Type = GetTypeFromString(L"float");
 				int typeID = DefineType(Type);
 				++CurrentID;
 				CodeGen.OpConstantFloat(CurrentID, typeID, f);
@@ -2189,8 +2269,9 @@ namespace Spire
 				return CurrentID;
 			}
 
-			int AddInstrConstantInt(RefPtr<ILType> Type, int i)
+			int AddInstrConstantInt(int i)
 			{
+				auto Type = GetTypeFromString(L"int");
 				if (Dictionary_ConstantIntToID.ContainsKey(i))
 					return Dictionary_ConstantIntToID[i].GetValue();
 
@@ -2202,8 +2283,9 @@ namespace Spire
 				return CurrentID;
 			}
 
-			int AddInstrConstantUInt(RefPtr<ILType> Type, unsigned int i)
+			int AddInstrConstantUInt(unsigned int i)
 			{
+				auto Type = GetTypeFromString(L"uint");
 				if (Dictionary_ConstantUIntToID.ContainsKey(i))
 					return Dictionary_ConstantUIntToID[i].GetValue();
 
@@ -2215,14 +2297,22 @@ namespace Spire
 				return CurrentID;
 			}
 
-			int AddInstrConstantCompositeFloat(RefPtr<ILType> Type, float *f, int len)
+			int AddInstrConstantCompositeFloat(float *f, int len)
 			{
+				RefPtr<ILType> Type;
+				if (len == 2)
+					Type = GetTypeFromString(L"vec2");
+				else if (len == 3)
+					Type = GetTypeFromString(L"vec3");
+				else if (len == 4)
+					Type = GetTypeFromString(L"vec4");
+				else
+					throw InvalidOperationException(L"Invalid type in AddInstrConstantCompositeFloat(): vec"+len);
 				int typeID = DefineType(Type);
 
 				List<int> elementIDs;
-				auto elementType = new ILBasicType(ILBaseType::Float);
 				for (int i = 0; i < len; i++)
-					elementIDs.Add(AddInstrConstantFloat(elementType, f[i]));
+					elementIDs.Add(AddInstrConstantFloat(f[i]));
 
 				++CurrentID;
 				CodeGen.OpConstantComposite(CurrentID, typeID, elementIDs);
@@ -2231,14 +2321,22 @@ namespace Spire
 				return CurrentID;
 			}
 
-			int AddInstrConstantCompositeInt(RefPtr<ILType> Type, int *v, int len)
+			int AddInstrConstantCompositeInt(int *v, int len)
 			{
+				RefPtr<ILType> Type;
+				if (len == 2)
+					Type = GetTypeFromString(L"ivec2");
+				else if (len == 3)
+					Type = GetTypeFromString(L"ivec3");
+				else if (len == 4)
+					Type = GetTypeFromString(L"ivec4");
+				else
+					throw InvalidOperationException(L"Invalid type in AddInstrConstantCompositeInt(): ivec" + len);
 				int typeID = DefineType(Type);
 
 				List<int> elementIDs;
-				auto elementType = new ILBasicType(ILBaseType::Int);
 				for (int i = 0; i < len; i++)
-					elementIDs.Add(AddInstrConstantInt(elementType, v[i]));
+					elementIDs.Add(AddInstrConstantInt(v[i]));
 
 				++CurrentID;
 				CodeGen.OpConstantComposite(CurrentID, typeID, elementIDs);
@@ -2247,14 +2345,22 @@ namespace Spire
 				return CurrentID;
 			}
 
-			int AddInstrConstantCompositeUInt(RefPtr<ILType> Type, int *v, int len)
+			int AddInstrConstantCompositeUInt(unsigned int *v, int len)
 			{
+				RefPtr<ILType> Type;
+				if (len == 2)
+					Type = GetTypeFromString(L"uvec2");
+				else if (len == 3)
+					Type = GetTypeFromString(L"uvec3");
+				else if (len == 4)
+					Type = GetTypeFromString(L"uvec4");
+				else
+					throw InvalidOperationException(L"Invalid type in AddInstrConstantCompositeUInt(): uvec" + len);
 				int typeID = DefineType(Type);
 
 				List<int> elementIDs;
-				auto elementType = new ILBasicType(ILBaseType::UInt);
 				for (int i = 0; i < len; i++)
-					elementIDs.Add(AddInstrConstantUInt(elementType, *(unsigned int*)(v + i)));
+					elementIDs.Add(AddInstrConstantUInt(*(v + i)));
 
 				++CurrentID;
 				CodeGen.OpConstantComposite(CurrentID, typeID, elementIDs);
@@ -2263,22 +2369,22 @@ namespace Spire
 				return CurrentID;
 			}
 
-			int AddInstrConstantMatrix(RefPtr<ILType> Type, float *f, int n)
+			int AddInstrConstantMatrix(float *f, int n)
 			{
+				RefPtr<ILType> Type;
+				if (n == 3)
+					Type = GetTypeFromString(L"mat3");
+				else if (n == 4)
+					Type = GetTypeFromString(L"mat4");
+				else
+					throw InvalidOperationException(L"Invalid type in AddInstrConstantMatrix(): mat" + n);
 				int typeID = DefineType(Type);
 
 				List<int> vectorIDs;
-				auto vectorType = new ILBasicType(ILBaseType::Float3);
-				if (n == 4)
-					vectorType = new ILBasicType(ILBaseType::Float4);
 				for (int i = 0; i < n; i++)
-					vectorIDs.Add(AddInstrConstantCompositeFloat(vectorType, f + (i * n), n));
+					vectorIDs.Add(AddInstrConstantCompositeFloat(f + (i * n), n));
 
 				++CurrentID;
-				/*TypeDefinition << LR"(%)" << CurrentID << LR"( = OpConstantComposite %)" << typeID;
-				for (auto & id : vectorIDs)
-				TypeDefinition << LR"( %)" << id;
-				TypeDefinition << EndLine;*/
 				CodeGen.OpConstantComposite(CurrentID, typeID, vectorIDs);
 
 				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(CurrentID, Type, 0, typeID);
@@ -2290,10 +2396,6 @@ namespace Spire
 			{
 				int typeID = DefineType(Type);
 				++CurrentID;
-				/*FunctionBody << LR"(%)" << CurrentID << LR"( = OpCompositeConstruct %)" << typeID;
-				for (auto &arg : Arguments)
-				FunctionBody << LR"( %)" << arg;
-				FunctionBody << EndLine;*/
 				CodeGen.OpCompositeConstruct(CurrentID, typeID, Arguments);
 				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(CurrentID, Type, op, typeID);
 				UpdateValue(op, CurrentID);
@@ -2304,8 +2406,6 @@ namespace Spire
 			{
 				int baseTypeID = DefineType(baseType);
 				++CurrentID;
-				/*FunctionBody << LR"(%)" << CurrentID << LR"( = OpCompositeExtract %)" << baseTypeID << LR"( %)" << ID
-				<< LR"( )" << index << EndLine;*/
 				CodeGen.OpCompositeExtract(CurrentID, baseTypeID, ID, index);
 				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(CurrentID, baseType, 0, baseTypeID);
 				return CurrentID;
@@ -2358,12 +2458,12 @@ namespace Spire
 
 				if (indexID == -1) {
 					//indexID == -1 && index != -1
-					indexID = AddInstrConstantInt(GetBasicTypeFromString(L"int"), index);
+					indexID = AddInstrConstantInt(index);
 				}
 
 				if (index != -1)
 				{
-					variableName = IDInfos[ID]().GetName() + L"[" + index + L"]";
+					variableName = IDInfos[ID]().GetVariableName() + L"[" + index + L"]";
 				}
 
 				RefPtr<ILType> TypeIL = IDInfos[ID]().GetILType();
@@ -2409,10 +2509,11 @@ namespace Spire
 				return CurrentID;
 			}
 
-			int AddInstrAccessChain_StructMember(ILOperand *op, RefPtr<ILType> Type, int ID, int indexID, int index)
+			int AddInstrAccessChain_StructMember(ILOperand *op, int ID, int indexID, int index)
 			{
-				if (!Type)
-					throw InvalidProgramException(L"empty type in AddInstrAccessChain_StructMember()");
+				if (indexID == -1)
+					indexID = AddInstrConstantInt(index);
+				RefPtr<ILType> Type = IDInfos[ID]().GetILType();
 				ILStructType * structType = dynamic_cast<ILStructType*>(Type.Ptr());
 				RefPtr<ILType> memberBasetypeIL = structType->Members[index].Type;
 				int memberTypeID = DefineTypePointer(memberBasetypeIL, IDInfos[ID]().GetStorageClass());
@@ -2448,8 +2549,8 @@ namespace Spire
 				{
 					return member.FieldName == memberName;
 				});
-				int indexID = AddInstrConstantInt(GetBasicTypeFromString(L"int"), index);
-				return AddInstrAccessChain_StructMember(op, IDInfos[structID]().GetILType(), structID, indexID, index);
+				int indexID = AddInstrConstantInt(index);
+				return AddInstrAccessChain_StructMember(op, structID, indexID, index);
 			}
 
 			int AddInstrAccessChain_StructMember(ILOperand *op, int structID, String memberName)
@@ -2461,8 +2562,8 @@ namespace Spire
 				{
 					return member.FieldName == memberName;
 				});
-				int indexID = AddInstrConstantInt(GetBasicTypeFromString(L"int"), index);
-				return AddInstrAccessChain_StructMember(op, IDInfos[structID]().GetILType(), structID, indexID, index);
+				int indexID = AddInstrConstantInt(index);
+				return AddInstrAccessChain_StructMember(op, structID, indexID, index);
 			}
 
 			int AddInstrAccessChain_ArrayMember(ILOperand *op, RefPtr<ILType> Type, int ID, int indexID)
@@ -2509,10 +2610,6 @@ namespace Spire
 				if (targetID == -1)
 					return -1;
 				int typeID = IDInfos[targetID]().GetBaseTypeID();
-				/*
-				FunctionBody << LR"(%)" << CurrentID << LR"( = OpLoad %)" << typeID << LR"( %)"
-				<< variableID << LR"( )" << MemoryAccessToString(ma) << EndLine;
-				*/
 				++CurrentID;
 				CodeGen.OpLoad(CurrentID, typeID, targetID, ma);
 				IDInfos[CurrentID]
@@ -2527,11 +2624,9 @@ namespace Spire
 
 			int AddInstrINotEqual(int id0, int id1)
 			{
-				RefPtr<ILType> typeIL = GetBasicTypeFromString(L"bool");
+				RefPtr<ILType> typeIL = GetTypeFromString(L"bool");
 				int typeID = DefineType(typeIL);
 				++CurrentID;
-				/*FunctionBody << LR"(%)" << CurrentID << LR"( = OpINotEqual %)"
-				<< typeID << LR"( %)" << id0 << LR"( %)" << id1 << EndLine;*/
 				CodeGen.OpINotEqual(CurrentID, typeID, id0, id1);
 				IDInfos[CurrentID]
 					= IDInfo::CreateIDInfoForValue(
@@ -2552,7 +2647,7 @@ namespace Spire
 				int GradX = -1,
 				int GradY = -1)
 			{
-				RefPtr<ILType> typeIL = GetBasicTypeFromString(L"vec4");
+				RefPtr<ILType> typeIL = GetTypeFromString(L"vec4");
 				int typeID = DefineType(typeIL);
 
 				++CurrentID;
@@ -2564,7 +2659,7 @@ namespace Spire
 				else
 				{
 					//explicit LOD
-					int zeroID = AddInstrConstantInt(GetBasicTypeFromString(L"int"), 0);
+					int zeroID = AddInstrConstantInt(0);
 					CodeGen.OpImageSampleExplicitLod(CurrentID, typeID, textureID, coordinateID, zeroID, Bias, GradX, GradY);
 				}
 				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(
@@ -2584,7 +2679,7 @@ namespace Spire
 				int coordinateID, 
 				ExecutionModel currentExecutionModel) 
 			{
-				RefPtr<ILType> typeIL = GetBasicTypeFromString(L"vec4");
+				RefPtr<ILType> typeIL = GetTypeFromString(L"vec4");
 				int typeID = DefineType(typeIL);
 
 				int veclen = IDInfos[coordinateID]().GetILType()->GetVectorSize();
@@ -2599,7 +2694,7 @@ namespace Spire
 				else
 				{
 					//explicit LOD
-					int zeroID = AddInstrConstantInt(GetBasicTypeFromString(L"int"), 0);
+					int zeroID = AddInstrConstantInt(0);
 					CodeGen.OpImageSampleDrefExplicitLod(CurrentID, typeID, textureID, coordinateID, DrefID, zeroID);
 				}
 				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(
@@ -2619,7 +2714,7 @@ namespace Spire
 				int coordinateID,	////coordinateID: u, v, depth, q
 				ExecutionModel currentExecutionModel)
 			{
-				RefPtr<ILType> typeIL = GetBasicTypeFromString(L"vec4");
+				RefPtr<ILType> typeIL = GetTypeFromString(L"vec4");
 				int typeID = DefineType(typeIL);
 
 				int DrefID = AddInstrCompositeExtract(coordinateID, GetTypeFromString(L"float"), 2);
@@ -2635,7 +2730,7 @@ namespace Spire
 				else
 				{
 					//explicit LOD
-					int zeroID = AddInstrConstantInt(GetBasicTypeFromString(L"int"), 0);
+					int zeroID = AddInstrConstantInt(0);
 					CodeGen.OpImageSampleProjDrefExplicitLod(CurrentID, typeID, textureID, NewCoordinateID, DrefID, zeroID);
 				}
 				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(
@@ -2649,122 +2744,165 @@ namespace Spire
 				return CurrentID;
 			}
 
-			void AddInstrConvertSToF(int ID, int destTypeID, int operandID) {
-				CodeGen.OpConvertSToF(ID, destTypeID, operandID);
-				IDInfos[ID] = IDInfo::CreateIDInfoForValue(
-					ID,
-					IDInfos[destTypeID]().GetILType(), 
-					0, 
-					destTypeID
-				);
-			}
-
-			void AddInstrConvertFToS(int ID, int destTypeID, int operandID) {
-				CodeGen.OpConvertFToS(ID, destTypeID, operandID);
-				IDInfos[ID] = IDInfo::CreateIDInfoForValue(
-					ID,
-					IDInfos[destTypeID]().GetILType(),
-					0,
-					destTypeID
-				);
-			}
-
-			void AddInstrConvertUToF(int ID, int destTypeID, int operandID) {
-				CodeGen.OpConvertUToF(ID, destTypeID, operandID);
-				IDInfos[ID] = IDInfo::CreateIDInfoForValue(
-					ID,
-					IDInfos[destTypeID]().GetILType(),
-					0,
-					destTypeID
-				);
-			}
-
-			void AddInstrConvertFToU(int ID, int destTypeID, int operandID) {
-				CodeGen.OpConvertFToU(ID, destTypeID, operandID);
-				IDInfos[ID] = IDInfo::CreateIDInfoForValue(
-					ID,
-					IDInfos[destTypeID]().GetILType(),
-					0,
-					destTypeID
-				);
-			}
-
-			void AddInstrConvertSToU(int ID, int destTypeID, int operandID) {
-				CodeGen.OpBitCast(ID, destTypeID, operandID);
-				IDInfos[ID] = IDInfo::CreateIDInfoForValue(
-					ID,
-					IDInfos[destTypeID]().GetILType(),
-					0,
-					destTypeID
-				);
-			}
-
-			void AddInstrConvertUToS(int ID, int destTypeID, int operandID) {
-				CodeGen.OpBitCast(ID, destTypeID, operandID);
-				IDInfos[ID] = IDInfo::CreateIDInfoForValue(
-					ID,
-					IDInfos[destTypeID]().GetILType(),
-					0,
-					destTypeID
-				);
-			}
-
-			void AddInstrFunctionCall(ILOperand *op, int ID, int typeID, int funcID, List<int> &args)
+			int AddInstrConvertSToF(int destTypeID, int operandID)
 			{
-				CodeGen.OpFunctionCall(ID, typeID, funcID, args); 
-				IDInfos[ID] = IDInfo::CreateIDInfoForValue(
-					ID,
+				++CurrentID;
+				CodeGen.OpConvertSToF(CurrentID, destTypeID, operandID);
+				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(
+					CurrentID,
+					IDInfos[destTypeID]().GetILType(),
+					0,
+					destTypeID
+				);
+				return CurrentID;
+			}
+
+			int AddInstrConvertFToS(int destTypeID, int operandID)
+			{
+				++CurrentID;
+				CodeGen.OpConvertFToS(CurrentID, destTypeID, operandID);
+				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(
+					CurrentID,
+					IDInfos[destTypeID]().GetILType(),
+					0,
+					destTypeID
+				);
+				return CurrentID;
+			}
+
+			int AddInstrConvertUToF(int destTypeID, int operandID)
+			{
+				++CurrentID;
+				CodeGen.OpConvertUToF(CurrentID, destTypeID, operandID);
+				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(
+					CurrentID,
+					IDInfos[destTypeID]().GetILType(),
+					0,
+					destTypeID
+				);
+				return CurrentID;
+			}
+
+			int AddInstrConvertFToU(int destTypeID, int operandID)
+			{
+				++CurrentID;
+				CodeGen.OpConvertFToU(CurrentID, destTypeID, operandID);
+				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(
+					CurrentID,
+					IDInfos[destTypeID]().GetILType(),
+					0,
+					destTypeID
+				);
+				return CurrentID;
+			}
+
+			int AddInstrConvertSToU(int destTypeID, int operandID)
+			{
+				++CurrentID;
+				CodeGen.OpBitCast(CurrentID, destTypeID, operandID);
+				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(
+					CurrentID,
+					IDInfos[destTypeID]().GetILType(),
+					0,
+					destTypeID
+				);
+				return CurrentID;
+			}
+
+			int AddInstrConvertUToS(int destTypeID, int operandID) 
+			{
+				++CurrentID;
+				CodeGen.OpBitCast(CurrentID, destTypeID, operandID);
+				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(
+					CurrentID,
+					IDInfos[destTypeID]().GetILType(),
+					0,
+					destTypeID
+				);
+				return CurrentID;
+			}
+
+			int AddInstrBitcast(int destTypeID, int operandID)
+			{
+				++CurrentID;
+				CodeGen.OpBitCast(CurrentID, destTypeID, operandID);
+				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(
+					CurrentID,
+					IDInfos[destTypeID]().GetILType(),
+					0,
+					destTypeID
+				);
+				return CurrentID;
+			}
+
+			int AddInstrFunctionCall(ILOperand *op, int typeID, int funcID, List<int> &args)
+			{
+				++CurrentID;
+				CodeGen.OpFunctionCall(CurrentID, typeID, funcID, args);
+				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(
+					CurrentID,
 					IDInfos[typeID]().GetILType(),
 					op,
 					typeID
 				);
-				UpdateValue(op, ID);
+				UpdateValue(op, CurrentID);
+				return CurrentID;
 			}
 
-			void AddInstrFnegate(ILOperand *op, int ID, int typeID, int valueID) {
-				CodeGen.OpFNegate(ID, typeID, valueID);
-				IDInfos[ID] = IDInfo::CreateIDInfoForValue(
-					ID, 
+			int AddInstrFnegate(ILOperand *op, int typeID, int valueID)
+			{
+				++CurrentID;
+				CodeGen.OpFNegate(CurrentID, typeID, valueID);
+				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(
+					CurrentID,
 					IDInfos[typeID]().GetILType(),
 					op, 
 					typeID
 				);
-				UpdateValue(op, ID);
+				UpdateValue(op, CurrentID);
+				return CurrentID;
 			}
 
-			void AddInstrSnegate(ILOperand *op, int ID, int typeID, int valueID) {
-				CodeGen.OpSNegate(ID, typeID, valueID);
-				IDInfos[ID] = IDInfo::CreateIDInfoForValue(
-					ID,
-					IDInfos[typeID]().GetILType(),
-					op,
-					typeID
-				);
-				UpdateValue(op, ID);
-			}
-
-			void AddInstrNot(ILOperand *op, int ID, int typeID, int valueID)
+			int AddInstrSnegate(ILOperand *op, int typeID, int valueID)
 			{
-				CodeGen.OpNot(ID, typeID, valueID);
-				IDInfos[ID] = IDInfo::CreateIDInfoForValue(
-					ID,
+				++CurrentID;
+				CodeGen.OpSNegate(CurrentID, typeID, valueID);
+				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(
+					CurrentID,
 					IDInfos[typeID]().GetILType(),
 					op,
 					typeID
 				);
-				UpdateValue(op, ID);
+				UpdateValue(op, CurrentID);
+				return CurrentID;
 			}
 
-			void AddInstrLogicalNot(ILOperand *op, int ID, int typeID, int valueID)
+			int AddInstrNot(ILOperand *op, int typeID, int valueID)
 			{
-				CodeGen.OpLogicalNot(ID, typeID, valueID);
-				IDInfos[ID] = IDInfo::CreateIDInfoForValue(
-					ID,
+				++CurrentID;
+				CodeGen.OpNot(CurrentID, typeID, valueID);
+				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(
+					CurrentID,
 					IDInfos[typeID]().GetILType(),
 					op,
 					typeID
 				);
-				UpdateValue(op, ID);
+				UpdateValue(op, CurrentID);
+				return CurrentID;
+			}
+
+			int AddInstrLogicalNot(ILOperand *op, int typeID, int valueID)
+			{
+				++CurrentID;
+				CodeGen.OpLogicalNot(CurrentID, typeID, valueID);
+				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(
+					CurrentID,
+					IDInfos[typeID]().GetILType(),
+					op,
+					typeID
+				);
+				UpdateValue(op, CurrentID);
+				return CurrentID;
 			}
 
 			int AddInstrMatrixTimesScalar(ILOperand *op, int ID0, int ID1)
@@ -2839,10 +2977,10 @@ namespace Spire
 				int typeID = IDInfos[operandID]().GetTypeID();  //shoudl be float 
 				RefPtr<ILType> typeIL = IDInfos[operandID]().GetILType();
 
-				int mul_ID = AddInstrConstantFloat(GetBasicTypeFromString(L"float"), mul);
+				int mul_ID = AddInstrConstantFloat(mul);
 				mul_ID = ConvertBasicType(mul_ID, IDInfos[mul_ID]().GetILType(), IDInfos[operandID]().GetILType());
 
-				int add_ID = AddInstrConstantFloat(GetBasicTypeFromString(L"float"), add);
+				int add_ID = AddInstrConstantFloat(add);
 				add_ID = ConvertBasicType(add_ID, IDInfos[add_ID]().GetILType(), IDInfos[operandID]().GetILType());
 
 				++CurrentID;
@@ -2866,9 +3004,9 @@ namespace Spire
 				if (dstType->IsBool())
 				{
 					if (srcType->IsInt())
-						return AddInstrINotEqual(operandID, AddInstrConstantInt(GetBasicTypeFromString(L"int"), 0));
+						return AddInstrINotEqual(operandID, AddInstrConstantInt(0));
 					if (srcType->IsUInt())
-						return AddInstrINotEqual(operandID, AddInstrConstantUInt(GetBasicTypeFromString(L"uint"), 0));
+						return AddInstrINotEqual(operandID, AddInstrConstantUInt(0));
 					throw NotImplementedException(L"only convert int to bool in ConvertBasicType(): " + srcType->ToString());
 				}
 
@@ -2904,11 +3042,11 @@ namespace Spire
 								if (i == srcType->GetVectorSize())
 								{
 									if (srcType->IsInt() || srcType->IsIntVector())
-										extraID = AddInstrConstantInt(new ILBasicType(ILBaseType::Int), 0);
+										extraID = AddInstrConstantInt(0);
 									else if (srcType->IsUInt() || srcType->IsUIntVector())
-										extraID = AddInstrConstantUInt(new ILBasicType(ILBaseType::UInt), 0);
+										extraID = AddInstrConstantUInt(0);
 									else
-										extraID = AddInstrConstantFloat(new ILBasicType(ILBaseType::Float), 0.0);
+										extraID = AddInstrConstantFloat(0.0);
 								}
 								arguments.Add(extraID);
 							}
@@ -2963,23 +3101,20 @@ namespace Spire
 				bool dstUint = dstType->IsUInt() || dstType->IsUIntVector();
 
 				int destTypeID = DefineType(dstType);
-				++CurrentID;
 				if (srcInt && dstFloat)
-					AddInstrConvertSToF(CurrentID, destTypeID, operandID);
+					return AddInstrConvertSToF(destTypeID, operandID);
 				else if (srcFloat && dstInt)
-					AddInstrConvertFToS(CurrentID, destTypeID, operandID);
+					return AddInstrConvertFToS(destTypeID, operandID);
 				else if (srcUint && dstFloat)
-					AddInstrConvertUToF(CurrentID, destTypeID, operandID);
+					return AddInstrConvertUToF(destTypeID, operandID);
 				else if (srcFloat && dstUint)
-					AddInstrConvertFToU(CurrentID, destTypeID, operandID);
+					return AddInstrConvertFToU(destTypeID, operandID);
 				else if (srcInt && dstUint)
-					AddInstrConvertSToU(CurrentID, destTypeID, operandID);
+					return AddInstrConvertSToU(destTypeID, operandID);
 				else if (srcUint && dstInt)
-					AddInstrConvertUToS(CurrentID, destTypeID, operandID);
+					return AddInstrConvertUToS(destTypeID, operandID);
 				else
 					throw NotImplementedException(L"can not convert " + srcType->ToString() + L" to " + dstType->ToString());
-
-				return CurrentID;
 			}
 
 			void AddInstrSelectionMerge(int MergeLabel) {
@@ -3056,8 +3191,9 @@ namespace Spire
 				CodeGen.OpFunction(funcID, returnTypeID, funcTypeID);
 			}
 
-			void AddInstrFunctionParameter(ILOperand *op, int paramID, int typeID, String DebugName)
+			void AddInstrFunctionParameter(ILOperand *op, int typeID, String DebugName)
 			{
+				int paramID = ++CurrentID;
 				CodeGen.OpName(paramID, DebugName);
 				CodeGen.OpFunctionParameter(paramID, typeID);
 				IDInfos[paramID] = IDInfo::CreateIDInfoForPointer(
@@ -3087,12 +3223,12 @@ namespace Spire
 				CodeGen.OpEntryPoint(EM, entryID, interfaceIDs);
 			}
 
-			void AddInstrExecutionMode(int ID, ExecutionMode EM) 
+			void AddInstrExecutionMode(int ID, ExecutionMode mode, int op1 = -1, int op2 = -1, int op3 = -1) 
 			{
-				CodeGen.OpExecutionMode(ID, EM);
+				CodeGen.OpExecutionMode(ID, mode, op1, op2, op3);
 			}
 
-			void AddInstrDot(ILOperand *op, RefPtr<ILType> typeIL, int ID0, int ID1)
+			int AddInstrDot(ILOperand *op, RefPtr<ILType> typeIL, int ID0, int ID1)
 			{
 				int typeID = DefineType(typeIL);
 				++CurrentID;
@@ -3104,9 +3240,10 @@ namespace Spire
 					typeID
 				);
 				UpdateValue(op, CurrentID);
+				return CurrentID;
 			}
 
-			void AddInstrTranspose(ILOperand *op, RefPtr<ILType> typeIL, int ID)
+			int AddInstrTranspose(ILOperand *op, RefPtr<ILType> typeIL, int ID)
 			{
 				int typeID = DefineType(typeIL);
 				++CurrentID;
@@ -3118,9 +3255,10 @@ namespace Spire
 					typeID
 				);
 				UpdateValue(op, CurrentID);
+				return CurrentID;
 			}
 
-			void AddInstrDFdx(ILOperand *op, RefPtr<ILType> typeIL, int ID)
+			int AddInstrDFdx(ILOperand *op, RefPtr<ILType> typeIL, int ID)
 			{
 				int typeID = DefineType(typeIL);
 				++CurrentID;
@@ -3132,9 +3270,10 @@ namespace Spire
 					typeID
 				);
 				UpdateValue(op, CurrentID);
+				return CurrentID;
 			}
 
-			void AddInstrDFdy(ILOperand *op, RefPtr<ILType> typeIL, int ID)
+			int AddInstrDFdy(ILOperand *op, RefPtr<ILType> typeIL, int ID)
 			{
 				int typeID = DefineType(typeIL);
 				++CurrentID;
@@ -3146,9 +3285,10 @@ namespace Spire
 					typeID
 				);
 				UpdateValue(op, CurrentID);
+				return CurrentID;
 			}
 
-			void AddInstrFwidth(ILOperand *op, RefPtr<ILType> typeIL, int ID)
+			int AddInstrFwidth(ILOperand *op, RefPtr<ILType> typeIL, int ID)
 			{
 				int typeID = DefineType(typeIL);
 				++CurrentID;
@@ -3160,6 +3300,7 @@ namespace Spire
 					typeID
 				);
 				UpdateValue(op, CurrentID);
+				return CurrentID;
 			}
 
 			void ProduceFunction()
@@ -3178,27 +3319,18 @@ namespace Spire
 			}
 		};
 
-		class SpirVCodeGen : public CodeGenBackend
-		{
-			String vertexOutputName;
-			CompiledWorld * currentWorld = nullptr;
-			EnumerableDictionary<String, String> backendArguments;
-			CodeGenContext_SPIRV ctx;
 
-		public:
-			
-			String GetFuncOriginalName(const String & name)
-			{
-				String originalName;
-				int splitPos = name.IndexOf(L'@');
-				if (splitPos == 0)
-					return name;
-				if (splitPos != -1)
-					originalName = name.SubString(0, splitPos);
-				else
-					originalName = name;
-				return originalName;
-			}
+
+		class SpirvModule
+		{
+		private:
+			SpirVCodeGenContext ctx;
+			ExecutionModel currentExecutionModel;
+			List<int> interfaceIDs;
+			bool DepthReplacing;
+			bool LocalSize;
+			bool BufferImportOrExport;
+			CompiledWorld * currentWorld;
 
 			int GetOperandValue(ILOperand * op)
 			{
@@ -3208,65 +3340,65 @@ namespace Spire
 					auto type = c->Type.Ptr();
 					if (type->IsFloat())
 					{
-						id = ctx.AddInstrConstantFloat(op->Type, c->FloatValues[0]);
+						id = ctx.AddInstrConstantFloat(c->FloatValues[0]);
 					}
 					else if (type->IsInt())
 					{
-						id = ctx.AddInstrConstantInt(op->Type, c->IntValues[0]);
+						id = ctx.AddInstrConstantInt(c->IntValues[0]);
 					}
 					else if (type->IsUInt())
 					{
-						id = ctx.AddInstrConstantUInt(op->Type, *((unsigned int*)(&c->IntValues[0])));
+						id = ctx.AddInstrConstantUInt(*((unsigned int*)(&c->IntValues[0])));
 					}
 					else if (auto baseType = dynamic_cast<ILBasicType*>(type))
 					{
 						if (baseType->Type == ILBaseType::Float2)
 						{
-							id = ctx.AddInstrConstantCompositeFloat(op->Type, c->FloatValues, 2);
+							id = ctx.AddInstrConstantCompositeFloat(c->FloatValues, 2);
 						}
 						else if (baseType->Type == ILBaseType::Float3)
 						{
-							id = ctx.AddInstrConstantCompositeFloat(op->Type, c->FloatValues, 3);
+							id = ctx.AddInstrConstantCompositeFloat(c->FloatValues, 3);
 						}
 						else if (baseType->Type == ILBaseType::Float4)
 						{
-							id = ctx.AddInstrConstantCompositeFloat(op->Type, c->FloatValues, 4);
+							id = ctx.AddInstrConstantCompositeFloat(c->FloatValues, 4);
 						}
 						else if (baseType->Type == ILBaseType::Float3x3)
 						{
-							id = ctx.AddInstrConstantMatrix(op->Type, c->FloatValues, 3);
+							id = ctx.AddInstrConstantMatrix(c->FloatValues, 3);
 						}
 						else if (baseType->Type == ILBaseType::Float4x4)
 						{
-							id = ctx.AddInstrConstantMatrix(op->Type, c->FloatValues, 4);
+							id = ctx.AddInstrConstantMatrix(c->FloatValues, 4);
 						}
 						else if (baseType->Type == ILBaseType::Int2)
 						{
-							id = ctx.AddInstrConstantCompositeInt(op->Type, c->IntValues, 2);
+							id = ctx.AddInstrConstantCompositeInt(c->IntValues, 2);
 						}
 						else if (baseType->Type == ILBaseType::Int3)
 						{
-							id = ctx.AddInstrConstantCompositeInt(op->Type, c->IntValues, 3);
+							id = ctx.AddInstrConstantCompositeInt(c->IntValues, 3);
 						}
 						else if (baseType->Type == ILBaseType::Int4)
 						{
-							id = ctx.AddInstrConstantCompositeInt(op->Type, c->IntValues, 4);
+							id = ctx.AddInstrConstantCompositeInt(c->IntValues, 4);
 						}
 						else if (baseType->Type == ILBaseType::UInt2)
 						{
-							id = ctx.AddInstrConstantCompositeUInt(op->Type, c->IntValues, 2);
+							id = ctx.AddInstrConstantCompositeUInt((unsigned int*)c->IntValues, 2);
 						}
 						else if (baseType->Type == ILBaseType::UInt3)
 						{
-							id = ctx.AddInstrConstantCompositeUInt(op->Type, c->IntValues, 3);
+							id = ctx.AddInstrConstantCompositeUInt((unsigned int*)c->IntValues, 3);
 						}
 						else if (baseType->Type == ILBaseType::UInt4)
 						{
-							id = ctx.AddInstrConstantCompositeUInt(op->Type, c->IntValues, 4);
+							id = ctx.AddInstrConstantCompositeUInt((unsigned int*)c->IntValues, 4);
 						}
 						else if (baseType->Type == ILBaseType::Bool)
 						{
-							id = ctx.AddInstrConstantBool(op->Type, c->IntValues[0]);
+							id = ctx.AddInstrConstantBool(c->IntValues[0]);
 						}
 					}
 					else
@@ -3362,7 +3494,7 @@ namespace Spire
 								);
 								return;
 							}
-							else 
+							else
 							{
 								//__intrinsic vec4 texture(samplerCube tex, vec3 coord, float bias);
 								ctx.AddInstrTexture(
@@ -3379,7 +3511,7 @@ namespace Spire
 					else
 					{
 						//instr->Arguments[0]->Type->IsShadowTexture
-							
+
 						//__intrinsic float texture(sampler2DShadow tex, vec3 coord);
 						//__intrinsic float texture(samplerCubeShadow tex, vec4 coord);
 						ctx.AddInstrTextureShadow(
@@ -3418,13 +3550,13 @@ namespace Spire
 							GetOperandValue(instr->Arguments[0].Ptr()),
 							GetOperandValue(instr->Arguments[1].Ptr()),
 							currentExecutionModel
-							);
+						);
 						return;
 					}
 				}
 
 				//------------------------- Dot Instruction ------------------------------
-				if (callName == L"dot" 
+				if (callName == L"dot"
 					&& instr->Arguments.Count() == 2
 					&& instr->Arguments[0]->Type->ToString() == instr->Arguments[1]->Type->ToString()
 					&& instr->Arguments[0]->Type->IsFloatVector()
@@ -3470,18 +3602,17 @@ namespace Spire
 					RefPtr<ILType> returnType = ctx.IDInfos[
 						ctx.FunctionNameToFunctionTypeID[instr->Function]()
 					]().GetFunc()->ReturnType;
-					int typeID = ctx.DefineType(returnType);
-					List<int> args;
-					for (auto & arg : instr->Arguments) {
-						int valueID = GetOperandValue(arg.Ptr());
-						int paramID = ctx.AddInstrVariableDeclaration(0, arg->Type, StorageClass::Function, L"param");
-						// the name of the parameter must be empty; or may conflict with non-param variables
-						ctx.AddInstrStore(0, paramID, valueID);
-						args.Add(paramID);
-					}
-					++ctx.CurrentID;
-					ctx.AddInstrFunctionCall((ILOperand*)instr, ctx.CurrentID, typeID, funcID, args);
-					return;
+						int typeID = ctx.DefineType(returnType);
+						List<int> args;
+						for (auto & arg : instr->Arguments) {
+							int valueID = GetOperandValue(arg.Ptr());
+							int paramID = ctx.AddInstrVariableDeclaration(0, arg->Type, StorageClass::Function, L"param");
+							// the name of the parameter must be empty; or may conflict with non-param variables
+							ctx.AddInstrStore(0, paramID, valueID);
+							args.Add(paramID);
+						}
+						ctx.AddInstrFunctionCall((ILOperand*)instr, typeID, funcID, args);
+						return;
 				}
 
 				//------------------------- ext-import  instructions -----------------------------
@@ -3506,7 +3637,7 @@ namespace Spire
 
 				//------------------------- built-in constructors -----------------------------
 
-				RefPtr<ILType> dstType = GetBasicTypeFromString(callName);
+				RefPtr<ILType> dstType = GetTypeFromString(callName);
 				if (dstType == nullptr)
 					throw InvalidOperationException(L"can not call: " + callName);
 				RefPtr<ILBasicType> dstBasicType = dstType;
@@ -3533,7 +3664,7 @@ namespace Spire
 						int diff = n * n - Arguments.Count();
 						if (diff > 0)
 							for (int i = 0; i < diff; i++)
-								Arguments.Add(ctx.AddInstrConstantFloat(GetBasicTypeFromString(L"float"), 0.0));
+								Arguments.Add(ctx.AddInstrConstantFloat(0.0));
 						List<int> newArguments;
 						RefPtr<ILType> vectorType = new ILBasicType(ILBaseType(ILBaseType::Float + n - 1));
 						for (int i = 0; i < n; i++)
@@ -3570,7 +3701,7 @@ namespace Spire
 				}
 
 				if (instr->Is<NotInstruction>())
-					instr->Type = GetBasicTypeFromString(L"bool");
+					instr->Type = GetTypeFromString(L"bool");
 
 				int op0ValueID = GetOperandValue(op0);
 				op0ValueID = ctx.ConvertBasicType(op0ValueID, ctx.IDInfos[op0ValueID]().GetILType(), instr->Type);
@@ -3583,29 +3714,22 @@ namespace Spire
 				}
 
 				int instrTypeID = ctx.DefineType(instr->Type);
-				//must be put before `++ctx.CurrentID`
 
-				++ctx.CurrentID;
 				if (instr->Is<NegInstruction>())
 				{
 					if (op0ILType->IsFloat() || op0ILType->IsFloatVector())
-						ctx.AddInstrFnegate((ILOperand*)instr, ctx.CurrentID, instrTypeID, op0ValueID);
+						ctx.AddInstrFnegate((ILOperand*)instr, instrTypeID, op0ValueID);
 					else if (op0ILType->IsInt() || op0ILType->IsIntVector())
-						ctx.AddInstrSnegate((ILOperand*)instr, ctx.CurrentID, instrTypeID, op0ValueID);
+						ctx.AddInstrSnegate((ILOperand*)instr, instrTypeID, op0ValueID);
 					else if (op0ILType->IsUInt() || op0ILType->IsUIntVector())
 						throw InvalidOperationException(L"trying to negate a uint in PrintUnaryInstruction(): " + instr->ToString());
 				}
 				else if (instr->Is<BitNotInstruction>())
-					ctx.AddInstrNot((ILOperand*)instr, ctx.CurrentID, instrTypeID, op0ValueID);
+					ctx.AddInstrNot((ILOperand*)instr, instrTypeID, op0ValueID);
 				else if (instr->Is<NotInstruction>())
-					ctx.AddInstrLogicalNot((ILOperand*)instr, ctx.CurrentID, instrTypeID, op0ValueID);
+					ctx.AddInstrLogicalNot((ILOperand*)instr, instrTypeID, op0ValueID);
 				else
 					throw InvalidProgramException(L"unsupported unary instruction.");
-
-				/*
-				ctx.FunctionBody << LR"(%)" << ctx.CurrentID << LR"( = Op)";
-				ctx.FunctionBody << LR"( %)" << instrTypeID << LR"( %)" << op0ValueID << EndLine;
-				*/
 			}
 
 			void PrintBinaryInstr(BinaryInstruction * instr)
@@ -3623,9 +3747,9 @@ namespace Spire
 						int index = 0;
 						for (int i = 0; i < structType->Members.Count(); i++)
 						{
-							int indexID = ctx.AddInstrConstantInt(GetTypeFromString(L"int"), index);
-							int dest = ctx.AddInstrAccessChain_StructMember(0, op0->Type, op0ID, indexID, index);
-							int pSrc = ctx.AddInstrAccessChain_StructMember(0, op1->Type, op1ID, indexID, index);
+							int indexID = ctx.AddInstrConstantInt(index);
+							int dest = ctx.AddInstrAccessChain_StructMember(0, op0ID, indexID, index);
+							int pSrc = ctx.AddInstrAccessChain_StructMember(0, op1ID, indexID, index);
 							int vSrc = ctx.AddInstrLoad(pSrc, MemoryAccess::None);
 							ctx.AddInstrStore(0, dest, vSrc);
 							index++;
@@ -3636,7 +3760,7 @@ namespace Spire
 					int op0ID = ctx.FindVariableID(op0); // should be a pointer 
 					int op1ID = GetOperandValue(op1);
 					op1ID = ctx.ConvertBasicType(op1ID, ctx.IDInfos[op1ID]().GetILType(), ctx.IDInfos[op0ID]().GetILType());
-					ctx.AddInstrStore((ILOperand*)instr, op0ID, op1ID);
+					ctx.AddInstrStore(instr, op0ID, op1ID); //TO FIX
 					return;
 				}
 
@@ -3669,7 +3793,7 @@ namespace Spire
 						{
 							//index of struct must be constant
 							int indexID = GetOperandValue(c);
-							int memberID = ctx.AddInstrAccessChain_StructMember((ILOperand*)instr, op0->Type, fatherID, indexID, c->IntValues[0]);
+							int memberID = ctx.AddInstrAccessChain_StructMember((ILOperand*)instr, fatherID, indexID, c->IntValues[0]);
 							int retID = ctx.AddInstrLoad(memberID, MemoryAccess::None);
 							ctx.UpdateValue((ILOperand*)instr, retID);
 							return;
@@ -3703,7 +3827,7 @@ namespace Spire
 						if (ID1Type->IsFloatMatrix())
 							Swap(ID0, ID1);
 						//now ID0 is matrix, ID1 is scalar, 
-						ID1 = ctx.ConvertBasicType(ID1, ctx.IDInfos[ID1]().GetILType(), GetBasicTypeFromString(L"float"));
+						ID1 = ctx.ConvertBasicType(ID1, ctx.IDInfos[ID1]().GetILType(), GetTypeFromString(L"float"));
 						ctx.AddInstrMatrixTimesScalar((ILOperand*)instr, ID0, ID1);
 						return;
 					}
@@ -3746,22 +3870,22 @@ namespace Spire
 					RefPtr<ILType> OperandType = nullptr;
 					if (instr->Is<OrInstruction>() || instr->Is<AndInstruction>())
 					{
-						OperandType = GetBasicTypeFromString(L"bool");
+						OperandType = GetTypeFromString(L"bool");
 					}
 					else
 					{
 						if (ID0Type->IsFloat() || ID1Type->IsFloat())
-							OperandType = GetBasicTypeFromString(L"float");
+							OperandType = GetTypeFromString(L"float");
 						else if (ID0Type->IsUInt() || ID1Type->IsUInt())
-							OperandType = GetBasicTypeFromString(L"uint");
+							OperandType = GetTypeFromString(L"uint");
 						else if (ID0Type->IsInt() || ID1Type->IsInt())
-							OperandType = GetBasicTypeFromString(L"int");
+							OperandType = GetTypeFromString(L"int");
 					}
 
 					ID0 = ctx.ConvertBasicType(ID0, ID0Type, OperandType);
 					ID1 = ctx.ConvertBasicType(ID1, ID1Type, OperandType);
 
-					instr->Type = GetBasicTypeFromString(L"bool");
+					instr->Type = GetTypeFromString(L"bool");
 					ID0Type = ctx.IDInfos[ID0]().GetILType();
 					ID1Type = ctx.IDInfos[ID1]().GetILType();
 				}
@@ -3903,11 +4027,6 @@ namespace Spire
 
 				//---------------------------------------Generate Instrction---------------------------------------
 
-				//suppose origin operator string is xxx
-				// with needPrefix=F			  -->  xxx
-				// with needPrefix=T && Signed=F  -->  Fxxx (float) or Ixxx (int)
-				// with needPrefix=T && Signed=T  -->  Fxxx (float) or Sxxx (int)
-				//FunctionBody << LR"(%)" << CurrentID << LR"( = )";
 				String finalOpStr = LR"(Op)";
 				if (needPrefix)
 				{
@@ -3926,111 +4045,6 @@ namespace Spire
 				ctx.AddInstrBinaryInstr((ILOperand*)instr, instr->Type, finalOpStr, ID0, ID1);
 			}
 
-
-			void PrintExportInstr(ExportInstruction * instr)
-			{
-				String exportOpName = instr->ExportOperator;
-				if (exportOpName == L"fragmentExport")
-				{
-					CompiledComponent ccomp;
-					bool isNormal = false;
-					bool isDepthOutput = false;
-					if (currentWorld->LocalComponents.TryGetValue(instr->ComponentName, ccomp))
-					{
-						if (ccomp.Attributes.ContainsKey(L"Normal"))
-							isNormal = true;
-						if (ccomp.Attributes.ContainsKey(L"DepthOutput"))
-							isDepthOutput = true;
-					}
-					String exportName;
-					if (isDepthOutput)
-						exportName = L"gl_FragDepth";
-					else
-						exportName = instr->ComponentName;
-
-					int exportID = ctx.InterfaceNameToID[exportName];
-					if (exportID == -1)
-						throw InvalidOperationException(L"can not find component for export instruction for fragmentExport in PrintExportInstr(): " + exportName);
-
-					int operandID = GetOperandValue(instr->Operand.Ptr());
-					if (isNormal)
-						operandID = ctx.AddInstrMulAdd(operandID, 0.5, 0.5);
-
-					ctx.AddInstrStore((ILOperand*)instr, exportID, operandID);
-				}
-				else if (exportOpName == L"standardExport")
-				{
-					int storeID = ctx.AddInstrAccessChain_StructMember(0, ctx.InterfaceNameToID[currentWorld->WorldOutput->Name], instr->ComponentName);
-					ctx.AddInstrStore((ILOperand*)instr, storeID, GetOperandValue(instr->Operand.Ptr()));
-				}
-				else
-					throw InvalidOperationException(L"not valid export operator in PrintExportInstr(): " + exportOpName);
-			}
-
-			void PrintImportInstr(ImportInstruction * instr)
-			{
-				auto block = instr->SourceWorld->WorldOutput;
-
-				if (instr->ImportOperator->Name.Content == L"standardImport")
-				{
-					ctx.AddInstrAccessChain_StructMember(instr, ctx.InterfaceNameToID[block->Name], instr->ComponentName);
-				}
-
-				else if (instr->ImportOperator->Name.Content == L"vertexImport")
-				{
-					int componentID = ctx.InterfaceNameToID[instr->ComponentName];
-					if (componentID == -1)
-						throw InvalidOperationException(L"can not find import component for vertexImport in PrintImportInstr(): " + instr->ComponentName);
-					ctx.UpdateVariable(instr, componentID);
-				}
-
-				else if (instr->ImportOperator->Name.Content == L"uniformImport")
-				{
-					if (instr->Type->IsTexture())
-					{
-						int pointerID = ctx.InterfaceNameToID[instr->ComponentName];
-						if (pointerID == -1)
-							throw InvalidOperationException(L"can not find import component for uniformImport in PrintImportInstr(): " + instr->ComponentName);
-						ctx.UpdateVariable(instr, pointerID);
-					}
-					else
-					{
-						ctx.AddInstrAccessChain_StructMember(instr, ctx.InterfaceNameToID[block->Name], instr->ComponentName);
-					}
-				}
-
-				else if (instr->ImportOperator->Name.Content == L"textureImport")
-				{
-					int textureStorageID = ctx.InterfaceNameToID[instr->ComponentName];
-					int textureValueID = ctx.AddInstrLoad(textureStorageID, MemoryAccess::None);
-
-					int operandID = -1;
-					operandID = ctx.AddInstrTexture(
-						0,
-						textureValueID,
-						GetOperandValue(instr->Arguments[0].Ptr()),
-						currentExecutionModel
-					);
-
-					operandID = ctx.ConvertBasicType(
-						operandID,
-						ctx.IDInfos[operandID]().GetILType(),
-						instr->Type);
-					CompiledComponent ccomp;
-					if (instr->SourceWorld->LocalComponents.TryGetValue(instr->ComponentName, ccomp))
-					{
-						if (ccomp.Attributes.ContainsKey(L"Normal"))
-							operandID = ctx.AddInstrMulAdd(operandID, 2.0, -1.0);
-					}
-
-					int storeID = ctx.AddInstrVariableDeclaration((ILOperand*)instr, instr->Type, StorageClass::Function);
-					ctx.AddInstrStore((ILOperand*)instr, storeID, operandID);
-				}
-
-				else
-					throw NotImplementedException(L"import in PrintImportInstr(): " + instr->ImportOperator->Name.Content);
-			}
-
 			void PrintUpdateInstr(MemberUpdateInstruction * instr)
 			{
 				int variableID = ctx.AddInstrVariableDeclaration((ILOperand*)instr, instr->Operands[0]->Type, StorageClass::Function);
@@ -4047,7 +4061,7 @@ namespace Spire
 				{
 					auto c = dynamic_cast<ILConstOperand*>(instr->Operands[1].Ptr());
 					if (c)
-						memberID = ctx.AddInstrAccessChain_StructMember(0, typeIL, variableID, indexID, c->IntValues[0]);
+						memberID = ctx.AddInstrAccessChain_StructMember(0, variableID, indexID, c->IntValues[0]);
 					else
 						throw InvalidOperationException(L"index of struct must be const in PrintUpdateInstr(): " + instr->Operands[1]->ToString());
 				}
@@ -4078,7 +4092,7 @@ namespace Spire
 				ID0 = ctx.ConvertBasicType(
 					ID0,
 					ctx.IDInfos[ID0]().GetILType(),
-					GetBasicTypeFromString(L"bool"));
+					GetTypeFromString(L"bool"));
 
 				int TrueLabel = ++ctx.CurrentID;
 				int FalseLabel = ++ctx.CurrentID;
@@ -4110,6 +4124,278 @@ namespace Spire
 				}
 			}
 
+			void PrintExportInstr(ExportInstruction * instr)
+			{
+				String exportOpName = instr->ExportOperator;
+
+				if (exportOpName == L"fragmentExport")
+				{
+					CompiledComponent ccomp;
+					bool isNormal = false;
+					bool isDepthOutput = false;
+					if (currentWorld->LocalComponents.TryGetValue(instr->ComponentName, ccomp))
+					{
+						if (ccomp.Attributes.ContainsKey(L"Normal"))
+							isNormal = true;
+						if (ccomp.Attributes.ContainsKey(L"DepthOutput"))
+							isDepthOutput = true;
+					}
+					String exportName;
+					if (isDepthOutput)
+						exportName = L"gl_FragDepth";
+					else
+						exportName = instr->ComponentName;
+
+					int exportID = ctx.InterfaceNameToID[exportName];
+					if (exportID == -1)
+						throw InvalidOperationException(L"can not find component for export instruction for fragmentExport in PrintExportInstr(): " + exportName);
+
+					int operandID = GetOperandValue(instr->Operand.Ptr());
+					if (isNormal)
+						operandID = ctx.AddInstrMulAdd(operandID, 0.5, 0.5);
+
+					ctx.AddInstrStore((ILOperand*)instr, exportID, operandID);
+				}
+
+				else if (exportOpName == L"standardExport")
+				{
+					int storeID = ctx.AddInstrAccessChain_StructMember(0, ctx.InterfaceNameToID[L"blk" + currentWorld->WorldOutput->Name], instr->ComponentName);
+					ctx.AddInstrStore((ILOperand*)instr, storeID, GetOperandValue(instr->Operand.Ptr()));
+				}
+
+				else if (exportOpName == L"bufferExport")
+				{
+					auto & comp = currentWorld->WorldOutput->Entries[instr->ComponentName]();
+
+					auto UIntType = GetTypeFromString(L"uint");
+					auto FloatType = GetTypeFromString(L"float");
+					int GIIDx = ctx.AddInstrLoad(
+						ctx.AddInstrAccessChain_VectorMember(0, ctx.InterfaceNameToID[L"gl_GlobalInvocationID"], -1, 0),
+						MemoryAccess::None
+					);	//GlobalInvocationID.x
+					int baseIndex = ctx.AddInstrBinaryInstr(
+						0,
+						UIntType,
+						L"OpIMul",
+						GIIDx,
+						ctx.AddInstrConstantUInt(currentWorld->WorldOutput->Size / 4)
+					);
+					baseIndex = ctx.AddInstrBinaryInstr(
+						0,
+						UIntType,
+						L"OpIAdd",
+						baseIndex,
+						ctx.AddInstrConstantUInt(comp.Offset / 4)
+					);
+
+					RefPtr<ILType> compElementType =
+						(!comp.Type->IsIntegral())
+						? FloatType
+						: ((comp.Type->IsUInt() || comp.Type->IsUIntVector()) ? UIntType : GetTypeFromString(L"int"));
+
+					for (int i = 0; i < comp.Type->GetVectorSize(); i++)
+					{
+						int index = ctx.AddInstrBinaryInstr(
+							0,
+							UIntType,
+							L"OpIAdd",
+							baseIndex,
+							ctx.AddInstrConstantUInt(i)
+						);
+
+						int blockID = ctx.InterfaceNameToID[L"blk" + currentWorld->WorldOutput->Name];
+						int arrayID = ctx.AddInstrAccessChain_StructMember(0, blockID, -1, 0);
+						int storeID = ctx.AddInstrAccessChain_ArrayMember(
+							0,
+							ctx.IDInfos[arrayID]().GetILType(),
+							arrayID,
+							index
+						);
+
+						int valueID = -1;
+						if (instr->Operand->Type->GetVectorSize() > 1)
+							valueID = ctx.AddInstrLoad(
+								ctx.AddInstrAccessChain_VectorMember(0, GetOperandPointer(instr->Operand.Ptr()), -1, i),
+								MemoryAccess::None
+							);
+						else
+							valueID = ctx.AddInstrLoad(
+								GetOperandPointer(instr->Operand.Ptr()),
+								MemoryAccess::None
+							);
+
+						valueID = ctx.ConvertBasicType(valueID, ctx.IDInfos[valueID]().GetILType(), compElementType);
+
+						if (ctx.IDInfos[valueID]().GetILType()->IsIntegral())
+							valueID = ctx.AddInstrBitcast(ctx.DefineType(FloatType), valueID);
+
+						ctx.AddInstrStore(0, storeID, valueID);
+					}
+				}
+
+				else
+					throw InvalidOperationException(L"not valid export operator in PrintExportInstr(): " + exportOpName);
+			}
+
+			void PrintImportInstr(ImportInstruction * instr)
+			{
+				auto block = instr->SourceWorld->WorldOutput;
+
+				if (instr->ImportOperator->Name.Content == L"standardImport")
+				{
+					ctx.AddInstrAccessChain_StructMember(instr, ctx.InterfaceNameToID[L"blk" + block->Name], instr->ComponentName);
+				}
+
+				else if (instr->ImportOperator->Name.Content == L"vertexImport")
+				{
+					int componentID = ctx.InterfaceNameToID[instr->ComponentName];
+					if (componentID == -1)
+						throw InvalidOperationException(L"can not find import component for vertexImport in PrintImportInstr(): " + instr->ComponentName);
+					ctx.UpdateVariable(instr, componentID);
+				}
+
+				else if (instr->ImportOperator->Name.Content == L"uniformImport")
+				{
+					if (instr->Type->IsTexture())
+					{
+						int pointerID = ctx.InterfaceNameToID[instr->ComponentName];
+						if (pointerID == -1)
+							throw InvalidOperationException(L"can not find import component for uniformImport in PrintImportInstr(): " + instr->ComponentName);
+						ctx.UpdateVariable(instr, pointerID);
+					}
+					else
+					{
+						ctx.AddInstrAccessChain_StructMember(instr, ctx.InterfaceNameToID[L"blk" + block->Name], instr->ComponentName);
+					}
+				}
+
+				else if (instr->ImportOperator->Name.Content == L"textureImport")
+				{
+					int textureStorageID = ctx.InterfaceNameToID[instr->ComponentName];
+					int textureValueID = ctx.AddInstrLoad(textureStorageID, MemoryAccess::None);
+
+					int operandID = -1;
+					operandID = ctx.AddInstrTexture(
+						0,
+						textureValueID,
+						GetOperandValue(instr->Arguments[0].Ptr()),
+						currentExecutionModel
+					);
+
+					operandID = ctx.ConvertBasicType(
+						operandID,
+						ctx.IDInfos[operandID]().GetILType(),
+						instr->Type);
+					CompiledComponent ccomp;
+					if (instr->SourceWorld->LocalComponents.TryGetValue(instr->ComponentName, ccomp))
+					{
+						if (ccomp.Attributes.ContainsKey(L"Normal"))
+							operandID = ctx.AddInstrMulAdd(operandID, 2.0, -1.0);
+					}
+
+					int storeID = ctx.AddInstrVariableDeclaration((ILOperand*)instr, instr->Type, StorageClass::Function);
+					ctx.AddInstrStore((ILOperand*)instr, storeID, operandID);
+				}
+
+				else if (instr->ImportOperator->Name.Content == L"bufferImport")
+				{
+					//instr->Name[][] = 
+					//	*(int*/float*) 
+					//	( block->Name + block->Entries[instr->ComponentName].GetValue().Offset / 4 + i + gl_GlobalInvocationID.x * block->Size / 4 )
+
+					auto UIntType = GetTypeFromString(L"uint");
+					auto FloatType = GetTypeFromString(L"float");
+					int GIIDx = ctx.AddInstrLoad(
+						ctx.AddInstrAccessChain_VectorMember(0, ctx.InterfaceNameToID[L"gl_GlobalInvocationID"], -1, 0),
+						MemoryAccess::None
+					);	//GlobalInvocationID.x
+					int baseIndex = ctx.AddInstrBinaryInstr(
+						0,
+						UIntType,
+						L"OpIMul",
+						GIIDx,
+						ctx.AddInstrConstantUInt(block->Size / 4)
+					);
+					baseIndex = ctx.AddInstrBinaryInstr(
+						0,
+						UIntType,
+						L"OpIAdd",
+						baseIndex,
+						ctx.AddInstrConstantUInt(block->Entries[instr->ComponentName]().Offset / 4)
+					);
+
+					RefPtr<ILType> instrElementType =
+						(!instr->Type->IsIntegral())
+						? FloatType
+						: ((instr->Type->IsUInt() || instr->Type->IsUIntVector()) ? UIntType : GetTypeFromString(L"int"));
+
+					int vecSize = instr->Type->GetVectorSize();
+					int srcIDs[16];
+					for (int i = 0; i < vecSize; i++)
+					{
+						int index = ctx.AddInstrBinaryInstr(
+							0,
+							UIntType,
+							L"OpIAdd",
+							baseIndex,
+							ctx.AddInstrConstantUInt(i)
+						);
+						int blockID = ctx.InterfaceNameToID[L"blk" + block->Name];
+						int arrayID = ctx.AddInstrAccessChain_StructMember(0, blockID, -1, 0);
+						int srcID = ctx.AddInstrLoad(
+							ctx.AddInstrAccessChain_ArrayMember(0, ctx.IDInfos[arrayID]().GetILType(), arrayID, index),
+							MemoryAccess::None
+						);
+						srcIDs[i] = ctx.AddInstrBitcast(ctx.DefineType(instrElementType), srcID);
+					}
+
+					int valueID = -1;
+
+					if (instr->Type->IsFloatMatrix())
+					{
+						int n = 3;
+						auto colType = GetTypeFromString(L"vec3");
+						if (instr->Type->GetVectorSize() == 16)
+						{
+							n = 4;
+							colType = GetTypeFromString(L"vec4");
+						}
+						int colIDs[4];
+						for (int i = 0; i < n; i++)
+						{
+							List<int> args;
+							for (int j = 0; j < n; j++)
+								args.Add(srcIDs[i*n + j]);
+							colIDs[i] = ctx.AddInstrCompositeConstruct(0, colType, args);
+						}
+						List<int> args;
+						for (int i = 0; i < n; i++)
+							args.Add(colIDs[i]);
+						valueID = ctx.AddInstrCompositeConstruct(0, instr->Type, args);
+					}
+					else if (instr->Type->IsVector())
+					{
+						int n = 3;
+						if (instr->Type->GetVectorSize() == 16)
+							n = 4;
+						List<int> args;
+						for (int i = 0; i < n; i++)
+							args.Add(srcIDs[i]);
+						valueID = ctx.AddInstrCompositeConstruct(0, instr->Type, args);
+					}
+					else //scalar
+					{
+						valueID = srcIDs[0];
+					}
+
+					int storeID = ctx.AddInstrVariableDeclaration(instr, instr->Type, StorageClass::Function);
+					ctx.AddInstrStore(instr, storeID, valueID);
+				}
+
+				else
+					throw NotImplementedException(L"import in PrintImportInstr(): " + instr->ImportOperator->Name.Content);
+			}
+
 			void PrintInstr(ILInstruction & instr)
 			{
 				if (auto binInstr = instr.As<BinaryInstruction>())
@@ -4119,9 +4405,16 @@ namespace Spire
 				else if (auto call = instr.As<CallInstruction>())
 					PrintCallInstr(call);
 				else if (auto exportInstr = instr.As<ExportInstruction>())
+				{
 					PrintExportInstr(exportInstr);
+					//throw InvalidOperationException(L"export instruction not supported");
+
+				}
 				else if (auto import = instr.As<ImportInstruction>())
+				{
 					PrintImportInstr(import);
+					//throw InvalidOperationException(L"import instruction not supported");
+				}
 				else if (auto update = instr.As<MemberUpdateInstruction>())
 					PrintUpdateInstr(update);
 				else if (auto unaryInstr = instr.As<UnaryInstruction>())
@@ -4140,7 +4433,7 @@ namespace Spire
 				operandID = ctx.ConvertBasicType(
 					operandID,
 					ctx.IDInfos[operandID]().GetILType(),
-					GetBasicTypeFromString(L"bool"));
+					GetTypeFromString(L"bool"));
 
 				int TrueLabel = ++ctx.CurrentID;
 				int FalseLabel = ++ctx.CurrentID;
@@ -4173,19 +4466,13 @@ namespace Spire
 				int UpdateBlockLabel = ++ctx.CurrentID;
 				int MergeBlockLabel = ++ctx.CurrentID;
 
-				//ctx.FunctionBody << LR"(OpBranch %)" << HeaderBlockLabel << EndLine;
 				ctx.AddInstrBranch(HeaderBlockLabel);
 
-				// header block
-				/*ctx.FunctionBody << LR"(%)" << HeaderBlockLabel << LR"( = OpLabel)" << EndLine;
-				ctx.FunctionBody << LR"(OpLoopMerge %)" << MergeBlockLabel << LR"( %)" << UpdateBlockLabel << LR"( None)" << EndLine;
-				ctx.FunctionBody << LR"(OpBranch %)" << ConditionBlockLabel << EndLine;*/
 				ctx.AddInstrLabel_AtFunctionBody(HeaderBlockLabel);
 				ctx.AddInstrLoopMerge(MergeBlockLabel, UpdateBlockLabel);
 				ctx.AddInstrBranch(ConditionBlockLabel);
 
 				// condition block
-				//ctx.FunctionBody << LR"(%)" << ConditionBlockLabel << LR"( = OpLabel)" << EndLine;
 				ctx.PushScope();
 				ctx.AddInstrLabel_AtFunctionBody(ConditionBlockLabel);
 				GenerateCode(instr->ConditionCode.Ptr(), ConditionBlockLabel);
@@ -4193,13 +4480,11 @@ namespace Spire
 				conditionID = ctx.ConvertBasicType(
 					conditionID,
 					ctx.IDInfos[conditionID]().GetILType(),
-					GetBasicTypeFromString(L"bool"));
-				//ctx.FunctionBody << LR"(OpBranchConditional %)" << conditionID << LR"( %)" << BodyBlockLabel << LR"( %)" << MergeBlockLabel << EndLine;
+					GetTypeFromString(L"bool"));
 				ctx.AddInstrBranchConditional(conditionID, BodyBlockLabel, MergeBlockLabel);
 				ctx.PopScope();
 
 				// body block
-				//ctx.FunctionBody << LR"(%)" << BodyBlockLabel << LR"( = OpLabel)" << EndLine;
 				ctx.PushScope();
 				ctx.AddInstrLabel_AtFunctionBody(BodyBlockLabel);
 				ctx.StackMergeBlock.Add(MergeBlockLabel);
@@ -4207,21 +4492,17 @@ namespace Spire
 				GenerateCode(instr->BodyCode.Ptr(), BodyBlockLabel);
 				ctx.StackMergeBlock.RemoveAt(ctx.StackMergeBlock.Count() - 1);
 				ctx.StackContinueBlock.RemoveAt(ctx.StackContinueBlock.Count() - 1);
-				//ctx.FunctionBody << LR"(OpBranch %)" << UpdateBlockLabel << EndLine;
 				ctx.AddInstrBranch(UpdateBlockLabel);
 				ctx.PopScope();
 
 				// update block
-				//ctx.FunctionBody << LR"(%)" << UpdateBlockLabel << LR"( = OpLabel)" << EndLine;
 				ctx.PushScope();
 				ctx.AddInstrLabel_AtFunctionBody(UpdateBlockLabel);
 				GenerateCode(instr->SideEffectCode.Ptr(), UpdateBlockLabel);
-				//ctx.FunctionBody << LR"(OpBranch %)" << HeaderBlockLabel << EndLine;
 				ctx.AddInstrBranch(HeaderBlockLabel);
 				ctx.PopScope();
 
 				// merge block
-				//ctx.FunctionBody << LR"(%)" << MergeBlockLabel << LR"( = OpLabel)" << EndLine;
 				ctx.AddInstrLabel_AtFunctionBody(MergeBlockLabel);
 			}
 
@@ -4233,19 +4514,14 @@ namespace Spire
 				int UpdateBlockLabel = ++ctx.CurrentID;
 				int MergeBlockLabel = ++ctx.CurrentID;
 
-				//ctx.FunctionBody << LR"(OpBranch %)" << HeaderBlockLabel << EndLine;
 				ctx.AddInstrBranch(HeaderBlockLabel);
 
 				// header block
-				/*ctx.FunctionBody << LR"(%)" << HeaderBlockLabel << LR"( = OpLabel)" << EndLine;
-				ctx.FunctionBody << LR"(OpLoopMerge %)" << MergeBlockLabel << LR"( %)" << UpdateBlockLabel << LR"( None)" << EndLine;
-				ctx.FunctionBody << LR"(OpBranch %)" << ConditionBlockLabel << EndLine;*/
 				ctx.AddInstrLabel_AtFunctionBody(HeaderBlockLabel);
 				ctx.AddInstrLoopMerge(MergeBlockLabel, UpdateBlockLabel);
 				ctx.AddInstrBranch(ConditionBlockLabel);
 
 				// condition block
-				//ctx.FunctionBody << LR"(%)" << ConditionBlockLabel << LR"( = OpLabel)" << EndLine;
 				ctx.PushScope();
 				ctx.AddInstrLabel_AtFunctionBody(ConditionBlockLabel);
 				GenerateCode(instr->ConditionCode.Ptr(), ConditionBlockLabel, true);
@@ -4253,14 +4529,12 @@ namespace Spire
 				conditionID = ctx.ConvertBasicType(
 					conditionID,
 					ctx.IDInfos[conditionID]().GetILType(),
-					GetBasicTypeFromString(L"bool")
+					GetTypeFromString(L"bool")
 				);
-				//ctx.FunctionBody << LR"(OpBranchConditional %)" << conditionID << LR"( %)" << BodyBlockLabel << LR"( %)" << MergeBlockLabel << EndLine;
 				ctx.AddInstrBranchConditional(conditionID, BodyBlockLabel, MergeBlockLabel);
 				ctx.PopScope();
 
 				// body block
-				//ctx.FunctionBody << LR"(%)" << BodyBlockLabel << LR"( = OpLabel)" << EndLine;
 				ctx.PushScope();
 				ctx.AddInstrLabel_AtFunctionBody(BodyBlockLabel);
 				ctx.StackMergeBlock.Add(MergeBlockLabel);
@@ -4268,18 +4542,14 @@ namespace Spire
 				GenerateCode(instr->BodyCode.Ptr(), BodyBlockLabel);
 				ctx.StackMergeBlock.RemoveAt(ctx.StackMergeBlock.Count() - 1);
 				ctx.StackContinueBlock.RemoveAt(ctx.StackContinueBlock.Count() - 1);
-				//ctx.FunctionBody << LR"(OpBranch %)" << UpdateBlockLabel << EndLine;
 				ctx.AddInstrBranch(UpdateBlockLabel);
 				ctx.PopScope();
 
 				// update block (empty)
-				//ctx.FunctionBody << LR"(%)" << UpdateBlockLabel << LR"( = OpLabel)" << EndLine;
 				ctx.AddInstrLabel_AtFunctionBody(UpdateBlockLabel);
-				//ctx.FunctionBody << LR"(OpBranch %)" << HeaderBlockLabel << EndLine;
 				ctx.AddInstrBranch(HeaderBlockLabel);
 
 				// merge block
-				//ctx.FunctionBody << LR"(%)" << MergeBlockLabel << LR"( = OpLabel)" << EndLine
 				ctx.AddInstrLabel_AtFunctionBody(MergeBlockLabel);
 			}
 
@@ -4294,15 +4564,11 @@ namespace Spire
 				ctx.AddInstrBranch(HeaderBlockLabel);
 
 				// header block
-				/*ctx.FunctionBody << LR"(%)" << HeaderBlockLabel << LR"( = OpLabel)" << EndLine;
-				ctx.FunctionBody << LR"(OpLoopMerge %)" << MergeBlockLabel << LR"( %)" << ConditionBlockLabel << LR"( None)" << EndLine;
-				ctx.FunctionBody << LR"(OpBranch %)" << BodyBlockLabel << EndLine;*/
 				ctx.AddInstrLabel_AtFunctionBody(HeaderBlockLabel);
 				ctx.AddInstrLoopMerge(MergeBlockLabel, ConditionBlockLabel);
 				ctx.AddInstrBranch(BodyBlockLabel);
 
 				// body block
-				//ctx.FunctionBody << LR"(%)" << BodyBlockLabel << LR"( = OpLabel)" << EndLine;
 				ctx.PushScope();
 				ctx.AddInstrLabel_AtFunctionBody(BodyBlockLabel);
 				ctx.StackMergeBlock.Add(MergeBlockLabel);
@@ -4310,12 +4576,10 @@ namespace Spire
 				GenerateCode(instr->BodyCode.Ptr(), BodyBlockLabel);
 				ctx.StackMergeBlock.RemoveAt(ctx.StackMergeBlock.Count() - 1);
 				ctx.StackContinueBlock.RemoveAt(ctx.StackContinueBlock.Count() - 1);
-				//ctx.FunctionBody << LR"(OpBranch %)" << ConditionBlockLabel << EndLine;
 				ctx.AddInstrBranch(ConditionBlockLabel);
 				ctx.PopScope();
 
 				// condition block
-				//ctx.FunctionBody << LR"(%)" << ConditionBlockLabel << LR"( = OpLabel)" << EndLine;
 				ctx.PushScope();
 				ctx.AddInstrLabel_AtFunctionBody(ConditionBlockLabel);
 				GenerateCode(instr->ConditionCode.Ptr(), ConditionBlockLabel, true);
@@ -4323,9 +4587,8 @@ namespace Spire
 				conditionID = ctx.ConvertBasicType(
 					conditionID,
 					ctx.IDInfos[conditionID]().GetILType(),
-					GetBasicTypeFromString(L"bool")
+					GetTypeFromString(L"bool")
 				);
-				//ctx.FunctionBody << LR"(OpBranchConditional %)" << conditionID << LR"( %)" << HeaderBlockLabel << LR"( %)" << MergeBlockLabel << EndLine;
 				ctx.AddInstrBranchConditional(conditionID, HeaderBlockLabel, MergeBlockLabel);
 				ctx.PopScope();
 
@@ -4389,32 +4652,324 @@ namespace Spire
 					}
 					else
 					{
-						//printf("%s\n", (instr.ToString().ToMultiByteString()));
-
-						//int LastUsedID = ctx.CurrentID;
 						PrintInstr(instr);
-						//for (int id = LastUsedID + 1; id <= ctx.CurrentID; id++) usedID.Add(id);
 					}
 				}
-				/*
-				for (auto & id : usedID)
-					if (ctx.ValueIDToVariableNames.ContainsKey(id))
-						for (auto & name : ctx.ValueIDToVariableNames[id]())
-							if (ctx.VariableNameToValueID[name] == id)
-								ctx.VariableNameToValueID[name] = -1;
-								*/
 			}
 
-			void ProcessInterfaces(
-				List<int> & interfaceIDs,
-				CompiledWorld * shaderWorld,
-				Dictionary<String,
-				ImportOperatorHandler*>& opHandlers,
-				bool &DepthReplacing)
-			{
+		public:
 
-				//for input interface
-				ctx.ImportOperatorHandlers = opHandlers;
+			bool BufferPreProcessed;
+
+			void Initiate(ExecutionModel model, CompiledWorld * shaderWorld)
+			{
+				ctx.Clear();
+				ctx.CodeGen.Initiate();
+				ctx.CurrentID = 1; // reserved for extinst
+				ctx.CodeGen.ProgramHeader();
+				ctx.PushScope();
+				interfaceIDs.Clear();
+				DepthReplacing = false;
+				LocalSize = false;
+				BufferImportOrExport = false;
+				BufferPreProcessed = false;
+				currentWorld = shaderWorld;
+				currentExecutionModel = model;
+			}
+
+			int GenerateFunctionDeclaration(CompiledFunction *func)
+				//return the ID of the Function Type
+			{
+				List<RefPtr<ILType>> args;
+				for (auto & instr : *func->Code)
+					if (auto arg = instr.As<FetchArgInstruction>())
+						if (arg->ArgId != 0)
+						{
+							args.Add(arg->Type);
+						}
+				int funcTypeID = ctx.AddInstrTypeFunction(func, args, func->ReturnType);
+				ctx.FunctionNameToFunctionID[func->Name] = ++ctx.CurrentID;
+				return funcTypeID;
+			}
+
+			int GenerateFunctionDefinition(CompiledFunction *func, ILOperand *vertexOutput = nullptr)
+				//return the ID of the Function
+			{
+				ctx.ClearBuffer();
+
+				ctx.PushScope();
+
+				int funcID = ctx.FunctionNameToFunctionID[func->Name]();
+				int funcTypeID = ctx.FunctionNameToFunctionTypeID[func->Name]();
+
+				ctx.AddInstrFunction(funcID, ctx.DefineType(func->ReturnType), funcTypeID, GetFuncOriginalName(func->Name));
+
+				for (auto & instr : *func->Code)
+					if (auto arg = instr.As<FetchArgInstruction>())
+						if (arg->ArgId != 0)
+						{
+							if (!ctx.ParameterNameToID.ContainsKey((ILOperand*)&instr))
+							{
+								ctx.DefineType(arg->Type);
+								int typeID = ctx.DefineTypePointer(arg->Type, StorageClass::Function);
+								ctx.AddInstrFunctionParameter((ILOperand*)&instr, typeID, arg->Name);
+							}
+						}
+
+				++ctx.CurrentID;
+				ctx.AddInstrLabel_AtFunctionHeader(ctx.CurrentID);
+
+				func->Code->NameAllInstructions();
+				GenerateCode(func->Code.Ptr(), ctx.CurrentID);
+
+				if (vertexOutput)
+				{
+					int valueID = ctx.AddInstrLoad(nullptr, vertexOutput, MemoryAccess::None);
+					int gl_PositionID = ctx.AddInstrAccessChain_StructMember(
+						0,
+						ctx.InterfaceNameToID[L"variable_gl_PerVertex"],
+						L"gl_Position"
+					);
+					ctx.AddInstrStore(0, gl_PositionID, valueID);
+				}
+
+				ctx.AddInstrReturn();
+				ctx.AddInstrFunctionEnd();
+
+				ctx.ProduceFunction();
+
+				ctx.PopScope();
+
+				return funcID;
+			}
+
+			void Decorate(int ID, Decoration deco, int op1 = -1)
+			{
+				ctx.AddInstrDecorate(ID, deco, op1);
+			}
+
+			void MemberDecorate(int ID, int index, Decoration deco, int op1 = -1)
+			{
+				ctx.AddInstrMemberDecorate(ID, index, deco, op1);
+			}
+
+			void SetDepthReplacing()
+			{
+				DepthReplacing = true;
+			}
+
+			void SetLocalSize(unsigned int x)
+			{
+				//layout(local_size_x = <x> ) in;
+				LocalSize = true;
+				unsigned int workgroup[3] = { x, 1, 1 };
+				ctx.AddInstrDecorate(
+					ctx.AddInstrConstantCompositeUInt(workgroup, 3),
+					Decoration::BuiltIn,
+					(int)BuiltIn::WorkgroupSize
+				);
+			}
+
+			void GenerateEntryPoint(int mainFunctionID)
+			{
+				ctx.AddInstrEntryPoint(currentExecutionModel, mainFunctionID, interfaceIDs);
+				if (currentExecutionModel == ExecutionModel::Fragment)
+				{
+					ctx.AddInstrExecutionMode(mainFunctionID, ExecutionMode::OriginUpperLeft);
+				}
+				if (DepthReplacing)
+				{
+					ctx.AddInstrExecutionMode(mainFunctionID, ExecutionMode::DepthReplacing);
+				}
+				if (LocalSize)
+				{
+					ctx.AddInstrExecutionMode(mainFunctionID, ExecutionMode::LocalSize, 256, 1, 1);
+				}
+			}
+
+			int GenerateGlGlobalInvocationID()
+				//return the ID of the gl_GlobalInvocationID variable
+			{
+				int GlobalInvocationID = ctx.AddInstrVariableDeclaration(0, GetTypeFromString(L"uvec3"), StorageClass::Input, L"gl_GlobalInvocationID", 0);
+				ctx.AddInstrDecorate(GlobalInvocationID, Decoration::BuiltIn, (int)BuiltIn::GlobalInvocationId);
+				ctx.InterfaceNameToID[L"gl_GlobalInvocationID"] = GlobalInvocationID;
+				return GlobalInvocationID;
+			}
+
+			int GenerateInterfaceForSingleVariable(
+				String varName,
+				RefPtr<ILType> varType,
+				StorageClass storageClass,
+				int location = -1,
+				int bindIndex = -1)
+				//return the ID of the variable
+			{
+				int entID = ctx.AddInstrVariableDeclaration(0, varType, storageClass, varName, 0);
+				ctx.InterfaceNameToID[varName] = entID;
+				if (location != -1)
+					ctx.AddInstrDecorate(entID, Decoration::Location, location);
+				if (bindIndex != -1)
+				{
+					ctx.AddInstrDecorate(entID, Decoration::DescriptorSet, 0);
+					ctx.AddInstrDecorate(entID, Decoration::Binding, bindIndex);
+				}
+				if (storageClass == StorageClass::Input || storageClass == StorageClass::Output)
+					interfaceIDs.Add(entID);
+				return entID;
+			}
+
+			std::pair<int,int> GenerateInterfaceForStructVariable(
+				String structTypeName,
+				String structVariableName,
+				List<RefPtr<ILType>> memberTypes,
+				List<String> memberNames,
+				int UniformOrBuffer,
+				StorageClass storageClass,
+				int location = -1,
+				int bindindex = -1)
+				//first  - the ID of the struct type
+				//second - the ID of the variable 
+			{
+				RefPtr<ILStructType> structIL = new ILStructType();
+				structIL->TypeName = structTypeName;
+				int n = memberTypes.Count();
+				for (int i = 0; i < n; i++)
+				{
+					ILStructType::ILStructField field;
+					field.Type = memberTypes[i];
+					field.FieldName = memberNames[i];
+					structIL->Members.Add(field);
+				}
+
+				int structTypeID = ctx.DefineType(structIL, UniformOrBuffer);
+				int structVariableID = ctx.AddInstrVariableDeclaration(0, structIL, storageClass, structVariableName, UniformOrBuffer);
+				ctx.InterfaceNameToID[structVariableName] = structVariableID;
+
+				if (UniformOrBuffer == 1)
+				{
+					ctx.AddInstrDecorate(structVariableID, Decoration::DescriptorSet, 0);
+					ctx.AddInstrDecorate(structTypeID, Decoration::Block);
+				}
+				else if (UniformOrBuffer == 2)
+				{
+					ctx.AddInstrDecorate(structVariableID, Decoration::DescriptorSet, 0);
+					ctx.AddInstrDecorate(structTypeID, Decoration::BufferBlock);
+				}
+
+				if (location != -1)
+				{
+					ctx.AddInstrDecorate(structVariableID, Decoration::Location, location);
+				}
+
+				if (bindindex != -1)
+				{
+					ctx.AddInstrDecorate(structVariableID, Decoration::Binding, bindindex);
+				}
+
+				if (storageClass == StorageClass::Input || storageClass == StorageClass::Output)
+				{
+					for (int i = 0; i < n; i++)
+						if (memberTypes[i]->IsIntegral())
+							ctx.AddInstrMemberDecorate(structTypeID, i, Decoration::Flat);
+					interfaceIDs.Add(structVariableID);
+				}
+
+				return std::make_pair(structTypeID, structVariableID);
+			}
+
+			CompiledShaderSource GenerateShaderWorld()
+			{
+				CompiledShaderSource rs;
+
+				auto binaryForm = ctx.ProduceWordStream();
+				rs.BinaryCode.SetSize(binaryForm.Count() * sizeof(unsigned int));
+				memcpy(rs.BinaryCode.Buffer(), binaryForm.Buffer(), rs.BinaryCode.Count());
+
+				rs.MainCode = ctx.ProduceTextCode();
+
+				return rs;
+			}
+		};
+
+		class SpirVCodeGen : public CodeGenBackend
+		{
+			String vertexOutputName;
+			EnumerableDictionary<String, String> backendArguments;
+
+		public:
+
+			ExecutionModel currentExecutionModel = ExecutionModel::Invalid;
+
+			void ProcessBufferImportOrExportInterfaces(SpirvModule & spvModule, String blkName, int index)
+			{
+				if (!spvModule.BufferPreProcessed)
+				{
+					spvModule.BufferPreProcessed = true;
+					spvModule.SetLocalSize(256);
+					spvModule.GenerateGlGlobalInvocationID();
+
+					List<RefPtr<ILType>> memberTypes;
+					List<String> memberNames;
+					memberTypes.Add(GetTypeFromString(L"uint"));
+					memberNames.Add(L"sys_thread_count");
+					spvModule.GenerateInterfaceForStructVariable(
+						L"SystemBlock",
+						L"blkSystemBlock",
+						memberTypes,
+						memberNames,
+						1,
+						StorageClass::Uniform,
+						-1,
+						0
+					);
+				}
+
+				List<RefPtr<ILType>> memberTypes;
+				List<String> memberNames;
+				memberTypes.Add(GetTypeFromString(L"float[0]"));
+				memberNames.Add(L"a");
+				spvModule.GenerateInterfaceForStructVariable(
+					blkName,
+					L"blk" + blkName,
+					memberTypes,
+					memberNames,
+					2,
+					StorageClass::Uniform,
+					-1,
+					index
+				);
+			}
+
+			virtual CompiledShaderSource GenerateShaderWorld(CompileResult & result, SymbolTable * /*symbols*/, CompiledWorld * shaderWorld, Dictionary<String, ImportOperatorHandler*>& opHandlers, Dictionary<String, ExportOperatorHandler*>& exportHandlers) override
+			{
+				
+				currentExecutionModel = ExecutionModel::Invalid;
+				if (shaderWorld->ExportOperator.Content == L"fragmentExport")
+					currentExecutionModel = ExecutionModel::Fragment;
+				else if (shaderWorld->BackendParameters.ContainsKey(L"vertex"))
+					currentExecutionModel = ExecutionModel::Vertex;
+				else if (shaderWorld->ExportOperator.Content == L"bufferExport")
+					currentExecutionModel = ExecutionModel::GLCompute;
+
+				CompiledFunction mainFunction;
+				mainFunction.Name = L"main";
+				mainFunction.ReturnType = nullptr;
+				mainFunction.Code = shaderWorld->Code;
+
+				SpirvModule spvModule;
+				spvModule.Initiate(currentExecutionModel, shaderWorld);
+				spvModule.GenerateFunctionDeclaration(&mainFunction);
+
+				for (auto funcName : shaderWorld->ReferencedFunctions)
+					for(auto & func : result.Program->Functions)
+						if (funcName == func->Name)
+							spvModule.GenerateFunctionDeclaration(func.Ptr());
+
+				for (auto funcName : shaderWorld->ReferencedFunctions)
+					for (auto & func : result.Program->Functions)
+						if (funcName == func->Name)
+							spvModule.GenerateFunctionDefinition(func.Ptr());
+
 				for (auto & inputBlock : shaderWorld->WorldInputs)
 				{
 					auto block = inputBlock.Value.Block;
@@ -4424,46 +4979,22 @@ namespace Spire
 
 					if (impOpName == L"standardImport")
 					{
-						//1. Since this input block is a struct in SPIR-V, we'd better define a corresponding ILStruct for it (that's structIL)
-						//2. Define type for each member
-						//3. Define struct using members' type provided by step 2
-						//4. Decorate the struct with 'block' and members of it with an optional 'flat'
-						//5. Make this struct available to shader program!
-
-						if (block->Entries.Count() == 0)
-							return;
-
-						RefPtr<ILStructType> structIL = new ILStructType();
-						structIL->TypeName = block->Name;
-						List<int> memberTypeIDs;
-
+						List<RefPtr<ILType>> memberTypes;
+						List<String> memberNames;
 						for (auto & ent : block->Entries)
 						{
-							if (dynamic_cast<ILStructType*>(ent.Value.Type.Ptr()))
-								throw InvalidOperationException(L"input block is not allowed to contain structs: " + ent.Value.Type->ToString());
-							memberTypeIDs.Add(ctx.DefineType(ent.Value.Type));
-							ILStructType::ILStructField field;
-							field.Type = ent.Value.Type;
-							field.FieldName = ent.Value.Name;
-							structIL->Members.Add(field);
+							memberTypes.Add(ent.Value.Type);
+							memberNames.Add(ent.Value.Name);
 						}
-
-						int structTypeID = ctx.DefineType(structIL);
-						int structVariableID = ctx.AddInstrVariableDeclaration(0, structIL, StorageClass::Input, L"blk" + block->Name);
-						ctx.InterfaceNameToID[block->Name] = structVariableID;
-
-						//ctx.AddInstrDecorate(structTypeID, Decoration::Block);
-						ctx.AddInstrDecorate(structTypeID, Decoration::Location, 0);
-
-						int idx = 0;
-						for (auto & ent : block->Entries)
-						{
-							if (ent.Value.Type->IsIntegral())
-								ctx.AddInstrMemberDecorate(structTypeID, idx, Decoration::Flat);
-							idx++;
-						}
-
-						interfaceIDs.Add(structVariableID);
+						spvModule.GenerateInterfaceForStructVariable(
+							block->Name,
+							L"blk"+block->Name,
+							memberTypes,
+							memberNames,
+							0,
+							StorageClass::Input,
+							0
+						);
 					}
 
 					else if (impOpName == L"vertexImport")
@@ -4471,19 +5002,18 @@ namespace Spire
 						int location = 0;
 						for (auto & ent : block->Entries)
 						{
-							int entID = ctx.AddInstrVariableDeclaration(0, ent.Value.Type, StorageClass::Input, ent.Key);
-							interfaceIDs.Add(entID);
-							ctx.InterfaceNameToID[ent.Value.Name] = entID;
-							ctx.AddInstrDecorate(entID, Decoration::Location, location);
+							spvModule.GenerateInterfaceForSingleVariable(
+								ent.Key,
+								ent.Value.Type,
+								StorageClass::Input,
+								location
+							);
 							location++;
 						}
 					}
 
 					else if (impOpName == L"uniformImport")
 					{
-						if (block->Entries.Count() == 0)
-							return;
-
 						int nonTextureCount = 0;
 						for (auto & ent : block->Entries)
 							if (!ent.Value.Type->IsTexture())
@@ -4495,49 +5025,45 @@ namespace Spire
 
 						if (nonTextureCount)
 						{
-							RefPtr<ILStructType> structIL = new ILStructType();
-							structIL->TypeName = block->Name;
-
+							List<RefPtr<ILType>> memberTypes;
+							List<String> memberNames;
 							for (auto & ent : block->Entries)
 								if (!ent.Value.Type->IsTexture())
 								{
-									ILStructType::ILStructField field;
-									field.Type = ent.Value.Type;
-									field.FieldName = ent.Value.Name;
-									structIL->Members.Add(field);
+									memberTypes.Add(ent.Value.Type);
+									memberNames.Add(ent.Value.Name);
 								}
-
-							int structTypeID = ctx.DefineType(structIL, TypeOfStruct);
-							int structVariableID = ctx.AddInstrVariableDeclaration(0, structIL, StorageClass::Uniform, L"blk" + block->Name, TypeOfStruct);
-							ctx.InterfaceNameToID[block->Name] = structVariableID;
-
-							if (TypeOfStruct == 1)
-							{
-								ctx.AddInstrDecorate(structTypeID, Decoration::Block);
-							}
-							else // TypeOfStruct == 2
-							{
-								ctx.AddInstrDecorate(structTypeID, Decoration::BufferBlock);
-							}
-
-							ctx.AddInstrDecorate(structVariableID, Decoration::DescriptorSet, 0);
 							String strIndex;
+							int index = -1;
 							if (block->Attributes.TryGetValue(L"Index", strIndex))
-								ctx.AddInstrDecorate(structVariableID, Decoration::Binding, StringToInt(strIndex));
+								index = StringToInt(strIndex);
+							spvModule.GenerateInterfaceForStructVariable(
+								block->Name,
+								L"blk" + block->Name,
+								memberTypes,
+								memberNames,
+								TypeOfStruct,
+								StorageClass::Uniform,
+								-1,
+								index
+							);
 						}
-
+						
 						int bindPoint = 0;
 						String bindingStart;
 						if (backendArguments.TryGetValue(L"TextureBindingStart", bindingStart))
 							bindPoint = StringToInt(bindingStart);
 
-						for (auto & ent : block->Entries)
+						for(auto & ent : block->Entries)
 							if (ent.Value.Type->IsTexture())
 							{
-								int entID = ctx.AddInstrVariableDeclaration(0, ent.Value.Type, StorageClass::UniformConstant, ent.Key);
-								ctx.InterfaceNameToID[ent.Value.Name] = entID;
-								ctx.AddInstrDecorate(entID, Decoration::DescriptorSet, 0);
-								ctx.AddInstrDecorate(entID, Decoration::Binding, bindPoint);
+								spvModule.GenerateInterfaceForSingleVariable(
+									ent.Key,
+									ent.Value.Type,
+									StorageClass::UniformConstant,
+									-1,
+									bindPoint
+								);
 								bindPoint++;
 							}
 					}
@@ -4550,97 +5076,148 @@ namespace Spire
 							bindPoint = StringToInt(strIndex);
 						for (auto & ent : block->Entries)
 						{
-							int entID = ctx.AddInstrVariableDeclaration(0, ent.Value.Type, StorageClass::UniformConstant, ent.Key);
-							ctx.InterfaceNameToID[ent.Value.Name] = entID;
-							ctx.AddInstrDecorate(entID, Decoration::DescriptorSet, 0);
-							ctx.AddInstrDecorate(entID, Decoration::Binding, bindPoint);
+							spvModule.GenerateInterfaceForSingleVariable(
+								ent.Key,
+								ent.Value.Type,
+								StorageClass::UniformConstant,
+								-1,
+								bindPoint
+							);
 							bindPoint++;
 						}
 					}
 
-					else
+					else if (impOpName == L"bufferImport")
+					{
+						String strIdx;
+						int index = 0;
+						if (block->Attributes.TryGetValue(L"Index", strIdx))
+							index = StringToInt(strIdx);
+						ProcessBufferImportOrExportInterfaces(spvModule, block->Name, index);
+					}
+
+					else 
 						throw NotImplementedException(L"not implemented input interface: " + impOpName);
 				}
 
-				//for output interface
-				if (currentWorld->ExportOperator.Content == L"fragmentExport")
+				if (shaderWorld->ExportOperator.Content == L"fragmentExport")
 				{
 					int location = 0;
-					for (auto & ent : currentWorld->WorldOutput->Entries)
+					for (auto & ent : shaderWorld->WorldOutput->Entries)
 						if (!ent.Value.LayoutAttribs.ContainsKey(L"DepthOutput"))
 						{
-							int entID = ctx.AddInstrVariableDeclaration(0, ent.Value.Type, StorageClass::Output, ent.Key);
-							ctx.InterfaceNameToID[ent.Value.Name] = entID;
-							interfaceIDs.Add(entID);
-							ctx.AddInstrDecorate(entID, Decoration::Location, location);
+							spvModule.GenerateInterfaceForSingleVariable(
+								ent.Key,
+								ent.Value.Type,
+								StorageClass::Output,
+								location
+							);
 							location++;
 						}
 						else
 						{
-							DepthReplacing = true;
-							int entID = ctx.AddInstrVariableDeclaration(0, ent.Value.Type, StorageClass::Output, L"gl_FragDepth");
-							ctx.InterfaceNameToID[L"gl_FragDepth"] = entID;
-							interfaceIDs.Add(entID);
-							ctx.AddInstrDecorate(entID, Decoration::BuiltIn, (int)BuiltIn::FragDepth);
+							int entID = spvModule.GenerateInterfaceForSingleVariable(
+								L"gl_FragDepth",
+								ent.Value.Type,
+								StorageClass::Output,
+								location
+							);
+							spvModule.SetDepthReplacing();
+							spvModule.Decorate(entID, Decoration::BuiltIn, (int)BuiltIn::FragDepth);
 						}
 				}
 
-				else if (currentWorld->ExportOperator.Content == L"standardExport")
+				else if (shaderWorld->ExportOperator.Content == L"standardExport")
 				{
-
-					auto block = currentWorld->WorldOutput;
-					if (block->Entries.Count() == 0)
-						return;
-
-					RefPtr<ILStructType> structIL = new ILStructType();
-					structIL->TypeName = block->Name;
-					List<int> memberTypeIDs;
-
-					for (auto & ent : block->Entries)
+					List<RefPtr<ILType>> memberTypes;
+					List<String> memberNames;
+					for (auto & ent : shaderWorld->WorldOutput->Entries)
 					{
-						if (dynamic_cast<ILStructType*>(ent.Value.Type.Ptr()))
-							throw InvalidOperationException(L"output block is not allowed to contain structs: " + ent.Value.Type->ToString());
-						memberTypeIDs.Add(ctx.DefineType(ent.Value.Type));
-						ILStructType::ILStructField field;
-						field.Type = ent.Value.Type;
-						field.FieldName = ent.Value.Name;
-						structIL->Members.Add(field);
+						memberTypes.Add(ent.Value.Type);
+						memberNames.Add(ent.Value.Name);
 					}
+					spvModule.GenerateInterfaceForStructVariable(
+						shaderWorld->WorldOutput->Name,
+						L"blk" + shaderWorld->WorldOutput->Name,
+						memberTypes,
+						memberNames,
+						0,
+						StorageClass::Output,
+						0
+					);
+				}
 
-					int structTypeID = ctx.DefineType(structIL);
-					int structVariableID = ctx.AddInstrVariableDeclaration(0, structIL, StorageClass::Output, L"blk" + block->Name);
-					ctx.InterfaceNameToID[block->Name] = structVariableID;
-
-					//ctx.AddInstrDecorate(structTypeID, Decoration::Block);
-					ctx.AddInstrDecorate(structTypeID, Decoration::Location, 0);
-
-					int idx = 0;
-					for (auto & ent : block->Entries)
-					{
-						if (ent.Value.Type->IsIntegral())
-							ctx.AddInstrMemberDecorate(structTypeID, idx, Decoration::Flat);
-						idx++;
-					}
-
-					interfaceIDs.Add(structVariableID);
+				else if (shaderWorld->ExportOperator.Content == L"bufferExport")
+				{
+					String strIdx;
+					int index = 0;
+					if (shaderWorld->WorldOutput->Attributes.TryGetValue(L"Index", strIdx))
+						index = StringToInt(strIdx);
+					ProcessBufferImportOrExportInterfaces(spvModule, shaderWorld->WorldOutput->Name, index);
 				}
 
 				else
-					throw NotImplementedException(L"not implemented output interface: " + currentWorld->ExportOperator.Content);
+					throw NotImplementedException(L"not implemented output interface: " + shaderWorld->ExportOperator.Content);
 
-			}
+				if (vertexOutputName.Length())
+				{
+					CompiledComponent ccomp;
+					if (shaderWorld->LocalComponents.TryGetValue(vertexOutputName, ccomp))
+					{
+						List<RefPtr<ILType>> memberTypes;
+						List<String> memberNames;
+						memberTypes.Add(GetTypeFromString(L"vec4"));
+						memberNames.Add(L"gl_Position");
+						memberTypes.Add(GetTypeFromString(L"float"));
+						memberNames.Add(L"gl_PointSize");
+						memberTypes.Add(GetTypeFromString(L"float[1]"));
+						memberNames.Add(L"gl_ClipDistance");
+						memberTypes.Add(GetTypeFromString(L"float[1]"));
+						memberNames.Add(L"gl_CullDistance");
 
-			ExecutionModel currentExecutionModel = ExecutionModel::Invalid;
+						int typeID = spvModule.GenerateInterfaceForStructVariable(
+							L"gl_PerVertex",
+							L"variable_gl_PerVertex",
+							memberTypes,
+							memberNames,
+							0,
+							StorageClass::Output,
+							-1,
+							-1
+						).first;
 
-			virtual CompiledShaderSource GenerateShaderWorld(CompileResult & result, SymbolTable * /*symbols*/, CompiledWorld * shaderWorld, Dictionary<String, ImportOperatorHandler*>& opHandlers, Dictionary<String, ExportOperatorHandler*>& exportHandlers) override
-			{
+						spvModule.Decorate(typeID, Decoration::Block);
+						spvModule.MemberDecorate(typeID, 0, Decoration::BuiltIn, (int)BuiltIn::Position);
+						spvModule.MemberDecorate(typeID, 1, Decoration::BuiltIn, (int)BuiltIn::PointSize);
+						spvModule.MemberDecorate(typeID, 2, Decoration::BuiltIn, (int)BuiltIn::ClipDistance);
+						spvModule.MemberDecorate(typeID, 3, Decoration::BuiltIn, (int)BuiltIn::CullDistance);
+					}
+				}
+
+				ILOperand *vertexOutput = nullptr;
+				if (vertexOutputName.Length())
+				{
+					CompiledComponent ccomp;
+					if (shaderWorld->LocalComponents.TryGetValue(vertexOutputName, ccomp))
+					{
+						vertexOutput = ccomp.CodeOperand;
+					}
+					else
+						throw InvalidOperationException(L"can not find vertexOutputName");
+				}
+
+				int mainFunctionID = spvModule.GenerateFunctionDefinition(&mainFunction, vertexOutput);
+
+				spvModule.GenerateEntryPoint(mainFunctionID);
+
+				return spvModule.GenerateShaderWorld();
+				
+				/*
 				ctx.Clear();
 
 				currentWorld = shaderWorld;
 				CompiledShaderSource rs;
 				ctx.Result = &result;
-				ctx.ImportOperatorHandlers = opHandlers;
-				ctx.ExportOperatorHandlers = exportHandlers;
 
 				currentExecutionModel = ExecutionModel::Invalid;
 				if (currentWorld->ExportOperator.Content == L"fragmentExport")
@@ -4655,11 +5232,8 @@ namespace Spire
 
 				ctx.CurrentID = 1;
 
-				ctx.CodeGen.Init();
+				ctx.CodeGen.Initiate();
 				ctx.CodeGen.ProgramHeader();
-
-				//add Main function type definition
-				ctx.MainFunctionTypeID = ctx.AddInstrTypeFunction(nullptr, List<RefPtr<ILType>>(), nullptr);
 
 				//add all functions type definition
 				for (auto funcName : shaderWorld->ReferencedFunctions)
@@ -4707,20 +5281,7 @@ namespace Spire
 										{
 											ctx.DefineType(arg->Type);
 											int typeID = ctx.DefineTypePointer(arg->Type, StorageClass::Function);
-											int paramID = ++ctx.CurrentID;
-											ctx.AddInstrFunctionParameter((ILOperand*)&instr, paramID, typeID, arg->Name);
-											/*
-											ctx.IDInfos[paramID] = IDInfo::CreateIDInfoForPointer(
-												paramID,
-												arg->Name,
-												typeID,
-												arg->Type,
-												baseTypeID,
-												StorageClass::Function
-											);
-											ctx.ParameterNameToID[arg->Name] = paramID;
-											ctx.UpdateVariable(arg->Name, paramID);
-											*/
+											ctx.AddInstrFunctionParameter((ILOperand*)&instr, typeID, arg->Name);
 										}
 									}
 
@@ -4746,9 +5307,9 @@ namespace Spire
 
 				List<int> interfaceIDs;
 				bool DepthReplacing = false;
-				ProcessInterfaces(interfaceIDs, shaderWorld, opHandlers, DepthReplacing);
-
-				ctx.MainFunctionID = ++ctx.CurrentID;
+				bool LocalSize = false;
+				bool BufferImportOrExport = false;
+				ProcessInterfaces(interfaceIDs, shaderWorld, opHandlers, DepthReplacing, LocalSize, BufferImportOrExport);
 
 				//for gl_Position
 				if (vertexOutputName.Length())
@@ -4760,7 +5321,7 @@ namespace Spire
 						structIL->TypeName = L"gl_PerVertex";
 
 						ILStructType::ILStructField f1;
-						f1.Type = GetBasicTypeFromString(L"vec4");
+						f1.Type = GetTypeFromString(L"vec4");
 						f1.FieldName = L"gl_Position";
 						structIL->Members.Add(f1);
 						ILStructType::ILStructField f2;
@@ -4792,6 +5353,10 @@ namespace Spire
 						throw InvalidOperationException(L"can not find vertexOutputName");
 				}
 
+				//add Main function type definition
+				ctx.MainFunctionTypeID = ctx.AddInstrTypeFunction(nullptr, List<RefPtr<ILType>>(), nullptr);
+				ctx.MainFunctionID = ++ctx.CurrentID;
+
 				//Entry Point
 				ctx.AddInstrEntryPoint(currentExecutionModel, ctx.MainFunctionID, interfaceIDs);
 
@@ -4801,11 +5366,14 @@ namespace Spire
 					//CodeGen.OpExecutionMode(ctx.MainFunctionID, ExecutionMode::OriginUpperLeft);
 					ctx.AddInstrExecutionMode(ctx.MainFunctionID, ExecutionMode::OriginUpperLeft);
 				}
-
 				if (DepthReplacing)
 				{
 					//CodeGen.OpExecutionMode(ctx.MainFunctionID, ExecutionMode::DepthReplacing);
 					ctx.AddInstrExecutionMode(ctx.MainFunctionID, ExecutionMode::DepthReplacing);
+				}
+				if (LocalSize)
+				{
+					ctx.AddInstrExecutionMode(ctx.MainFunctionID, ExecutionMode::LocalSize, 256, 1, 1);
 				}
 
 				//MainFunction
@@ -4813,6 +5381,28 @@ namespace Spire
 
 				++ctx.CurrentID;
 				ctx.AddInstrLabel_AtFunctionHeader(ctx.CurrentID);
+
+				if (BufferImportOrExport)
+				{
+					int GIIDx = ctx.AddInstrLoad(
+						ctx.AddInstrAccessChain_VectorMember(0, ctx.InterfaceNameToID[L"gl_GlobalInvocationID"], -1, 0),
+						MemoryAccess::None
+					);	//GlobalInvocationID.x
+					int SysThreadCountID = ctx.AddInstrLoad(
+						ctx.AddInstrAccessChain_StructMember(0, ctx.InterfaceNameToID[L"SystemBlock"], L"sys_thread_count"),
+						MemoryAccess::None
+					);
+					int conditionID = ctx.AddInstrBinaryInstr(
+						0, GetTypeFromString(L"bool"), L"OpUGreaterThanEqual", GIIDx, SysThreadCountID
+					);
+					int MergeLabel = ++ctx.CurrentID;
+					int TrueLabel = ++ctx.CurrentID;
+					ctx.AddInstrSelectionMerge(MergeLabel);
+					ctx.AddInstrBranchConditional(conditionID, TrueLabel, MergeLabel);
+					ctx.AddInstrLabel_AtFunctionBody(TrueLabel);
+					ctx.AddInstrReturn();
+					ctx.AddInstrLabel_AtFunctionBody(MergeLabel);
+				}
 
 				shaderWorld->Code->NameAllInstructions();
 				GenerateCode(shaderWorld->Code.Ptr(), ctx.CurrentID);
@@ -4841,17 +5431,6 @@ namespace Spire
 				ctx.ProduceFunction();
 
 				ctx.PopScope();
-				
-				/*printf("%s\n", currentWorld->WorldName.ToMultiByteString());
-				for (int i = 0; i <= ctx.CurrentID; i++)
-					if (ctx.IDInfos.ContainsKey(i))
-					{
-						if (ctx.IDInfos[i]().GetClass() == IDClass::Pointer)
-						{
-							printf("%d\t- %s\n", i, ctx.IDInfos[i]().GetName().ToMultiByteString());
-						}
-					}
-				printf("\n");*/
 
 				auto binaryForm = ctx.ProduceWordStream();
 				rs.BinaryCode.SetSize(binaryForm.Count() * sizeof(unsigned int));
@@ -4861,11 +5440,55 @@ namespace Spire
 
 				rs.OutputDeclarations = L"spirv";
 
+				//print IL 
+				{
+					auto compiledProgram = result.Program.Ptr();
+					StringBuilder sb;
+
+					//function part
+					sb << L"function" << EndLine;
+					sb << L"{" << EndLine;
+					for (auto &pfunc : compiledProgram->Functions) {
+						sb << pfunc->ReturnType->ToString() << L" " << pfunc->Name << L"(";
+						bool first = true;
+						for (auto &name2param : pfunc->Parameters) {
+							if (!first)
+								sb << L", ";
+							sb << name2param.Value->ToString() << L" " << name2param.Key;
+							first = false;
+						}
+						sb << L")" << EndLine;
+						sb << L"{" << EndLine;
+						pfunc->Code->NameAllInstructions();
+						sb << pfunc->Code->ToString() << EndLine;
+						sb << L"}" << EndLine;
+					}
+					sb << L"}" << EndLine;
+
+					//shader part
+					for (auto &pshader : compiledProgram->Shaders) {
+						sb << L"Shader " << pshader->MetaData.ShaderName << EndLine;
+						sb << L"{" << EndLine;
+						for (auto &pworld : pshader->Worlds) {
+							sb << L"World " << pworld.Key << EndLine;
+							sb << L"{" << EndLine;
+							pworld.Value.Ptr()->Code->NameAllInstructions();
+							sb << pworld.Value.Ptr()->Code->ToString() << EndLine;
+							sb << L"}" << EndLine;
+						}
+						sb << L"}" << EndLine;
+					}
+
+					StringBuilder sb_indent;
+					IndentString(sb_indent, sb.ToSt\`ring());
+					CoreLib::IO::StreamWriter sw(L"IL-" + currentWorld->ShaderName + L"-" + currentWorld->WorldOutput->Name + String(L".out"));
+					sw.Write(sb_indent.ToString());
+				}
+
 				currentWorld = nullptr;
 
-				//CoreLib::IO::File::WriteAllText(currentWorld->WorldName + L"-IL.txt", );
-
 				return rs;
+				*/
 			}
 
 			virtual void SetParameters(const EnumerableDictionary<String, String>& arguments) override

@@ -54,6 +54,15 @@
     <ClInclude Include="Closure.h">
       <Filter>Front End</Filter>
     </ClInclude>
+    <ClInclude Include="VariantIR.h">
+      <Filter>Back End</Filter>
+    </ClInclude>
+    <ClInclude Include="StringObject.h">
+      <Filter>Back End</Filter>
+    </ClInclude>
+    <ClInclude Include="CodePosition.h">
+      <Filter>Front End</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Lexer.cpp">
@@ -104,5 +113,14 @@
     <ClCompile Include="SpirVCodeGen.cpp">
       <Filter>Back End</Filter>
     </ClCompile>
+    <ClCompile Include="VariantIR.cpp">
+      <Filter>Back End</Filter>
+    </ClCompile>
+    <ClCompile Include="InsertImplicitImportOperator.cpp">
+      <Filter>Back End</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="NatvisFile.natvis" />
   </ItemGroup>
 </Project>

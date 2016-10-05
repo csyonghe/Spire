@@ -1,6 +1,7 @@
 #include "SyntaxVisitors.h"
 #include "ScopeDictionary.h"
 #include "CodeWriter.h"
+#include "StringObject.h"
 #include "../CoreLib/Parser.h"
 #include <assert.h>
 
@@ -8,46 +9,92 @@ namespace Spire
 {
 	namespace Compiler
 	{
-		RefPtr<ILType> TranslateExpressionType(const ExpressionType & type)
+		RefPtr<ILType> TranslateExpressionType(const ExpressionType * type, Dictionary<String, RefPtr<ILRecordType>> * recordTypes)
 		{
 			RefPtr<ILType> resultType = 0;
-			if (type.BaseType == BaseType::Struct)
+			if (auto basicType = type->AsBasicType())
 			{
-				resultType = type.Struct->Type;
-			}
-			else
-			{
-				auto base = new ILBasicType();
-				base->Type = (ILBaseType)type.BaseType;
-				if (type.BaseType == BaseType::Bool)
+				if (basicType->BaseType == BaseType::Struct)
 				{
-					base->Type = ILBaseType::Int;
+					resultType = basicType->Struct->Type;
 				}
-				resultType = base;
+				else if (basicType->BaseType == BaseType::Record)
+				{
+					if (recordTypes)
+						return (*recordTypes)[basicType->RecordTypeName]();
+					else
+						throw InvalidProgramException(L"unexpected record type.");
+				}
+				else
+				{
+					auto base = new ILBasicType();
+					base->Type = (ILBaseType)basicType->BaseType;
+					resultType = base;
+				}
 			}
-			if (type.IsArray)
+			else if (auto arrType = type->AsArrayType())
 			{
 				auto nArrType = new ILArrayType();
-				nArrType->BaseType = resultType;
-				nArrType->ArrayLength = type.ArrayLength;
+				nArrType->BaseType = TranslateExpressionType(arrType->BaseType.Ptr(), recordTypes);
+				nArrType->ArrayLength = arrType->ArrayLength;
 				resultType = nArrType;
 			}
+			else if (auto genType = type->AsGenericType())
+			{
+				auto gType = new ILGenericType();
+				gType->GenericTypeName = genType->GenericTypeName;
+				gType->BaseType = TranslateExpressionType(genType->BaseType.Ptr(), recordTypes);
+				resultType = gType;
+			}
 			return resultType;
+		}
+
+		RefPtr<ILType> TranslateExpressionType(const ExpressionType * type)
+		{
+			return TranslateExpressionType(type, nullptr);
+		}
+
+		RefPtr<ILType> TranslateExpressionType(const RefPtr<ExpressionType> & type, Dictionary<String, RefPtr<ILRecordType>> * recordTypes = nullptr)
+		{
+			return TranslateExpressionType(type.Ptr(), recordTypes);
+		}
+
+		template<typename Func>
+		class ImportNodeVisitor : public SyntaxVisitor
+		{
+		public:
+			const Func & func;
+			ImportNodeVisitor(const Func & f)
+				: func(f), SyntaxVisitor(nullptr)
+			{}
+			virtual RefPtr<ExpressionSyntaxNode> VisitImportExpression(ImportExpressionSyntaxNode * expr) override
+			{
+				func(expr);
+				return expr;
+			}
+		};
+
+		template<typename Func>
+		void EnumerateImportExpressions(SyntaxNode * node, const Func & f)
+		{
+			ImportNodeVisitor<Func> visitor(f);
+			node->Accept(&visitor);
 		}
 
 		class CodeGenerator : public ICodeGenerator
 		{
 		private:
 			SymbolTable * symTable;
-			CompiledWorld * currentWorld = nullptr;
-			ShaderComponentSymbol * currentComponent = nullptr;
-			ShaderComponentImplSymbol * currentComponentImpl = nullptr;
-			ShaderClosure * currentShader = nullptr;
+			ILWorld * currentWorld = nullptr;
+			ComponentDefinitionIR * currentComponent = nullptr;
+			ImportOperatorDefSyntaxNode * currentImportDef = nullptr;
+			ShaderIR * currentShader = nullptr;
 			CompileResult & result;
 			List<ILOperand*> exprStack;
 			CodeWriter codeWriter;
 			ScopeDictionary<String, ILOperand*> variables;
-			
+			Dictionary<String, RefPtr<ILRecordType>> recordTypes;
+
 			void PushStack(ILOperand * op)
 			{
 				exprStack.Add(op);
@@ -58,10 +105,10 @@ namespace Spire
 				exprStack.SetSize(exprStack.Count() - 1);
 				return rs;
 			}
-			AllocVarInstruction * AllocVar(const ExpressionType & etype)
+			AllocVarInstruction * AllocVar(ExpressionType * etype)
 			{
 				AllocVarInstruction * varOp = 0;
-				RefPtr<ILType> type = TranslateExpressionType(etype);
+				RefPtr<ILType> type = TranslateExpressionType(const_cast<const ExpressionType*>(etype), &recordTypes);
 				auto arrType = dynamic_cast<ILArrayType*>(type.Ptr());
 
 				if (arrType)
@@ -75,9 +122,9 @@ namespace Spire
 				}
 				return varOp;
 			}
-			FetchArgInstruction * FetchArg(const ExpressionType & etype, int argId)
+			FetchArgInstruction * FetchArg(ExpressionType * etype, int argId)
 			{
-				auto type = TranslateExpressionType(etype);
+				auto type = TranslateExpressionType(etype, &recordTypes);
 				auto arrType = dynamic_cast<ILArrayType*>(type.Ptr());
 				FetchArgInstruction * varOp = 0;
 				if (arrType)
@@ -91,26 +138,30 @@ namespace Spire
 				}
 				return varOp;
 			}
-			void SortInterfaceBlock(InterfaceBlock * block)
+			void TranslateStages(ILShader * compiledShader, PipelineSyntaxNode * pipeline)
 			{
-				List<KeyValuePair<String, ComponentDefinition>> entries;
-				for (auto & kv : block->Entries)
-					entries.Add(kv);
-				entries.Sort([](const KeyValuePair<String, ComponentDefinition> & v0, const KeyValuePair<String, ComponentDefinition> & v1) 
+				for (auto & stage : pipeline->Stages)
 				{
-					return v0.Value.OrderingStr < v1.Value.OrderingStr; 
-				});
-				block->Entries.Clear();
-				for (auto & kv : entries)
-					block->Entries.Add(kv.Key, kv.Value);
+					RefPtr<ILStage> ilStage = new ILStage();
+					ilStage->Position = stage->Position;
+					ilStage->Name = stage->Name.Content;
+					ilStage->StageType = stage->StageType.Content;
+					for (auto & attrib : stage->Attributes)
+					{
+						StageAttribute sattrib;
+						sattrib.Name = attrib.Key;
+						sattrib.Position = attrib.Value.Position;
+						sattrib.Value = attrib.Value.Content;
+						ilStage->Attributes[attrib.Key] = sattrib;
+					}
+					compiledShader->Stages[stage->Name.Content] = ilStage;
+				}
 			}
 		public:
-			virtual void VisitProgram(ProgramSyntaxNode *) override
-			{
-			}
-			virtual void VisitStruct(StructSyntaxNode * st) override
+			virtual RefPtr<StructSyntaxNode> VisitStruct(StructSyntaxNode * st) override
 			{
 				result.Program->Structs.Add(symTable->Structs[st->Name.Content]()->Type);
+				return st;
 			}
 			virtual void ProcessFunction(FunctionSyntaxNode * func) override
 			{
@@ -120,235 +171,124 @@ namespace Spire
 			{
 				VisitStruct(st);
 			}
-			struct ThroughVar
-			{
-				bool Export = false;
-				String InputName, OutputName;
-				String InputWorldName;
-				ImportOperatorDefSyntaxNode * ImportOperator;
-				ComponentDefinitionIR * Component;
-				int GetHashCode()
-				{
-					return PointerHash<1>().GetHashCode(Component);
-				}
-				bool operator == (const ThroughVar & other)
-				{
-					return Component == other.Component;
-				}
-			};
-			virtual void ProcessShader(ShaderClosure * shader) override
+
+			virtual void ProcessShader(ShaderIR * shader) override
 			{
 				currentShader = shader;
-				RefPtr<CompiledShader> compiledShader = new CompiledShader();
-				compiledShader->MetaData.ShaderName = shader->Name;
+				auto pipeline = shader->Shader->Pipeline;
+				RefPtr<ILShader> compiledShader = new ILShader();
+				compiledShader->Name = shader->Shader->Name;
+				TranslateStages(compiledShader.Ptr(), pipeline->SyntaxNode);
 				result.Program->Shaders.Add(compiledShader);
-				for (auto & world : shader->Pipeline->Worlds)
+
+				recordTypes.Clear();
+
+				// pass 1: iterating all worlds
+				// create ILWorld and ILRecordType objects for all worlds
+
+				for (auto & world : pipeline->Worlds)
 				{
-					auto w = new CompiledWorld();
-					w->ExportOperator = world.Value.SyntaxNode->ExportOperator;
-					auto outputBlock = new InterfaceBlock();
-					outputBlock->Name = world.Key;
-					for (auto & attrib : world.Value.SyntaxNode->LayoutAttributes)
-						outputBlock->Attributes[attrib.Key] = attrib.Value;
-					world.Value.SyntaxNode->LayoutAttributes.TryGetValue(L"InterfaceBlock", outputBlock->Name);
-					if (outputBlock->Name.Contains(L":"))
-					{
-						CoreLib::Text::Parser parser(outputBlock->Name);
-						auto blockName = parser.ReadWord();
-						parser.Read(L":");
-						auto indx = parser.ReadInt();
-						outputBlock->Name = blockName;
-						outputBlock->Attributes[L"Index"] = String(indx);
-					}
-					String strIdx;
-					if (world.Value.SyntaxNode->LayoutAttributes.TryGetValue(L"InterfaceBlockIndex", strIdx))
-						outputBlock->Attributes[L"Index"] = strIdx;
-					if (world.Value.SyntaxNode->LayoutAttributes.ContainsKey(L"Packed"))
-						outputBlock->Attributes[L"Packed"] = L"1";
-					
-					w->WorldOutput = outputBlock;
-					compiledShader->InterfaceBlocks[outputBlock->Name] = outputBlock;
+					auto w = new ILWorld();
+					auto recordType = new ILRecordType();
+					recordType->TypeName = world.Key;
+					recordTypes[world.Key] = recordType;
+					w->Name = world.Key;
+					w->OutputType = recordType;
 					w->Attributes = world.Value.SyntaxNode->LayoutAttributes;
 					w->Shader = compiledShader.Ptr();
-					w->ShaderName = shader->Name;
-					w->WorldName = world.Key;
 					w->IsAbstract = world.Value.IsAbstract;
-					auto impOps = shader->Pipeline->GetImportOperatorsFromSourceWorld(world.Key);
-
-					w->TargetMachine = world.Value.SyntaxNode->TargetMachine;
-					CoreLib::Text::Parser parser(w->TargetMachine);
-					try
-					{
-						if (!parser.IsEnd())
-						{
-							w->TargetMachine = parser.ReadWord();
-							if (parser.LookAhead(L"("))
-							{
-								parser.Read(L"(");
-								while (!parser.LookAhead(L")"))
-								{
-									auto param = parser.ReadWord();
-									if (parser.LookAhead(L":"))
-									{
-										parser.Read(L":");
-										auto value = parser.ReadToken().Str;
-										w->BackendParameters[param] = value;
-									}
-									else
-										w->BackendParameters[param] = L"";
-									if (parser.LookAhead(L";"))
-									{
-										parser.Read(L";");
-									}
-									else
-										break;
-								}
-								parser.Read(L")");
-							}
-						}
-					}
-					catch (const CoreLib::Text::TextFormatException & ex)
-					{
-						result.GetErrorWriter()->Error(34031, L"invalid target machine syntax. \n" + ex.Message, world.Value.SyntaxNode->Position);
-					}
-					w->WorldDefPosition = world.Value.SyntaxNode->Position;
+					auto impOps = pipeline->GetImportOperatorsFromSourceWorld(world.Key);
+					w->Position = world.Value.SyntaxNode->Position;
 					compiledShader->Worlds[world.Key] = w;
 				}
 
+				// pass 2: iterating all worlds:
+				// 1) Gather list of components for each world, and store it in worldComps dictionary.
+				// 2) For each abstract world, add its components to record type
+
 				Dictionary<String, List<ComponentDefinitionIR*>> worldComps;
 				
-				Dictionary<String, EnumerableHashSet<ThroughVar>> worldThroughVars;
-				for (auto & world : shader->Pipeline->Worlds)
+				for (auto & world : pipeline->Worlds)
 				{
+					// gather list of components
 					List<ComponentDefinitionIR*> components;
-					for (auto & compDef : shader->IR->Definitions)
+					for (auto & compDef : shader->Definitions)
 						if (compDef->World == world.Key)
 							components.Add(compDef.Ptr());
 
-					auto & compiledWorld = compiledShader->Worlds[world.Key].GetValue();
+					// for abstract world, fill in record type now
+					if (world.Value.IsAbstract)
+					{
+						auto compiledWorld = compiledShader->Worlds[world.Key]();
+						for (auto & comp : components)
+						{
+							ILObjectDefinition compDef;
+							compDef.Attributes = comp->SyntaxNode->LayoutAttributes;
+							compDef.Name = comp->UniqueName;
+							compDef.Type = TranslateExpressionType(comp->Type.Ptr(), &recordTypes);
+							compDef.Position = comp->SyntaxNode->Position;
+							compiledWorld->OutputType->Members.AddIfNotExists(compDef.Name, compDef);
+						}
+					}
+
+					// sort components by dependency
 					DependencySort(components, [](ComponentDefinitionIR * def)
 					{
 						return def->Dependency;
 					});
+					// put the list in worldComps
 					worldComps[world.Key] = components;
-					worldThroughVars[world.Key] = EnumerableHashSet<ThroughVar>();
-
-					if (world.Value.SyntaxNode->LayoutAttributes.ContainsKey(L"Pinned"))
-					{
-						for (auto & comp : components)
-						{
-							ComponentDefinition compDef;
-							compDef.LayoutAttribs = comp->Implementation->SyntaxNode->LayoutAttributes;
-							compDef.Name = comp->Component->UniqueName;
-							compDef.Type = TranslateExpressionType(comp->Component->Type->DataType);
-							compDef.OrderingStr = comp->Implementation->SyntaxNode->Position.FileName +
-								String(comp->Implementation->SyntaxNode->Position.Line).PadLeft(L' ', 8) + compDef.Name;
-							compiledWorld->WorldOutput->Entries.AddIfNotExists(compDef.Name, compDef);
-						}
-					}
 				}
-				for (auto & world : shader->Pipeline->Worlds)
+
+				// now we need to deal with import operators
+				// create world input declarations base on input components
+				for (auto & world : compiledShader->Worlds)
 				{
-					auto compiledWorld = compiledShader->Worlds[world.Key].GetValue();
-					for (auto & impOp : shader->Pipeline->SyntaxNode->ImportOperators)
-					{
-						if (impOp->DestWorld.Content == world.Key)
-						{
-							InputInterface input;
-							input.Block = compiledShader->Worlds[impOp->SourceWorld.Content].GetValue()->WorldOutput;
-							input.ImportOperator = *impOp;
-							compiledWorld->WorldInputs[impOp->SourceWorld.Content] = input;
-						}
-					}
-					auto & components = worldComps[world.Key].GetValue();
-					
+					auto components = worldComps[world.Key]();
 					for (auto & comp : components)
 					{
-						auto srcWorld = world.Key;
-						EnumerableHashSet<String> outputWorlds;
-						if (comp->Implementation->ExportWorlds.Contains(srcWorld))
-							outputWorlds.Add(srcWorld);
-						struct ImportTechnique
+						if (comp->SyntaxNode->IsInput)
 						{
-							String SourceWorld;
-							ImportOperatorDefSyntaxNode * ImportOperator;
-						};
-						EnumerableDictionary<String, ImportTechnique> inputSourceWorlds;
-						auto useInWorld = [&](String userWorld)
-						{
-							if (userWorld == srcWorld)
-								return;
-							auto path = this->currentShader->Pipeline->FindImportOperatorChain(srcWorld, userWorld);
-							if (path.Count() == 0)
-								throw InvalidProgramException(L"no import exists, this should have been checked by semantics analyzer.");
-							for (int i = 0; i < path[0].Nodes.Count(); i++)
-							{
-								auto & node = path[0].Nodes[i];
-								if (node.TargetWorld != userWorld)
-								{
-									// should define output in node.TargetWorld
-									outputWorlds.Add(node.TargetWorld);
-								}
-								if (node.TargetWorld != srcWorld)
-								{
-									// should define input in node.TargetWorld
-									ImportTechnique tech;
-									tech.SourceWorld = path[0].Nodes[i - 1].TargetWorld;
-									tech.ImportOperator = path[0].Nodes[i].ImportOperator;
-									inputSourceWorlds[node.TargetWorld] = tech;
-								}
-							}
-						};
-						for (auto user : comp->Users)
-						{
-							if (user->World != srcWorld)
-							{
-								useInWorld(user->World);
-							}
-						}
-
-						ShaderComponentImplSymbol * compImpl = comp->Implementation;
-						
-						// define outputs in all involved worlds
-						for (auto & outputWorld : outputWorlds)
-						{
-							auto & w = compiledShader->Worlds[outputWorld].GetValue();
-							
-							ComponentDefinition compDef;
-							compDef.Name = comp->Component->UniqueName;
-							compDef.OrderingStr = compImpl->SyntaxNode->Position.FileName +
-								String(compImpl->SyntaxNode->Position.Line).PadLeft(L' ', 8) + compDef.Name;
-							compDef.Type = TranslateExpressionType(comp->Component->Type->DataType);
-							compDef.LayoutAttribs = compImpl->SyntaxNode->LayoutAttributes;
-							w->WorldOutput->Entries.AddIfNotExists(compDef.Name, compDef);
-							// if an input is also defined in this world (i.e. this is a through world), insert assignment
-							ImportTechnique importTech;
-							if (inputSourceWorlds.TryGetValue(outputWorld, importTech))
-							{
-								ThroughVar tvar;
-								tvar.ImportOperator = importTech.ImportOperator;
-								tvar.Export = true;
-								tvar.InputName = comp->Component->UniqueName;
-								tvar.Component = comp;
-								tvar.OutputName = w->WorldOutput->Name + L"." + comp->Component->UniqueName;
-								tvar.InputWorldName = importTech.SourceWorld;
-								worldThroughVars[outputWorld].GetValue().Add(tvar);
-							}
-						}
-						// define inputs
-						for (auto & input : inputSourceWorlds)
-						{
-							ThroughVar tvar;
-							tvar.ImportOperator = input.Value.ImportOperator;
-							tvar.Export = false;
-							tvar.InputName = comp->Component->UniqueName;
-							tvar.Component = comp;
-							tvar.InputWorldName = input.Value.SourceWorld;
-							worldThroughVars[input.Key].GetValue().Add(tvar);
+							ILObjectDefinition def;
+							def.Name = comp->UniqueName;
+							def.Type = TranslateExpressionType(comp->Type.Ptr(), &recordTypes);
+							def.Position = comp->SyntaxNode->Position;
+							world.Value->Inputs.Add(def);
 						}
 					}
 				}
-				for (auto & world : shader->Pipeline->Worlds)
+
+				// fill in record types
+				for (auto & comps : worldComps)
+				{
+					for (auto & comp : comps.Value)
+					{
+						// for each import operator call "import[w0->w1](x)", add x to w0's record type
+						EnumerateImportExpressions(comp->SyntaxNode.Ptr(), [&](ImportExpressionSyntaxNode * importExpr)
+						{
+							auto & recType = recordTypes[importExpr->ImportOperatorDef->SourceWorld.Content]();
+							ILObjectDefinition entryDef;
+							entryDef.Attributes = comp->SyntaxNode->LayoutAttributes;
+							entryDef.Name = importExpr->ComponentUniqueName;
+							entryDef.Type = TranslateExpressionType(importExpr->Type.Ptr(), &recordTypes);
+							entryDef.Position = importExpr->Position;
+							recType->Members.AddIfNotExists(importExpr->ComponentUniqueName, entryDef);
+						});
+						// if comp is output, add comp to its world's record type
+						if (comp->SyntaxNode->IsOutput)
+						{
+							auto & recType = recordTypes[comp->World]();
+							ILObjectDefinition entryDef;
+							entryDef.Attributes = comp->SyntaxNode->LayoutAttributes;
+							entryDef.Name = comp->UniqueName;
+							entryDef.Type = TranslateExpressionType(comp->Type.Ptr(), &recordTypes);
+							entryDef.Position = comp->SyntaxNode->Position;
+							recType->Members.AddIfNotExists(comp->UniqueName, entryDef);
+						}
+					}
+				}
+				
+				for (auto & world : pipeline->Worlds)
 				{
 					if (world.Value.IsAbstract)
 						continue;
@@ -361,98 +301,15 @@ namespace Spire
 					variables.PushScope();
 					HashSet<String> localComponents;
 					for (auto & comp : components)
-						localComponents.Add(comp->Component->UniqueName);
+						localComponents.Add(comp->UniqueName);
 
 					DependencySort(components, [](ComponentDefinitionIR * def)
 					{
 						return def->Dependency;
 					});
 
-					auto generateImportInstr = [&](ComponentDefinitionIR * comp, ComponentDefinitionIR * user)
-					{
-						ImportInstruction * instr = nullptr;
-						if (!compiledWorld->ImportInstructions.TryGetValue(comp->Component->UniqueName, instr))
-						{
-							auto path = shader->Pipeline->FindImportOperatorChain(comp->World, world.Key);
-							auto importOp = path[0].Nodes.Last().ImportOperator;
-							auto sourceWorld = compiledShader->Worlds[path[0].Nodes[path[0].Nodes.Count() - 2].TargetWorld].GetValue().Ptr();
-							instr = new ImportInstruction(importOp->Usings.Count(), comp->Component->UniqueName, importOp,
-								sourceWorld, TranslateExpressionType(comp->Component->Type->DataType));
-							for (int i = 0; i < importOp->Usings.Count(); i++)
-							{
-								// resolve import operator arguments
-								ILOperand * val = nullptr;
-								if (!variables.TryGetValue(importOp->Usings[i].Content, val))
-								{
-									ImportInstruction * impInstr = nullptr;
-									compiledWorld->ImportInstructions.TryGetValue(importOp->Usings[i].Content, impInstr);
-									val = impInstr;
-								}
-								String userCompName;
-								if (user)
-									userCompName = user->Component->Name;
-								else
-									userCompName = comp->Component->Name;
-								if (!val)
-									result.GetErrorWriter()->Error(50010, L"\'" + importOp->Usings[i].Content + L"\': implicit import operator argument is not accessible when attempting to import \'"
-										+ comp->Component->Name + L"\' from world \'" + sourceWorld->WorldName + L"\' when compiling \'" + userCompName + L"\' for world \'" + compiledWorld->WorldName + L"\'.\nsee import operator declaration at " +
-										importOp->Position.ToString() + L".", comp->Implementation->SyntaxNode->Position);
-								else
-									instr->Arguments[i] = val;
-							}
-							sourceWorld->WorldOutput->UserWorlds.Add(world.Key);
-							instr->Name = L"_vout" + comp->Component->UniqueName;
-							codeWriter.Insert(instr);
-							compiledWorld->ImportInstructions[comp->Component->UniqueName] = instr;
-							CompiledComponent ccomp;
-							ccomp.CodeOperand = instr;
-							ccomp.Attributes = comp->Implementation->SyntaxNode->LayoutAttributes;
-							compiledWorld->LocalComponents[comp->Component->UniqueName] = ccomp;
-						}
-						return instr;
-					};
-					HashSet<String> thisWorldComponents;
 					for (auto & comp : components)
 					{
-						thisWorldComponents.Add(comp->Component->UniqueName);
-					}
-					auto & throughVars = worldThroughVars[world.Key].GetValue();
-					auto genInputVar = [&]()
-					{
-						for (auto & throughVar : throughVars)
-						{
-							bool shouldSkip = false;
-							for (auto & depComp : throughVar.ImportOperator->Usings)
-							{
-								if (thisWorldComponents.Contains(depComp.Content))
-								{
-									shouldSkip = true;
-									break;
-								}
-							}
-							if (shouldSkip)
-								continue;
-							auto srcInstr = generateImportInstr(throughVar.Component, nullptr);
-							if (throughVar.Export)
-							{
-								auto exp = new ExportInstruction(throughVar.Component->Component->UniqueName, compiledWorld->ExportOperator.Content, compiledWorld, srcInstr);
-								codeWriter.Insert(exp);
-								throughVars.Remove(throughVar);
-							}
-						}
-					};
-					genInputVar();
-					for (auto & comp : components)
-					{
-						genInputVar();
-						for (auto & dep : comp->Dependency)
-						{
-							if (dep->World != world.Key)
-							{
-								generateImportInstr(dep, comp);
-							}
-						}
-						thisWorldComponents.Remove(comp->Component->UniqueName);
 						VisitComponent(comp);
 					}
 					
@@ -460,49 +317,11 @@ namespace Spire
 					compiledWorld->Code = codeWriter.PopNode();
 					EvalReferencedFunctionClosure(compiledWorld);
 					currentWorld = nullptr;
-
-					// fill in meta data
-					WorldMetaData wdata;
-					for (auto & comp : components)
-						wdata.Components.Add(comp->Component->UniqueName);
-					wdata.Name = compiledWorld->WorldName;
-					wdata.TargetName = compiledWorld->TargetMachine;
-					wdata.OutputBlock = compiledWorld->WorldOutput->Name;
-					for (auto & inputBlock : compiledWorld->WorldInputs)
-						wdata.InputBlocks.Add(inputBlock.Value.Block->Name);
-					compiledWorld->Shader->MetaData.Worlds.Add(wdata.Name, wdata);
-				}
-				for (auto & block : compiledShader->InterfaceBlocks)
-				{
-					SortInterfaceBlock(block.Value.Ptr());
-					InterfaceBlockMetaData blockMeta;
-					blockMeta.Name = block.Value->Name;
-					blockMeta.Attributes = block.Value->Attributes;
-					int offset = 0;
-					bool pack = block.Value->Attributes.ContainsKey(L"Packed");
-					for (auto & entry : block.Value->Entries)
-					{
-						InterfaceBlockEntry ment;
-						ment.Type = entry.Value.Type;
-						ment.Name = entry.Key;
-						ment.Attributes = entry.Value.LayoutAttribs;
-						if (!pack)
-							offset = RoundToAlignment(offset, ment.Type->GetAlignment());
-						ment.Offset = offset;
-						entry.Value.Offset = offset;
-						ment.Size = ment.Type->GetSize();
-						offset += ment.Size;
-						blockMeta.Entries.Add(ment);
-					}
-					block.Value->Size = offset;
-					if (!pack && block.Value->Entries.Count() > 0)
-						block.Value->Size = RoundToAlignment(offset, (*(block.Value->Entries.begin())).Value.Type->GetAlignment());
-					blockMeta.Size = block.Value->Size;
-					compiledShader->MetaData.InterfaceBlocks[blockMeta.Name] = blockMeta;
 				}
 				currentShader = nullptr;
 			}
-			void EvalReferencedFunctionClosure(CompiledWorld * world)
+
+			void EvalReferencedFunctionClosure(ILWorld * world)
 			{
 				List<String> workList;
 				for (auto & rfunc : world->ReferencedFunctions)
@@ -521,74 +340,78 @@ namespace Spire
 					}
 				}
 			}
-			virtual void VisitComponent(ComponentSyntaxNode *) override
+			virtual RefPtr<ComponentSyntaxNode> VisitComponent(ComponentSyntaxNode *) override
 			{
 				throw NotImplementedException();
 			}
 			void VisitComponent(ComponentDefinitionIR * comp)
 			{
-				currentComponent = comp->Component;
-				currentComponentImpl = comp->Implementation;
+				currentComponent = comp;
 				String varName = L"_vcmp" + currentComponent->UniqueName;
+				RefPtr<ILType> type = TranslateExpressionType(currentComponent->Type, &recordTypes);
 
-				RefPtr<ILType> type = TranslateExpressionType(currentComponent->Type->DataType);
+				if (comp->SyntaxNode->IsInput)
+				{
+					auto loadInput = new LoadInputInstruction(type.Ptr(), comp->UniqueName);
+					codeWriter.Insert(loadInput);
+					variables.Add(currentComponent->UniqueName, loadInput);
+					return;
+				}
+
 				auto allocVar = codeWriter.AllocVar(type, result.Program->ConstantPool->CreateConstant(1));
+				currentWorld->Components[currentComponent->UniqueName] = allocVar;
 				allocVar->Name = varName;
 				variables.Add(currentComponent->UniqueName, allocVar);
-				CompiledComponent ccomp;
-				ccomp.CodeOperand = allocVar;
-				ccomp.Attributes = comp->Implementation->SyntaxNode->LayoutAttributes;
-				currentWorld->LocalComponents[currentComponent->UniqueName] = ccomp;
-				if (currentComponentImpl->SyntaxNode->Expression)
+
+				if (currentComponent->SyntaxNode->Expression)
 				{
-					currentComponentImpl->SyntaxNode->Expression->Accept(this);
-					Assign(currentComponentImpl->SyntaxNode->Type->ToExpressionType(symTable, nullptr), allocVar, exprStack.Last());
-					if (currentWorld->WorldOutput->Entries.ContainsKey(currentComponent->UniqueName))
+					currentComponent->SyntaxNode->Expression->Accept(this);
+					Assign(allocVar, exprStack.Last());
+					if (currentWorld->OutputType->Members.ContainsKey(currentComponent->UniqueName))
 					{
-						auto exp = new ExportInstruction(currentComponent->UniqueName, currentWorld->ExportOperator.Content, currentWorld,
-							allocVar);
+						auto exp = new ExportInstruction(currentComponent->UniqueName, currentWorld, allocVar);
 						codeWriter.Insert(exp);
 					}
 					exprStack.Clear();
 				}
-				else if (currentComponentImpl->SyntaxNode->BlockStatement)
+				else if (currentComponent->SyntaxNode->BlockStatement)
 				{
-					currentComponentImpl->SyntaxNode->BlockStatement->Accept(this);
+					currentComponent->SyntaxNode->BlockStatement->Accept(this);
 				}
-				currentComponentImpl = nullptr;
 				currentComponent = nullptr;
 			}
-			virtual void VisitFunction(FunctionSyntaxNode* function) override
+			virtual RefPtr<FunctionSyntaxNode> VisitFunction(FunctionSyntaxNode* function) override
 			{
 				if (function->IsExtern)
-					return;
-				RefPtr<CompiledFunction> func = new CompiledFunction();
+					return function;
+				RefPtr<ILFunction> func = new ILFunction();
 				result.Program->Functions.Add(func);
 				func->Name = function->InternalName;
-				func->ReturnType = TranslateExpressionType(function->ReturnType->ToExpressionType(symTable, nullptr));
+				func->ReturnType = TranslateExpressionType(function->ReturnType);
 				variables.PushScope();
 				codeWriter.PushNode();
 				int id = 0;
 				for (auto &param : function->Parameters)
 				{
-					func->Parameters.Add(param->Name, TranslateExpressionType(param->Type->ToExpressionType(symTable, nullptr)));
-					auto op = FetchArg(param->Type->ToExpressionType(symTable, nullptr), ++id);
+					func->Parameters.Add(param->Name, TranslateExpressionType(param->Type));
+					auto op = FetchArg(param->Type.Ptr(), ++id);
 					op->Name = String(L"p_") + param->Name;
 					variables.Add(param->Name, op);
 				}
 				function->Body->Accept(this);
 				func->Code = codeWriter.PopNode();
 				variables.PopScope();
+				return function;
 			}
-			virtual void VisitBlockStatement(BlockStatementSyntaxNode* stmt) override
+			virtual RefPtr<StatementSyntaxNode> VisitBlockStatement(BlockStatementSyntaxNode* stmt) override
 			{
 				variables.PushScope();
 				for (auto & subStmt : stmt->Statements)
 					subStmt->Accept(this);
 				variables.PopScope();
+				return stmt;
 			}
-			virtual void VisitEmptyStatement(EmptyStatementSyntaxNode*) override {}
-			virtual void VisitWhileStatement(WhileStatementSyntaxNode* stmt) override
+			virtual RefPtr<StatementSyntaxNode> VisitWhileStatement(WhileStatementSyntaxNode* stmt) override
 			{
 				RefPtr<WhileInstruction> instr = new WhileInstruction();
 				variables.PushScope();
@@ -601,8 +424,9 @@ namespace Spire
 				instr->BodyCode = codeWriter.PopNode();
 				codeWriter.Insert(instr.Release());
 				variables.PopScope();
+				return stmt;
 			}
-			virtual void VisitDoWhileStatement(DoWhileStatementSyntaxNode* stmt) override
+			virtual RefPtr<StatementSyntaxNode> VisitDoWhileStatement(DoWhileStatementSyntaxNode* stmt) override
 			{
 				RefPtr<DoInstruction> instr = new DoInstruction();
 				variables.PushScope();
@@ -615,14 +439,15 @@ namespace Spire
 				instr->BodyCode = codeWriter.PopNode();
 				codeWriter.Insert(instr.Release());
 				variables.PopScope();
+				return stmt;
 			}
-			virtual void VisitForStatement(ForStatementSyntaxNode* stmt) override
+			virtual RefPtr<StatementSyntaxNode> VisitForStatement(ForStatementSyntaxNode* stmt) override
 			{
 				RefPtr<ForInstruction> instr = new ForInstruction();
 				variables.PushScope();
 				if (stmt->TypeDef)
 				{
-					AllocVarInstruction * varOp = AllocVar(stmt->TypeDef->ToExpressionType(symTable));
+					AllocVarInstruction * varOp = AllocVar(stmt->IterationVariableType.Ptr());
 					varOp->Name = L"v_" + String(NamingCounter++) + stmt->IterationVariable.Content;
 					variables.Add(stmt->IterationVariable.Content, varOp);
 				}
@@ -630,7 +455,7 @@ namespace Spire
 				if (!variables.TryGetValue(stmt->IterationVariable.Content, iterVar))
 					throw InvalidProgramException(L"Iteration variable not found in variables dictionary. This should have been checked by semantics analyzer.");
 				stmt->InitialExpression->Accept(this);
-				Assign(stmt->TypeDef->ToExpressionType(symTable), iterVar, PopStack());
+				Assign(iterVar, PopStack());
 
 				codeWriter.PushNode();
 				stmt->EndExpression->Accept(this);
@@ -654,7 +479,7 @@ namespace Spire
 				}
 				auto afterVal = new AddInstruction(codeWriter.Load(iterVar), stepVal);
 				codeWriter.Insert(afterVal);
-				Assign(stmt->TypeDef->ToExpressionType(symTable), iterVar, afterVal);
+				Assign(iterVar, afterVal);
 				instr->SideEffectCode = codeWriter.PopNode();
 
 				codeWriter.PushNode();
@@ -662,8 +487,9 @@ namespace Spire
 				instr->BodyCode = codeWriter.PopNode();
 				codeWriter.Insert(instr.Release());
 				variables.PopScope();
+				return stmt;
 			}
-			virtual void VisitIfStatement(IfStatementSyntaxNode* stmt) override
+			virtual RefPtr<StatementSyntaxNode> VisitIfStatement(IfStatementSyntaxNode* stmt) override
 			{
 				RefPtr<IfInstruction> instr = new IfInstruction();
 				variables.PushScope();
@@ -680,10 +506,11 @@ namespace Spire
 				}
 				codeWriter.Insert(instr.Release());
 				variables.PopScope();
+				return stmt;
 			}
-			virtual void VisitReturnStatement(ReturnStatementSyntaxNode* stmt) override
+			virtual RefPtr<StatementSyntaxNode> VisitReturnStatement(ReturnStatementSyntaxNode* stmt) override
 			{
-				if (currentComponentImpl != nullptr)
+				if (currentComponent != nullptr && !currentImportDef)
 				{
 					if (stmt->Expression)
 					{
@@ -692,9 +519,9 @@ namespace Spire
 						variables.TryGetValue(currentComponent->UniqueName, op);
 						auto val = PopStack();
 						codeWriter.Store(op, val);
-						if (currentWorld->WorldOutput->Entries.ContainsKey(currentComponent->UniqueName))
+						if (currentWorld->OutputType->Members.ContainsKey(currentComponent->UniqueName))
 						{
-							auto exp = new ExportInstruction(currentComponent->UniqueName, currentWorld->ExportOperator.Content, currentWorld, op);
+							auto exp = new ExportInstruction(currentComponent->UniqueName, currentWorld, op);
 							codeWriter.Insert(exp);
 						}
 					}
@@ -705,16 +532,19 @@ namespace Spire
 						stmt->Expression->Accept(this);
 					codeWriter.Insert(new ReturnInstruction(PopStack()));
 				}
+				return stmt;
 			}
-			virtual void VisitBreakStatement(BreakStatementSyntaxNode*) override
+			virtual RefPtr<StatementSyntaxNode> VisitBreakStatement(BreakStatementSyntaxNode* stmt) override
 			{
 				codeWriter.Insert(new BreakInstruction());
+				return stmt;
 			}
-			virtual void VisitContinueStatement(ContinueStatementSyntaxNode*) override
+			virtual RefPtr<StatementSyntaxNode> VisitContinueStatement(ContinueStatementSyntaxNode* stmt) override
 			{
 				codeWriter.Insert(new ContinueInstruction());
+				return stmt;
 			}
-			virtual void VisitSelectExpression(SelectExpressionSyntaxNode * expr) override
+			virtual RefPtr<ExpressionSyntaxNode> VisitSelectExpression(SelectExpressionSyntaxNode * expr) override
 			{
 				expr->SelectorExpr->Accept(this);
 				auto predOp = PopStack();
@@ -723,10 +553,11 @@ namespace Spire
 				expr->Expr1->Accept(this);
 				auto v1 = PopStack();
 				PushStack(codeWriter.Select(predOp, v0, v1));
+				return expr;
 			}
-			ILOperand * EnsureBoolType(ILOperand * op, ExpressionType type)
+			ILOperand * EnsureBoolType(ILOperand * op, RefPtr<ExpressionType> type)
 			{
-				if (type != ExpressionType::Bool)
+				if (!type->Equals(ExpressionType::Bool.Ptr()))
 				{
 					auto cmpeq = new CmpneqInstruction();
 					cmpeq->Operands[0] = op;
@@ -738,30 +569,33 @@ namespace Spire
 				else
 					return op;
 			}
-			virtual void VisitDiscardStatement(DiscardStatementSyntaxNode *) override
+			virtual RefPtr<StatementSyntaxNode> VisitDiscardStatement(DiscardStatementSyntaxNode * stmt) override
 			{
 				codeWriter.Discard();
+				return stmt;
 			}
-			virtual void VisitVarDeclrStatement(VarDeclrStatementSyntaxNode* stmt) override
+			virtual RefPtr<StatementSyntaxNode> VisitVarDeclrStatement(VarDeclrStatementSyntaxNode* stmt) override
 			{
 				for (auto & v : stmt->Variables)
 				{
-					AllocVarInstruction * varOp = AllocVar(stmt->Type->ToExpressionType(symTable));
+					AllocVarInstruction * varOp = AllocVar(stmt->Type.Ptr());
 					varOp->Name = L"v" + String(NamingCounter++) + L"_" + v->Name;
 					variables.Add(v->Name, varOp);
 					if (v->Expression)
 					{
 						v->Expression->Accept(this);
-						Assign(stmt->Type->ToExpressionType(symTable), varOp, PopStack());
+						Assign(varOp, PopStack());
 					}
 				}
+				return stmt;
 			}
-			virtual void VisitExpressionStatement(ExpressionStatementSyntaxNode* stmt) override
+			virtual RefPtr<StatementSyntaxNode> VisitExpressionStatement(ExpressionStatementSyntaxNode* stmt) override
 			{
 				stmt->Expression->Accept(this);
 				PopStack();
+				return stmt;
 			}
-			void Assign(const ExpressionType & /*type*/, ILOperand * left, ILOperand * right)
+			void Assign(ILOperand * left, ILOperand * right)
 			{
 				if (auto add = dynamic_cast<AddInstruction*>(left))
 				{
@@ -772,7 +606,7 @@ namespace Spire
 				else
 					codeWriter.Store(left, right);
 			}
-			virtual void VisitBinaryExpression(BinaryExpressionSyntaxNode* expr) override
+			virtual RefPtr<ExpressionSyntaxNode> VisitBinaryExpression(BinaryExpressionSyntaxNode* expr) override
 			{
 				expr->RightExpression->Accept(this);
 				auto right = PopStack();
@@ -781,7 +615,7 @@ namespace Spire
 					expr->LeftExpression->Access = ExpressionAccess::Write;
 					expr->LeftExpression->Accept(this);
 					auto left = PopStack();
-					Assign(expr->LeftExpression->Type, left, right);
+					Assign(left, right);
 					PushStack(left);
 				}
 				else
@@ -862,7 +696,7 @@ namespace Spire
 					rs->Operands.SetSize(2);
 					rs->Operands[0] = left;
 					rs->Operands[1] = right;
-					rs->Type = TranslateExpressionType(expr->Type);
+					rs->Type = TranslateExpressionType(expr->Type, &recordTypes);
 					codeWriter.Insert(rs);
 					switch (expr->Operator)
 					{
@@ -880,7 +714,7 @@ namespace Spire
 						expr->LeftExpression->Access = ExpressionAccess::Write;
 						expr->LeftExpression->Accept(this);
 						auto target = PopStack();
-						Assign(expr->Type, target, rs);
+						Assign(target, rs);
 						break;
 					}
 					default:
@@ -888,8 +722,9 @@ namespace Spire
 					}
 					PushStack(rs);
 				}
+				return expr;
 			}
-			virtual void VisitConstantExpression(ConstantExpressionSyntaxNode* expr) override
+			virtual RefPtr<ExpressionSyntaxNode> VisitConstantExpression(ConstantExpressionSyntaxNode* expr) override
 			{
 				ILConstOperand * op;
 				if (expr->ConstType == ConstantExpressionSyntaxNode::ConstantType::Float)
@@ -901,6 +736,7 @@ namespace Spire
 					op = result.Program->ConstantPool->CreateConstant(expr->IntValue);
 				}
 				PushStack(op);
+				return expr;
 			}
 			void GenerateIndexExpression(ILOperand * base, ILOperand * idx, bool read)
 			{
@@ -915,7 +751,33 @@ namespace Spire
 					PushStack(codeWriter.Add(base, idx));
 				}
 			}
-			virtual void VisitIndexExpression(IndexExpressionSyntaxNode* expr) override
+			virtual RefPtr<ExpressionSyntaxNode> VisitImportExpression(ImportExpressionSyntaxNode * expr) override
+			{
+				variables.PushScope();
+				List<ILOperand*> arguments;
+				for (int i = 0; i < expr->Arguments.Count(); i++)
+				{
+					expr->Arguments[i]->Accept(this);
+					auto argOp = PopStack();
+					arguments.Add(argOp);
+					variables.Add(expr->ImportOperatorDef->Parameters[i]->Name, argOp);
+				}
+				currentImportDef = expr->ImportOperatorDef.Ptr();
+				codeWriter.PushNode();
+				expr->ImportOperatorDef->Body->Accept(this);
+				currentImportDef = nullptr;
+				auto impInstr = new ImportInstruction(expr->Arguments.Count());
+				for (int i = 0; i < expr->Arguments.Count(); i++)
+					impInstr->Arguments[i] = arguments[i];
+				impInstr->ImportOperator = codeWriter.PopNode();
+				variables.PopScope();
+				impInstr->ComponentName = expr->ComponentUniqueName;
+				impInstr->Type = TranslateExpressionType(expr->Type, &recordTypes);
+				codeWriter.Insert(impInstr);
+				PushStack(impInstr);
+				return expr;
+			}
+			virtual RefPtr<ExpressionSyntaxNode> VisitIndexExpression(IndexExpressionSyntaxNode* expr) override
 			{
 				expr->BaseExpression->Access = expr->Access;
 				expr->BaseExpression->Accept(this);
@@ -925,19 +787,20 @@ namespace Spire
 				auto idx = PopStack();
 				GenerateIndexExpression(base, idx,
 					expr->Access == ExpressionAccess::Read);
+				return expr;
 			}
-			virtual void VisitMemberExpression(MemberExpressionSyntaxNode * expr) override
+			virtual RefPtr<ExpressionSyntaxNode> VisitMemberExpression(MemberExpressionSyntaxNode * expr) override
 			{
 				RefPtr<Object> refObj;
 				if (expr->Tags.TryGetValue(L"ComponentReference", refObj))
 				{
-					if (auto refComp = dynamic_cast<ShaderComponentSymbol*>(refObj.Ptr()))
+					if (auto refComp = refObj.As<StringObject>())
 					{
 						ILOperand * op;
-						if (variables.TryGetValue(refComp->UniqueName, op))
+						if (variables.TryGetValue(refComp->Content, op))
 							PushStack(op);
 						else
-							PushStack(currentWorld->ImportInstructions[refComp->UniqueName]());
+							throw InvalidProgramException(L"referencing undefined component/variable. probable cause: unchecked circular reference.");
 					}
 				}
 				else
@@ -958,7 +821,7 @@ namespace Spire
 						GenerateIndexExpression(base, result.Program->ConstantPool->CreateConstant(idx),
 							expr->Access == ExpressionAccess::Read);
 					};
-					if (expr->BaseExpression->Type.IsVectorType())
+					if (expr->BaseExpression->Type->IsVectorType())
 					{
 						if (expr->MemberName.Length() == 1)
 						{
@@ -968,8 +831,7 @@ namespace Spire
 						{
 							if (expr->Access != ExpressionAccess::Read)
 								throw InvalidOperationException(L"temporary vector (vec.xyz) is read-only.");
-							String funcName = BaseTypeToString(expr->Type.BaseType);
-							auto rs = AllocVar(expr->Type);
+							auto rs = AllocVar(expr->Type.Ptr());
 							ILOperand* tmp = codeWriter.Load(rs);
 							for (int i = 0; i < expr->MemberName.Length(); i++)
 							{
@@ -980,11 +842,11 @@ namespace Spire
 							PushStack(codeWriter.Load(rs));
 						}
 					}
-					else if (expr->BaseExpression->Type.BaseType == BaseType::Struct)
+					else if (expr->BaseExpression->Type->IsStruct())
 					{
 						if (expr->Access == ExpressionAccess::Read)
 						{
-							int id = expr->BaseExpression->Type.Struct->SyntaxNode->FindField(expr->MemberName);
+							int id = expr->BaseExpression->Type->AsBasicType()->Struct->SyntaxNode->FindField(expr->MemberName);
 							GenerateIndexExpression(base, result.Program->ConstantPool->CreateConstant(id),
 								expr->Access == ExpressionAccess::Read);
 						}
@@ -995,8 +857,9 @@ namespace Spire
 					else
 						throw NotImplementedException(L"member expression codegen");
 				}
+				return expr;
 			}
-			virtual void VisitInvokeExpression(InvokeExpressionSyntaxNode* expr) override
+			virtual RefPtr<ExpressionSyntaxNode> VisitInvokeExpression(InvokeExpressionSyntaxNode* expr) override
 			{
 				List<ILOperand*> args;
 				if (currentWorld)
@@ -1010,11 +873,12 @@ namespace Spire
 				instr->Function = expr->FunctionExpr->Variable;
 				for (int i = 0; i < args.Count(); i++)
 					instr->Arguments[i] = args[i];
-				instr->Type = TranslateExpressionType(expr->Type);
+				instr->Type = TranslateExpressionType(expr->Type, &recordTypes);
 				codeWriter.Insert(instr);
 				PushStack(instr);
+				return expr;
 			}
-			virtual void VisitTypeCastExpression(TypeCastExpressionSyntaxNode * expr) override
+			virtual RefPtr<ExpressionSyntaxNode> VisitTypeCastExpression(TypeCastExpressionSyntaxNode * expr) override
 			{
 				expr->Expression->Accept(this);
 				auto base = PopStack();
@@ -1038,11 +902,12 @@ namespace Spire
 				}
 				else
 				{
-					Error(40001, L"Invalid type cast: \"" + expr->Expression->Type.ToString() + L"\" to \"" +
-						expr->Type.ToString() + L"\"", expr);
+					Error(40001, L"Invalid type cast: \"" + expr->Expression->Type->ToString() + L"\" to \"" +
+						expr->Type->ToString() + L"\"", expr);
 				}
+				return expr;
 			}
-			virtual void VisitUnaryExpression(UnaryExpressionSyntaxNode* expr) override
+			virtual RefPtr<ExpressionSyntaxNode> VisitUnaryExpression(UnaryExpressionSyntaxNode* expr) override
 			{
 				if (expr->Operator == Operator::PostDec || expr->Operator == Operator::PostInc
 					|| expr->Operator == Operator::PreDec || expr->Operator == Operator::PreInc)
@@ -1061,7 +926,7 @@ namespace Spire
 						instr->Operands[1] = result.Program->ConstantPool->CreateConstant(1.0f);
 					else
 						instr->Operands[1] = result.Program->ConstantPool->CreateConstant(1);
-					instr->Type = TranslateExpressionType(expr->Type);
+					instr->Type = TranslateExpressionType(expr->Type, &recordTypes);
 					codeWriter.Insert(instr);
 
 					expr->Expression->Access = ExpressionAccess::Write;
@@ -1087,7 +952,7 @@ namespace Spire
 						instr->Operands[1] = result.Program->ConstantPool->CreateConstant(1.0f);
 					else
 						instr->Operands[1] = result.Program->ConstantPool->CreateConstant(1);
-					instr->Type = TranslateExpressionType(expr->Type);
+					instr->Type = TranslateExpressionType(expr->Type, &recordTypes);
 					codeWriter.Insert(instr);
 
 					expr->Expression->Access = ExpressionAccess::Write;
@@ -1126,8 +991,9 @@ namespace Spire
 					};
 					PushStack(genUnaryInstr(base));
 				}
+				return expr;
 			}
-			bool GenerateVarRef(String name, ExpressionType & type, ExpressionAccess access)
+			bool GenerateVarRef(String name, ExpressionAccess access)
 			{
 				ILOperand * var = 0;
 				String srcName = name;
@@ -1137,15 +1003,7 @@ namespace Spire
 				}
 				if (access == ExpressionAccess::Read)
 				{
-					auto instr = new LoadInstruction();
-					instr->Name = L"local_" + name;
-					instr->Operand = var;
-					instr->Type = TranslateExpressionType(type);
-					codeWriter.Insert(instr);
-					instr->Attribute = var->Attribute;
-					if (!Is<LeaInstruction>(var))
-						throw L"error";
-					PushStack(instr);
+					PushStack(var);
 				}
 				else
 				{
@@ -1153,35 +1011,33 @@ namespace Spire
 				}
 				return true;
 			}
-			virtual void VisitVarExpression(VarExpressionSyntaxNode* expr) override
+			virtual RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode* expr) override
 			{
 				RefPtr<Object> refObj;
 				if (expr->Tags.TryGetValue(L"ComponentReference", refObj))
 				{
-					if (auto refComp = dynamic_cast<ShaderComponentSymbol*>(refObj.Ptr()))
+					if (auto refComp = refObj.As<StringObject>())
 					{
 						ILOperand * op;
-						if (variables.TryGetValue(refComp->UniqueName, op))
+						if (variables.TryGetValue(refComp->Content, op))
 							PushStack(op);
 						else
-							PushStack(currentWorld->ImportInstructions[refComp->UniqueName]());
+							throw InvalidProgramException(L"referencing undefined component/variable. probable cause: unchecked circular reference.");
 					}
 				}
-				else if (!GenerateVarRef(expr->Variable, expr->Type, expr->Access))
+				else if (!GenerateVarRef(expr->Variable, expr->Access))
 				{
-						throw InvalidProgramException(L"identifier is neither a variable nor a regnoized component.");
+					throw InvalidProgramException(L"identifier is neither a variable nor a recognized component.");
 				}
+				return expr;
 			}
-			virtual void VisitParameter(ParameterSyntaxNode*) override {}
-			virtual void VisitType(TypeSyntaxNode*) override {}
-			virtual void VisitDeclrVariable(Variable*) override {}
 		private:
 			CodeGenerator & operator = (const CodeGenerator & other) = delete;
 		public:
 			CodeGenerator(SymbolTable * symbols, ErrorWriter * pErr, CompileResult & _result)
 				: ICodeGenerator(pErr), symTable(symbols), result(_result)
 			{
-				result.Program = new CompiledProgram();
+				result.Program = new ILProgram();
 				codeWriter.SetConstantPool(result.Program->ConstantPool.Ptr());
 			}
 		};

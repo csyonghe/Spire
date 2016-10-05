@@ -501,6 +501,8 @@ namespace CoreLib
 			}
 			Dictionary<TKey, TValue> & operator = (const Dictionary<TKey, TValue> & other)
 			{
+				if (this == &other)
+					return *this;
 				Free();
 				bucketSizeMinusOne = other.bucketSizeMinusOne;
 				_count = other._count;
@@ -513,6 +515,8 @@ namespace CoreLib
 			}
 			Dictionary<TKey, TValue> & operator = (Dictionary<TKey, TValue> && other)
 			{
+				if (this == &other)
+					return *this;
 				Free();
 				bucketSizeMinusOne = other.bucketSizeMinusOne;
 				_count = other._count;
@@ -868,6 +872,8 @@ namespace CoreLib
 			}
 			EnumerableDictionary<TKey, TValue> & operator = (const EnumerableDictionary<TKey, TValue> & other)
 			{
+				if (this == &other)
+					return *this;
 				Clear();
 				for (auto & item : other)
 					Add(item.Key, item.Value);
@@ -875,6 +881,8 @@ namespace CoreLib
 			}
 			EnumerableDictionary<TKey, TValue> & operator = (EnumerableDictionary<TKey, TValue> && other)
 			{
+				if (this == &other)
+					return *this;
 				Free();
 				bucketSizeMinusOne = other.bucketSizeMinusOne;
 				_count = other._count;

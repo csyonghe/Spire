@@ -1,4 +1,5 @@
 #include "Closure.h"
+#include "StringObject.h"
 
 namespace Spire
 {
@@ -64,8 +65,8 @@ namespace Spire
 						compSyntax->Name.Content = compName;
 						CloneContext cloneCtx;
 						compSyntax->Expression = arg->Expression->Clone(cloneCtx);
-						compSyntax->Type = TypeSyntaxNode::FromExpressionType(arg->Expression->Type);
-						compSyntax->Type->Position = compSyntax->Position;
+						compSyntax->TypeNode = TypeSyntaxNode::FromExpressionType(arg->Expression->Type.Ptr());
+						compSyntax->TypeNode->Position = compSyntax->Position;
 						impl->SyntaxNode = compSyntax;
 						ccomp->Name = compName;
 						ccomp->Type = new Type();
@@ -83,7 +84,7 @@ namespace Spire
 							if (param.Value->IsParam() && !refMap.ContainsKey(param.Key))
 							{
 								auto arg = rs->FindComponent(param.Key);
-								if (arg && arg->Type->DataType == param.Value->Type->DataType)
+								if (arg && arg->Type->DataType->Equals(param.Value->Type->DataType.Ptr()))
 								{
 									refMap[param.Key] = arg;
 								}
@@ -145,20 +146,55 @@ namespace Spire
 		private:
 			ShaderClosure * shaderClosure = nullptr;
 			ShaderComponentSymbol * currentComponent = nullptr;
-			void AddReference(ShaderComponentSymbol * referee, CodePosition pos)
+			ImportExpressionSyntaxNode * currentImport = nullptr;
+			void AddReference(ShaderComponentSymbol * referee, ImportExpressionSyntaxNode * importOp, CodePosition pos)
 			{
 				referee->UserComponents.Add(currentComponent);
-				currentComponent->DependentComponents.Add(referee);
-				currentImpl->DependentComponents.Add(referee);
+				if (auto * importOps = currentComponent->DependentComponents.TryGetValue(referee))
+					importOps->Add(importOp);
+				else
+				{
+					EnumerableHashSet<RefPtr<ImportExpressionSyntaxNode>> op;
+					op.Add(importOp);
+					currentComponent->DependentComponents.Add(referee, op);
+				}
+
+				if (auto * importOps = currentImpl->DependentComponents.TryGetValue(referee))
+					importOps->Add(importOp);
+				else
+				{
+					EnumerableHashSet<RefPtr<ImportExpressionSyntaxNode>> op;
+					op.Add(importOp);
+					currentImpl->DependentComponents.Add(referee, op);
+				}
 				currentImpl->ComponentReferencePositions[referee] = pos;
 			}
 		public:
 			ShaderComponentImplSymbol * currentImpl = nullptr;
+
 			ResolveDependencyVisitor(ErrorWriter * err, ShaderClosure * closure, ShaderComponentSymbol * comp)
 				: SyntaxVisitor(err), shaderClosure(closure), currentComponent(comp)
 			{}
 
-			void VisitVarExpression(VarExpressionSyntaxNode * var) override
+			RefPtr<ExpressionSyntaxNode> VisitImportExpression(ImportExpressionSyntaxNode * import) override
+			{
+				currentImport = import;
+				import->Component->Accept(this);
+				if (!import->Component->Tags.ContainsKey(L"ComponentReference"))
+				{
+					Error(34043, L"first argument of an import operator call does not resolve to a component.", import->Component.Ptr());
+				}
+				else
+				{
+					import->ComponentUniqueName = import->Component->Tags[L"ComponentReference"]().As<StringObject>()->Content;
+				}
+				currentImport = nullptr;
+				for (auto & arg : import->Arguments)
+					arg->Accept(this);
+				return import;
+			}
+
+			RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode * var) override
 			{
 				VariableEntry varEntry;
 				if (!var->Scope->FindVariable(var->Variable, varEntry))
@@ -167,29 +203,42 @@ namespace Spire
 					{
 						if (comp->Implementations.First()->SyntaxNode->IsParam)
 							shaderClosure->RefMap.TryGetValue(var->Variable, comp);
-						var->Tags[L"ComponentReference"] = comp;
-						AddReference(comp.Ptr(), var->Position);
+						var->Tags[L"ComponentReference"] = new StringObject(comp->UniqueName);
+
+						AddReference(comp.Ptr(), currentImport, var->Position);
 					}
 					else if (auto closure = shaderClosure->FindClosure(var->Variable))
 					{
-						var->Type.ShaderClosure = closure.Ptr();
+						ShaderSymbol * originalShader = nullptr;
+						if (var->Type->AsBasicType())
+							originalShader = var->Type->AsBasicType()->Shader;
+						var->Type = new BasicExpressionType(originalShader, closure.Ptr());
 					}
+					else
+						throw InvalidProgramException(L"cannot resolve reference.");
 				}
+				return var;
 			}
 
-			void VisitMemberExpression(MemberExpressionSyntaxNode * member) override
+			RefPtr<ExpressionSyntaxNode> VisitMemberExpression(MemberExpressionSyntaxNode * member) override
 			{
 				member->BaseExpression->Accept(this);
-				if (member->BaseExpression->Type.ShaderClosure)
+				if (member->BaseExpression->Type->AsBasicType() && member->BaseExpression->Type->AsBasicType()->ShaderClosure)
 				{
-					if (auto comp = member->BaseExpression->Type.ShaderClosure->FindComponent(member->MemberName))
+					if (auto comp = member->BaseExpression->Type->AsBasicType()->ShaderClosure->FindComponent(member->MemberName))
 					{
-						member->Tags[L"ComponentReference"] = comp;
-						AddReference(comp.Ptr(), member->Position);
+						member->Tags[L"ComponentReference"] = new StringObject(comp->UniqueName);
+						AddReference(comp.Ptr(), currentImport, member->Position);
 					}
-					else if (auto shader = member->BaseExpression->Type.ShaderClosure->FindClosure(member->MemberName))
-						member->Type.ShaderClosure = shader.Ptr();
+					else if (auto shader = member->BaseExpression->Type->AsBasicType()->ShaderClosure->FindClosure(member->MemberName))
+					{
+						ShaderSymbol * originalShader = nullptr;
+						if (member->Type->AsBasicType())
+							originalShader = member->Type->AsBasicType()->Shader;
+						member->Type = new BasicExpressionType(originalShader, shader.Ptr());
+					}
 				}
+				return member;
 			}
 		};
 
@@ -233,7 +282,7 @@ namespace Spire
 			{
 				if (IsInAbstractWorld(shader->Pipeline, comp.Value.Ptr()))
 				{
-					comp.Value->UniqueName = comp.Value->Name;
+					comp.Value->UniqueKey = comp.Value->UniqueName = comp.Value->Name;
 				}
 				else
 				{
@@ -288,13 +337,13 @@ namespace Spire
 						{
 							for (auto & user : existingComp->UserComponents)
 							{
+								user->DependentComponents.Add(comp.Value.Ptr(), user->DependentComponents[existingComp]());
 								user->DependentComponents.Remove(existingComp);
-								user->DependentComponents.Add(comp.Value.Ptr());
 								for (auto & impl : user->Implementations)
-									if (impl->DependentComponents.Contains(existingComp))
+									if (impl->DependentComponents.ContainsKey(existingComp))
 									{
+										impl->DependentComponents.Add(comp.Value.Ptr(), impl->DependentComponents[existingComp]());
 										impl->DependentComponents.Remove(existingComp);
-										impl->DependentComponents.Add(comp.Value.Ptr());
 									}
 							}
 							err->Warning(34026, L"'" + existingComp->Name + L"': component is already defined when compiling shader '" + closure->Name + L"'. use 'require' to declare it as a parameter. \nsee previous declaration at " + existingComp->Implementations.First()->SyntaxNode->Position.ToString(),
@@ -325,20 +374,23 @@ namespace Spire
 			bool isWFeasible = true;
 			for (auto & dcomp : impl->DependentComponents)
 			{
-				bool reachable = false;
-				for (auto & dw : dcomp->Type->FeasibleWorlds)
+				if (dcomp.Value.Contains(nullptr))
 				{
-					if (pipeline->IsWorldReachable(dw, world))
+					bool reachable = false;
+					for (auto & dw : dcomp.Key->Type->FeasibleWorlds)
 					{
-						reachable = true;
+						if (pipeline->IsWorldImplicitlyReachable(dw, world))
+						{
+							reachable = true;
+							break;
+						}
+					}
+					if (!reachable)
+					{
+						unaccessibleComp = dcomp.Key;
+						isWFeasible = false;
 						break;
 					}
-				}
-				if (!reachable)
-				{
-					unaccessibleComp = dcomp;
-					isWFeasible = false;
-					break;
 				}
 			}
 			return isWFeasible;
@@ -413,14 +465,7 @@ namespace Spire
 			{
 				for (auto comp : impOp->Usings)
 				{
-					useInWorld(comp.Content, impOp->DestWorld.Content);
-				}
-			}
-			for (auto & userWorld : shader->Pipeline->Worlds)
-			{
-				for (auto comp : userWorld.Value.SyntaxNode->Usings)
-				{
-					useInWorld(comp.Content, userWorld.Key);
+					useInWorld(comp, impOp->DestWorld.Content);
 				}
 			}
 		}
@@ -428,14 +473,14 @@ namespace Spire
 		bool CheckCircularReference(ErrorWriter * err, ShaderClosure * shader)
 		{
 			bool rs = false;
-			for (auto & comp : shader->Components)
+			for (auto & comp : shader->AllComponents)
 			{
 				for (auto & impl : comp.Value->Implementations)
 				{
 					// check circular references
 					HashSet<ShaderComponentSymbol*> set;
 					List<ShaderComponentSymbol*> referredComponents;
-					referredComponents.Add(comp.Value.Ptr());
+					referredComponents.Add(comp.Value);
 					for (int i = 0; i < referredComponents.Count(); i++)
 					{
 						auto xcomp = referredComponents[i];
@@ -443,13 +488,13 @@ namespace Spire
 						{
 							for (auto & rcomp : xcompImpl->DependentComponents)
 							{
-								if (set.Add(rcomp))
+								if (set.Add(rcomp.Key))
 								{
-									referredComponents.Add(rcomp);
+									referredComponents.Add(rcomp.Key);
 								}
-								if (rcomp == comp.Value.Ptr())
+								if (rcomp.Key == comp.Value)
 								{
-									err->Error(32013, L"circular reference is not allowed.", impl->SyntaxNode->Position);
+									err->Error(32013, L"'" + rcomp.Key->Name + L"': circular reference is not allowed.", impl->SyntaxNode->Position);
 									rs = true;
 								}
 							}
@@ -492,7 +537,7 @@ namespace Spire
 					{
 						for (auto w : requirement->Implementations.First()->Worlds)
 						{
-							if (!shader->Pipeline->IsWorldReachable(arg->Type->FeasibleWorlds, w))
+							if (!shader->Pipeline->IsWorldImplicitlyReachable(arg->Type->FeasibleWorlds, w))
 							{
 								err->Error(32015, L"argument '" + arg->Name + L"' is not available in world '" + w + L"' as required by '" + shader->Name
 									+ L"'.\nsee requirement declaration at " +
@@ -507,11 +552,23 @@ namespace Spire
 				VerifyAndPropagateArgumentConstraints(err, subClosure.Value.Ptr());
 		}
 
+		void AddPipelineComponents(ShaderClosure * shader)
+		{
+			for (auto & comp : shader->Pipeline->Components)
+			{
+				if (!comp.Value->IsParam())
+					shader->Components.AddIfNotExists(comp.Key, new ShaderComponentSymbol(*comp.Value));
+			}
+		}
+
 		void FlattenShaderClosure(ErrorWriter * err, ShaderClosure * shader)
 		{
-			ResolveReference(err, shader);
+			// add input(extern) components from pipeline
+			AddPipelineComponents(shader);
 			// assign choice names
 			AssignUniqueNames(shader, L"", L"");
+
+			ResolveReference(err, shader);
 			// traverse closures to get component list
 			GatherComponents(err, shader, shader);
 			// propagate world constraints
@@ -521,6 +578,8 @@ namespace Spire
 			// check pipeline constraints
 			for (auto & requirement : shader->Pipeline->Components)
 			{
+				if (!requirement.Value->IsParam())
+					continue;
 				auto comp = shader->FindComponent(requirement.Key);
 				if (!comp)
 				{
@@ -534,7 +593,7 @@ namespace Spire
 					{
 						for (auto w : impl->Worlds)
 						{
-							if (!shader->Pipeline->IsWorldReachable(comp->Type->FeasibleWorlds, w))
+							if (!shader->Pipeline->IsWorldImplicitlyReachable(comp->Type->FeasibleWorlds, w))
 							{
 								err->Error(32015, L"component '" + comp->Name + L"' is not available in world '" + w + L"' as required by '" + shader->Pipeline->SyntaxNode->Name.Content
 									+ L"'.\nsee requirement declaration at " +

@@ -15,20 +15,11 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ImportOperator.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="SpireLib.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="GLSLImportOperatorHandlers.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ImportOperator.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="SpireLib.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

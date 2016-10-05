@@ -210,7 +210,7 @@ namespace Spire
 				{
 					if (LookAheadToken(L"inline") || (LookAheadToken(L"public") && !LookAheadToken(L"using", 1)) ||
 						LookAheadToken(L"out") || LookAheadToken(L"@") || IsTypeKeyword()
-						|| LookAheadToken(L"[") || LookAheadToken(L"require"))
+						|| LookAheadToken(L"[") || LookAheadToken(L"require") || LookAheadToken(L"extern"))
 						shader->Members.Add(ParseComponent());
 					else if (LookAheadToken(L"using") || (LookAheadToken(L"public") && LookAheadToken(L"using", 1)))
 					{
@@ -241,6 +241,7 @@ namespace Spire
 		{
 			RefPtr<PipelineSyntaxNode> pipeline = new PipelineSyntaxNode();
 			ReadToken(L"pipeline");
+			PushScope();
 			FillPosition(pipeline.Ptr());
 			pipeline->Name = ReadToken(TokenType::Identifier);
 			ReadToken(TokenType::LBrace);
@@ -259,6 +260,10 @@ namespace Spire
 					op->LayoutAttributes = attribs;
 					pipeline->ImportOperators.Add(op);
 				}
+				else if (LookAheadToken(L"stage"))
+				{
+					pipeline->Stages.Add(ParseStage());
+				}
 				else
 				{
 					auto comp = ParseComponent();
@@ -267,14 +272,40 @@ namespace Spire
 				}
 			}
 			ReadToken(TokenType::RBrace);
+			PopScope();
 			return pipeline;
+		}
+
+		RefPtr<StageSyntaxNode> Parser::ParseStage()
+		{
+			RefPtr<StageSyntaxNode> stage = new StageSyntaxNode();
+			ReadToken(L"stage");
+			stage->Name = ReadToken(TokenType::Identifier);
+			ReadToken(TokenType::Colon);
+			stage->StageType = ReadToken(TokenType::Identifier);
+			ReadToken(TokenType::LBrace);
+			while (!LookAheadToken(TokenType::RBrace))
+			{
+				auto attribName = ReadToken(TokenType::Identifier);
+				ReadToken(TokenType::Colon);
+				Token attribValue;
+				if (LookAheadToken(TokenType::StringLiterial) || LookAheadToken(TokenType::DoubleLiterial) || LookAheadToken(TokenType::IntLiterial))
+					attribValue = ReadToken();
+				else
+					attribValue = ReadToken(TokenType::Identifier);
+				stage->Attributes[attribName.Content] = attribValue;
+				ReadToken(TokenType::Semicolon);
+			}
+			ReadToken(TokenType::RBrace);
+			return stage;
 		}
 
 		RefPtr<ComponentSyntaxNode> Parser::ParseComponent()
 		{
 			RefPtr<ComponentSyntaxNode> component = new ComponentSyntaxNode();
 			component->LayoutAttributes = ParseAttribute();
-			while (LookAheadToken(L"inline") || LookAheadToken(L"out") || LookAheadToken(L"require") || LookAheadToken(L"public"))
+			while (LookAheadToken(L"inline") || LookAheadToken(L"out") || LookAheadToken(L"require") || LookAheadToken(L"public") ||
+				LookAheadToken(L"extern"))
 			{
 				if (LookAheadToken(L"inline"))
 				{
@@ -296,12 +327,17 @@ namespace Spire
 					component->IsParam = true;
 					ReadToken(L"require");
 				}
+				else if (LookAheadToken(L"extern"))
+				{
+					component->IsInput = true;
+					ReadToken(L"extern");
+				}
 				else
 					break;
 			}
 			if (LookAheadToken(L"@"))
 				component->Rate = ParseRate();
-			component->Type = ParseType();
+			component->TypeNode = ParseType();
 			FillPosition(component.Ptr());
 			component->Name = ReadToken(TokenType::Identifier);
 			if (LookAheadToken(L":"))
@@ -334,28 +370,6 @@ namespace Spire
 			ReadToken(L"world");
 			FillPosition(world.Ptr());
 			world->Name = ReadToken(TokenType::Identifier);
-			if (LookAheadToken(TokenType::Colon))
-			{
-				ReadToken(TokenType::Colon);
-				world->TargetMachine = ReadToken(TokenType::StringLiterial).Content;
-			}
-			if (LookAheadToken(L"using"))
-			{
-				ReadToken(L"using");
-				while (LookAheadToken(TokenType::Identifier))
-				{
-					world->Usings.Add(ReadToken(TokenType::Identifier));
-					if (LookAheadToken(TokenType::Comma))
-						ReadToken(TokenType::Comma);
-					else
-						break;
-				}
-			}
-			if (!world->IsAbstract)
-			{
-				ReadToken(L"export");
-				world->ExportOperator = ReadToken(TokenType::Identifier);
-			}
 			ReadToken(TokenType::Semicolon);
 			return world;
 		}
@@ -461,48 +475,33 @@ namespace Spire
 		RefPtr<ImportOperatorDefSyntaxNode> Parser::ParseImportOperator()
 		{
 			RefPtr<ImportOperatorDefSyntaxNode> op = new ImportOperatorDefSyntaxNode();
-			ReadToken(L"import");
+			PushScope();
 			FillPosition(op.Ptr());
-			op->Name = ReadToken(TokenType::Identifier);
+			ReadToken(L"import");
 			ReadToken(TokenType::LParent);
 			op->SourceWorld = ReadToken(TokenType::Identifier);
 			ReadToken(TokenType::RightArrow);
 			op->DestWorld = ReadToken(TokenType::Identifier);
 			ReadToken(TokenType::RParent);
-			if (LookAheadToken(L"using"))
+			FillPosition(op.Ptr());
+			op->Name = ReadToken(TokenType::Identifier);
+			ReadToken(TokenType::LParent);
+			while (!LookAheadToken(TokenType::RParent))
 			{
-				ReadToken(L"using");
-				do
-				{
-					op->Usings.Add(ReadToken(TokenType::Identifier));
-					if (LookAheadToken(TokenType::Comma))
-						ReadToken(TokenType::Comma);
-					else
-						break;
-				} while (LookAheadToken(TokenType::Identifier));
+				op->Parameters.Add(ParseParameter());
+				if (LookAheadToken(TokenType::Comma))
+					ReadToken(TokenType::Comma);
+				else
+					break;
 			}
+			ReadToken(TokenType::RParent);
 			if (LookAheadToken(TokenType::LBrace))
 			{
-				ReadToken(TokenType::LBrace);
-				while (!LookAheadToken(TokenType::RBrace))
-				{
-					auto name = ReadToken(TokenType::Identifier);
-					ReadToken(TokenType::Colon);
-					auto value = ReadToken(TokenType::StringLiterial);
-					ReadToken(TokenType::Semicolon);
-					op->Arguments[name.Content] = value.Content;
-					if (LookAheadToken(TokenType::Comma))
-						ReadToken(TokenType::Comma);
-					else
-						break;
-
-				}
-				ReadToken(TokenType::RBrace);
-				if (LookAheadToken(TokenType::Semicolon))
-					ReadToken(TokenType::Semicolon);
+				op->Body = ParseBlockStatement();
 			}
 			else 
 				ReadToken(TokenType::Semicolon);
+			PopScope();
 			return op;
 		}
 
@@ -530,7 +529,7 @@ namespace Spire
 			}
 			
 			PushScope();
-			function->ReturnType = ParseType();
+			function->ReturnTypeNode = ParseType();
 			try
 			{
 				FillPosition(function.Ptr());
@@ -578,7 +577,7 @@ namespace Spire
 				{
 					RefPtr<StructField> field = new StructField();
 					FillPosition(field.Ptr());
-					field->Type = type;
+					field->TypeNode = type;
 					field->Name = ReadToken(TokenType::Identifier);
 					rs->Fields.Add(field);
 					if (!LookAheadToken(TokenType::Comma))
@@ -741,7 +740,7 @@ namespace Spire
 				else
 					break;
 			}
-			varDeclrStatement->Type = ParseType();
+			varDeclrStatement->TypeNode = ParseType();
 			while (pos < tokens.Count())
 			{
 				RefPtr<Variable> var = new Variable();
@@ -882,7 +881,7 @@ namespace Spire
 		{
 			RefPtr<ParameterSyntaxNode> parameter = new ParameterSyntaxNode();
 			
-			parameter->Type = ParseType();
+			parameter->TypeNode = ParseType();
 			Token & name = ReadToken(TokenType::Identifier);
 			parameter->Name = name.Content;
 			FillPosition(parameter.Ptr());
@@ -892,31 +891,43 @@ namespace Spire
 
 		RefPtr<TypeSyntaxNode> Parser::ParseType()
 		{
-			RefPtr<TypeSyntaxNode> type = new TypeSyntaxNode();
-		
-			FillPosition(type.Ptr());
+			Token typeName;
 			if (LookAheadToken(TokenType::Identifier))
-				type->TypeName = ReadToken(TokenType::Identifier).Content;
+				typeName = ReadToken(TokenType::Identifier);
 			else
-				type->TypeName = ReadTypeKeyword().Content;
-	
+				typeName = ReadTypeKeyword();
+			RefPtr<TypeSyntaxNode> rs;
 			if (LookAheadToken(TokenType::OpLess))
 			{
+				RefPtr<GenericTypeSyntaxNode> gtype = new GenericTypeSyntaxNode();
+				gtype->Position = typeName.Position;
+				gtype->GenericTypeName = typeName.Content;
 				ReadToken(TokenType::OpLess);
-				type->GenericBaseType = ReadToken(TokenType::Identifier).Content;
+				gtype->BaseType = ParseType();
 				ReadToken(TokenType::OpGreater);
+				rs = gtype;
 			}
-			if(LookAheadToken(TokenType::LBracket))
+			else
 			{
-				ReadToken(TokenType::LBracket);
-				type->IsArray = true;
-				if (LookAheadToken(TokenType::IntLiterial))
-					type->ArrayLength = atoi(ReadToken(TokenType::IntLiterial).Content.ToMultiByteString());
-				else
-					type->ArrayLength = 0;
-				ReadToken(TokenType::RBracket);
+				auto basicType = new BasicTypeSyntaxNode();
+				basicType->Position = typeName.Position;
+				basicType->TypeName = typeName.Content;
+				rs = basicType;
 			}
-			return type;
+			while (LookAheadToken(TokenType::LBracket))
+			{
+				RefPtr<ArrayTypeSyntaxNode> arrType = new ArrayTypeSyntaxNode();
+				arrType->Position = rs->Position;
+				arrType->BaseType = rs;
+				ReadToken(TokenType::LBracket);
+				if (LookAheadToken(TokenType::IntLiterial))
+					arrType->ArrayLength = atoi(ReadToken(TokenType::IntLiterial).Content.ToMultiByteString());
+				else
+					arrType->ArrayLength = 0;
+				ReadToken(TokenType::RBracket);
+				rs = arrType;
+			}
+			return rs;
 		}
 
 		enum class Associativity
@@ -1224,7 +1235,7 @@ namespace Spire
 				else if (LookAheadToken(TokenType::LParent))
 				{
 					RefPtr<InvokeExpressionSyntaxNode> invokeExpr = new InvokeExpressionSyntaxNode();
-					invokeExpr->FunctionExpr = rs;
+					invokeExpr->FunctionExpr = rs.As<VarExpressionSyntaxNode>();
 					if (!invokeExpr->FunctionExpr)
 					{
 						errors.Add(CompileError(L"syntax error.", 20002, tokens[pos].Position));
@@ -1239,7 +1250,6 @@ namespace Spire
 						{
 							break;
 						}
-						
 						if (!LookAheadToken(TokenType::Comma))
 							break;
 						ReadToken(TokenType::Comma);

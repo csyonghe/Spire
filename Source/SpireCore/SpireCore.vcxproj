@@ -53,7 +53,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v140</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_VS2013|Win32'" Label="Configuration">
@@ -71,7 +71,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v140</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_VS2013|x64'" Label="Configuration">
@@ -96,7 +96,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release_VS2013|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v120</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -110,7 +110,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release_VS2013|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v120</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -370,6 +370,7 @@
   <ItemGroup>
     <ClInclude Include="Closure.h" />
     <ClInclude Include="CodeGenBackend.h" />
+    <ClInclude Include="CodePosition.h" />
     <ClInclude Include="CodeWriter.h" />
     <ClInclude Include="CompiledProgram.h" />
     <ClInclude Include="CompileError.h" />
@@ -379,10 +380,12 @@
     <ClInclude Include="Parser.h" />
     <ClInclude Include="ScopeDictionary.h" />
     <ClInclude Include="ShaderCompiler.h" />
+    <ClInclude Include="StringObject.h" />
     <ClInclude Include="SymbolTable.h" />
     <ClInclude Include="StdInclude.h" />
     <ClInclude Include="Syntax.h" />
     <ClInclude Include="SyntaxVisitors.h" />
+    <ClInclude Include="VariantIR.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Closure.cpp" />
@@ -390,6 +393,7 @@
     <ClCompile Include="CompiledProgram.cpp" />
     <ClCompile Include="ConstantPool.cpp" />
     <ClCompile Include="GLSLCodeGen.cpp" />
+    <ClCompile Include="InsertImplicitImportOperator.cpp" />
     <ClCompile Include="KeyHoleMatching.cpp" />
     <ClCompile Include="Schedule.cpp" />
     <ClCompile Include="IL.cpp" />
@@ -397,15 +401,30 @@
     <ClCompile Include="ShaderCompiler.cpp" />
     <ClCompile Include="Parser.cpp" />
     <ClCompile Include="SemanticsVisitor.cpp" />
-    <ClCompile Include="SpirVCodeGen.cpp" />
+    <ClCompile Include="SpirVCodeGen.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release_VS2013|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release_VS2013|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugClang|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug_VS2013|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugClang|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug_VS2013|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="SymbolTable.cpp" />
     <ClCompile Include="StdInclude.cpp" />
     <ClCompile Include="Syntax.cpp" />
+    <ClCompile Include="VariantIR.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\CoreLib\CoreLibBasic.vcxproj">
       <Project>{f9be7957-8399-899e-0c49-e714fddd4b65}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="NatvisFile.natvis" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -6,23 +6,6 @@ namespace Spire
 {
 	namespace Compiler
 	{
-		ExpressionType ExpressionType::Bool(Compiler::BaseType::Bool);
-		ExpressionType ExpressionType::Int(Compiler::BaseType::Int);
-		ExpressionType ExpressionType::UInt(Compiler::BaseType::UInt);
-		ExpressionType ExpressionType::UInt2(Compiler::BaseType::UInt2);
-		ExpressionType ExpressionType::UInt3(Compiler::BaseType::UInt3);
-		ExpressionType ExpressionType::UInt4(Compiler::BaseType::UInt4);
-
-		ExpressionType ExpressionType::Float(Compiler::BaseType::Float);
-		ExpressionType ExpressionType::Int2(Compiler::BaseType::Int2);
-		ExpressionType ExpressionType::Float2(Compiler::BaseType::Float2);
-		ExpressionType ExpressionType::Int3(Compiler::BaseType::Int3);
-		ExpressionType ExpressionType::Float3(Compiler::BaseType::Float3);
-		ExpressionType ExpressionType::Int4(Compiler::BaseType::Int4);
-		ExpressionType ExpressionType::Float4(Compiler::BaseType::Float4);
-		ExpressionType ExpressionType::Void(Compiler::BaseType::Void);
-		ExpressionType ExpressionType::Error(Compiler::BaseType::Error);
-
 		bool Scope::FindVariable(const String & name, VariableEntry & variable)
 		{
 			if (Variables.TryGetValue(name, variable))
@@ -32,7 +15,7 @@ namespace Spire
 			return false;
 		}
 
-		int ExpressionType::GetSize()
+		int BasicExpressionType::GetSize() const
 		{
 			int baseSize = GetVectorSize(BaseType);
 			if (BaseType == Compiler::BaseType::Texture2D || BaseType == Compiler::BaseType::TextureCube ||
@@ -40,13 +23,31 @@ namespace Spire
 				baseSize = sizeof(void*) / sizeof(int);
 			else if (BaseType == Compiler::BaseType::Struct)
 				baseSize = Struct->Type->GetSize();
-			if (ArrayLength == 0)
-				return baseSize;
-			else
-				return ArrayLength*baseSize;
+			return baseSize;
 		}
 
-		CoreLib::Basic::String ExpressionType::ToString()
+		bool BasicExpressionType::Equals(const ExpressionType * type) const
+		{
+			auto basicType = dynamic_cast<const BasicExpressionType*>(type);
+			if (basicType == nullptr)
+				return false;
+			return (basicType->BaseType == BaseType &&
+				basicType->Func == Func &&
+				basicType->Shader == Shader &&
+				basicType->Struct == Struct);
+		}
+
+		bool BasicExpressionType::IsVectorType() const
+		{
+			return IsVector(BaseType);
+		}
+
+		bool BasicExpressionType::IsArray() const
+		{
+			return false;
+		}
+
+		CoreLib::Basic::String BasicExpressionType::ToString() const
 		{
 			CoreLib::Basic::StringBuilder res;
 
@@ -101,15 +102,7 @@ namespace Spire
 				res.Append(L"samplerCubeShadow");
 				break;
 			case Compiler::BaseType::Function:
-				res.Append(L"(");
-				for (int i = 0; i < Func->Parameters.Count(); i++)
-				{
-					if (i > 0)
-						res.Append(L",");
-					res.Append(Func->Parameters[i]->Type->ToString());
-				}
-				res.Append(L") => ");
-				res.Append(Func->ReturnType->ToString());
+				res.Append(Func->InternalName);
 				break;
 			case Compiler::BaseType::Shader:
 				res.Append(Shader->SyntaxNode->Name.Content);
@@ -117,22 +110,28 @@ namespace Spire
 			case Compiler::BaseType::Void:
 				res.Append("void");
 				break;
+			case Compiler::BaseType::Record:
+				res.Append(RecordTypeName);
+				break;
+			case Compiler::BaseType::Error:
+				res.Append(L"<errtype>");
+				break;
 			default:
 				break;
-			}
-			if (ArrayLength != 0)
-			{
-				res.Append(L"[");
-				res.Append(CoreLib::Basic::String(ArrayLength));
-				res.Append(L"]");
 			}
 			return res.ToString();
 		}
 
-
-		void ProgramSyntaxNode::Accept(SyntaxVisitor * visitor)
+		ExpressionType * BasicExpressionType::Clone()
 		{
-			visitor->VisitProgram(this);
+			BasicExpressionType * rs = new BasicExpressionType(*this);
+			return rs;
+		}
+
+
+		RefPtr<SyntaxNode> ProgramSyntaxNode::Accept(SyntaxVisitor * visitor)
+		{
+			return visitor->VisitProgram(this);
 		}
 		ProgramSyntaxNode * ProgramSyntaxNode::Clone(CloneContext & ctx)
 		{
@@ -151,9 +150,9 @@ namespace Spire
 				rs->Shaders.Add(x->Clone(ctx));
 			return rs;
 		}
-		void FunctionSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> FunctionSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitFunction(this);
+			return visitor->VisitFunction(this);
 		}
 		FunctionSyntaxNode * FunctionSyntaxNode::Clone(CloneContext & ctx)
 		{
@@ -163,13 +162,13 @@ namespace Spire
 			{
 				rs->Parameters.Add(param->Clone(ctx));
 			}
-			rs->ReturnType = ReturnType->Clone(ctx);
+			rs->ReturnTypeNode = ReturnTypeNode->Clone(ctx);
 			rs->Body = Body->Clone(ctx);
 			return rs;
 		}
-		void BlockStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> BlockStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitBlockStatement(this);
+			return visitor->VisitBlockStatement(this);
 		}
 		BlockStatementSyntaxNode * BlockStatementSyntaxNode::Clone(CloneContext & ctx)
 		{
@@ -181,25 +180,25 @@ namespace Spire
 			}
 			return rs;
 		}
-		void BreakStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> BreakStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitBreakStatement(this);
+			return visitor->VisitBreakStatement(this);
 		}
 		BreakStatementSyntaxNode * BreakStatementSyntaxNode::Clone(CloneContext & ctx)
 		{
 			return CloneSyntaxNodeFields(new BreakStatementSyntaxNode(*this), ctx);
 		}
-		void ContinueStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> ContinueStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitContinueStatement(this);
+			return visitor->VisitContinueStatement(this);
 		}
 		ContinueStatementSyntaxNode * ContinueStatementSyntaxNode::Clone(CloneContext & ctx)
 		{
 			return CloneSyntaxNodeFields(new ContinueStatementSyntaxNode(*this), ctx);
 		}
-		void DoWhileStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> DoWhileStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitDoWhileStatement(this);
+			return visitor->VisitDoWhileStatement(this);
 		}
 		DoWhileStatementSyntaxNode * DoWhileStatementSyntaxNode::Clone(CloneContext & ctx)
 		{
@@ -210,17 +209,17 @@ namespace Spire
 				rs->Statement = Statement->Clone(ctx);
 			return rs;
 		}
-		void EmptyStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> EmptyStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitEmptyStatement(this);
+			return visitor->VisitEmptyStatement(this);
 		}
 		EmptyStatementSyntaxNode * EmptyStatementSyntaxNode::Clone(CloneContext & ctx)
 		{
 			return CloneSyntaxNodeFields(new EmptyStatementSyntaxNode(*this), ctx);
 		}
-		void ForStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> ForStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitForStatement(this);
+			return visitor->VisitForStatement(this);
 		}
 		ForStatementSyntaxNode * ForStatementSyntaxNode::Clone(CloneContext & ctx)
 		{
@@ -236,9 +235,9 @@ namespace Spire
 			rs->TypeDef = TypeDef->Clone(ctx);
 			return rs;
 		}
-		void IfStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> IfStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitIfStatement(this);
+			return visitor->VisitIfStatement(this);
 		}
 		IfStatementSyntaxNode * IfStatementSyntaxNode::Clone(CloneContext & ctx)
 		{
@@ -251,9 +250,9 @@ namespace Spire
 				rs->NegativeStatement = NegativeStatement->Clone(ctx);
 			return rs;
 		}
-		void ReturnStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> ReturnStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitReturnStatement(this);
+			return visitor->VisitReturnStatement(this);
 		}
 		ReturnStatementSyntaxNode * ReturnStatementSyntaxNode::Clone(CloneContext & ctx)
 		{
@@ -262,22 +261,22 @@ namespace Spire
 				rs->Expression = Expression->Clone(ctx);
 			return rs;
 		}
-		void VarDeclrStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> VarDeclrStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitVarDeclrStatement(this);
+			return visitor->VisitVarDeclrStatement(this);
 		}
 		VarDeclrStatementSyntaxNode * VarDeclrStatementSyntaxNode::Clone(CloneContext & ctx)
 		{
 			auto rs = CloneSyntaxNodeFields(new VarDeclrStatementSyntaxNode(*this), ctx);
-			rs->Type = Type->Clone(ctx);
+			rs->TypeNode = TypeNode->Clone(ctx);
 			rs->Variables.Clear();
 			for (auto & var : Variables)
 				rs->Variables.Add(var->Clone(ctx));
 			return rs;
 		}
-		void Variable::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> Variable::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitDeclrVariable(this);
+			return visitor->VisitDeclrVariable(this);
 		}
 		Variable * Variable::Clone(CloneContext & ctx)
 		{
@@ -286,9 +285,9 @@ namespace Spire
 				rs->Expression = Expression->Clone(ctx);
 			return rs;
 		}
-		void WhileStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> WhileStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitWhileStatement(this);
+			return visitor->VisitWhileStatement(this);
 		}
 		WhileStatementSyntaxNode * WhileStatementSyntaxNode::Clone(CloneContext & ctx)
 		{
@@ -299,9 +298,9 @@ namespace Spire
 				rs->Statement = Statement->Clone(ctx);
 			return rs;
 		}
-		void ExpressionStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> ExpressionStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitExpressionStatement(this);
+			return visitor->VisitExpressionStatement(this);
 		}
 		ExpressionStatementSyntaxNode * ExpressionStatementSyntaxNode::Clone(CloneContext & ctx)
 		{
@@ -310,9 +309,9 @@ namespace Spire
 				rs->Expression = Expression->Clone(ctx);
 			return rs;
 		}
-		void BinaryExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> BinaryExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitBinaryExpression(this);
+			return visitor->VisitBinaryExpression(this);
 		}
 		BinaryExpressionSyntaxNode * BinaryExpressionSyntaxNode::Clone(CloneContext & ctx)
 		{
@@ -321,9 +320,9 @@ namespace Spire
 			rs->RightExpression = RightExpression->Clone(ctx);
 			return rs;
 		}
-		void ConstantExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> ConstantExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitConstantExpression(this);
+			return visitor->VisitConstantExpression(this);
 		}
 		ConstantExpressionSyntaxNode * ConstantExpressionSyntaxNode::Clone(CloneContext & ctx)
 		{
@@ -336,13 +335,13 @@ namespace Spire
 			rs->IndexExpression = IndexExpression->Clone(ctx);
 			return rs;
 		}
-		void IndexExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> IndexExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitIndexExpression(this);
+			return visitor->VisitIndexExpression(this);
 		}
-		void MemberExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> MemberExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitMemberExpression(this);
+			return visitor->VisitMemberExpression(this);
 		}
 		MemberExpressionSyntaxNode * MemberExpressionSyntaxNode::Clone(CloneContext & ctx)
 		{
@@ -350,9 +349,9 @@ namespace Spire
 			rs->BaseExpression = BaseExpression->Clone(ctx);
 			return rs;
 		}
-		void InvokeExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> InvokeExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitInvokeExpression(this);
+			return visitor->VisitInvokeExpression(this);
 		}
 		InvokeExpressionSyntaxNode * InvokeExpressionSyntaxNode::Clone(CloneContext & ctx)
 		{
@@ -365,9 +364,9 @@ namespace Spire
 			}
 			return rs;
 		}
-		void TypeCastExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> TypeCastExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitTypeCastExpression(this);
+			return visitor->VisitTypeCastExpression(this);
 		}
 		TypeCastExpressionSyntaxNode * TypeCastExpressionSyntaxNode::Clone(CloneContext & ctx)
 		{
@@ -376,9 +375,9 @@ namespace Spire
 			rs->Expression = Expression->Clone(ctx);
 			return rs;
 		}
-		void SelectExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> SelectExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitSelectExpression(this);
+			return visitor->VisitSelectExpression(this);
 		}
 		SelectExpressionSyntaxNode * SelectExpressionSyntaxNode::Clone(CloneContext & ctx)
 		{
@@ -388,9 +387,9 @@ namespace Spire
 			rs->Expr1 = Expr1->Clone(ctx);
 			return rs;
 		}
-		void UnaryExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> UnaryExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitUnaryExpression(this);
+			return visitor->VisitUnaryExpression(this);
 		}
 		UnaryExpressionSyntaxNode * UnaryExpressionSyntaxNode::Clone(CloneContext & ctx)
 		{
@@ -398,137 +397,92 @@ namespace Spire
 			rs->Expression = Expression->Clone(ctx);
 			return rs;
 		}
-		void VarExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> VarExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitVarExpression(this);
+			return visitor->VisitVarExpression(this);
 		}
 		VarExpressionSyntaxNode * VarExpressionSyntaxNode::Clone(CloneContext & ctx)
 		{
 			return CloneSyntaxNodeFields(new VarExpressionSyntaxNode(*this), ctx);
 		}
-		void ParameterSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> ParameterSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitParameter(this);
+			return visitor->VisitParameter(this);
 		}
 		ParameterSyntaxNode * ParameterSyntaxNode::Clone(CloneContext & ctx)
 		{
 			auto rs = CloneSyntaxNodeFields(new ParameterSyntaxNode(*this), ctx);
-			rs->Type = Type->Clone(ctx);
+			rs->TypeNode = TypeNode->Clone(ctx);
 			rs->Expr = Expr->Clone(ctx);
 			return rs;
 		}
-		void TypeSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> BasicTypeSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitType(this);
+			return visitor->VisitBasicType(this);
 		}
-		TypeSyntaxNode * TypeSyntaxNode::FromExpressionType(ExpressionType t)
+		RefPtr<TypeSyntaxNode> TypeSyntaxNode::FromExpressionType(ExpressionType * type)
 		{
-			TypeSyntaxNode * rs = new TypeSyntaxNode();
-			ExpressionType expType;
-			if (t.BaseType == BaseType::Int)
-				rs->TypeName = L"int";
-			else if (t.BaseType == BaseType::Float)
-				rs->TypeName = L"float";
-			else if (t.BaseType == BaseType::Int2)
-				rs->TypeName = L"ivec2";
-			else if (t.BaseType == BaseType::Int3)
-				rs->TypeName = L"ivec3";
-			else if (t.BaseType == BaseType::Int4)
-				rs->TypeName = L"ivec4";
-			else if (t.BaseType == BaseType::Float2)
-				rs->TypeName = L"vec2";
-			else if (t.BaseType == BaseType::Float3)
-				rs->TypeName = L"vec3";
-			else if (t.BaseType == BaseType::Float4)
-				rs->TypeName = L"vec4";
-			else if (t.BaseType == BaseType::Float3x3)
-				rs->TypeName = L"mat3";
-			else if (t.BaseType == BaseType::Float4x4)
-				rs->TypeName = L"mat4";
-			else if (t.BaseType == BaseType::Texture2D)
-				rs->TypeName = L"sampler2D";
-			else if (t.BaseType == BaseType::TextureCube)
-				rs->TypeName = L"samplerCube";
-			else if (t.BaseType == BaseType::TextureShadow)
-				rs->TypeName = L"samplerShadow";
-			else if (t.BaseType == BaseType::TextureCubeShadow)
-				rs->TypeName = L"samplerCubeShadow";
-			rs->ArrayLength = 0;
-			rs->IsArray = false;		
-			return rs;
-		}
-		ExpressionType TypeSyntaxNode::ToExpressionType(SymbolTable * symTable, ErrorWriter * errWriter)
-		{
-			ExpressionType expType;
-			if (TypeName == L"int")
-				expType.BaseType = BaseType::Int;
-			else if (TypeName == L"uint")
-				expType.BaseType = BaseType::UInt;
-			else if (TypeName == L"float")
-				expType.BaseType = BaseType::Float;
-			else if (TypeName == L"ivec2")
-				expType.BaseType = BaseType::Int2;
-			else if (TypeName == L"ivec3")
-				expType.BaseType = BaseType::Int3;
-			else if (TypeName == L"ivec4")
-				expType.BaseType = BaseType::Int4;
-			else if (TypeName == L"uvec2")
-				expType.BaseType = BaseType::UInt2;
-			else if (TypeName == L"uvec3")
-				expType.BaseType = BaseType::UInt3;
-			else if (TypeName == L"uvec4")
-				expType.BaseType = BaseType::UInt4;
-			else if (TypeName == L"vec2")
-				expType.BaseType = BaseType::Float2;
-			else if (TypeName == L"vec3")
-				expType.BaseType = BaseType::Float3;
-			else if (TypeName == L"vec4")
-				expType.BaseType = BaseType::Float4;
-			else if (TypeName == L"mat3" || TypeName == L"mat3x3")
-				expType.BaseType = BaseType::Float3x3;
-			else if (TypeName == L"mat4" || TypeName == L"mat4x4")
-				expType.BaseType = BaseType::Float4x4;
-			else if (TypeName == L"sampler2D")
-				expType.BaseType = BaseType::Texture2D;
-			else if (TypeName == L"samplerCube")
-				expType.BaseType = BaseType::TextureCube;
-			else if (TypeName == L"sampler2DShadow")
-				expType.BaseType = BaseType::TextureShadow;
-			else if (TypeName == L"samplerCubeShadow")
-				expType.BaseType = BaseType::TextureCubeShadow;
-			else if (TypeName == L"void")
-				expType.BaseType = BaseType::Void;
-			else if (TypeName == L"bool")
-				expType.BaseType = BaseType::Bool;
-			else
+			if (auto basicType = dynamic_cast<BasicExpressionType*>(type))
 			{
-				expType.BaseType = BaseType::Struct;
-				RefPtr<StructSymbol> ssym;
-				if (symTable->Structs.TryGetValue(TypeName, ssym))
-				{
-					expType.Struct = ssym.Ptr();
-				}
-				else
-				{
-					if (errWriter)
-					{
-						errWriter->Error(31040, L"undefined type name: '" + TypeName + L"'.", Position);
-					}
-					return ExpressionType::Error;
-				}
+				RefPtr<BasicTypeSyntaxNode> rs = new BasicTypeSyntaxNode();
+				auto & t = *basicType;
+				if (basicType->BaseType == BaseType::Int)
+					rs->TypeName = L"int";
+				else if (t.BaseType == BaseType::Float)
+					rs->TypeName = L"float";
+				else if (t.BaseType == BaseType::Bool)
+					rs->TypeName = L"bool";
+				else if (t.BaseType == BaseType::Int2)
+					rs->TypeName = L"ivec2";
+				else if (t.BaseType == BaseType::Int3)
+					rs->TypeName = L"ivec3";
+				else if (t.BaseType == BaseType::Int4)
+					rs->TypeName = L"ivec4";
+				else if (t.BaseType == BaseType::UInt)
+					rs->TypeName = L"uint";
+				else if (t.BaseType == BaseType::UInt2)
+					rs->TypeName = L"uint2";
+				else if (t.BaseType == BaseType::UInt3)
+					rs->TypeName = L"uint3";
+				else if (t.BaseType == BaseType::UInt4)
+					rs->TypeName = L"uint4";
+				else if (t.BaseType == BaseType::Float2)
+					rs->TypeName = L"vec2";
+				else if (t.BaseType == BaseType::Float3)
+					rs->TypeName = L"vec3";
+				else if (t.BaseType == BaseType::Float4)
+					rs->TypeName = L"vec4";
+				else if (t.BaseType == BaseType::Float3x3)
+					rs->TypeName = L"mat3";
+				else if (t.BaseType == BaseType::Float4x4)
+					rs->TypeName = L"mat4";
+				else if (t.BaseType == BaseType::Texture2D)
+					rs->TypeName = L"sampler2D";
+				else if (t.BaseType == BaseType::TextureCube)
+					rs->TypeName = L"samplerCube";
+				else if (t.BaseType == BaseType::TextureShadow)
+					rs->TypeName = L"samplerShadow";
+				else if (t.BaseType == BaseType::TextureCubeShadow)
+					rs->TypeName = L"samplerCubeShadow";
+				return rs;
 			}
-			expType.ArrayLength = ArrayLength;
-			expType.IsArray = IsArray;
-			return expType;
+			else if (auto arrayType = dynamic_cast<ArrayExpressionType*>(type))
+			{
+				RefPtr<ArrayTypeSyntaxNode> rs = new ArrayTypeSyntaxNode();
+				rs->ArrayLength = arrayType->ArrayLength;
+				rs->BaseType = FromExpressionType(arrayType->BaseType.Ptr());
+				return rs;
+			}
+			throw NotImplementedException();
 		}
-		void ComponentSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> ComponentSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitComponent(this);
+			return visitor->VisitComponent(this);
 		}
 		ComponentSyntaxNode * ComponentSyntaxNode::Clone(CloneContext & ctx)
 		{
 			auto rs = CloneSyntaxNodeFields(new ComponentSyntaxNode(*this), ctx);
-			rs->Type = Type->Clone(ctx);
+			rs->TypeNode = TypeNode->Clone(ctx);
 			if (Rate)
 				rs->Rate = Rate->Clone(ctx);
 			if (BlockStatement)
@@ -537,9 +491,9 @@ namespace Spire
 				rs->Expression = Expression->Clone(ctx);
 			return rs;
 		}
-		void ShaderSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> ShaderSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitShader(this);
+			return visitor->VisitShader(this);
 		}
 		ShaderSyntaxNode * ShaderSyntaxNode::Clone(CloneContext & ctx)
 		{
@@ -556,6 +510,10 @@ namespace Spire
 		WorldSyntaxNode * WorldSyntaxNode::Clone(CloneContext & ctx)
 		{
 			return CloneSyntaxNodeFields(new WorldSyntaxNode(*this), ctx);
+		}
+		RefPtr<SyntaxNode> ImportOperatorDefSyntaxNode::Accept(SyntaxVisitor * visitor)
+		{
+			return visitor->VisitImportOperatorDef(this); 
 		}
 		ImportOperatorDefSyntaxNode * ImportOperatorDefSyntaxNode::Clone(CloneContext & ctx)
 		{
@@ -579,9 +537,9 @@ namespace Spire
 		{
 			return CloneSyntaxNodeFields(new ChoiceValueSyntaxNode(*this), ctx);
 		}
-		void ImportSyntaxNode::Accept(SyntaxVisitor * v)
+		RefPtr<SyntaxNode> ImportSyntaxNode::Accept(SyntaxVisitor * v)
 		{
-			v->VisitImport(this);
+			return v->VisitImport(this);
 		}
 		ImportSyntaxNode * ImportSyntaxNode::Clone(CloneContext & ctx)
 		{
@@ -591,9 +549,9 @@ namespace Spire
 				rs->Arguments.Add(arg->Clone(ctx));
 			return rs;
 		}
-		void ImportArgumentSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> ImportArgumentSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitImportArgument(this);
+			return visitor->VisitImportArgument(this);
 		}
 		ImportArgumentSyntaxNode * ImportArgumentSyntaxNode::Clone(CloneContext & ctx)
 		{
@@ -601,9 +559,9 @@ namespace Spire
 			rs->Expression = Expression->Clone(ctx);
 			return rs;
 		}
-		void ImportStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> ImportStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitImportStatement(this);
+			return visitor->VisitImportStatement(this);
 		}
 		ImportStatementSyntaxNode * ImportStatementSyntaxNode::Clone(CloneContext & ctx)
 		{
@@ -611,22 +569,208 @@ namespace Spire
 			rs->Import = Import->Clone(ctx);
 			return rs;
 		}
-		void StructField::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> StructField::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitStructField(this);
+			return visitor->VisitStructField(this);
 		}
-		void StructSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> StructSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitStruct(this);
+			return visitor->VisitStruct(this);
 		}
-		void DiscardStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> DiscardStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
-			visitor->VisitDiscardStatement(this);
+			return visitor->VisitDiscardStatement(this);
 		}
 		DiscardStatementSyntaxNode * DiscardStatementSyntaxNode::Clone(CloneContext & ctx)
 		{
 			auto rs = CloneSyntaxNodeFields(new DiscardStatementSyntaxNode(*this), ctx);
 			return rs;
+		}
+		bool BasicExpressionType::IsIntegral() const
+		{
+			return (BaseType == Compiler::BaseType::Int || BaseType == Compiler::BaseType::UInt || BaseType == Compiler::BaseType::Bool);
+		}
+		bool ExpressionType::IsTexture() const
+		{
+			auto basicType = AsBasicType();
+			if (basicType)
+				return basicType->BaseType == BaseType::Texture2D ||
+					basicType->BaseType == BaseType::TextureCube ||
+					basicType->BaseType == BaseType::TextureCubeShadow ||
+					basicType->BaseType == BaseType::TextureShadow;
+			return false;
+		}
+		bool ExpressionType::IsStruct() const
+		{
+			auto basicType = AsBasicType();
+			if (basicType)
+				return basicType->Struct != nullptr;
+			return false;
+		}
+		bool ExpressionType::IsShader() const
+		{
+			auto basicType = AsBasicType();
+			if (basicType)
+				return basicType->Shader != nullptr;
+			return false;
+		}
+
+		RefPtr<ExpressionType> ExpressionType::Bool;
+		RefPtr<ExpressionType> ExpressionType::UInt;
+		RefPtr<ExpressionType> ExpressionType::UInt2;
+		RefPtr<ExpressionType> ExpressionType::UInt3;
+		RefPtr<ExpressionType> ExpressionType::UInt4;
+		RefPtr<ExpressionType> ExpressionType::Int;
+		RefPtr<ExpressionType> ExpressionType::Int2;
+		RefPtr<ExpressionType> ExpressionType::Int3;
+		RefPtr<ExpressionType> ExpressionType::Int4;
+		RefPtr<ExpressionType> ExpressionType::Float;
+		RefPtr<ExpressionType> ExpressionType::Float2;
+		RefPtr<ExpressionType> ExpressionType::Float3;
+		RefPtr<ExpressionType> ExpressionType::Float4;
+		RefPtr<ExpressionType> ExpressionType::Void;
+		RefPtr<ExpressionType> ExpressionType::Error;
+
+		void ExpressionType::Init()
+		{
+			Bool = new BasicExpressionType(BaseType::Bool);
+			UInt = new BasicExpressionType(BaseType::UInt);
+			UInt2 = new BasicExpressionType(BaseType::UInt2);
+			UInt3 = new BasicExpressionType(BaseType::UInt3);
+			UInt4 = new BasicExpressionType(BaseType::UInt4);
+			Int = new BasicExpressionType(BaseType::Int);
+			Int2 = new BasicExpressionType(BaseType::Int2);
+			Int3 = new BasicExpressionType(BaseType::Int3);
+			Int4 = new BasicExpressionType(BaseType::Int4);
+			Float = new BasicExpressionType(BaseType::Float);
+			Float2 = new BasicExpressionType(BaseType::Float2);
+			Float3 = new BasicExpressionType(BaseType::Float3);
+			Float4 = new BasicExpressionType(BaseType::Float4);
+			Void = new BasicExpressionType(BaseType::Void);
+			Error = new BasicExpressionType(BaseType::Error);
+		}
+		void ExpressionType::Finalize()
+		{
+			Bool = nullptr;
+			UInt = nullptr;
+			UInt2 = nullptr;
+			UInt3 = nullptr;
+			UInt4 = nullptr;
+			Int = nullptr;
+			Int2 = nullptr;
+			Int3 = nullptr;
+			Int4 = nullptr;
+			Float = nullptr;
+			Float2 = nullptr;
+			Float3 = nullptr;
+			Float4 = nullptr;
+			Void = nullptr;
+			Error = nullptr;
+		}
+		bool ArrayExpressionType::IsIntegral() const
+		{
+			return false;
+		}
+		bool ArrayExpressionType::IsArray() const
+		{
+			return true;
+		}
+		int ArrayExpressionType::GetSize() const
+		{
+			return ArrayLength * BaseType->GetSize();
+		}
+		bool ArrayExpressionType::Equals(const ExpressionType * type) const
+		{
+			auto arrType = dynamic_cast<const ArrayExpressionType*>(type);
+			if (!arrType)
+				return false;
+			return (ArrayLength == arrType->ArrayLength && BaseType->Equals(arrType->BaseType.Ptr()));
+		}
+		bool ArrayExpressionType::IsVectorType() const
+		{
+			return false;
+		}
+		CoreLib::Basic::String ArrayExpressionType::ToString() const
+		{
+			if (ArrayLength > 0)
+				return BaseType->ToString() + L"[" + String(ArrayLength) + L"]";
+			else
+				return BaseType->ToString() + L"[]";
+		}
+		ExpressionType * ArrayExpressionType::Clone()
+		{
+			auto rs = new ArrayExpressionType(*this);
+			rs->BaseType = BaseType->Clone();
+			return rs;
+		}
+		RefPtr<SyntaxNode> ArrayTypeSyntaxNode::Accept(SyntaxVisitor * visitor)
+		{
+			return visitor->VisitArrayType(this);
+		}
+		RefPtr<SyntaxNode> GenericTypeSyntaxNode::Accept(SyntaxVisitor * visitor)
+		{
+			return visitor->VisitGenericType(this);
+		}
+		bool GenericExpressionType::IsIntegral() const
+		{
+			return false;
+		}
+		int GenericExpressionType::GetSize() const
+		{
+			return 0;
+		}
+		bool GenericExpressionType::IsArray() const
+		{
+			return false;
+		}
+		bool GenericExpressionType::Equals(const ExpressionType * type) const
+		{
+			if (auto gtype = dynamic_cast<const GenericExpressionType*>(type))
+				return GenericTypeName == gtype->GenericTypeName && gtype->BaseType->Equals(BaseType.Ptr());
+			
+			return false;
+		}
+		bool GenericExpressionType::IsVectorType() const
+		{
+			return false;
+		}
+		CoreLib::Basic::String GenericExpressionType::ToString() const
+		{
+			return GenericTypeName + L"<" + BaseType->ToString() + L">";
+		}
+		ExpressionType * GenericExpressionType::Clone()
+		{
+			auto rs = new GenericExpressionType(*this);
+			rs->BaseType = BaseType->Clone();
+			return rs;
+		}
+		RefPtr<SyntaxNode> ImportExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
+		{
+			return visitor->VisitImportExpression(this);
+		}
+		ImportExpressionSyntaxNode * ImportExpressionSyntaxNode::Clone(CloneContext & ctx)
+		{
+			ImportExpressionSyntaxNode * result = new ImportExpressionSyntaxNode(*this);
+			CloneSyntaxNodeFields(result, ctx);
+			result->Component = Component->Clone(ctx);
+			result->Arguments.Clear();
+			for (auto & arg : Arguments)
+				result->Arguments.Add(arg->Clone(ctx));
+			return result;
+		}
+		StageSyntaxNode * StageSyntaxNode::Clone(CloneContext &)
+		{
+			return new StageSyntaxNode(*this);
+		}
+		RefPtr<ComponentSyntaxNode> SyntaxVisitor::VisitComponent(ComponentSyntaxNode * comp)
+		{
+			if (comp->TypeNode)
+				comp->TypeNode = comp->TypeNode->Accept(this).As<TypeSyntaxNode>();
+			if (comp->Expression)
+				comp->Expression = comp->Expression->Accept(this).As<ExpressionSyntaxNode>();
+			if (comp->BlockStatement)
+				comp->BlockStatement = comp->BlockStatement->Accept(this).As<BlockStatementSyntaxNode>();
+			return comp;
 		}
 }
 }

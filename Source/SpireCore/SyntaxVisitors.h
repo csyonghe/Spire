@@ -21,13 +21,13 @@ namespace Spire
 				: SyntaxVisitor(perr)
 			{}
 			virtual void ProcessFunction(FunctionSyntaxNode * func) = 0;
-			virtual void ProcessShader(ShaderClosure * shader) = 0;
+			virtual void ProcessShader(ShaderIR * shader) = 0;
 			virtual void ProcessStruct(StructSyntaxNode * st) = 0;
 		};
 
 		SyntaxVisitor * CreateSemanticsVisitor(SymbolTable * symbols, ErrorWriter * err);
 		ICodeGenerator * CreateCodeGenerator(SymbolTable * symbols, CompileResult & result);
-		RefPtr<ILType> TranslateExpressionType(const ExpressionType & type);
+		RefPtr<ILType> TranslateExpressionType(const ExpressionType * type);
 	}
 }
 

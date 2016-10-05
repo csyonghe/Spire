@@ -19,10 +19,16 @@ namespace Spire
 			GenerateChoice
 		};
 
+		enum class CodeGenTarget
+		{
+			GLSL, SPIRV
+		};
+
 		class CompileOptions
 		{
 		public:
 			CompilerMode Mode = CompilerMode::ProduceShader;
+			CodeGenTarget Target = CodeGenTarget::GLSL;
 			EnumerableDictionary<String, String> BackendArguments;
 			String ScheduleSource, ScheduleFileName;
 			String SymbolToCompile;
@@ -39,10 +45,8 @@ namespace Spire
 		public:
 			virtual CompileUnit Parse(CompileResult & result, String source, String fileName) = 0;
 			virtual void Compile(CompileResult & result, List<CompileUnit> & units, const CompileOptions & options) = 0;
-			virtual void RegisterImportOperator(String backendName, ImportOperatorHandler * handler) = 0;
-			virtual void RegisterExportOperator(String backendName, ExportOperatorHandler * handler) = 0;
-
 		};
+
 		ShaderCompiler * CreateShaderCompiler();
 	}
 }

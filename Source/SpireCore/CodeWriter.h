@@ -196,15 +196,6 @@ namespace Spire
 				cfgNode->InsertTail(instr);
 				return instr;
 			}*/
-			GLeaInstruction * GLea(RefPtr<ILType> & type, const String & name)
-			{
-				auto instr = new GLeaInstruction();
-				instr->Type = type;
-				instr->Name = name;
-				instr->VariableName = name;
-				cfgNode.Last()->InsertTail(instr);
-				return instr;
-			}
 			FetchArgInstruction * FetchArg(RefPtr<ILType> type, int argId)
 			{
 				auto instr = new FetchArgInstruction(type);

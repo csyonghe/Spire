@@ -2,43 +2,13 @@
 #define RASTER_RENDERER_COMPILE_ERROR_H
 
 #include "../CoreLib/Basic.h"
+#include "CodePosition.h"
 
 namespace Spire
 {
 	namespace Compiler
 	{
 		using namespace CoreLib::Basic;
-
-		class CodePosition
-		{
-		public:
-			int Line = -1, Col = -1;
-			String FileName;
-			String ToString()
-			{
-				StringBuilder sb(100);
-				sb << FileName;
-				if (Line != -1)
-					sb << L"(" << Line << L")";
-				return sb.ProduceString();
-			}
-			CodePosition() = default;
-			CodePosition(int line, int col, String fileName)
-			{
-				Line = line;
-				Col = col;
-				this->FileName = fileName;
-			}
-			bool operator < (const CodePosition & pos) const
-			{
-				return FileName < pos.FileName || (FileName == pos.FileName && Line < pos.Line) ||
-					(FileName == pos.FileName && Line == pos.Line && Col < pos.Col);
-			}
-			bool operator == (const CodePosition & pos) const
-			{
-				return FileName == pos.FileName && Line == pos.Line && Col == pos.Col;
-			}
-		};
 
 		class CompileError
 		{

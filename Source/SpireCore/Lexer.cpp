@@ -401,7 +401,7 @@ namespace Spire
 						tokenLine = line;
 						tokenCol = col;
 					}
-					else if (curChar == L' ' || curChar == L'\t' || curChar == L'\r' || curChar == L'\n')
+					else if (curChar == L' ' || curChar == L'\t' || curChar == L'\r' || curChar == L'\n' || curChar == 160) // 160:non-break space
 						pos++;
 					else if (curChar == L'/' && nextChar == L'/')
 					{

@@ -11,6 +11,7 @@
 #include "CodeGenBackend.h"
 #include "../CoreLib/Parser.h"
 #include "Closure.h"
+#include "VariantIR.h"
 
 #ifdef CreateDirectory
 #undef CreateDirectory
@@ -24,12 +25,12 @@ namespace Spire
 {
 	namespace Compiler
 	{
+		int compilerInstances = 0;
+
 		class ShaderCompilerImpl : public ShaderCompiler
 		{
 		private:
 			Dictionary<String, RefPtr<CodeGenBackend>> backends;
-			Dictionary<String, Dictionary<String, ImportOperatorHandler *>> opHandlers;
-			Dictionary<String, Dictionary<String, ExportOperatorHandler *>> exportHandlers;
 
 			void ResolveAttributes(SymbolTable * symTable)
 			{
@@ -87,7 +88,7 @@ namespace Spire
 					{
 						for (auto & w : impl->Worlds)
 						{
-							if (impl->SrcPinnedWorlds.Contains(w) || impl->SyntaxNode->IsInline || impl->ExportWorlds.Contains(w))
+							if (impl->SrcPinnedWorlds.Contains(w) || impl->SyntaxNode->IsInline || impl->ExportWorlds.Contains(w) || impl->SyntaxNode->IsInput)
 							{
 								comp.Value->Type->PinnedWorlds.Add(w);
 							}
@@ -145,20 +146,31 @@ namespace Spire
 				for (auto & comp : shader->AllComponents)
 				{
 					EnumerableDictionary<String, ComponentDefinitionIR*> defs;
+					Dictionary<String, ShaderComponentImplSymbol*> impls;
 					for (auto & impl : comp.Value->Implementations)
 					{
 						for (auto & w : impl->Worlds)
 						{
 							RefPtr<ComponentDefinitionIR> def = new ComponentDefinitionIR();
-							def->Component = comp.Value;
-							def->Implementation = impl.Ptr();
+							def->OriginalName = comp.Value->Name;
+							def->UniqueKey = comp.Value->UniqueKey;
+							def->UniqueName = comp.Value->UniqueName;
+							def->Type = comp.Value->Type->DataType;
+							def->IsEntryPoint = (impl->ExportWorlds.Contains(w) ||
+								(shader->Pipeline->IsAbstractWorld(w) &&
+								(impl->SyntaxNode->LayoutAttributes.ContainsKey(L"Pinned") || shader->Pipeline->Worlds[w]().SyntaxNode->LayoutAttributes.ContainsKey(L"Pinned"))));
+							CloneContext cloneCtx;
+							def->SyntaxNode = impl->SyntaxNode->Clone(cloneCtx);
 							def->World = w;
 							result->Definitions.Add(def);
 							bool existingDefIsPinned = false;
-							if (auto existingDef = defs.TryGetValue(w))
-								existingDefIsPinned = pinnedImpl.Contains((*existingDef)->Implementation);
+							if (defs.ContainsKey(w))
+								existingDefIsPinned = pinnedImpl.Contains(impls[w]());
 							if (!existingDefIsPinned)
+							{
 								defs[w] = def.Ptr();
+								impls[w] = impl.Ptr();
+							}
 						}
 					}
 					result->DefinitionsByComponent[comp.Key] = defs;
@@ -174,8 +186,8 @@ namespace Spire
 					{
 						if (def->Dependency.Contains(def.Ptr()))
 						{
-							cresult.GetErrorWriter()->Error(33102, L"component definition \'" + def->Component->Name + L"\' involves circular reference.",
-								def->Implementation->SyntaxNode->Position);
+							cresult.GetErrorWriter()->Error(33102, L"component definition \'" + def->OriginalName + L"\' involves circular reference.",
+								def->SyntaxNode->Position);
 							return nullptr;
 						}
 					}
@@ -256,6 +268,11 @@ namespace Spire
 
 					if (result.ErrorList.Count() > 0)
 						return;
+					CodeGenBackend * backend = nullptr;
+					if (options.Target == CodeGenTarget::SPIRV)
+						backend = backends[L"spirv"]().Ptr();
+					else
+						backend = backends[L"glsl"]().Ptr();
 
 					Schedule schedule;
 					if (options.ScheduleSource != L"")
@@ -278,7 +295,15 @@ namespace Spire
 						for (auto & func : programSyntaxNode->Functions)
 							codeGen->ProcessFunction(func.Ptr());
 						for (auto & shader : shaderClosures)
-							codeGen->ProcessShader(shader.Ptr());
+						{
+							InsertImplicitImportOperators(shader->IR.Ptr());
+						}
+						if (result.ErrorList.Count() > 0)
+							return;
+						for (auto & shader : shaderClosures)
+						{
+							codeGen->ProcessShader(shader->IR.Ptr());
+						}
 						if (result.ErrorList.Count() > 0)
 							return;
 						// emit target code
@@ -300,40 +325,15 @@ namespace Spire
 									return true;
 							return false;
 						};
+						ErrorWriter errWriter(result.ErrorList, result.WarningList);
 						for (auto & shader : result.Program->Shaders)
 						{
-							if ((options.SymbolToCompile.Length() == 0 && IsSymbolToGen(shader->MetaData.ShaderName))
-								|| options.SymbolToCompile == shader->MetaData.ShaderName)
+							if ((options.SymbolToCompile.Length() == 0 && IsSymbolToGen(shader->Name))
+								|| options.SymbolToCompile == shader->Name)
 							{
 								StringBuilder glslBuilder;
 								Dictionary<String, String> targetCode;
-								result.CompiledSource[shader->MetaData.ShaderName + L".glsl"] = EnumerableDictionary<String, CompiledShaderSource>();
-								auto & worldSources = result.CompiledSource[shader->MetaData.ShaderName + L".glsl"]();
-								for (auto & world : shader->Worlds)
-								{
-									if (world.Value->IsAbstract)
-										continue;
-									RefPtr<CodeGenBackend> backend;
-									if (!backends.TryGetValue(world.Value->TargetMachine, backend))
-									{
-										result.GetErrorWriter()->Error(40000, L"backend '" + world.Value->TargetMachine + L"' is not supported.",
-											world.Value->WorldDefPosition);
-									}
-									else
-									{
-										auto args = world.Value->BackendParameters;
-										for (auto & arg : options.BackendArguments)
-											args[arg.Key] = args[arg.Value];
-										backend->SetParameters(args);
-										Dictionary<String, ImportOperatorHandler*> importHandlers;
-										Dictionary<String, ExportOperatorHandler*> beExportHandlers;
-
-										opHandlers.TryGetValue(world.Value->TargetMachine, importHandlers);
-										exportHandlers.TryGetValue(world.Value->TargetMachine, beExportHandlers);
-
-										worldSources[world.Key] = backend->GenerateShaderWorld(result, &symTable, world.Value.Ptr(), importHandlers, beExportHandlers);
-									}
-								}
+								result.CompiledSource[shader->Name] = backend->GenerateShader(result, &symTable, shader.Ptr(), &errWriter);
 							}
 						}
 						result.Success = result.ErrorList.Count() == 0;
@@ -394,24 +394,24 @@ namespace Spire
 				return;
 			}
 
-			virtual void RegisterImportOperator(String backendName, ImportOperatorHandler * handler) override
-			{
-				if (!opHandlers.ContainsKey(backendName))
-					opHandlers[backendName] = Dictionary<String, ImportOperatorHandler*>();
-				opHandlers[backendName]().Add(handler->GetName(), handler);
-			}
-
-			virtual void RegisterExportOperator(String backendName, ExportOperatorHandler * handler) override
-			{
-				if (!exportHandlers.ContainsKey(backendName))
-					exportHandlers[backendName] = Dictionary<String, ExportOperatorHandler*>();
-				exportHandlers[backendName]().Add(handler->GetName(), handler);
-			}
-
 			ShaderCompilerImpl()
 			{
+				if (compilerInstances == 0)
+				{
+					BasicExpressionType::Init();
+				}
+				compilerInstances++;
 				backends.Add(L"glsl", CreateGLSLCodeGen());
-				backends.Add(L"spirv", CreateSpirVCodeGen());
+				//backends.Add(L"spirv", CreateSpirVCodeGen());
+			}
+
+			~ShaderCompilerImpl()
+			{
+				compilerInstances--;
+				if (compilerInstances == 0)
+				{
+					BasicExpressionType::Finalize();
+				}
 			}
 		};
 

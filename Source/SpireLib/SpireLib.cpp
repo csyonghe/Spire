@@ -2,7 +2,6 @@
 #include "../CoreLib/LibIO.h"
 #include "../CoreLib/Parser.h"
 #include "../SpireCore/StdInclude.h"
-#include "ImportOperator.h"
 
 using namespace CoreLib::Basic;
 using namespace CoreLib::IO;
@@ -11,7 +10,7 @@ using namespace Spire::Compiler;
 
 namespace SpireLib
 {
-	void ReadSource(EnumerableDictionary<CoreLib::Basic::String, CompiledShaderSource> & sources, CoreLib::Text::Parser & parser, String src)
+	void ReadSource(EnumerableDictionary<String, StageSource> & sources, CoreLib::Text::Parser & parser, String src)
 	{
 		auto getShaderSource = [&]()
 		{
@@ -34,7 +33,7 @@ namespace SpireLib
 		while (!parser.IsEnd() && !parser.LookAhead(L"}"))
 		{
 			auto worldName = parser.ReadWord();
-			CompiledShaderSource compiledSrc;
+			StageSource compiledSrc;
 			if (parser.LookAhead(L"binary"))
 			{
 				parser.ReadToken();
@@ -51,15 +50,15 @@ namespace SpireLib
 			if (parser.LookAhead(L"text"))
 			{
 				parser.ReadToken();
-				compiledSrc.ParseFromGLSL(getShaderSource());
+				compiledSrc.MainCode = getShaderSource();
 			}
 			sources[worldName] = compiledSrc;
 		}
 	}
-	CompiledShaderSource ShaderLib::GetWorldSource(String world)
+	StageSource ShaderLib::GetStageSource(String stage)
 	{
-		CompiledShaderSource rs;
-		Sources.TryGetValue(world, rs);
+		StageSource rs;
+		Sources.TryGetValue(stage, rs);
 		return rs;
 	}
 	ShaderLib::ShaderLib(CoreLib::Basic::String fileName)
@@ -98,27 +97,7 @@ namespace SpireLib
 		Spire::Compiler::CompileOptions & options)
 	{
 		List<ShaderLibFile> resultFiles;
-		List<ImportOperatorHandler*> importHandlers;
-		List<ExportOperatorHandler*> exportHandlers;
-		CreateGLSLImportOperatorHandlers(importHandlers);
-		CreateGLSLExportOperatorHandlers(exportHandlers);
-		for (auto handler : exportHandlers)
-			compiler->RegisterExportOperator(L"glsl", handler);
-		for (auto handler : importHandlers)
-			compiler->RegisterImportOperator(L"glsl", handler);
-		try
-		{
-			if (compileResult.ErrorList.Count() == 0)
-				compiler->Compile(compileResult, units, options);
-			DestroyImportOperatorHanlders(importHandlers);
-			DestroyExportOperatorHanlders(exportHandlers);
-		}
-		catch (...)
-		{
-			DestroyImportOperatorHanlders(importHandlers);
-			DestroyExportOperatorHanlders(exportHandlers);
-			throw;
-		}
+		compiler->Compile(compileResult, units, options);
 		if (compileResult.Success)
 		{
 			if (options.Mode == CompilerMode::ProduceShader)
@@ -126,27 +105,10 @@ namespace SpireLib
 				EnumerableDictionary<String, ShaderLibFile> shaderLibs;
 				for (auto file : compileResult.CompiledSource)
 				{
-					auto shaderName = Path::GetFileNameWithoutEXT(file.Key);
-					ShaderLibFile * libFile = shaderLibs.TryGetValue(shaderName);
-					if (!libFile)
-					{
-						shaderLibs.Add(shaderName, ShaderLibFile());
-						libFile = shaderLibs.TryGetValue(shaderName);
-						libFile->MetaData.ShaderName = shaderName;
-					}
-					libFile->Sources = file.Value;
-				}
-				for (auto & libFile : shaderLibs)
-				{
-					for (auto & shader : compileResult.Program->Shaders)
-					{
-						if (shader->MetaData.ShaderName == libFile.Key)
-						{
-							// fill in meta data
-							libFile.Value.MetaData = shader->MetaData;
-						}
-					}
-					resultFiles.Add(libFile.Value);
+					ShaderLibFile libFile;
+					libFile.MetaData = file.Value.MetaData;
+					libFile.Sources = file.Value.Stages;
+					resultFiles.Add(libFile);
 				}
 			}
 		}
@@ -154,15 +116,15 @@ namespace SpireLib
 	}
 
 	List<ShaderLibFile> CompileShaderSource(Spire::Compiler::CompileResult & compileResult,
-		const CoreLib::String & src, Spire::Compiler::CompileOptions & options)
+		const CoreLib::String & src, const CoreLib::String & fileName, Spire::Compiler::CompileOptions & options)
 	{
 		Spire::Compiler::NamingCounter = 0;
 		RefPtr<ShaderCompiler> compiler = CreateShaderCompiler();
 		List<CompileUnit> units;
 		HashSet<String> processedUnits;
 		List<String> unitsToInclude;
-		unitsToInclude.Add(L"");
-		processedUnits.Add(L"");
+		unitsToInclude.Add(fileName);
+		processedUnits.Add(fileName);
 		auto predefUnit = compiler->Parse(compileResult, LibIncludeString, L"stdlib");
 		for (int i = 0; i < unitsToInclude.Count(); i++)
 		{
@@ -192,48 +154,25 @@ namespace SpireLib
 			}
 		}
 		units.Add(predefUnit);
-		return CompileUnits(compileResult, compiler.Ptr(), units, options);
+		if (compileResult.ErrorList.Count() == 0)
+			return CompileUnits(compileResult, compiler.Ptr(), units, options);
+		else
+			return List<ShaderLibFile>();
 	}
 
 	List<ShaderLibFile> CompileShaderSourceFromFile(Spire::Compiler::CompileResult & compileResult, 
 		CoreLib::Basic::String sourceFileName,
 		Spire::Compiler::CompileOptions & options)
 	{
-		Spire::Compiler::NamingCounter = 0;
-		RefPtr<ShaderCompiler> compiler = CreateShaderCompiler();
-		List<CompileUnit> units;
-		HashSet<String> processedUnits;
-		List<String> unitsToInclude;
-		unitsToInclude.Add(sourceFileName);
-		processedUnits.Add(sourceFileName);
-		auto predefUnit = compiler->Parse(compileResult, LibIncludeString, L"stdlib");
-		for (int i = 0; i < unitsToInclude.Count(); i++)
+		try
 		{
-			auto inputFileName = unitsToInclude[i];
-			try
-			{
-				String source = File::ReadAllText(inputFileName);
-				auto unit = compiler->Parse(compileResult, source, Path::GetFileName(inputFileName));
-				units.Add(unit);
-				if (unit.SyntaxNode)
-				{
-					for (auto inc : unit.SyntaxNode->Usings)
-					{
-						String includeFile = Path::Combine(Path::GetDirectoryName(inputFileName), inc.Content);
-						if (processedUnits.Add(includeFile))
-						{
-							unitsToInclude.Add(includeFile);
-						}
-					}
-				}
-			}
-			catch (IOException)
-			{
-				compileResult.GetErrorWriter()->Error(1, L"cannot open file '" + Path::GetFileName(inputFileName) + L"'.", CodePosition(0, 0, sourceFileName));
-			}
+			return CompileShaderSource(compileResult, File::ReadAllText(sourceFileName), sourceFileName, options);
 		}
-		units.Add(predefUnit);
-		return CompileUnits(compileResult, compiler.Ptr(), units, options);
+		catch (IOException)
+		{
+			compileResult.GetErrorWriter()->Error(1, L"cannot open file '" + Path::GetFileName(sourceFileName) + L"'.", CodePosition(0, 0, L""));
+		}
+		return List<ShaderLibFile>();
 	}
 	void ShaderLibFile::AddSource(CoreLib::Basic::String source, CoreLib::Text::Parser & parser)
 	{
@@ -244,16 +183,16 @@ namespace SpireLib
 	{
 		StringBuilder writer;
 		writer << L"name " << MetaData.ShaderName << EndLine;
-		for (auto & world : MetaData.Worlds)
+		for (auto & stage : MetaData.Stages)
 		{
-			writer << L"world " << world.Key << EndLine << L"{" << EndLine;
-			writer << L"target " << world.Value.TargetName << EndLine;
-			for (auto & blk : world.Value.InputBlocks)
+			writer << L"stage " << stage.Key << EndLine << L"{" << EndLine;
+			writer << L"target " << stage.Value.TargetName << EndLine;
+			for (auto & blk : stage.Value.InputBlocks)
 			{
 				writer << L"in " << blk << L";\n";
 			}
-			writer << L"out " << world.Value.OutputBlock << L";\n";
-			for (auto & comp : world.Value.Components)
+			writer << L"out " << stage.Value.OutputBlock << L";\n";
+			for (auto & comp : stage.Value.Components)
 				writer << L"comp " << comp << L";\n";
 			writer << L"}" << EndLine;
 		}
@@ -293,7 +232,7 @@ namespace SpireLib
 				writer << EndLine << L"}" << EndLine;
 			}
 			writer << L"text" << EndLine << L"{" << EndLine;
-			writer << src.Value.GetAllCodeGLSL() << EndLine;
+			writer << src.Value.MainCode << EndLine;
 
 			writer << L"}" << EndLine;
 		}
@@ -306,7 +245,7 @@ namespace SpireLib
 	void ShaderLibFile::Clear()
 	{
 		Sources.Clear();
-		MetaData.Worlds.Clear();
+		MetaData.Stages.Clear();
 		Sources.Clear();
 	}
 
@@ -334,35 +273,35 @@ namespace SpireLib
 				parser.Read(L"}");
 			}
 			
-			else if (fieldName == L"world")
+			else if (fieldName == L"stage")
 			{
-				WorldMetaData world;
-				world.Name = parser.ReadWord();
+				StageMetaData stage;
+				stage.Name = parser.ReadWord();
 				parser.Read(L"{");
 				while (!parser.LookAhead(L"}"))
 				{
 					auto subFieldName = parser.ReadWord();
 					if (subFieldName == L"target")
-						world.TargetName = parser.ReadWord();
+						stage.TargetName = parser.ReadWord();
 					else if (subFieldName == L"in")
 					{
-						world.InputBlocks.Add(parser.ReadWord());
+						stage.InputBlocks.Add(parser.ReadWord());
 						parser.Read(L";");
 					}
 					else if (subFieldName == L"out")
 					{
-						world.OutputBlock = parser.ReadWord();
+						stage.OutputBlock = parser.ReadWord();
 						parser.Read(L";");
 					}
 					else if (subFieldName == L"comp")
 					{
 						auto compName = parser.ReadWord();
 						parser.Read(L";");
-						world.Components.Add(compName);
+						stage.Components.Add(compName);
 					}
 				}
 				parser.Read(L"}");
-				MetaData.Worlds[world.Name] = world;
+				MetaData.Stages[stage.Name] = stage;
 			}
 			else if (fieldName == L"interface")
 			{

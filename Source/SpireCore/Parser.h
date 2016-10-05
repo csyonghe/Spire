@@ -10,6 +10,8 @@ namespace Spire
 	{
 		const int MaxExprLevel = 12;
 
+		// TODO: implement two pass parsing for file reference and struct type recognition
+
 		class Parser
 		{
 		private:
@@ -70,6 +72,11 @@ namespace Spire
 				typeNames.Add(L"sampler2DShadow");
 				typeNames.Add(L"samplerCube");
 				typeNames.Add(L"samplerCubeShadow");
+				typeNames.Add(L"Texture");
+				typeNames.Add(L"Uniform");
+				typeNames.Add(L"Buffer");
+				typeNames.Add(L"Patch");
+				typeNames.Add(L"PackedBuffer");
 			}
 			RefPtr<ProgramSyntaxNode> Parse();
 		private:
@@ -85,6 +92,7 @@ namespace Spire
 			RefPtr<ProgramSyntaxNode>				ParseProgram();
 			RefPtr<ShaderSyntaxNode>				ParseShader();
 			RefPtr<PipelineSyntaxNode>				ParsePipeline();
+			RefPtr<StageSyntaxNode>					ParseStage();
 			RefPtr<ComponentSyntaxNode>				ParseComponent();
 			RefPtr<WorldSyntaxNode>					ParseWorld();
 			RefPtr<RateSyntaxNode>					ParseRate();

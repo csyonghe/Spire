@@ -47,8 +47,6 @@ namespace Spire
 				matches = true;
 			else if (NodeType == L"load")
 				matches = dynamic_cast<LoadInstruction*>(instr) != nullptr;
-			else if (NodeType == L"glea")
-				matches = dynamic_cast<GLeaInstruction*>(instr) != nullptr;
 			else if (NodeType == L"add")
 				matches = dynamic_cast<AddInstruction*>(instr) != nullptr;
 			else if (NodeType == L"mul")

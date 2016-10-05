@@ -4,6 +4,7 @@
 #include "../CoreLib/Basic.h"
 #include "Syntax.h"
 #include "IL.h"
+#include "VariantIR.h"
 
 namespace Spire
 {
@@ -23,7 +24,7 @@ namespace Spire
 			String AlternateName;
 			EnumerableHashSet<String> Worlds, ExportWorlds, SrcPinnedWorlds;
 			RefPtr<ComponentSyntaxNode> SyntaxNode;
-			EnumerableHashSet<ShaderComponentSymbol *> DependentComponents;
+			EnumerableDictionary<ShaderComponentSymbol *, EnumerableHashSet<RefPtr<ImportExpressionSyntaxNode>>> DependentComponents; // key: dependent components, value: set of import expression nodes (null means implicit reference)
 			EnumerableDictionary<ShaderComponentSymbol *, CodePosition> ComponentReferencePositions;
 			ShaderComponentImplSymbol() = default;
 			ShaderComponentImplSymbol(const ShaderComponentImplSymbol & other)
@@ -43,7 +44,8 @@ namespace Spire
 			bool IsDceEntryPoint = false;
 			String Name, UniqueName, UniqueKey;
 			List<String> ChoiceNames;
-			EnumerableHashSet<ShaderComponentSymbol *> DependentComponents, UserComponents;
+			EnumerableDictionary<ShaderComponentSymbol *, EnumerableHashSet<RefPtr<ImportExpressionSyntaxNode>>> DependentComponents;
+			EnumerableHashSet<ShaderComponentSymbol *>UserComponents;
 			List<RefPtr<ShaderComponentImplSymbol>> Implementations;
 			RefPtr<Type> Type;
 			bool IsParam()
@@ -71,49 +73,7 @@ namespace Spire
 		};
 
 		class PipelineSymbol;
-
-		class ComponentDefinitionIR
-		{
-		public:
-			ShaderComponentSymbol * Component;
-			ShaderComponentImplSymbol * Implementation;
-			String World;
-			bool IsEntryPoint = false;
-			EnumerableHashSet<ComponentDefinitionIR*> Users, Dependency; // Bidirectional dependency;
-		};
-		
 		class ShaderClosure;
-
-		class ShaderIR
-		{
-		public:
-			ShaderClosure * Shader;
-			List<RefPtr<ComponentDefinitionIR>> Definitions;
-			EnumerableDictionary<String, EnumerableDictionary<String, ComponentDefinitionIR*>> DefinitionsByComponent;
-			void EliminateDeadCode(); // returns remaining definitions in reverse dependency order
-			void ResolveComponentReference(); // resolve reference and build dependency map
-			List<ShaderComponentSymbol*> GetComponentDependencyOrder();
-			template<typename ShouldRemoveFunc>
-			void RemoveDefinitions(const ShouldRemoveFunc &shouldRemove)
-			{
-				List<RefPtr<ComponentDefinitionIR>> newDefinitions;
-				for (auto & def : Definitions)
-				{
-					if (!shouldRemove(def.Ptr()))
-					{
-						newDefinitions.Add(def);
-					}
-				}
-				Definitions = _Move(newDefinitions);
-				for (auto & kv : DefinitionsByComponent)
-				{
-					for (auto & def : kv.Value)
-						if (shouldRemove(def.Value))
-							kv.Value.Remove(def.Key);
-				}
-			}
-
-		};
 		
 		class ShaderSymbol;
 
@@ -130,6 +90,7 @@ namespace Spire
 			bool IsAbstract = false;
 			ShaderSyntaxNode * SyntaxNode = nullptr;
 			PipelineSymbol * Pipeline = nullptr;
+		
 			EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>> Components;
 			List<ShaderComponentSymbol*> GetComponentDependencyOrder();
 			EnumerableHashSet<ShaderSymbol*> DependentShaders;
@@ -138,7 +99,7 @@ namespace Spire
 			void SortComponents(List<ShaderComponentSymbol*> & comps);
 			struct ComponentReference
 			{
-				ShaderComponentSymbol * Component;
+				ShaderComponentSymbol * Component = nullptr;
 				bool IsAccessible = false;
 			};
 			ComponentReference ResolveComponentReference(String compName, bool topLevel = true);
@@ -186,16 +147,18 @@ namespace Spire
 			List<String> WorldTopologyOrder;
 		public:
 			PipelineSyntaxNode * SyntaxNode;
+			EnumerableDictionary<String, List<RefPtr<ImportOperatorDefSyntaxNode>>> ImportOperators;
 			EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>> Components;
-			EnumerableDictionary<String, EnumerableHashSet<String>> ReachableWorlds;
-			EnumerableDictionary<String, EnumerableHashSet<String>> WorldDependency;
+			EnumerableDictionary<String, EnumerableHashSet<String>> ReachableWorlds, ImplicitlyReachableWorlds;
+			EnumerableDictionary<String, EnumerableHashSet<String>> WorldDependency, ImplicitWorldDependency;
 			EnumerableDictionary<String, WorldSymbol> Worlds;
 			bool IsAbstractWorld(String world);
 			bool IsWorldReachable(EnumerableHashSet<String> & src, String targetWorld);
 			bool IsWorldReachable(String src, String targetWorld);
-			bool IsWorldDirectlyReachable(String src, String targetWorld);
+			bool IsWorldImplicitlyReachable(EnumerableHashSet<String> & src, String targetWorld);
+			bool IsWorldImplicitlyReachable(String src, String targetWorld);
 			List<String> & GetWorldTopologyOrder();
-			List<ImportPath> FindImportOperatorChain(String worldSrc, String worldDest);
+			List<ImportPath> FindImplicitImportOperatorChain(String worldSrc, String worldDest);
 			List<ImportOperatorDefSyntaxNode*> GetImportOperatorsFromSourceWorld(String worldSrc);
 		};
 

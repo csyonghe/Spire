@@ -314,7 +314,7 @@ namespace Spire
 			Deterministic = false;
 			Operand = dest;
 			Type = dest->Type->Clone();
-			if (!Spire::Compiler::Is<AllocVarInstruction>(dest) && !Spire::Compiler::Is<GLeaInstruction>(dest) && !Spire::Compiler::Is<FetchArgInstruction>(dest))
+			if (!Spire::Compiler::Is<AllocVarInstruction>(dest) && !Spire::Compiler::Is<FetchArgInstruction>(dest))
 				throw L"invalid address operand";
 		}
 		void MemberUpdateInstruction::Accept(InstructionVisitor * visitor)
@@ -409,10 +409,6 @@ namespace Spire
 		{
 			visitor->VisitStoreInstruction(this);
 		}
-		void GLeaInstruction::Accept(InstructionVisitor * visitor)
-		{
-			visitor->VisitGLeaInstruction(this);
-		}
 		void AllocVarInstruction::Accept(InstructionVisitor * visitor)
 		{
 			visitor->VisitAllocVarInstruction(this);
@@ -504,18 +500,19 @@ namespace Spire
 		String ImportInstruction::ToString()
 		{
 			StringBuilder rs;
-			//__DEBUG__: ImportOperator->Name.Content will cause error, so replaced it with N/A
-			rs << Name << L" = import<" << L"N/A" << ">[" << ComponentName << L"@" << SourceWorld->WorldName << L"](";
+			rs << Name << L" = import [" << ComponentName << L"](";
 			for (auto & arg : Arguments)
 			{
 				rs << arg->ToString() << L", ";
 			}
 			rs << L")";
+			rs << L"\n{";
+			rs << ImportOperator->ToString() << L"}\n";
 			return rs.ProduceString();
 		}
 		String ImportInstruction::GetOperatorString()
 		{
-			return L"import<" + ImportOperator->Name.Content + L">";
+			return L"import";
 		}
 		void ImportInstruction::Accept(InstructionVisitor * visitor)
 		{
@@ -578,9 +575,48 @@ namespace Spire
 			}
 			return rs;
 		}
+
+		ILType * ILRecordType::Clone()
+		{
+			auto rs = new ILRecordType(*this);
+			rs->Members.Clear();
+			for (auto & m : Members)
+			{
+				ILObjectDefinition f;
+				f.Type = m.Value.Type->Clone();
+				f.Name = m.Value.Name;
+				f.Attributes = m.Value.Attributes;
+				rs->Members.Add(m.Key, f);
+			}
+			return rs;
+		}
+		String ILRecordType::ToString()
+		{
+			return TypeName;
+		}
+		bool ILRecordType::Equals(ILType * type)
+		{
+			auto recType = dynamic_cast<ILRecordType*>(type);
+			if (recType)
+				return TypeName == recType->TypeName;
+			else
+				return false;
+		}
+		int ILRecordType::GetSize()
+		{
+			return 0;
+		}
+		int ILRecordType::GetAlignment()
+		{
+			return 0;
+		}
 		void DiscardInstruction::Accept(InstructionVisitor * visitor)
 		{
 			visitor->VisitDiscardInstruction(this);
+		}
+		void LoadInputInstruction::Accept(InstructionVisitor * visitor)
+		{
+			visitor->VisitLoadInputInstruction(this);
 		}
 }
 }

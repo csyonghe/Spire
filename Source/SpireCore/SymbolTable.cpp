@@ -90,13 +90,26 @@ namespace Spire
 			return false;
 		}
 
-		bool PipelineSymbol::IsWorldDirectlyReachable(String src, String targetWorld)
+		bool PipelineSymbol::IsWorldImplicitlyReachable(String src, String targetWorld)
 		{
 			if (src == targetWorld)
 				return true;
-			for (auto & op : SyntaxNode->ImportOperators)
-				if (op->SourceWorld.Content == src && op->DestWorld.Content == targetWorld)
+			if (ImplicitlyReachableWorlds.ContainsKey(src))
+				if (ImplicitlyReachableWorlds[src]().Contains(targetWorld))
 					return true;
+			return false;
+		}
+
+		bool PipelineSymbol::IsWorldImplicitlyReachable(EnumerableHashSet<String>& src, String targetWorld)
+		{
+			for (auto srcW : src)
+			{
+				if (srcW == targetWorld)
+					return true;
+				if (ImplicitlyReachableWorlds.ContainsKey(srcW))
+					if (ImplicitlyReachableWorlds[srcW]().Contains(targetWorld))
+						return true;
+			}
 			return false;
 		}
 
@@ -147,7 +160,7 @@ namespace Spire
 			return false;
 		}
 		
-		List<ImportPath> PipelineSymbol::FindImportOperatorChain(String worldSrc, String worldDest)
+		List<ImportPath> PipelineSymbol::FindImplicitImportOperatorChain(String worldSrc, String worldDest)
 		{
 			List<ImportPath> resultPathes;
 			if (worldSrc == worldDest)
@@ -163,7 +176,7 @@ namespace Spire
 					String world0 = p.Nodes.Last().TargetWorld;
 					for (auto op : SyntaxNode->ImportOperators)
 					{
-						if (op->SourceWorld.Content == world0)
+						if (op->SourceWorld.Content == world0 && op->Parameters.Count() == 0)
 						{
 							ImportPath np = p;
 							np.Nodes.Add(ImportPath::Node(op->DestWorld.Content, op.Ptr()));
@@ -220,7 +233,7 @@ namespace Spire
 						bool isFirst = true;
 						for (auto & impl : comp->Implementations)
 							for (auto & dep : impl->DependentComponents)
-								if (allSymbols.Contains(dep) && !addedSymbols.Contains(dep))
+								if (allSymbols.Contains(dep.Key) && !addedSymbols.Contains(dep.Key))
 								{
 									isFirst = false;
 									goto loopEnd;
@@ -273,205 +286,18 @@ namespace Spire
 						result = rresult;
 				}
 			}
+			if (Pipeline->Components.TryGetValue(compName, refComp))
+			{
+				if (!refComp->IsParam())
+				{
+					result.Component = refComp.Ptr();
+					return result;
+				}
+			}
 			result.IsAccessible = false;
 			return result;
 		}
 
-		void ShaderIR::EliminateDeadCode()
-		{
-			// mark entry points
-			auto MarkUsing = [&](String compName, String userWorld)
-			{
-				if (auto defs = DefinitionsByComponent.TryGetValue(compName))
-				{
-					if (auto def = defs->TryGetValue(userWorld))
-						(*def)->IsEntryPoint = true;
-					else
-					{
-						for (auto & world : Shader->Pipeline->WorldDependency[userWorld]())
-						{
-							if (auto def2 = defs->TryGetValue(world))
-							{
-								(*def2)->IsEntryPoint = true;
-								break;
-							}
-						}
-					}
-				}
-			};
-			for (auto & impOp : Shader->Pipeline->SyntaxNode->ImportOperators)
-				for (auto & ref : impOp->Usings)
-					MarkUsing(ref.Content, impOp->DestWorld.Content);
-			for (auto & w : Shader->Pipeline->SyntaxNode->Worlds)
-				for (auto & ref : w->Usings)
-					MarkUsing(ref.Content, w->Name.Content);
-			for (auto & comp : Definitions)
-				if (comp->Implementation->ExportWorlds.Contains(comp->World) ||
-					(Shader->Pipeline->IsAbstractWorld(comp->World) &&
-					(comp->Implementation->SyntaxNode->LayoutAttributes.ContainsKey(L"Pinned") || Shader->Pipeline->Worlds[comp->World]().SyntaxNode->LayoutAttributes.ContainsKey(L"Pinned"))))
-				{
-					comp->IsEntryPoint = true;
-				}
-
-			List<ComponentDefinitionIR*> workList;
-			HashSet<ComponentDefinitionIR*> referencedDefs;
-			for (auto & def : Definitions)
-			{
-				if (def->IsEntryPoint)
-				{
-					if (referencedDefs.Add(def.Ptr()))
-						workList.Add(def.Ptr());
-				}
-			}
-			for (int i = 0; i < workList.Count(); i++)
-			{
-				auto def = workList[i];
-				for (auto & dep : def->Dependency)
-				{
-					if (referencedDefs.Add(dep))
-						workList.Add(dep);
-				}
-			}
-			List<RefPtr<ComponentDefinitionIR>> newDefinitions;
-			for (auto & def : Definitions)
-			{
-				if (referencedDefs.Contains(def.Ptr()))
-				{
-					newDefinitions.Add(def);
-					EnumerableHashSet<ComponentDefinitionIR*> newSet;
-					for (auto & comp : def->Users)
-						if (referencedDefs.Contains(comp))
-						{
-							newSet.Add(comp);
-						}
-					def->Users = newSet;
-					newSet.Clear();
-					for (auto & comp : def->Dependency)
-						if (referencedDefs.Contains(comp))
-						{
-							newSet.Add(comp);
-						}
-					def->Dependency = newSet;
-				}
-			}
-			Definitions = _Move(newDefinitions);
-			for (auto & kv : DefinitionsByComponent)
-			{
-				for (auto & def : kv.Value)
-					if (!referencedDefs.Contains(def.Value))
-						kv.Value.Remove(def.Key);
-			}
-		}
-		void ShaderIR::ResolveComponentReference()
-		{
-			// build bidirectional dependency map of component definitions
-			for (auto & comp : Definitions)
-			{
-				comp->Dependency.Clear();
-				comp->Users.Clear();
-			}
-			for (auto & comp : Definitions)
-			{
-				List<ShaderComponentSymbol *> workList;
-				for (auto & dep : comp->Implementation->DependentComponents)
-					workList.Add(dep);
-				HashSet<ShaderComponentSymbol*> proceseedDefCompss;
-				for (int i = 0; i < workList.Count(); i++)
-				{
-					auto dep = workList[i];
-					if (!proceseedDefCompss.Add(dep))
-						continue;
-					auto & depDefs = DefinitionsByComponent[dep->UniqueName]();
-					// select the best overload according to import operator ordering,
-					// prefer user-pinned definitions (as provided in the choice file)
-					List<String> depWorlds;
-					depWorlds.Add(comp->World);
-					for (auto & w : Shader->Pipeline->WorldDependency[comp->World]())
-						depWorlds.Add(w);
-					for (int pass = 0; pass < 2; pass++)
-					{
-						// in the first pass, examine the pinned definitions only
-						// in the second pass, examine all the rest definitions
-						for (auto & depWorld : depWorlds)
-						{
-							bool isPinned = dep->Type->PinnedWorlds.Contains(depWorld);
-							if ((pass == 0 && !isPinned) || (pass == 1 && isPinned)) continue;
-							ComponentDefinitionIR * depDef;
-							if (depDefs.TryGetValue(depWorld, depDef))
-							{
-								comp->Dependency.Add(depDef);
-								depDef->Users.Add(comp.Ptr());
-								// add additional dependencies due to import operators
-								if (depWorld != comp->World)
-								{
-									auto importPath = Shader->Pipeline->FindImportOperatorChain(depWorld, comp->World);
-									if (importPath.Count() == 0)
-										throw InvalidProgramException(L"no import path found.");
-									auto & usings = importPath.First().Nodes.Last().ImportOperator->Usings;
-									for (auto & importUsing : usings)
-									{
-										ShaderComponentSymbol* refComp;
-										if (!Shader->AllComponents.TryGetValue(importUsing.Content, refComp))
-											throw InvalidProgramException(L"import operator dependency not exists.");
-										workList.Add(refComp);
-									}
-								}
-								goto selectionEnd; // first preferred overload is found, terminate searching
-							}
-						}
-					}
-					selectionEnd:;
-				}
-			}
-		}
-		List<ShaderComponentSymbol*> ShaderIR::GetComponentDependencyOrder()
-		{
-			List<ShaderComponentSymbol*> result, workList;
-			HashSet<String> set;
-			for (auto & comp : DefinitionsByComponent)
-			{
-				bool emptyDependency = true;
-				for (auto & def : comp.Value)
-					if (def.Value->Dependency.Count())
-					{
-						emptyDependency = false;
-						break;
-					}
-				if (emptyDependency)
-				{
-					workList.Add(Shader->AllComponents[comp.Key]());
-				}
-			}
-			for (int i = 0; i < workList.Count(); i++)
-			{
-				auto comp = workList[i];
-				if (!set.Contains(comp->UniqueName))
-				{
-					bool insertable = true;
-					for (auto & def : DefinitionsByComponent[comp->UniqueName]())
-					{
-						for (auto & dep : def.Value->Dependency)
-							if (!set.Contains(dep->Component->UniqueName))
-							{
-								insertable = false;
-								goto breakLoc;
-							}
-					}
-				breakLoc:;
-					if (insertable)
-					{
-						if (set.Add(comp->UniqueName))
-						{
-							result.Add(comp);
-							for (auto & def : DefinitionsByComponent[comp->UniqueName]())
-								for (auto & user : def.Value->Users)
-									workList.Add(user->Component);
-						}
-					}
-				}
-			}
-			return result;
-		}
 		bool SymbolTable::CheckComponentImplementationConsistency(ErrorWriter * err, ShaderComponentSymbol * comp, ShaderComponentImplSymbol * impl)
 		{
 			bool rs = true;
@@ -518,7 +344,7 @@ namespace Spire
 					rs = false;
 					break;
 				}
-				if (impl->SyntaxNode->Type->ToExpressionType(this) != cimpl->SyntaxNode->Type->ToExpressionType(this))
+				if (!impl->SyntaxNode->Type->Equals(cimpl->SyntaxNode->Type.Ptr()))
 				{
 					err->Error(33021, L"\'" + comp->Name + L"\': inconsistent signature.\nsee previous definition at " + cimpl->SyntaxNode->Position.ToString(), impl->SyntaxNode->Position);
 					rs = false;
@@ -559,6 +385,15 @@ namespace Spire
 					else
 						rs = nullptr;
 				}
+			}
+			ShaderClosure * root = this;
+			while (root->Parent != nullptr)
+				root = root->Parent;
+			if (root != this)
+			{
+				// find global components in root (pipeline-defined components)
+				if (root->Components.TryGetValue(name, rs))
+					return rs;
 			}
 			return rs;
 		}
@@ -604,7 +439,7 @@ namespace Spire
 						bool isFirst = true;
 						for (auto & impl : comp->Implementations)
 							for (auto & dep : impl->DependentComponents)
-								if (allSymbols.Contains(dep) && !addedSymbols.Contains(dep))
+								if (allSymbols.Contains(dep.Key) && !addedSymbols.Contains(dep.Key))
 								{
 									isFirst = false;
 									goto loopEnd;

@@ -32,141 +32,50 @@ namespace Spire
 			~ConstantPool();
 		};
 
-		enum class InterfaceQualifier
-		{
-			Input, Output
-		};
+		class ILShader;
 
-		
-
-		class CompiledGlobalVar
+		class ILWorld : public Object
 		{
 		public:
 			String Name;
-			String InputSourceWorld;
-			String OrderingStr;
-			ImportOperatorDefSyntaxNode ImportOperator;
-			InterfaceQualifier Qualifier;
-			RefPtr<ILType> Type;
-			int OutputIndex = -1, InputIndex = -1;
-			bool IsBuiltin = false;
-			EnumerableDictionary<String, String> LayoutAttribs;
-		};
-
-		class ComponentDefinition
-		{
-		public:
-			String Name;
-			String OrderingStr;
-			int Offset = 0;
-			RefPtr<ILType> Type;
-			EnumerableDictionary<String, String> LayoutAttribs;
-		};
-
-		class InterfaceBlock : public Object
-		{
-		public:
-			String Name;
-			String SourceWorld;
-			int Size = 0;
-			EnumerableDictionary<String, String> Attributes;
-			EnumerableHashSet<String> UserWorlds;
-			EnumerableDictionary<String, ComponentDefinition> Entries;
-		};
-
-		class InputInterface
-		{
-		public:
-			InterfaceBlock * Block;
-			ImportOperatorDefSyntaxNode ImportOperator;
-		};
-
-		class CompiledShader;
-
-		class CompiledComponent
-		{
-		public:
-			ILOperand * CodeOperand;
-			EnumerableDictionary<String, String> Attributes;
-		};
-
-		class CompiledWorld
-		{
-		public:
-			String TargetMachine;
-			String ShaderName, WorldName;
-			Token ExportOperator;
-			EnumerableDictionary<String, String> BackendParameters;
-			EnumerableDictionary<String, InputInterface> WorldInputs;
-			InterfaceBlock * WorldOutput;
-
+			CodePosition Position;
+			RefPtr<ILRecordType> OutputType;
+			List<ILObjectDefinition> Inputs;
+			RefPtr<CFGNode> Code;
+			EnumerableDictionary<String, ILOperand*> Components;
 			bool IsAbstract = false;
-			CodePosition WorldDefPosition;
 			EnumerableDictionary<String, String> Attributes;
-			EnumerableHashSet<String> ReferencedFunctions;
-			EnumerableDictionary<String, CompiledComponent> LocalComponents;
-			EnumerableDictionary<String, ImportInstruction*> ImportInstructions;
-			RefPtr<CFGNode> Code = new CFGNode();
-			CompiledShader * Shader;
+			EnumerableHashSet<String> ReferencedFunctions; // internal names of referenced functions
+			ILShader * Shader = nullptr;
 		};
 
-		class InterfaceMetaData
-		{
-		public:
-			CoreLib::Basic::String Name;
-			RefPtr<Spire::Compiler::ILType> Type;
-			EnumerableDictionary<String, String> Attributes;
-
-			int GetHashCode()
-			{
-				return Name.GetHashCode();
-			}
-			bool operator == (const InterfaceMetaData & other)
-			{
-				return Name == other.Name;
-			}
-		};
-
-		class WorldMetaData
-		{
-		public:
-			CoreLib::Basic::String Name;
-			CoreLib::Basic::String TargetName;
-			CoreLib::Basic::String OutputBlock;
-			CoreLib::Basic::List<CoreLib::Basic::String> InputBlocks;
-			CoreLib::Basic::List<CoreLib::Basic::String> Components;
-		};
-
-		class InterfaceBlockEntry : public InterfaceMetaData
-		{
-		public:
-			int Offset = 0, Size = 0;
-		};
-		class InterfaceBlockMetaData
+		class StageAttribute
 		{
 		public:
 			String Name;
-			int Size = 0;
-			EnumerableHashSet<InterfaceBlockEntry> Entries;
-			EnumerableDictionary<String, String> Attributes;
-			EnumerableHashSet<String> UserWorlds;
-		};
-		class ShaderMetaData
-		{
-		public:
-			CoreLib::String ShaderName;
-			CoreLib::EnumerableDictionary<CoreLib::String, WorldMetaData> Worlds;
-			EnumerableDictionary<String, InterfaceBlockMetaData> InterfaceBlocks;
+			String Value;
+			CodePosition Position;
 		};
 
-		class CompiledShader
+		class ILStage : public Object
 		{
 		public:
-			ShaderMetaData MetaData;
-			EnumerableDictionary<String, RefPtr<InterfaceBlock>> InterfaceBlocks;
-			EnumerableDictionary<String, RefPtr<CompiledWorld>> Worlds;
+			CodePosition Position;
+			String Name;
+			String StageType;
+			EnumerableDictionary<String, StageAttribute> Attributes;
 		};
-		class CompiledFunction
+
+		class ILShader
+		{
+		public:
+			CodePosition Position;
+			String Name;
+			EnumerableDictionary<String, RefPtr<ILWorld>> Worlds;
+			EnumerableDictionary<String, RefPtr<ILStage>> Stages;
+		};
+
+		class ILFunction
 		{
 		public:
 			EnumerableDictionary<String, RefPtr<ILType>> Parameters;
@@ -174,12 +83,13 @@ namespace Spire
 			RefPtr<CFGNode> Code;
 			String Name;
 		};
-		class CompiledProgram
+
+		class ILProgram
 		{
 		public:
 			RefPtr<ConstantPool> ConstantPool = new Compiler::ConstantPool();
-			List<RefPtr<CompiledShader>> Shaders;
-			List<RefPtr<CompiledFunction>> Functions;
+			List<RefPtr<ILShader>> Shaders;
+			List<RefPtr<ILFunction>> Functions;
 			List<RefPtr<ILStructType>> Structs;
 		};
 
@@ -223,25 +133,68 @@ namespace Spire
 			List<ShaderChoiceValue> Options;
 		};
 
-		class CompiledShaderSource
+
+		class InterfaceMetaData
 		{
-		private:
-			void PrintAdditionalCode(StringBuilder & sb, String userCode);
 		public:
-			String GlobalHeader;
-			EnumerableDictionary<String, String> InputDeclarations; // indexed by world
-			String OutputDeclarations;
-			String GlobalDefinitions;
-			String LocalDeclarations;
+			CoreLib::Basic::String Name;
+			RefPtr<Spire::Compiler::ILType> Type;
+			EnumerableDictionary<String, String> Attributes;
+
+			int GetHashCode()
+			{
+				return Name.GetHashCode();
+			}
+			bool operator == (const InterfaceMetaData & other)
+			{
+				return Name == other.Name;
+			}
+		};
+
+		class StageMetaData
+		{
+		public:
+			CoreLib::Basic::String Name;
+			CoreLib::Basic::String TargetName;
+			CoreLib::Basic::String OutputBlock;
+			CoreLib::Basic::List<CoreLib::Basic::String> InputBlocks;
+			CoreLib::Basic::List<CoreLib::Basic::String> Components;
+		};
+
+		class InterfaceBlockEntry : public InterfaceMetaData
+		{
+		public:
+			int Offset = 0, Size = 0;
+		};
+		class InterfaceBlockMetaData
+		{
+		public:
+			String Name;
+			int Size = 0;
+			EnumerableHashSet<InterfaceBlockEntry> Entries;
+			EnumerableDictionary<String, String> Attributes;
+			EnumerableHashSet<String> UserWorlds;
+		};
+		class ShaderMetaData
+		{
+		public:
+			CoreLib::String ShaderName;
+			CoreLib::EnumerableDictionary<CoreLib::String, StageMetaData> Stages;
+			EnumerableDictionary<String, InterfaceBlockMetaData> InterfaceBlocks;
+		};
+
+		class StageSource
+		{
+		public:
 			String MainCode;
 			List<unsigned char> BinaryCode;
-			CoreLib::Basic::EnumerableDictionary<CoreLib::String, CoreLib::String> ComponentAccessNames;
-			String GetAllCodeGLSL(String additionalHeader, String additionalGlobalDeclaration, String preambleCode, String epilogCode);
-			String GetAllCodeGLSL()
-			{
-				return GetAllCodeGLSL(L"", L"", L"", L"");
-			}
-			void ParseFromGLSL(String code);
+		};
+
+		class CompiledShaderSource
+		{
+		public:
+			EnumerableDictionary<String, StageSource> Stages;
+			ShaderMetaData MetaData;
 		};
 
 		void IndentString(StringBuilder & sb, String src);
@@ -254,9 +207,9 @@ namespace Spire
 			bool Success;
 			List<CompileError> ErrorList, WarningList;
 			String ScheduleFile;
-			RefPtr<CompiledProgram> Program;
+			RefPtr<ILProgram> Program;
 			List<ShaderChoice> Choices;
-			EnumerableDictionary<String, EnumerableDictionary<String, CompiledShaderSource>> CompiledSource; // file -> world -> code
+			EnumerableDictionary<String, CompiledShaderSource> CompiledSource; // shader -> stage -> code
 			void PrintError(bool printWarning = false)
 			{
 				for (int i = 0; i < ErrorList.Count(); i++)

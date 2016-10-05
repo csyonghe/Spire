@@ -3,6 +3,7 @@
 
 #include "../CoreLib/Basic.h"
 #include "../CoreLib/Parser.h"
+#include "CodePosition.h"
 
 namespace Spire
 {
@@ -27,7 +28,7 @@ namespace Spire
 		int SizeofBaseType(ILBaseType type);
 		int RoundToAlignment(int offset, int alignment);
 		extern int NamingCounter;
-		class ILType : public Object
+		class ILType : public RefObject
 		{
 		public:
 			bool IsBool();
@@ -58,6 +59,27 @@ namespace Spire
 		};
 
 		RefPtr<ILType> TypeFromString(CoreLib::Text::Parser & parser);
+
+		class ILObjectDefinition
+		{
+		public:
+			RefPtr<ILType> Type;
+			String Name;
+			EnumerableDictionary<String, String> Attributes;
+			CodePosition Position;
+		};
+
+		class ILRecordType : public ILType
+		{
+		public:
+			String TypeName;
+			EnumerableDictionary<String, ILObjectDefinition> Members;
+			virtual ILType * Clone() override;
+			virtual String ToString() override;
+			virtual bool Equals(ILType* type) override;
+			virtual int GetSize() override;
+			virtual int GetAlignment() override;
+		};
 
 		class ILBasicType : public ILType
 		{
@@ -240,6 +262,39 @@ namespace Spire
 			}
 		};
 
+		class ILGenericType : public ILType
+		{
+		public:
+			RefPtr<ILType> BaseType;
+			String GenericTypeName;
+			virtual bool Equals(ILType* type) override
+			{
+				auto btype = dynamic_cast<ILArrayType*>(type);
+				if (!btype)
+					return false;
+				return BaseType->Equals(btype->BaseType.Ptr());;
+			}
+			virtual ILType * Clone() override
+			{
+				auto rs = new ILGenericType();
+				rs->BaseType = BaseType->Clone();
+				rs->GenericTypeName = GenericTypeName;
+				return rs;
+			}
+			virtual String ToString() override
+			{
+				return GenericTypeName + L"<" + BaseType->ToString() + L">";
+			}
+			virtual int GetSize() override
+			{
+				return 0;
+			}
+			virtual int GetAlignment() override
+			{
+				return BaseType->GetAlignment();
+			}
+		};
+
 		class ILStructType : public ILType
 		{
 		public:
@@ -366,7 +421,7 @@ namespace Spire
 			}
 		};
 
-		class ILOperand : public Object
+		class ILOperand : public RefObject
 		{
 		public:
 			String Name;
@@ -807,40 +862,12 @@ namespace Spire
 
 		class LeaInstruction : public ILInstruction
 		{};
-
-		// retrieves pointer to a global entry
-		class GLeaInstruction : public LeaInstruction
-		{
-		public:
-			String VariableName;
-			GLeaInstruction() = default;
-			GLeaInstruction(const GLeaInstruction &) = default;
-			GLeaInstruction(const String & varName)
-				:VariableName(varName)
-			{
-			}
-			virtual String ToString() override
-			{
-				return Name + L" = g_var [" + VariableName + L"]";
-			}
-			virtual String GetOperatorString() override
-			{
-				return L"glea " + VariableName;
-			}
-			virtual GLeaInstruction * Clone() override
-			{
-				return new GLeaInstruction(*this);
-			}
-			virtual void Accept(InstructionVisitor * visitor) override;
-		};
-		class ImportOperatorDefSyntaxNode;
-		class CompiledWorld;
+		class ILWorld;
 		class ImportInstruction : public LeaInstruction
 		{
 		public:
 			String ComponentName;
-			ImportOperatorDefSyntaxNode * ImportOperator;
-			CompiledWorld * SourceWorld;
+			RefPtr<CFGNode> ImportOperator;
 
 			List<UseReference> Arguments;
 			virtual OperandIterator begin() override
@@ -851,7 +878,16 @@ namespace Spire
 			{
 				return Arguments.end();
 			}
-
+			virtual int GetSubBlockCount()
+			{
+				return 1;
+			}
+			virtual CFGNode * GetSubBlock(int i)
+			{
+				if (i == 0)
+					return ImportOperator.Ptr();
+				return nullptr;
+			}
 			ImportInstruction(int argSize = 0)
 				: LeaInstruction()
 			{
@@ -870,12 +906,11 @@ namespace Spire
 				}
 			}
 
-			ImportInstruction(int argSize, String compName, ImportOperatorDefSyntaxNode * importOp, CompiledWorld * srcWorld, RefPtr<ILType> type)
+			ImportInstruction(int argSize, String compName, RefPtr<CFGNode> importOp, RefPtr<ILType> type)
 				:ImportInstruction(argSize)
 			{
 				this->ComponentName = compName;
 				this->ImportOperator = importOp;
-				this->SourceWorld = srcWorld;
 				this->Type = type;
 			}
 			virtual String ToString() override;
@@ -883,6 +918,38 @@ namespace Spire
 			virtual ImportInstruction * Clone() override
 			{
 				return new ImportInstruction(*this);
+			}
+			virtual void Accept(InstructionVisitor * visitor) override;
+		};
+
+		class LoadInputInstruction : public LeaInstruction
+		{
+		public:
+			String InputName;
+			LoadInputInstruction(RefPtr<ILType> type, String name)
+				: InputName(name)
+			{
+				this->Type = type;
+			}
+			LoadInputInstruction(const LoadInputInstruction & other)
+				:LeaInstruction(other), InputName(other.InputName)
+			{
+			}
+			virtual bool IsDeterministic() override
+			{
+				return true;
+			}
+			virtual String ToString() override
+			{
+				return Name + L" = INPUT " + InputName;
+			}
+			virtual String GetOperatorString() override
+			{
+				return L"input";
+			}
+			virtual LoadInputInstruction * Clone() override
+			{
+				return new LoadInputInstruction(*this);
 			}
 			virtual void Accept(InstructionVisitor * visitor) override;
 		};
@@ -1291,32 +1358,37 @@ namespace Spire
 			}
 		};
 
+		class MakeRecordInstruction : public ILInstruction
+		{
+		public:
+			RefPtr<ILRecordType> RecordType;
+			List<UseReference> Arguments;
+		};
+
 		class ExportInstruction : public UnaryInstruction
 		{
 		public:
 			String ComponentName;
-			String ExportOperator;
-			CompiledWorld * World;
+			ILWorld * World;
 
 			ExportInstruction() = default;
 			ExportInstruction(const ExportInstruction &) = default;
 
-			ExportInstruction(String compName, String exportOp, CompiledWorld * srcWorld, ILOperand * value)
+			ExportInstruction(String compName, ILWorld * srcWorld, ILOperand * value)
 				: UnaryInstruction()
 			{
 				this->Operand = value;
 				this->ComponentName = compName;
-				this->ExportOperator = exportOp;
 				this->World = srcWorld;
 				this->Type = value->Type;
 			}
 			virtual String ToString() override
 			{
-				return L"export<" + ExportOperator + L">[" + ComponentName + L"], " + Operand.ToString();
+				return L"export [" + ComponentName + L"], " + Operand.ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"export<" + ExportOperator + L">[" + ComponentName + L"]";
+				return L"export [" + ComponentName + L"]";
 			}
 			virtual ExportInstruction * Clone() override
 			{
@@ -2234,7 +2306,6 @@ namespace Spire
 
 			virtual void VisitAllocVarInstruction(AllocVarInstruction *){}
 			virtual void VisitFetchArgInstruction(FetchArgInstruction *){}
-			virtual void VisitGLeaInstruction(GLeaInstruction *){}
 			virtual void VisitCastInstruction(CastInstruction *){}
 			virtual void VisitInt2FloatInstruction(Int2FloatInstruction *){}
 			virtual void VisitFloat2IntInstruction(Float2IntInstruction *){}
@@ -2246,7 +2317,7 @@ namespace Spire
 			virtual void VisitCallInstruction(CallInstruction *){}
 			virtual void VisitSwitchInstruction(SwitchInstruction *){}
 			virtual void VisitDiscardInstruction(DiscardInstruction *) {}
-
+			virtual void VisitLoadInputInstruction(LoadInputInstruction *) {}
 			virtual void VisitPhiInstruction(PhiInstruction *){}
 		};
 
