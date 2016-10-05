@@ -152,7 +152,8 @@ module MeshVertex
 
 module SurfacePattern
 {
-    public vec3 albedo = vec3(0.9, 0.45, 0.05);
+    require @viewUniform sampler2D testSampler;
+    public vec3 albedo = vec3(0.9, 0.45, 0.05) + texture(testSampler, vec2(0.0)).xyz;
     public vec3 normal = vec3(0.0, 0.0, 1.0);
     public float specular = 1.0;
     public float roughness = 0.5;
@@ -180,6 +181,7 @@ module SystemUniforms
     public @viewUniform mat4 invViewTransform;
     public @viewUniform mat4 invViewProjTransform;
     public @viewUniform vec3 cameraPos;
+    public @viewUniform sampler2D testSampler;
     public vec3 lightDir = vec3(1.0, 1.0, 0.0);
     public vec3 lightColor = vec3(1.5, 1.5, 1.5);
 }

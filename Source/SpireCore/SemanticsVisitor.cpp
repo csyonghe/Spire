@@ -396,8 +396,8 @@ namespace Spire
 					currentShader->Components.TryGetValue(comp->Name.Content, compSym);
 					currentComp = compSym.Ptr();
 					SyntaxVisitor::VisitComponent(comp);
-					if (compSym->Type->DataType->IsArray() || compSym->Type->DataType->IsStruct() ||
-						compSym->Type->DataType->IsTexture())
+					if (!compSym->IsParam() && (compSym->Type->DataType->IsArray() || compSym->Type->DataType->IsStruct() ||
+						compSym->Type->DataType->IsTexture()))
 					{
 						bool valid = true;
 						bool isInStorageBuffer = true;

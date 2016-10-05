@@ -304,7 +304,7 @@ namespace Spire
 
 		bool IsInAbstractWorld(PipelineSymbol * pipeline, ShaderComponentSymbol* comp)
 		{
-			return comp->Implementations.First()->Worlds.Count() &&
+			return comp->Implementations.First()->Worlds.Count() && !comp->Implementations.First()->SyntaxNode->IsParam &&
 				pipeline->IsAbstractWorld(comp->Implementations.First()->Worlds.First());
 		}
 
@@ -354,6 +354,8 @@ namespace Spire
 			for (auto & comp : subClosure->Components)
 			{
 				ShaderComponentSymbol* existingComp = nullptr;
+				if (comp.Value->IsParam())
+					continue;
 				if (closure->AllComponents.TryGetValue(comp.Value->UniqueName, existingComp))
 				{
 					if (IsInAbstractWorld(closure->Pipeline, comp.Value.Ptr()) &&
@@ -7224,8 +7226,8 @@ namespace Spire
 					currentShader->Components.TryGetValue(comp->Name.Content, compSym);
 					currentComp = compSym.Ptr();
 					SyntaxVisitor::VisitComponent(comp);
-					if (compSym->Type->DataType->IsArray() || compSym->Type->DataType->IsStruct() ||
-						compSym->Type->DataType->IsTexture())
+					if (!compSym->IsParam() && (compSym->Type->DataType->IsArray() || compSym->Type->DataType->IsStruct() ||
+						compSym->Type->DataType->IsTexture()))
 					{
 						bool valid = true;
 						bool isInStorageBuffer = true;
