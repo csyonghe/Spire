@@ -495,12 +495,7 @@ namespace Spire
 					break;
 			}
 			ReadToken(TokenType::RParent);
-			if (LookAheadToken(TokenType::LBrace))
-			{
-				op->Body = ParseBlockStatement();
-			}
-			else 
-				ReadToken(TokenType::Semicolon);
+			op->Body = ParseBlockStatement();
 			PopScope();
 			return op;
 		}
