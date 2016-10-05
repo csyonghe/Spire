@@ -72,9 +72,13 @@ namespace Spire
 				}
 			}
 		}
-		RefPtr<ShaderClosure> CreateShaderClosure(ErrorWriter * err, SymbolTable * symTable, ShaderSymbol * shader, CodePosition usingPos, const Dictionary<String, RefPtr<ShaderComponentSymbol>>& pRefMap)
+		RefPtr<ShaderClosure> CreateShaderClosure(ErrorWriter * err, SymbolTable * symTable, ShaderSymbol * shader, CodePosition usingPos, 
+			ShaderClosure * rootShader,
+			const Dictionary<String, RefPtr<ShaderComponentSymbol>>& pRefMap)
 		{
 			RefPtr<ShaderClosure> rs = new ShaderClosure();
+			if (rootShader == nullptr)
+				rootShader = rs.Ptr();
 			rs->Name = shader->SyntaxNode->Name.Content;
 			rs->RefMap = pRefMap;
 			rs->Pipeline = shader->Pipeline;
@@ -122,7 +126,7 @@ namespace Spire
 								}
 							}
 						}
-						auto refClosure = CreateShaderClosure(err, symTable, shaderSym.Ptr(), import->Position, refMap);
+						auto refClosure = CreateShaderClosure(err, symTable, shaderSym.Ptr(), import->Position, rootShader, refMap);
 						refClosure->IsPublic = import->IsPublic;
 						refClosure->Parent = rs.Ptr();
 						if (import->IsInplace)
@@ -157,10 +161,16 @@ namespace Spire
 					StringBuilder errMsg;
 					errMsg << L"argument '" + comp.Key + L"' is unassigned.";
 					// try to provide more info on why it is unassigned
-					if (auto arg = rs->FindComponent(comp.Key, true))
-						errMsg << L" automatic argument filling failed because the component of the same name is not accessible from '" << shader->SyntaxNode->Name.Content << L"'.";
+					auto arg = rootShader->FindComponent(comp.Key, true, false);
+					if (!arg)
+						errMsg << L" automatic argument filling failed because shader '" << rootShader->Name << L"' does not define component '" + comp.Key + L"'.";
 					else
-						errMsg << L" automatic argument filling failed because shader '" << shader->SyntaxNode->Name.Content << L"' does not define component '" + comp.Key + L"'.";
+					{
+						errMsg << L" automatic argument filling failed because the component of the same name is not accessible from '" << rootShader->Name << L"'.";
+						errMsg << L"\nsee requirement declaration at " << comp.Value->Implementations.First()->SyntaxNode->Position.ToString() << L".";
+						errMsg << L"\nsee potential definition of component '" << comp.Key << L"' at " << arg->Implementations.First()->SyntaxNode->Position.ToString()
+							<< L".\ndid you forget the 'public' qualifier?";
+					}
 					err->Error(33023,errMsg.ProduceString(), rs->UsingPosition);
 				}
 			}
@@ -169,7 +179,7 @@ namespace Spire
 
 		RefPtr<ShaderClosure> CreateShaderClosure(ErrorWriter * err, SymbolTable * symTable, ShaderSymbol * shader)
 		{
-			return CreateShaderClosure(err, symTable, shader, shader->SyntaxNode->Position, Dictionary<String, RefPtr<ShaderComponentSymbol>>());
+			return CreateShaderClosure(err, symTable, shader, shader->SyntaxNode->Position, nullptr, Dictionary<String, RefPtr<ShaderComponentSymbol>>());
 		}
 
 
@@ -8318,6 +8328,7 @@ namespace Spire
 				// this is not an import operator call, resolve as function call
 				String funcName;
 				bool found = false;
+				bool functionNameFound = false;
 				RefPtr<FunctionSymbol> func;
 				if (expr->FunctionExpr->Variable == L"texture" && expr->Arguments.Count() > 0 &&
 					expr->Arguments[0]->Type->IsGenericType(L"Buffer"))
@@ -8354,6 +8365,7 @@ namespace Spire
 					{
 						if (f.Key.StartsWith(namePrefix))
 						{
+							functionNameFound = true;
 							if (f.Value->SyntaxNode->Parameters.Count() == expr->Arguments.Count())
 							{
 								int conversions = 0;
@@ -8396,7 +8408,11 @@ namespace Spire
 						if (i != expr->Arguments.Count() - 1)
 							argList << L", ";
 					}
-					Error(30021, expr->FunctionExpr->Variable + L": no overload takes arguments (" + argList.ProduceString() + L")", expr);
+					if (functionNameFound)
+						Error(30021, expr->FunctionExpr->Variable + L": no overload takes arguments (" + argList.ProduceString() + L")", expr);
+					else
+						Error(30015, L"undefined identifier '" + expr->FunctionExpr->Variable + L"'.", expr->FunctionExpr.Ptr());
+
 				}
 				else if (func)
 				{
@@ -15242,18 +15258,28 @@ namespace Spire
 		{
 			return currentGUID++;
 		}
-		RefPtr<ShaderComponentSymbol> ShaderClosure::FindComponent(String name, bool findInPrivate)
+		RefPtr<ShaderComponentSymbol> ShaderClosure::FindComponent(String name, bool findInPrivate, bool includeParams)
 		{
 			RefPtr<ShaderComponentSymbol> rs;
 			if (RefMap.TryGetValue(name, rs))
-				return rs;
+			{
+				if (includeParams || !rs->IsParam())
+					return rs;
+				else
+					return nullptr;
+			}
 			if (Components.TryGetValue(name, rs))
-				return rs;
+			{
+				if (includeParams || !rs->IsParam())
+					return rs;
+				else
+					return nullptr;
+			}
 			for (auto & subClosure : SubClosures)
 			{
 				if (subClosure.Value->IsInPlace)
 				{
-					rs = subClosure.Value->FindComponent(name);
+					rs = subClosure.Value->FindComponent(name, findInPrivate, includeParams);
 					if (rs && (findInPrivate || rs->Implementations.First()->SyntaxNode->IsPublic))
 						return rs;
 					else
@@ -16544,7 +16570,7 @@ namespace SpireLib
 				String source = src;
 				if (i > 0)
 					source = File::ReadAllText(inputFileName);
-				auto unit = compiler->Parse(compileResult, source, Path::GetFileName(inputFileName));
+				auto unit = compiler->Parse(compileResult, source, inputFileName);
 				units.Add(unit);
 				if (unit.SyntaxNode)
 				{
@@ -16560,7 +16586,7 @@ namespace SpireLib
 			}
 			catch (IOException)
 			{
-				compileResult.GetErrorWriter()->Error(1, L"cannot open file '" + Path::GetFileName(inputFileName) + L"'.", CodePosition(0, 0, L""));
+				compileResult.GetErrorWriter()->Error(1, L"cannot open file '" + inputFileName + L"'.", CodePosition(0, 0, L""));
 			}
 		}
 		units.Add(predefUnit);

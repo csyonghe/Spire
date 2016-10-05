@@ -3997,7 +3997,7 @@ namespace Spire
 			EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>> Components;
 			EnumerableDictionary<String, ShaderComponentSymbol *> AllComponents;
 			EnumerableDictionary<String, RefPtr<ShaderClosure>> SubClosures;
-			RefPtr<ShaderComponentSymbol> FindComponent(String name, bool findInPrivate = false);
+			RefPtr<ShaderComponentSymbol> FindComponent(String name, bool findInPrivate = false, bool includeParams = true);
 			RefPtr<ShaderClosure> FindClosure(String name);
 			List<ShaderComponentSymbol*> GetDependencyOrder();
 			RefPtr<ShaderIR> IR;

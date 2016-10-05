@@ -1446,6 +1446,7 @@ namespace Spire
 				// this is not an import operator call, resolve as function call
 				String funcName;
 				bool found = false;
+				bool functionNameFound = false;
 				RefPtr<FunctionSymbol> func;
 				if (expr->FunctionExpr->Variable == L"texture" && expr->Arguments.Count() > 0 &&
 					expr->Arguments[0]->Type->IsGenericType(L"Buffer"))
@@ -1482,6 +1483,7 @@ namespace Spire
 					{
 						if (f.Key.StartsWith(namePrefix))
 						{
+							functionNameFound = true;
 							if (f.Value->SyntaxNode->Parameters.Count() == expr->Arguments.Count())
 							{
 								int conversions = 0;
@@ -1524,7 +1526,11 @@ namespace Spire
 						if (i != expr->Arguments.Count() - 1)
 							argList << L", ";
 					}
-					Error(30021, expr->FunctionExpr->Variable + L": no overload takes arguments (" + argList.ProduceString() + L")", expr);
+					if (functionNameFound)
+						Error(30021, expr->FunctionExpr->Variable + L": no overload takes arguments (" + argList.ProduceString() + L")", expr);
+					else
+						Error(30015, L"undefined identifier '" + expr->FunctionExpr->Variable + L"'.", expr->FunctionExpr.Ptr());
+
 				}
 				else if (func)
 				{

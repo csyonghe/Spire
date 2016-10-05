@@ -40,9 +40,13 @@ namespace Spire
 				}
 			}
 		}
-		RefPtr<ShaderClosure> CreateShaderClosure(ErrorWriter * err, SymbolTable * symTable, ShaderSymbol * shader, CodePosition usingPos, const Dictionary<String, RefPtr<ShaderComponentSymbol>>& pRefMap)
+		RefPtr<ShaderClosure> CreateShaderClosure(ErrorWriter * err, SymbolTable * symTable, ShaderSymbol * shader, CodePosition usingPos, 
+			ShaderClosure * rootShader,
+			const Dictionary<String, RefPtr<ShaderComponentSymbol>>& pRefMap)
 		{
 			RefPtr<ShaderClosure> rs = new ShaderClosure();
+			if (rootShader == nullptr)
+				rootShader = rs.Ptr();
 			rs->Name = shader->SyntaxNode->Name.Content;
 			rs->RefMap = pRefMap;
 			rs->Pipeline = shader->Pipeline;
@@ -90,7 +94,7 @@ namespace Spire
 								}
 							}
 						}
-						auto refClosure = CreateShaderClosure(err, symTable, shaderSym.Ptr(), import->Position, refMap);
+						auto refClosure = CreateShaderClosure(err, symTable, shaderSym.Ptr(), import->Position, rootShader, refMap);
 						refClosure->IsPublic = import->IsPublic;
 						refClosure->Parent = rs.Ptr();
 						if (import->IsInplace)
@@ -125,10 +129,16 @@ namespace Spire
 					StringBuilder errMsg;
 					errMsg << L"argument '" + comp.Key + L"' is unassigned.";
 					// try to provide more info on why it is unassigned
-					if (auto arg = rs->FindComponent(comp.Key, true))
-						errMsg << L" automatic argument filling failed because the component of the same name is not accessible from '" << shader->SyntaxNode->Name.Content << L"'.";
+					auto arg = rootShader->FindComponent(comp.Key, true, false);
+					if (!arg)
+						errMsg << L" automatic argument filling failed because shader '" << rootShader->Name << L"' does not define component '" + comp.Key + L"'.";
 					else
-						errMsg << L" automatic argument filling failed because shader '" << shader->SyntaxNode->Name.Content << L"' does not define component '" + comp.Key + L"'.";
+					{
+						errMsg << L" automatic argument filling failed because the component of the same name is not accessible from '" << rootShader->Name << L"'.";
+						errMsg << L"\nsee requirement declaration at " << comp.Value->Implementations.First()->SyntaxNode->Position.ToString() << L".";
+						errMsg << L"\nsee potential definition of component '" << comp.Key << L"' at " << arg->Implementations.First()->SyntaxNode->Position.ToString()
+							<< L".\ndid you forget the 'public' qualifier?";
+					}
 					err->Error(33023,errMsg.ProduceString(), rs->UsingPosition);
 				}
 			}
@@ -137,7 +147,7 @@ namespace Spire
 
 		RefPtr<ShaderClosure> CreateShaderClosure(ErrorWriter * err, SymbolTable * symTable, ShaderSymbol * shader)
 		{
-			return CreateShaderClosure(err, symTable, shader, shader->SyntaxNode->Position, Dictionary<String, RefPtr<ShaderComponentSymbol>>());
+			return CreateShaderClosure(err, symTable, shader, shader->SyntaxNode->Position, nullptr, Dictionary<String, RefPtr<ShaderComponentSymbol>>());
 		}
 
 

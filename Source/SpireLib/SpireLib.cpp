@@ -134,7 +134,7 @@ namespace SpireLib
 				String source = src;
 				if (i > 0)
 					source = File::ReadAllText(inputFileName);
-				auto unit = compiler->Parse(compileResult, source, Path::GetFileName(inputFileName));
+				auto unit = compiler->Parse(compileResult, source, inputFileName);
 				units.Add(unit);
 				if (unit.SyntaxNode)
 				{
@@ -150,7 +150,7 @@ namespace SpireLib
 			}
 			catch (IOException)
 			{
-				compileResult.GetErrorWriter()->Error(1, L"cannot open file '" + Path::GetFileName(inputFileName) + L"'.", CodePosition(0, 0, L""));
+				compileResult.GetErrorWriter()->Error(1, L"cannot open file '" + inputFileName + L"'.", CodePosition(0, 0, L""));
 			}
 		}
 		units.Add(predefUnit);

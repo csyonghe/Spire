@@ -368,18 +368,28 @@ namespace Spire
 		{
 			return currentGUID++;
 		}
-		RefPtr<ShaderComponentSymbol> ShaderClosure::FindComponent(String name, bool findInPrivate)
+		RefPtr<ShaderComponentSymbol> ShaderClosure::FindComponent(String name, bool findInPrivate, bool includeParams)
 		{
 			RefPtr<ShaderComponentSymbol> rs;
 			if (RefMap.TryGetValue(name, rs))
-				return rs;
+			{
+				if (includeParams || !rs->IsParam())
+					return rs;
+				else
+					return nullptr;
+			}
 			if (Components.TryGetValue(name, rs))
-				return rs;
+			{
+				if (includeParams || !rs->IsParam())
+					return rs;
+				else
+					return nullptr;
+			}
 			for (auto & subClosure : SubClosures)
 			{
 				if (subClosure.Value->IsInPlace)
 				{
-					rs = subClosure.Value->FindComponent(name);
+					rs = subClosure.Value->FindComponent(name, findInPrivate, includeParams);
 					if (rs && (findInPrivate || rs->Implementations.First()->SyntaxNode->IsPublic))
 						return rs;
 					else
