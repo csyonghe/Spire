@@ -6935,27 +6935,27 @@ namespace Spire
 					expType->BaseType = BaseType::UInt;
 				else if (typeNode->TypeName == L"float")
 					expType->BaseType = BaseType::Float;
-				else if (typeNode->TypeName == L"ivec2")
+				else if (typeNode->TypeName == L"ivec2" || typeNode->TypeName == L"int2")
 					expType->BaseType = BaseType::Int2;
-				else if (typeNode->TypeName == L"ivec3")
+				else if (typeNode->TypeName == L"ivec3" || typeNode->TypeName == L"int3")
 					expType->BaseType = BaseType::Int3;
-				else if (typeNode->TypeName == L"ivec4")
+				else if (typeNode->TypeName == L"ivec4" || typeNode->TypeName == L"int4")
 					expType->BaseType = BaseType::Int4;
-				else if (typeNode->TypeName == L"uvec2")
+				else if (typeNode->TypeName == L"uvec2" || typeNode->TypeName == L"uint2")
 					expType->BaseType = BaseType::UInt2;
-				else if (typeNode->TypeName == L"uvec3")
+				else if (typeNode->TypeName == L"uvec3" || typeNode->TypeName == L"uint3")
 					expType->BaseType = BaseType::UInt3;
-				else if (typeNode->TypeName == L"uvec4")
+				else if (typeNode->TypeName == L"uvec4" || typeNode->TypeName == L"uint4")
 					expType->BaseType = BaseType::UInt4;
-				else if (typeNode->TypeName == L"vec2")
+				else if (typeNode->TypeName == L"vec2" || typeNode->TypeName == L"float2")
 					expType->BaseType = BaseType::Float2;
-				else if (typeNode->TypeName == L"vec3")
+				else if (typeNode->TypeName == L"vec3" || typeNode->TypeName == L"float3")
 					expType->BaseType = BaseType::Float3;
-				else if (typeNode->TypeName == L"vec4")
+				else if (typeNode->TypeName == L"vec4" || typeNode->TypeName == L"float4")
 					expType->BaseType = BaseType::Float4;
-				else if (typeNode->TypeName == L"mat3" || typeNode->TypeName == L"mat3x3")
+				else if (typeNode->TypeName == L"mat3" || typeNode->TypeName == L"mat3x3" || typeNode->TypeName == L"float3x3")
 					expType->BaseType = BaseType::Float3x3;
-				else if (typeNode->TypeName == L"mat4" || typeNode->TypeName == L"mat4x4")
+				else if (typeNode->TypeName == L"mat4" || typeNode->TypeName == L"mat4x4" || typeNode->TypeName == L"float4x4")
 					expType->BaseType = BaseType::Float4x4;
 				else if (typeNode->TypeName == L"sampler2D")
 					expType->BaseType = BaseType::Texture2D;
