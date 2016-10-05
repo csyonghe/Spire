@@ -87,6 +87,7 @@ namespace Spire
 			SymbolTable * symTable;
 			ILWorld * currentWorld = nullptr;
 			ComponentDefinitionIR * currentComponent = nullptr;
+			ILOperand * returnRegister = nullptr;
 			ImportOperatorDefSyntaxNode * currentImportDef = nullptr;
 			ShaderIR * currentShader = nullptr;
 			CompileResult & result;
@@ -358,26 +359,29 @@ namespace Spire
 					return;
 				}
 
-				auto allocVar = codeWriter.AllocVar(type, result.Program->ConstantPool->CreateConstant(1));
-				currentWorld->Components[currentComponent->UniqueName] = allocVar;
-				allocVar->Name = varName;
-				variables.Add(currentComponent->UniqueName, allocVar);
+				ILOperand * componentVar = nullptr;
+				
 
 				if (currentComponent->SyntaxNode->Expression)
 				{
 					currentComponent->SyntaxNode->Expression->Accept(this);
-					Assign(allocVar, exprStack.Last());
+					componentVar = exprStack.Last();
 					if (currentWorld->OutputType->Members.ContainsKey(currentComponent->UniqueName))
 					{
-						auto exp = new ExportInstruction(currentComponent->UniqueName, currentWorld, allocVar);
+						auto exp = new ExportInstruction(currentComponent->UniqueName, currentWorld, componentVar);
 						codeWriter.Insert(exp);
 					}
 					exprStack.Clear();
 				}
 				else if (currentComponent->SyntaxNode->BlockStatement)
 				{
+					returnRegister = nullptr;
 					currentComponent->SyntaxNode->BlockStatement->Accept(this);
+					componentVar = returnRegister;
 				}
+				currentWorld->Components[currentComponent->UniqueName] = componentVar;
+				variables.Add(currentComponent->UniqueName, componentVar);
+				componentVar->Name = varName;
 				currentComponent = nullptr;
 			}
 			virtual RefPtr<FunctionSyntaxNode> VisitFunction(FunctionSyntaxNode* function) override
@@ -510,27 +514,29 @@ namespace Spire
 			}
 			virtual RefPtr<StatementSyntaxNode> VisitReturnStatement(ReturnStatementSyntaxNode* stmt) override
 			{
+				returnRegister = nullptr;
 				if (currentComponent != nullptr && !currentImportDef)
 				{
 					if (stmt->Expression)
 					{
 						stmt->Expression->Accept(this);
-						ILOperand *op = nullptr;
-						variables.TryGetValue(currentComponent->UniqueName, op);
 						auto val = PopStack();
-						codeWriter.Store(op, val);
 						if (currentWorld->OutputType->Members.ContainsKey(currentComponent->UniqueName))
 						{
-							auto exp = new ExportInstruction(currentComponent->UniqueName, currentWorld, op);
+							auto exp = new ExportInstruction(currentComponent->UniqueName, currentWorld, val);
 							codeWriter.Insert(exp);
 						}
+						returnRegister = val;
 					}
 				}
 				else
 				{
 					if (stmt->Expression)
+					{
 						stmt->Expression->Accept(this);
-					codeWriter.Insert(new ReturnInstruction(PopStack()));
+						returnRegister = PopStack();
+					}
+					codeWriter.Insert(new ReturnInstruction(returnRegister));
 				}
 				return stmt;
 			}

@@ -731,6 +731,7 @@ namespace Spire
 			SymbolTable * symTable;
 			ILWorld * currentWorld = nullptr;
 			ComponentDefinitionIR * currentComponent = nullptr;
+			ILOperand * returnRegister = nullptr;
 			ImportOperatorDefSyntaxNode * currentImportDef = nullptr;
 			ShaderIR * currentShader = nullptr;
 			CompileResult & result;
@@ -1002,26 +1003,29 @@ namespace Spire
 					return;
 				}
 
-				auto allocVar = codeWriter.AllocVar(type, result.Program->ConstantPool->CreateConstant(1));
-				currentWorld->Components[currentComponent->UniqueName] = allocVar;
-				allocVar->Name = varName;
-				variables.Add(currentComponent->UniqueName, allocVar);
+				ILOperand * componentVar = nullptr;
+				
 
 				if (currentComponent->SyntaxNode->Expression)
 				{
 					currentComponent->SyntaxNode->Expression->Accept(this);
-					Assign(allocVar, exprStack.Last());
+					componentVar = exprStack.Last();
 					if (currentWorld->OutputType->Members.ContainsKey(currentComponent->UniqueName))
 					{
-						auto exp = new ExportInstruction(currentComponent->UniqueName, currentWorld, allocVar);
+						auto exp = new ExportInstruction(currentComponent->UniqueName, currentWorld, componentVar);
 						codeWriter.Insert(exp);
 					}
 					exprStack.Clear();
 				}
 				else if (currentComponent->SyntaxNode->BlockStatement)
 				{
+					returnRegister = nullptr;
 					currentComponent->SyntaxNode->BlockStatement->Accept(this);
+					componentVar = returnRegister;
 				}
+				currentWorld->Components[currentComponent->UniqueName] = componentVar;
+				variables.Add(currentComponent->UniqueName, componentVar);
+				componentVar->Name = varName;
 				currentComponent = nullptr;
 			}
 			virtual RefPtr<FunctionSyntaxNode> VisitFunction(FunctionSyntaxNode* function) override
@@ -1154,27 +1158,29 @@ namespace Spire
 			}
 			virtual RefPtr<StatementSyntaxNode> VisitReturnStatement(ReturnStatementSyntaxNode* stmt) override
 			{
+				returnRegister = nullptr;
 				if (currentComponent != nullptr && !currentImportDef)
 				{
 					if (stmt->Expression)
 					{
 						stmt->Expression->Accept(this);
-						ILOperand *op = nullptr;
-						variables.TryGetValue(currentComponent->UniqueName, op);
 						auto val = PopStack();
-						codeWriter.Store(op, val);
 						if (currentWorld->OutputType->Members.ContainsKey(currentComponent->UniqueName))
 						{
-							auto exp = new ExportInstruction(currentComponent->UniqueName, currentWorld, op);
+							auto exp = new ExportInstruction(currentComponent->UniqueName, currentWorld, val);
 							codeWriter.Insert(exp);
 						}
+						returnRegister = val;
 					}
 				}
 				else
 				{
 					if (stmt->Expression)
+					{
 						stmt->Expression->Accept(this);
-					codeWriter.Insert(new ReturnInstruction(PopStack()));
+						returnRegister = PopStack();
+					}
+					codeWriter.Insert(new ReturnInstruction(returnRegister));
 				}
 				return stmt;
 			}
@@ -2230,6 +2236,7 @@ namespace Spire
 			RefPtr<OutputStrategy> outputStrategy;
 			Dictionary<String, ExternComponentCodeGenInfo> extCompInfo;
 			ImportInstruction * currentImportInstr = nullptr;
+			bool useBindlessTexture = false;
 			ErrorWriter * errWriter;
 		public:
 			void Error(int errId, String msg, CodePosition pos)
@@ -2793,6 +2800,11 @@ namespace Spire
 					if (arg->ArgId == 0)
 						return false;
 				}
+				if (auto import = instr.As<ImportInstruction>())
+				{
+					if (!useBindlessTexture && import->Type->IsTexture())
+						return true;
+				}
 				for (auto &&usr : instr.Users)
 				{
 					if (auto update = dynamic_cast<MemberUpdateInstruction*>(usr))
@@ -2858,6 +2870,24 @@ namespace Spire
 				genCode(varName, instr->Operands[0]->Type.Ptr(), instr->Operands[1].Ptr(), instr->Operands[2].Ptr());
 			}
 
+			void PrintImportInstr(CodeGenContext & ctx, ImportInstruction * importInstr)
+			{
+				currentImportInstr = importInstr;
+				
+				PrintDef(ctx.Header, importInstr->Type.Ptr(), importInstr->Name);
+				ctx.Header << L";\n";
+				GenerateCode(ctx, importInstr->ImportOperator.Ptr());
+				
+				currentImportInstr = nullptr;
+			}
+
+			void PrintImportInstrExpr(CodeGenContext & ctx, ImportInstruction * importInstr)
+			{
+				currentImportInstr = importInstr;
+				PrintOp(ctx, importInstr->ImportOperator->GetLastInstruction()->As<ReturnInstruction>()->Operand.Ptr());
+				currentImportInstr = nullptr;
+			}
+
 			void PrintInstrExpr(CodeGenContext & ctx, ILInstruction & instr)
 			{
 				if (auto binInstr = instr.As<BinaryInstruction>())
@@ -2878,6 +2908,8 @@ namespace Spire
 					PrintCastI2FInstrExpr(ctx, casti2f);
 				else if (auto ldInput = instr.As<LoadInputInstruction>())
 					PrintLoadInputInstrExpr(ctx, ldInput);
+				else if (auto import = instr.As<ImportInstruction>())
+					PrintImportInstrExpr(ctx, import);
 				else if (instr.As<MemberUpdateInstruction>())
 					throw InvalidOperationException(L"member update instruction cannot appear as expression.");
 			}
@@ -2907,6 +2939,9 @@ namespace Spire
 						PrintCastI2FInstr(ctx, casti2f);
 					else if (auto update = instr.As<MemberUpdateInstruction>())
 						PrintUpdateInstr(ctx, update);
+					else if (auto importInstr = instr.As<ImportInstruction>())
+						PrintImportInstr(ctx, importInstr);
+					
 				}
 			}
 
@@ -2986,14 +3021,7 @@ namespace Spire
 					{
 						context.Body << L"discard;\n";
 					}
-					else if (auto importInstr = instr.As<ImportInstruction>())
-					{
-						currentImportInstr = importInstr;
-						PrintDef(context.Header, importInstr->Type.Ptr(), importInstr->Name);
-						context.Header << L";\n";
-						GenerateCode(context, importInstr->ImportOperator.Ptr()); 
-						currentImportInstr = nullptr;
-					}
+					
 					else
 						PrintInstr(context, instr);
 				}
@@ -3121,7 +3149,10 @@ namespace Spire
 
 				if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer)
 				{
-					sb << L"blk" << input << L"." << currentImportInstr->ComponentName;
+					if (!currentImportInstr->Type->IsTexture() || useBindlessTexture)
+						sb << L"blk" << input << L"." << currentImportInstr->ComponentName;
+					else
+						sb << currentImportInstr->ComponentName;
 				}
 				else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StorageBuffer)
 				{
@@ -3184,7 +3215,9 @@ namespace Spire
 							{
 								if (input.Attributes.ContainsKey(L"Flat"))
 									sb.GlobalHeader << L"flat ";
-
+								if (!useBindlessTexture && info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer &&
+									field.Value.Type->IsTexture())
+									continue;
 								if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput)
 									sb.GlobalHeader << L"in ";
 								else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
@@ -3207,6 +3240,20 @@ namespace Spire
 						sb.GlobalHeader << L"} blk" << input.Name << L";\n";
 					else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StorageBuffer)
 						sb.GlobalHeader << L"};\nbuffer " << input.Name << L"\n{\nT" << input.Name << L"content[];\n} blk" << input.Name << L";\n";
+					if (!useBindlessTexture && info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer)
+					{
+						for (auto & field : recType->Members)
+						{
+							if (field.Value.Type->IsTexture())
+							{
+								if (field.Value.Attributes.ContainsKey(L"Binding"))
+									sb.GlobalHeader << L"layout(binding = " << field.Value.Attributes[L"Binding"]() << L") ";
+								sb.GlobalHeader << L"uniform ";
+								PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), field.Key);
+								sb.GlobalHeader << L";\n";
+							}
+						}
+					}
 				}
 				else
 				{

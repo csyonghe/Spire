@@ -113,6 +113,7 @@ namespace Spire
 			RefPtr<OutputStrategy> outputStrategy;
 			Dictionary<String, ExternComponentCodeGenInfo> extCompInfo;
 			ImportInstruction * currentImportInstr = nullptr;
+			bool useBindlessTexture = false;
 			ErrorWriter * errWriter;
 		public:
 			void Error(int errId, String msg, CodePosition pos)
@@ -676,6 +677,11 @@ namespace Spire
 					if (arg->ArgId == 0)
 						return false;
 				}
+				if (auto import = instr.As<ImportInstruction>())
+				{
+					if (!useBindlessTexture && import->Type->IsTexture())
+						return true;
+				}
 				for (auto &&usr : instr.Users)
 				{
 					if (auto update = dynamic_cast<MemberUpdateInstruction*>(usr))
@@ -741,6 +747,24 @@ namespace Spire
 				genCode(varName, instr->Operands[0]->Type.Ptr(), instr->Operands[1].Ptr(), instr->Operands[2].Ptr());
 			}
 
+			void PrintImportInstr(CodeGenContext & ctx, ImportInstruction * importInstr)
+			{
+				currentImportInstr = importInstr;
+				
+				PrintDef(ctx.Header, importInstr->Type.Ptr(), importInstr->Name);
+				ctx.Header << L";\n";
+				GenerateCode(ctx, importInstr->ImportOperator.Ptr());
+				
+				currentImportInstr = nullptr;
+			}
+
+			void PrintImportInstrExpr(CodeGenContext & ctx, ImportInstruction * importInstr)
+			{
+				currentImportInstr = importInstr;
+				PrintOp(ctx, importInstr->ImportOperator->GetLastInstruction()->As<ReturnInstruction>()->Operand.Ptr());
+				currentImportInstr = nullptr;
+			}
+
 			void PrintInstrExpr(CodeGenContext & ctx, ILInstruction & instr)
 			{
 				if (auto binInstr = instr.As<BinaryInstruction>())
@@ -761,6 +785,8 @@ namespace Spire
 					PrintCastI2FInstrExpr(ctx, casti2f);
 				else if (auto ldInput = instr.As<LoadInputInstruction>())
 					PrintLoadInputInstrExpr(ctx, ldInput);
+				else if (auto import = instr.As<ImportInstruction>())
+					PrintImportInstrExpr(ctx, import);
 				else if (instr.As<MemberUpdateInstruction>())
 					throw InvalidOperationException(L"member update instruction cannot appear as expression.");
 			}
@@ -790,6 +816,9 @@ namespace Spire
 						PrintCastI2FInstr(ctx, casti2f);
 					else if (auto update = instr.As<MemberUpdateInstruction>())
 						PrintUpdateInstr(ctx, update);
+					else if (auto importInstr = instr.As<ImportInstruction>())
+						PrintImportInstr(ctx, importInstr);
+					
 				}
 			}
 
@@ -869,14 +898,7 @@ namespace Spire
 					{
 						context.Body << L"discard;\n";
 					}
-					else if (auto importInstr = instr.As<ImportInstruction>())
-					{
-						currentImportInstr = importInstr;
-						PrintDef(context.Header, importInstr->Type.Ptr(), importInstr->Name);
-						context.Header << L";\n";
-						GenerateCode(context, importInstr->ImportOperator.Ptr()); 
-						currentImportInstr = nullptr;
-					}
+					
 					else
 						PrintInstr(context, instr);
 				}
@@ -1004,7 +1026,10 @@ namespace Spire
 
 				if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer)
 				{
-					sb << L"blk" << input << L"." << currentImportInstr->ComponentName;
+					if (!currentImportInstr->Type->IsTexture() || useBindlessTexture)
+						sb << L"blk" << input << L"." << currentImportInstr->ComponentName;
+					else
+						sb << currentImportInstr->ComponentName;
 				}
 				else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StorageBuffer)
 				{
@@ -1067,7 +1092,9 @@ namespace Spire
 							{
 								if (input.Attributes.ContainsKey(L"Flat"))
 									sb.GlobalHeader << L"flat ";
-
+								if (!useBindlessTexture && info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer &&
+									field.Value.Type->IsTexture())
+									continue;
 								if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput)
 									sb.GlobalHeader << L"in ";
 								else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
@@ -1090,6 +1117,20 @@ namespace Spire
 						sb.GlobalHeader << L"} blk" << input.Name << L";\n";
 					else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StorageBuffer)
 						sb.GlobalHeader << L"};\nbuffer " << input.Name << L"\n{\nT" << input.Name << L"content[];\n} blk" << input.Name << L";\n";
+					if (!useBindlessTexture && info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer)
+					{
+						for (auto & field : recType->Members)
+						{
+							if (field.Value.Type->IsTexture())
+							{
+								if (field.Value.Attributes.ContainsKey(L"Binding"))
+									sb.GlobalHeader << L"layout(binding = " << field.Value.Attributes[L"Binding"]() << L") ";
+								sb.GlobalHeader << L"uniform ";
+								PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), field.Key);
+								sb.GlobalHeader << L";\n";
+							}
+						}
+					}
 				}
 				else
 				{

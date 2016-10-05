@@ -154,7 +154,7 @@ module SurfacePattern
 {
     require @viewUniform sampler2D testSampler;
     public vec3 albedo = vec3(0.9, 0.45, 0.05) + texture(testSampler, vec2(0.0)).xyz;
-    public vec3 normal = vec3(0.0, 0.0, 1.0);
+    public vec3 normal = vec3(0.0, 0.0, 1.0)+ texture(testSampler, vec2(3.0)).xyz;
     public float specular = 1.0;
     public float roughness = 0.5;
     public float metallic = 0.4;
@@ -181,6 +181,7 @@ module SystemUniforms
     public @viewUniform mat4 invViewTransform;
     public @viewUniform mat4 invViewProjTransform;
     public @viewUniform vec3 cameraPos;
+    [Binding:"1"]
     public @viewUniform sampler2D testSampler;
     public vec3 lightDir = vec3(1.0, 1.0, 0.0);
     public vec3 lightColor = vec3(1.5, 1.5, 1.5);
