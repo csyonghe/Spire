@@ -4888,6 +4888,7 @@ namespace Spire
 				typeNames.Add(L"float4x4");
 				typeNames.Add(L"half3x3");
 				typeNames.Add(L"half4x4");
+				typeNames.Add(L"Texture2D");
 				typeNames.Add(L"sampler2D");
 				typeNames.Add(L"sampler2DShadow");
 				typeNames.Add(L"samplerCube");
