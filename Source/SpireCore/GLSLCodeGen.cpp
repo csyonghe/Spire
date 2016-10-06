@@ -1237,6 +1237,7 @@ namespace Spire
 
 			StageSource GenerateSingleWorldShader(ILProgram * program, ILShader * shader, ILStage * stage)
 			{
+				useBindlessTexture = stage->Attributes.ContainsKey(L"BindlessTexture");
 				StageSource rs;
 				CodeGenContext ctx;
 				GenerateHeader(ctx.GlobalHeader, stage);
@@ -1306,6 +1307,8 @@ namespace Spire
 
 			StageSource GenerateHullShader(ILProgram * program, ILShader * shader, ILStage * stage)
 			{
+				useBindlessTexture = stage->Attributes.ContainsKey(L"BindlessTexture");
+
 				StageSource rs;
 				StageAttribute patchWorldName, controlPointWorldName, cornerPointWorldName, domain, innerLevel, outterLevel, numControlPoints;
 				RefPtr<ILWorld> patchWorld, controlPointWorld, cornerPointWorld;
