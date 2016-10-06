@@ -500,7 +500,7 @@ namespace Spire
 		public:
 			enum class ConstantType
 			{
-				Int, Float
+				Int, Bool, Float
 			};
 			ConstantType ConstType;
 			union

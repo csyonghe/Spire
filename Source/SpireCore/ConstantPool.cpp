@@ -15,6 +15,7 @@ namespace Spire
 			Dictionary<ConstKey<int>, ILConstOperand*> intConsts;
 			Dictionary<ConstKey<float>, ILConstOperand*> floatConsts;
 			List<RefPtr<ILConstOperand>> constants;
+			RefPtr<ILConstOperand> trueConst, falseConst;
 		public:
 			ILUndefinedOperand * GetUndefinedOperand()
 			{
@@ -152,6 +153,15 @@ namespace Spire
 						return rs;
 					}
 				}
+			}
+
+
+			ILConstOperand * CreateConstant(bool b)
+			{
+				if (b) 
+					return trueConst.Ptr();
+				else
+					return falseConst.Ptr();
 			}
 
 			ILConstOperand * CreateConstant(int val, int size = 0)
@@ -300,6 +310,20 @@ namespace Spire
 
 				return rs;
 			}
+
+			ConstantPoolImpl()
+			{
+				trueConst = new ILConstOperand();
+				trueConst->Type = new ILBasicType(ILBaseType::Bool);
+				trueConst->IntValues[0] = trueConst->IntValues[1] = trueConst->IntValues[2] = trueConst->IntValues[3] = 1;
+				trueConst->Name = L"true";
+
+				falseConst = new ILConstOperand();
+				falseConst->Type = new ILBasicType(ILBaseType::Bool);
+				falseConst->IntValues[0] = falseConst->IntValues[1] = falseConst->IntValues[2] = falseConst->IntValues[3] = 0;
+				trueConst->Name = L"false";
+
+			}
 		};
 
 		ConstantPool::ConstantPool()
@@ -330,6 +354,10 @@ namespace Spire
 		ILConstOperand * ConstantPool::CreateConstantIntVec(int val0, int val1, int val3, int val4)
 		{
 			return impl->CreateConstantIntVec(val0, val1, val3, val4);
+		}
+		ILConstOperand * ConstantPool::CreateConstant(bool b)
+		{
+			return impl->CreateConstant(b);
 		}
 		ILConstOperand * ConstantPool::CreateConstant(int val, int vectorSize)
 		{

@@ -22,8 +22,8 @@ namespace Spire
 			TextureShadow = 49,
 			TextureCube = 50,
 			TextureCubeShadow = 51,
+			Bool = 128,
 			UInt = 512, UInt2 = 513, UInt3 = 514, UInt4 = 515,
-			Bool
 		};
 		int SizeofBaseType(ILBaseType type);
 		int RoundToAlignment(int offset, int alignment);

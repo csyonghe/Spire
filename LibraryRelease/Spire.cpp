@@ -1423,6 +1423,10 @@ namespace Spire
 				{
 					op = result.Program->ConstantPool->CreateConstant(expr->FloatValue);
 				}
+				else if (expr->ConstType == ConstantExpressionSyntaxNode::ConstantType::Bool)
+				{
+					op = result.Program->ConstantPool->CreateConstant(expr->IntValue != 0);
+				}
 				else
 				{
 					op = result.Program->ConstantPool->CreateConstant(expr->IntValue);
@@ -1812,6 +1816,7 @@ namespace Spire
 			Dictionary<ConstKey<int>, ILConstOperand*> intConsts;
 			Dictionary<ConstKey<float>, ILConstOperand*> floatConsts;
 			List<RefPtr<ILConstOperand>> constants;
+			RefPtr<ILConstOperand> trueConst, falseConst;
 		public:
 			ILUndefinedOperand * GetUndefinedOperand()
 			{
@@ -1949,6 +1954,15 @@ namespace Spire
 						return rs;
 					}
 				}
+			}
+
+
+			ILConstOperand * CreateConstant(bool b)
+			{
+				if (b) 
+					return trueConst.Ptr();
+				else
+					return falseConst.Ptr();
 			}
 
 			ILConstOperand * CreateConstant(int val, int size = 0)
@@ -2097,6 +2111,20 @@ namespace Spire
 
 				return rs;
 			}
+
+			ConstantPoolImpl()
+			{
+				trueConst = new ILConstOperand();
+				trueConst->Type = new ILBasicType(ILBaseType::Bool);
+				trueConst->IntValues[0] = trueConst->IntValues[1] = trueConst->IntValues[2] = trueConst->IntValues[3] = 1;
+				trueConst->Name = L"true";
+
+				falseConst = new ILConstOperand();
+				falseConst->Type = new ILBasicType(ILBaseType::Bool);
+				falseConst->IntValues[0] = falseConst->IntValues[1] = falseConst->IntValues[2] = falseConst->IntValues[3] = 0;
+				trueConst->Name = L"false";
+
+			}
 		};
 
 		ConstantPool::ConstantPool()
@@ -2127,6 +2155,10 @@ namespace Spire
 		ILConstOperand * ConstantPool::CreateConstantIntVec(int val0, int val1, int val3, int val4)
 		{
 			return impl->CreateConstantIntVec(val0, val1, val3, val4);
+		}
+		ILConstOperand * ConstantPool::CreateConstant(bool b)
+		{
+			return impl->CreateConstant(b);
 		}
 		ILConstOperand * ConstantPool::CreateConstant(int val, int vectorSize)
 		{
@@ -2341,6 +2373,8 @@ namespace Spire
 						ctx.Body << makeFloat(c->FloatValues[0]);
 					else if (type->IsInt())
 						ctx.Body << (c->IntValues[0]);
+					else if (type->IsBool())
+						ctx.Body << ((c->IntValues[0] != 0) ? L"true" : L"false");
 					else if (auto baseType = dynamic_cast<ILBasicType*>(type))
 					{
 						if (baseType->Type == ILBaseType::Float2)
@@ -6669,6 +6703,15 @@ namespace Spire
 				}
 				rs = constExpr;
 			}
+			else if (LookAheadToken(L"true") || LookAheadToken(L"false"))
+			{
+				RefPtr<ConstantExpressionSyntaxNode> constExpr = new ConstantExpressionSyntaxNode();
+				auto token = tokens[pos++];
+				FillPosition(constExpr.Ptr());
+				constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Bool;
+				constExpr->IntValue = token.Content == L"true" ? 1 : 0;
+				rs = constExpr;
+			}
 			else if (LookAheadToken(TokenType::Identifier))
 			{
 				RefPtr<VarExpressionSyntaxNode> varExpr = new VarExpressionSyntaxNode();
@@ -8217,6 +8260,9 @@ namespace Spire
 				{
 				case ConstantExpressionSyntaxNode::ConstantType::Int:
 					expr->Type = ExpressionType::Int;
+					break;
+				case ConstantExpressionSyntaxNode::ConstantType::Bool:
+					expr->Type = ExpressionType::Bool;
 					break;
 				case ConstantExpressionSyntaxNode::ConstantType::Float:
 					expr->Type = ExpressionType::Float;

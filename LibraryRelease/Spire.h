@@ -702,7 +702,7 @@ namespace Spire
 		public:
 			enum class ConstantType
 			{
-				Int, Float
+				Int, Bool, Float
 			};
 			ConstantType ConstType;
 			union
@@ -1371,8 +1371,8 @@ namespace Spire
 			TextureShadow = 49,
 			TextureCube = 50,
 			TextureCubeShadow = 51,
+			Bool = 128,
 			UInt = 512, UInt2 = 513, UInt3 = 514, UInt4 = 515,
-			Bool
 		};
 		int SizeofBaseType(ILBaseType type);
 		int RoundToAlignment(int offset, int alignment);
@@ -4162,6 +4162,7 @@ namespace Spire
 			ILConstOperand * CreateConstant(float val, float val1);
 			ILConstOperand * CreateConstant(float val, float val1, float val2);
 			ILConstOperand * CreateConstant(float val, float val1, float val2, float val3);
+			ILConstOperand * CreateConstant(bool b);
 			ILOperand * CreateDefaultValue(ILType * type);
 			ILUndefinedOperand * GetUndefinedOperand();
 			ConstantPool();

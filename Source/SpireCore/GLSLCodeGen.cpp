@@ -182,6 +182,8 @@ namespace Spire
 						ctx.Body << makeFloat(c->FloatValues[0]);
 					else if (type->IsInt())
 						ctx.Body << (c->IntValues[0]);
+					else if (type->IsBool())
+						ctx.Body << ((c->IntValues[0] != 0) ? L"true" : L"false");
 					else if (auto baseType = dynamic_cast<ILBasicType*>(type))
 					{
 						if (baseType->Type == ILBaseType::Float2)

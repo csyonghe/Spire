@@ -1183,6 +1183,15 @@ namespace Spire
 				}
 				rs = constExpr;
 			}
+			else if (LookAheadToken(L"true") || LookAheadToken(L"false"))
+			{
+				RefPtr<ConstantExpressionSyntaxNode> constExpr = new ConstantExpressionSyntaxNode();
+				auto token = tokens[pos++];
+				FillPosition(constExpr.Ptr());
+				constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Bool;
+				constExpr->IntValue = token.Content == L"true" ? 1 : 0;
+				rs = constExpr;
+			}
 			else if (LookAheadToken(TokenType::Identifier))
 			{
 				RefPtr<VarExpressionSyntaxNode> varExpr = new VarExpressionSyntaxNode();

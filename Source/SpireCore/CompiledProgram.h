@@ -26,6 +26,7 @@ namespace Spire
 			ILConstOperand * CreateConstant(float val, float val1);
 			ILConstOperand * CreateConstant(float val, float val1, float val2);
 			ILConstOperand * CreateConstant(float val, float val1, float val2, float val3);
+			ILConstOperand * CreateConstant(bool b);
 			ILOperand * CreateDefaultValue(ILType * type);
 			ILUndefinedOperand * GetUndefinedOperand();
 			ConstantPool();

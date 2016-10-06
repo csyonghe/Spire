@@ -769,6 +769,10 @@ namespace Spire
 				{
 					op = result.Program->ConstantPool->CreateConstant(expr->FloatValue);
 				}
+				else if (expr->ConstType == ConstantExpressionSyntaxNode::ConstantType::Bool)
+				{
+					op = result.Program->ConstantPool->CreateConstant(expr->IntValue != 0);
+				}
 				else
 				{
 					op = result.Program->ConstantPool->CreateConstant(expr->IntValue);
