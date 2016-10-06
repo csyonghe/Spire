@@ -1028,7 +1028,7 @@ namespace Spire
 						if (variables.TryGetValue(refComp->Content, op))
 							PushStack(op);
 						else
-							throw InvalidProgramException(L"referencing undefined component/variable. probable cause: unchecked circular reference.");
+							throw InvalidProgramException(String(L"referencing undefined component/variable '") + refComp->Content + L"'. probable cause: unchecked circular reference.");
 					}
 				}
 				else if (!GenerateVarRef(expr->Variable, expr->Access))

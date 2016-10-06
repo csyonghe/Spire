@@ -42,18 +42,25 @@ int wmain(int argc, wchar_t* argv[])
 		}
 	}
 	CompileResult result;
-	auto files = SpireLib::CompileShaderSourceFromFile(result, fileName, options);
-	for (auto & f : files)
-	{		
-		try
+	try
+	{
+		auto files = SpireLib::CompileShaderSourceFromFile(result, fileName, options);
+		for (auto & f : files)
 		{
-			f.SaveToFile(Path::Combine(outputDir, f.MetaData.ShaderName + L".cse"));
+			try
+			{
+				f.SaveToFile(Path::Combine(outputDir, f.MetaData.ShaderName + L".cse"));
+			}
+			catch (Exception &)
+			{
+				result.GetErrorWriter()->Error(4, L"cannot write output file \'" + Path::Combine(outputDir, f.MetaData.ShaderName + L".cse") + L"\'.",
+					CodePosition(0, 0, L""));
+			}
 		}
-		catch (Exception &)
-		{
-			result.GetErrorWriter()->Error(4, L"cannot write output file \'" + Path::Combine(outputDir, f.MetaData.ShaderName + L".cse") + L"\'.",
-				CodePosition(0, 0, L""));
-		}
+	}
+	catch (Exception & e)
+	{
+		wprintf(L"internal compiler error: %s\n", e.Message.Buffer());
 	}
 	result.PrintError(true);
 	if (result.Success)

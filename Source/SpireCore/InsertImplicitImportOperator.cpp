@@ -139,7 +139,7 @@ namespace Spire
 					return ProcessComponentReference(refComp->Content);
 				}
 				else
-					member->BaseExpression->Accept(this);
+					member->BaseExpression = member->BaseExpression->Accept(this).As<ExpressionSyntaxNode>();
 				return member;
 			}
 			RefPtr<ExpressionSyntaxNode> VisitImportExpression(ImportExpressionSyntaxNode * import) override

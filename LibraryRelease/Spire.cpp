@@ -1682,7 +1682,7 @@ namespace Spire
 						if (variables.TryGetValue(refComp->Content, op))
 							PushStack(op);
 						else
-							throw InvalidProgramException(L"referencing undefined component/variable. probable cause: unchecked circular reference.");
+							throw InvalidProgramException(String(L"referencing undefined component/variable '") + refComp->Content + L"'. probable cause: unchecked circular reference.");
 					}
 				}
 				else if (!GenerateVarRef(expr->Variable, expr->Access))
@@ -4612,7 +4612,7 @@ namespace Spire
 					return ProcessComponentReference(refComp->Content);
 				}
 				else
-					member->BaseExpression->Accept(this);
+					member->BaseExpression = member->BaseExpression->Accept(this).As<ExpressionSyntaxNode>();
 				return member;
 			}
 			RefPtr<ExpressionSyntaxNode> VisitImportExpression(ImportExpressionSyntaxNode * import) override
@@ -6894,12 +6894,14 @@ namespace Spire
 
 		String TranslateHLSLTypeNames(String name)
 		{
-			if (name == L"float2")
+			if (name == L"float2" || name == L"half2")
 				return L"vec2";
-			else if (name == L"float3")
+			else if (name == L"float3" || name == L"half3")
 				return L"vec3";
-			else if (name == L"float4")
+			else if (name == L"float4" || name == L"half4")
 				return L"vec4";
+			else if (name == L"half")
+				return L"float";
 			else if (name == L"int2")
 				return L"ivec2";
 			else if (name == L"int3")
@@ -6912,9 +6914,9 @@ namespace Spire
 				return L"uvec3";
 			else if (name == L"uint4")
 				return L"uvec4";
-			else if (name == L"float3x3")
+			else if (name == L"float3x3" || name == L"half3x3")
 				return L"mat3";
-			else if (name == L"float4x4")
+			else if (name == L"float4x4" || name == L"half4x4")
 				return L"mat4";
 			else
 				return name;
@@ -6972,7 +6974,7 @@ namespace Spire
 					expType->BaseType = BaseType::Int;
 				else if (typeNode->TypeName == L"uint")
 					expType->BaseType = BaseType::UInt;
-				else if (typeNode->TypeName == L"float")
+				else if (typeNode->TypeName == L"float" || typeNode->TypeName == L"half")
 					expType->BaseType = BaseType::Float;
 				else if (typeNode->TypeName == L"ivec2" || typeNode->TypeName == L"int2")
 					expType->BaseType = BaseType::Int2;
@@ -6986,15 +6988,15 @@ namespace Spire
 					expType->BaseType = BaseType::UInt3;
 				else if (typeNode->TypeName == L"uvec4" || typeNode->TypeName == L"uint4")
 					expType->BaseType = BaseType::UInt4;
-				else if (typeNode->TypeName == L"vec2" || typeNode->TypeName == L"float2")
+				else if (typeNode->TypeName == L"vec2" || typeNode->TypeName == L"float2" || typeNode->TypeName == L"half2")
 					expType->BaseType = BaseType::Float2;
-				else if (typeNode->TypeName == L"vec3" || typeNode->TypeName == L"float3")
+				else if (typeNode->TypeName == L"vec3" || typeNode->TypeName == L"float3" || typeNode->TypeName == L"half3")
 					expType->BaseType = BaseType::Float3;
-				else if (typeNode->TypeName == L"vec4" || typeNode->TypeName == L"float4")
+				else if (typeNode->TypeName == L"vec4" || typeNode->TypeName == L"float4" || typeNode->TypeName == L"half4")
 					expType->BaseType = BaseType::Float4;
-				else if (typeNode->TypeName == L"mat3" || typeNode->TypeName == L"mat3x3" || typeNode->TypeName == L"float3x3")
+				else if (typeNode->TypeName == L"mat3" || typeNode->TypeName == L"mat3x3" || typeNode->TypeName == L"float3x3" || typeNode->TypeName == L"half3x3")
 					expType->BaseType = BaseType::Float3x3;
-				else if (typeNode->TypeName == L"mat4" || typeNode->TypeName == L"mat4x4" || typeNode->TypeName == L"float4x4")
+				else if (typeNode->TypeName == L"mat4" || typeNode->TypeName == L"mat4x4" || typeNode->TypeName == L"float4x4" || typeNode->TypeName == L"half4x4")
 					expType->BaseType = BaseType::Float4x4;
 				else if (typeNode->TypeName == L"sampler2D")
 					expType->BaseType = BaseType::Texture2D;

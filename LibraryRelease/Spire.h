@@ -4834,6 +4834,7 @@ namespace Spire
 				typeNames.Add(L"uint");
 				typeNames.Add(L"bool");
 				typeNames.Add(L"float");
+				typeNames.Add(L"half");
 				typeNames.Add(L"void");
 				typeNames.Add(L"ivec2");
 				typeNames.Add(L"ivec3");
@@ -4857,8 +4858,13 @@ namespace Spire
 				typeNames.Add(L"float2");
 				typeNames.Add(L"float3");
 				typeNames.Add(L"float4");
+				typeNames.Add(L"half2");
+				typeNames.Add(L"half3");
+				typeNames.Add(L"half4");
 				typeNames.Add(L"float3x3");
 				typeNames.Add(L"float4x4");
+				typeNames.Add(L"half3x3");
+				typeNames.Add(L"half4x4");
 				typeNames.Add(L"sampler2D");
 				typeNames.Add(L"sampler2DShadow");
 				typeNames.Add(L"samplerCube");
