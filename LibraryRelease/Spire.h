@@ -353,6 +353,7 @@ namespace Spire
 		public:
 			bool IsLeftValue;
 			bool IsReference;
+			bool IsMaskedVector = false;
 			BaseType BaseType;
 			ShaderSymbol * Shader = nullptr;
 			ShaderClosure * ShaderClosure = nullptr;
@@ -2437,6 +2438,7 @@ namespace Spire
 			AllInstructionsIterator end();
 		};
 
+
 		class CFGNode : public Object
 		{
 		private:
@@ -2932,6 +2934,26 @@ namespace Spire
 			virtual NegInstruction * Clone() override
 			{
 				return new NegInstruction(*this);
+			}
+			virtual void Accept(InstructionVisitor * visitor) override;
+		};
+
+
+		class SwizzleInstruction : public UnaryInstruction
+		{
+		public:
+			String SwizzleString;
+			virtual String ToString() override
+			{
+				return  Name + L" = " + Operand.ToString() + L"." + SwizzleString;
+			}
+			virtual String GetOperatorString() override
+			{
+				return L"swizzle";
+			}
+			virtual SwizzleInstruction * Clone() override
+			{
+				return new SwizzleInstruction(*this);
 			}
 			virtual void Accept(InstructionVisitor * visitor) override;
 		};
@@ -3667,6 +3689,7 @@ namespace Spire
 			virtual void VisitDiscardInstruction(DiscardInstruction *) {}
 			virtual void VisitLoadInputInstruction(LoadInputInstruction *) {}
 			virtual void VisitPhiInstruction(PhiInstruction *){}
+			virtual void VisitSwizzleInstruction(SwizzleInstruction*) {}
 		};
 
 		class ForInstruction : public ILInstruction

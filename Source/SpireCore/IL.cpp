@@ -618,5 +618,9 @@ namespace Spire
 		{
 			visitor->VisitLoadInputInstruction(this);
 		}
+		void SwizzleInstruction::Accept(InstructionVisitor * visitor)
+		{
+			visitor->VisitSwizzleInstruction(this);
+		}
 }
 }

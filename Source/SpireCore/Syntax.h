@@ -151,6 +151,7 @@ namespace Spire
 		public:
 			bool IsLeftValue;
 			bool IsReference;
+			bool IsMaskedVector = false;
 			BaseType BaseType;
 			ShaderSymbol * Shader = nullptr;
 			ShaderClosure * ShaderClosure = nullptr;

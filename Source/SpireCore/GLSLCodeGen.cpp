@@ -408,7 +408,7 @@ namespace Spire
 							PrintOp(ctx, op1);
 							ctx.Body << L"]";
 						}
-						if (auto genType = dynamic_cast<ILGenericType*>(op0->Type.Ptr()))
+						if (genType)
 						{
 							if (genType->GenericTypeName == L"Buffer" && dynamic_cast<ILRecordType*>(genType->BaseType.Ptr()))
 								ctx.Body << L"." << currentImportInstr->ComponentName;
@@ -535,6 +535,11 @@ namespace Spire
 				if (instr->Is<LoadInstruction>())
 				{
 					PrintOp(ctx, op0);
+					return;
+				}
+				else if (instr->Is<SwizzleInstruction>())
+				{
+					PrintSwizzleInstrExpr(ctx, instr->As<SwizzleInstruction>());
 					return;
 				}
 				const wchar_t * op = L"";
@@ -672,6 +677,8 @@ namespace Spire
 			{
 				if (instr.Is<LoadInputInstruction>())
 					return true;
+				if (instr.Is<SwizzleInstruction>())
+					return true;
 				if (auto arg = instr.As<FetchArgInstruction>())
 				{
 					if (arg->ArgId == 0)
@@ -745,6 +752,12 @@ namespace Spire
 				PrintOp(ctx, instr->Operands[0].Ptr());
 				ctx.Body << L";\n";
 				genCode(varName, instr->Operands[0]->Type.Ptr(), instr->Operands[1].Ptr(), instr->Operands[2].Ptr());
+			}
+
+			void PrintSwizzleInstrExpr(CodeGenContext & ctx, SwizzleInstruction * swizzle)
+			{
+				PrintOp(ctx, swizzle->Operand.Ptr());
+				ctx.Body << L"." << swizzle->SwizzleString;
 			}
 
 			void PrintImportInstr(CodeGenContext & ctx, ImportInstruction * importInstr)
@@ -1175,11 +1188,6 @@ namespace Spire
 						sb.Header << input.Name << L" = gl_GlobalInvocationID.x;\n";
 					}
 				}
-			}
-
-			void DeclareOutput(CodeGenContext & sb, ILRecordType * output, ILStage * stage)
-			{
-				outputStrategy->DeclareOutput(sb, stage);
 			}
 
 			void GenerateVertexShaderEpilog(CodeGenContext & ctx, ILWorld * world, ILStage * stage)

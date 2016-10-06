@@ -1263,6 +1263,38 @@ namespace Spire
 					codeWriter.Store(add->Operands[0].Ptr(), codeWriter.Update(codeWriter.Load(baseOp), add->Operands[1].Ptr(), right));
 					add->Erase();
 				}
+				else if (auto swizzle = dynamic_cast<SwizzleInstruction*>(left))
+				{
+					auto baseOp = swizzle->Operand.Ptr();
+					int index = 0;
+					auto val = codeWriter.Load(baseOp);
+					for (int i = 0; i < swizzle->SwizzleString.Length(); i++)
+					{
+						switch (swizzle->SwizzleString[i])
+						{
+						case L'r':
+						case L'x':
+							index = 0;
+							break;
+						case L'g':
+						case L'y':
+							index = 1;
+							break;
+						case L'b':
+						case L'z':
+							index = 2;
+							break;
+						case L'a':
+						case L'w':
+							index = 3;
+							break;
+						}
+						val = codeWriter.Update(val, result.Program->ConstantPool->CreateConstant(index),
+							codeWriter.Retrieve(right, result.Program->ConstantPool->CreateConstant(i)));
+					}
+					codeWriter.Store(baseOp, val);
+					swizzle->Erase();
+				}
 				else
 					codeWriter.Store(left, right);
 			}
@@ -1489,17 +1521,11 @@ namespace Spire
 						}
 						else
 						{
-							if (expr->Access != ExpressionAccess::Read)
-								throw InvalidOperationException(L"temporary vector (vec.xyz) is read-only.");
-							auto rs = AllocVar(expr->Type.Ptr());
-							ILOperand* tmp = codeWriter.Load(rs);
-							for (int i = 0; i < expr->MemberName.Length(); i++)
-							{
-								generateSingleMember(expr->MemberName[i]);
-								tmp = codeWriter.Update(tmp, result.Program->ConstantPool->CreateConstant(i), PopStack());
-							}
-							codeWriter.Store(rs, tmp);
-							PushStack(codeWriter.Load(rs));
+							auto rs = new SwizzleInstruction();
+							rs->Type = TranslateExpressionType(expr->Type.Ptr(), &recordTypes);
+							rs->SwizzleString = expr->MemberName;
+							rs->Operand = base;
+							PushStack(rs);
 						}
 					}
 					else if (expr->BaseExpression->Type->IsStruct())
@@ -2541,7 +2567,7 @@ namespace Spire
 							PrintOp(ctx, op1);
 							ctx.Body << L"]";
 						}
-						if (auto genType = dynamic_cast<ILGenericType*>(op0->Type.Ptr()))
+						if (genType)
 						{
 							if (genType->GenericTypeName == L"Buffer" && dynamic_cast<ILRecordType*>(genType->BaseType.Ptr()))
 								ctx.Body << L"." << currentImportInstr->ComponentName;
@@ -2668,6 +2694,11 @@ namespace Spire
 				if (instr->Is<LoadInstruction>())
 				{
 					PrintOp(ctx, op0);
+					return;
+				}
+				else if (instr->Is<SwizzleInstruction>())
+				{
+					PrintSwizzleInstrExpr(ctx, instr->As<SwizzleInstruction>());
 					return;
 				}
 				const wchar_t * op = L"";
@@ -2805,6 +2836,8 @@ namespace Spire
 			{
 				if (instr.Is<LoadInputInstruction>())
 					return true;
+				if (instr.Is<SwizzleInstruction>())
+					return true;
 				if (auto arg = instr.As<FetchArgInstruction>())
 				{
 					if (arg->ArgId == 0)
@@ -2878,6 +2911,12 @@ namespace Spire
 				PrintOp(ctx, instr->Operands[0].Ptr());
 				ctx.Body << L";\n";
 				genCode(varName, instr->Operands[0]->Type.Ptr(), instr->Operands[1].Ptr(), instr->Operands[2].Ptr());
+			}
+
+			void PrintSwizzleInstrExpr(CodeGenContext & ctx, SwizzleInstruction * swizzle)
+			{
+				PrintOp(ctx, swizzle->Operand.Ptr());
+				ctx.Body << L"." << swizzle->SwizzleString;
 			}
 
 			void PrintImportInstr(CodeGenContext & ctx, ImportInstruction * importInstr)
@@ -3308,11 +3347,6 @@ namespace Spire
 						sb.Header << input.Name << L" = gl_GlobalInvocationID.x;\n";
 					}
 				}
-			}
-
-			void DeclareOutput(CodeGenContext & sb, ILRecordType * output, ILStage * stage)
-			{
-				outputStrategy->DeclareOutput(sb, stage);
 			}
 
 			void GenerateVertexShaderEpilog(CodeGenContext & ctx, ILWorld * world, ILStage * stage)
@@ -4467,6 +4501,10 @@ namespace Spire
 		void LoadInputInstruction::Accept(InstructionVisitor * visitor)
 		{
 			visitor->VisitLoadInputInstruction(this);
+		}
+		void SwizzleInstruction::Accept(InstructionVisitor * visitor)
+		{
+			visitor->VisitSwizzleInstruction(this);
 		}
 }
 }
@@ -8041,17 +8079,45 @@ namespace Spire
 				auto & leftType = expr->LeftExpression->Type;
 				auto & rightType = expr->RightExpression->Type;
 				RefPtr<ExpressionType> matchedType;
+				auto checkAssign = [&]()
+				{
+					if (!(leftType->AsBasicType() && leftType->AsBasicType()->IsLeftValue) &&
+						!leftType->Equals(ExpressionType::Error.Ptr()))
+						Error(30011, L"left of '=' is not an l-value.", expr->LeftExpression.Ptr());
+					if (expr->Operator == Operator::AndAssign ||
+						expr->Operator == Operator::OrAssign ||
+						expr->Operator == Operator::XorAssign ||
+						expr->Operator == Operator::LshAssign ||
+						expr->Operator == Operator::RshAssign)
+					{
+						if (!(leftType->IsIntegral() && rightType->IsIntegral()))
+						{
+							Error(30041, L"bit operation: operand must be integral type.", expr);
+						}
+					}
+					expr->LeftExpression->Access = ExpressionAccess::Write;
+					if (MatchType_ValueReceiver(leftType.Ptr(), expr->Type.Ptr()))
+						expr->Type = leftType;
+					else
+						expr->Type = ExpressionType::Error;
+				};
 				switch (expr->Operator)
 				{
 				case Operator::Add:
 				case Operator::Sub:
 				case Operator::Div:
+				case Operator::AddAssign:
+				case Operator::DivAssign:
+				case Operator::SubAssign:
 					if (MatchType_BinaryImplicit(matchedType, leftType, rightType))
 						expr->Type = matchedType;
 					else
 						expr->Type = ExpressionType::Error;
+					if (expr->Operator == Operator::AddAssign || expr->Operator == Operator::DivAssign || expr->Operator == Operator::SubAssign)
+						checkAssign();
 					break;
 				case Operator::Mul:
+				case Operator::MulAssign:
 					if (leftType->AsBasicType() && leftType->AsBasicType()->BaseType != BaseType::Shader)
 					{
 						auto basicType = leftType->AsBasicType();
@@ -8068,6 +8134,8 @@ namespace Spire
 					}
 					else
 						expr->Type = ExpressionType::Error;
+					if (expr->Operator == Operator::MulAssign)
+						checkAssign();
 					break;
 				case Operator::Mod:
 				case Operator::Rsh:
@@ -8077,6 +8145,12 @@ namespace Spire
 				case Operator::BitXor:
 				case Operator::And:
 				case Operator::Or:
+				case Operator::ModAssign:
+				case Operator::AndAssign:
+				case Operator::OrAssign:
+				case Operator::XorAssign:
+				case Operator::LshAssign:
+				case Operator::RshAssign:
 					if (leftType->Equals(rightType.Ptr()) && !leftType->IsArray() && !leftType->IsTexture()
 						&& !leftType->IsShader() &&
 						leftType->AsBasicType() && GetVectorBaseType(leftType->AsBasicType()->BaseType) != BaseType::Float)
@@ -8085,6 +8159,9 @@ namespace Spire
 						expr->Type = leftType;
 					else
 						expr->Type = ExpressionType::Error;
+					if (expr->Operator == Operator::ModAssign || expr->Operator == Operator::AndAssign || expr->Operator == Operator::OrAssign ||
+						expr->Operator == Operator::XorAssign || expr->Operator == Operator::LshAssign || expr->Operator == Operator::RshAssign)
+						checkAssign();
 					break;
 				case Operator::Neq:
 				case Operator::Eql:
@@ -8117,41 +8194,13 @@ namespace Spire
 						expr->Type = ExpressionType::Error;
 					break;
 				case Operator::Assign:
-				case Operator::AddAssign:
-				case Operator::MulAssign:
-				case Operator::DivAssign:
-				case Operator::SubAssign:
-				case Operator::ModAssign:
-				case Operator::AndAssign:
-				case Operator::OrAssign:
-				case Operator::XorAssign:
-				case Operator::LshAssign:
-				case Operator::RshAssign:
-					if (!(leftType->AsBasicType() && leftType->AsBasicType()->IsLeftValue) && 
-						!leftType->Equals(ExpressionType::Error.Ptr()))
-						Error(30011, L"left of '=' is not an l-value.", expr->LeftExpression.Ptr());
-					if (expr->Operator == Operator::AndAssign ||
-						expr->Operator == Operator::OrAssign ||
-						expr->Operator == Operator::XorAssign ||
-						expr->Operator == Operator::LshAssign ||
-						expr->Operator == Operator::RshAssign)
-					{
-						if (!(leftType->IsIntegral() && rightType->IsIntegral()))
-						{
-							Error(30041, L"bit operation: operand must be integral type.", expr);
-						}
-					}
-					expr->LeftExpression->Access = ExpressionAccess::Write;
-					if (MatchType_ValueReceiver(leftType.Ptr(), rightType.Ptr()))
-						expr->Type = ExpressionType::Void;
-					else
-						expr->Type = ExpressionType::Error;
+					expr->Type = rightType;
+					checkAssign();
 					break;
 				default:
-						expr->Type = ExpressionType::Error;
+					expr->Type = ExpressionType::Error;
 					break;
 				}
-				
 				if (expr->Type->Equals(ExpressionType::Error.Ptr()) &&
 					!leftType->Equals(ExpressionType::Error.Ptr()) && 
 					!rightType->Equals(ExpressionType::Error.Ptr()))
@@ -8446,18 +8495,25 @@ namespace Spire
 				case Spire::Compiler::Operator::PostDec:
 					return L"--";
 				case Spire::Compiler::Operator::Mul:
+				case Spire::Compiler::Operator::MulAssign:
 					return L"*";
 				case Spire::Compiler::Operator::Div:
+				case Spire::Compiler::Operator::DivAssign:
 					return L"/";
 				case Spire::Compiler::Operator::Mod:
+				case Spire::Compiler::Operator::ModAssign:
 					return L"%";
 				case Spire::Compiler::Operator::Add:
+				case Spire::Compiler::Operator::AddAssign:
 					return L"+";
 				case Spire::Compiler::Operator::Sub:
+				case Spire::Compiler::Operator::SubAssign:
 					return L"-";
 				case Spire::Compiler::Operator::Lsh:
+				case Spire::Compiler::Operator::LshAssign:
 					return L"<<";
 				case Spire::Compiler::Operator::Rsh:
+				case Spire::Compiler::Operator::RshAssign:
 					return L">>";
 				case Spire::Compiler::Operator::Eql:
 					return L"==";
@@ -8472,10 +8528,13 @@ namespace Spire
 				case Spire::Compiler::Operator::Leq:
 					return L"<=";
 				case Spire::Compiler::Operator::BitAnd:
+				case Spire::Compiler::Operator::AndAssign:
 					return L"&";
 				case Spire::Compiler::Operator::BitXor:
+				case Spire::Compiler::Operator::XorAssign:
 					return L"^";
 				case Spire::Compiler::Operator::BitOr:
+				case Spire::Compiler::Operator::OrAssign:
 					return L"|";
 				case Spire::Compiler::Operator::And:
 					return L"&&";
@@ -8693,9 +8752,21 @@ namespace Spire
 							{
 								expr->Type = new BasicExpressionType((BaseType)((int)GetVectorBaseType(baseType->AsBasicType()->BaseType) + children.Count() - 1));
 							}
+							expr->Type.As<BasicExpressionType>()->IsMaskedVector = true;
 						}
 						if (auto bt = expr->Type->AsBasicType())
-							bt->IsLeftValue = true;
+						{
+							bt->IsLeftValue = !baseType->AsBasicType()->IsMaskedVector;
+							if (children.Count() > vecLen || children.Count() == 0)
+								bt->IsLeftValue = false;
+							int curMax = children[0];
+							for (int i = 0; i < children.Count(); i++)
+								if (children[i] < curMax)
+								{
+									bt->IsLeftValue = false;
+									curMax = children[i];
+								}
+						}
 					}
 				}
 				else if (baseType->AsBasicType()->BaseType == BaseType::Shader)

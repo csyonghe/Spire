@@ -609,6 +609,38 @@ namespace Spire
 					codeWriter.Store(add->Operands[0].Ptr(), codeWriter.Update(codeWriter.Load(baseOp), add->Operands[1].Ptr(), right));
 					add->Erase();
 				}
+				else if (auto swizzle = dynamic_cast<SwizzleInstruction*>(left))
+				{
+					auto baseOp = swizzle->Operand.Ptr();
+					int index = 0;
+					auto val = codeWriter.Load(baseOp);
+					for (int i = 0; i < swizzle->SwizzleString.Length(); i++)
+					{
+						switch (swizzle->SwizzleString[i])
+						{
+						case L'r':
+						case L'x':
+							index = 0;
+							break;
+						case L'g':
+						case L'y':
+							index = 1;
+							break;
+						case L'b':
+						case L'z':
+							index = 2;
+							break;
+						case L'a':
+						case L'w':
+							index = 3;
+							break;
+						}
+						val = codeWriter.Update(val, result.Program->ConstantPool->CreateConstant(index),
+							codeWriter.Retrieve(right, result.Program->ConstantPool->CreateConstant(i)));
+					}
+					codeWriter.Store(baseOp, val);
+					swizzle->Erase();
+				}
 				else
 					codeWriter.Store(left, right);
 			}
@@ -835,17 +867,11 @@ namespace Spire
 						}
 						else
 						{
-							if (expr->Access != ExpressionAccess::Read)
-								throw InvalidOperationException(L"temporary vector (vec.xyz) is read-only.");
-							auto rs = AllocVar(expr->Type.Ptr());
-							ILOperand* tmp = codeWriter.Load(rs);
-							for (int i = 0; i < expr->MemberName.Length(); i++)
-							{
-								generateSingleMember(expr->MemberName[i]);
-								tmp = codeWriter.Update(tmp, result.Program->ConstantPool->CreateConstant(i), PopStack());
-							}
-							codeWriter.Store(rs, tmp);
-							PushStack(codeWriter.Load(rs));
+							auto rs = new SwizzleInstruction();
+							rs->Type = TranslateExpressionType(expr->Type.Ptr(), &recordTypes);
+							rs->SwizzleString = expr->MemberName;
+							rs->Operand = base;
+							PushStack(rs);
 						}
 					}
 					else if (expr->BaseExpression->Type->IsStruct())

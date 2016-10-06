@@ -1159,17 +1159,45 @@ namespace Spire
 				auto & leftType = expr->LeftExpression->Type;
 				auto & rightType = expr->RightExpression->Type;
 				RefPtr<ExpressionType> matchedType;
+				auto checkAssign = [&]()
+				{
+					if (!(leftType->AsBasicType() && leftType->AsBasicType()->IsLeftValue) &&
+						!leftType->Equals(ExpressionType::Error.Ptr()))
+						Error(30011, L"left of '=' is not an l-value.", expr->LeftExpression.Ptr());
+					if (expr->Operator == Operator::AndAssign ||
+						expr->Operator == Operator::OrAssign ||
+						expr->Operator == Operator::XorAssign ||
+						expr->Operator == Operator::LshAssign ||
+						expr->Operator == Operator::RshAssign)
+					{
+						if (!(leftType->IsIntegral() && rightType->IsIntegral()))
+						{
+							Error(30041, L"bit operation: operand must be integral type.", expr);
+						}
+					}
+					expr->LeftExpression->Access = ExpressionAccess::Write;
+					if (MatchType_ValueReceiver(leftType.Ptr(), expr->Type.Ptr()))
+						expr->Type = leftType;
+					else
+						expr->Type = ExpressionType::Error;
+				};
 				switch (expr->Operator)
 				{
 				case Operator::Add:
 				case Operator::Sub:
 				case Operator::Div:
+				case Operator::AddAssign:
+				case Operator::DivAssign:
+				case Operator::SubAssign:
 					if (MatchType_BinaryImplicit(matchedType, leftType, rightType))
 						expr->Type = matchedType;
 					else
 						expr->Type = ExpressionType::Error;
+					if (expr->Operator == Operator::AddAssign || expr->Operator == Operator::DivAssign || expr->Operator == Operator::SubAssign)
+						checkAssign();
 					break;
 				case Operator::Mul:
+				case Operator::MulAssign:
 					if (leftType->AsBasicType() && leftType->AsBasicType()->BaseType != BaseType::Shader)
 					{
 						auto basicType = leftType->AsBasicType();
@@ -1186,6 +1214,8 @@ namespace Spire
 					}
 					else
 						expr->Type = ExpressionType::Error;
+					if (expr->Operator == Operator::MulAssign)
+						checkAssign();
 					break;
 				case Operator::Mod:
 				case Operator::Rsh:
@@ -1195,6 +1225,12 @@ namespace Spire
 				case Operator::BitXor:
 				case Operator::And:
 				case Operator::Or:
+				case Operator::ModAssign:
+				case Operator::AndAssign:
+				case Operator::OrAssign:
+				case Operator::XorAssign:
+				case Operator::LshAssign:
+				case Operator::RshAssign:
 					if (leftType->Equals(rightType.Ptr()) && !leftType->IsArray() && !leftType->IsTexture()
 						&& !leftType->IsShader() &&
 						leftType->AsBasicType() && GetVectorBaseType(leftType->AsBasicType()->BaseType) != BaseType::Float)
@@ -1203,6 +1239,9 @@ namespace Spire
 						expr->Type = leftType;
 					else
 						expr->Type = ExpressionType::Error;
+					if (expr->Operator == Operator::ModAssign || expr->Operator == Operator::AndAssign || expr->Operator == Operator::OrAssign ||
+						expr->Operator == Operator::XorAssign || expr->Operator == Operator::LshAssign || expr->Operator == Operator::RshAssign)
+						checkAssign();
 					break;
 				case Operator::Neq:
 				case Operator::Eql:
@@ -1235,41 +1274,13 @@ namespace Spire
 						expr->Type = ExpressionType::Error;
 					break;
 				case Operator::Assign:
-				case Operator::AddAssign:
-				case Operator::MulAssign:
-				case Operator::DivAssign:
-				case Operator::SubAssign:
-				case Operator::ModAssign:
-				case Operator::AndAssign:
-				case Operator::OrAssign:
-				case Operator::XorAssign:
-				case Operator::LshAssign:
-				case Operator::RshAssign:
-					if (!(leftType->AsBasicType() && leftType->AsBasicType()->IsLeftValue) && 
-						!leftType->Equals(ExpressionType::Error.Ptr()))
-						Error(30011, L"left of '=' is not an l-value.", expr->LeftExpression.Ptr());
-					if (expr->Operator == Operator::AndAssign ||
-						expr->Operator == Operator::OrAssign ||
-						expr->Operator == Operator::XorAssign ||
-						expr->Operator == Operator::LshAssign ||
-						expr->Operator == Operator::RshAssign)
-					{
-						if (!(leftType->IsIntegral() && rightType->IsIntegral()))
-						{
-							Error(30041, L"bit operation: operand must be integral type.", expr);
-						}
-					}
-					expr->LeftExpression->Access = ExpressionAccess::Write;
-					if (MatchType_ValueReceiver(leftType.Ptr(), rightType.Ptr()))
-						expr->Type = ExpressionType::Void;
-					else
-						expr->Type = ExpressionType::Error;
+					expr->Type = rightType;
+					checkAssign();
 					break;
 				default:
-						expr->Type = ExpressionType::Error;
+					expr->Type = ExpressionType::Error;
 					break;
 				}
-				
 				if (expr->Type->Equals(ExpressionType::Error.Ptr()) &&
 					!leftType->Equals(ExpressionType::Error.Ptr()) && 
 					!rightType->Equals(ExpressionType::Error.Ptr()))
@@ -1564,18 +1575,25 @@ namespace Spire
 				case Spire::Compiler::Operator::PostDec:
 					return L"--";
 				case Spire::Compiler::Operator::Mul:
+				case Spire::Compiler::Operator::MulAssign:
 					return L"*";
 				case Spire::Compiler::Operator::Div:
+				case Spire::Compiler::Operator::DivAssign:
 					return L"/";
 				case Spire::Compiler::Operator::Mod:
+				case Spire::Compiler::Operator::ModAssign:
 					return L"%";
 				case Spire::Compiler::Operator::Add:
+				case Spire::Compiler::Operator::AddAssign:
 					return L"+";
 				case Spire::Compiler::Operator::Sub:
+				case Spire::Compiler::Operator::SubAssign:
 					return L"-";
 				case Spire::Compiler::Operator::Lsh:
+				case Spire::Compiler::Operator::LshAssign:
 					return L"<<";
 				case Spire::Compiler::Operator::Rsh:
+				case Spire::Compiler::Operator::RshAssign:
 					return L">>";
 				case Spire::Compiler::Operator::Eql:
 					return L"==";
@@ -1590,10 +1608,13 @@ namespace Spire
 				case Spire::Compiler::Operator::Leq:
 					return L"<=";
 				case Spire::Compiler::Operator::BitAnd:
+				case Spire::Compiler::Operator::AndAssign:
 					return L"&";
 				case Spire::Compiler::Operator::BitXor:
+				case Spire::Compiler::Operator::XorAssign:
 					return L"^";
 				case Spire::Compiler::Operator::BitOr:
+				case Spire::Compiler::Operator::OrAssign:
 					return L"|";
 				case Spire::Compiler::Operator::And:
 					return L"&&";
@@ -1811,9 +1832,21 @@ namespace Spire
 							{
 								expr->Type = new BasicExpressionType((BaseType)((int)GetVectorBaseType(baseType->AsBasicType()->BaseType) + children.Count() - 1));
 							}
+							expr->Type.As<BasicExpressionType>()->IsMaskedVector = true;
 						}
 						if (auto bt = expr->Type->AsBasicType())
-							bt->IsLeftValue = true;
+						{
+							bt->IsLeftValue = !baseType->AsBasicType()->IsMaskedVector;
+							if (children.Count() > vecLen || children.Count() == 0)
+								bt->IsLeftValue = false;
+							int curMax = children[0];
+							for (int i = 0; i < children.Count(); i++)
+								if (children[i] < curMax)
+								{
+									bt->IsLeftValue = false;
+									curMax = children[i];
+								}
+						}
 					}
 				}
 				else if (baseType->AsBasicType()->BaseType == BaseType::Shader)
