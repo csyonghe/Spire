@@ -90,8 +90,13 @@ namespace Spire
 			bool IsAbstract = false;
 			ShaderSyntaxNode * SyntaxNode = nullptr;
 			PipelineSymbol * Pipeline = nullptr;
-		
+
+			// components that are functions, they are also listed in Components, index by original names
+			EnumerableDictionary<String, List<RefPtr<ShaderComponentSymbol>>> FunctionComponents; 
+			
+			// all components in this shader, function components are indexed by their unique names
 			EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>> Components;
+
 			List<ShaderComponentSymbol*> GetComponentDependencyOrder();
 			EnumerableHashSet<ShaderSymbol*> DependentShaders;
 			List<ShaderUsing> ShaderUsings;
@@ -149,6 +154,7 @@ namespace Spire
 			PipelineSyntaxNode * SyntaxNode;
 			EnumerableDictionary<String, List<RefPtr<ImportOperatorDefSyntaxNode>>> ImportOperators;
 			EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>> Components;
+			EnumerableDictionary<String, List<RefPtr<ShaderComponentSymbol>>> FunctionComponents;
 			EnumerableDictionary<String, EnumerableHashSet<String>> ReachableWorlds, ImplicitlyReachableWorlds;
 			EnumerableDictionary<String, EnumerableHashSet<String>> WorldDependency, ImplicitWorldDependency;
 			EnumerableDictionary<String, WorldSymbol> Worlds;
@@ -175,7 +181,8 @@ namespace Spire
 		class SymbolTable
 		{
 		public:
-			EnumerableDictionary<String, RefPtr<FunctionSymbol>> Functions;
+			EnumerableDictionary<String, List<RefPtr<FunctionSymbol>>> FunctionOverloads; // indexed by original name
+			EnumerableDictionary<String, RefPtr<FunctionSymbol>> Functions; // indexed by internal name
 			EnumerableDictionary<String, RefPtr<ShaderSymbol>> Shaders;
 			EnumerableDictionary<String, RefPtr<PipelineSymbol>> Pipelines;
 			EnumerableDictionary<String, RefPtr<StructSymbol>> Structs;

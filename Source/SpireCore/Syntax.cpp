@@ -102,7 +102,7 @@ namespace Spire
 				res.Append(L"samplerCubeShadow");
 				break;
 			case Compiler::BaseType::Function:
-				res.Append(Func->InternalName);
+				res.Append(Func->SyntaxNode->InternalName);
 				break;
 			case Compiler::BaseType::Shader:
 				res.Append(Shader->SyntaxNode->Name.Content);

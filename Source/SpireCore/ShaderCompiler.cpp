@@ -402,7 +402,7 @@ namespace Spire
 				}
 				compilerInstances++;
 				backends.Add(L"glsl", CreateGLSLCodeGen());
-				//backends.Add(L"spirv", CreateSpirVCodeGen());
+				backends.Add(L"spirv", CreateSpirVCodeGen());
 			}
 
 			~ShaderCompilerImpl()

@@ -158,6 +158,20 @@ namespace Spire
 					compiledShader->Stages[stage->Name.Content] = ilStage;
 				}
 			}
+			String GetComponentFunctionName(ComponentSyntaxNode * comp)
+			{
+				StringBuilder nameSb;
+				nameSb << comp->ParentModuleName.Content << L"." << comp->Name.Content;
+				StringBuilder finalNameSb;
+				for (auto ch : nameSb.ProduceString())
+				{
+					if (ch >= L'0' && ch <= L'9' || ch >= L'a' && ch <= L'z' || ch >= 'A' && ch <= 'Z')
+						finalNameSb << ch;
+					else
+						finalNameSb << L'X';
+				}
+				return finalNameSb.ProduceString();
+			}
 		public:
 			virtual RefPtr<StructSyntaxNode> VisitStruct(StructSyntaxNode * st) override
 			{
@@ -179,6 +193,7 @@ namespace Spire
 				auto pipeline = shader->Shader->Pipeline;
 				RefPtr<ILShader> compiledShader = new ILShader();
 				compiledShader->Name = shader->Shader->Name;
+				compiledShader->Position = shader->Shader->Position;
 				TranslateStages(compiledShader.Ptr(), pipeline->SyntaxNode);
 				result.Program->Shaders.Add(compiledShader);
 
@@ -288,6 +303,55 @@ namespace Spire
 						}
 					}
 				}
+			
+				// generate component functions
+				for (auto & comp : shader->Definitions)
+				{
+					currentComponent = comp.Ptr();
+					if (comp->SyntaxNode->Parameters.Count())
+					{
+						auto funcName = GetComponentFunctionName(comp->SyntaxNode.Ptr());
+						if (result.Program->Functions.ContainsKey(funcName))
+							continue;
+						RefPtr<ILFunction> func = new ILFunction();
+						func->Name = funcName;
+						func->ReturnType = TranslateExpressionType(comp->Type, &recordTypes);
+						result.Program->Functions[funcName] = func;
+						int id = 0;
+						Dictionary<String, ILOperand*> refComponents;
+						variables.PushScope();
+						codeWriter.PushNode();
+						for (auto & dep : comp->Dependency)
+						{
+							if (dep->SyntaxNode->Parameters.Count() == 0)
+							{
+								auto paramType = TranslateExpressionType(dep->Type, &recordTypes);
+								func->Parameters.Add(dep->OriginalName + String(id), paramType);
+								variables.Add(dep->UniqueName, codeWriter.FetchArg(paramType, id + 1));
+								id++;
+							}
+						}
+						for (auto & param : comp->SyntaxNode->Parameters)
+						{
+							auto paramType = TranslateExpressionType(param->Type, &recordTypes);
+							func->Parameters.Add(param->Name + String(id), paramType);
+							variables.Add(param->Name, codeWriter.FetchArg(paramType, id + 1));
+							id++;
+						}
+						if (comp->SyntaxNode->Expression)
+						{
+							comp->SyntaxNode->Expression->Accept(this);
+							codeWriter.Insert(new ReturnInstruction(PopStack()));
+						}
+						else
+						{
+							comp->SyntaxNode->BlockStatement->Accept(this);
+						}
+						variables.PopScope();
+						func->Code = codeWriter.PopNode();
+					}
+					currentComponent = nullptr;
+				}
 				
 				for (auto & world : pipeline->Worlds)
 				{
@@ -311,7 +375,8 @@ namespace Spire
 
 					for (auto & comp : components)
 					{
-						VisitComponent(comp);
+						if (comp->SyntaxNode->Parameters.Count() == 0)
+							VisitComponent(comp);
 					}
 					
 					variables.PopScope();
@@ -389,7 +454,7 @@ namespace Spire
 				if (function->IsExtern)
 					return function;
 				RefPtr<ILFunction> func = new ILFunction();
-				result.Program->Functions.Add(func);
+				result.Program->Functions.Add(function->InternalName, func);
 				func->Name = function->InternalName;
 				func->ReturnType = TranslateExpressionType(function->ReturnType);
 				variables.PushScope();
@@ -769,6 +834,10 @@ namespace Spire
 				{
 					op = result.Program->ConstantPool->CreateConstant(expr->FloatValue);
 				}
+				else if (expr->ConstType == ConstantExpressionSyntaxNode::ConstantType::Bool)
+				{
+					op = result.Program->ConstantPool->CreateConstant(expr->IntValue != 0);
+				}
 				else
 				{
 					op = result.Program->ConstantPool->CreateConstant(expr->IntValue);
@@ -894,15 +963,41 @@ namespace Spire
 			virtual RefPtr<ExpressionSyntaxNode> VisitInvokeExpression(InvokeExpressionSyntaxNode* expr) override
 			{
 				List<ILOperand*> args;
+				String funcName;
+				if (auto basicType = expr->FunctionExpr->Type->AsBasicType())
+				{
+					if (basicType->Func)
+						funcName = basicType->Func->SyntaxNode->Name;
+					else if (basicType->Component)
+					{
+						auto funcCompName = expr->FunctionExpr->Tags[L"ComponentReference"]().As<StringObject>()->Content;
+						auto funcComp = *(currentShader->DefinitionsByComponent[funcCompName]().TryGetValue(currentComponent->World));
+						funcName = GetComponentFunctionName(basicType->Component->Implementations.First()->SyntaxNode.Ptr());
+						// push additional arguments
+						for (auto & dep : funcComp->Dependency)
+						{
+							if (dep->SyntaxNode->Parameters.Count() == 0)
+							{
+								ILOperand * op = nullptr;
+								if (variables.TryGetValue(dep->UniqueName, op))
+									args.Add(op);
+								else
+									throw InvalidProgramException(L"cannot resolve reference for implicit component function argument.");
+							}
+						}
+					}
+				}
 				if (currentWorld)
-					currentWorld->ReferencedFunctions.Add(expr->FunctionExpr->Variable);
+				{
+					currentWorld->ReferencedFunctions.Add(funcName);
+				}
 				for (auto arg : expr->Arguments)
 				{
 					arg->Accept(this);
 					args.Add(PopStack());
 				}
 				auto instr = new CallInstruction(args.Count());
-				instr->Function = expr->FunctionExpr->Variable;
+				instr->Function = funcName;
 				for (int i = 0; i < args.Count(); i++)
 					instr->Arguments[i] = args[i];
 				instr->Type = TranslateExpressionType(expr->Type, &recordTypes);

@@ -115,8 +115,11 @@ __intrinsic vec4 textureGrad(samplerCube tex, vec3 coord, vec3 dPdx, vec3 dPdy);
 __intrinsic vec4 texture(samplerCube tex, vec3 coord, float bias);
 __intrinsic float texture(sampler2DShadow tex, vec3 coord);
 __intrinsic float texture(samplerCubeShadow tex, vec4 coord);
+__intrinsic vec4 textureProj(sampler2D tex, vec3 coord);
+__intrinsic vec4 textureProj(samplerCube tex, vec4 coord);
 __intrinsic float textureProj(sampler2DShadow tex, vec4 coord);
 __intrinsic float textureProj(samplerCubeShadow tex, vec4 coord);
+__intrinsic vec4 texelFetch(sampler2D sampler, ivec2 P, int lod);
 __intrinsic float diff(float v);
 __intrinsic float mod(float x, float y);
 __intrinsic float max(float v);
@@ -209,6 +212,8 @@ __intrinsic vec4 vec4(uvec4 val);
 
 __intrinsic mat3 transpose(mat3 in);
 __intrinsic mat4 transpose(mat4 in);
+
+__intrinsic vec4 mul(mat4 a, vec4 b);
 
 #line_reset#
 )";

@@ -35,6 +35,11 @@ namespace Spire
 		private:
 			List<CompileError> & errors;
 			List<CompileError> & warnings;
+			struct ErrorState
+			{
+				int ErrorCount, WarningCount;
+			};
+			List<ErrorState> errStack;
 		public:
 			ErrorWriter(List<CompileError> & perrors, List<CompileError> & pwarnings)
 				: errors(perrors), warnings(pwarnings)
@@ -46,6 +51,19 @@ namespace Spire
 			void Warning(int id, const String & msg, const CodePosition & pos)
 			{
 				warnings.Add(CompileError(msg, id, pos));
+			}
+			void PushState()
+			{
+				ErrorState state;
+				state.ErrorCount = errors.Count();
+				state.WarningCount = warnings.Count();
+			}
+			void PopState()
+			{
+				ErrorState state = errStack.Last();
+				errStack.RemoveAt(errStack.Count() - 1);
+				errors.SetSize(state.ErrorCount);
+				warnings.SetSize(state.WarningCount);
 			}
 			int GetErrorCount()
 			{

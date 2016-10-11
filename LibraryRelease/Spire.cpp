@@ -241,6 +241,16 @@ namespace Spire
 				VariableEntry varEntry;
 				if (!var->Scope->FindVariable(var->Variable, varEntry))
 				{
+					if (var->Type->AsBasicType() && var->Type->AsBasicType()->Component)
+					{
+						if (auto comp = shaderClosure->FindComponent(var->Type->AsBasicType()->Component->Name))
+						{
+							var->Tags[L"ComponentReference"] = new StringObject(comp->UniqueName);
+							AddReference(comp.Ptr(), currentImport, var->Position);
+						}
+						else
+							throw InvalidProgramException(L"cannot resolve reference.");
+					}
 					if (auto comp = shaderClosure->FindComponent(var->Variable))
 					{
 						if (comp->Implementations.First()->SyntaxNode->IsParam)
@@ -256,7 +266,7 @@ namespace Spire
 							originalShader = var->Type->AsBasicType()->Shader;
 						var->Type = new BasicExpressionType(originalShader, closure.Ptr());
 					}
-					else
+					else if (!(var->Type->AsBasicType() && var->Type->AsBasicType()->BaseType == BaseType::Function))
 						throw InvalidProgramException(L"cannot resolve reference.");
 				}
 				return var;
@@ -279,6 +289,16 @@ namespace Spire
 							originalShader = member->Type->AsBasicType()->Shader;
 						member->Type = new BasicExpressionType(originalShader, shader.Ptr());
 					}
+				}
+				else if (member->Type->AsBasicType() && member->Type->AsBasicType()->Component)
+				{
+					if (auto comp = shaderClosure->FindComponent(member->Type->AsBasicType()->Component->Name))
+					{
+						member->Tags[L"ComponentReference"] = new StringObject(comp->UniqueName);
+						AddReference(comp.Ptr(), currentImport, member->Position);
+					}
+					else
+						throw InvalidProgramException(L"cannot resolve reference.");
 				}
 				return member;
 			}
@@ -812,6 +832,20 @@ namespace Spire
 					compiledShader->Stages[stage->Name.Content] = ilStage;
 				}
 			}
+			String GetComponentFunctionName(ComponentSyntaxNode * comp)
+			{
+				StringBuilder nameSb;
+				nameSb << comp->ParentModuleName.Content << L"." << comp->Name.Content;
+				StringBuilder finalNameSb;
+				for (auto ch : nameSb.ProduceString())
+				{
+					if (ch >= L'0' && ch <= L'9' || ch >= L'a' && ch <= L'z' || ch >= 'A' && ch <= 'Z')
+						finalNameSb << ch;
+					else
+						finalNameSb << L'X';
+				}
+				return finalNameSb.ProduceString();
+			}
 		public:
 			virtual RefPtr<StructSyntaxNode> VisitStruct(StructSyntaxNode * st) override
 			{
@@ -833,6 +867,7 @@ namespace Spire
 				auto pipeline = shader->Shader->Pipeline;
 				RefPtr<ILShader> compiledShader = new ILShader();
 				compiledShader->Name = shader->Shader->Name;
+				compiledShader->Position = shader->Shader->Position;
 				TranslateStages(compiledShader.Ptr(), pipeline->SyntaxNode);
 				result.Program->Shaders.Add(compiledShader);
 
@@ -942,6 +977,55 @@ namespace Spire
 						}
 					}
 				}
+			
+				// generate component functions
+				for (auto & comp : shader->Definitions)
+				{
+					currentComponent = comp.Ptr();
+					if (comp->SyntaxNode->Parameters.Count())
+					{
+						auto funcName = GetComponentFunctionName(comp->SyntaxNode.Ptr());
+						if (result.Program->Functions.ContainsKey(funcName))
+							continue;
+						RefPtr<ILFunction> func = new ILFunction();
+						func->Name = funcName;
+						func->ReturnType = TranslateExpressionType(comp->Type, &recordTypes);
+						result.Program->Functions[funcName] = func;
+						int id = 0;
+						Dictionary<String, ILOperand*> refComponents;
+						variables.PushScope();
+						codeWriter.PushNode();
+						for (auto & dep : comp->Dependency)
+						{
+							if (dep->SyntaxNode->Parameters.Count() == 0)
+							{
+								auto paramType = TranslateExpressionType(dep->Type, &recordTypes);
+								func->Parameters.Add(dep->OriginalName + String(id), paramType);
+								variables.Add(dep->UniqueName, codeWriter.FetchArg(paramType, id + 1));
+								id++;
+							}
+						}
+						for (auto & param : comp->SyntaxNode->Parameters)
+						{
+							auto paramType = TranslateExpressionType(param->Type, &recordTypes);
+							func->Parameters.Add(param->Name + String(id), paramType);
+							variables.Add(param->Name, codeWriter.FetchArg(paramType, id + 1));
+							id++;
+						}
+						if (comp->SyntaxNode->Expression)
+						{
+							comp->SyntaxNode->Expression->Accept(this);
+							codeWriter.Insert(new ReturnInstruction(PopStack()));
+						}
+						else
+						{
+							comp->SyntaxNode->BlockStatement->Accept(this);
+						}
+						variables.PopScope();
+						func->Code = codeWriter.PopNode();
+					}
+					currentComponent = nullptr;
+				}
 				
 				for (auto & world : pipeline->Worlds)
 				{
@@ -965,7 +1049,8 @@ namespace Spire
 
 					for (auto & comp : components)
 					{
-						VisitComponent(comp);
+						if (comp->SyntaxNode->Parameters.Count() == 0)
+							VisitComponent(comp);
 					}
 					
 					variables.PopScope();
@@ -1043,7 +1128,7 @@ namespace Spire
 				if (function->IsExtern)
 					return function;
 				RefPtr<ILFunction> func = new ILFunction();
-				result.Program->Functions.Add(func);
+				result.Program->Functions.Add(function->InternalName, func);
 				func->Name = function->InternalName;
 				func->ReturnType = TranslateExpressionType(function->ReturnType);
 				variables.PushScope();
@@ -1423,6 +1508,10 @@ namespace Spire
 				{
 					op = result.Program->ConstantPool->CreateConstant(expr->FloatValue);
 				}
+				else if (expr->ConstType == ConstantExpressionSyntaxNode::ConstantType::Bool)
+				{
+					op = result.Program->ConstantPool->CreateConstant(expr->IntValue != 0);
+				}
 				else
 				{
 					op = result.Program->ConstantPool->CreateConstant(expr->IntValue);
@@ -1548,15 +1637,41 @@ namespace Spire
 			virtual RefPtr<ExpressionSyntaxNode> VisitInvokeExpression(InvokeExpressionSyntaxNode* expr) override
 			{
 				List<ILOperand*> args;
+				String funcName;
+				if (auto basicType = expr->FunctionExpr->Type->AsBasicType())
+				{
+					if (basicType->Func)
+						funcName = basicType->Func->SyntaxNode->Name;
+					else if (basicType->Component)
+					{
+						auto funcCompName = expr->FunctionExpr->Tags[L"ComponentReference"]().As<StringObject>()->Content;
+						auto funcComp = *(currentShader->DefinitionsByComponent[funcCompName]().TryGetValue(currentComponent->World));
+						funcName = GetComponentFunctionName(basicType->Component->Implementations.First()->SyntaxNode.Ptr());
+						// push additional arguments
+						for (auto & dep : funcComp->Dependency)
+						{
+							if (dep->SyntaxNode->Parameters.Count() == 0)
+							{
+								ILOperand * op = nullptr;
+								if (variables.TryGetValue(dep->UniqueName, op))
+									args.Add(op);
+								else
+									throw InvalidProgramException(L"cannot resolve reference for implicit component function argument.");
+							}
+						}
+					}
+				}
 				if (currentWorld)
-					currentWorld->ReferencedFunctions.Add(expr->FunctionExpr->Variable);
+				{
+					currentWorld->ReferencedFunctions.Add(funcName);
+				}
 				for (auto arg : expr->Arguments)
 				{
 					arg->Accept(this);
 					args.Add(PopStack());
 				}
 				auto instr = new CallInstruction(args.Count());
-				instr->Function = expr->FunctionExpr->Variable;
+				instr->Function = funcName;
 				for (int i = 0; i < args.Count(); i++)
 					instr->Arguments[i] = args[i];
 				instr->Type = TranslateExpressionType(expr->Type, &recordTypes);
@@ -1812,6 +1927,7 @@ namespace Spire
 			Dictionary<ConstKey<int>, ILConstOperand*> intConsts;
 			Dictionary<ConstKey<float>, ILConstOperand*> floatConsts;
 			List<RefPtr<ILConstOperand>> constants;
+			RefPtr<ILConstOperand> trueConst, falseConst;
 		public:
 			ILUndefinedOperand * GetUndefinedOperand()
 			{
@@ -1949,6 +2065,15 @@ namespace Spire
 						return rs;
 					}
 				}
+			}
+
+
+			ILConstOperand * CreateConstant(bool b)
+			{
+				if (b) 
+					return trueConst.Ptr();
+				else
+					return falseConst.Ptr();
 			}
 
 			ILConstOperand * CreateConstant(int val, int size = 0)
@@ -2097,6 +2222,20 @@ namespace Spire
 
 				return rs;
 			}
+
+			ConstantPoolImpl()
+			{
+				trueConst = new ILConstOperand();
+				trueConst->Type = new ILBasicType(ILBaseType::Bool);
+				trueConst->IntValues[0] = trueConst->IntValues[1] = trueConst->IntValues[2] = trueConst->IntValues[3] = 1;
+				trueConst->Name = L"true";
+
+				falseConst = new ILConstOperand();
+				falseConst->Type = new ILBasicType(ILBaseType::Bool);
+				falseConst->IntValues[0] = falseConst->IntValues[1] = falseConst->IntValues[2] = falseConst->IntValues[3] = 0;
+				trueConst->Name = L"false";
+
+			}
 		};
 
 		ConstantPool::ConstantPool()
@@ -2127,6 +2266,10 @@ namespace Spire
 		ILConstOperand * ConstantPool::CreateConstantIntVec(int val0, int val1, int val3, int val4)
 		{
 			return impl->CreateConstantIntVec(val0, val1, val3, val4);
+		}
+		ILConstOperand * ConstantPool::CreateConstant(bool b)
+		{
+			return impl->CreateConstant(b);
 		}
 		ILConstOperand * ConstantPool::CreateConstant(int val, int vectorSize)
 		{
@@ -2341,6 +2484,8 @@ namespace Spire
 						ctx.Body << makeFloat(c->FloatValues[0]);
 					else if (type->IsInt())
 						ctx.Body << (c->IntValues[0]);
+					else if (type->IsBool())
+						ctx.Body << ((c->IntValues[0] != 0) ? L"true" : L"false");
 					else if (auto baseType = dynamic_cast<ILBasicType*>(type))
 					{
 						if (baseType->Type == ILBaseType::Float2)
@@ -3133,13 +3278,16 @@ namespace Spire
 						refFuncs.Add(func);
 				for (auto & func : program->Functions)
 				{
-					if (refFuncs.Contains(func->Name))
-						GenerateFunctionDeclaration(sb, func.Ptr());
+					if (refFuncs.Contains(func.Value->Name))
+					{
+						GenerateFunctionDeclaration(sb, func.Value.Ptr());
+						sb << L";\n";
+					}
 				}
 				for (auto & func : program->Functions)
 				{
-					if (refFuncs.Contains(func->Name))
-						sb << GenerateFunction(func.Ptr());
+					if (refFuncs.Contains(func.Value->Name))
+						sb << GenerateFunction(func.Value.Ptr());
 				}
 			}
 
@@ -3396,6 +3544,7 @@ namespace Spire
 
 			StageSource GenerateSingleWorldShader(ILProgram * program, ILShader * shader, ILStage * stage)
 			{
+				useBindlessTexture = stage->Attributes.ContainsKey(L"BindlessTexture");
 				StageSource rs;
 				CodeGenContext ctx;
 				GenerateHeader(ctx.GlobalHeader, stage);
@@ -3465,6 +3614,8 @@ namespace Spire
 
 			StageSource GenerateHullShader(ILProgram * program, ILShader * shader, ILStage * stage)
 			{
+				useBindlessTexture = stage->Attributes.ContainsKey(L"BindlessTexture");
+
 				StageSource rs;
 				StageAttribute patchWorldName, controlPointWorldName, cornerPointWorldName, domain, innerLevel, outterLevel, numControlPoints;
 				RefPtr<ILWorld> patchWorld, controlPointWorld, cornerPointWorld;
@@ -3612,6 +3763,7 @@ namespace Spire
 
 			void GenerateFunctionDeclaration(StringBuilder & sbCode, ILFunction * function)
 			{
+				function->Code->NameAllInstructions();
 				auto retType = function->ReturnType.Ptr();
 				if (retType)
 					PrintType(sbCode, retType);
@@ -5480,6 +5632,78 @@ namespace Spire
 }
 
 /***********************************************************************
+CORE\NEWSPIRVCODEGEN.CPP
+***********************************************************************/
+#include <vector>
+#include <fstream>
+
+using namespace CoreLib::Basic;
+
+namespace Spire
+{
+	namespace Compiler
+	{
+		void PrintILShader(ILShader * shader)
+		{
+			printf("%S\n", shader->Name.Buffer());
+			printf("%S\n", shader->Position.ToString().Buffer());
+			printf("\n---\n\n");
+
+			for (auto& stage : shader->Stages)
+			{
+				printf("Stage: %S\n", stage.Key.Buffer());
+				auto& stageIL = stage.Value;
+
+				int maxAttrNameLength = 0;
+				int maxAttrValueLength = 0;
+				for (auto& attr : stageIL->Attributes)
+				{
+					if (attr.Value.Name.Length() > maxAttrNameLength)
+						maxAttrNameLength = attr.Value.Name.Length();
+
+					if (attr.Value.Value.Length() > maxAttrValueLength)
+						maxAttrValueLength = attr.Value.Value.Length();
+				}
+
+				for (auto& attr : stageIL->Attributes)
+				{
+					printf("\t%-*S = %-*S (%S)\n",
+						maxAttrNameLength, attr.Value.Name.Buffer(),
+						maxAttrValueLength, attr.Value.Value.Buffer(),
+						attr.Value.Position.ToString().Buffer());
+				}
+
+				printf("\n");
+			}
+
+			printf("\n---\n\n");
+
+			for (auto& world : shader->Worlds)
+			{
+				printf("World: %S\n", world.Key.Buffer());
+				auto& worldIL = world.Value;
+			}
+		}
+
+		class SpirVCodeGen : public CodeGenBackend
+		{
+		public:
+			virtual CompiledShaderSource GenerateShader(CompileResult & result, SymbolTable * symbols, ILShader * shader, ErrorWriter * err) override
+			{
+				PrintILShader(shader);
+				system("pause");
+				return CompiledShaderSource();
+			}
+		};
+
+		CodeGenBackend * CreateSpirVCodeGen()
+		{
+			return new SpirVCodeGen();
+		}
+	}
+}
+
+/***********************************************************************
 CORE\PARSER.CPP
 ***********************************************************************/
 
@@ -5694,10 +5918,16 @@ namespace Spire
 					if (LookAheadToken(L"inline") || (LookAheadToken(L"public") && !LookAheadToken(L"using", 1)) ||
 						LookAheadToken(L"out") || LookAheadToken(L"@") || IsTypeKeyword()
 						|| LookAheadToken(L"[") || LookAheadToken(L"require") || LookAheadToken(L"extern"))
-						shader->Members.Add(ParseComponent());
+					{
+						auto comp = ParseComponent();
+						comp->ParentModuleName = shader->Name;
+						shader->Members.Add(comp);
+					}
 					else if (LookAheadToken(L"using") || (LookAheadToken(L"public") && LookAheadToken(L"using", 1)))
 					{
-						shader->Members.Add(ParseImport());
+						auto imp = ParseImport();
+						imp->ParentModuleName = shader->Name;
+						shader->Members.Add(imp);
 					}
 					else
 					{
@@ -5764,6 +5994,7 @@ namespace Spire
 			RefPtr<StageSyntaxNode> stage = new StageSyntaxNode();
 			ReadToken(L"stage");
 			stage->Name = ReadToken(TokenType::Identifier);
+			FillPosition(stage.Ptr());
 			ReadToken(TokenType::Colon);
 			stage->StageType = ReadToken(TokenType::Identifier);
 			ReadToken(TokenType::LBrace);
@@ -5786,6 +6017,7 @@ namespace Spire
 		RefPtr<ComponentSyntaxNode> Parser::ParseComponent()
 		{
 			RefPtr<ComponentSyntaxNode> component = new ComponentSyntaxNode();
+			PushScope();
 			component->LayoutAttributes = ParseAttribute();
 			while (LookAheadToken(L"inline") || LookAheadToken(L"out") || LookAheadToken(L"require") || LookAheadToken(L"public") ||
 				LookAheadToken(L"extern"))
@@ -5828,18 +6060,32 @@ namespace Spire
 				ReadToken(L":");
 				component->AlternateName = ReadToken(TokenType::Identifier);
 			}
-			if (!component->IsParam && LookAheadToken(TokenType::OpAssign))
+			if (LookAheadToken(TokenType::LParent))
+			{
+				ReadToken(TokenType::LParent);
+				while (!LookAheadToken(TokenType::RParent))
+				{
+					component->Parameters.Add(ParseParameter());
+					if (LookAheadToken(TokenType::Comma))
+						ReadToken(TokenType::Comma);
+					else
+						break;
+				}
+				ReadToken(TokenType::RParent);
+			}
+			if (LookAheadToken(TokenType::OpAssign))
 			{
 				ReadToken(TokenType::OpAssign);
 				component->Expression = ParseExpression();
 				ReadToken(TokenType::Semicolon);
 			}
-			else if (!component->IsParam && LookAheadToken(TokenType::LBrace))
+			else if (LookAheadToken(TokenType::LBrace))
 			{
 				component->BlockStatement = ParseBlockStatement();
 			}
 			else
 				ReadToken(TokenType::Semicolon);
+			PopScope();
 			return component;
 		}
 
@@ -6666,6 +6912,15 @@ namespace Spire
 				}
 				rs = constExpr;
 			}
+			else if (LookAheadToken(L"true") || LookAheadToken(L"false"))
+			{
+				RefPtr<ConstantExpressionSyntaxNode> constExpr = new ConstantExpressionSyntaxNode();
+				auto token = tokens[pos++];
+				FillPosition(constExpr.Ptr());
+				constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Bool;
+				constExpr->IntValue = token.Content == L"true" ? 1 : 0;
+				rs = constExpr;
+			}
 			else if (LookAheadToken(TokenType::Identifier))
 			{
 				RefPtr<VarExpressionSyntaxNode> varExpr = new VarExpressionSyntaxNode();
@@ -6713,11 +6968,7 @@ namespace Spire
 				else if (LookAheadToken(TokenType::LParent))
 				{
 					RefPtr<InvokeExpressionSyntaxNode> invokeExpr = new InvokeExpressionSyntaxNode();
-					invokeExpr->FunctionExpr = rs.As<VarExpressionSyntaxNode>();
-					if (!invokeExpr->FunctionExpr)
-					{
-						errors.Add(CompileError(L"syntax error.", 20002, tokens[pos].Position));
-					}
+					invokeExpr->FunctionExpr = rs;
 					FillPosition(invokeExpr.Ptr());
 					ReadToken(TokenType::LParent);
 					while (pos < tokens.Count())
@@ -6930,6 +7181,17 @@ namespace Spire
 			return t == BaseType::Int || t == BaseType::Float || t == BaseType::UInt;
 		}
 
+		String GetFullComponentName(ComponentSyntaxNode * comp)
+		{
+			StringBuilder sb;
+			sb << comp->Name.Content;
+			for (auto & param : comp->Parameters)
+			{
+				sb << L"@" << param->Type->ToString();
+			}
+			return sb.ProduceString();
+		}
+
 		String TranslateHLSLTypeNames(String name)
 		{
 			if (name == L"float2" || name == L"half2")
@@ -6959,6 +7221,15 @@ namespace Spire
 			else
 				return name;
 		}
+
+		class ComponentReferenceObject : public Object
+		{
+		public:
+			ShaderComponentSymbol * Component = nullptr;
+			ComponentReferenceObject(ShaderComponentSymbol * component)
+				: Component(component)
+			{}
+		};
 
 		class SemanticsVisitor : public SyntaxVisitor
 		{
@@ -7036,7 +7307,7 @@ namespace Spire
 					expType->BaseType = BaseType::Float3x3;
 				else if (typeNode->TypeName == L"mat4" || typeNode->TypeName == L"mat4x4" || typeNode->TypeName == L"float4x4" || typeNode->TypeName == L"half4x4")
 					expType->BaseType = BaseType::Float4x4;
-				else if (typeNode->TypeName == L"sampler2D")
+				else if (typeNode->TypeName == L"sampler2D" || typeNode->TypeName == L"Texture2D")
 					expType->BaseType = BaseType::Texture2D;
 				else if (typeNode->TypeName == L"samplerCube")
 					expType->BaseType = BaseType::TextureCube;
@@ -7131,7 +7402,7 @@ namespace Spire
 					comp->Type = TranslateTypeNode(comp->TypeNode);
 					if (comp->IsParam || comp->IsInput || (comp->Rate && comp->Rate->Worlds.Count() == 1
 						&& psymbol->IsAbstractWorld(comp->Rate->Worlds.First().World.Content)))
-						AddNewComponentSymbol(psymbol->Components, comp);
+						AddNewComponentSymbol(psymbol->Components, psymbol->FunctionComponents, comp);
 					else
 						Error(33003, L"cannot define components in a pipeline.",
 							comp.Ptr());
@@ -7344,30 +7615,44 @@ namespace Spire
 				virtual RefPtr<ComponentSyntaxNode> VisitComponent(ComponentSyntaxNode * comp) override
 				{
 					RefPtr<ShaderComponentSymbol> compSym;
+					
 					currentShader->Components.TryGetValue(comp->Name.Content, compSym);
 					currentComp = compSym.Ptr();
 					SyntaxVisitor::VisitComponent(comp);
+					if (comp->Parameters.Count() > 0)
+					{
+						comp->IsInline = true;
+					}
+					bool isDefinedInAbstractWorld = false, isDefinedInNonAbstractWorld = false;
+					bool isInStorageBuffer = false;
+					if (comp->Rate)
+					{
+						for (auto & w : comp->Rate->Worlds)
+						{
+							auto world = currentShader->Pipeline->Worlds.TryGetValue(w.World.Content);
+							if (world)
+							{
+								if (world->IsAbstract)
+									isDefinedInAbstractWorld = true;
+								else
+									isDefinedInNonAbstractWorld = true;
+								isInStorageBuffer = isInStorageBuffer && world->SyntaxNode->LayoutAttributes.ContainsKey(L"ShaderStorageBlock");
+							}
+						}
+					}
+					else
+						isDefinedInNonAbstractWorld = true;
+					if (comp->Expression || comp->BlockStatement)
+					{
+						if (compSym->IsParam())
+							Error(33039, L"'" + comp->Name.Content + L"': no code allowed for component defined in input world.", comp);
+						else if (isDefinedInAbstractWorld)
+							Error(33040, L"'require': cannot define computation on component requirements.", comp);
+					}
 					if (!compSym->IsParam() && (compSym->Type->DataType->IsArray() || compSym->Type->DataType->IsStruct() ||
 						compSym->Type->DataType->IsTexture()))
 					{
-						bool valid = true;
-						bool isInStorageBuffer = true;
-						if (comp->Rate)
-						{
-							for (auto & w : comp->Rate->Worlds)
-							{
-								auto world = currentShader->Pipeline->Worlds.TryGetValue(w.World.Content);
-								if (world)
-								{
-									if (!world->IsAbstract)
-										valid = false;
-									isInStorageBuffer = isInStorageBuffer && world->SyntaxNode->LayoutAttributes.ContainsKey(L"ShaderStorageBlock");
-								}
-							}
-						}
-						else 
-							valid = false;
-						if (!valid)
+						if (isDefinedInNonAbstractWorld)
 						{
 							Error(33035, L"\'" + compSym->Name + L"\': sampler, struct and array types only allowed in input worlds.", comp->Name);
 						}
@@ -7465,7 +7750,9 @@ namespace Spire
 								Error(33009, L"parameters can only be defined in modules.", shaderSymbol->SyntaxNode);
 							}
 						}
-						AddNewComponentSymbol(shaderSymbol->Components, comp);
+						for (auto & param : comp->Parameters)
+							param->Type = TranslateTypeNode(param->TypeNode);
+						AddNewComponentSymbol(shaderSymbol->Components, shaderSymbol->FunctionComponents, comp);
 					}
 				}
 				// add shader objects to symbol table
@@ -7564,6 +7851,15 @@ namespace Spire
 				RefPtr<ShaderComponentSymbol> compSym;
 				currentShader->Components.TryGetValue(comp->Name.Content, compSym);
 				this->currentComp = compSym.Ptr();
+				for (auto & param : comp->Parameters)
+				{
+					param->Accept(this);
+					VariableEntry varEntry;
+					varEntry.IsComponent = false;
+					varEntry.Name = param->Name;
+					varEntry.Type.DataType = param->Type;
+					comp->Scope->Variables.Add(param->Name, varEntry);
+				}
 				if (comp->Expression)
 				{
 					comp->Expression = comp->Expression->Accept(this).As<ExpressionSyntaxNode>();
@@ -7583,7 +7879,9 @@ namespace Spire
 				importStmt->Import->Accept(this);
 				return importStmt;
 			}
-			void AddNewComponentSymbol(EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>> & components, RefPtr<ComponentSyntaxNode> comp)
+			void AddNewComponentSymbol(EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>> & components, 
+				EnumerableDictionary<String, List<RefPtr<ShaderComponentSymbol>>> & funcComponents,
+				RefPtr<ComponentSyntaxNode> comp)
 			{
 				RefPtr<ShaderComponentSymbol> compSym;
 				RefPtr<ShaderComponentImplSymbol> compImpl = new ShaderComponentImplSymbol();
@@ -7613,21 +7911,39 @@ namespace Spire
 						Error(33019, L"component \'" + compImpl->SyntaxNode->Name.Content + L"\': definition marked as 'export' must have an explicitly specified world.",
 							compImpl->SyntaxNode.Ptr());
 					}
+					if (compImpl->SyntaxNode->Parameters.Count() > 0)
+						Error(33037, L"component '" + compImpl->SyntaxNode->Name.Content + L"\': definition marked as 'export' cannot have parameters.",
+							compImpl->SyntaxNode->Name);
 				}
-				if (!components.TryGetValue(comp->Name.Content, compSym))
+				auto compName = GetFullComponentName(comp.Ptr());
+				if (!components.TryGetValue(compName, compSym))
 				{
 					compSym = new ShaderComponentSymbol();
 					compSym->Type = new Type();
-					compSym->Name = comp->Name.Content;
+					compSym->Name = compName;
 					compSym->Type->DataType = comp->Type;
-					components.Add(comp->Name.Content, compSym);
+					components.Add(compName, compSym);
 				}
 				else
 				{
 					if (comp->IsParam)
 						Error(33029, L"\'" + compImpl->SyntaxNode->Name.Content + L"\': requirement clash with previous definition.",
 							compImpl->SyntaxNode.Ptr());
+					if (compImpl->SyntaxNode->Parameters.Count())
+						Error(33032, L"\'" + compImpl->SyntaxNode->Name.Content + L"\': function redefinition.\nsee previous definition at " +
+							compSym->Implementations.Last()->SyntaxNode->Position.ToString(), compImpl->SyntaxNode.Ptr());
 					symbolTable->CheckComponentImplementationConsistency(err, compSym.Ptr(), compImpl.Ptr());
+				}
+				if (compImpl->SyntaxNode->Parameters.Count())
+				{
+					auto list = funcComponents.TryGetValue(comp->Name.Content);
+					if (!list)
+					{
+						funcComponents[comp->Name.Content] = List<RefPtr<ShaderComponentSymbol>>();
+						list = funcComponents.TryGetValue(comp->Name.Content);
+					}
+					comp->Name.Content = compName;
+					list->Add(compSym);
 				}
 				compSym->Implementations.Add(compImpl);
 			}
@@ -7785,6 +8101,13 @@ namespace Spire
 				RefPtr<FunctionSymbol> symbol = new FunctionSymbol();
 				symbol->SyntaxNode = functionNode;
 				symbolTable->Functions[functionNode->InternalName] = symbol;
+				auto overloadList = symbolTable->FunctionOverloads.TryGetValue(functionNode->Name);
+				if (!overloadList)
+				{
+					symbolTable->FunctionOverloads[functionNode->Name] = List<RefPtr<FunctionSymbol>>();
+					overloadList = symbolTable->FunctionOverloads.TryGetValue(functionNode->Name);
+				}
+				overloadList->Add(symbol);
 				this->function = NULL;
 			}
 			
@@ -7842,17 +8165,17 @@ namespace Spire
 					if (!iterVar.Type.DataType->Equals(ExpressionType::Float.Ptr()) && !iterVar.Type.DataType->Equals(ExpressionType::Int.Ptr()))
 						Error(30035, L"iteration variable \'" + stmt->IterationVariable.Content + L"\' can only be a int or float", stmt->IterationVariable);
 					stmt->InitialExpression = stmt->InitialExpression->Accept(this).As<ExpressionSyntaxNode>();
-					if (stmt->InitialExpression->Type != iterVar.Type.DataType)
+					if (!stmt->InitialExpression->Type->Equals(iterVar.Type.DataType.Ptr()))
 						Error(30019, L"type mismatch \'" + stmt->InitialExpression->Type->ToString() + L"\' and \'" +
 							iterVar.Type.DataType->ToString() + L"\'", stmt->InitialExpression.Ptr());
 					stmt->EndExpression = stmt->EndExpression->Accept(this).As<ExpressionSyntaxNode>();
-					if (stmt->EndExpression->Type != iterVar.Type.DataType)
+					if (!stmt->EndExpression->Type->Equals(iterVar.Type.DataType.Ptr()))
 						Error(30019, L"type mismatch \'" + stmt->EndExpression->Type->ToString() + L"\' and \'" +
 							iterVar.Type.DataType->ToString() + L"\'", stmt->EndExpression.Ptr());
 					if (stmt->StepExpression != nullptr)
 					{
 						stmt->StepExpression = stmt->StepExpression->Accept(this).As<ExpressionSyntaxNode>();
-						if (stmt->StepExpression->Type != iterVar.Type.DataType)
+						if (!stmt->StepExpression->Type->Equals(iterVar.Type.DataType.Ptr()))
 							Error(30019, L"type mismatch \'" + stmt->StepExpression->Type->ToString() + L"\' and \'" +
 								iterVar.Type.DataType->ToString() + L"\'", stmt->StepExpression.Ptr());
 					}
@@ -8215,6 +8538,9 @@ namespace Spire
 				case ConstantExpressionSyntaxNode::ConstantType::Int:
 					expr->Type = ExpressionType::Int;
 					break;
+				case ConstantExpressionSyntaxNode::ConstantType::Bool:
+					expr->Type = ExpressionType::Bool;
+					break;
 				case ConstantExpressionSyntaxNode::ConstantType::Float:
 					expr->Type = ExpressionType::Float;
 					break;
@@ -8284,196 +8610,266 @@ namespace Spire
 				}
 				return true;
 			}
-			virtual RefPtr<ExpressionSyntaxNode> VisitInvokeExpression(InvokeExpressionSyntaxNode *expr) override
-			{
-				expr->FunctionExpr->Variable = TranslateHLSLTypeNames(expr->FunctionExpr->Variable);
-				for (auto & arg : expr->Arguments)
-					arg = arg->Accept(this).As<ExpressionSyntaxNode>();
 
-				// check if this is an import operator call
-				if (currentShader && currentCompNode && expr->Arguments.Count() > 0)
+			template<typename GetParamFunc, typename PFuncT>
+			PFuncT FindFunctionOverload(const List<PFuncT> & funcs, const GetParamFunc & getParam, List<RefPtr<ExpressionSyntaxNode>> & arguments)
+			{
+				int bestMatchConversions = 1 << 30;
+				PFuncT func = nullptr;
+				for (auto & f : funcs)
 				{
-					if (auto impOpList = currentShader->Pipeline->ImportOperators.TryGetValue(expr->FunctionExpr->Variable))
+					auto params = getParam(f);
+					if (params.Count() == arguments.Count())
+					{
+						int conversions = 0;
+						bool match = true;
+						for (int i = 0; i < arguments.Count(); i++)
+						{
+							auto argType = arguments[i]->Type;
+							auto paramType = params[i]->Type;
+							if (argType->Equals(paramType.Ptr()))
+								continue;
+							else if (MatchType_ValueReceiver(paramType.Ptr(), argType.Ptr()))
+							{
+								conversions++;
+								continue;
+							}
+							else
+							{
+								match = false;
+								break;
+							}
+						}
+						if (match && conversions < bestMatchConversions)
+						{
+							func = f;
+							bestMatchConversions = conversions;
+						}
+					}
+				}
+				return func;
+			}
+
+			ShaderComponentSymbol * ResolveFunctionComponent(ShaderSymbol * shader, String name, List<RefPtr<ExpressionSyntaxNode>> & args, bool topLevel = true)
+			{
+				auto list = currentShader->FunctionComponents.TryGetValue(name);
+				if (list)
+				{
+					auto func = FindFunctionOverload(*list, [](RefPtr<ShaderComponentSymbol> & comp)
+					{
+						return comp->Implementations.First()->SyntaxNode->Parameters;
+					}, args);
+					if (func)
+					{
+						return func.Ptr();
+					}
+				}
+				for (auto & module : shader->ShaderUsings)
+				{
+					if (module.IsPublic || topLevel)
+					{
+						auto func = ResolveFunctionComponent(module.Shader, name, args, false);
+						if (func)
+							return func;
+					}
+				}
+				return nullptr;
+			}
+
+			RefPtr<ExpressionSyntaxNode> ResolveFunctionOverload(InvokeExpressionSyntaxNode * invoke, MemberExpressionSyntaxNode* memberExpr, List<RefPtr<ExpressionSyntaxNode>> & arguments)
+			{
+				err->PushState();
+				memberExpr->BaseExpression->Accept(this);
+				err->PopState();
+				if (memberExpr->BaseExpression->Type->IsShader())
+				{
+					auto basicType = memberExpr->BaseExpression->Type->AsBasicType();
+					auto func = ResolveFunctionComponent(basicType->Shader, memberExpr->MemberName, arguments);
+					if (func)
+					{
+						auto funcType = new BasicExpressionType();
+						funcType->BaseType = BaseType::Function;
+						funcType->Component = func;
+						memberExpr->Type = funcType;
+						invoke->Type = func->Implementations.First()->SyntaxNode->Type;
+						return invoke;
+					}
+				}
+				return invoke;
+			}
+
+			RefPtr<ExpressionSyntaxNode> ResolveFunctionOverload(InvokeExpressionSyntaxNode * invoke, VarExpressionSyntaxNode* varExpr, List<RefPtr<ExpressionSyntaxNode>> & arguments)
+			{
+				if (currentShader)
+				{
+					auto func = ResolveFunctionComponent(currentShader, varExpr->Variable, arguments);
+					if (func)
+					{
+						auto funcType = new BasicExpressionType();
+						funcType->BaseType = BaseType::Function;
+						funcType->Component = func;
+						varExpr->Type = funcType;
+						invoke->Type = func->Implementations.First()->SyntaxNode->Type;
+						return invoke;
+					}
+				}
+				// check if this is an import operator call
+				if (currentShader && currentCompNode && arguments.Count() > 0)
+				{
+					if (auto impOpList = currentShader->Pipeline->ImportOperators.TryGetValue(varExpr->Variable))
 					{
 						// component with explicit import operator call must be qualified with explicit rate
 						if (!currentCompNode->Rate)
 						{
 							Error(33071, L"cannot call an import operator from an auto-placed component '" + currentCompNode->Name.Content + L"'. try qualify the component with explicit worlds.",
-								expr);
-							expr->Type = ExpressionType::Error;
-							return expr;
+								varExpr);
+							invoke->Type = ExpressionType::Error;
+							return invoke;
 						}
 						// for now we do not support calling import operator from a multi-world component definition
 						if (currentCompNode->Rate->Worlds.Count() > 1)
 							Error(33073, L"cannot call an import operator from a multi-world component definition. consider qualify the component with only one explicit world.",
-								expr);
-						int bestMatchConversions = 1 << 30;
-						bool found = false;
-						RefPtr<ImportOperatorDefSyntaxNode> func;
-						for (auto & f : *impOpList)
+								varExpr);
+						auto func = FindFunctionOverload(*impOpList, [](RefPtr<ImportOperatorDefSyntaxNode> imp)
 						{
-							if (f->Parameters.Count() == expr->Arguments.Count() - 1 &&
-								f->DestWorld.Content == currentCompNode->Rate->Worlds.First().World.Content)
-							{
-								int conversions = 0;
-								bool match = true;
-								for (int i = 1; i < expr->Arguments.Count(); i++)
-								{
-									auto argType = expr->Arguments[i]->Type;
-									auto paramType = f->Parameters[i - 1]->Type;
-									if (argType->Equals(paramType.Ptr()))
-										continue;
-									else if (MatchType_ValueReceiver(paramType.Ptr(), argType.Ptr()))
-									{
-										conversions++;
-										continue;
-									}
-									else
-									{
-										match = false;
-										break;
-									}
-								}
-								if (match && conversions < bestMatchConversions)
-								{
-									func = f;
-									found = true;
-									bestMatchConversions = conversions;
-								}
-							}
-						}
-						if (found)
+							List<RefPtr<ParameterSyntaxNode>> params;
+							for (int i = 1; i < imp->Parameters.Count(); i++)
+								params.Add(imp->Parameters[i]);
+							return params;
+						}, arguments);
+						if (func)
 						{
 							RefPtr<ImportExpressionSyntaxNode> importExpr = new ImportExpressionSyntaxNode();
-							importExpr->Position = expr->Position;
-							importExpr->Component = expr->Arguments[0];
+							importExpr->Position = varExpr->Position;
+							importExpr->Component = arguments[0];
 							CloneContext cloneCtx;
 							importExpr->ImportOperatorDef = func->Clone(cloneCtx);
-							importExpr->ImportOperatorDef->Scope->Parent = expr->Scope->Parent;
-							importExpr->Type = expr->Arguments[0]->Type->Clone();
-							importExpr->Scope = expr->Scope;
+							importExpr->ImportOperatorDef->Scope->Parent = varExpr->Scope->Parent;
+							importExpr->Type = arguments[0]->Type->Clone();
+							importExpr->Scope = varExpr->Scope;
 							importExpr->Access = ExpressionAccess::Read;
-							for (int i = 1; i < expr->Arguments.Count(); i++)
-								importExpr->Arguments.Add(expr->Arguments[i]);
+							for (int i = 1; i < arguments.Count(); i++)
+								importExpr->Arguments.Add(arguments[i]);
 							return importExpr;
 						}
 						else
 						{
 							StringBuilder argList;
-							for (int i = 1; i < expr->Arguments.Count(); i++)
+							for (int i = 1; i < arguments.Count(); i++)
 							{
-								argList << expr->Arguments[i]->Type->ToString();
-								if (i != expr->Arguments.Count() - 1)
+								argList << arguments[i]->Type->ToString();
+								if (i != arguments.Count() - 1)
 									argList << L", ";
 							}
-							Error(33072, L"'" + expr->FunctionExpr->Variable + L"' is an import operator defined in pipeline '" + currentShader->Pipeline->SyntaxNode->Name.Content
+							Error(33072, L"'" + varExpr->Variable + L"' is an import operator defined in pipeline '" + currentShader->Pipeline->SyntaxNode->Name.Content
 								+ L"', but none of the import operator overloads matches argument list '(" +
 								argList.ProduceString() + L"').",
-								expr);
-							expr->Type = ExpressionType::Error;
+								varExpr);
+							invoke->Type = ExpressionType::Error;
 						}
-						return expr;
+						return invoke;
 					}
 				}
-
 				// this is not an import operator call, resolve as function call
-				String funcName;
 				bool found = false;
 				bool functionNameFound = false;
+				String funcName;
 				RefPtr<FunctionSymbol> func;
-				if (expr->FunctionExpr->Variable == L"texture" && expr->Arguments.Count() > 0 &&
-					expr->Arguments[0]->Type->IsGenericType(L"Buffer"))
+				varExpr->Variable = TranslateHLSLTypeNames(varExpr->Variable);
+
+				if (varExpr->Variable == L"texture" && arguments.Count() > 0 &&
+					arguments[0]->Type->IsGenericType(L"Buffer"))
 				{
-					if (expr->Arguments.Count() != 2)
+					if (arguments.Count() != 2)
 					{
-						expr->Type = ExpressionType::Error;
+						invoke->Type = ExpressionType::Error;
 						found = false;
 					}
 					else
 					{
-						if (auto genType = expr->Arguments[0]->Type->AsGenericType())
+						if (auto genType = arguments[0]->Type->AsGenericType())
 						{
-							expr->Type = genType->BaseType;
-							if (!expr->Arguments[1]->Type->Equals(ExpressionType::Float2.Ptr()))
+							invoke->Type = genType->BaseType;
+							if (!arguments[1]->Type->Equals(ExpressionType::Float2.Ptr()))
 							{
 								found = false;
-								expr->Type = ExpressionType::Error;
+								invoke->Type = ExpressionType::Error;
 							}
 						}
 						else
 						{
-							expr->Type = ExpressionType::Error;
+							invoke->Type = ExpressionType::Error;
 							found = false;
 						}
 					}
+					auto funcType = new BasicExpressionType(BaseType::Function);
+					funcType->Func = symbolTable->FunctionOverloads[L"texture"]().First().Ptr();
+					varExpr->Type = funcType;
 				}
 				else
 				{
 					// find function overload with implicit argument type conversions
-					auto namePrefix = expr->FunctionExpr->Variable + L"@";
-					int bestMatchConversions = 1 << 30;
-					for (auto & f : symbolTable->Functions)
+					auto namePrefix = varExpr->Variable + L"@";
+					List<RefPtr<FunctionSymbol>> * functionOverloads = symbolTable->FunctionOverloads.TryGetValue(varExpr->Variable);
+					if (functionOverloads)
 					{
-						if (f.Key.StartsWith(namePrefix))
+						func = FindFunctionOverload(*functionOverloads, [](RefPtr<FunctionSymbol> f)
 						{
-							functionNameFound = true;
-							if (f.Value->SyntaxNode->Parameters.Count() == expr->Arguments.Count())
-							{
-								int conversions = 0;
-								bool match = true;
-								for (int i = 0; i < expr->Arguments.Count(); i++)
-								{
-									auto argType = expr->Arguments[i]->Type;
-									auto paramType = f.Value->SyntaxNode->Parameters[i]->Type;
-									if (argType->Equals(paramType.Ptr()))
-										continue;
-									else if (MatchType_ValueReceiver(paramType.Ptr(), argType.Ptr()))
-									{
-										conversions++;
-										continue;
-									}
-									else
-									{
-										match = false;
-										break;
-									}
-								}
-								if (match && conversions < bestMatchConversions)
-								{
-									func = f.Value;
-									funcName = f.Key;
-									found = true;
-									bestMatchConversions = conversions;
-								}
-							}
-						}
+							return f->SyntaxNode->Parameters;
+						}, arguments);
+						functionNameFound = true;
 					}
 				}
-				if (!found)
-				{
-					expr->Type = ExpressionType::Error;
-					StringBuilder argList;
-					for (int i = 0; i < expr->Arguments.Count(); i++)
-					{
-						argList << expr->Arguments[i]->Type->ToString();
-						if (i != expr->Arguments.Count() - 1)
-							argList << L", ";
-					}
-					if (functionNameFound)
-						Error(30021, expr->FunctionExpr->Variable + L": no overload takes arguments (" + argList.ProduceString() + L")", expr);
-					else
-						Error(30015, L"undefined identifier '" + expr->FunctionExpr->Variable + L"'.", expr->FunctionExpr.Ptr());
-
-				}
-				else if (func)
+				if (func)
 				{
 					if (!func->SyntaxNode->IsExtern)
 					{
-						expr->FunctionExpr->Variable = funcName;
+						varExpr->Variable = funcName;
 						if (currentFunc)
 							currentFunc->ReferencedFunctions.Add(funcName);
 					}
-					expr->Type = func->SyntaxNode->ReturnType;
+					invoke->Type = func->SyntaxNode->ReturnType;
+					auto funcType = new BasicExpressionType();
+					funcType->BaseType = BaseType::Function;
+					funcType->Func = func.Ptr();
+					varExpr->Type = funcType;
+					found = true;
+				}
+				if (!found)
+				{
+					invoke->Type = ExpressionType::Error;
+					StringBuilder argList;
+					for (int i = 0; i < arguments.Count(); i++)
+					{
+						argList << arguments[i]->Type->ToString();
+						if (i != arguments.Count() - 1)
+							argList << L", ";
+					}
+					if (functionNameFound)
+						Error(30021, varExpr->Variable + L": no overload takes arguments (" + argList.ProduceString() + L")", varExpr);
+					else
+						Error(30015, L"undefined identifier '" + varExpr->Variable + L"'.", varExpr);
+				}
+				return invoke;
+			}
+
+			virtual RefPtr<ExpressionSyntaxNode> VisitInvokeExpression(InvokeExpressionSyntaxNode *expr) override
+			{
+				for (auto & arg : expr->Arguments)
+					arg = arg->Accept(this).As<ExpressionSyntaxNode>();
+
+				if (auto varExpr = expr->FunctionExpr.As<VarExpressionSyntaxNode>())
+				{
+					return ResolveFunctionOverload(expr, varExpr.Ptr(), expr->Arguments);
+				}
+				else if (auto memberExpr = expr->FunctionExpr.As<MemberExpressionSyntaxNode>())
+				{
+					return ResolveFunctionOverload(expr, memberExpr.Ptr(), expr->Arguments);
+				}
+				else
+				{
+					Error(33070, L"expression preceding parenthesis of apparent call must have function type.", expr->FunctionExpr.Ptr());
+					expr->Type = ExpressionType::Error;
 				}
 				return expr;
 			}
@@ -8632,6 +9028,7 @@ namespace Spire
 					}
 					else
 						Error(30015, L"undefined identifier \'" + expr->Variable + L"\'", expr);
+					expr->Tags[L"ComponentReference"] = new ComponentReferenceObject(compRef.Component);
 				}
 				else
 					Error(30015, L"undefined identifier \'" + expr->Variable + L"\'", expr);
@@ -8674,13 +9071,13 @@ namespace Spire
 					&& !expr->SelectorExpr->Type->Equals(ExpressionType::Error.Ptr()))
 				{
 					expr->Type = ExpressionType::Error;
-					Error(30079, L"selector must evaluate to int.", expr);
+					Error(30079, L"selector must evaluate to bool.", expr);
 				}
 				expr->Expr0 = expr->Expr0->Accept(this).As<ExpressionSyntaxNode>();
 				expr->Expr1 = expr->Expr1->Accept(this).As<ExpressionSyntaxNode>();
-				if (expr->Expr0->Type != expr->Expr1->Type)
+				if (!expr->Expr0->Type->Equals(expr->Expr1->Type.Ptr()))
 				{
-					Error(30080, L"the two value expressions in a select clause must evaluate to same type.", expr);
+					Error(30080, L"the two value expressions in a select clause must have same type.", expr);
 				}
 				expr->Type = expr->Expr0->Type;
 				return expr;
@@ -8752,7 +9149,7 @@ namespace Spire
 							{
 								expr->Type = new BasicExpressionType((BaseType)((int)GetVectorBaseType(baseType->AsBasicType()->BaseType) + children.Count() - 1));
 							}
-							expr->Type.As<BasicExpressionType>()->IsMaskedVector = true;
+							expr->Type->AsBasicType()->IsMaskedVector = true;
 						}
 						if (auto bt = expr->Type->AsBasicType())
 						{
@@ -8788,6 +9185,7 @@ namespace Spire
 					}
 					else
 						expr->Type = ExpressionType::Error;
+					expr->Tags[L"ComponentReference"] = new ComponentReferenceObject(refComp.Component);
 				}
 				else if (baseType->IsStruct())
 				{
@@ -9217,7 +9615,7 @@ namespace Spire
 				}
 				compilerInstances++;
 				backends.Add(L"glsl", CreateGLSLCodeGen());
-				//backends.Add(L"spirv", CreateSpirVCodeGen());
+				backends.Add(L"spirv", CreateSpirVCodeGen());
 			}
 
 			~ShaderCompilerImpl()
@@ -9241,8 +9639,6 @@ namespace Spire
 /***********************************************************************
 CORE\SPIRVCODEGEN.CPP
 ***********************************************************************/
-#include <vector>
-#include <fstream>
 
 using namespace CoreLib::Basic;
 
@@ -14862,8 +15258,11 @@ __intrinsic vec4 textureGrad(samplerCube tex, vec3 coord, vec3 dPdx, vec3 dPdy);
 __intrinsic vec4 texture(samplerCube tex, vec3 coord, float bias);
 __intrinsic float texture(sampler2DShadow tex, vec3 coord);
 __intrinsic float texture(samplerCubeShadow tex, vec4 coord);
+__intrinsic vec4 textureProj(sampler2D tex, vec3 coord);
+__intrinsic vec4 textureProj(samplerCube tex, vec4 coord);
 __intrinsic float textureProj(sampler2DShadow tex, vec4 coord);
 __intrinsic float textureProj(samplerCubeShadow tex, vec4 coord);
+__intrinsic vec4 texelFetch(sampler2D sampler, ivec2 P, int lod);
 __intrinsic float diff(float v);
 __intrinsic float mod(float x, float y);
 __intrinsic float max(float v);
@@ -14956,6 +15355,8 @@ __intrinsic vec4 vec4(uvec4 val);
 
 __intrinsic mat3 transpose(mat3 in);
 __intrinsic mat4 transpose(mat4 in);
+
+__intrinsic vec4 mul(mat4 a, vec4 b);
 
 #line_reset#
 )";
@@ -15536,7 +15937,7 @@ namespace Spire
 				res.Append(L"samplerCubeShadow");
 				break;
 			case Compiler::BaseType::Function:
-				res.Append(Func->InternalName);
+				res.Append(Func->SyntaxNode->InternalName);
 				break;
 			case Compiler::BaseType::Shader:
 				res.Append(Shader->SyntaxNode->Name.Content);

@@ -104,7 +104,8 @@ namespace Spire
 		class StructSymbol;
 		class ShaderClosure;
 		class StructSyntaxNode;
-
+		class ShaderComponentSymbol;
+		class FunctionSymbol;
 		class BasicExpressionType;
 		class ArrayExpressionType;
 		class GenericExpressionType;
@@ -155,7 +156,8 @@ namespace Spire
 			BaseType BaseType;
 			ShaderSymbol * Shader = nullptr;
 			ShaderClosure * ShaderClosure = nullptr;
-			FunctionSyntaxNode * Func = nullptr;
+			FunctionSymbol * Func = nullptr;
+			ShaderComponentSymbol * Component = nullptr;
 			StructSymbol * Struct = nullptr;
 			String RecordTypeName;
 
@@ -500,7 +502,7 @@ namespace Spire
 		public:
 			enum class ConstantType
 			{
-				Int, Float
+				Int, Bool, Float
 			};
 			ConstantType ConstType;
 			union
@@ -577,7 +579,7 @@ namespace Spire
 		class InvokeExpressionSyntaxNode : public ExpressionSyntaxNode
 		{
 		public:
-			RefPtr<VarExpressionSyntaxNode> FunctionExpr;
+			RefPtr<ExpressionSyntaxNode> FunctionExpr;
 			List<RefPtr<ExpressionSyntaxNode>> Arguments;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
 			virtual InvokeExpressionSyntaxNode * Clone(CloneContext & ctx);
@@ -699,6 +701,7 @@ namespace Spire
 		class ShaderMemberNode : public SyntaxNode
 		{
 		public:
+			Token ParentModuleName;
 			virtual ShaderMemberNode * Clone(CloneContext & ctx) = 0;
 		};
 
@@ -713,6 +716,7 @@ namespace Spire
 			EnumerableDictionary<String, String> LayoutAttributes;
 			RefPtr<BlockStatementSyntaxNode> BlockStatement;
 			RefPtr<ExpressionSyntaxNode> Expression;
+			List<RefPtr<ParameterSyntaxNode>> Parameters;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ComponentSyntaxNode * Clone(CloneContext & ctx) override;
 		};
@@ -1047,6 +1051,7 @@ namespace Spire
 			}
 			virtual RefPtr<ExpressionSyntaxNode> VisitInvokeExpression(InvokeExpressionSyntaxNode* stmt)
 			{
+				stmt->FunctionExpr->Accept(this);
 				for (auto & arg : stmt->Arguments)
 					arg = arg->Accept(this).As<ExpressionSyntaxNode>();
 				return stmt;

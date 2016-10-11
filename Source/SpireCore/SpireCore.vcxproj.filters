@@ -54,13 +54,13 @@
     <ClInclude Include="Closure.h">
       <Filter>Front End</Filter>
     </ClInclude>
+    <ClInclude Include="CodePosition.h">
+      <Filter>Front End</Filter>
+    </ClInclude>
     <ClInclude Include="VariantIR.h">
-      <Filter>Back End</Filter>
+      <Filter>Front End</Filter>
     </ClInclude>
     <ClInclude Include="StringObject.h">
-      <Filter>Back End</Filter>
-    </ClInclude>
-    <ClInclude Include="CodePosition.h">
       <Filter>Front End</Filter>
     </ClInclude>
   </ItemGroup>
@@ -101,9 +101,6 @@
     <ClCompile Include="ConstantPool.cpp">
       <Filter>Back End</Filter>
     </ClCompile>
-    <ClCompile Include="CodeGenerator.cpp">
-      <Filter>Back End</Filter>
-    </ClCompile>
     <ClCompile Include="CompiledProgram.cpp">
       <Filter>Back End</Filter>
     </ClCompile>
@@ -113,11 +110,17 @@
     <ClCompile Include="SpirVCodeGen.cpp">
       <Filter>Back End</Filter>
     </ClCompile>
-    <ClCompile Include="VariantIR.cpp">
+    <ClCompile Include="NewSpirVCodeGen.cpp">
       <Filter>Back End</Filter>
     </ClCompile>
+    <ClCompile Include="CodeGenerator.cpp">
+      <Filter>Front End</Filter>
+    </ClCompile>
+    <ClCompile Include="VariantIR.cpp">
+      <Filter>Front End</Filter>
+    </ClCompile>
     <ClCompile Include="InsertImplicitImportOperator.cpp">
-      <Filter>Back End</Filter>
+      <Filter>Front End</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

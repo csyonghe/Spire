@@ -209,6 +209,16 @@ namespace Spire
 				VariableEntry varEntry;
 				if (!var->Scope->FindVariable(var->Variable, varEntry))
 				{
+					if (var->Type->AsBasicType() && var->Type->AsBasicType()->Component)
+					{
+						if (auto comp = shaderClosure->FindComponent(var->Type->AsBasicType()->Component->Name))
+						{
+							var->Tags[L"ComponentReference"] = new StringObject(comp->UniqueName);
+							AddReference(comp.Ptr(), currentImport, var->Position);
+						}
+						else
+							throw InvalidProgramException(L"cannot resolve reference.");
+					}
 					if (auto comp = shaderClosure->FindComponent(var->Variable))
 					{
 						if (comp->Implementations.First()->SyntaxNode->IsParam)
@@ -224,7 +234,7 @@ namespace Spire
 							originalShader = var->Type->AsBasicType()->Shader;
 						var->Type = new BasicExpressionType(originalShader, closure.Ptr());
 					}
-					else
+					else if (!(var->Type->AsBasicType() && var->Type->AsBasicType()->BaseType == BaseType::Function))
 						throw InvalidProgramException(L"cannot resolve reference.");
 				}
 				return var;
@@ -247,6 +257,16 @@ namespace Spire
 							originalShader = member->Type->AsBasicType()->Shader;
 						member->Type = new BasicExpressionType(originalShader, shader.Ptr());
 					}
+				}
+				else if (member->Type->AsBasicType() && member->Type->AsBasicType()->Component)
+				{
+					if (auto comp = shaderClosure->FindComponent(member->Type->AsBasicType()->Component->Name))
+					{
+						member->Tags[L"ComponentReference"] = new StringObject(comp->UniqueName);
+						AddReference(comp.Ptr(), currentImport, member->Position);
+					}
+					else
+						throw InvalidProgramException(L"cannot resolve reference.");
 				}
 				return member;
 			}

@@ -1,4 +1,4 @@
-pipeline EnginePipeline
+﻿pipeline EnginePipeline
 {
     [Pinned]
     [Packed]
@@ -195,7 +195,6 @@ module VertexTransform
     require mat4 viewProjectionTransform;
     @modelTransform mat4 modelMatrix; 
     @modelTransform mat4 normalMatrix;
-    
     vec4 position = modelMatrix * vec4(objPos, 1); 
     public @tes vec4 projCoord = viewProjectionTransform * position;
     public vec3 pos = position.xyz;
@@ -239,6 +238,7 @@ vec2 LightingFuncGGX_FV(float dotLH, float roughness)
     float invK2 = 1.0-k2;
     vis = 1.0/(dotLH*dotLH*invK2 + k2);
 
+    bool testBool = true || false;
     return vec2(F_a*vis, F_b*vis);
 }
 

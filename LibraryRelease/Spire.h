@@ -115,6 +115,11 @@ namespace Spire
 		private:
 			List<CompileError> & errors;
 			List<CompileError> & warnings;
+			struct ErrorState
+			{
+				int ErrorCount, WarningCount;
+			};
+			List<ErrorState> errStack;
 		public:
 			ErrorWriter(List<CompileError> & perrors, List<CompileError> & pwarnings)
 				: errors(perrors), warnings(pwarnings)
@@ -126,6 +131,19 @@ namespace Spire
 			void Warning(int id, const String & msg, const CodePosition & pos)
 			{
 				warnings.Add(CompileError(msg, id, pos));
+			}
+			void PushState()
+			{
+				ErrorState state;
+				state.ErrorCount = errors.Count();
+				state.WarningCount = warnings.Count();
+			}
+			void PopState()
+			{
+				ErrorState state = errStack.Last();
+				errStack.RemoveAt(errStack.Count() - 1);
+				errors.SetSize(state.ErrorCount);
+				warnings.SetSize(state.WarningCount);
 			}
 			int GetErrorCount()
 			{
@@ -306,7 +324,8 @@ namespace Spire
 		class StructSymbol;
 		class ShaderClosure;
 		class StructSyntaxNode;
-
+		class ShaderComponentSymbol;
+		class FunctionSymbol;
 		class BasicExpressionType;
 		class ArrayExpressionType;
 		class GenericExpressionType;
@@ -357,7 +376,8 @@ namespace Spire
 			BaseType BaseType;
 			ShaderSymbol * Shader = nullptr;
 			ShaderClosure * ShaderClosure = nullptr;
-			FunctionSyntaxNode * Func = nullptr;
+			FunctionSymbol * Func = nullptr;
+			ShaderComponentSymbol * Component = nullptr;
 			StructSymbol * Struct = nullptr;
 			String RecordTypeName;
 
@@ -702,7 +722,7 @@ namespace Spire
 		public:
 			enum class ConstantType
 			{
-				Int, Float
+				Int, Bool, Float
 			};
 			ConstantType ConstType;
 			union
@@ -779,7 +799,7 @@ namespace Spire
 		class InvokeExpressionSyntaxNode : public ExpressionSyntaxNode
 		{
 		public:
-			RefPtr<VarExpressionSyntaxNode> FunctionExpr;
+			RefPtr<ExpressionSyntaxNode> FunctionExpr;
 			List<RefPtr<ExpressionSyntaxNode>> Arguments;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
 			virtual InvokeExpressionSyntaxNode * Clone(CloneContext & ctx);
@@ -901,6 +921,7 @@ namespace Spire
 		class ShaderMemberNode : public SyntaxNode
 		{
 		public:
+			Token ParentModuleName;
 			virtual ShaderMemberNode * Clone(CloneContext & ctx) = 0;
 		};
 
@@ -915,6 +936,7 @@ namespace Spire
 			EnumerableDictionary<String, String> LayoutAttributes;
 			RefPtr<BlockStatementSyntaxNode> BlockStatement;
 			RefPtr<ExpressionSyntaxNode> Expression;
+			List<RefPtr<ParameterSyntaxNode>> Parameters;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ComponentSyntaxNode * Clone(CloneContext & ctx) override;
 		};
@@ -1249,6 +1271,7 @@ namespace Spire
 			}
 			virtual RefPtr<ExpressionSyntaxNode> VisitInvokeExpression(InvokeExpressionSyntaxNode* stmt)
 			{
+				stmt->FunctionExpr->Accept(this);
 				for (auto & arg : stmt->Arguments)
 					arg = arg->Accept(this).As<ExpressionSyntaxNode>();
 				return stmt;
@@ -1371,8 +1394,8 @@ namespace Spire
 			TextureShadow = 49,
 			TextureCube = 50,
 			TextureCubeShadow = 51,
+			Bool = 128,
 			UInt = 512, UInt2 = 513, UInt3 = 514, UInt4 = 515,
-			Bool
 		};
 		int SizeofBaseType(ILBaseType type);
 		int RoundToAlignment(int offset, int alignment);
@@ -3591,6 +3614,7 @@ namespace Spire
 			}
 			virtual void Accept(InstructionVisitor * visitor) override;
 		};
+
 		class MemberUpdateInstruction : public ILInstruction
 		{
 		public:
@@ -3710,8 +3734,9 @@ namespace Spire
 					return BodyCode.Ptr();
 				return nullptr;
 			}
-			//__DEBUG__
-			virtual String ToString()override {
+
+			virtual String ToString() override
+			{
 				StringBuilder sb;
 				sb << L"for (; " << ConditionCode->ToString() << L"; ";
 				sb << SideEffectCode->ToString() << L")" << EndLine;
@@ -3740,8 +3765,9 @@ namespace Spire
 					return FalseCode.Ptr();
 				return nullptr;
 			}
-			//__DEBUG__
-			virtual String ToString()override {
+
+			virtual String ToString() override
+			{
 				StringBuilder sb;
 				sb << L"if (" << Operand->ToString() << L")" << EndLine;
 				sb << L"{" << EndLine;
@@ -3773,8 +3799,9 @@ namespace Spire
 					return BodyCode.Ptr();
 				return nullptr;
 			}
-			//__DEBUG__
-			virtual String ToString() override {
+
+			virtual String ToString() override
+			{
 				StringBuilder sb;
 				sb << L"while (" << ConditionCode->ToString() << L")" << EndLine;
 				sb << L"{" << EndLine;
@@ -3799,8 +3826,9 @@ namespace Spire
 					return BodyCode.Ptr();
 				return nullptr;
 			}
-			//__DEBUG__
-			virtual String ToString() override {
+
+			virtual String ToString() override
+			{
 				StringBuilder sb;
 				sb << L"{" << EndLine;
 				sb << BodyCode->ToString();
@@ -3817,8 +3845,9 @@ namespace Spire
 			{
 				Operand = op;
 			}
-			//__DEBUG__
-			virtual String ToString() override {
+
+			virtual String ToString() override
+			{
 				return L"return " + Operand->ToString() + L";";
 			}
 		};
@@ -3991,8 +4020,13 @@ namespace Spire
 			bool IsAbstract = false;
 			ShaderSyntaxNode * SyntaxNode = nullptr;
 			PipelineSymbol * Pipeline = nullptr;
-		
+
+			// components that are functions, they are also listed in Components, index by original names
+			EnumerableDictionary<String, List<RefPtr<ShaderComponentSymbol>>> FunctionComponents; 
+			
+			// all components in this shader, function components are indexed by their unique names
 			EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>> Components;
+
 			List<ShaderComponentSymbol*> GetComponentDependencyOrder();
 			EnumerableHashSet<ShaderSymbol*> DependentShaders;
 			List<ShaderUsing> ShaderUsings;
@@ -4050,6 +4084,7 @@ namespace Spire
 			PipelineSyntaxNode * SyntaxNode;
 			EnumerableDictionary<String, List<RefPtr<ImportOperatorDefSyntaxNode>>> ImportOperators;
 			EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>> Components;
+			EnumerableDictionary<String, List<RefPtr<ShaderComponentSymbol>>> FunctionComponents;
 			EnumerableDictionary<String, EnumerableHashSet<String>> ReachableWorlds, ImplicitlyReachableWorlds;
 			EnumerableDictionary<String, EnumerableHashSet<String>> WorldDependency, ImplicitWorldDependency;
 			EnumerableDictionary<String, WorldSymbol> Worlds;
@@ -4076,7 +4111,8 @@ namespace Spire
 		class SymbolTable
 		{
 		public:
-			EnumerableDictionary<String, RefPtr<FunctionSymbol>> Functions;
+			EnumerableDictionary<String, List<RefPtr<FunctionSymbol>>> FunctionOverloads; // indexed by original name
+			EnumerableDictionary<String, RefPtr<FunctionSymbol>> Functions; // indexed by internal name
 			EnumerableDictionary<String, RefPtr<ShaderSymbol>> Shaders;
 			EnumerableDictionary<String, RefPtr<PipelineSymbol>> Pipelines;
 			EnumerableDictionary<String, RefPtr<StructSymbol>> Structs;
@@ -4162,6 +4198,7 @@ namespace Spire
 			ILConstOperand * CreateConstant(float val, float val1);
 			ILConstOperand * CreateConstant(float val, float val1, float val2);
 			ILConstOperand * CreateConstant(float val, float val1, float val2, float val3);
+			ILConstOperand * CreateConstant(bool b);
 			ILOperand * CreateDefaultValue(ILType * type);
 			ILUndefinedOperand * GetUndefinedOperand();
 			ConstantPool();
@@ -4225,7 +4262,7 @@ namespace Spire
 		public:
 			RefPtr<ConstantPool> ConstantPool = new Compiler::ConstantPool();
 			List<RefPtr<ILShader>> Shaders;
-			List<RefPtr<ILFunction>> Functions;
+			EnumerableDictionary<String, RefPtr<ILFunction>> Functions;
 			List<RefPtr<ILStructType>> Structs;
 		};
 
@@ -4888,6 +4925,7 @@ namespace Spire
 				typeNames.Add(L"float4x4");
 				typeNames.Add(L"half3x3");
 				typeNames.Add(L"half4x4");
+				typeNames.Add(L"Texture2D");
 				typeNames.Add(L"sampler2D");
 				typeNames.Add(L"sampler2DShadow");
 				typeNames.Add(L"samplerCube");

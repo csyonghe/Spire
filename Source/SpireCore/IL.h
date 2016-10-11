@@ -22,8 +22,8 @@ namespace Spire
 			TextureShadow = 49,
 			TextureCube = 50,
 			TextureCubeShadow = 51,
+			Bool = 128,
 			UInt = 512, UInt2 = 513, UInt3 = 514, UInt4 = 515,
-			Bool
 		};
 		int SizeofBaseType(ILBaseType type);
 		int RoundToAlignment(int offset, int alignment);
@@ -2242,6 +2242,7 @@ namespace Spire
 			}
 			virtual void Accept(InstructionVisitor * visitor) override;
 		};
+
 		class MemberUpdateInstruction : public ILInstruction
 		{
 		public:
@@ -2361,8 +2362,9 @@ namespace Spire
 					return BodyCode.Ptr();
 				return nullptr;
 			}
-			//__DEBUG__
-			virtual String ToString()override {
+
+			virtual String ToString() override
+			{
 				StringBuilder sb;
 				sb << L"for (; " << ConditionCode->ToString() << L"; ";
 				sb << SideEffectCode->ToString() << L")" << EndLine;
@@ -2391,8 +2393,9 @@ namespace Spire
 					return FalseCode.Ptr();
 				return nullptr;
 			}
-			//__DEBUG__
-			virtual String ToString()override {
+
+			virtual String ToString() override
+			{
 				StringBuilder sb;
 				sb << L"if (" << Operand->ToString() << L")" << EndLine;
 				sb << L"{" << EndLine;
@@ -2424,8 +2427,9 @@ namespace Spire
 					return BodyCode.Ptr();
 				return nullptr;
 			}
-			//__DEBUG__
-			virtual String ToString() override {
+
+			virtual String ToString() override
+			{
 				StringBuilder sb;
 				sb << L"while (" << ConditionCode->ToString() << L")" << EndLine;
 				sb << L"{" << EndLine;
@@ -2450,8 +2454,9 @@ namespace Spire
 					return BodyCode.Ptr();
 				return nullptr;
 			}
-			//__DEBUG__
-			virtual String ToString() override {
+
+			virtual String ToString() override
+			{
 				StringBuilder sb;
 				sb << L"{" << EndLine;
 				sb << BodyCode->ToString();
@@ -2468,8 +2473,9 @@ namespace Spire
 			{
 				Operand = op;
 			}
-			//__DEBUG__
-			virtual String ToString() override {
+
+			virtual String ToString() override
+			{
 				return L"return " + Operand->ToString() + L";";
 			}
 		};

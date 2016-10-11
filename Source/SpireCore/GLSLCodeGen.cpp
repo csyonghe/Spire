@@ -182,6 +182,8 @@ namespace Spire
 						ctx.Body << makeFloat(c->FloatValues[0]);
 					else if (type->IsInt())
 						ctx.Body << (c->IntValues[0]);
+					else if (type->IsBool())
+						ctx.Body << ((c->IntValues[0] != 0) ? L"true" : L"false");
 					else if (auto baseType = dynamic_cast<ILBasicType*>(type))
 					{
 						if (baseType->Type == ILBaseType::Float2)
@@ -974,13 +976,16 @@ namespace Spire
 						refFuncs.Add(func);
 				for (auto & func : program->Functions)
 				{
-					if (refFuncs.Contains(func->Name))
-						GenerateFunctionDeclaration(sb, func.Ptr());
+					if (refFuncs.Contains(func.Value->Name))
+					{
+						GenerateFunctionDeclaration(sb, func.Value.Ptr());
+						sb << L";\n";
+					}
 				}
 				for (auto & func : program->Functions)
 				{
-					if (refFuncs.Contains(func->Name))
-						sb << GenerateFunction(func.Ptr());
+					if (refFuncs.Contains(func.Value->Name))
+						sb << GenerateFunction(func.Value.Ptr());
 				}
 			}
 
@@ -1237,6 +1242,7 @@ namespace Spire
 
 			StageSource GenerateSingleWorldShader(ILProgram * program, ILShader * shader, ILStage * stage)
 			{
+				useBindlessTexture = stage->Attributes.ContainsKey(L"BindlessTexture");
 				StageSource rs;
 				CodeGenContext ctx;
 				GenerateHeader(ctx.GlobalHeader, stage);
@@ -1306,6 +1312,8 @@ namespace Spire
 
 			StageSource GenerateHullShader(ILProgram * program, ILShader * shader, ILStage * stage)
 			{
+				useBindlessTexture = stage->Attributes.ContainsKey(L"BindlessTexture");
+
 				StageSource rs;
 				StageAttribute patchWorldName, controlPointWorldName, cornerPointWorldName, domain, innerLevel, outterLevel, numControlPoints;
 				RefPtr<ILWorld> patchWorld, controlPointWorld, cornerPointWorld;
@@ -1453,6 +1461,7 @@ namespace Spire
 
 			void GenerateFunctionDeclaration(StringBuilder & sbCode, ILFunction * function)
 			{
+				function->Code->NameAllInstructions();
 				auto retType = function->ReturnType.Ptr();
 				if (retType)
 					PrintType(sbCode, retType);

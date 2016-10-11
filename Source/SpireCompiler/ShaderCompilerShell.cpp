@@ -1,6 +1,5 @@
 ﻿#include "CoreLib/LibIO.h"
 #include "SpireLib.h"
-#include <fstream>
 
 using namespace CoreLib::Basic;
 using namespace CoreLib::IO;
@@ -21,6 +20,8 @@ int wmain(int argc, wchar_t* argv[])
 				options.SymbolToCompile = argv[i + 1];
 			else if (String(argv[i]) == L"-schedule")
 				options.ScheduleFileName = argv[i + 1];
+			else if (String(argv[i]) == L"-backend")
+				options.Target = (String(argv[i + 1]) == L"glsl") ? CodeGenTarget::GLSL : CodeGenTarget::SPIRV;
 		}
 		if (String(argv[i]) == L"-genchoice")
 			options.Mode = CompilerMode::GenerateChoice;

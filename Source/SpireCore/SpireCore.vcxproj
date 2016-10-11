@@ -395,6 +395,7 @@
     <ClCompile Include="GLSLCodeGen.cpp" />
     <ClCompile Include="InsertImplicitImportOperator.cpp" />
     <ClCompile Include="KeyHoleMatching.cpp" />
+    <ClCompile Include="NewSpirVCodeGen.cpp" />
     <ClCompile Include="Schedule.cpp" />
     <ClCompile Include="IL.cpp" />
     <ClCompile Include="Lexer.cpp" />

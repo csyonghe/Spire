@@ -211,10 +211,16 @@ namespace Spire
 					if (LookAheadToken(L"inline") || (LookAheadToken(L"public") && !LookAheadToken(L"using", 1)) ||
 						LookAheadToken(L"out") || LookAheadToken(L"@") || IsTypeKeyword()
 						|| LookAheadToken(L"[") || LookAheadToken(L"require") || LookAheadToken(L"extern"))
-						shader->Members.Add(ParseComponent());
+					{
+						auto comp = ParseComponent();
+						comp->ParentModuleName = shader->Name;
+						shader->Members.Add(comp);
+					}
 					else if (LookAheadToken(L"using") || (LookAheadToken(L"public") && LookAheadToken(L"using", 1)))
 					{
-						shader->Members.Add(ParseImport());
+						auto imp = ParseImport();
+						imp->ParentModuleName = shader->Name;
+						shader->Members.Add(imp);
 					}
 					else
 					{
@@ -281,6 +287,7 @@ namespace Spire
 			RefPtr<StageSyntaxNode> stage = new StageSyntaxNode();
 			ReadToken(L"stage");
 			stage->Name = ReadToken(TokenType::Identifier);
+			FillPosition(stage.Ptr());
 			ReadToken(TokenType::Colon);
 			stage->StageType = ReadToken(TokenType::Identifier);
 			ReadToken(TokenType::LBrace);
@@ -303,6 +310,7 @@ namespace Spire
 		RefPtr<ComponentSyntaxNode> Parser::ParseComponent()
 		{
 			RefPtr<ComponentSyntaxNode> component = new ComponentSyntaxNode();
+			PushScope();
 			component->LayoutAttributes = ParseAttribute();
 			while (LookAheadToken(L"inline") || LookAheadToken(L"out") || LookAheadToken(L"require") || LookAheadToken(L"public") ||
 				LookAheadToken(L"extern"))
@@ -345,18 +353,32 @@ namespace Spire
 				ReadToken(L":");
 				component->AlternateName = ReadToken(TokenType::Identifier);
 			}
-			if (!component->IsParam && LookAheadToken(TokenType::OpAssign))
+			if (LookAheadToken(TokenType::LParent))
+			{
+				ReadToken(TokenType::LParent);
+				while (!LookAheadToken(TokenType::RParent))
+				{
+					component->Parameters.Add(ParseParameter());
+					if (LookAheadToken(TokenType::Comma))
+						ReadToken(TokenType::Comma);
+					else
+						break;
+				}
+				ReadToken(TokenType::RParent);
+			}
+			if (LookAheadToken(TokenType::OpAssign))
 			{
 				ReadToken(TokenType::OpAssign);
 				component->Expression = ParseExpression();
 				ReadToken(TokenType::Semicolon);
 			}
-			else if (!component->IsParam && LookAheadToken(TokenType::LBrace))
+			else if (LookAheadToken(TokenType::LBrace))
 			{
 				component->BlockStatement = ParseBlockStatement();
 			}
 			else
 				ReadToken(TokenType::Semicolon);
+			PopScope();
 			return component;
 		}
 
@@ -1183,6 +1205,15 @@ namespace Spire
 				}
 				rs = constExpr;
 			}
+			else if (LookAheadToken(L"true") || LookAheadToken(L"false"))
+			{
+				RefPtr<ConstantExpressionSyntaxNode> constExpr = new ConstantExpressionSyntaxNode();
+				auto token = tokens[pos++];
+				FillPosition(constExpr.Ptr());
+				constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Bool;
+				constExpr->IntValue = token.Content == L"true" ? 1 : 0;
+				rs = constExpr;
+			}
 			else if (LookAheadToken(TokenType::Identifier))
 			{
 				RefPtr<VarExpressionSyntaxNode> varExpr = new VarExpressionSyntaxNode();
@@ -1230,11 +1261,7 @@ namespace Spire
 				else if (LookAheadToken(TokenType::LParent))
 				{
 					RefPtr<InvokeExpressionSyntaxNode> invokeExpr = new InvokeExpressionSyntaxNode();
-					invokeExpr->FunctionExpr = rs.As<VarExpressionSyntaxNode>();
-					if (!invokeExpr->FunctionExpr)
-					{
-						errors.Add(CompileError(L"syntax error.", 20002, tokens[pos].Position));
-					}
+					invokeExpr->FunctionExpr = rs;
 					FillPosition(invokeExpr.Ptr());
 					ReadToken(TokenType::LParent);
 					while (pos < tokens.Count())
