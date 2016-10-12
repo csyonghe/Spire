@@ -182,15 +182,94 @@ namespace Spire
 			return CreateShaderClosure(err, symTable, shader, shader->SyntaxNode->Position, nullptr, Dictionary<String, RefPtr<ShaderComponentSymbol>>());
 		}
 
-
-		class ResolveDependencyVisitor : public SyntaxVisitor
+		class ReplaceReferenceVisitor : public SyntaxVisitor
 		{
 		private:
 			ShaderClosure * shaderClosure = nullptr;
 			ShaderComponentSymbol * currentComponent = nullptr;
 			ImportExpressionSyntaxNode * currentImport = nullptr;
+			void ReplaceReference(RefPtr<StringObject> refComp)
+			{
+				String targetComp;
+				if (replacements.TryGetValue(refComp->Content, targetComp))
+				{
+					auto oldComp = shaderClosure->AllComponents[refComp->Content]();
+					auto newComp = shaderClosure->AllComponents[targetComp]();
+					newComp->UserComponents.Add(currentComponent);
+					if (auto * importOps = currentComponent->DependentComponents.TryGetValue(newComp))
+						importOps->Add(currentImport);
+					else
+					{
+						EnumerableHashSet<RefPtr<ImportExpressionSyntaxNode>> op;
+						op.Add(currentImport);
+						currentComponent->DependentComponents.Add(newComp, op);
+					}
+					currentComponent->DependentComponents.Remove(oldComp);
+					if (auto * importOps = currentImpl->DependentComponents.TryGetValue(newComp))
+						importOps->Add(currentImport);
+					else
+					{
+						EnumerableHashSet<RefPtr<ImportExpressionSyntaxNode>> op;
+						op.Add(currentImport);
+						currentImpl->DependentComponents.Add(newComp, op);
+					}
+					currentImpl->DependentComponents.Remove(oldComp);
+					currentImpl->ComponentReferencePositions[newComp] = currentImpl->ComponentReferencePositions[oldComp]();
+					refComp->Content = newComp->UniqueName;
+				}
+			}
+		public:
+			ShaderComponentImplSymbol * currentImpl = nullptr;
+			EnumerableDictionary<String, String> & replacements;
+			ReplaceReferenceVisitor(ShaderClosure * closure, ShaderComponentSymbol * comp, EnumerableDictionary<String, String> &pReplacements)
+				: SyntaxVisitor(nullptr), shaderClosure(closure), currentComponent(comp), replacements(pReplacements)
+			{}
+
+			RefPtr<ExpressionSyntaxNode> VisitImportExpression(ImportExpressionSyntaxNode * import) override
+			{
+				currentImport = import;
+				import->Component->Accept(this);
+				if (import->Component->Tags.ContainsKey(L"ComponentReference"))
+				{
+					import->ComponentUniqueName = import->Component->Tags[L"ComponentReference"]().As<StringObject>()->Content;
+				}
+				currentImport = nullptr;
+				for (auto & arg : import->Arguments)
+					arg->Accept(this);
+				return import;
+			}
+
+			RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode * var) override
+			{
+				RefPtr<Object> compRef;
+				if (var->Tags.TryGetValue(L"ComponentReference", compRef))
+				{
+					ReplaceReference(compRef.As<StringObject>());
+				}
+				return var;
+			}
+
+			RefPtr<ExpressionSyntaxNode> VisitMemberExpression(MemberExpressionSyntaxNode * member) override
+			{
+				member->BaseExpression->Accept(this);
+				RefPtr<Object> compRef;
+				if (member->Tags.TryGetValue(L"ComponentReference", compRef))
+				{
+					ReplaceReference(compRef.As<StringObject>());
+				}
+				return member;
+			}
+		};
+
+		class ResolveDependencyVisitor : public SyntaxVisitor
+		{
+		private:
+			ShaderClosure * shaderClosure = nullptr, *rootShader = nullptr;
+			ShaderComponentSymbol * currentComponent = nullptr;
+			ImportExpressionSyntaxNode * currentImport = nullptr;
 			void AddReference(ShaderComponentSymbol * referee, ImportExpressionSyntaxNode * importOp, CodePosition pos)
 			{
+				rootShader->AllComponents.TryGetValue(referee->UniqueName, referee);
 				referee->UserComponents.Add(currentComponent);
 				if (auto * importOps = currentComponent->DependentComponents.TryGetValue(referee))
 					importOps->Add(importOp);
@@ -214,8 +293,8 @@ namespace Spire
 		public:
 			ShaderComponentImplSymbol * currentImpl = nullptr;
 
-			ResolveDependencyVisitor(ErrorWriter * err, ShaderClosure * closure, ShaderComponentSymbol * comp)
-				: SyntaxVisitor(err), shaderClosure(closure), currentComponent(comp)
+			ResolveDependencyVisitor(ErrorWriter * err, ShaderClosure * pRootShader, ShaderClosure * closure, ShaderComponentSymbol * comp)
+				: SyntaxVisitor(err), rootShader(pRootShader), shaderClosure(closure), currentComponent(comp)
 			{}
 
 			RefPtr<ExpressionSyntaxNode> VisitImportExpression(ImportExpressionSyntaxNode * import) override
@@ -306,11 +385,11 @@ namespace Spire
 			}
 		};
 
-		void ResolveReference(ErrorWriter * err, ShaderClosure* shader)
+		void ResolveReference(ErrorWriter * err, ShaderClosure * rootShader, ShaderClosure* shader)
 		{
 			for (auto & comp : shader->Components)
 			{
-				ResolveDependencyVisitor depVisitor(err, shader, comp.Value.Ptr());
+				ResolveDependencyVisitor depVisitor(err, rootShader, shader, comp.Value.Ptr());
 				for (auto & impl : comp.Value->Implementations)
 				{
 					depVisitor.currentImpl = impl.Ptr();
@@ -318,7 +397,24 @@ namespace Spire
 				}
 			}
 			for (auto & subClosure : shader->SubClosures)
-				ResolveReference(err, subClosure.Value.Ptr());
+				ResolveReference(err, rootShader, subClosure.Value.Ptr());
+		}
+
+		void ReplaceReference(ShaderClosure * shader, EnumerableDictionary<String, String> & replacements)
+		{
+			for (auto & comp : shader->AllComponents)
+			{
+				ReplaceReferenceVisitor replaceVisitor(shader, comp.Value, replacements);
+				for (auto & impl : comp.Value->Implementations)
+				{
+					replaceVisitor.currentImpl = impl.Ptr();
+					impl->SyntaxNode->Accept(&replaceVisitor);
+				}
+			}
+			for (auto & rep : replacements)
+			{
+				shader->AllComponents[rep.Key]()->UserComponents.Clear();
+			}
 		}
 
 		String GetUniqueCodeName(String name)
@@ -401,22 +497,11 @@ namespace Spire
 						}
 						else
 						{
-							for (auto & user : existingComp->UserComponents)
-							{
-								user->DependentComponents.Add(comp.Value.Ptr(), user->DependentComponents[existingComp]());
-								user->DependentComponents.Remove(existingComp);
-								for (auto & impl : user->Implementations)
-									if (impl->DependentComponents.ContainsKey(existingComp))
-									{
-										impl->DependentComponents.Add(comp.Value.Ptr(), impl->DependentComponents[existingComp]());
-										impl->DependentComponents.Remove(existingComp);
-									}
-							}
 							err->Warning(34026, L"'" + existingComp->Name + L"': component is already defined when compiling shader '" + closure->Name + L"'. use 'require' to declare it as a parameter. \nsee previous declaration at " + existingComp->Implementations.First()->SyntaxNode->Position.ToString(),
 								comp.Value->Implementations.First()->SyntaxNode->Position);
 						}
 					}
-					else
+					else if (comp.Value->Implementations.First()->SyntaxNode->Parameters.Count() == 0)
 					{
 						StringBuilder errBuilder;
 						errBuilder << L"component named '" << comp.Value->UniqueKey << L"\' is already defined when compiling '" << closure->Name << L"'.";
@@ -627,19 +712,55 @@ namespace Spire
 			}
 		}
 
+		void RemoveTrivialComponents(ShaderClosure * shader)
+		{
+			// remove trivial components, e.g. if A = B, replace all references to A with B.
+			// this is not just an optimization, it is also critical for CodeGen because 
+			// code gen does not support components that returns another function component or sampler2D etc.
+			// i.e. function/sampler2D components must be referenced directly.
+			EnumerableDictionary<String, String> compSub;
+			for (auto & comp : shader->AllComponents)
+			{
+				if (comp.Value->Implementations.Count() == 1 &&
+					comp.Value->Implementations.First()->SyntaxNode->Expression &&
+					!comp.Value->Implementations.First()->SyntaxNode->IsOutput)
+				{
+					RefPtr<Object> compRef;
+					if (comp.Value->Implementations.First()->SyntaxNode->Expression->Tags.TryGetValue(L"ComponentReference", compRef))
+					{
+						compSub[comp.Key] = compRef.As<StringObject>()->Content;
+					}
+				}
+			}
+			EnumerableDictionary<String, String> replacements;
+			for (auto & replace : compSub)
+			{
+				// search transitively for replaceDest;
+				String replaceDest = replace.Key;
+				while (compSub.ContainsKey(replaceDest))
+					replaceDest = compSub[replaceDest]();
+				if (replace.Key != replaceDest)
+					replacements[replace.Key] = replaceDest;
+			}
+			ReplaceReference(shader, replacements);
+			for (auto & r : replacements)
+				shader->AllComponents.Remove(r.Key);
+		}
+
 		void FlattenShaderClosure(ErrorWriter * err, ShaderClosure * shader)
 		{
 			// add input(extern) components from pipeline
 			AddPipelineComponents(shader);
 			// assign choice names
 			AssignUniqueNames(shader, L"", L"");
-
-			ResolveReference(err, shader);
 			// traverse closures to get component list
 			GatherComponents(err, shader, shader);
+
+			ResolveReference(err, shader, shader);
 			// propagate world constraints
 			if (CheckCircularReference(err, shader))
 				return;
+			RemoveTrivialComponents(shader);
 			SolveWorldConstraints(err, shader);
 			// check pipeline constraints
 			for (auto & requirement : shader->Pipeline->Components)
@@ -7579,16 +7700,50 @@ namespace Spire
 							arg->ArgumentName.Position = arg->Position;
 						}
 						position++;
-						arg->Accept(this);
 						RefPtr<ShaderComponentSymbol> refComp;
 						if (refShader->Components.TryGetValue(arg->ArgumentName.Content, refComp))
 						{
-							if (!refComp->Type->DataType->Equals(arg->Expression->Type.Ptr()))
+							if (refComp->Implementations.First()->SyntaxNode->Parameters.Count()) // this is a function parameter
 							{
-								Error(33027, L"argument type (" + arg->Expression->Type->ToString() + L") does not match parameter type (" + refComp->Type->DataType->ToString() + L")", arg->Expression.Ptr());
+								// construct an invocation node to resolve overloaded component function
+								RefPtr<InvokeExpressionSyntaxNode> tempInvoke = new InvokeExpressionSyntaxNode();
+								tempInvoke->Position = arg->Position;
+								tempInvoke->Scope = arg->Scope;
+								tempInvoke->FunctionExpr = arg->Expression;
+								for (auto & param : refComp->Implementations.First()->SyntaxNode->Parameters)
+								{
+									RefPtr<VarExpressionSyntaxNode> tempArg = new VarExpressionSyntaxNode();
+									tempArg->Type = param->Type;
+									tempInvoke->Arguments.Add(tempArg);
+								}
+								auto resolvedExpr = ResolveInvoke(tempInvoke.Ptr());
+								if (auto resolveInvoke = resolvedExpr.As<InvokeExpressionSyntaxNode>())
+								{
+									auto funcType = resolveInvoke->FunctionExpr->Type->AsBasicType();
+									if (funcType->Component)
+									{
+										// modify function name to resolved name
+										if (auto memberExpr = arg->Expression.As<MemberExpressionSyntaxNode>())
+											memberExpr->MemberName = funcType->Component->Name;
+										else if (auto varExpr = arg->Expression.As<VarExpressionSyntaxNode>())
+											varExpr->Variable = funcType->Component->Name;
+									}
+									else
+										Error(33042, L"ordinary functions not allowed as argument to function-typed module parameter.", arg.Ptr());
+								}
+								else
+									Error(33041, L"invalid value for argument '" + arg->ArgumentName.Content, arg.Ptr());
 							}
-							if (!refComp->IsParam())
-								Error(33028, L"'" + arg->ArgumentName.Content + L"' is not a parameter of '" + import->ShaderName.Content + L"'.", arg->ArgumentName);
+							else
+							{
+								arg->Accept(this);
+								if (!refComp->Type->DataType->Equals(arg->Expression->Type.Ptr()))
+								{
+									Error(33027, L"argument type (" + arg->Expression->Type->ToString() + L") does not match parameter type (" + refComp->Type->DataType->ToString() + L")", arg->Expression.Ptr());
+								}
+								if (!refComp->IsParam())
+									Error(33028, L"'" + arg->ArgumentName.Content + L"' is not a parameter of '" + import->ShaderName.Content + L"'.", arg->ArgumentName);
+							}
 						}
 						else
 							Error(33028, L"'" + arg->ArgumentName.Content + L"' is not a parameter of '" + import->ShaderName.Content + L"'.", arg->ArgumentName);
@@ -8614,7 +8769,7 @@ namespace Spire
 			}
 
 			template<typename GetParamFunc, typename PFuncT>
-			PFuncT FindFunctionOverload(const List<PFuncT> & funcs, const GetParamFunc & getParam, List<RefPtr<ExpressionSyntaxNode>> & arguments)
+			PFuncT FindFunctionOverload(const List<PFuncT> & funcs, const GetParamFunc & getParam, const List<RefPtr<ExpressionType>> & arguments)
 			{
 				int bestMatchConversions = 1 << 30;
 				PFuncT func = nullptr;
@@ -8627,7 +8782,7 @@ namespace Spire
 						bool match = true;
 						for (int i = 0; i < arguments.Count(); i++)
 						{
-							auto argType = arguments[i]->Type;
+							auto argType = arguments[i];
 							auto paramType = params[i]->Type;
 							if (argType->Equals(paramType.Ptr()))
 								continue;
@@ -8652,9 +8807,9 @@ namespace Spire
 				return func;
 			}
 
-			ShaderComponentSymbol * ResolveFunctionComponent(ShaderSymbol * shader, String name, List<RefPtr<ExpressionSyntaxNode>> & args, bool topLevel = true)
+			ShaderComponentSymbol * ResolveFunctionComponent(ShaderSymbol * shader, String name, const List<RefPtr<ExpressionType>> & args, bool topLevel = true)
 			{
-				auto list = currentShader->FunctionComponents.TryGetValue(name);
+				auto list = shader->FunctionComponents.TryGetValue(name);
 				if (list)
 				{
 					auto func = FindFunctionOverload(*list, [](RefPtr<ShaderComponentSymbol> & comp)
@@ -8676,6 +8831,11 @@ namespace Spire
 					}
 				}
 				return nullptr;
+			}
+
+			ShaderComponentSymbol * ResolveFunctionComponent(ShaderSymbol * shader, String name, const List<RefPtr<ExpressionSyntaxNode>> & args, bool topLevel = true)
+			{
+				return ResolveFunctionComponent(shader, name, AsQueryable(args).Select([](RefPtr<ExpressionSyntaxNode> x) {return x->Type; }).ToList(), topLevel);
 			}
 
 			RefPtr<ExpressionSyntaxNode> ResolveFunctionOverload(InvokeExpressionSyntaxNode * invoke, MemberExpressionSyntaxNode* memberExpr, List<RefPtr<ExpressionSyntaxNode>> & arguments)
@@ -8738,7 +8898,7 @@ namespace Spire
 							for (int i = 1; i < imp->Parameters.Count(); i++)
 								params.Add(imp->Parameters[i]);
 							return params;
-						}, arguments);
+						}, AsQueryable(arguments).Select([](RefPtr<ExpressionSyntaxNode> x) {return x->Type; }).ToList());
 						if (func)
 						{
 							RefPtr<ImportExpressionSyntaxNode> importExpr = new ImportExpressionSyntaxNode();
@@ -8818,7 +8978,7 @@ namespace Spire
 						func = FindFunctionOverload(*functionOverloads, [](RefPtr<FunctionSymbol> f)
 						{
 							return f->SyntaxNode->Parameters;
-						}, arguments);
+						}, AsQueryable(arguments).Select([](RefPtr<ExpressionSyntaxNode> x) {return x->Type; }).ToList());
 						functionNameFound = true;
 					}
 				}
@@ -8855,11 +9015,8 @@ namespace Spire
 				return invoke;
 			}
 
-			virtual RefPtr<ExpressionSyntaxNode> VisitInvokeExpression(InvokeExpressionSyntaxNode *expr) override
+			RefPtr<ExpressionSyntaxNode> ResolveInvoke(InvokeExpressionSyntaxNode * expr)
 			{
-				for (auto & arg : expr->Arguments)
-					arg = arg->Accept(this).As<ExpressionSyntaxNode>();
-
 				if (auto varExpr = expr->FunctionExpr.As<VarExpressionSyntaxNode>())
 				{
 					return ResolveFunctionOverload(expr, varExpr.Ptr(), expr->Arguments);
@@ -8874,6 +9031,14 @@ namespace Spire
 					expr->Type = ExpressionType::Error;
 				}
 				return expr;
+			}
+
+			virtual RefPtr<ExpressionSyntaxNode> VisitInvokeExpression(InvokeExpressionSyntaxNode *expr) override
+			{
+				for (auto & arg : expr->Arguments)
+					arg = arg->Accept(this).As<ExpressionSyntaxNode>();
+
+				return ResolveInvoke(expr);
 			}
 
 			String OperatorToString(Operator op)

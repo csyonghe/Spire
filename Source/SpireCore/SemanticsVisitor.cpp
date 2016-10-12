@@ -406,16 +406,50 @@ namespace Spire
 							arg->ArgumentName.Position = arg->Position;
 						}
 						position++;
-						arg->Accept(this);
 						RefPtr<ShaderComponentSymbol> refComp;
 						if (refShader->Components.TryGetValue(arg->ArgumentName.Content, refComp))
 						{
-							if (!refComp->Type->DataType->Equals(arg->Expression->Type.Ptr()))
+							if (refComp->Implementations.First()->SyntaxNode->Parameters.Count()) // this is a function parameter
 							{
-								Error(33027, L"argument type (" + arg->Expression->Type->ToString() + L") does not match parameter type (" + refComp->Type->DataType->ToString() + L")", arg->Expression.Ptr());
+								// construct an invocation node to resolve overloaded component function
+								RefPtr<InvokeExpressionSyntaxNode> tempInvoke = new InvokeExpressionSyntaxNode();
+								tempInvoke->Position = arg->Position;
+								tempInvoke->Scope = arg->Scope;
+								tempInvoke->FunctionExpr = arg->Expression;
+								for (auto & param : refComp->Implementations.First()->SyntaxNode->Parameters)
+								{
+									RefPtr<VarExpressionSyntaxNode> tempArg = new VarExpressionSyntaxNode();
+									tempArg->Type = param->Type;
+									tempInvoke->Arguments.Add(tempArg);
+								}
+								auto resolvedExpr = ResolveInvoke(tempInvoke.Ptr());
+								if (auto resolveInvoke = resolvedExpr.As<InvokeExpressionSyntaxNode>())
+								{
+									auto funcType = resolveInvoke->FunctionExpr->Type->AsBasicType();
+									if (funcType->Component)
+									{
+										// modify function name to resolved name
+										if (auto memberExpr = arg->Expression.As<MemberExpressionSyntaxNode>())
+											memberExpr->MemberName = funcType->Component->Name;
+										else if (auto varExpr = arg->Expression.As<VarExpressionSyntaxNode>())
+											varExpr->Variable = funcType->Component->Name;
+									}
+									else
+										Error(33042, L"ordinary functions not allowed as argument to function-typed module parameter.", arg.Ptr());
+								}
+								else
+									Error(33041, L"invalid value for argument '" + arg->ArgumentName.Content, arg.Ptr());
 							}
-							if (!refComp->IsParam())
-								Error(33028, L"'" + arg->ArgumentName.Content + L"' is not a parameter of '" + import->ShaderName.Content + L"'.", arg->ArgumentName);
+							else
+							{
+								arg->Accept(this);
+								if (!refComp->Type->DataType->Equals(arg->Expression->Type.Ptr()))
+								{
+									Error(33027, L"argument type (" + arg->Expression->Type->ToString() + L") does not match parameter type (" + refComp->Type->DataType->ToString() + L")", arg->Expression.Ptr());
+								}
+								if (!refComp->IsParam())
+									Error(33028, L"'" + arg->ArgumentName.Content + L"' is not a parameter of '" + import->ShaderName.Content + L"'.", arg->ArgumentName);
+							}
 						}
 						else
 							Error(33028, L"'" + arg->ArgumentName.Content + L"' is not a parameter of '" + import->ShaderName.Content + L"'.", arg->ArgumentName);
@@ -1441,7 +1475,7 @@ namespace Spire
 			}
 
 			template<typename GetParamFunc, typename PFuncT>
-			PFuncT FindFunctionOverload(const List<PFuncT> & funcs, const GetParamFunc & getParam, List<RefPtr<ExpressionSyntaxNode>> & arguments)
+			PFuncT FindFunctionOverload(const List<PFuncT> & funcs, const GetParamFunc & getParam, const List<RefPtr<ExpressionType>> & arguments)
 			{
 				int bestMatchConversions = 1 << 30;
 				PFuncT func = nullptr;
@@ -1454,7 +1488,7 @@ namespace Spire
 						bool match = true;
 						for (int i = 0; i < arguments.Count(); i++)
 						{
-							auto argType = arguments[i]->Type;
+							auto argType = arguments[i];
 							auto paramType = params[i]->Type;
 							if (argType->Equals(paramType.Ptr()))
 								continue;
@@ -1479,9 +1513,9 @@ namespace Spire
 				return func;
 			}
 
-			ShaderComponentSymbol * ResolveFunctionComponent(ShaderSymbol * shader, String name, List<RefPtr<ExpressionSyntaxNode>> & args, bool topLevel = true)
+			ShaderComponentSymbol * ResolveFunctionComponent(ShaderSymbol * shader, String name, const List<RefPtr<ExpressionType>> & args, bool topLevel = true)
 			{
-				auto list = currentShader->FunctionComponents.TryGetValue(name);
+				auto list = shader->FunctionComponents.TryGetValue(name);
 				if (list)
 				{
 					auto func = FindFunctionOverload(*list, [](RefPtr<ShaderComponentSymbol> & comp)
@@ -1503,6 +1537,11 @@ namespace Spire
 					}
 				}
 				return nullptr;
+			}
+
+			ShaderComponentSymbol * ResolveFunctionComponent(ShaderSymbol * shader, String name, const List<RefPtr<ExpressionSyntaxNode>> & args, bool topLevel = true)
+			{
+				return ResolveFunctionComponent(shader, name, AsQueryable(args).Select([](RefPtr<ExpressionSyntaxNode> x) {return x->Type; }).ToList(), topLevel);
 			}
 
 			RefPtr<ExpressionSyntaxNode> ResolveFunctionOverload(InvokeExpressionSyntaxNode * invoke, MemberExpressionSyntaxNode* memberExpr, List<RefPtr<ExpressionSyntaxNode>> & arguments)
@@ -1565,7 +1604,7 @@ namespace Spire
 							for (int i = 1; i < imp->Parameters.Count(); i++)
 								params.Add(imp->Parameters[i]);
 							return params;
-						}, arguments);
+						}, AsQueryable(arguments).Select([](RefPtr<ExpressionSyntaxNode> x) {return x->Type; }).ToList());
 						if (func)
 						{
 							RefPtr<ImportExpressionSyntaxNode> importExpr = new ImportExpressionSyntaxNode();
@@ -1645,7 +1684,7 @@ namespace Spire
 						func = FindFunctionOverload(*functionOverloads, [](RefPtr<FunctionSymbol> f)
 						{
 							return f->SyntaxNode->Parameters;
-						}, arguments);
+						}, AsQueryable(arguments).Select([](RefPtr<ExpressionSyntaxNode> x) {return x->Type; }).ToList());
 						functionNameFound = true;
 					}
 				}
@@ -1682,11 +1721,8 @@ namespace Spire
 				return invoke;
 			}
 
-			virtual RefPtr<ExpressionSyntaxNode> VisitInvokeExpression(InvokeExpressionSyntaxNode *expr) override
+			RefPtr<ExpressionSyntaxNode> ResolveInvoke(InvokeExpressionSyntaxNode * expr)
 			{
-				for (auto & arg : expr->Arguments)
-					arg = arg->Accept(this).As<ExpressionSyntaxNode>();
-
 				if (auto varExpr = expr->FunctionExpr.As<VarExpressionSyntaxNode>())
 				{
 					return ResolveFunctionOverload(expr, varExpr.Ptr(), expr->Arguments);
@@ -1701,6 +1737,14 @@ namespace Spire
 					expr->Type = ExpressionType::Error;
 				}
 				return expr;
+			}
+
+			virtual RefPtr<ExpressionSyntaxNode> VisitInvokeExpression(InvokeExpressionSyntaxNode *expr) override
+			{
+				for (auto & arg : expr->Arguments)
+					arg = arg->Accept(this).As<ExpressionSyntaxNode>();
+
+				return ResolveInvoke(expr);
 			}
 
 			String OperatorToString(Operator op)

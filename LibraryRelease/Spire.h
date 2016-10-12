@@ -137,6 +137,7 @@ namespace Spire
 				ErrorState state;
 				state.ErrorCount = errors.Count();
 				state.WarningCount = warnings.Count();
+				errStack.Add(state);
 			}
 			void PopState()
 			{

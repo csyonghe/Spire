@@ -150,15 +150,94 @@ namespace Spire
 			return CreateShaderClosure(err, symTable, shader, shader->SyntaxNode->Position, nullptr, Dictionary<String, RefPtr<ShaderComponentSymbol>>());
 		}
 
-
-		class ResolveDependencyVisitor : public SyntaxVisitor
+		class ReplaceReferenceVisitor : public SyntaxVisitor
 		{
 		private:
 			ShaderClosure * shaderClosure = nullptr;
 			ShaderComponentSymbol * currentComponent = nullptr;
 			ImportExpressionSyntaxNode * currentImport = nullptr;
+			void ReplaceReference(RefPtr<StringObject> refComp)
+			{
+				String targetComp;
+				if (replacements.TryGetValue(refComp->Content, targetComp))
+				{
+					auto oldComp = shaderClosure->AllComponents[refComp->Content]();
+					auto newComp = shaderClosure->AllComponents[targetComp]();
+					newComp->UserComponents.Add(currentComponent);
+					if (auto * importOps = currentComponent->DependentComponents.TryGetValue(newComp))
+						importOps->Add(currentImport);
+					else
+					{
+						EnumerableHashSet<RefPtr<ImportExpressionSyntaxNode>> op;
+						op.Add(currentImport);
+						currentComponent->DependentComponents.Add(newComp, op);
+					}
+					currentComponent->DependentComponents.Remove(oldComp);
+					if (auto * importOps = currentImpl->DependentComponents.TryGetValue(newComp))
+						importOps->Add(currentImport);
+					else
+					{
+						EnumerableHashSet<RefPtr<ImportExpressionSyntaxNode>> op;
+						op.Add(currentImport);
+						currentImpl->DependentComponents.Add(newComp, op);
+					}
+					currentImpl->DependentComponents.Remove(oldComp);
+					currentImpl->ComponentReferencePositions[newComp] = currentImpl->ComponentReferencePositions[oldComp]();
+					refComp->Content = newComp->UniqueName;
+				}
+			}
+		public:
+			ShaderComponentImplSymbol * currentImpl = nullptr;
+			EnumerableDictionary<String, String> & replacements;
+			ReplaceReferenceVisitor(ShaderClosure * closure, ShaderComponentSymbol * comp, EnumerableDictionary<String, String> &pReplacements)
+				: SyntaxVisitor(nullptr), shaderClosure(closure), currentComponent(comp), replacements(pReplacements)
+			{}
+
+			RefPtr<ExpressionSyntaxNode> VisitImportExpression(ImportExpressionSyntaxNode * import) override
+			{
+				currentImport = import;
+				import->Component->Accept(this);
+				if (import->Component->Tags.ContainsKey(L"ComponentReference"))
+				{
+					import->ComponentUniqueName = import->Component->Tags[L"ComponentReference"]().As<StringObject>()->Content;
+				}
+				currentImport = nullptr;
+				for (auto & arg : import->Arguments)
+					arg->Accept(this);
+				return import;
+			}
+
+			RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode * var) override
+			{
+				RefPtr<Object> compRef;
+				if (var->Tags.TryGetValue(L"ComponentReference", compRef))
+				{
+					ReplaceReference(compRef.As<StringObject>());
+				}
+				return var;
+			}
+
+			RefPtr<ExpressionSyntaxNode> VisitMemberExpression(MemberExpressionSyntaxNode * member) override
+			{
+				member->BaseExpression->Accept(this);
+				RefPtr<Object> compRef;
+				if (member->Tags.TryGetValue(L"ComponentReference", compRef))
+				{
+					ReplaceReference(compRef.As<StringObject>());
+				}
+				return member;
+			}
+		};
+
+		class ResolveDependencyVisitor : public SyntaxVisitor
+		{
+		private:
+			ShaderClosure * shaderClosure = nullptr, *rootShader = nullptr;
+			ShaderComponentSymbol * currentComponent = nullptr;
+			ImportExpressionSyntaxNode * currentImport = nullptr;
 			void AddReference(ShaderComponentSymbol * referee, ImportExpressionSyntaxNode * importOp, CodePosition pos)
 			{
+				rootShader->AllComponents.TryGetValue(referee->UniqueName, referee);
 				referee->UserComponents.Add(currentComponent);
 				if (auto * importOps = currentComponent->DependentComponents.TryGetValue(referee))
 					importOps->Add(importOp);
@@ -182,8 +261,8 @@ namespace Spire
 		public:
 			ShaderComponentImplSymbol * currentImpl = nullptr;
 
-			ResolveDependencyVisitor(ErrorWriter * err, ShaderClosure * closure, ShaderComponentSymbol * comp)
-				: SyntaxVisitor(err), shaderClosure(closure), currentComponent(comp)
+			ResolveDependencyVisitor(ErrorWriter * err, ShaderClosure * pRootShader, ShaderClosure * closure, ShaderComponentSymbol * comp)
+				: SyntaxVisitor(err), rootShader(pRootShader), shaderClosure(closure), currentComponent(comp)
 			{}
 
 			RefPtr<ExpressionSyntaxNode> VisitImportExpression(ImportExpressionSyntaxNode * import) override
@@ -274,11 +353,11 @@ namespace Spire
 			}
 		};
 
-		void ResolveReference(ErrorWriter * err, ShaderClosure* shader)
+		void ResolveReference(ErrorWriter * err, ShaderClosure * rootShader, ShaderClosure* shader)
 		{
 			for (auto & comp : shader->Components)
 			{
-				ResolveDependencyVisitor depVisitor(err, shader, comp.Value.Ptr());
+				ResolveDependencyVisitor depVisitor(err, rootShader, shader, comp.Value.Ptr());
 				for (auto & impl : comp.Value->Implementations)
 				{
 					depVisitor.currentImpl = impl.Ptr();
@@ -286,7 +365,24 @@ namespace Spire
 				}
 			}
 			for (auto & subClosure : shader->SubClosures)
-				ResolveReference(err, subClosure.Value.Ptr());
+				ResolveReference(err, rootShader, subClosure.Value.Ptr());
+		}
+
+		void ReplaceReference(ShaderClosure * shader, EnumerableDictionary<String, String> & replacements)
+		{
+			for (auto & comp : shader->AllComponents)
+			{
+				ReplaceReferenceVisitor replaceVisitor(shader, comp.Value, replacements);
+				for (auto & impl : comp.Value->Implementations)
+				{
+					replaceVisitor.currentImpl = impl.Ptr();
+					impl->SyntaxNode->Accept(&replaceVisitor);
+				}
+			}
+			for (auto & rep : replacements)
+			{
+				shader->AllComponents[rep.Key]()->UserComponents.Clear();
+			}
 		}
 
 		String GetUniqueCodeName(String name)
@@ -369,22 +465,11 @@ namespace Spire
 						}
 						else
 						{
-							for (auto & user : existingComp->UserComponents)
-							{
-								user->DependentComponents.Add(comp.Value.Ptr(), user->DependentComponents[existingComp]());
-								user->DependentComponents.Remove(existingComp);
-								for (auto & impl : user->Implementations)
-									if (impl->DependentComponents.ContainsKey(existingComp))
-									{
-										impl->DependentComponents.Add(comp.Value.Ptr(), impl->DependentComponents[existingComp]());
-										impl->DependentComponents.Remove(existingComp);
-									}
-							}
 							err->Warning(34026, L"'" + existingComp->Name + L"': component is already defined when compiling shader '" + closure->Name + L"'. use 'require' to declare it as a parameter. \nsee previous declaration at " + existingComp->Implementations.First()->SyntaxNode->Position.ToString(),
 								comp.Value->Implementations.First()->SyntaxNode->Position);
 						}
 					}
-					else
+					else if (comp.Value->Implementations.First()->SyntaxNode->Parameters.Count() == 0)
 					{
 						StringBuilder errBuilder;
 						errBuilder << L"component named '" << comp.Value->UniqueKey << L"\' is already defined when compiling '" << closure->Name << L"'.";
@@ -595,19 +680,55 @@ namespace Spire
 			}
 		}
 
+		void RemoveTrivialComponents(ShaderClosure * shader)
+		{
+			// remove trivial components, e.g. if A = B, replace all references to A with B.
+			// this is not just an optimization, it is also critical for CodeGen because 
+			// code gen does not support components that returns another function component or sampler2D etc.
+			// i.e. function/sampler2D components must be referenced directly.
+			EnumerableDictionary<String, String> compSub;
+			for (auto & comp : shader->AllComponents)
+			{
+				if (comp.Value->Implementations.Count() == 1 &&
+					comp.Value->Implementations.First()->SyntaxNode->Expression &&
+					!comp.Value->Implementations.First()->SyntaxNode->IsOutput)
+				{
+					RefPtr<Object> compRef;
+					if (comp.Value->Implementations.First()->SyntaxNode->Expression->Tags.TryGetValue(L"ComponentReference", compRef))
+					{
+						compSub[comp.Key] = compRef.As<StringObject>()->Content;
+					}
+				}
+			}
+			EnumerableDictionary<String, String> replacements;
+			for (auto & replace : compSub)
+			{
+				// search transitively for replaceDest;
+				String replaceDest = replace.Key;
+				while (compSub.ContainsKey(replaceDest))
+					replaceDest = compSub[replaceDest]();
+				if (replace.Key != replaceDest)
+					replacements[replace.Key] = replaceDest;
+			}
+			ReplaceReference(shader, replacements);
+			for (auto & r : replacements)
+				shader->AllComponents.Remove(r.Key);
+		}
+
 		void FlattenShaderClosure(ErrorWriter * err, ShaderClosure * shader)
 		{
 			// add input(extern) components from pipeline
 			AddPipelineComponents(shader);
 			// assign choice names
 			AssignUniqueNames(shader, L"", L"");
-
-			ResolveReference(err, shader);
 			// traverse closures to get component list
 			GatherComponents(err, shader, shader);
+
+			ResolveReference(err, shader, shader);
 			// propagate world constraints
 			if (CheckCircularReference(err, shader))
 				return;
+			RemoveTrivialComponents(shader);
 			SolveWorldConstraints(err, shader);
 			// check pipeline constraints
 			for (auto & requirement : shader->Pipeline->Components)
