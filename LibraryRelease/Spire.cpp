@@ -245,6 +245,8 @@ namespace Spire
 					{
 						if (auto comp = shaderClosure->FindComponent(var->Type->AsBasicType()->Component->Name))
 						{
+							if (comp->Implementations.First()->SyntaxNode->IsParam)
+								shaderClosure->RefMap.TryGetValue(comp->Name, comp);
 							var->Tags[L"ComponentReference"] = new StringObject(comp->UniqueName);
 							AddReference(comp.Ptr(), currentImport, var->Position);
 						}
@@ -1646,7 +1648,7 @@ namespace Spire
 					{
 						auto funcCompName = expr->FunctionExpr->Tags[L"ComponentReference"]().As<StringObject>()->Content;
 						auto funcComp = *(currentShader->DefinitionsByComponent[funcCompName]().TryGetValue(currentComponent->World));
-						funcName = GetComponentFunctionName(basicType->Component->Implementations.First()->SyntaxNode.Ptr());
+						funcName = GetComponentFunctionName(funcComp->SyntaxNode.Ptr());
 						// push additional arguments
 						for (auto & dep : funcComp->Dependency)
 						{

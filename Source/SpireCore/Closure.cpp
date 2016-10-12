@@ -213,6 +213,8 @@ namespace Spire
 					{
 						if (auto comp = shaderClosure->FindComponent(var->Type->AsBasicType()->Component->Name))
 						{
+							if (comp->Implementations.First()->SyntaxNode->IsParam)
+								shaderClosure->RefMap.TryGetValue(comp->Name, comp);
 							var->Tags[L"ComponentReference"] = new StringObject(comp->UniqueName);
 							AddReference(comp.Ptr(), currentImport, var->Position);
 						}

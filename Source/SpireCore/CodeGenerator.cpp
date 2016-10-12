@@ -972,7 +972,7 @@ namespace Spire
 					{
 						auto funcCompName = expr->FunctionExpr->Tags[L"ComponentReference"]().As<StringObject>()->Content;
 						auto funcComp = *(currentShader->DefinitionsByComponent[funcCompName]().TryGetValue(currentComponent->World));
-						funcName = GetComponentFunctionName(basicType->Component->Implementations.First()->SyntaxNode.Ptr());
+						funcName = GetComponentFunctionName(funcComp->SyntaxNode.Ptr());
 						// push additional arguments
 						for (auto & dep : funcComp->Dependency)
 						{
