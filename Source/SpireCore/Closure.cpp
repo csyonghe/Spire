@@ -127,17 +127,25 @@ namespace Spire
 					!pRefMap.ContainsKey(comp.Key))
 				{
 					StringBuilder errMsg;
-					errMsg << L"argument '" + comp.Key + L"' is unassigned.";
+					errMsg << L"parameter '" << comp.Key << L"' of module '" << shader->SyntaxNode->Name.Content << L"' is unassigned.";
 					// try to provide more info on why it is unassigned
 					auto arg = rootShader->FindComponent(comp.Key, true, false);
 					if (!arg)
-						errMsg << L" automatic argument filling failed because shader '" << rootShader->Name << L"' does not define component '" + comp.Key + L"'.";
+						errMsg << L" implicit parameter matching failed because shader '" << rootShader->Name << L"' does not define component '" + comp.Key + L"'.";
 					else
 					{
-						errMsg << L" automatic argument filling failed because the component of the same name is not accessible from '" << rootShader->Name << L"'.";
+						if (comp.Value->Type->DataType->Equals(arg->Type->DataType.Ptr()))
+						{
+							errMsg << L" implicit parameter matching failed because the component of the same name is not accessible from '" << rootShader->Name << L"'.\ndid you forget the 'public' qualifier?";
+						}
+						else
+						{
+							errMsg << L"implicit parameter matching failed because the component of the same name does not match parameter type '"
+								<< comp.Value->Type->DataType->ToString() << L"'.";
+						}
 						errMsg << L"\nsee requirement declaration at " << comp.Value->Implementations.First()->SyntaxNode->Position.ToString() << L".";
 						errMsg << L"\nsee potential definition of component '" << comp.Key << L"' at " << arg->Implementations.First()->SyntaxNode->Position.ToString()
-							<< L".\ndid you forget the 'public' qualifier?";
+							<< L".\n";
 					}
 					err->Error(33023,errMsg.ProduceString(), rs->UsingPosition);
 				}
@@ -271,7 +279,7 @@ namespace Spire
 				import->Component->Accept(this);
 				if (!import->Component->Tags.ContainsKey(L"ComponentReference"))
 				{
-					Error(34043, L"first argument of an import operator call does not resolve to a component.", import->Component.Ptr());
+					Error(32047, L"first argument of an import operator call does not resolve to a component.", import->Component.Ptr());
 				}
 				else
 				{
@@ -715,6 +723,40 @@ namespace Spire
 				shader->AllComponents.Remove(r.Key);
 		}
 
+		void PropagatePipelineRequirements(ErrorWriter * err, ShaderClosure * shader)
+		{
+			for (auto & req : shader->Pipeline->Components)
+			{
+				if (req.Value->IsParam())
+				{
+					ShaderComponentSymbol * comp;
+					StringBuilder errMsg;
+					if (shader->AllComponents.TryGetValue(req.Key, comp))
+					{
+						if (!comp->Type->DataType->Equals(req.Value->Type->DataType.Ptr()))
+						{
+							errMsg << L"component '" << req.Key << L"' has type '" << comp->Type->DataType->ToString() << L"', but pipeline '"
+								<< shader->Pipeline->SyntaxNode->Name.Content << L"' requires it to be '" << req.Value->Type->DataType->ToString() 
+								<< L"'.\nsee pipeline requirement definition at " << req.Value->Implementations.First()->SyntaxNode->Position.ToString();
+							err->Error(32051, errMsg.ProduceString(), comp->Implementations.First()->SyntaxNode->Position);
+						}
+						else
+						{
+							for (auto & impl : comp->Implementations)
+								impl->SyntaxNode->IsOutput = true;
+						}
+					}
+					else
+					{
+						errMsg << L"shader '" << shader->Name << L"' does not define '" << req.Key << L"' as required by pipeline '"
+							<< shader->Pipeline->SyntaxNode->Name.Content << L"''.\nsee pipeline requirement definition at "
+							<< req.Value->Implementations.First()->SyntaxNode->Position.ToString();
+						err->Error(32052, errMsg.ProduceString(), shader->Position);
+					}
+				}
+			}
+		}
+
 		void FlattenShaderClosure(ErrorWriter * err, ShaderClosure * shader)
 		{
 			// add input(extern) components from pipeline
@@ -723,7 +765,7 @@ namespace Spire
 			AssignUniqueNames(shader, L"", L"");
 			// traverse closures to get component list
 			GatherComponents(err, shader, shader);
-
+			PropagatePipelineRequirements(err, shader);
 			ResolveReference(err, shader, shader);
 			// propagate world constraints
 			if (CheckCircularReference(err, shader))

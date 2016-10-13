@@ -74,7 +74,7 @@ namespace Spire
 		public:
 			enum class DataStructureType
 			{
-				StandardInput, UniformBuffer, StorageBuffer, PackedBuffer, Texture, Patch
+				StandardInput, UniformBuffer, ArrayBuffer, PackedBuffer, StorageBuffer, Texture, Patch
 			};
 			DataStructureType DataStructure = DataStructureType::StandardInput;
 			RefPtr<ILType> Type;
@@ -688,7 +688,7 @@ namespace Spire
 				}
 				if (auto import = instr.As<ImportInstruction>())
 				{
-					if (!useBindlessTexture && import->Type->IsTexture())
+					if (!useBindlessTexture && import->Type->IsTexture() || import->Type.As<ILArrayType>())
 						return true;
 				}
 				for (auto &&usr : instr.Users)
@@ -1011,7 +1011,9 @@ namespace Spire
 							info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::Texture;
 						else if (genType->GenericTypeName == L"PackedBuffer")
 							info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::PackedBuffer;
-						else if (genType->GenericTypeName == L"Buffer")
+						else if (genType->GenericTypeName == L"ArrayBuffer")
+							info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::ArrayBuffer;
+						else if (genType->GenericTypeName == L"StorageBuffer")
 							info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::StorageBuffer;
 					}
 					if (auto arrType = dynamic_cast<ILArrayType*>(type))
@@ -1042,14 +1044,15 @@ namespace Spire
 			{
 				auto info = extCompInfo[input]();
 
-				if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer)
+				if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer ||
+					info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StorageBuffer)
 				{
 					if (!currentImportInstr->Type->IsTexture() || useBindlessTexture)
 						sb << L"blk" << input << L"." << currentImportInstr->ComponentName;
 					else
 						sb << currentImportInstr->ComponentName;
 				}
-				else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StorageBuffer)
+				else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::ArrayBuffer)
 				{
 					sb << L"blk" << input << L".content";
 				}
@@ -1067,13 +1070,15 @@ namespace Spire
 				}
 			}
 
-			void DeclareInput(CodeGenContext & sb, const ILObjectDefinition & input)
+			void DeclareInput(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader)
 			{
 				auto info = ExtractExternComponentInfo(input);
 				extCompInfo[input.Name] = info;
 				auto recType = ExtractRecordType(input.Type.Ptr());
 				if (recType)
 				{
+					int declarationStart = sb.GlobalHeader.Length();
+					int itemsDeclaredInBlock = 0;
 					if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer)
 					{
 						sb.GlobalHeader << L"layout(std140";
@@ -1082,6 +1087,13 @@ namespace Spire
 						sb.GlobalHeader << L") uniform " << input.Name << L"\n{\n";
 					}
 					else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StorageBuffer)
+					{
+						sb.GlobalHeader << L"layout(std430";
+						if (info.Binding != -1)
+							sb.GlobalHeader << L", binding = " << info.Binding;
+						sb.GlobalHeader << L") buffer " << input.Name << L"\n{\n";
+					}
+					else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::ArrayBuffer)
 					{
 						sb.GlobalHeader << L"struct T" << input.Name << L"\n{\n";
 					}
@@ -1108,16 +1120,21 @@ namespace Spire
 							}
 							else
 							{
-								if (input.Attributes.ContainsKey(L"Flat"))
-									sb.GlobalHeader << L"flat ";
 								if (!useBindlessTexture && info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer &&
 									field.Value.Type->IsTexture())
 									continue;
+								if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat") ||
+									(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput &&
+									 field.Value.Type->IsIntegral())))
+									sb.GlobalHeader << L"flat ";
 								if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput)
+								{
 									sb.GlobalHeader << L"in ";
+								}
 								else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
 									sb.GlobalHeader << L"patch in ";
 								PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), field.Key);
+								itemsDeclaredInBlock++;
 								if (info.IsArray)
 								{
 									sb.GlobalHeader << L"[";
@@ -1131,10 +1148,24 @@ namespace Spire
 						}
 					}
 
-					if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer)
+					auto removeEmptyBlock = [&]()
+					{
+						if (itemsDeclaredInBlock == 0)
+							sb.GlobalHeader.Remove(declarationStart, sb.GlobalHeader.Length() - declarationStart);
+					};
+					if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer ||
+						info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StorageBuffer)
+					{
 						sb.GlobalHeader << L"} blk" << input.Name << L";\n";
-					else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StorageBuffer)
-						sb.GlobalHeader << L"};\nbuffer " << input.Name << L"\n{\nT" << input.Name << L"content[];\n} blk" << input.Name << L";\n";
+						removeEmptyBlock();
+					}
+					else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::ArrayBuffer)
+					{
+						sb.GlobalHeader << L"};\nlayout(std430";
+						if (info.Binding != -1)
+							sb.GlobalHeader << L", binding = " << info.Binding;
+						sb.GlobalHeader  << ") buffer " << input.Name << L"\n{\nT" << input.Name << L"content[];\n} blk" << input.Name << L";\n";
+					}
 					if (!useBindlessTexture && info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer)
 					{
 						for (auto & field : recType->Members)
@@ -1265,7 +1296,7 @@ namespace Spire
 				extCompInfo.Clear();
 				for (auto & input : world->Inputs)
 				{
-					DeclareInput(ctx, input);
+					DeclareInput(ctx, input, stage->StageType == L"VertexShader");
 				}
 		
 				outputStrategy->DeclareOutput(ctx, stage);
@@ -1382,7 +1413,7 @@ namespace Spire
 				for (auto & input : patchWorld->Inputs)
 				{
 					if (declaredInputs.Add(input.Name))
-						DeclareInput(ctx, input);
+						DeclareInput(ctx, input, false);
 				}
 				outputStrategy->DeclareOutput(ctx, stage);
 				GenerateCode(ctx, patchWorld->Code.Ptr());
@@ -1392,7 +1423,7 @@ namespace Spire
 				for (auto & input : controlPointWorld->Inputs)
 				{
 					if (declaredInputs.Add(input.Name))
-						DeclareInput(ctx, input);
+						DeclareInput(ctx, input, false);
 				}
 				outputStrategy->DeclareOutput(ctx, stage);
 				GenerateCode(ctx, controlPointWorld->Code.Ptr());
@@ -1402,7 +1433,7 @@ namespace Spire
 				for (auto & input : cornerPointWorld->Inputs)
 				{
 					if (declaredInputs.Add(input.Name))
-						DeclareInput(ctx, input);
+						DeclareInput(ctx, input, false);
 				}
 				outputStrategy->DeclareOutput(ctx, stage);
 				ctx.Body << L"for (int sysLocalIterator = 0; sysLocalIterator < gl_PatchVerticesIn; sysLocalIterator++)\n{\n";
@@ -1523,7 +1554,11 @@ namespace Spire
 			{
 				for (auto & field : world->OutputType->Members)
 				{
-					ctx.GlobalHeader << declPrefix << L" out ";
+					if (declPrefix.Length())
+						ctx.GlobalHeader << declPrefix << L" ";
+					if (field.Value.Type->IsIntegral())
+						ctx.GlobalHeader << L"flat ";
+					ctx.GlobalHeader << L"out ";
 					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), field.Key);
 					ctx.GlobalHeader << L";\n";
 				}

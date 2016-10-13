@@ -1,0 +1,598 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="FBX">
+      <UniqueIdentifier>{7c942f5a-82f3-49fa-9fcd-060dd9668d4c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ZLIB">
+      <UniqueIdentifier>{7df46740-9d2d-40e7-8f50-20bc822b68c5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="FBX\include">
+      <UniqueIdentifier>{681f8034-96d6-4c80-813f-ff758a215d9d}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="FBXImport\FBXAnimation.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\FBXBinaryTokenizer.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\FBXConverter.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\FBXDeformer.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\FBXDocument.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\FBXDocumentUtil.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\FBXImporter.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\FBXMaterial.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\FBXMeshGeometry.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\FBXModel.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\FBXNodeAttribute.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\FBXParser.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\FBXProperties.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\FBXTokenizer.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\FBXUtil.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\BaseImporter.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\Importer.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\ConvertUTF.c">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\BaseProcess.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\ProcessHelper.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\ScenePreprocessor.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\ValidateDataStructure.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\SpatialSort.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\DefaultLogger.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\Version.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\MaterialSystem.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\PostStepRegistry.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\CalcTangentsProcess.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\ComputeUVMappingProcess.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\ConvertToLHProcess.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\DeboneProcess.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\FindDegenerates.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\FindInstancesProcess.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\FindInvalidDataProcess.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\FixNormalsStep.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\GenFaceNormalsProcess.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\GenVertexNormalsProcess.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\ImproveCacheLocality.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\JoinVerticesProcess.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\LimitBoneWeightsProcess.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\OptimizeMeshes.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\PretransformVertices.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\RemoveVCProcess.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\SortByPTypeProcess.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\SplitByBoneCountProcess.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\SplitLargeMeshes.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\TextureTransform.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\TriangulateProcess.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\OptimizeGraph.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\RemoveRedundantMaterials.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\SceneCombiner.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\VertexTriangleAdjacency.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\ImporterRegistry.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\DefaultIOStream.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\DefaultIOSystem.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="ZLIB\adler32.c">
+      <Filter>ZLIB</Filter>
+    </ClCompile>
+    <ClCompile Include="ZLIB\compress.c">
+      <Filter>ZLIB</Filter>
+    </ClCompile>
+    <ClCompile Include="ZLIB\crc32.c">
+      <Filter>ZLIB</Filter>
+    </ClCompile>
+    <ClCompile Include="ZLIB\deflate.c">
+      <Filter>ZLIB</Filter>
+    </ClCompile>
+    <ClCompile Include="ZLIB\gzclose.c">
+      <Filter>ZLIB</Filter>
+    </ClCompile>
+    <ClCompile Include="ZLIB\gzlib.c">
+      <Filter>ZLIB</Filter>
+    </ClCompile>
+    <ClCompile Include="ZLIB\gzread.c">
+      <Filter>ZLIB</Filter>
+    </ClCompile>
+    <ClCompile Include="ZLIB\gzwrite.c">
+      <Filter>ZLIB</Filter>
+    </ClCompile>
+    <ClCompile Include="ZLIB\infback.c">
+      <Filter>ZLIB</Filter>
+    </ClCompile>
+    <ClCompile Include="ZLIB\inffast.c">
+      <Filter>ZLIB</Filter>
+    </ClCompile>
+    <ClCompile Include="ZLIB\inflate.c">
+      <Filter>ZLIB</Filter>
+    </ClCompile>
+    <ClCompile Include="ZLIB\inftrees.c">
+      <Filter>ZLIB</Filter>
+    </ClCompile>
+    <ClCompile Include="ZLIB\trees.c">
+      <Filter>ZLIB</Filter>
+    </ClCompile>
+    <ClCompile Include="ZLIB\zutil.c">
+      <Filter>ZLIB</Filter>
+    </ClCompile>
+    <ClCompile Include="ModelImporter.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="FBXImport\FBXCompileConfig.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\FBXConverter.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\FBXDocument.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\FBXDocumentUtil.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\FBXImporter.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\FBXImportSettings.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\FBXMeshGeometry.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\FBXParser.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\FBXProperties.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\FBXTokenizer.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\FBXUtil.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\ByteSwapper.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\DefaultLogger.hpp">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\Exceptional.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\fast_atof.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\LogAux.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\ParsingUtils.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\TinyFormatter.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\BaseImporter.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\StringComparison.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\StringUtils.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\Importer.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\FileSystemFilter.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\ConvertUTF.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\MemoryIOWrapper.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\StreamReader.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\BaseProcess.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\DefaultProgressHandler.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\ProcessHelper.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\Profiler.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\ScenePreprocessor.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\ScenePrivate.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\ValidateDataStructure.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\GenericProperty.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\SpatialSort.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\Hash.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\logger.hpp">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\logstream.hpp">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\NullLogger.hpp">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\StdOStreamLogStream.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\Win32DebugLogStream.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\Macros.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\MaterialSystem.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\CalcTangentsProcess.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\ComputeUVMappingProcess.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\ConvertToLHProcess.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\DeboneProcess.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\FindDegenerates.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\FindInstancesProcess.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\FindInvalidDataProcess.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\FixNormalsStep.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\GenFaceNormalsProcess.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\GenVertexNormalsProcess.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\ImproveCacheLocality.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\JoinVerticesProcess.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\LimitBoneWeightsProcess.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\OptimizeMeshes.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\PretransformVertices.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\RemoveVCProcess.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\revision.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\SortByPTypeProcess.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\SplitByBoneCountProcess.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\SplitLargeMeshes.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\TextureTransform.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\TriangulateProcess.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\OptimizeGraph.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\RemoveRedundantMaterials.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\SceneCombiner.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\Vertex.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\VertexTriangleAdjacency.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\qnan.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\PolyTools.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\ai_assert.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\anim.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\camera.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\cexport.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\cfileio.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\cimport.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\color4.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\config.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\DefaultLogger.hpp">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\defs.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\Exporter.hpp">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\Importer.hpp">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\importerdesc.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\IOStream.hpp">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\IOSystem.hpp">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\light.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\Logger.hpp">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\LogStream.hpp">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\material.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\matrix3x3.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\matrix3x3_inl.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\matrix4x4.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\matrix4x4_inl.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\mesh.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\metadata.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\NullLogger.hpp">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\poppack1.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\postprocess.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\ProgressHandler.hpp">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\pstdint.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\pushpack1.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\quaternion.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\scene.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\texture.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\types.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\vector2.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\vector3.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\include\version.h">
+      <Filter>FBX\include</Filter>
+    </ClInclude>
+    <ClInclude Include="ZLIB\crc32.h">
+      <Filter>ZLIB</Filter>
+    </ClInclude>
+    <ClInclude Include="ZLIB\deflate.h">
+      <Filter>ZLIB</Filter>
+    </ClInclude>
+    <ClInclude Include="ZLIB\gzguts.h">
+      <Filter>ZLIB</Filter>
+    </ClInclude>
+    <ClInclude Include="ZLIB\inffast.h">
+      <Filter>ZLIB</Filter>
+    </ClInclude>
+    <ClInclude Include="ZLIB\inffixed.h">
+      <Filter>ZLIB</Filter>
+    </ClInclude>
+    <ClInclude Include="ZLIB\inflate.h">
+      <Filter>ZLIB</Filter>
+    </ClInclude>
+    <ClInclude Include="ZLIB\inftrees.h">
+      <Filter>ZLIB</Filter>
+    </ClInclude>
+    <ClInclude Include="ZLIB\trees.h">
+      <Filter>ZLIB</Filter>
+    </ClInclude>
+    <ClInclude Include="ZLIB\zconf.in.h">
+      <Filter>ZLIB</Filter>
+    </ClInclude>
+    <ClInclude Include="ZLIB\zlib.h">
+      <Filter>ZLIB</Filter>
+    </ClInclude>
+    <ClInclude Include="ZLIB\zutil.h">
+      <Filter>ZLIB</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\DefaultIOStream.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\DefaultIOSystem.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\Defines.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

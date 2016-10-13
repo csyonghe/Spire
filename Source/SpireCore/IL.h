@@ -421,7 +421,7 @@ namespace Spire
 			}
 		};
 
-		class ILOperand : public RefObject
+		class ILOperand : public Object
 		{
 		public:
 			String Name;

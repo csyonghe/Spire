@@ -155,7 +155,8 @@ namespace Spire
 			auto basicType = dynamic_cast<ILBasicType*>(this);
 			if (basicType)
 				return basicType->Type == ILBaseType::Int || basicType->Type == ILBaseType::Int2 || basicType->Type == ILBaseType::Int3 || basicType->Type == ILBaseType::Int4 
-				|| basicType->Type == ILBaseType::UInt || basicType->Type == ILBaseType::UInt2 || basicType->Type == ILBaseType::UInt3 || basicType->Type == ILBaseType::UInt4;
+				|| basicType->Type == ILBaseType::UInt || basicType->Type == ILBaseType::UInt2 || basicType->Type == ILBaseType::UInt3 || basicType->Type == ILBaseType::UInt4 ||
+				basicType->Type == ILBaseType::Bool;
 			else
 				return false;
 		}

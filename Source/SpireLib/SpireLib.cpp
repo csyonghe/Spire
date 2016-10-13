@@ -161,7 +161,7 @@ namespace SpireLib
 	}
 
 	List<ShaderLibFile> CompileShaderSourceFromFile(Spire::Compiler::CompileResult & compileResult, 
-		CoreLib::Basic::String sourceFileName,
+		const CoreLib::Basic::String & sourceFileName,
 		Spire::Compiler::CompileOptions & options)
 	{
 		try

@@ -269,6 +269,7 @@ namespace Spire
 							def.Name = comp->UniqueName;
 							def.Type = TranslateExpressionType(comp->Type.Ptr(), &recordTypes);
 							def.Position = comp->SyntaxNode->Position;
+							def.Attributes = comp->SyntaxNode->LayoutAttributes;
 							world.Value->Inputs.Add(def);
 						}
 					}
@@ -940,6 +941,7 @@ namespace Spire
 							rs->Type = TranslateExpressionType(expr->Type.Ptr(), &recordTypes);
 							rs->SwizzleString = expr->MemberName;
 							rs->Operand = base;
+							codeWriter.Insert(rs);
 							PushStack(rs);
 						}
 					}
@@ -967,7 +969,7 @@ namespace Spire
 				if (auto basicType = expr->FunctionExpr->Type->AsBasicType())
 				{
 					if (basicType->Func)
-						funcName = basicType->Func->SyntaxNode->Name;
+						funcName = basicType->Func->SyntaxNode->IsExtern ? basicType->Func->SyntaxNode->Name : basicType->Func->SyntaxNode->InternalName;
 					else if (basicType->Component)
 					{
 						auto funcCompName = expr->FunctionExpr->Tags[L"ComponentReference"]().As<StringObject>()->Content;

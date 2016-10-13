@@ -1,3 +1,4 @@
+#if 0
 #include "CodeGenBackend.h"
 #include "../CoreLib/Parser.h"
 #include "IL.h"
@@ -2221,12 +2222,6 @@ namespace Spire
 				for (auto & arg : argTypes)
 					DefineTypePointer(arg, StorageClass::Function);
 				int functionTypeID = ++CurrentID;
-				/*
-				TypeDefinition << LR"(%)" << functionTypeID << LR"( = OpTypeFunction %)" << returnTypeID;
-				for (auto & arg : argTypes)
-				TypeDefinition << LR"( %)" << DefineTypePointer(arg, StorageClass::Function);
-				TypeDefinition << EndLine;
-				*/
 				List<int> argIDList;
 				for (auto & arg : argTypes)
 					argIDList.Add(DefineTypePointer(arg, StorageClass::Function));
@@ -2247,12 +2242,6 @@ namespace Spire
 				auto Type = GetTypeFromString(L"bool");
 				int typeID = DefineType(Type);
 				++CurrentID;
-				/*
-				if (value != 0)
-				TypeDefinition << LR"(%)" << CurrentID << LR"( = OpConstantTrue%)" << EndLine;
-				else
-				TypeDefinition << LR"(%)" << CurrentID << LR"( = OpConstantFalse%)" << EndLine;
-				*/
 				CodeGen.OpConstantBool(typeID, CurrentID, value != 0);
 				IDInfos[CurrentID] = IDInfo::CreateIDInfoForValue(CurrentID, Type, 0, typeID);
 				Dictionary_ConstantBoolToID[value != 0] = CurrentID;
@@ -5505,3 +5494,4 @@ namespace Spire
 		}
 	}
 }
+#endif

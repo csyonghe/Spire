@@ -92,9 +92,10 @@ namespace Spire
 				typeNames.Add(L"samplerCubeShadow");
 				typeNames.Add(L"Texture");
 				typeNames.Add(L"Uniform");
-				typeNames.Add(L"Buffer");
-				typeNames.Add(L"Patch");
+				typeNames.Add(L"ArrayBuffer");
 				typeNames.Add(L"PackedBuffer");
+				typeNames.Add(L"StorageBuffer");
+				typeNames.Add(L"Patch");
 			}
 			RefPtr<ProgramSyntaxNode> Parse();
 		private:

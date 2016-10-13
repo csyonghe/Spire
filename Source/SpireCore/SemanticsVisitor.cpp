@@ -487,7 +487,6 @@ namespace Spire
 						comp->IsInline = true;
 					}
 					bool isDefinedInAbstractWorld = false, isDefinedInNonAbstractWorld = false;
-					bool isInStorageBuffer = false;
 					if (comp->Rate)
 					{
 						for (auto & w : comp->Rate->Worlds)
@@ -499,7 +498,6 @@ namespace Spire
 									isDefinedInAbstractWorld = true;
 								else
 									isDefinedInNonAbstractWorld = true;
-								isInStorageBuffer = isInStorageBuffer && world->SyntaxNode->LayoutAttributes.ContainsKey(L"ShaderStorageBlock");
 							}
 						}
 					}
@@ -518,15 +516,6 @@ namespace Spire
 						if (isDefinedInNonAbstractWorld)
 						{
 							Error(33035, L"\'" + compSym->Name + L"\': sampler, struct and array types only allowed in input worlds.", comp->Name);
-						}
-						else
-						{
-							auto basicType = compSym->Type->DataType->AsBasicType();
-
-							if (!isInStorageBuffer && basicType && basicType->Struct != nullptr)
-							{
-								Error(33036, L"\'" + compSym->Name + L"\': struct must only be defined in a input world with [ShaderStorageBlock] attribute.", comp->Name);
-							}
 						}
 					}
 					currentComp = nullptr;
@@ -1423,7 +1412,7 @@ namespace Spire
 				else
 				{
 					if (expr->BaseExpression->Type->AsGenericType() && 
-						(expr->BaseExpression->Type->AsGenericType()->GenericTypeName != L"Buffer" || expr->BaseExpression->Type->AsGenericType()->GenericTypeName != L"PackedBuffer") ||
+						(expr->BaseExpression->Type->AsGenericType()->GenericTypeName != L"ArrayBuffer" || expr->BaseExpression->Type->AsGenericType()->GenericTypeName != L"PackedBuffer") ||
 						expr->BaseExpression->Type->AsBasicType() &&
 						GetVectorSize(expr->BaseExpression->Type->AsBasicType()->BaseType) == 0)
 					{
@@ -1641,12 +1630,11 @@ namespace Spire
 				// this is not an import operator call, resolve as function call
 				bool found = false;
 				bool functionNameFound = false;
-				String funcName;
 				RefPtr<FunctionSymbol> func;
 				varExpr->Variable = TranslateHLSLTypeNames(varExpr->Variable);
 
 				if (varExpr->Variable == L"texture" && arguments.Count() > 0 &&
-					arguments[0]->Type->IsGenericType(L"Buffer"))
+					arguments[0]->Type->IsGenericType(L"Texture"))
 				{
 					if (arguments.Count() != 2)
 					{
@@ -1692,9 +1680,9 @@ namespace Spire
 				{
 					if (!func->SyntaxNode->IsExtern)
 					{
-						varExpr->Variable = funcName;
+						varExpr->Variable = func->SyntaxNode->InternalName;
 						if (currentFunc)
-							currentFunc->ReferencedFunctions.Add(funcName);
+							currentFunc->ReferencedFunctions.Add(func->SyntaxNode->InternalName);
 					}
 					invoke->Type = func->SyntaxNode->ReturnType;
 					auto funcType = new BasicExpressionType();
@@ -1906,7 +1894,7 @@ namespace Spire
 				else
 					Error(30015, L"undefined identifier \'" + expr->Variable + L"\'", expr);
 
-				if (expr->Type->IsGenericType(L"Uniform") || expr->Type->IsGenericType(L"Patch"))
+				if (expr->Type->IsGenericType(L"Uniform") || expr->Type->IsGenericType(L"Patch") || expr->Type->IsGenericType(L"StorageBuffer"))
 					expr->Type = expr->Type->AsGenericType()->BaseType;
 
 				return expr;

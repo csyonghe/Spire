@@ -22,11 +22,11 @@ namespace SpireLib
 	};
 	
 	CoreLib::Basic::List<ShaderLibFile> CompileShaderSourceFromFile(Spire::Compiler::CompileResult & result,
-		CoreLib::Basic::String sourceFileName,
+		const CoreLib::Basic::String & sourceFileName,
 		Spire::Compiler::CompileOptions &options);
 
 	CoreLib::Basic::List<ShaderLibFile> CompileShaderSource(Spire::Compiler::CompileResult & result,
-		const CoreLib::Basic::String &source, Spire::Compiler::CompileOptions &options);
+		const CoreLib::Basic::String &source, const CoreLib::Basic::String & sourceFileName, Spire::Compiler::CompileOptions &options);
 
 	class ShaderLib : public ShaderLibFile
 	{
