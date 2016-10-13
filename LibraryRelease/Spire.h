@@ -3953,7 +3953,6 @@ namespace Spire
 		{
 		public:
 			String AlternateName;
-			int buff[100000];
 			EnumerableHashSet<String> Worlds, ExportWorlds, SrcPinnedWorlds;
 			RefPtr<ComponentSyntaxNode> SyntaxNode;
 			EnumerableDictionary<ShaderComponentSymbol *, EnumerableHashSet<RefPtr<ImportExpressionSyntaxNode>>> DependentComponents; // key: dependent components, value: set of import expression nodes (null means implicit reference)

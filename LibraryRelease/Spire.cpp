@@ -2500,6 +2500,7 @@ namespace Spire
 			Dictionary<ILOperand*, String> VarName;
 			CompileResult * Result = nullptr;
 			HashSet<String> UsedVarNames;
+			int TextureBindingsAllocator = 0;
 			StringBuilder Body, Header, GlobalHeader;
 			List<ILType*> Arguments;
 			String ReturnVarName;
@@ -3582,7 +3583,10 @@ namespace Spire
 							if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Texture)
 							{
 								if (field.Value.Type->IsFloat() || field.Value.Type->IsFloatVector() && !field.Value.Type->IsFloatMatrix())
-									sb.GlobalHeader << L"uniform sampler2D " << field.Key << L";\n";
+								{
+									sb.GlobalHeader << L"layout(binding = " << sb.TextureBindingsAllocator << L") uniform sampler2D " << field.Key << L";\n";
+									sb.TextureBindingsAllocator++;
+								}
 								else
 									errWriter->Error(51091, L"type '" + field.Value.Type->ToString() + L"' cannot be placed in a texture.",
 										field.Value.Position);
@@ -3592,6 +3596,8 @@ namespace Spire
 								if (!useBindlessTexture && info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer &&
 									field.Value.Type->IsTexture())
 									continue;
+								if (input.Attributes.ContainsKey(L"VertexInput"))
+									sb.GlobalHeader << L"layout(location = " << index << L") ";
 								if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat") ||
 									(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput &&
 									 field.Value.Type->IsIntegral())))
@@ -3643,6 +3649,11 @@ namespace Spire
 							{
 								if (field.Value.Attributes.ContainsKey(L"Binding"))
 									sb.GlobalHeader << L"layout(binding = " << field.Value.Attributes[L"Binding"]() << L") ";
+								else
+								{
+									sb.GlobalHeader << L"layout(binding = " << sb.TextureBindingsAllocator << L") ";
+									sb.TextureBindingsAllocator++;
+								}
 								sb.GlobalHeader << L"uniform ";
 								PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), field.Key);
 								sb.GlobalHeader << L";\n";

@@ -111,7 +111,7 @@ module SkeletalVertexTransform
     require uint boneIds;
     require uint boneWeights;
     
-    @skeletalTransform BoneTransform[2048] boneTransforms;
+    @skeletalTransform BoneTransform[] boneTransforms;
     
     @vs vec4 position// = vec4(vertPos, 1.0);
     {

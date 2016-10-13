@@ -1,16 +1,12 @@
 pipeline EnginePipeline
 {
     [Pinned]
-    [Packed]
     input world rootVert;
     
     [Pinned]
-    [InterfaceBlockIndex: "0"]
     input world modelTransform;
     
     [Pinned]
-    [InterfaceBlockIndex: "3"]
-    [ShaderStorageBlock]
     input world skeletalTransform;
     
     [Pinned]
@@ -18,7 +14,6 @@ pipeline EnginePipeline
     input world viewUniform;
     
     [Pinned]
-    [InterfaceBlockIndex: "2"]
     input world perInstanceUniform;
     
     world vs;// : "glsl(vertex:projCoord)" using projCoord export standardExport;
@@ -26,7 +21,7 @@ pipeline EnginePipeline
     
     require @vs vec4 projCoord; 
     
-    [Binding: "0"]
+    [Binding: "2"]
     extern @(vs*, fs*) Uniform<perInstanceUniform> perInstanceUniformBlock; 
     import(perInstanceUniform->vs) uniformImport()
     {
@@ -48,7 +43,7 @@ pipeline EnginePipeline
         return viewUniformBlock;
     }
     
-    [Binding: "2"]
+    [Binding: "0"]
     extern @(vs*, fs*) Uniform<modelTransform> modelTransformBlock;
     import(modelTransform->vs) uniformImport()
     {
@@ -70,6 +65,7 @@ pipeline EnginePipeline
         return skeletalTransformBlock;
     }
     
+    [VertexInput]
     extern @vs rootVert vertAttribIn;
     import(rootVert->vs) vertexImport()
     {
