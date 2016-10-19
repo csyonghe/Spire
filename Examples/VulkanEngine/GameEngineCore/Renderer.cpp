@@ -273,7 +273,7 @@ namespace GameEngine
 				return LoadTexture2D(L"ERROR_TEXTURE", errTex);
 			}
 		}
-
+		
 		Shader* LoadShader(const String & src, void* data, int size, ShaderType shaderType)
 		{
 			{
@@ -334,6 +334,14 @@ namespace GameEngine
 				else if (compiledShader.Key == L"fs")
 				{
 					shader = LoadShader(Path::ReplaceExt(material->ShaderFile, compiledShader.Key.Buffer()), compiledShader.Value.Buffer(), compiledShader.Value.Count(), ShaderType::FragmentShader);
+				}
+				else if (compiledShader.Key == L"tcs")
+				{
+					shader = LoadShader(Path::ReplaceExt(material->ShaderFile, compiledShader.Key.Buffer()), compiledShader.Value.Buffer(), compiledShader.Value.Count(), ShaderType::HullShader);
+				}
+				else if (compiledShader.Key == L"tes")
+				{
+					shader = LoadShader(Path::ReplaceExt(material->ShaderFile, compiledShader.Key.Buffer()), compiledShader.Value.Buffer(), compiledShader.Value.Count(), ShaderType::DomainShader);
 				}
 				materialInstance.shaders.Add(shader);
 			}

@@ -235,7 +235,7 @@ namespace Spire
 								{
 									auto importPath = Shader->Pipeline->FindImplicitImportOperatorChain(depWorld, dep.SourceWorld);
 									if (importPath.Count() == 0)
-										throw InvalidProgramException(L"no import path found.");
+										continue;
 									processImportOperatorUsings(importPath.First().Nodes.Last().ImportOperator);
 								}
 								goto selectionEnd; // first preferred overload is found, terminate searching

@@ -42,14 +42,30 @@ namespace Spire
 		}
 		RefPtr<ShaderClosure> CreateShaderClosure(ErrorWriter * err, SymbolTable * symTable, ShaderSymbol * shader, CodePosition usingPos, 
 			ShaderClosure * rootShader,
-			const Dictionary<String, RefPtr<ShaderComponentSymbol>>& pRefMap)
+			const EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>>& pRefMap)
 		{
 			RefPtr<ShaderClosure> rs = new ShaderClosure();
 			if (rootShader == nullptr)
+			{
 				rootShader = rs.Ptr();
+				rootShader->Pipeline = shader->Pipeline;
+			}
 			rs->Name = shader->SyntaxNode->Name.Content;
 			rs->RefMap = pRefMap;
-			rs->Pipeline = shader->Pipeline;
+			if (shader->Pipeline && rootShader->Pipeline)
+			{
+				if (shader->Pipeline->IsChildOf(rootShader->Pipeline))
+					rootShader->Pipeline = shader->Pipeline;
+				else
+				{
+					StringBuilder sb;
+					sb << L"pipeline '" << shader->Pipeline->SyntaxNode->Name.Content << L"' targeted by module '" <<
+						shader->SyntaxNode->Name.Content << L"' is incompatible with pipeline '" << rootShader->Pipeline->SyntaxNode->Name.Content << L"' targeted by shader '" << rootShader->Name << L"'.\nsee definition of shader '" << shader->SyntaxNode->Name.Content << L"' at " << shader->SyntaxNode->Position.ToString();
+					err->Error(33041, sb.ProduceString(), shader->SyntaxNode->Position);
+				}
+			}
+			
+			rs->Pipeline = rootShader->Pipeline;
 			rs->UsingPosition = usingPos;
 			rs->Position = shader->SyntaxNode->Position;
 			for (auto & mbr : shader->SyntaxNode->Members)
@@ -57,7 +73,7 @@ namespace Spire
 				if (auto import = dynamic_cast<ImportSyntaxNode*>(mbr.Ptr()))
 				{
 					// create component for each argument
-					Dictionary<String, RefPtr<ShaderComponentSymbol>> refMap;
+					EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>> refMap;
 					for (auto & arg : import->Arguments)
 					{
 						RefPtr<ShaderComponentSymbol> ccomp = new ShaderComponentSymbol();
@@ -136,7 +152,7 @@ namespace Spire
 					{
 						if (comp.Value->Type->DataType->Equals(arg->Type->DataType.Ptr()))
 						{
-							errMsg << L" implicit parameter matching failed because the component of the same name is not accessible from '" << rootShader->Name << L"'.\ndid you forget the 'public' qualifier?";
+							errMsg << L" implicit parameter matching failed because the component of the same name is not accessible from '" << shader->SyntaxNode->Name.Content << L"'.\ncheck if you have declared necessary requirements and properly used the 'public' qualifier.";
 						}
 						else
 						{
@@ -155,7 +171,7 @@ namespace Spire
 
 		RefPtr<ShaderClosure> CreateShaderClosure(ErrorWriter * err, SymbolTable * symTable, ShaderSymbol * shader)
 		{
-			return CreateShaderClosure(err, symTable, shader, shader->SyntaxNode->Position, nullptr, Dictionary<String, RefPtr<ShaderComponentSymbol>>());
+			return CreateShaderClosure(err, symTable, shader, shader->SyntaxNode->Position, nullptr, EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>>());
 		}
 
 		class ReplaceReferenceVisitor : public SyntaxVisitor
@@ -688,6 +704,16 @@ namespace Spire
 			}
 		}
 
+		void GatherArgumentMappings(EnumerableDictionary<String, String> & result, ShaderClosure* shader)
+		{
+			for (auto & map : shader->RefMap)
+			{
+				result[shader->Components[map.Key]()->UniqueName] = map.Value->UniqueName;
+			}
+			for (auto & subShader : shader->SubClosures)
+				GatherArgumentMappings(result, subShader.Value.Ptr());
+		}
+
 		void RemoveTrivialComponents(ShaderClosure * shader)
 		{
 			// remove trivial components, e.g. if A = B, replace all references to A with B.
@@ -708,13 +734,19 @@ namespace Spire
 					}
 				}
 			}
+			// gather argument mappings
+			EnumerableDictionary<String, String> arguments;
+			GatherArgumentMappings(arguments, shader);
 			EnumerableDictionary<String, String> replacements;
 			for (auto & replace : compSub)
 			{
 				// search transitively for replaceDest;
 				String replaceDest = replace.Key;
 				while (compSub.ContainsKey(replaceDest))
+				{
 					replaceDest = compSub[replaceDest]();
+					arguments.TryGetValue(replaceDest, replaceDest);
+				}
 				if (replace.Key != replaceDest)
 					replacements[replace.Key] = replaceDest;
 			}
@@ -757,10 +789,106 @@ namespace Spire
 			}
 		}
 
+		void PrintModuleUsingStack(StringBuilder & sb, ShaderClosure * shader)
+		{
+			if (shader->Parent)
+			{
+				sb << L"see module '" + shader->Name << L"' being used in '" + shader->Parent->Name << L"' at " << shader->Position.ToString() << L"\n";
+				PrintModuleUsingStack(sb, shader->Parent);
+			}
+			else
+			{
+				sb << L"shader '" << shader->Name << L"' is targeting pipeline '" << shader->Pipeline->SyntaxNode->Name.Content << L"' at " << shader->Position.ToString() << L"\nalso see pipeline definition at " << shader->Pipeline->SyntaxNode->Position.ToString();
+			}
+		}
+	
+		void CheckPipelineShaderConsistency(ErrorWriter * err, ShaderClosure * shader)
+		{
+			for (auto & comp : shader->Components)
+			{
+				for (auto & impl : comp.Value->Implementations)
+				{
+					bool inAbstractWorld = false;
+					if (impl->SyntaxNode->Rate)
+					{
+						auto & userSpecifiedWorlds = impl->SyntaxNode->Rate->Worlds;
+						for (auto & world : userSpecifiedWorlds)
+						{
+							{
+								StringBuilder sb;
+								sb << L"\'" << world.World.Content << L"' is not a defined world in '" <<
+									shader->Pipeline->SyntaxNode->Name.Content << L"'.\n";
+								PrintModuleUsingStack(sb, shader);
+								if (!shader->Pipeline->WorldDependency.ContainsKey(world.World.Content))
+									err->Error(33012, sb.ProduceString(), world.World.Position);
+							}
+							WorldSymbol worldSym;
+							if (shader->Pipeline->Worlds.TryGetValue(world.World.Content, worldSym))
+							{
+								if (worldSym.IsAbstract)
+								{
+									inAbstractWorld = true;
+									if (userSpecifiedWorlds.Count() > 1)
+									{
+										StringBuilder sb;
+										sb << L"abstract world cannot appear with other worlds.\n";
+										PrintModuleUsingStack(sb, shader);
+										err->Error(33013, sb.ProduceString(),
+											world.World.Position);
+										PrintModuleUsingStack(sb, shader);
+									}
+								}
+							}
+						}
+					}
+					if (!inAbstractWorld && !impl->SyntaxNode->IsParam && !impl->SyntaxNode->IsInput
+						&& !impl->SyntaxNode->Expression && !impl->SyntaxNode->BlockStatement)
+					{
+						err->Error(33014, L"non-abstract component must have an implementation.",
+							impl->SyntaxNode->Position);
+					}
+
+					bool isDefinedInAbstractWorld = false, isDefinedInNonAbstractWorld = false;
+					if (impl->SyntaxNode->Rate)
+					{
+						for (auto & w : impl->SyntaxNode->Rate->Worlds)
+						{
+							auto world = shader->Pipeline->Worlds.TryGetValue(w.World.Content);
+							if (world)
+							{
+								if (world->IsAbstract)
+									isDefinedInAbstractWorld = true;
+								else
+									isDefinedInNonAbstractWorld = true;
+							}
+						}
+					}
+					else
+						isDefinedInNonAbstractWorld = true;
+					if (impl->SyntaxNode->Expression || impl->SyntaxNode->BlockStatement)
+					{
+						if (isDefinedInAbstractWorld)
+							err->Error(33039, L"'" + impl->SyntaxNode->Name.Content + L"': no code allowed for component defined in input world.", impl->SyntaxNode->Position);
+					}
+					if (!comp.Value->IsParam() && !comp.Value->Implementations.First()->SyntaxNode->IsInput && (comp.Value->Type->DataType->IsArray() || comp.Value->Type->DataType->IsStruct() ||
+						comp.Value->Type->DataType->IsTexture()))
+					{
+						if (isDefinedInNonAbstractWorld)
+						{
+							err->Error(33035, L"\'" + comp.Value->Name + L"\': sampler, struct and array types only allowed in input worlds.", impl->SyntaxNode->Position);
+						}
+					}
+				}
+			}
+			for (auto & subShader : shader->SubClosures)
+				CheckPipelineShaderConsistency(err, subShader.Value.Ptr());
+		}
+
 		void FlattenShaderClosure(ErrorWriter * err, ShaderClosure * shader)
 		{
 			// add input(extern) components from pipeline
 			AddPipelineComponents(shader);
+			CheckPipelineShaderConsistency(err, shader);
 			// assign choice names
 			AssignUniqueNames(shader, L"", L"");
 			// traverse closures to get component list
@@ -769,6 +897,8 @@ namespace Spire
 			ResolveReference(err, shader, shader);
 			// propagate world constraints
 			if (CheckCircularReference(err, shader))
+				return;
+			if (err->GetErrorCount())
 				return;
 			RemoveTrivialComponents(shader);
 			SolveWorldConstraints(err, shader);

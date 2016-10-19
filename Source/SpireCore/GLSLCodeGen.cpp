@@ -77,8 +77,13 @@ namespace Spire
 			{
 				StandardInput, UniformBuffer, ArrayBuffer, PackedBuffer, StorageBuffer, Texture, Patch
 			};
+			enum class SystemVarType
+			{
+				None, TessCoord, InvocationId, ThreadId, FragCoord, PatchVertexCount, PrimitiveId
+			};
 			DataStructureType DataStructure = DataStructureType::StandardInput;
 			RefPtr<ILType> Type;
+			SystemVarType SystemVar = SystemVarType::None;
 			bool IsArray = false;
 			int ArrayLength = 0;
 			int Binding = -1;
@@ -1037,6 +1042,42 @@ namespace Spire
 				else
 				{
 					// check for attributes 
+					if (input.Attributes.ContainsKey(L"TessCoord"))
+					{
+						info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::TessCoord;
+						if (!(input.Type->IsFloatVector() && input.Type->GetVectorSize() <= 3))
+							Error(50020, L"TessCoord must have vec2 or vec3 type.", input.Position);
+					}
+					else if (input.Attributes.ContainsKey(L"FragCoord"))
+					{
+						info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::FragCoord;
+						if (!(input.Type->IsFloatVector() && input.Type->GetVectorSize() == 4))
+							Error(50020, L"FragCoord must be a vec4.", input.Position);
+					}
+					else if (input.Attributes.ContainsKey(L"InvocationId"))
+					{
+						info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::InvocationId;
+						if (!input.Type->IsInt())
+							Error(50020, L"InvocationId must have int type.", input.Position);
+					}
+					else if (input.Attributes.ContainsKey(L"ThreadId"))
+					{
+						info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::InvocationId;
+						if (!input.Type->IsInt())
+							Error(50020, L"ThreadId must have int type.", input.Position);
+					}
+					else if (input.Attributes.ContainsKey(L"PrimitiveId"))
+					{
+						info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::PrimitiveId;
+						if (!input.Type->IsInt())
+							Error(50020, L"PrimitiveId must have int type.", input.Position);
+					}
+					else if (input.Attributes.ContainsKey(L"PatchVertexCount"))
+					{
+						info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::PatchVertexCount;
+						if (!input.Type->IsInt())
+							Error(50020, L"PatchVertexCount must have int type.", input.Position);
+					}
 				}
 				return info;
 			}
@@ -1044,7 +1085,7 @@ namespace Spire
 			void PrintInputReference(StringBuilder & sb, String input)
 			{
 				auto info = extCompInfo[input]();
-
+				
 				if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer ||
 					info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StorageBuffer)
 				{
@@ -1067,7 +1108,20 @@ namespace Spire
 				}
 				else
 				{
-					sb << input;
+					if (info.SystemVar == ExternComponentCodeGenInfo::SystemVarType::FragCoord)
+						sb << L"gl_FragCoord";
+					else if (info.SystemVar == ExternComponentCodeGenInfo::SystemVarType::TessCoord)
+						sb << L"gl_TessCoord";
+					else if (info.SystemVar == ExternComponentCodeGenInfo::SystemVarType::InvocationId)
+						sb << L"gl_InvocationID";
+					else if (info.SystemVar == ExternComponentCodeGenInfo::SystemVarType::ThreadId)
+						sb << L"gl_GlobalInvocationID.x";
+					else if (info.SystemVar == ExternComponentCodeGenInfo::SystemVarType::PatchVertexCount)
+						sb << L"gl_PatchVerticesIn";
+					else if (info.SystemVar == ExternComponentCodeGenInfo::SystemVarType::PrimitiveId)
+						sb << L"gl_PrimitiveID";
+					else
+						sb << input;
 				}
 			}
 
@@ -1192,49 +1246,6 @@ namespace Spire
 						}
 					}
 				}
-				else
-				{
-					if (input.Attributes.ContainsKey(L"TessCoord"))
-					{
-						if (input.Type->IsFloatVector() && input.Type->GetVectorSize() == 3)
-							PrintDef(sb.Header, input.Type.Ptr(), input.Name);
-						else
-							errWriter->Error(50053, L"component as '[TessCoord]' attribute must be a vec3.", input.Position);
-						sb.Header << input.Name << L" = gl_TessCoord;\n";
-					}
-					else if (input.Attributes.ContainsKey(L"InvocationId") || input.Attributes.ContainsKey(L"InvocationID"))
-					{
-						if (input.Type->IsInt())
-							PrintDef(sb.Header, input.Type.Ptr(), input.Name);
-						else
-							errWriter->Error(50053, L"component as '[InvocationId]' attribute must be an int.", input.Position);
-						sb.Header << input.Name << L" = gl_InvocationID;\n";
-					}
-					else if (input.Attributes.ContainsKey(L"PrimitiveId") || input.Attributes.ContainsKey(L"PrimitiveID"))
-					{
-						if (input.Type->IsInt())
-							PrintDef(sb.Header, input.Type.Ptr(), input.Name);
-						else
-							errWriter->Error(50053, L"component as '[PrimitiveID]' attribute must be an int.", input.Position);
-						sb.Header << input.Name << L" = gl_PrimitiveID;\n";
-					}
-					else if (input.Attributes.ContainsKey(L"PatchVerticesIn"))
-					{
-						if (input.Type->IsInt())
-							PrintDef(sb.Header, input.Type.Ptr(), input.Name);
-						else
-							errWriter->Error(50053, L"component as '[PatchVerticesIn]' attribute must be an int.", input.Position);
-						sb.Header << input.Name << L" = gl_PatchVerticesIn;\n";
-					}
-					else if (input.Attributes.ContainsKey(L"ThreadId") || input.Attributes.ContainsKey(L"GlobalInvocationId"))
-					{
-						if (input.Type->IsInt())
-							PrintDef(sb.Header, input.Type.Ptr(), input.Name);
-						else
-							errWriter->Error(50053, L"component as '[ThreadId]' attribute must be an int.", input.Position);
-						sb.Header << input.Name << L" = gl_GlobalInvocationID.x;\n";
-					}
-				}
 			}
 
 			void GenerateVertexShaderEpilog(CodeGenContext & ctx, ILWorld * world, ILStage * stage)
@@ -1357,7 +1368,7 @@ namespace Spire
 				useBindlessTexture = stage->Attributes.ContainsKey(L"BindlessTexture");
 
 				StageSource rs;
-				StageAttribute patchWorldName, controlPointWorldName, cornerPointWorldName, domain, innerLevel, outterLevel, numControlPoints;
+				StageAttribute patchWorldName, controlPointWorldName, cornerPointWorldName, domain, innerLevel, outerLevel, numControlPoints;
 				RefPtr<ILWorld> patchWorld, controlPointWorld, cornerPointWorld;
 				if (!stage->Attributes.TryGetValue(L"PatchWorld", patchWorldName))
 				{
@@ -1390,9 +1401,9 @@ namespace Spire
 					errWriter->Error(50053, L"'Domain' should be either 'triangles' or 'quads'.", domain.Position);
 					return rs;
 				}
-				if (!stage->Attributes.TryGetValue(L"TessLevelOutter", outterLevel))
+				if (!stage->Attributes.TryGetValue(L"TessLevelOuter", outerLevel))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'TessLevelOutter'.", stage->Position);
+					errWriter->Error(50052, L"'HullShader' requires attribute 'TessLevelOuter'.", stage->Position);
 					return rs;
 				}
 				if (!stage->Attributes.TryGetValue(L"TessLevelInner", innerLevel))
@@ -1477,11 +1488,11 @@ namespace Spire
 				for (auto & world : worlds)
 				{
 					ILOperand * operand;
-					if (world->Components.TryGetValue(outterLevel.Value, operand))
+					if (world->Components.TryGetValue(outerLevel.Value, operand))
 					{
 						for (int i = 0; i < 4; i++)
 						{
-							ctx.Body << L"gl_TessLevelOutter[" << i << L"] = ";
+							ctx.Body << L"gl_TessLevelOuter[" << i << L"] = ";
 							PrintOp(ctx, operand);
 							ctx.Body << L"[" << i << L"];\n";
 						}
@@ -1491,8 +1502,8 @@ namespace Spire
 
 				}
 				if (!found)
-					errWriter->Error(50041, L"'" + outterLevel.Value + L"': component not defined.",
-						outterLevel.Position);
+					errWriter->Error(50041, L"'" + outerLevel.Value + L"': component not defined.",
+						outerLevel.Position);
 
 				StringBuilder sb;
 				sb << ctx.GlobalHeader.ProduceString();

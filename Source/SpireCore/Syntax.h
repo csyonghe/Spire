@@ -745,6 +745,7 @@ namespace Spire
 		{
 		public:
 			Token Name;
+			Token ParentPipeline;
 			List<RefPtr<WorldSyntaxNode>> Worlds;
 			List<RefPtr<ImportOperatorDefSyntaxNode>> ImportOperators;
 			List<RefPtr<StageSyntaxNode>> Stages;

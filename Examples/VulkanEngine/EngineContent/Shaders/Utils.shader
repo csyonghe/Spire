@@ -80,18 +80,19 @@ module SystemUniforms
 
 module VertexTransform
 {
-    require vec3 vertPos;
-    require vec3 vertTangent;
-    require vec3 vertNormal;
+    require vec3 fineVertPos;
+    require vec3 coarseVertTangent;
+    require vec3 coarseVertNormal;
+    require vec3 displacement;
     require mat4 viewProjectionTransform;
     @modelTransform mat4 modelMatrix; 
     @modelTransform mat4 normalMatrix;
     
-    vec4 position = modelMatrix * vec4(vertPos, 1); 
+    vec4 position = modelMatrix * vec4((fineVertPos+displacement), 1); 
     public vec4 projCoord = viewProjectionTransform * position;
     public vec3 pos = position.xyz;
-    public vec3 vNormal = (normalMatrix * vec4(vertNormal, 0.0)).xyz;
-    public vec3 vTangent = (normalMatrix * vec4(vertTangent, 0.0)).xyz;
+    public vec3 vNormal = (normalMatrix * vec4(coarseVertNormal, 0.0)).xyz;
+    public vec3 vTangent = (normalMatrix * vec4(coarseVertTangent, 0.0)).xyz;
     public vec3 vBiTangent = cross(vTangent, vNormal);
 }
 
@@ -101,34 +102,34 @@ struct BoneTransform
     mat3 normalMatrix;
 }
 
-module SkeletalVertexTransform
+module StaticVertex
 {
-    require vec3 vertPos;
-    require vec2 vertUV;
-    require vec3 vertTangent;
-    require vec3 vertNormal;
+    public using MeshVertex;
+    public @vs vec3 coarseVertPos = vertPos;
+    public @vs vec3 coarseVertNormal = vertNormal;
+    public @vs vec3 coarseVertTangent = vertTangent;
+}
+
+module SkinnedVertex
+{
+    public using MeshVertex;
     require mat4 viewProjectionTransform;
-    require uint boneIds;
-    require uint boneWeights;
-    
     @skeletalTransform BoneTransform[] boneTransforms;
     
-    @vs vec4 position// = vec4(vertPos, 1.0);
+    public @vs vec3 coarseVertPos
     {
-        vec4 result = vec4(0.0);
+        vec3 result = vec3(0.0);
         for (int i = 0 : 3)
         {
             uint boneId = (boneIds >> (i*8)) & 255;
             if (boneId == 255) continue;
             float boneWeight = float((boneWeights >> (i*8)) & 255) * (1.0/255.0);
-            vec4 tp = boneTransforms[boneId].transformMatrix * vec4(vertPos, 1.0);
+            vec3 tp = (boneTransforms[boneId].transformMatrix * vec4(vertPos, 1.0)).xyz;
             result += tp * boneWeight;
         }
         return result;
     }
-    public @vs vec3 pos = position.xyz;
-    public vec4 projCoord = viewProjectionTransform * position;
-    public @vs vec3 vNormal
+    public @vs vec3 coarseVertNormal
     {
         vec3 result = vec3(0.0);
         for (int i = 0 : 3)
@@ -141,7 +142,7 @@ module SkeletalVertexTransform
         }
         return result;
     }
-    public @vs vec3 vTangent
+    public @vs vec3 coarseVertTangent
     {
         vec3 result = vec3(0.0);
         for (int i = 0 : 3)
@@ -154,7 +155,6 @@ module SkeletalVertexTransform
         }
         return result;
     }
-    public vec3 vBiTangent = cross(vTangent, vNormal); 
 }
 
 module TangentSpaceTransform
@@ -203,6 +203,89 @@ float LightingFuncGGX_D(float dotNH, float roughness)
 
     float D = alphaSqr/(pi * denom * denom);
     return D;
+}
+
+module NoTessellation
+{
+    require vec3 coarseVertPos;
+    public vec3 fineVertPos = coarseVertPos;
+}
+
+vec3 ProjectToPlane(vec3 Point, vec3 PlanePoint, vec3 PlaneNormal)
+{
+    vec3 v = Point - PlanePoint;
+    float Len = dot(v, PlaneNormal);
+    vec3 d = Len * PlaneNormal;
+    return (Point - d);
+}
+
+module PN_Tessellation : TessellationPipeline
+{
+    require vec3 coarseVertPos;
+    require vec3 coarseVertNormal;
+    
+    public @tcs vec4 tessLevelOuter = vec4(3, 3, 3, 0);
+    public @tcs vec2 tessLevelInner = vec2(3.0);
+    
+    @tcs vec3 WorldPos_B030 = indexImport(coarseVertPos, 0);
+    @tcs vec3 WorldPos_B003 = indexImport(coarseVertPos, 1);
+    @tcs vec3 WorldPos_B300 = indexImport(coarseVertPos, 2);
+
+    // Edges are names according to the opposing vertex
+    vec3 EdgeB300 = WorldPos_B003 - WorldPos_B030;
+    vec3 EdgeB030 = WorldPos_B300 - WorldPos_B003;
+    vec3 EdgeB003 = WorldPos_B030 - WorldPos_B300;
+
+    // Generate two midpoints on each edge
+    vec3 WorldPos_B021t = WorldPos_B030 + EdgeB300 / 3.0;
+    vec3 WorldPos_B012t = WorldPos_B030 + EdgeB300 * 2.0 / 3.0;
+    vec3 WorldPos_B102t = WorldPos_B003 + EdgeB030 / 3.0;
+    vec3 WorldPos_B201t = WorldPos_B003 + EdgeB030 * 2.0 / 3.0;
+    vec3 WorldPos_B210t = WorldPos_B300 + EdgeB003 / 3.0;
+    vec3 WorldPos_B120t = WorldPos_B300 + EdgeB003 * 2.0 / 3.0;
+
+    // Project each midpoint on the plane defined by the nearest vertex and its normal
+    @tcs vec3 WorldPos_B021 = ProjectToPlane(WorldPos_B021t, WorldPos_B030,
+                                         indexImport(coarseVertNormal, 0));
+    @tcs vec3 WorldPos_B012 = ProjectToPlane(WorldPos_B012t, WorldPos_B003,
+                                         indexImport(coarseVertNormal, 1));
+    @tcs vec3 WorldPos_B102 = ProjectToPlane(WorldPos_B102t, WorldPos_B003,
+                                         indexImport(coarseVertNormal, 1));
+    @tcs vec3 WorldPos_B201 = ProjectToPlane(WorldPos_B201t, WorldPos_B300,
+                                         indexImport(coarseVertNormal, 2));
+    @tcs vec3 WorldPos_B210 = ProjectToPlane(WorldPos_B210t, WorldPos_B300,
+                                         indexImport(coarseVertNormal, 2));
+    @tcs vec3 WorldPos_B120 = ProjectToPlane(WorldPos_B120t, WorldPos_B030,
+                                         indexImport(coarseVertNormal, 0));
+
+    // Handle the center
+    vec3 Center = (WorldPos_B003 + WorldPos_B030 + WorldPos_B300) / 3.0;
+    vec3 WorldPos_B111t = (WorldPos_B021 + WorldPos_B012 + WorldPos_B102 +
+                          WorldPos_B201 + WorldPos_B210 + WorldPos_B120) / 6.0;
+    vec3 WorldPos_B111 = WorldPos_B111t + (WorldPos_B111t - Center) / 2.0;
+
+    
+    float u = tessCoord.x;
+    float v = tessCoord.y;
+    float w = tessCoord.z;
+
+    float vPow2 = v*v;
+    float uPow2 = u*u;
+    float wPow2 = w*w;
+    float uPow3 = uPow2 * u;
+    float vPow3 = vPow2 * v;
+    float wPow3 = wPow2 * w;
+
+    public @tes float3 fineVertPos = indexImport(WorldPos_B300, 0) * wPow3 +
+                    indexImport(WorldPos_B030, 0) * uPow3 +
+                    indexImport(WorldPos_B003, 0) * vPow3 +
+                    indexImport(WorldPos_B210, 0) * 3.0 * wPow2 * u +
+                    indexImport(WorldPos_B120, 0) * 3.0 * w * uPow2 +
+                    indexImport(WorldPos_B201, 0) * 3.0 * wPow2 * v +
+                    indexImport(WorldPos_B021, 0) * 3.0 * uPow2 * v +
+                    indexImport(WorldPos_B102, 0) * 3.0 * w * vPow2 +
+                    indexImport(WorldPos_B012, 0) * 3.0 * u * vPow2 +
+                    indexImport(WorldPos_B111, 0) * 6.0 * w * u * v;
 }
 
 module Lighting

@@ -1,6 +1,9 @@
 module SurfacePattern
 {
+    require vec3 coarseVertPos;
     require vec2 vertUV;
+    
+    public using NoTessellation;
     @perInstanceUniform sampler2D maskMap;
     @perInstanceUniform sampler2D leatherNormalMap;
     @perInstanceUniform sampler2D baseNormalMap;
@@ -11,6 +14,7 @@ module SurfacePattern
     inline vec3 mask = texture(maskMap, vec2(vertUV.x, vertUV.y)).xyz;
     inline vec2 normalCoord = vertUV * 5.79;
     
+    public vec3 displacement = vec3(0.0);
     
     public vec3 normal
     {

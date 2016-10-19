@@ -100,6 +100,16 @@ namespace Spire
 			return false;
 		}
 
+		bool PipelineSymbol::IsChildOf(PipelineSymbol * parentPipeline)
+		{
+			if (this == parentPipeline)
+				return true;
+			else if (ParentPipeline)
+				return ParentPipeline->IsChildOf(parentPipeline);
+			else
+				return false;
+		}
+
 		bool PipelineSymbol::IsWorldImplicitlyReachable(EnumerableHashSet<String>& src, String targetWorld)
 		{
 			for (auto srcW : src)
@@ -286,7 +296,7 @@ namespace Spire
 						result = rresult;
 				}
 			}
-			if (Pipeline->Components.TryGetValue(compName, refComp))
+			if (Pipeline && Pipeline->Components.TryGetValue(compName, refComp))
 			{
 				if (!refComp->IsParam())
 				{

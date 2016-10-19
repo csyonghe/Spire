@@ -74,14 +74,30 @@ namespace Spire
 		}
 		RefPtr<ShaderClosure> CreateShaderClosure(ErrorWriter * err, SymbolTable * symTable, ShaderSymbol * shader, CodePosition usingPos, 
 			ShaderClosure * rootShader,
-			const Dictionary<String, RefPtr<ShaderComponentSymbol>>& pRefMap)
+			const EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>>& pRefMap)
 		{
 			RefPtr<ShaderClosure> rs = new ShaderClosure();
 			if (rootShader == nullptr)
+			{
 				rootShader = rs.Ptr();
+				rootShader->Pipeline = shader->Pipeline;
+			}
 			rs->Name = shader->SyntaxNode->Name.Content;
 			rs->RefMap = pRefMap;
-			rs->Pipeline = shader->Pipeline;
+			if (shader->Pipeline && rootShader->Pipeline)
+			{
+				if (shader->Pipeline->IsChildOf(rootShader->Pipeline))
+					rootShader->Pipeline = shader->Pipeline;
+				else
+				{
+					StringBuilder sb;
+					sb << L"pipeline '" << shader->Pipeline->SyntaxNode->Name.Content << L"' targeted by module '" <<
+						shader->SyntaxNode->Name.Content << L"' is incompatible with pipeline '" << rootShader->Pipeline->SyntaxNode->Name.Content << L"' targeted by shader '" << rootShader->Name << L"'.\nsee definition of shader '" << shader->SyntaxNode->Name.Content << L"' at " << shader->SyntaxNode->Position.ToString();
+					err->Error(33041, sb.ProduceString(), shader->SyntaxNode->Position);
+				}
+			}
+			
+			rs->Pipeline = rootShader->Pipeline;
 			rs->UsingPosition = usingPos;
 			rs->Position = shader->SyntaxNode->Position;
 			for (auto & mbr : shader->SyntaxNode->Members)
@@ -89,7 +105,7 @@ namespace Spire
 				if (auto import = dynamic_cast<ImportSyntaxNode*>(mbr.Ptr()))
 				{
 					// create component for each argument
-					Dictionary<String, RefPtr<ShaderComponentSymbol>> refMap;
+					EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>> refMap;
 					for (auto & arg : import->Arguments)
 					{
 						RefPtr<ShaderComponentSymbol> ccomp = new ShaderComponentSymbol();
@@ -168,7 +184,7 @@ namespace Spire
 					{
 						if (comp.Value->Type->DataType->Equals(arg->Type->DataType.Ptr()))
 						{
-							errMsg << L" implicit parameter matching failed because the component of the same name is not accessible from '" << rootShader->Name << L"'.\ndid you forget the 'public' qualifier?";
+							errMsg << L" implicit parameter matching failed because the component of the same name is not accessible from '" << shader->SyntaxNode->Name.Content << L"'.\ncheck if you have declared necessary requirements and properly used the 'public' qualifier.";
 						}
 						else
 						{
@@ -187,7 +203,7 @@ namespace Spire
 
 		RefPtr<ShaderClosure> CreateShaderClosure(ErrorWriter * err, SymbolTable * symTable, ShaderSymbol * shader)
 		{
-			return CreateShaderClosure(err, symTable, shader, shader->SyntaxNode->Position, nullptr, Dictionary<String, RefPtr<ShaderComponentSymbol>>());
+			return CreateShaderClosure(err, symTable, shader, shader->SyntaxNode->Position, nullptr, EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>>());
 		}
 
 		class ReplaceReferenceVisitor : public SyntaxVisitor
@@ -720,6 +736,16 @@ namespace Spire
 			}
 		}
 
+		void GatherArgumentMappings(EnumerableDictionary<String, String> & result, ShaderClosure* shader)
+		{
+			for (auto & map : shader->RefMap)
+			{
+				result[shader->Components[map.Key]()->UniqueName] = map.Value->UniqueName;
+			}
+			for (auto & subShader : shader->SubClosures)
+				GatherArgumentMappings(result, subShader.Value.Ptr());
+		}
+
 		void RemoveTrivialComponents(ShaderClosure * shader)
 		{
 			// remove trivial components, e.g. if A = B, replace all references to A with B.
@@ -740,13 +766,19 @@ namespace Spire
 					}
 				}
 			}
+			// gather argument mappings
+			EnumerableDictionary<String, String> arguments;
+			GatherArgumentMappings(arguments, shader);
 			EnumerableDictionary<String, String> replacements;
 			for (auto & replace : compSub)
 			{
 				// search transitively for replaceDest;
 				String replaceDest = replace.Key;
 				while (compSub.ContainsKey(replaceDest))
+				{
 					replaceDest = compSub[replaceDest]();
+					arguments.TryGetValue(replaceDest, replaceDest);
+				}
 				if (replace.Key != replaceDest)
 					replacements[replace.Key] = replaceDest;
 			}
@@ -789,10 +821,106 @@ namespace Spire
 			}
 		}
 
+		void PrintModuleUsingStack(StringBuilder & sb, ShaderClosure * shader)
+		{
+			if (shader->Parent)
+			{
+				sb << L"see module '" + shader->Name << L"' being used in '" + shader->Parent->Name << L"' at " << shader->Position.ToString() << L"\n";
+				PrintModuleUsingStack(sb, shader->Parent);
+			}
+			else
+			{
+				sb << L"shader '" << shader->Name << L"' is targeting pipeline '" << shader->Pipeline->SyntaxNode->Name.Content << L"' at " << shader->Position.ToString() << L"\nalso see pipeline definition at " << shader->Pipeline->SyntaxNode->Position.ToString();
+			}
+		}
+	
+		void CheckPipelineShaderConsistency(ErrorWriter * err, ShaderClosure * shader)
+		{
+			for (auto & comp : shader->Components)
+			{
+				for (auto & impl : comp.Value->Implementations)
+				{
+					bool inAbstractWorld = false;
+					if (impl->SyntaxNode->Rate)
+					{
+						auto & userSpecifiedWorlds = impl->SyntaxNode->Rate->Worlds;
+						for (auto & world : userSpecifiedWorlds)
+						{
+							{
+								StringBuilder sb;
+								sb << L"\'" << world.World.Content << L"' is not a defined world in '" <<
+									shader->Pipeline->SyntaxNode->Name.Content << L"'.\n";
+								PrintModuleUsingStack(sb, shader);
+								if (!shader->Pipeline->WorldDependency.ContainsKey(world.World.Content))
+									err->Error(33012, sb.ProduceString(), world.World.Position);
+							}
+							WorldSymbol worldSym;
+							if (shader->Pipeline->Worlds.TryGetValue(world.World.Content, worldSym))
+							{
+								if (worldSym.IsAbstract)
+								{
+									inAbstractWorld = true;
+									if (userSpecifiedWorlds.Count() > 1)
+									{
+										StringBuilder sb;
+										sb << L"abstract world cannot appear with other worlds.\n";
+										PrintModuleUsingStack(sb, shader);
+										err->Error(33013, sb.ProduceString(),
+											world.World.Position);
+										PrintModuleUsingStack(sb, shader);
+									}
+								}
+							}
+						}
+					}
+					if (!inAbstractWorld && !impl->SyntaxNode->IsParam && !impl->SyntaxNode->IsInput
+						&& !impl->SyntaxNode->Expression && !impl->SyntaxNode->BlockStatement)
+					{
+						err->Error(33014, L"non-abstract component must have an implementation.",
+							impl->SyntaxNode->Position);
+					}
+
+					bool isDefinedInAbstractWorld = false, isDefinedInNonAbstractWorld = false;
+					if (impl->SyntaxNode->Rate)
+					{
+						for (auto & w : impl->SyntaxNode->Rate->Worlds)
+						{
+							auto world = shader->Pipeline->Worlds.TryGetValue(w.World.Content);
+							if (world)
+							{
+								if (world->IsAbstract)
+									isDefinedInAbstractWorld = true;
+								else
+									isDefinedInNonAbstractWorld = true;
+							}
+						}
+					}
+					else
+						isDefinedInNonAbstractWorld = true;
+					if (impl->SyntaxNode->Expression || impl->SyntaxNode->BlockStatement)
+					{
+						if (isDefinedInAbstractWorld)
+							err->Error(33039, L"'" + impl->SyntaxNode->Name.Content + L"': no code allowed for component defined in input world.", impl->SyntaxNode->Position);
+					}
+					if (!comp.Value->IsParam() && !comp.Value->Implementations.First()->SyntaxNode->IsInput && (comp.Value->Type->DataType->IsArray() || comp.Value->Type->DataType->IsStruct() ||
+						comp.Value->Type->DataType->IsTexture()))
+					{
+						if (isDefinedInNonAbstractWorld)
+						{
+							err->Error(33035, L"\'" + comp.Value->Name + L"\': sampler, struct and array types only allowed in input worlds.", impl->SyntaxNode->Position);
+						}
+					}
+				}
+			}
+			for (auto & subShader : shader->SubClosures)
+				CheckPipelineShaderConsistency(err, subShader.Value.Ptr());
+		}
+
 		void FlattenShaderClosure(ErrorWriter * err, ShaderClosure * shader)
 		{
 			// add input(extern) components from pipeline
 			AddPipelineComponents(shader);
+			CheckPipelineShaderConsistency(err, shader);
 			// assign choice names
 			AssignUniqueNames(shader, L"", L"");
 			// traverse closures to get component list
@@ -801,6 +929,8 @@ namespace Spire
 			ResolveReference(err, shader, shader);
 			// propagate world constraints
 			if (CheckCircularReference(err, shader))
+				return;
+			if (err->GetErrorCount())
 				return;
 			RemoveTrivialComponents(shader);
 			SolveWorldConstraints(err, shader);
@@ -2546,8 +2676,13 @@ namespace Spire
 			{
 				StandardInput, UniformBuffer, ArrayBuffer, PackedBuffer, StorageBuffer, Texture, Patch
 			};
+			enum class SystemVarType
+			{
+				None, TessCoord, InvocationId, ThreadId, FragCoord, PatchVertexCount, PrimitiveId
+			};
 			DataStructureType DataStructure = DataStructureType::StandardInput;
 			RefPtr<ILType> Type;
+			SystemVarType SystemVar = SystemVarType::None;
 			bool IsArray = false;
 			int ArrayLength = 0;
 			int Binding = -1;
@@ -3506,6 +3641,42 @@ namespace Spire
 				else
 				{
 					// check for attributes 
+					if (input.Attributes.ContainsKey(L"TessCoord"))
+					{
+						info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::TessCoord;
+						if (!(input.Type->IsFloatVector() && input.Type->GetVectorSize() <= 3))
+							Error(50020, L"TessCoord must have vec2 or vec3 type.", input.Position);
+					}
+					else if (input.Attributes.ContainsKey(L"FragCoord"))
+					{
+						info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::FragCoord;
+						if (!(input.Type->IsFloatVector() && input.Type->GetVectorSize() == 4))
+							Error(50020, L"FragCoord must be a vec4.", input.Position);
+					}
+					else if (input.Attributes.ContainsKey(L"InvocationId"))
+					{
+						info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::InvocationId;
+						if (!input.Type->IsInt())
+							Error(50020, L"InvocationId must have int type.", input.Position);
+					}
+					else if (input.Attributes.ContainsKey(L"ThreadId"))
+					{
+						info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::InvocationId;
+						if (!input.Type->IsInt())
+							Error(50020, L"ThreadId must have int type.", input.Position);
+					}
+					else if (input.Attributes.ContainsKey(L"PrimitiveId"))
+					{
+						info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::PrimitiveId;
+						if (!input.Type->IsInt())
+							Error(50020, L"PrimitiveId must have int type.", input.Position);
+					}
+					else if (input.Attributes.ContainsKey(L"PatchVertexCount"))
+					{
+						info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::PatchVertexCount;
+						if (!input.Type->IsInt())
+							Error(50020, L"PatchVertexCount must have int type.", input.Position);
+					}
 				}
 				return info;
 			}
@@ -3513,7 +3684,7 @@ namespace Spire
 			void PrintInputReference(StringBuilder & sb, String input)
 			{
 				auto info = extCompInfo[input]();
-
+				
 				if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer ||
 					info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StorageBuffer)
 				{
@@ -3536,7 +3707,20 @@ namespace Spire
 				}
 				else
 				{
-					sb << input;
+					if (info.SystemVar == ExternComponentCodeGenInfo::SystemVarType::FragCoord)
+						sb << L"gl_FragCoord";
+					else if (info.SystemVar == ExternComponentCodeGenInfo::SystemVarType::TessCoord)
+						sb << L"gl_TessCoord";
+					else if (info.SystemVar == ExternComponentCodeGenInfo::SystemVarType::InvocationId)
+						sb << L"gl_InvocationID";
+					else if (info.SystemVar == ExternComponentCodeGenInfo::SystemVarType::ThreadId)
+						sb << L"gl_GlobalInvocationID.x";
+					else if (info.SystemVar == ExternComponentCodeGenInfo::SystemVarType::PatchVertexCount)
+						sb << L"gl_PatchVerticesIn";
+					else if (info.SystemVar == ExternComponentCodeGenInfo::SystemVarType::PrimitiveId)
+						sb << L"gl_PrimitiveID";
+					else
+						sb << input;
 				}
 			}
 
@@ -3661,49 +3845,6 @@ namespace Spire
 						}
 					}
 				}
-				else
-				{
-					if (input.Attributes.ContainsKey(L"TessCoord"))
-					{
-						if (input.Type->IsFloatVector() && input.Type->GetVectorSize() == 3)
-							PrintDef(sb.Header, input.Type.Ptr(), input.Name);
-						else
-							errWriter->Error(50053, L"component as '[TessCoord]' attribute must be a vec3.", input.Position);
-						sb.Header << input.Name << L" = gl_TessCoord;\n";
-					}
-					else if (input.Attributes.ContainsKey(L"InvocationId") || input.Attributes.ContainsKey(L"InvocationID"))
-					{
-						if (input.Type->IsInt())
-							PrintDef(sb.Header, input.Type.Ptr(), input.Name);
-						else
-							errWriter->Error(50053, L"component as '[InvocationId]' attribute must be an int.", input.Position);
-						sb.Header << input.Name << L" = gl_InvocationID;\n";
-					}
-					else if (input.Attributes.ContainsKey(L"PrimitiveId") || input.Attributes.ContainsKey(L"PrimitiveID"))
-					{
-						if (input.Type->IsInt())
-							PrintDef(sb.Header, input.Type.Ptr(), input.Name);
-						else
-							errWriter->Error(50053, L"component as '[PrimitiveID]' attribute must be an int.", input.Position);
-						sb.Header << input.Name << L" = gl_PrimitiveID;\n";
-					}
-					else if (input.Attributes.ContainsKey(L"PatchVerticesIn"))
-					{
-						if (input.Type->IsInt())
-							PrintDef(sb.Header, input.Type.Ptr(), input.Name);
-						else
-							errWriter->Error(50053, L"component as '[PatchVerticesIn]' attribute must be an int.", input.Position);
-						sb.Header << input.Name << L" = gl_PatchVerticesIn;\n";
-					}
-					else if (input.Attributes.ContainsKey(L"ThreadId") || input.Attributes.ContainsKey(L"GlobalInvocationId"))
-					{
-						if (input.Type->IsInt())
-							PrintDef(sb.Header, input.Type.Ptr(), input.Name);
-						else
-							errWriter->Error(50053, L"component as '[ThreadId]' attribute must be an int.", input.Position);
-						sb.Header << input.Name << L" = gl_GlobalInvocationID.x;\n";
-					}
-				}
 			}
 
 			void GenerateVertexShaderEpilog(CodeGenContext & ctx, ILWorld * world, ILStage * stage)
@@ -3826,7 +3967,7 @@ namespace Spire
 				useBindlessTexture = stage->Attributes.ContainsKey(L"BindlessTexture");
 
 				StageSource rs;
-				StageAttribute patchWorldName, controlPointWorldName, cornerPointWorldName, domain, innerLevel, outterLevel, numControlPoints;
+				StageAttribute patchWorldName, controlPointWorldName, cornerPointWorldName, domain, innerLevel, outerLevel, numControlPoints;
 				RefPtr<ILWorld> patchWorld, controlPointWorld, cornerPointWorld;
 				if (!stage->Attributes.TryGetValue(L"PatchWorld", patchWorldName))
 				{
@@ -3859,9 +4000,9 @@ namespace Spire
 					errWriter->Error(50053, L"'Domain' should be either 'triangles' or 'quads'.", domain.Position);
 					return rs;
 				}
-				if (!stage->Attributes.TryGetValue(L"TessLevelOutter", outterLevel))
+				if (!stage->Attributes.TryGetValue(L"TessLevelOuter", outerLevel))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'TessLevelOutter'.", stage->Position);
+					errWriter->Error(50052, L"'HullShader' requires attribute 'TessLevelOuter'.", stage->Position);
 					return rs;
 				}
 				if (!stage->Attributes.TryGetValue(L"TessLevelInner", innerLevel))
@@ -3946,11 +4087,11 @@ namespace Spire
 				for (auto & world : worlds)
 				{
 					ILOperand * operand;
-					if (world->Components.TryGetValue(outterLevel.Value, operand))
+					if (world->Components.TryGetValue(outerLevel.Value, operand))
 					{
 						for (int i = 0; i < 4; i++)
 						{
-							ctx.Body << L"gl_TessLevelOutter[" << i << L"] = ";
+							ctx.Body << L"gl_TessLevelOuter[" << i << L"] = ";
 							PrintOp(ctx, operand);
 							ctx.Body << L"[" << i << L"];\n";
 						}
@@ -3960,8 +4101,8 @@ namespace Spire
 
 				}
 				if (!found)
-					errWriter->Error(50041, L"'" + outterLevel.Value + L"': component not defined.",
-						outterLevel.Position);
+					errWriter->Error(50041, L"'" + outerLevel.Value + L"': component not defined.",
+						outerLevel.Position);
 
 				StringBuilder sb;
 				sb << ctx.GlobalHeader.ProduceString();
@@ -5895,14 +6036,14 @@ namespace Spire
 			for (auto& world : shader->Worlds)
 			{
 				printf("World: %S\n", world.Key.Buffer());
-				auto& worldIL = world.Value;
+				//auto& worldIL = world.Value;
 			}
 		}
 
 		class SpirVCodeGen : public CodeGenBackend
 		{
 		public:
-			virtual CompiledShaderSource GenerateShader(CompileResult & result, SymbolTable * symbols, ILShader * shader, ErrorWriter * err) override
+			virtual CompiledShaderSource GenerateShader(CompileResult & /*result*/, SymbolTable * /*symbols*/, ILShader * shader, ErrorWriter * /*err*/) override
 			{
 				PrintILShader(shader);
 				system("pause");
@@ -6171,6 +6312,11 @@ namespace Spire
 			PushScope();
 			FillPosition(pipeline.Ptr());
 			pipeline->Name = ReadToken(TokenType::Identifier);
+			if (LookAheadToken(TokenType::Colon))
+			{
+				ReadToken(TokenType::Colon);
+				pipeline->ParentPipeline = ReadToken(TokenType::Identifier);
+			}
 			ReadToken(TokenType::LBrace);
 			while (!LookAheadToken(TokenType::RBrace))
 			{
@@ -7590,6 +7736,18 @@ namespace Spire
 			{
 				RefPtr<PipelineSymbol> psymbol = new PipelineSymbol();
 				psymbol->SyntaxNode = pipeline;
+				if (pipeline->ParentPipeline.Content.Length())
+				{
+					RefPtr<PipelineSymbol> parentPipeline;
+					if (symbolTable->Pipelines.TryGetValue(pipeline->ParentPipeline.Content, parentPipeline))
+					{
+						psymbol->ParentPipeline = parentPipeline.Ptr();
+					}
+					else
+					{
+						Error(33010, L"pipeline '" + pipeline->ParentPipeline.Content + L"' is undefined.", pipeline->ParentPipeline);
+					}
+				}
 				currentPipeline = psymbol.Ptr();
 				symbolTable->Pipelines.Add(pipeline->Name.Content, psymbol);
 				for (auto world : pipeline->Worlds)
@@ -7871,37 +8029,10 @@ namespace Spire
 					{
 						comp->IsInline = true;
 					}
-					bool isDefinedInAbstractWorld = false, isDefinedInNonAbstractWorld = false;
-					if (comp->Rate)
-					{
-						for (auto & w : comp->Rate->Worlds)
-						{
-							auto world = currentShader->Pipeline->Worlds.TryGetValue(w.World.Content);
-							if (world)
-							{
-								if (world->IsAbstract)
-									isDefinedInAbstractWorld = true;
-								else
-									isDefinedInNonAbstractWorld = true;
-							}
-						}
-					}
-					else
-						isDefinedInNonAbstractWorld = true;
 					if (comp->Expression || comp->BlockStatement)
 					{
 						if (compSym->IsParam())
-							Error(33039, L"'" + comp->Name.Content + L"': no code allowed for component defined in input world.", comp);
-						else if (isDefinedInAbstractWorld)
 							Error(33040, L"'require': cannot define computation on component requirements.", comp);
-					}
-					if (!compSym->IsParam() && (compSym->Type->DataType->IsArray() || compSym->Type->DataType->IsStruct() ||
-						compSym->Type->DataType->IsTexture()))
-					{
-						if (isDefinedInNonAbstractWorld)
-						{
-							Error(33035, L"\'" + compSym->Name + L"\': sampler, struct and array types only allowed in input worlds.", comp->Name);
-						}
 					}
 					currentComp = nullptr;
 					return comp;
@@ -7946,31 +8077,36 @@ namespace Spire
 				inheritanceSet.Add(curShader->Name.Content);
 				auto & shaderSymbol = symbolTable->Shaders[curShader->Name.Content].GetValue();
 				this->currentShader = shaderSymbol.Ptr();
-				if (shader->Pipeline.Content.Length() == 0) // implicit pipeline
-				{
-					if (program->Pipelines.Count() == 1)
+				
+					if (shader->Pipeline.Content.Length() == 0) // implicit pipeline
 					{
-						shader->Pipeline = shader->Name; // get line and col from shader name
-						shader->Pipeline.Content = program->Pipelines.First()->Name.Content;
+						if (program->Pipelines.Count() == 1)
+						{
+							shader->Pipeline = shader->Name; // get line and col from shader name
+							shader->Pipeline.Content = program->Pipelines.First()->Name.Content;
+						}
+						else if (!shader->IsModule)
+						{
+							// current compilation context has more than one pipeline defined,
+							// in which case we do not allow implicit pipeline specification
+							Error(33002, L"explicit pipeline specification required for shader '" +
+								shader->Name.Content + L"' because multiple pipelines are defined in current context.", curShader->Name);
+						}
 					}
+
+				auto pipelineName = shader->Pipeline.Content;
+				if (pipelineName.Length())
+				{
+					auto pipeline = symbolTable->Pipelines.TryGetValue(pipelineName);
+					if (pipeline)
+						shaderSymbol->Pipeline = pipeline->Ptr();
 					else
 					{
-						// current compilation context has more than one pipeline defined,
-						// in which case we do not allow implicit pipeline specification
-						Error(33002, L"explicit pipeline specification required for shader '" +
-							shader->Name.Content + L"' because multiple pipelines are defined in current context.", curShader->Name);
+						Error(33010, L"pipeline \'" + pipelineName + L"' is not defined.", shader->Pipeline);
+						throw 0;
 					}
 				}
-				
-				auto pipelineName = shader->Pipeline.Content;
-				auto pipeline = symbolTable->Pipelines.TryGetValue(pipelineName);
-				if (pipeline)
-					shaderSymbol->Pipeline = pipeline->Ptr();
-				else
-				{
-					Error(33010, L"pipeline \'" + pipelineName + L"' is not defined.", shader->Pipeline);
-					throw 0;
-				}
+
 				if (shader->IsModule)
 					shaderSymbol->IsAbstract = true;
 				// add components to symbol table
@@ -7995,7 +8131,8 @@ namespace Spire
 				// add shader objects to symbol table
 				ShaderImportVisitor importVisitor(err, symbolTable);
 				shader->Accept(&importVisitor);
-
+				/* ************************************
+				***************************************
 				for (auto & comp : shaderSymbol->Components)
 				{
 					for (auto & impl : comp.Value->Implementations)
@@ -8033,6 +8170,7 @@ namespace Spire
 						}
 					}
 				}
+				*/
 				this->currentShader = nullptr;
 			}
 			// pass 2: type checking component definitions
@@ -8915,7 +9053,7 @@ namespace Spire
 
 			ShaderComponentSymbol * ResolveFunctionComponent(ShaderSymbol * shader, String name, const List<RefPtr<ExpressionSyntaxNode>> & args, bool topLevel = true)
 			{
-				return ResolveFunctionComponent(shader, name, AsQueryable(args).Select([](RefPtr<ExpressionSyntaxNode> x) {return x->Type; }).ToList(), topLevel);
+				return ResolveFunctionComponent(shader, name, From(args).Select([](RefPtr<ExpressionSyntaxNode> x) {return x->Type; }).ToList(), topLevel);
 			}
 
 			RefPtr<ExpressionSyntaxNode> ResolveFunctionOverload(InvokeExpressionSyntaxNode * invoke, MemberExpressionSyntaxNode* memberExpr, List<RefPtr<ExpressionSyntaxNode>> & arguments)
@@ -8956,7 +9094,7 @@ namespace Spire
 					}
 				}
 				// check if this is an import operator call
-				if (currentShader && currentCompNode && arguments.Count() > 0)
+				if (currentShader && currentCompNode && arguments.Count() > 0 && currentShader->Pipeline)
 				{
 					if (auto impOpList = currentShader->Pipeline->ImportOperators.TryGetValue(varExpr->Variable))
 					{
@@ -8972,13 +9110,11 @@ namespace Spire
 						if (currentCompNode->Rate->Worlds.Count() > 1)
 							Error(33073, L"cannot call an import operator from a multi-world component definition. consider qualify the component with only one explicit world.",
 								varExpr);
-						auto func = FindFunctionOverload(*impOpList, [](RefPtr<ImportOperatorDefSyntaxNode> imp)
+						auto validOverloads = From(*impOpList).Where([&](RefPtr<ImportOperatorDefSyntaxNode> imp) { return imp->DestWorld.Content == currentCompNode->Rate->Worlds.First().World.Content; }).ToList();
+						auto func = FindFunctionOverload(validOverloads, [](RefPtr<ImportOperatorDefSyntaxNode> imp)
 						{
-							List<RefPtr<ParameterSyntaxNode>> params;
-							for (int i = 1; i < imp->Parameters.Count(); i++)
-								params.Add(imp->Parameters[i]);
-							return params;
-						}, AsQueryable(arguments).Select([](RefPtr<ExpressionSyntaxNode> x) {return x->Type; }).ToList());
+							return imp->Parameters;
+						}, From(arguments).Skip(1).Select([](RefPtr<ExpressionSyntaxNode> x) {return x->Type; }).ToList());
 						if (func)
 						{
 							RefPtr<ImportExpressionSyntaxNode> importExpr = new ImportExpressionSyntaxNode();
@@ -9057,7 +9193,7 @@ namespace Spire
 						func = FindFunctionOverload(*functionOverloads, [](RefPtr<FunctionSymbol> f)
 						{
 							return f->SyntaxNode->Parameters;
-						}, AsQueryable(arguments).Select([](RefPtr<ExpressionSyntaxNode> x) {return x->Type; }).ToList());
+						}, From(arguments).Select([](RefPtr<ExpressionSyntaxNode> x) {return x->Type; }).ToList());
 						functionNameFound = true;
 					}
 				}
@@ -15701,6 +15837,16 @@ namespace Spire
 			return false;
 		}
 
+		bool PipelineSymbol::IsChildOf(PipelineSymbol * parentPipeline)
+		{
+			if (this == parentPipeline)
+				return true;
+			else if (ParentPipeline)
+				return ParentPipeline->IsChildOf(parentPipeline);
+			else
+				return false;
+		}
+
 		bool PipelineSymbol::IsWorldImplicitlyReachable(EnumerableHashSet<String>& src, String targetWorld)
 		{
 			for (auto srcW : src)
@@ -15887,7 +16033,7 @@ namespace Spire
 						result = rresult;
 				}
 			}
-			if (Pipeline->Components.TryGetValue(compName, refComp))
+			if (Pipeline && Pipeline->Components.TryGetValue(compName, refComp))
 			{
 				if (!refComp->IsParam())
 				{
@@ -17084,7 +17230,7 @@ namespace Spire
 								{
 									auto importPath = Shader->Pipeline->FindImplicitImportOperatorChain(depWorld, dep.SourceWorld);
 									if (importPath.Count() == 0)
-										throw InvalidProgramException(L"no import path found.");
+										continue;
 									processImportOperatorUsings(importPath.First().Nodes.Last().ImportOperator);
 								}
 								goto selectionEnd; // first preferred overload is found, terminate searching

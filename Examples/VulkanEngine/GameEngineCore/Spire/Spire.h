@@ -966,6 +966,7 @@ namespace Spire
 		{
 		public:
 			Token Name;
+			Token ParentPipeline;
 			List<RefPtr<WorldSyntaxNode>> Worlds;
 			List<RefPtr<ImportOperatorDefSyntaxNode>> ImportOperators;
 			List<RefPtr<StageSyntaxNode>> Stages;
@@ -4051,7 +4052,7 @@ namespace Spire
 			bool IsPublic = false;
 			String Name;
 			CodePosition UsingPosition;
-			Dictionary<String, RefPtr<ShaderComponentSymbol>> RefMap;
+			EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>> RefMap;
 			EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>> Components;
 			EnumerableDictionary<String, ShaderComponentSymbol *> AllComponents;
 			EnumerableDictionary<String, RefPtr<ShaderClosure>> SubClosures;
@@ -4083,6 +4084,7 @@ namespace Spire
 			List<String> WorldTopologyOrder;
 		public:
 			PipelineSyntaxNode * SyntaxNode;
+			PipelineSymbol * ParentPipeline;
 			EnumerableDictionary<String, List<RefPtr<ImportOperatorDefSyntaxNode>>> ImportOperators;
 			EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>> Components;
 			EnumerableDictionary<String, List<RefPtr<ShaderComponentSymbol>>> FunctionComponents;
@@ -4094,6 +4096,7 @@ namespace Spire
 			bool IsWorldReachable(String src, String targetWorld);
 			bool IsWorldImplicitlyReachable(EnumerableHashSet<String> & src, String targetWorld);
 			bool IsWorldImplicitlyReachable(String src, String targetWorld);
+			bool IsChildOf(PipelineSymbol * parentPipeline);
 			List<String> & GetWorldTopologyOrder();
 			List<ImportPath> FindImplicitImportOperatorChain(String worldSrc, String worldDest);
 			List<ImportOperatorDefSyntaxNode*> GetImportOperatorsFromSourceWorld(String worldSrc);

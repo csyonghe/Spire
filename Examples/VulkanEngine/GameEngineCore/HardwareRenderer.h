@@ -93,7 +93,7 @@ namespace GameEngine
 
 	enum class PrimitiveType
 	{
-		Points = 0, Lines = 1, LineStrips = 3, Triangles = 4, TriangleStrips = 5, TriangleFans = 6,
+		Points = 0, Lines = 1, LineStrips = 3, Triangles = 4, TriangleStrips = 5, TriangleFans = 6, Quads = 7, Patches = 14
 	};
 
 	enum class ShaderDataType
@@ -104,7 +104,7 @@ namespace GameEngine
 
 	enum class ShaderType
 	{
-		VertexShader, FragmentShader, ComputeShader
+		VertexShader, FragmentShader, HullShader, DomainShader, ComputeShader
 	};
 
 	enum class StencilOp : char
@@ -564,6 +564,7 @@ namespace GameEngine
 	public:
 		bool PrimitiveRestartEnabled = false;
 		PrimitiveType PrimitiveTopology = GameEngine::PrimitiveType::Triangles;
+		int PatchSize = 3;
 		CompareFunc DepthCompareFunc = CompareFunc::Disabled, StencilCompareFunc = CompareFunc::Disabled;
 		StencilOp StencilFailOp = StencilOp::Keep, StencilDepthFailOp = StencilOp::Keep, StencilDepthPassOp = StencilOp::Keep;
 		BlendMode BlendMode = GameEngine::BlendMode::Replace;

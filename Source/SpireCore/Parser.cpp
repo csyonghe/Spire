@@ -250,6 +250,11 @@ namespace Spire
 			PushScope();
 			FillPosition(pipeline.Ptr());
 			pipeline->Name = ReadToken(TokenType::Identifier);
+			if (LookAheadToken(TokenType::Colon))
+			{
+				ReadToken(TokenType::Colon);
+				pipeline->ParentPipeline = ReadToken(TokenType::Identifier);
+			}
 			ReadToken(TokenType::LBrace);
 			while (!LookAheadToken(TokenType::RBrace))
 			{

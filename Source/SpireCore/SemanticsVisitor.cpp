@@ -205,6 +205,18 @@ namespace Spire
 			{
 				RefPtr<PipelineSymbol> psymbol = new PipelineSymbol();
 				psymbol->SyntaxNode = pipeline;
+				if (pipeline->ParentPipeline.Content.Length())
+				{
+					RefPtr<PipelineSymbol> parentPipeline;
+					if (symbolTable->Pipelines.TryGetValue(pipeline->ParentPipeline.Content, parentPipeline))
+					{
+						psymbol->ParentPipeline = parentPipeline.Ptr();
+					}
+					else
+					{
+						Error(33010, L"pipeline '" + pipeline->ParentPipeline.Content + L"' is undefined.", pipeline->ParentPipeline);
+					}
+				}
 				currentPipeline = psymbol.Ptr();
 				symbolTable->Pipelines.Add(pipeline->Name.Content, psymbol);
 				for (auto world : pipeline->Worlds)
@@ -486,37 +498,10 @@ namespace Spire
 					{
 						comp->IsInline = true;
 					}
-					bool isDefinedInAbstractWorld = false, isDefinedInNonAbstractWorld = false;
-					if (comp->Rate)
-					{
-						for (auto & w : comp->Rate->Worlds)
-						{
-							auto world = currentShader->Pipeline->Worlds.TryGetValue(w.World.Content);
-							if (world)
-							{
-								if (world->IsAbstract)
-									isDefinedInAbstractWorld = true;
-								else
-									isDefinedInNonAbstractWorld = true;
-							}
-						}
-					}
-					else
-						isDefinedInNonAbstractWorld = true;
 					if (comp->Expression || comp->BlockStatement)
 					{
 						if (compSym->IsParam())
-							Error(33039, L"'" + comp->Name.Content + L"': no code allowed for component defined in input world.", comp);
-						else if (isDefinedInAbstractWorld)
 							Error(33040, L"'require': cannot define computation on component requirements.", comp);
-					}
-					if (!compSym->IsParam() && (compSym->Type->DataType->IsArray() || compSym->Type->DataType->IsStruct() ||
-						compSym->Type->DataType->IsTexture()))
-					{
-						if (isDefinedInNonAbstractWorld)
-						{
-							Error(33035, L"\'" + compSym->Name + L"\': sampler, struct and array types only allowed in input worlds.", comp->Name);
-						}
 					}
 					currentComp = nullptr;
 					return comp;
@@ -561,31 +546,36 @@ namespace Spire
 				inheritanceSet.Add(curShader->Name.Content);
 				auto & shaderSymbol = symbolTable->Shaders[curShader->Name.Content].GetValue();
 				this->currentShader = shaderSymbol.Ptr();
-				if (shader->Pipeline.Content.Length() == 0) // implicit pipeline
-				{
-					if (program->Pipelines.Count() == 1)
+				
+					if (shader->Pipeline.Content.Length() == 0) // implicit pipeline
 					{
-						shader->Pipeline = shader->Name; // get line and col from shader name
-						shader->Pipeline.Content = program->Pipelines.First()->Name.Content;
+						if (program->Pipelines.Count() == 1)
+						{
+							shader->Pipeline = shader->Name; // get line and col from shader name
+							shader->Pipeline.Content = program->Pipelines.First()->Name.Content;
+						}
+						else if (!shader->IsModule)
+						{
+							// current compilation context has more than one pipeline defined,
+							// in which case we do not allow implicit pipeline specification
+							Error(33002, L"explicit pipeline specification required for shader '" +
+								shader->Name.Content + L"' because multiple pipelines are defined in current context.", curShader->Name);
+						}
 					}
+
+				auto pipelineName = shader->Pipeline.Content;
+				if (pipelineName.Length())
+				{
+					auto pipeline = symbolTable->Pipelines.TryGetValue(pipelineName);
+					if (pipeline)
+						shaderSymbol->Pipeline = pipeline->Ptr();
 					else
 					{
-						// current compilation context has more than one pipeline defined,
-						// in which case we do not allow implicit pipeline specification
-						Error(33002, L"explicit pipeline specification required for shader '" +
-							shader->Name.Content + L"' because multiple pipelines are defined in current context.", curShader->Name);
+						Error(33010, L"pipeline \'" + pipelineName + L"' is not defined.", shader->Pipeline);
+						throw 0;
 					}
 				}
-				
-				auto pipelineName = shader->Pipeline.Content;
-				auto pipeline = symbolTable->Pipelines.TryGetValue(pipelineName);
-				if (pipeline)
-					shaderSymbol->Pipeline = pipeline->Ptr();
-				else
-				{
-					Error(33010, L"pipeline \'" + pipelineName + L"' is not defined.", shader->Pipeline);
-					throw 0;
-				}
+
 				if (shader->IsModule)
 					shaderSymbol->IsAbstract = true;
 				// add components to symbol table
@@ -610,7 +600,8 @@ namespace Spire
 				// add shader objects to symbol table
 				ShaderImportVisitor importVisitor(err, symbolTable);
 				shader->Accept(&importVisitor);
-
+				/* ************************************
+				***************************************
 				for (auto & comp : shaderSymbol->Components)
 				{
 					for (auto & impl : comp.Value->Implementations)
@@ -648,6 +639,7 @@ namespace Spire
 						}
 					}
 				}
+				*/
 				this->currentShader = nullptr;
 			}
 			// pass 2: type checking component definitions
@@ -1530,7 +1522,7 @@ namespace Spire
 
 			ShaderComponentSymbol * ResolveFunctionComponent(ShaderSymbol * shader, String name, const List<RefPtr<ExpressionSyntaxNode>> & args, bool topLevel = true)
 			{
-				return ResolveFunctionComponent(shader, name, AsQueryable(args).Select([](RefPtr<ExpressionSyntaxNode> x) {return x->Type; }).ToList(), topLevel);
+				return ResolveFunctionComponent(shader, name, From(args).Select([](RefPtr<ExpressionSyntaxNode> x) {return x->Type; }).ToList(), topLevel);
 			}
 
 			RefPtr<ExpressionSyntaxNode> ResolveFunctionOverload(InvokeExpressionSyntaxNode * invoke, MemberExpressionSyntaxNode* memberExpr, List<RefPtr<ExpressionSyntaxNode>> & arguments)
@@ -1571,7 +1563,7 @@ namespace Spire
 					}
 				}
 				// check if this is an import operator call
-				if (currentShader && currentCompNode && arguments.Count() > 0)
+				if (currentShader && currentCompNode && arguments.Count() > 0 && currentShader->Pipeline)
 				{
 					if (auto impOpList = currentShader->Pipeline->ImportOperators.TryGetValue(varExpr->Variable))
 					{
@@ -1587,13 +1579,11 @@ namespace Spire
 						if (currentCompNode->Rate->Worlds.Count() > 1)
 							Error(33073, L"cannot call an import operator from a multi-world component definition. consider qualify the component with only one explicit world.",
 								varExpr);
-						auto func = FindFunctionOverload(*impOpList, [](RefPtr<ImportOperatorDefSyntaxNode> imp)
+						auto validOverloads = From(*impOpList).Where([&](RefPtr<ImportOperatorDefSyntaxNode> imp) { return imp->DestWorld.Content == currentCompNode->Rate->Worlds.First().World.Content; }).ToList();
+						auto func = FindFunctionOverload(validOverloads, [](RefPtr<ImportOperatorDefSyntaxNode> imp)
 						{
-							List<RefPtr<ParameterSyntaxNode>> params;
-							for (int i = 1; i < imp->Parameters.Count(); i++)
-								params.Add(imp->Parameters[i]);
-							return params;
-						}, AsQueryable(arguments).Select([](RefPtr<ExpressionSyntaxNode> x) {return x->Type; }).ToList());
+							return imp->Parameters;
+						}, From(arguments).Skip(1).Select([](RefPtr<ExpressionSyntaxNode> x) {return x->Type; }).ToList());
 						if (func)
 						{
 							RefPtr<ImportExpressionSyntaxNode> importExpr = new ImportExpressionSyntaxNode();
@@ -1672,7 +1662,7 @@ namespace Spire
 						func = FindFunctionOverload(*functionOverloads, [](RefPtr<FunctionSymbol> f)
 						{
 							return f->SyntaxNode->Parameters;
-						}, AsQueryable(arguments).Select([](RefPtr<ExpressionSyntaxNode> x) {return x->Type; }).ToList());
+						}, From(arguments).Select([](RefPtr<ExpressionSyntaxNode> x) {return x->Type; }).ToList());
 						functionNameFound = true;
 					}
 				}

@@ -1271,6 +1271,7 @@ namespace GLL
 		VertexFormat format;
 		bool primitiveRestart;
 		PrimitiveType primitiveType;
+		int patchSize;
 		CompareFunc DepthCompareFunc;
 		CompareFunc StencilCompareFunc;
 		StencilOp StencilFailOp, StencilDepthFailOp, StencilDepthPassOp;
@@ -1321,12 +1322,13 @@ namespace GLL
 	public:
 		Program shaderProgram;
 		VertexFormat format;
+		bool isTessellation = false;
 		virtual void SetShaders(CoreLib::ArrayView<GameEngine::Shader*> shaders) override
 		{
 #if _DEBUG
 			bool vertPresent = false;
-			//bool tescControlPresent = false;
-			//bool tescEvalPresent = false;
+			bool tessControlPresent = false;
+			bool tessEvalPresent = false;
 			//bool geometryPresent = false;
 			bool fragPresent = false;
 			bool computePresent = false;
@@ -1350,11 +1352,20 @@ namespace GLL
 					assert(computePresent == false);
 					computePresent = true;
 					break;
+				case ShaderType::HullShader:
+					assert(tessControlPresent == false);
+					tessControlPresent = true;
+					break;
+				case ShaderType::DomainShader:
+					assert(tessEvalPresent == false);
+					tessEvalPresent = true;
+					break;
 				default:
 					throw HardwareRendererException(L"Unknown shader stage");
 				}
 #endif
-
+				if (dynamic_cast<Shader*>(shader)->stage == ShaderType::HullShader)
+					isTessellation = true;
 				glAttachShader(handle, dynamic_cast<Shader*>(shader)->GetHandle());
 			}
 
@@ -1375,7 +1386,29 @@ namespace GLL
 			PipelineSettings settings;
 			settings.format = format;
 			settings.primitiveRestart = PrimitiveRestartEnabled;
-			settings.primitiveType = PrimitiveTopology;
+			if (isTessellation)
+			{
+				switch (PrimitiveTopology)
+				{
+				case PrimitiveType::Lines:
+					settings.patchSize = 2;
+					break;
+				case PrimitiveType::Triangles:
+					settings.patchSize = 3;
+					break;
+				case PrimitiveType::Quads:
+					settings.patchSize = 4;
+					break;
+				case PrimitiveType::Patches:
+					settings.patchSize = PatchSize;
+					break;
+				default:
+					throw InvalidOperationException(L"invalid primitive type for tessellation.");
+				}
+				settings.primitiveType = PrimitiveType::Patches;
+			}
+			else
+				settings.primitiveType = PrimitiveTopology;
 			settings.program = shaderProgram;
 			
 			settings.DepthCompareFunc = DepthCompareFunc;
@@ -1803,9 +1836,10 @@ namespace GLL
 						break;
 					case Command::BindPipeline:
 					{
-						command.pipeline.instance->settings.program.Use();
+						auto & pipelineSettings = command.pipeline.instance->settings;
+						pipelineSettings.program.Use();
 						if (currentVertexBuffer == nullptr) throw HardwareRendererException(L"For OpenGL, must BindVertexBuffer before BindPipeline.");
-						currentVAO.SetVertex(*currentVertexBuffer, command.pipeline.instance->settings.format.Attributes.GetArrayView(), command.pipeline.vertSize, 0, 0);
+						currentVAO.SetVertex(*currentVertexBuffer, pipelineSettings.format.Attributes.GetArrayView(), command.pipeline.vertSize, 0, 0);
 						primType = command.pipeline.primitiveType;
 						if (command.pipeline.primitiveRestart)
 						{
@@ -1816,7 +1850,8 @@ namespace GLL
 						{
 							glDisable(GL_PRIMITIVE_RESTART);
 						}
-						auto & pipelineSettings = command.pipeline.instance->settings;
+						if (pipelineSettings.primitiveType == PrimitiveType::Patches)
+							glPatchParameteri(GL_PATCH_VERTICES, pipelineSettings.patchSize);
 						SetZTestMode(pipelineSettings.DepthCompareFunc);
 						SetBlendMode(pipelineSettings.BlendMode);
 						StencilMode smode;
@@ -2244,6 +2279,12 @@ namespace GLL
 				break;
 			case ShaderType::FragmentShader:
 				handle = glCreateShader(GL_FRAGMENT_SHADER);
+				break;
+			case ShaderType::HullShader:
+				handle = glCreateShader(GL_TESS_CONTROL_SHADER);
+				break;
+			case ShaderType::DomainShader:
+				handle = glCreateShader(GL_TESS_EVALUATION_SHADER);
 				break;
 			case ShaderType::ComputeShader:
 				handle = glCreateShader(GL_COMPUTE_SHADER);

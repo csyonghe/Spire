@@ -76,6 +76,7 @@ namespace GameEngine
 			}
 			if (compileResult.ErrorList.Count() > 0)
 			{
+				CoreLib::IO::File::WriteAllText(L"debugSpireShader.spire", shaderSrc);
 				src.Errors = compileResult.ErrorList;
 				compileResult.PrintError();
 				return false;

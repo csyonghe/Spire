@@ -51,14 +51,14 @@ namespace Spire
 			for (auto& world : shader->Worlds)
 			{
 				printf("World: %S\n", world.Key.Buffer());
-				auto& worldIL = world.Value;
+				//auto& worldIL = world.Value;
 			}
 		}
 
 		class SpirVCodeGen : public CodeGenBackend
 		{
 		public:
-			virtual CompiledShaderSource GenerateShader(CompileResult & result, SymbolTable * symbols, ILShader * shader, ErrorWriter * err) override
+			virtual CompiledShaderSource GenerateShader(CompileResult & /*result*/, SymbolTable * /*symbols*/, ILShader * shader, ErrorWriter * /*err*/) override
 			{
 				PrintILShader(shader);
 				system("pause");
