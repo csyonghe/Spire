@@ -145,47 +145,8 @@ module SkinnedVertex
     }
     
     public vec3 coarseVertPos = skinning.pos;
-    /*{
-        vec3 result = vec3(0.0);
-        for (int i = 0 : 3)
-        {
-            uint boneId = (boneIds >> (i*8)) & 255;
-            if (boneId == 255) continue;
-            float boneWeight = float((boneWeights >> (i*8)) & 255) * (1.0/255.0);
-            vec3 tp = (boneTransforms[boneId].transformMatrix * vec4(vertPos, 1.0)).xyz;
-            result += tp * boneWeight;
-            
-        }
-        return result;
-    }*/
     public vec3 coarseVertNormal = skinning.normal;
-   /* {
-        vec3 result = vec3(0.0);
-        for (int i = 0 : 3)
-        {
-            uint boneId = (boneIds >> (i*8)) & 255;
-            if (boneId == 255) continue;            
-            float boneWeight = float((boneWeights >> (i*8)) & 255) * (1.0/255.0);
-            vec3 tp = boneTransforms[boneId].normalMatrix * vertNormal;
-            result += tp * boneWeight;
-        }
-        return result;
-    }
-    */
     public vec3 coarseVertTangent = skinning.tangent;
-    /*{
-        vec3 result = vec3(0.0);
-        for (int i = 0 : 3)
-        {
-            uint boneId = (boneIds >> (i*8)) & 255;
-            if (boneId == 255) continue;            
-            float boneWeight = float((boneWeights >> (i*8)) & 255) * (1.0/255.0);
-            vec3 tp = boneTransforms[boneId].normalMatrix * vertTangent;
-            result += tp * boneWeight;
-        }
-        return result;
-    }
-    */
 }
 
 module TangentSpaceTransform
@@ -199,55 +160,10 @@ module TangentSpaceTransform
         + normal_in.z * vNormal);
 }
 
-
-float Pow4(float x)
-{
-    return (x*x)*(x*x);
-}
-
-vec2 LightingFuncGGX_FV(float dotLH, float roughness)
-{
-    float alpha = roughness*roughness;/*sf*/
-
-    // F
-    float F_a, F_b;
-    float dotLH5 = Pow4(1.0-dotLH) * (1.0 - dotLH);
-    F_a = 1.0;
-    F_b = dotLH5;
-
-    // V
-    float vis;
-    float k = alpha/2.0;
-    float k2 = k*k;
-    float invK2 = 1.0-k2;
-    vis = 1.0/(dotLH*dotLH*invK2 + k2);
-
-    return vec2(F_a*vis, F_b*vis);
-}
-
-float LightingFuncGGX_D(float dotNH, float roughness)
-{
-    float alpha = roughness*roughness;
-    float alphaSqr = alpha*alpha;
-    float pi = 3.14159;
-    float denom = dotNH * dotNH *(alphaSqr-1.0) + 1.0;
-
-    float D = alphaSqr/(pi * denom * denom);
-    return D;
-}
-
 module NoTessellation
 {
     require vec3 coarseVertPos;
     public vec3 fineVertPos = coarseVertPos;
-}
-
-vec3 ProjectToPlane(vec3 Point, vec3 PlanePoint, vec3 PlaneNormal)
-{
-    vec3 v = Point - PlanePoint;
-    float Len = dot(v, PlaneNormal);
-    vec3 d = Len * PlaneNormal;
-    return (Point - d);
 }
 
 module PN_Tessellation : TessellationPipeline
@@ -257,6 +173,14 @@ module PN_Tessellation : TessellationPipeline
     
     public @tcs vec4 tessLevelOuter = vec4(3, 3, 3, 0);
     public @tcs vec2 tessLevelInner = vec2(3.0);
+    
+    vec3 ProjectToPlane(vec3 Point, vec3 PlanePoint, vec3 PlaneNormal)
+    {
+        vec3 v = Point - PlanePoint;
+        float Len = dot(v, PlaneNormal);
+        vec3 d = Len * PlaneNormal;
+        return (Point - d);
+    }
     
     @tcs vec3 WorldPos_B030 = indexImport(coarseVertPos, 0);
     @tcs vec3 WorldPos_B003 = indexImport(coarseVertPos, 1);
@@ -339,6 +263,43 @@ module Lighting
     float dotNL = clamp(dot(normal,L), 0.01, 0.99);
     float dotLH = clamp(dot(L,H), 0.01, 0.99);
     float dotNH = clamp(dot(normal,H), 0.01, 0.99);
+    
+    float Pow4(float x)
+    {
+        return (x*x)*(x*x);
+    }
+
+    vec2 LightingFuncGGX_FV(float dotLH, float roughness)
+    {
+        float alpha = roughness*roughness;/*sf*/
+
+        // F
+        float F_a, F_b;
+        float dotLH5 = Pow4(1.0-dotLH) * (1.0 - dotLH);
+        F_a = 1.0;
+        F_b = dotLH5;
+
+        // V
+        float vis;
+        float k = alpha/2.0;
+        float k2 = k*k;
+        float invK2 = 1.0-k2;
+        vis = 1.0/(dotLH*dotLH*invK2 + k2);
+
+        return vec2(F_a*vis, F_b*vis);
+    }
+
+    float LightingFuncGGX_D(float dotNH, float roughness)
+    {
+        float alpha = roughness*roughness;
+        float alphaSqr = alpha*alpha;
+        float pi = 3.14159;
+        float denom = dotNH * dotNH *(alphaSqr-1.0) + 1.0;
+
+        float D = alphaSqr/(pi * denom * denom);
+        return D;
+    }
+    
     float highlight : phongStandard
     {
         float alpha = roughness_in*roughness_in;

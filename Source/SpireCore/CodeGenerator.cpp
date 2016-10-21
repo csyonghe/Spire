@@ -315,9 +315,18 @@ namespace Spire
 						if (result.Program->Functions.ContainsKey(funcName))
 							continue;
 						RefPtr<ILFunction> func = new ILFunction();
+						RefPtr<FunctionSymbol> funcSym = new FunctionSymbol();
 						func->Name = funcName;
 						func->ReturnType = TranslateExpressionType(comp->Type, &recordTypes);
+						symTable->Functions[funcName] = funcSym;
 						result.Program->Functions[funcName] = func;
+						for (auto dep : comp->Dependency)
+						{
+							if (dep->SyntaxNode->Parameters.Count())
+							{
+								funcSym->ReferencedFunctions.Add(GetComponentFunctionName(dep->SyntaxNode.Ptr()));
+							}
+						}
 						int id = 0;
 						Dictionary<String, ILOperand*> refComponents;
 						variables.PushScope();
@@ -586,13 +595,19 @@ namespace Spire
 					if (stmt->Expression)
 					{
 						stmt->Expression->Accept(this);
-						auto val = PopStack();
-						if (currentWorld->OutputType->Members.ContainsKey(currentComponent->UniqueName))
+						returnRegister = PopStack();
+						if (currentComponent->SyntaxNode->Parameters.Count() == 0)
 						{
-							auto exp = new ExportInstruction(currentComponent->UniqueName, currentWorld, val);
-							codeWriter.Insert(exp);
+							if (currentWorld->OutputType->Members.ContainsKey(currentComponent->UniqueName))
+							{
+								auto exp = new ExportInstruction(currentComponent->UniqueName, currentWorld, returnRegister);
+								codeWriter.Insert(exp);
+							}
 						}
-						returnRegister = val;
+						else
+						{
+							codeWriter.Insert(new ReturnInstruction(returnRegister));
+						}
 					}
 				}
 				else
