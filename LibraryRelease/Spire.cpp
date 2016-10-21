@@ -544,7 +544,7 @@ namespace Spire
 				GatherComponents(err, closure, sc.Value.Ptr());
 		}
 
-		bool IsWorldFeasible(PipelineSymbol * pipeline, ShaderComponentImplSymbol * impl, String world, ShaderComponentSymbol*& unaccessibleComp)
+		bool IsWorldFeasible(SymbolTable * symTable, PipelineSymbol * pipeline, ShaderComponentImplSymbol * impl, String world, ShaderComponentSymbol*& unaccessibleComp)
 		{
 			bool isWFeasible = true;
 			for (auto & dcomp : impl->DependentComponents)
@@ -554,7 +554,7 @@ namespace Spire
 					bool reachable = false;
 					for (auto & dw : dcomp.Key->Type->FeasibleWorlds)
 					{
-						if (pipeline->IsWorldImplicitlyReachable(dw, world))
+						if (symTable->IsWorldImplicitlyReachable(pipeline, dw, world, dcomp.Key->Type->DataType))
 						{
 							reachable = true;
 							break;
@@ -571,7 +571,7 @@ namespace Spire
 			return isWFeasible;
 		}
 
-		void SolveWorldConstraints(ErrorWriter * err, ShaderClosure * shader)
+		void SolveWorldConstraints(ErrorWriter * err, SymbolTable * symTable, ShaderClosure * shader)
 		{
 			EnumerableHashSet<String> allWorlds;
 			for (auto w : shader->Pipeline->Worlds)
@@ -590,7 +590,7 @@ namespace Spire
 					for (auto & w : impl->Worlds)
 					{
 						ShaderComponentSymbol* unaccessibleComp = nullptr;
-						if (!IsWorldFeasible(shader->Pipeline, impl.Ptr(), w, unaccessibleComp))
+						if (!IsWorldFeasible(symTable, shader->Pipeline, impl.Ptr(), w, unaccessibleComp))
 						{
 							err->Error(33100, L"'" + comp->Name + L"' cannot be computed at '" + w + L"' because the dependent component '" + unaccessibleComp->Name + L"' is not accessible.\nsee definition of '"
 								+ unaccessibleComp->Name + L"' at " + unaccessibleComp->Implementations.First()->SyntaxNode->Position.ToString(),
@@ -608,7 +608,7 @@ namespace Spire
 						for (auto & w : deducedWorlds)
 						{
 							ShaderComponentSymbol* unaccessibleComp = nullptr;
-							bool isWFeasible = IsWorldFeasible(shader->Pipeline, impl.Ptr(), w, unaccessibleComp);
+							bool isWFeasible = IsWorldFeasible(symTable, shader->Pipeline, impl.Ptr(), w, unaccessibleComp);
 							if (isWFeasible)
 								feasibleWorlds.Add(w);
 						}
@@ -631,7 +631,7 @@ namespace Spire
 				{
 					EnumerableHashSet<String> newWorlds;
 					for (auto & w : compSym->Type->ConstrainedWorlds)
-						if (shader->Pipeline->IsWorldReachable(w, world))
+						if (symTable->IsWorldReachable(shader->Pipeline, w, world, compSym->Type->DataType))
 							newWorlds.Add(w);
 					compSym->Type->ConstrainedWorlds = _Move(newWorlds);
 				}
@@ -700,7 +700,7 @@ namespace Spire
 			}
 		}
 
-		void VerifyAndPropagateArgumentConstraints(ErrorWriter * err, ShaderClosure * shader)
+		void VerifyAndPropagateArgumentConstraints(ErrorWriter * err, SymbolTable * symTable, ShaderClosure * shader)
 		{
 			for (auto & map : shader->RefMap)
 			{
@@ -712,7 +712,7 @@ namespace Spire
 					{
 						for (auto w : requirement->Implementations.First()->Worlds)
 						{
-							if (!shader->Pipeline->IsWorldImplicitlyReachable(arg->Type->FeasibleWorlds, w))
+							if (!symTable->IsWorldImplicitlyReachable(shader->Pipeline, arg->Type->FeasibleWorlds, w, requirement->Type->DataType))
 							{
 								err->Error(32015, L"argument '" + arg->Name + L"' is not available in world '" + w + L"' as required by '" + shader->Name
 									+ L"'.\nsee requirement declaration at " +
@@ -724,7 +724,7 @@ namespace Spire
 				}
 			}
 			for (auto & subClosure : shader->SubClosures)
-				VerifyAndPropagateArgumentConstraints(err, subClosure.Value.Ptr());
+				VerifyAndPropagateArgumentConstraints(err, symTable, subClosure.Value.Ptr());
 		}
 
 		void AddPipelineComponents(ShaderClosure * shader)
@@ -902,21 +902,13 @@ namespace Spire
 						if (isDefinedInAbstractWorld)
 							err->Error(33039, L"'" + impl->SyntaxNode->Name.Content + L"': no code allowed for component defined in input world.", impl->SyntaxNode->Position);
 					}
-					if (!comp.Value->IsParam() && !comp.Value->Implementations.First()->SyntaxNode->IsInput && (comp.Value->Type->DataType->IsArray() || comp.Value->Type->DataType->IsStruct() ||
-						comp.Value->Type->DataType->IsTexture()))
-					{
-						if (isDefinedInNonAbstractWorld)
-						{
-							err->Error(33035, L"\'" + comp.Value->Name + L"\': sampler, struct and array types only allowed in input worlds.", impl->SyntaxNode->Position);
-						}
-					}
 				}
 			}
 			for (auto & subShader : shader->SubClosures)
 				CheckPipelineShaderConsistency(err, subShader.Value.Ptr());
 		}
 
-		void FlattenShaderClosure(ErrorWriter * err, ShaderClosure * shader)
+		void FlattenShaderClosure(ErrorWriter * err, SymbolTable * symTable, ShaderClosure * shader)
 		{
 			// add input(extern) components from pipeline
 			AddPipelineComponents(shader);
@@ -933,7 +925,7 @@ namespace Spire
 			if (err->GetErrorCount())
 				return;
 			RemoveTrivialComponents(shader);
-			SolveWorldConstraints(err, shader);
+			SolveWorldConstraints(err, symTable, shader);
 			// check pipeline constraints
 			for (auto & requirement : shader->Pipeline->Components)
 			{
@@ -952,7 +944,7 @@ namespace Spire
 					{
 						for (auto w : impl->Worlds)
 						{
-							if (!shader->Pipeline->IsWorldImplicitlyReachable(comp->Type->FeasibleWorlds, w))
+							if (!symTable->IsWorldImplicitlyReachable(shader->Pipeline, comp->Type->FeasibleWorlds, w, requirement.Value->Type->DataType))
 							{
 								err->Error(32015, L"component '" + comp->Name + L"' is not available in world '" + w + L"' as required by '" + shader->Pipeline->SyntaxNode->Name.Content
 									+ L"'.\nsee requirement declaration at " +
@@ -964,7 +956,7 @@ namespace Spire
 				}
 			}
 			// check argument constraints
-			VerifyAndPropagateArgumentConstraints(err, shader);
+			VerifyAndPropagateArgumentConstraints(err, symTable, shader);
 		}
 	}
 }
@@ -1916,15 +1908,9 @@ namespace Spire
 					}
 					else if (expr->BaseExpression->Type->IsStruct())
 					{
-						if (expr->Access == ExpressionAccess::Read)
-						{
-							int id = expr->BaseExpression->Type->AsBasicType()->Struct->SyntaxNode->FindField(expr->MemberName);
-							GenerateIndexExpression(base, result.Program->ConstantPool->CreateConstant(id),
-								expr->Access == ExpressionAccess::Read);
-						}
-						else
-						{
-						}
+						int id = expr->BaseExpression->Type->AsBasicType()->Struct->SyntaxNode->FindField(expr->MemberName);
+						GenerateIndexExpression(base, result.Program->ConstantPool->CreateConstant(id),
+							expr->Access == ExpressionAccess::Read);
 					}
 					else
 						throw NotImplementedException(L"member expression codegen");
@@ -3554,13 +3540,16 @@ namespace Spire
 			{
 				for (auto & st : program->Structs)
 				{
-					sb << L"struct " << st->TypeName << L"\n{\n";
-					for (auto & f : st->Members)
+					if (!st->IsIntrinsic)
 					{
-						sb << f.Type->ToString();
-						sb << " " << f.FieldName << L";\n";
+						sb << L"struct " << st->TypeName << L"\n{\n";
+						for (auto & f : st->Members)
+						{
+							sb << f.Type->ToString();
+							sb << " " << f.FieldName << L";\n";
+						}
+						sb << L"};\n";
 					}
-					sb << L"};\n";
 				}
 			}
 
@@ -3701,9 +3690,12 @@ namespace Spire
 				{
 					sb << L"blk" << input << L".content";
 				}
-				else if (ExtractRecordType(info.Type.Ptr()))
+				else if (auto recType = ExtractRecordType(info.Type.Ptr()))
 				{
 					sb << currentImportInstr->ComponentName;
+					if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput ||
+						info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
+						sb << L"_at" << recType->ToString();
 				}
 				else
 				{
@@ -3792,7 +3784,11 @@ namespace Spire
 								}
 								else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
 									sb.GlobalHeader << L"patch in ";
-								PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), field.Key);
+								String defPostFix;
+								if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput ||
+									info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
+									defPostFix = L"_at" + recType->ToString();
+								PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), field.Key + defPostFix);
 								itemsDeclaredInBlock++;
 								if (info.IsArray)
 								{
@@ -4180,13 +4176,13 @@ namespace Spire
 					if (field.Value.Type->IsIntegral())
 						ctx.GlobalHeader << L"flat ";
 					ctx.GlobalHeader << L"out ";
-					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), field.Key);
+					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), field.Key + L"_at" + world->OutputType->TypeName);
 					ctx.GlobalHeader << L";\n";
 				}
 			}
 			virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) override
 			{
-				ctx.Body << instr->ComponentName << L" = ";
+				ctx.Body << instr->ComponentName << L"_at" << world->OutputType->TypeName << L" = ";
 				codeGen->PrintOp(ctx, instr->Operand.Ptr());
 				ctx.Body << L";\n";
 			}
@@ -4213,7 +4209,7 @@ namespace Spire
 					if (isPatch)
 						ctx.GlobalHeader << L"patch ";
 					ctx.GlobalHeader << L"out ";
-					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), field.Key);
+					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), field.Key + L"_at" + world->Name);
 					ctx.GlobalHeader << L"[";
 					if (arraySize != 0)
 						ctx.GlobalHeader << arraySize;
@@ -4222,7 +4218,7 @@ namespace Spire
 			}
 			virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) override
 			{
-				ctx.Body << instr->ComponentName << L"[" << outputIndex << L"] = ";
+				ctx.Body << instr->ComponentName << L"_at" << world->Name << L"[" << outputIndex << L"] = ";
 				codeGen->PrintOp(ctx, instr->Operand.Ptr());
 				ctx.Body << L";\n";
 			}
@@ -5072,7 +5068,7 @@ namespace Spire
 				}
 				for (auto & compDef : shaderIR->DefinitionsByComponent[componentUniqueName]())
 				{
-					auto path = shaderIR->Shader->Pipeline->FindImplicitImportOperatorChain(compDef.Value->World, world);
+					auto path = shaderIR->SymbolTable->FindImplicitImportOperatorChain(shaderIR->Shader->Pipeline, compDef.Value->World, world, compDef.Value->Type);
 					if (path.Count() && path.First().Nodes.Count() < currentPathLength)
 					{
 						importPath = path.First();
@@ -6584,13 +6580,19 @@ namespace Spire
 					break;
 			}
 			ReadToken(TokenType::RParent);
+			while (LookAheadToken(L"require"))
+			{
+				ReadToken(L"require");
+				op->Requirements.Add(ParseFunction(false));
+			}
 			op->Body = ParseBlockStatement();
 			PopScope();
 			return op;
 		}
 
-		RefPtr<FunctionSyntaxNode> Parser::ParseFunction()
+		RefPtr<FunctionSyntaxNode> Parser::ParseFunction(bool parseBody)
 		{
+			anonymousParamCounter = 0;
 			RefPtr<FunctionSyntaxNode> function = new FunctionSyntaxNode();
 			if (LookAheadToken(L"__intrinsic"))
 			{
@@ -6617,7 +6619,28 @@ namespace Spire
 			try
 			{
 				FillPosition(function.Ptr());
-				Token name = ReadToken();
+				Token name;
+				if (LookAheadToken(L"operator"))
+				{
+					ReadToken();
+					name = ReadToken();
+					switch (name.Type)
+					{
+					case TokenType::OpAdd: case TokenType::OpSub: case TokenType::OpMul: case TokenType::OpDiv:
+					case TokenType::OpMod: case TokenType::OpNot: case TokenType::OpBitNot: case TokenType::OpLsh: case TokenType::OpRsh:
+					case TokenType::OpEql: case TokenType::OpNeq: case TokenType::OpGreater: case TokenType::OpLess: case TokenType::OpGeq:
+					case TokenType::OpLeq: case TokenType::OpAnd: case TokenType::OpOr: case TokenType::OpBitXor: case TokenType::OpBitAnd:
+					case TokenType::OpBitOr: case TokenType::OpInc: case TokenType::OpDec:
+						break;
+					default:
+						errors.Add(CompileError(L"invalid operator '" + name.Content + L"'.", 20008, name.Position));
+						break;
+					}
+				}
+				else
+				{
+					name = ReadToken(TokenType::Identifier);
+				}
 				function->Name = name.Content;
 				ReadToken(TokenType::LParent);
 				while(pos < tokens.Count() && tokens[pos].Type != TokenType::RParent)
@@ -6639,10 +6662,13 @@ namespace Spire
 					pos++;
 				}
 			}
-			if (!function->IsExtern)
-				function->Body = ParseBlockStatement();
-			else
-				ReadToken(TokenType::Semicolon);
+			if (parseBody)
+			{
+				if (!function->IsExtern)
+					function->Body = ParseBlockStatement();
+				else
+					ReadToken(TokenType::Semicolon);
+			}
 			PopScope();
 			return function;
 		}
@@ -6653,6 +6679,11 @@ namespace Spire
 			FillPosition(rs.Ptr());
 			ReadToken(L"struct");
 			rs->Name = ReadToken(TokenType::Identifier);
+			if (LookAheadToken(L"__intrinsic"))
+			{
+				ReadToken();
+				rs->IsIntrinsic = true;
+			}
 			ReadToken(L"{");
 			while (!LookAheadToken(L"}") && pos < tokens.Count())
 			{
@@ -6966,10 +6997,14 @@ namespace Spire
 			RefPtr<ParameterSyntaxNode> parameter = new ParameterSyntaxNode();
 			
 			parameter->TypeNode = ParseType();
-			Token & name = ReadToken(TokenType::Identifier);
-			parameter->Name = name.Content;
+			if (LookAheadToken(TokenType::Identifier))
+			{
+				Token & name = ReadToken(TokenType::Identifier);
+				parameter->Name = name.Content;
+			}
+			else
+				parameter->Name = L"_anonymousParam" + String(anonymousParamCounter++);
 			FillPosition(parameter.Ptr());
-			
 			return parameter;
 		}
 
@@ -7759,10 +7794,6 @@ namespace Spire
 					{
 						psymbol->Worlds.Add(world->Name.Content, worldSym);
 						psymbol->WorldDependency.Add(world->Name.Content, EnumerableHashSet<String>());
-						psymbol->ReachableWorlds.Add(world->Name.Content, EnumerableHashSet<String>());
-						psymbol->ImplicitWorldDependency.Add(world->Name.Content, EnumerableHashSet<String>());
-						psymbol->ImplicitlyReachableWorlds.Add(world->Name.Content, EnumerableHashSet<String>());
-
 					}
 					else
 					{
@@ -7781,18 +7812,7 @@ namespace Spire
 				}
 				for (auto & op : pipeline->ImportOperators)
 				{
-					if (auto list = psymbol->ImportOperators.TryGetValue(op->Name.Content))
-					{
-						list->Add(op);
-					}
-					else
-					{
-						List<RefPtr<ImportOperatorDefSyntaxNode>> nlist;
-						nlist.Add(op);
-						psymbol->ImportOperators[op->Name.Content] = nlist;
-						for (auto & param : op->Parameters)
-							param->Type = TranslateTypeNode(param->TypeNode);
-					}
+					psymbol->AddImportOperator(op);
 				}
 				// add initial world dependency edges
 				for (auto op : pipeline->ImportOperators)
@@ -7815,9 +7835,6 @@ namespace Spire
 							else
 							{
 								psymbol->WorldDependency[op->DestWorld.Content].GetValue().Add(op->SourceWorld.Content);
-								if (op->Parameters.Count() == 0)
-									psymbol->ImplicitWorldDependency[op->DestWorld.Content].GetValue().Add(op->SourceWorld.Content);
-
 							}
 						}
 					}
@@ -7848,48 +7865,6 @@ namespace Spire
 						}
 					}
 				}
-				changed = true;
-				while (changed)
-				{
-					changed = false;
-					for (auto world : pipeline->Worlds)
-					{
-						EnumerableHashSet<String> & dependentWorlds = psymbol->ImplicitWorldDependency[world->Name.Content].GetValue();
-						List<String> loopRange;
-						for (auto w : dependentWorlds)
-							loopRange.Add(w);
-						for (auto w : loopRange)
-						{
-							EnumerableHashSet<String> & ddw = psymbol->ImplicitWorldDependency[w].GetValue();
-							for (auto ww : ddw)
-							{
-								if (!dependentWorlds.Contains(ww))
-								{
-									dependentWorlds.Add(ww);
-									changed = true;
-								}
-							}
-						}
-					}
-				}
-				// fill in reachable worlds
-				for (auto world : psymbol->Worlds)
-				{
-					if (auto depWorlds = psymbol->WorldDependency.TryGetValue(world.Key))
-					{
-						for (auto & dep : *depWorlds)
-						{
-							psymbol->ReachableWorlds[dep].GetValue().Add(world.Key);
-						}
-					}
-					if (auto depWorlds = psymbol->ImplicitWorldDependency.TryGetValue(world.Key))
-					{
-						for (auto & dep : *depWorlds)
-						{
-							psymbol->ImplicitlyReachableWorlds[dep].GetValue().Add(world.Key);
-						}
-					}
-				}
 
 				for (auto & op : pipeline->ImportOperators)
 				{
@@ -7909,7 +7884,15 @@ namespace Spire
 						if (varEntry.Type.DataType->Equals(ExpressionType::Void.Ptr()))
 							Error(30016, L"'void' can not be parameter type.", para.Ptr());
 					}
+					auto oldSymFuncs = symbolTable->Functions;
+					auto oldSymFuncOverloads = symbolTable->FunctionOverloads;
+					for (auto req : op->Requirements)
+					{
+						VisitFunctionDeclaration(req.Ptr());
+					}
 					op->Body->Accept(this);
+					symbolTable->Functions = oldSymFuncs;
+					symbolTable->FunctionOverloads = oldSymFuncOverloads;
 					currentImportOperator = nullptr;
 				}
 				currentPipeline = nullptr;
@@ -8337,10 +8320,6 @@ namespace Spire
 				}
 				for (auto & s : program->Structs)
 					VisitStruct(s.Ptr());
-				for (auto & pipeline : program->Pipelines)
-				{
-					VisitPipeline(pipeline.Ptr());
-				}
 				for (auto & func : program->Functions)
 				{
 					VisitFunctionDeclaration(func.Ptr());
@@ -8355,7 +8334,7 @@ namespace Spire
 								argList << L", ";
 						}
 						argList << L")";
-						Error(30001, L"function \'" + func->Name + argList.ProduceString() + L"\' redefinition.", func.Ptr());
+						Error(30001, L"\'" + func->Name + argList.ProduceString() + L"\': function redefinition.", func.Ptr());
 					}
 					else
 						funcNames.Add(func->InternalName);
@@ -8363,6 +8342,10 @@ namespace Spire
 				for (auto & func : program->Functions)
 				{
 					func->Accept(this);
+				}
+				for (auto & pipeline : program->Pipelines)
+				{
+					VisitPipeline(pipeline.Ptr());
 				}
 				// build initial symbol table for shaders
 				for (auto & shader : program->Shaders)
@@ -8424,6 +8407,7 @@ namespace Spire
 				if (symbolTable->Structs.TryGetValue(structNode->Name.Content, st))
 				{
 					st->Type->TypeName = structNode->Name.Content;
+					st->Type->IsIntrinsic = structNode->IsIntrinsic;
 					for (auto node : structNode->Fields)
 					{
 						node->Type = TranslateTypeNode(node->TypeNode);
@@ -8667,109 +8651,6 @@ namespace Spire
 				stmt->Expression = stmt->Expression->Accept(this).As<ExpressionSyntaxNode>();
 				return stmt;
 			}
-			bool MatchType_BinaryImplicit(RefPtr<ExpressionType> & resultType, RefPtr<ExpressionType> &leftType, RefPtr<ExpressionType> &rightType)
-			{
-				if (leftType->Equals(rightType.Ptr()) && !leftType->IsTexture())
-				{
-					resultType = leftType;
-					return true;
-				}
-				else if (leftType->IsVectorType() && rightType->AsBasicType() &&
-					rightType->AsBasicType()->BaseType == GetVectorBaseType(leftType->AsBasicType()->BaseType))
-				{
-					resultType = leftType;
-					return true;
-				}
-				else if (rightType->IsVectorType() && leftType->AsBasicType() 
-					&& leftType->AsBasicType()->BaseType == GetVectorBaseType(rightType->AsBasicType()->BaseType))
-				{
-					resultType = rightType;
-					return true;
-				}
-				else if ((rightType->Equals(ExpressionType::Float.Ptr()) && leftType->Equals(ExpressionType::Int.Ptr())) ||
-					(leftType->Equals(ExpressionType::Float.Ptr()) && rightType->Equals(ExpressionType::Int.Ptr())))
-				{
-					resultType = ExpressionType::Float;
-					return true;
-				}
-				else if ((rightType->Equals(ExpressionType::Float2.Ptr()) && leftType->Equals(ExpressionType::Int2.Ptr())) ||
-					(leftType->Equals(ExpressionType::Float2.Ptr()) && rightType->Equals(ExpressionType::Int2.Ptr())))
-				{
-					resultType = ExpressionType::Float2;
-					return true;
-				}
-				else if ((rightType->Equals(ExpressionType::Float3.Ptr()) && leftType->Equals(ExpressionType::Int3.Ptr())) ||
-					(leftType->Equals(ExpressionType::Float3.Ptr()) && rightType->Equals(ExpressionType::Int3.Ptr())))
-				{
-					resultType = ExpressionType::Float3;
-					return true;
-				}
-				else if ((rightType->Equals(ExpressionType::Float4.Ptr()) && leftType->Equals(ExpressionType::Int4.Ptr())) ||
-					(leftType->Equals(ExpressionType::Float4.Ptr()) && rightType->Equals(ExpressionType::Int4.Ptr())))
-				{
-					resultType = ExpressionType::Float4;
-					return true;
-				}
-				else if ((rightType->Equals(ExpressionType::Float.Ptr()) && leftType->Equals(ExpressionType::UInt.Ptr())) ||
-					(leftType->Equals(ExpressionType::Float.Ptr()) && rightType->Equals(ExpressionType::UInt.Ptr())))
-				{
-					resultType = ExpressionType::Float;
-					return true;
-				}
-				else if ((rightType->Equals(ExpressionType::Float2.Ptr()) && leftType->Equals(ExpressionType::UInt2.Ptr())) ||
-					(leftType->Equals(ExpressionType::Float2.Ptr()) && rightType->Equals(ExpressionType::UInt2.Ptr())))
-				{
-					resultType = ExpressionType::Float2;
-					return true;
-				}
-				else if ((rightType->Equals(ExpressionType::Float3.Ptr()) && leftType->Equals(ExpressionType::UInt3.Ptr())) ||
-					(leftType->Equals(ExpressionType::Float3.Ptr()) && rightType->Equals(ExpressionType::UInt3.Ptr())))
-				{
-					resultType = ExpressionType::Float3;
-					return true;
-				}
-				else if ((rightType->Equals(ExpressionType::Float4.Ptr()) && leftType->Equals(ExpressionType::UInt4.Ptr())) ||
-					(leftType->Equals(ExpressionType::Float4.Ptr()) && rightType->Equals(ExpressionType::UInt4.Ptr())))
-				{
-					resultType = ExpressionType::Float4;
-					return true;
-				}
-				else if ((rightType->Equals(ExpressionType::Int.Ptr()) && leftType->Equals(ExpressionType::UInt.Ptr())) ||
-					(leftType->Equals(ExpressionType::Int.Ptr()) && rightType->Equals(ExpressionType::UInt.Ptr())))
-				{
-					resultType = ExpressionType::Int;
-					return true;
-				}
-				else if ((rightType->Equals(ExpressionType::Int2.Ptr()) && leftType->Equals(ExpressionType::UInt2.Ptr())) ||
-					(leftType->Equals(ExpressionType::Int2.Ptr()) && rightType->Equals(ExpressionType::UInt2.Ptr())))
-				{
-					resultType = ExpressionType::Int2;
-					return true;
-				}
-				else if ((rightType->Equals(ExpressionType::Int3.Ptr()) && leftType->Equals(ExpressionType::UInt3.Ptr())) ||
-					(leftType->Equals(ExpressionType::Int3.Ptr()) && rightType->Equals(ExpressionType::UInt3.Ptr())))
-				{
-					resultType = ExpressionType::Int3;
-					return true;
-				}
-				else if ((rightType->Equals(ExpressionType::Int4.Ptr()) && leftType->Equals(ExpressionType::UInt4.Ptr())) ||
-					(leftType->Equals(ExpressionType::Int4.Ptr()) && rightType->Equals(ExpressionType::UInt4.Ptr())))
-				{
-					resultType = ExpressionType::Int4;
-					return true;
-				}
-				else if (leftType->AsBasicType() && leftType->AsBasicType()->BaseType == BaseType::Record)
-				{
-					resultType = leftType;
-					return true;
-				}
-				else if (rightType->AsBasicType() && rightType->AsBasicType()->BaseType == BaseType::Record)
-				{
-					resultType = rightType;
-					return true;
-				}
-				return false;
-			}
 			virtual RefPtr<ExpressionSyntaxNode> VisitBinaryExpression(BinaryExpressionSyntaxNode *expr) override
 			{
 				expr->LeftExpression = expr->LeftExpression->Accept(this).As<ExpressionSyntaxNode>();
@@ -8799,111 +8680,35 @@ namespace Spire
 					else
 						expr->Type = ExpressionType::Error;
 				};
-				switch (expr->Operator)
+				if (expr->Operator == Operator::Assign)
 				{
-				case Operator::Add:
-				case Operator::Sub:
-				case Operator::Div:
-				case Operator::AddAssign:
-				case Operator::DivAssign:
-				case Operator::SubAssign:
-					if (MatchType_BinaryImplicit(matchedType, leftType, rightType))
-						expr->Type = matchedType;
-					else
-						expr->Type = ExpressionType::Error;
-					if (expr->Operator == Operator::AddAssign || expr->Operator == Operator::DivAssign || expr->Operator == Operator::SubAssign)
-						checkAssign();
-					break;
-				case Operator::Mul:
-				case Operator::MulAssign:
-					if (leftType->AsBasicType() && leftType->AsBasicType()->BaseType != BaseType::Shader)
-					{
-						auto basicType = leftType->AsBasicType();
-						if (MatchType_BinaryImplicit(matchedType, leftType, rightType))
-							expr->Type = matchedType;
-						else if ((basicType->BaseType == BaseType::Float3x3 && rightType->Equals(ExpressionType::Float3.Ptr())) ||
-							(basicType->BaseType == BaseType::Float3 && rightType->AsBasicType() && rightType->AsBasicType()->BaseType == BaseType::Float3x3))
-							expr->Type = ExpressionType::Float3;
-						else if ((basicType->BaseType == BaseType::Float4x4 && rightType->Equals(ExpressionType::Float4.Ptr())) ||
-							(basicType->BaseType == BaseType::Float4 && rightType->AsBasicType() && rightType->AsBasicType()->BaseType == BaseType::Float4x4))
-							expr->Type = ExpressionType::Float4;
-						else
-							expr->Type = ExpressionType::Error;
-					}
-					else
-						expr->Type = ExpressionType::Error;
-					if (expr->Operator == Operator::MulAssign)
-						checkAssign();
-					break;
-				case Operator::Mod:
-				case Operator::Rsh:
-				case Operator::Lsh:
-				case Operator::BitAnd:
-				case Operator::BitOr:
-				case Operator::BitXor:
-				case Operator::And:
-				case Operator::Or:
-				case Operator::ModAssign:
-				case Operator::AndAssign:
-				case Operator::OrAssign:
-				case Operator::XorAssign:
-				case Operator::LshAssign:
-				case Operator::RshAssign:
-					if (leftType->Equals(rightType.Ptr()) && !leftType->IsArray() && !leftType->IsTexture()
-						&& !leftType->IsShader() &&
-						leftType->AsBasicType() && GetVectorBaseType(leftType->AsBasicType()->BaseType) != BaseType::Float)
-						expr->Type = (expr->Operator == Operator::And || expr->Operator == Operator::Or ? ExpressionType::Bool : leftType);
-					else if (leftType->IsIntegral() && rightType->IsIntegral())
-						expr->Type = leftType;
-					else
-						expr->Type = ExpressionType::Error;
-					if (expr->Operator == Operator::ModAssign || expr->Operator == Operator::AndAssign || expr->Operator == Operator::OrAssign ||
-						expr->Operator == Operator::XorAssign || expr->Operator == Operator::LshAssign || expr->Operator == Operator::RshAssign)
-						checkAssign();
-					break;
-				case Operator::Neq:
-				case Operator::Eql:
-					if (leftType->Equals(rightType.Ptr()) && !leftType->IsArray() && !leftType->IsTexture() && !leftType->IsShader())
-						expr->Type = ExpressionType::Bool;
-					else if ((leftType->Equals(ExpressionType::Int.Ptr()) || leftType->Equals(ExpressionType::UInt.Ptr())) &&
-						(rightType->Equals(ExpressionType::Int.Ptr()) || rightType->Equals(ExpressionType::UInt.Ptr())))
-						expr->Type = ExpressionType::Bool;
-					else if (leftType->IsIntegral() && rightType->IsIntegral())
-						expr->Type = ExpressionType::Bool;
-					else if (leftType->Equals(ExpressionType::Float.Ptr()) && rightType->IsIntegral() ||
-						leftType->IsIntegral() && rightType->Equals(ExpressionType::Float.Ptr()))
-						expr->Type = ExpressionType::Bool;
-					else
-						expr->Type = ExpressionType::Error;
-					break;
-				case Operator::Greater:
-				case Operator::Geq:
-				case Operator::Less:
-				case Operator::Leq:
-					if ((leftType->Equals(ExpressionType::Int.Ptr()) || leftType->Equals(ExpressionType::UInt.Ptr())) && 
-						(rightType->Equals(ExpressionType::Int.Ptr()) || rightType->Equals(ExpressionType::UInt.Ptr())))
-						expr->Type = ExpressionType::Bool;
-					else if (leftType->Equals(ExpressionType::Float.Ptr()) && rightType->Equals(ExpressionType::Float.Ptr()))
-						expr->Type = ExpressionType::Bool;
-					else if (leftType->Equals(ExpressionType::Float.Ptr()) && rightType->IsIntegral() ||
-						leftType->IsIntegral() && rightType->Equals(ExpressionType::Float.Ptr()))
-						expr->Type = ExpressionType::Bool;
-					else
-						expr->Type = ExpressionType::Error;
-					break;
-				case Operator::Assign:
 					expr->Type = rightType;
 					checkAssign();
-					break;
-				default:
-					expr->Type = ExpressionType::Error;
-					break;
 				}
-				if (expr->Type->Equals(ExpressionType::Error.Ptr()) &&
-					!leftType->Equals(ExpressionType::Error.Ptr()) && 
-					!rightType->Equals(ExpressionType::Error.Ptr()))
-					Error(30012, L"no overload found for operator " + OperatorToString(expr->Operator)  + L" (" + leftType->ToString() + L", " 
-						+ rightType->ToString() + L").", expr);
+				else
+				{
+					List<RefPtr<ExpressionType>> argTypes;
+					argTypes.Add(leftType);
+					argTypes.Add(rightType);
+					List<RefPtr<FunctionSymbol>> * operatorOverloads = symbolTable->FunctionOverloads.TryGetValue(GetOperatorFunctionName(expr->Operator));
+					auto overload = FindFunctionOverload(*operatorOverloads, [](RefPtr<FunctionSymbol> f)
+					{
+						return f->SyntaxNode->Parameters;
+					}, argTypes);
+					if (!overload)
+					{
+						expr->Type = ExpressionType::Error;
+						if (!leftType->Equals(ExpressionType::Error.Ptr()) && !rightType->Equals(ExpressionType::Error.Ptr()))
+							Error(30012, L"no overload found for operator " + OperatorToString(expr->Operator) + L" (" + leftType->ToString() + L", "
+								+ rightType->ToString() + L").", expr);
+					}
+					else
+					{
+						expr->Type = overload->SyntaxNode->ReturnType;
+					}
+					if (expr->Operator > Operator::Assign)
+						checkAssign();
+				}
 				return expr;
 			}
 			virtual RefPtr<ExpressionSyntaxNode> VisitConstantExpression(ConstantExpressionSyntaxNode *expr) override
@@ -9327,43 +9132,23 @@ namespace Spire
 			virtual RefPtr<ExpressionSyntaxNode> VisitUnaryExpression(UnaryExpressionSyntaxNode *expr) override
 			{
 				expr->Expression = expr->Expression->Accept(this).As<ExpressionSyntaxNode>();
-				
-				switch (expr->Operator)
+				List<RefPtr<ExpressionType>> argTypes;
+				argTypes.Add(expr->Expression->Type);
+				List<RefPtr<FunctionSymbol>> * operatorOverloads = symbolTable->FunctionOverloads.TryGetValue(GetOperatorFunctionName(expr->Operator));
+				auto overload = FindFunctionOverload(*operatorOverloads, [](RefPtr<FunctionSymbol> f)
 				{
-				case Operator::Neg:
-					if (expr->Expression->Type->Equals(ExpressionType::Int.Ptr()) ||
-						expr->Expression->Type->Equals(ExpressionType::Bool.Ptr()) ||
-						expr->Expression->Type->Equals(ExpressionType::Float.Ptr()) ||
-						expr->Expression->Type->IsVectorType())
-						expr->Type = expr->Expression->Type;
-					else
-						expr->Type = ExpressionType::Error;
-					break;
-				case Operator::Not:
-				case Operator::BitNot:
-					if (expr->Expression->Type->Equals(ExpressionType::Int.Ptr()) || expr->Expression->Type->Equals(ExpressionType::Bool.Ptr()) ||
-						expr->Expression->Type->Equals(ExpressionType::Int2.Ptr())
-						|| expr->Expression->Type->Equals(ExpressionType::Int3.Ptr()) || expr->Expression->Type->Equals(ExpressionType::Int4.Ptr()))
-						expr->Type = (expr->Operator == Operator::Not ? ExpressionType::Bool : expr->Expression->Type);
-					else
-						expr->Type = ExpressionType::Error;
-					break;
-				case Operator::PostDec:
-				case Operator::PostInc:
-				case Operator::PreDec:
-				case Operator::PreInc:
-					if (expr->Expression->Type->Equals(ExpressionType::Int.Ptr()))
-						expr->Type = ExpressionType::Int;
-					else
-						expr->Type = ExpressionType::Error;
-					break;
-				default:
+					return f->SyntaxNode->Parameters;
+				}, argTypes);
+				if (!overload)
+				{
 					expr->Type = ExpressionType::Error;
-					break;
+					if (!expr->Expression->Type->Equals(ExpressionType::Error.Ptr()))
+						Error(30012, L"no overload found for operator " + OperatorToString(expr->Operator) + L" (" + expr->Expression->Type->ToString() + L").", expr);
 				}
-
-				if(expr->Type->Equals(ExpressionType::Error.Ptr()) && !expr->Expression->Type->Equals(ExpressionType::Error.Ptr()))
-					Error(30020, L"operator " + OperatorToString(expr->Operator) + L" can not be applied to " + expr->Expression->Type->ToString(), expr);
+				else
+				{
+					expr->Type = overload->SyntaxNode->ReturnType;
+				}
 				return expr;
 			}
 			virtual RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode *expr) override
@@ -9580,6 +9365,10 @@ namespace Spire
 					}
 					else
 						expr->Type = baseType->AsBasicType()->Struct->SyntaxNode->Fields[id]->Type;
+					if (auto bt = expr->Type->AsBasicType())
+					{
+						bt->IsLeftValue = baseType->AsBasicType()->IsLeftValue;
+					}
 				}
 				else
 					expr->Type = ExpressionType::Error;
@@ -9672,10 +9461,11 @@ namespace Spire
 			   After all references are resolved, all unreferenced definitions (dead code) are eliminated, 
 			   resulting a shader variant ready for code generation.
 			*/
-			RefPtr<ShaderIR> GenerateShaderVariantIR(CompileResult & cresult, ShaderClosure * shader, Schedule & schedule)
+			RefPtr<ShaderIR> GenerateShaderVariantIR(CompileResult & cresult, ShaderClosure * shader, Schedule & schedule, SymbolTable * symbolTable)
 			{
 				RefPtr<ShaderIR> result = new ShaderIR();
 				result->Shader = shader;
+				result->SymbolTable = symbolTable;
 				// mark pinned worlds
 				for (auto & comp : shader->Components)
 				{
@@ -9855,7 +9645,7 @@ namespace Spire
 						if (shader->IsAbstract)
 							continue;
 						auto shaderClosure = CreateShaderClosure(result.GetErrorWriter(), &symTable, shader);
-						FlattenShaderClosure(result.GetErrorWriter(), shaderClosure.Ptr());
+						FlattenShaderClosure(result.GetErrorWriter(), &symTable, shaderClosure.Ptr());
 						shaderClosures.Add(shaderClosure);
 					}
 					
@@ -9877,7 +9667,7 @@ namespace Spire
 					for (auto shader : shaderClosures)
 					{
 						// generate shader variant from schedule file, and also apply mechanic deduction rules
-						shader->IR = GenerateShaderVariantIR(result, shader.Ptr(), schedule);
+						shader->IR = GenerateShaderVariantIR(result, shader.Ptr(), schedule, &symTable);
 					}
 					if (options.Mode == CompilerMode::ProduceShader)
 					{
@@ -10007,6 +9797,7 @@ namespace Spire
 				if (compilerInstances == 0)
 				{
 					BasicExpressionType::Finalize();
+					SpireStdLib::Finalize();
 				}
 			}
 		};
@@ -15516,10 +15307,6 @@ namespace Spire
 CORE\STDINCLUDE.CPP
 ***********************************************************************/
 
-const wchar_t * VertexShaderIncludeString = LR"(
-__builtin out vec4 gl_Position;
-)";
-
 const char * LibIncludeString = R"(
 __intrinsic float dFdx(float v);
 __intrinsic float dFdy(float v);
@@ -15729,10 +15516,164 @@ __intrinsic vec4 vec4(uvec4 val);
 __intrinsic mat3 transpose(mat3 in);
 __intrinsic mat4 transpose(mat4 in);
 
-__intrinsic vec4 mul(mat4 a, vec4 b);
-
+struct trait __intrinsic {};
+__intrinsic trait IsTriviallyPassable(float);
+__intrinsic trait IsTriviallyPassable(vec2);
+__intrinsic trait IsTriviallyPassable(vec3);
+__intrinsic trait IsTriviallyPassable(vec4);
+__intrinsic trait IsTriviallyPassable(mat3);
+__intrinsic trait IsTriviallyPassable(mat4);
+__intrinsic trait IsTriviallyPassable(int);
+__intrinsic trait IsTriviallyPassable(ivec2);
+__intrinsic trait IsTriviallyPassable(ivec3);
+__intrinsic trait IsTriviallyPassable(ivec4);
+__intrinsic trait IsTriviallyPassable(uint);
+__intrinsic trait IsTriviallyPassable(uvec2);
+__intrinsic trait IsTriviallyPassable(uvec3);
+__intrinsic trait IsTriviallyPassable(uvec4);
+__intrinsic trait IsTriviallyPassable(bool);
 #line_reset#
 )";
+
+using namespace CoreLib::Basic;
+
+namespace Spire
+{
+	namespace Compiler
+	{
+		String SpireStdLib::code;
+
+		String SpireStdLib::GetCode()
+		{
+			if (code.Length() > 0)
+				return code;
+			StringBuilder sb;
+			// generate operator overloads
+			Operator floatUnaryOps[] = { Operator::Neg, Operator::Not, Operator::PreInc, Operator::PreDec };
+			Operator intUnaryOps[] = { Operator::Neg, Operator::Not, Operator::BitNot, Operator::PreInc, Operator::PreDec};
+			Operator floatOps[] = { Operator::Mul, Operator::Div,
+				Operator::Add, Operator::Sub, Operator::And, Operator::Or,
+				Operator::Eql, Operator::Neq, Operator::Greater, Operator::Less, Operator::Geq, Operator::Leq };
+			Operator intOps[] = {  Operator::Mul, Operator::Div, Operator::Mod,
+				Operator::Add, Operator::Sub,
+				Operator::Lsh, Operator::Rsh,
+				Operator::Eql, Operator::Neq, Operator::Greater, Operator::Less, Operator::Geq, Operator::Leq,
+				Operator::BitAnd, Operator::BitXor, Operator::BitOr,
+				Operator::And,
+				Operator::Or };
+			String floatTypes[] = { L"float", L"vec2", L"vec3", L"vec4" };
+			String intTypes[] = { L"int", L"ivec2", L"ivec3", L"ivec4" };
+			String uintTypes[] = { L"uint", L"uvec2", L"uvec3", L"uvec4" };
+
+			sb << L"__intrinsic vec3 operator * (vec3, mat3);\n";
+			sb << L"__intrinsic vec3 operator * (mat3, vec3);\n";
+
+			sb << L"__intrinsic vec4 operator * (vec4, mat4);\n";
+			sb << L"__intrinsic vec4 operator * (mat4, vec4);\n";
+
+			sb << L"__intrinsic mat3 operator * (mat3, mat3);\n";
+			sb << L"__intrinsic mat4 operator * (mat4, mat4);\n";
+
+			sb << L"__intrinsic bool operator && (bool, bool);\n";
+			sb << L"__intrinsic bool operator || (bool, bool);\n";
+
+			for (auto type : intTypes)
+			{
+				sb << L"__intrinsic bool operator && (bool, " << type << L");\n";
+				sb << L"__intrinsic bool operator || (bool, " << type << L");\n";
+				sb << L"__intrinsic bool operator && (" << type << ", bool);\n";
+				sb << L"__intrinsic bool operator || (" << type << ", bool);\n";
+			}
+
+			for (auto op : intUnaryOps)
+			{
+				String opName = GetOperatorFunctionName(op);
+				for (int i = 0; i < 4; i++)
+				{
+					auto itype = intTypes[i];
+					auto utype = uintTypes[i];
+					for (int j = 0; j < 2; j++)
+					{
+						auto retType = (op == Operator::Not) ? L"bool" : j == 0 ? itype : utype;
+						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << (j == 0 ? itype : utype) << L");\n";
+					}
+				}
+			}
+
+			for (auto op : floatUnaryOps)
+			{
+				String opName = GetOperatorFunctionName(op);
+				for (int i = 0; i < 4; i++)
+				{
+					auto type = floatTypes[i];
+					auto retType = (op == Operator::Not) ? L"bool" : type;
+					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L");\n";
+				}
+			}
+
+			for (auto op : floatOps)
+			{
+				String opName = GetOperatorFunctionName(op);
+				for (int i = 0; i < 4; i++)
+				{
+					auto type = floatTypes[i];
+					auto itype = intTypes[i];
+					auto utype = uintTypes[i];
+					auto retType = (op >= Operator::Eql && op <= Operator::Leq || op == Operator::And || op == Operator::Or) ? L"bool" : type;
+					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << type << L");\n";
+					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << itype << L", " << type << L");\n";
+					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << utype << L", " << type << L");\n";
+					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << itype << L");\n";
+					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << utype << L");\n";
+					if (i > 0)
+					{
+						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << floatTypes[0] << L");\n";
+						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << floatTypes[0] << L", " << type << L");\n";
+
+						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << intTypes[0] << L");\n";
+						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << intTypes[0] << L", " << type << L");\n";
+
+						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << uintTypes[0] << L");\n";
+						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << uintTypes[0] << L", " << type << L");\n";
+					}
+				}
+			}
+
+			for (auto op : intOps)
+			{
+				String opName = GetOperatorFunctionName(op);
+				for (int i = 0; i < 4; i++)
+				{
+					auto type = intTypes[i];
+					auto utype = uintTypes[i];
+					auto retType = (op >= Operator::Eql && op <= Operator::Leq || op == Operator::And || op == Operator::Or) ? L"bool" : type;
+					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << type << L");\n";
+					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << utype << L", " << type << L");\n";
+					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << utype << L");\n";
+					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << utype << L", " << utype << L");\n";
+					if (i > 0)
+					{
+						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << intTypes[0] << L");\n";
+						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << intTypes[0] << L", " << type << L");\n";
+
+						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << uintTypes[0] << L");\n";
+						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << uintTypes[0] << L", " << type << L");\n";
+					}
+				}
+			}
+			sb << LibIncludeString;
+			code = sb.ProduceString();
+			return code;
+		}
+
+		void SpireStdLib::Finalize()
+		{
+			code = nullptr;
+		}
+
+	}
+}
+
 
 /***********************************************************************
 CORE\SYMBOLTABLE.CPP
@@ -15742,6 +15683,7 @@ namespace Spire
 {
 	namespace Compiler
 	{
+
 		bool SymbolTable::SortShaders()
 		{
 			HashSet<ShaderSymbol*> shaderSet;
@@ -15809,31 +15751,64 @@ namespace Spire
 			}
 		}
 
+		List<ImportPath>& PipelineSymbol::GetPaths(String srcWorld, String destWorld)
+		{
+			if (auto first = pathCache.TryGetValue(srcWorld))
+			{
+				if (auto second = first->TryGetValue(destWorld))
+					return *second;
+			}
+			else
+			{
+				pathCache[srcWorld] = EnumerableDictionary<String, List<ImportPath>>();
+			}
+			auto path = FindPaths(srcWorld, destWorld);
+			auto & dict = pathCache[srcWorld]();
+			dict[destWorld] = _Move(path);
+			return dict[destWorld]();
+		}
+
+		List<ImportPath> PipelineSymbol::FindPaths(String worldSrc, String worldDest)
+		{
+			List<ImportPath> resultPaths;
+			if (worldSrc == worldDest)
+				return resultPaths;
+			List<ImportPath> paths, paths2;
+			paths.Add(ImportPath());
+			paths[0].Nodes.Add(ImportPath::Node(worldSrc, nullptr));
+			while (paths.Count())
+			{
+				paths2.Clear();
+				for (auto & p : paths)
+				{
+					String world0 = p.Nodes.Last().TargetWorld;
+					for (auto op : SyntaxNode->ImportOperators)
+					{
+						if (op->SourceWorld.Content == world0)
+						{
+							ImportPath np = p;
+							if (op->Parameters.Count() != 0)
+								np.IsImplicitPath = false;
+							for (auto &req : op->Requirements)
+								np.TypeRequirements.Add(req.Ptr());
+							np.Nodes.Add(ImportPath::Node(op->DestWorld.Content, op.Ptr()));
+							if (op->DestWorld.Content == worldDest)
+								resultPaths.Add(np);
+							else
+								paths2.Add(np);
+						}
+					}
+				}
+				paths.SwapWith(paths2);
+			}
+			return resultPaths;
+		}
+
 		bool PipelineSymbol::IsAbstractWorld(String world)
 		{
 			WorldSymbol ws;
 			if (Worlds.TryGetValue(world, ws))
 				return ws.IsAbstract;
-			return false;
-		}
-
-		bool PipelineSymbol::IsWorldReachable(String src, String targetWorld)
-		{
-			if (src == targetWorld)
-				return true;
-			if (ReachableWorlds.ContainsKey(src))
-				if (ReachableWorlds[src]().Contains(targetWorld))
-					return true;
-			return false;
-		}
-
-		bool PipelineSymbol::IsWorldImplicitlyReachable(String src, String targetWorld)
-		{
-			if (src == targetWorld)
-				return true;
-			if (ImplicitlyReachableWorlds.ContainsKey(src))
-				if (ImplicitlyReachableWorlds[src]().Contains(targetWorld))
-					return true;
 			return false;
 		}
 
@@ -15845,19 +15820,6 @@ namespace Spire
 				return ParentPipeline->IsChildOf(parentPipeline);
 			else
 				return false;
-		}
-
-		bool PipelineSymbol::IsWorldImplicitlyReachable(EnumerableHashSet<String>& src, String targetWorld)
-		{
-			for (auto srcW : src)
-			{
-				if (srcW == targetWorld)
-					return true;
-				if (ImplicitlyReachableWorlds.ContainsKey(srcW))
-					if (ImplicitlyReachableWorlds[srcW]().Contains(targetWorld))
-						return true;
-			}
-			return false;
 		}
 
 		List<String>& PipelineSymbol::GetWorldTopologyOrder()
@@ -15894,60 +15856,46 @@ namespace Spire
 			return WorldTopologyOrder;
 		}
 		
-		bool PipelineSymbol::IsWorldReachable(EnumerableHashSet<String>& src, String targetWorld)
-		{
-			for (auto srcW : src)
-			{
-				if (srcW == targetWorld)
-					return true;
-				if (ReachableWorlds.ContainsKey(srcW))
-					if (ReachableWorlds[srcW]().Contains(targetWorld))
-						return true;
-			}
-			return false;
-		}
-		
-		List<ImportPath> PipelineSymbol::FindImplicitImportOperatorChain(String worldSrc, String worldDest)
-		{
-			List<ImportPath> resultPathes;
-			if (worldSrc == worldDest)
-				return resultPathes;
-			List<ImportPath> pathes, pathes2;
-			pathes.Add(ImportPath());
-			pathes[0].Nodes.Add(ImportPath::Node(worldSrc, nullptr));
-			while (pathes.Count())
-			{
-				pathes2.Clear();
-				for (auto & p : pathes)
-				{
-					String world0 = p.Nodes.Last().TargetWorld;
-					for (auto op : SyntaxNode->ImportOperators)
-					{
-						if (op->SourceWorld.Content == world0 && op->Parameters.Count() == 0)
-						{
-							ImportPath np = p;
-							np.Nodes.Add(ImportPath::Node(op->DestWorld.Content, op.Ptr()));
-							if (op->DestWorld.Content == worldDest)
-								resultPathes.Add(np);
-							else
-								pathes2.Add(np);
-						}
-					}
-				}
-				pathes.SwapWith(pathes2);
-			}
-			return resultPathes;
-		}
 		List<ImportOperatorDefSyntaxNode*> PipelineSymbol::GetImportOperatorsFromSourceWorld(String worldSrc)
 		{
 			List<ImportOperatorDefSyntaxNode*> rs;
-			for (auto & op : this->SyntaxNode->ImportOperators)
+			auto dict = ImportOperatorsByPath.TryGetValue(worldSrc);
+			if (dict)
 			{
-				if (op->SourceWorld.Content == worldSrc)
-					rs.Add(op.Ptr());
+				for (auto & op : *dict)
+				{
+					for (auto & x : op.Value)
+						rs.Add(x.Ptr());
+				}
 			}
 			return rs;
 		}
+		void PipelineSymbol::AddImportOperator(RefPtr<ImportOperatorDefSyntaxNode> op)
+		{
+			auto list = ImportOperators.TryGetValue(op->Name.Content);
+			if (!list)
+			{
+				ImportOperators[op->Name.Content] = List<RefPtr<ImportOperatorDefSyntaxNode>>();
+				list = ImportOperators.TryGetValue(op->Name.Content);
+			}
+			list->Add(op);
+
+			auto first = ImportOperatorsByPath.TryGetValue(op->SourceWorld.Content);
+			if (!first)
+			{
+				ImportOperatorsByPath[op->SourceWorld.Content] = EnumerableDictionary<String, List<RefPtr<ImportOperatorDefSyntaxNode>>>();
+				first = ImportOperatorsByPath.TryGetValue(op->SourceWorld.Content);
+			}
+
+			auto second = first->TryGetValue(op->DestWorld.Content);
+			if (!second)
+			{
+				(*first)[op->DestWorld.Content] = List<RefPtr<ImportOperatorDefSyntaxNode>>();
+				second = first->TryGetValue(op->DestWorld.Content);
+			}
+			second->Add(op);
+		}
+
 		List<ShaderComponentSymbol*> ShaderSymbol::GetComponentDependencyOrder()
 		{
 			List<ShaderComponentSymbol*> components;
@@ -16104,6 +16052,101 @@ namespace Spire
 				rs = false;
 			}
 			return rs;
+		}
+
+		String PrintType(RefPtr<ExpressionType> type, String recordReplaceStr)
+		{
+			if (auto basic = type->AsBasicType())
+			{
+				if (basic->BaseType == BaseType::Record)
+					return recordReplaceStr;
+				else
+					return basic->ToString();
+			}
+			else if (auto arr = type.As<ArrayExpressionType>())
+			{
+				if (arr->ArrayLength > 0)
+					return PrintType(arr->BaseType, recordReplaceStr) + L"[" + arr->ArrayLength + L"]";
+				else
+					return PrintType(arr->BaseType, recordReplaceStr) + L"[]";
+			}
+			else if (auto gen = type.As<GenericExpressionType>())
+			{
+				return gen->GenericTypeName + L"<" + PrintType(gen->BaseType, recordReplaceStr) + L">";
+			}
+			return L"";
+		}
+
+		bool SymbolTable::CheckTypeRequirement(const ImportPath & p, RefPtr<ExpressionType> type)
+		{
+			for (auto & req : p.TypeRequirements)
+			{
+				auto typeStr = type->ToString();
+				auto retType = PrintType(req->ReturnType, typeStr);
+				StringBuilder sbInternalName;
+				sbInternalName << req->Name;
+				for (auto & op : req->Parameters)
+				{
+					sbInternalName << L"@" << PrintType(op->Type, typeStr);
+				}
+				auto funcName = sbInternalName.ProduceString();
+				auto func = Functions.TryGetValue(funcName);
+				if (!func)
+					return false;
+				if ((*func)->SyntaxNode->ReturnType->ToString() != retType)
+					return false;
+			}
+			return true;
+		}
+
+		bool SymbolTable::IsWorldReachable(PipelineSymbol * pipe, String src, String targetWorld, RefPtr<ExpressionType> type)
+		{
+			if (src == targetWorld)
+				return true;
+			return From(pipe->GetPaths(src, targetWorld)).Any([&](const ImportPath & p)
+			{
+				return CheckTypeRequirement(p, type);
+			});
+		}
+
+		bool SymbolTable::IsWorldImplicitlyReachable(PipelineSymbol * pipe, String src, String targetWorld, RefPtr<ExpressionType> type)
+		{
+			if (src == targetWorld)
+				return true;
+			return From(pipe->GetPaths(src, targetWorld)).Any([&](const ImportPath & p)
+			{
+				return p.IsImplicitPath && CheckTypeRequirement(p, type);
+			});
+		}
+
+		bool SymbolTable::IsWorldImplicitlyReachable(PipelineSymbol * pipe, EnumerableHashSet<String>& src, String targetWorld, RefPtr<ExpressionType> type)
+		{
+			for (auto srcW : src)
+			{
+				if (IsWorldImplicitlyReachable(pipe, srcW, targetWorld, type))
+					return true;
+			}
+			return false;
+		}
+
+		bool SymbolTable::IsWorldReachable(PipelineSymbol * pipe, EnumerableHashSet<String>& src, String targetWorld, RefPtr<ExpressionType> type)
+		{
+			for (auto srcW : src)
+			{
+				if (IsWorldReachable(pipe, srcW, targetWorld, type))
+					return true;
+			}
+			return false;
+		}
+
+		List<ImportPath> SymbolTable::FindImplicitImportOperatorChain(PipelineSymbol * pipe, String worldSrc, String worldDest, RefPtr<ExpressionType> type)
+		{
+			return From(pipe->GetPaths(worldSrc, worldDest)).Where([&](const ImportPath & p)
+			{
+				if (p.IsImplicitPath)
+					return CheckTypeRequirement(p, type);
+				return false;
+			}).ToList();
 		}
 
 		int GUID::currentGUID = 0;
@@ -16286,17 +16329,26 @@ namespace Spire
 			case Compiler::BaseType::Int2:
 				res.Append(L"ivec2");
 				break;
+			case Compiler::BaseType::UInt2:
+				res.Append(L"uvec2");
+				break;
 			case Compiler::BaseType::Float2:
 				res.Append(L"vec2");
 				break;
 			case Compiler::BaseType::Int3:
 				res.Append(L"ivec3");
 				break;
+			case Compiler::BaseType::UInt3:
+				res.Append(L"uvec3");
+				break;
 			case Compiler::BaseType::Float3:
 				res.Append(L"vec3");
 				break;
 			case Compiler::BaseType::Int4:
 				res.Append(L"ivec4");
+				break;
+			case Compiler::BaseType::UInt4:
+				res.Append(L"uvec4");
 				break;
 			case Compiler::BaseType::Float4:
 				res.Append(L"vec4");
@@ -16990,7 +17042,73 @@ namespace Spire
 				comp->BlockStatement = comp->BlockStatement->Accept(this).As<BlockStatementSyntaxNode>();
 			return comp;
 		}
-}
+		String GetOperatorFunctionName(Operator op)
+		{
+			switch (op)
+			{
+			case Operator::Add:
+			case Operator::AddAssign:
+				return L"+";
+			case Operator::Sub:
+			case Operator::SubAssign:
+				return L"-";
+			case Operator::Neg:
+				return L"-";
+			case Operator::Not:
+				return L"!";
+			case Operator::BitNot:
+				return L"~";
+			case Operator::PreInc:
+			case Operator::PostInc:
+				return L"++";
+			case Operator::PreDec:
+			case Operator::PostDec:
+				return L"--";
+			case Operator::Mul:
+			case Operator::MulAssign:
+				return L"*";
+			case Operator::Div:
+			case Operator::DivAssign:
+				return L"/";
+			case Operator::Mod:
+			case Operator::ModAssign:
+				return L"%";
+			case Operator::Lsh:
+			case Operator::LshAssign:
+				return L"<<";
+			case Operator::Rsh:
+			case Operator::RshAssign:
+				return L">>";
+			case Operator::Eql:
+				return L"==";
+			case Operator::Neq:
+				return L"!=";
+			case Operator::Greater:
+				return L">";
+			case Operator::Less:
+				return L"<";
+			case Operator::Geq:
+				return L">=";
+			case Operator::Leq:
+				return L"<=";
+			case Operator::BitAnd:
+			case Operator::AndAssign:
+				return L"&";
+			case Operator::BitXor:
+			case Operator::XorAssign:
+				return L"^";
+			case Operator::BitOr:
+			case Operator::OrAssign:
+				return L"|";
+			case Operator::And:
+				return L"&&";
+			case Operator::Or:
+				return L"||";
+			default:
+				return L"";
+			}
+		}
+	}
 }
 
 /***********************************************************************
@@ -17201,7 +17319,8 @@ namespace Spire
 						// in the second pass, examine all the rest definitions
 						for (auto & depWorld : depWorlds)
 						{
-							bool isPinned = Shader->AllComponents[dep.Dependency.ReferencedComponent]()->Type->PinnedWorlds.Contains(depWorld);
+							auto refComp = Shader->AllComponents[dep.Dependency.ReferencedComponent]();
+							bool isPinned = refComp->Type->PinnedWorlds.Contains(depWorld);
 							if ((pass == 0 && !isPinned) || (pass == 1 && isPinned)) continue;
 							ComponentDefinitionIR * depDef;
 							if (depDefs.TryGetValue(depWorld, depDef))
@@ -17228,7 +17347,7 @@ namespace Spire
 								}
 								if (depWorld != dep.SourceWorld)
 								{
-									auto importPath = Shader->Pipeline->FindImplicitImportOperatorChain(depWorld, dep.SourceWorld);
+									auto importPath = SymbolTable->FindImplicitImportOperatorChain(Shader->Pipeline, depWorld, dep.SourceWorld, refComp->Type->DataType);
 									if (importPath.Count() == 0)
 										continue;
 									processImportOperatorUsings(importPath.First().Nodes.Last().ImportOperator);
@@ -17418,7 +17537,7 @@ namespace SpireLib
 		List<String> unitsToInclude;
 		unitsToInclude.Add(fileName);
 		processedUnits.Add(fileName);
-		auto predefUnit = compiler->Parse(compileResult, LibIncludeString, L"stdlib");
+		auto predefUnit = compiler->Parse(compileResult, SpireStdLib::GetCode(), L"stdlib");
 		for (int i = 0; i < unitsToInclude.Count(); i++)
 		{
 			auto inputFileName = unitsToInclude[i];

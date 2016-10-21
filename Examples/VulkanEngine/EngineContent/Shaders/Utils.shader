@@ -110,14 +110,42 @@ module StaticVertex
     public @vs vec3 coarseVertTangent = vertTangent;
 }
 
+struct SkinningResult
+{
+    vec3 pos;
+    vec3 normal;
+    vec3 tangent;
+}
+
 module SkinnedVertex
 {
     public using MeshVertex;
     require mat4 viewProjectionTransform;
     @skeletalTransform BoneTransform[] boneTransforms;
     
-    public @vs vec3 coarseVertPos
+    public SkinningResult skinning
     {
+        SkinningResult result;
+        result.pos = vec3(0.0);
+        result.normal = vec3(0.0);
+        result.tangent = vec3(0.0);
+        for (int i = 0 : 3)
+        {
+            uint boneId = (boneIds >> (i*8)) & 255;
+            if (boneId == 255) continue;
+            float boneWeight = float((boneWeights >> (i*8)) & 255) * (1.0/255.0);
+            vec3 tp = (boneTransforms[boneId].transformMatrix * vec4(vertPos, 1.0)).xyz;
+            result.pos += tp * boneWeight;
+            tp = boneTransforms[boneId].normalMatrix * vertNormal;
+            result.normal += tp * boneWeight;
+            tp = boneTransforms[boneId].normalMatrix * vertTangent;
+            result.tangent += tp * boneWeight;
+        }
+        return result;
+    }
+    
+    public vec3 coarseVertPos = skinning.pos;
+    /*{
         vec3 result = vec3(0.0);
         for (int i = 0 : 3)
         {
@@ -126,11 +154,12 @@ module SkinnedVertex
             float boneWeight = float((boneWeights >> (i*8)) & 255) * (1.0/255.0);
             vec3 tp = (boneTransforms[boneId].transformMatrix * vec4(vertPos, 1.0)).xyz;
             result += tp * boneWeight;
+            
         }
         return result;
-    }
-    public @vs vec3 coarseVertNormal
-    {
+    }*/
+    public vec3 coarseVertNormal = skinning.normal;
+   /* {
         vec3 result = vec3(0.0);
         for (int i = 0 : 3)
         {
@@ -142,8 +171,9 @@ module SkinnedVertex
         }
         return result;
     }
-    public @vs vec3 coarseVertTangent
-    {
+    */
+    public vec3 coarseVertTangent = skinning.tangent;
+    /*{
         vec3 result = vec3(0.0);
         for (int i = 0 : 3)
         {
@@ -155,6 +185,7 @@ module SkinnedVertex
         }
         return result;
     }
+    */
 }
 
 module TangentSpaceTransform

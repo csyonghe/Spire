@@ -405,6 +405,7 @@ namespace Spire
 		public:
 			List<RefPtr<StructField>> Fields;
 			Token Name;
+			bool IsIntrinsic = false;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			int FindField(String name)
 			{
@@ -468,6 +469,28 @@ namespace Spire
 			virtual ParameterSyntaxNode * Clone(CloneContext & ctx);
 		};
 
+		class FunctionSyntaxNode : public SyntaxNode
+		{
+		public:
+			String Name, InternalName;
+			RefPtr<ExpressionType> ReturnType;
+			RefPtr<TypeSyntaxNode> ReturnTypeNode;
+			List<RefPtr<ParameterSyntaxNode>> Parameters;
+			RefPtr<BlockStatementSyntaxNode> Body;
+			bool IsInline;
+			bool IsExtern;
+			bool HasSideEffect;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
+			FunctionSyntaxNode()
+			{
+				IsInline = false;
+				IsExtern = false;
+				HasSideEffect = true;
+			}
+
+			virtual FunctionSyntaxNode * Clone(CloneContext & ctx);
+		};
+
 		class ImportOperatorDefSyntaxNode : public SyntaxNode
 		{
 		public:
@@ -476,6 +499,8 @@ namespace Spire
 			List<RefPtr<ParameterSyntaxNode>> Parameters;
 			RefPtr<BlockStatementSyntaxNode> Body;
 			EnumerableDictionary<String, String> LayoutAttributes;
+			Token TypeName;
+			List<RefPtr<FunctionSyntaxNode>> Requirements;
 			List<String> Usings;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ImportOperatorDefSyntaxNode * Clone(CloneContext & ctx) override;
@@ -524,9 +549,11 @@ namespace Spire
 			BitAnd, BitXor, BitOr,
 			And,
 			Or,
-			Assign, AddAssign, SubAssign, MulAssign, DivAssign, ModAssign,
+			Assign = 200, AddAssign, SubAssign, MulAssign, DivAssign, ModAssign,
 			LshAssign, RshAssign, OrAssign, AndAssign, XorAssign
 		};
+
+		String GetOperatorFunctionName(Operator op);
 		
 		class ImportExpressionSyntaxNode : public ExpressionSyntaxNode
 		{
@@ -631,28 +658,6 @@ namespace Spire
 			{
 				return name == Name;
 			}
-		};
-		class FunctionSyntaxNode : public SyntaxNode
-		{
-		public:
-			String Name, InternalName;
-			RefPtr<ExpressionType> ReturnType;
-			RefPtr<TypeSyntaxNode> ReturnTypeNode;
-			List<RefPtr<ParameterSyntaxNode>> Parameters;
-			RefPtr<BlockStatementSyntaxNode> Body;
-			List<VariableDeclr> Variables;
-			bool IsInline;
-			bool IsExtern;
-			bool HasSideEffect;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			FunctionSyntaxNode()
-			{
-				IsInline = false;
-				IsExtern = false;
-				HasSideEffect = true;
-			}
-
-			virtual FunctionSyntaxNode * Clone(CloneContext & ctx);
 		};
 
 		struct Variable : public SyntaxNode

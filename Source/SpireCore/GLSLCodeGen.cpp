@@ -955,13 +955,16 @@ namespace Spire
 			{
 				for (auto & st : program->Structs)
 				{
-					sb << L"struct " << st->TypeName << L"\n{\n";
-					for (auto & f : st->Members)
+					if (!st->IsIntrinsic)
 					{
-						sb << f.Type->ToString();
-						sb << " " << f.FieldName << L";\n";
+						sb << L"struct " << st->TypeName << L"\n{\n";
+						for (auto & f : st->Members)
+						{
+							sb << f.Type->ToString();
+							sb << " " << f.FieldName << L";\n";
+						}
+						sb << L"};\n";
 					}
-					sb << L"};\n";
 				}
 			}
 
@@ -1102,9 +1105,12 @@ namespace Spire
 				{
 					sb << L"blk" << input << L".content";
 				}
-				else if (ExtractRecordType(info.Type.Ptr()))
+				else if (auto recType = ExtractRecordType(info.Type.Ptr()))
 				{
 					sb << currentImportInstr->ComponentName;
+					if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput ||
+						info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
+						sb << L"_at" << recType->ToString();
 				}
 				else
 				{
@@ -1193,7 +1199,11 @@ namespace Spire
 								}
 								else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
 									sb.GlobalHeader << L"patch in ";
-								PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), field.Key);
+								String defPostFix;
+								if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput ||
+									info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
+									defPostFix = L"_at" + recType->ToString();
+								PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), field.Key + defPostFix);
 								itemsDeclaredInBlock++;
 								if (info.IsArray)
 								{
@@ -1581,13 +1591,13 @@ namespace Spire
 					if (field.Value.Type->IsIntegral())
 						ctx.GlobalHeader << L"flat ";
 					ctx.GlobalHeader << L"out ";
-					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), field.Key);
+					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), field.Key + L"_at" + world->OutputType->TypeName);
 					ctx.GlobalHeader << L";\n";
 				}
 			}
 			virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) override
 			{
-				ctx.Body << instr->ComponentName << L" = ";
+				ctx.Body << instr->ComponentName << L"_at" << world->OutputType->TypeName << L" = ";
 				codeGen->PrintOp(ctx, instr->Operand.Ptr());
 				ctx.Body << L";\n";
 			}
@@ -1614,7 +1624,7 @@ namespace Spire
 					if (isPatch)
 						ctx.GlobalHeader << L"patch ";
 					ctx.GlobalHeader << L"out ";
-					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), field.Key);
+					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), field.Key + L"_at" + world->Name);
 					ctx.GlobalHeader << L"[";
 					if (arraySize != 0)
 						ctx.GlobalHeader << arraySize;
@@ -1623,7 +1633,7 @@ namespace Spire
 			}
 			virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) override
 			{
-				ctx.Body << instr->ComponentName << L"[" << outputIndex << L"] = ";
+				ctx.Body << instr->ComponentName << L"_at" << world->Name << L"[" << outputIndex << L"] = ";
 				codeGen->PrintOp(ctx, instr->Operand.Ptr());
 				ctx.Body << L";\n";
 			}

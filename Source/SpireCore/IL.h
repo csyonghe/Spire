@@ -299,6 +299,7 @@ namespace Spire
 		{
 		public:
 			String TypeName;
+			bool IsIntrinsic = false;
 			class ILStructField
 			{
 			public:

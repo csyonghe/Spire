@@ -143,6 +143,8 @@ namespace Spire
 					: TargetWorld(world), ImportOperator(imp)
 				{}
 			};
+			bool IsImplicitPath = true;
+			EnumerableHashSet<FunctionSyntaxNode*> TypeRequirements;
 			List<Node> Nodes;
 		};
 
@@ -150,24 +152,25 @@ namespace Spire
 		{
 		private:
 			List<String> WorldTopologyOrder;
+			EnumerableDictionary<String, EnumerableDictionary<String, List<ImportPath>>> pathCache;
+			List<ImportPath> FindPaths(String worldSrc, String worldDest);
 		public:
 			PipelineSyntaxNode * SyntaxNode;
 			PipelineSymbol * ParentPipeline;
 			EnumerableDictionary<String, List<RefPtr<ImportOperatorDefSyntaxNode>>> ImportOperators;
+			// SourceWorld=>DestinationWorld=>ImportOperator
+			EnumerableDictionary<String, EnumerableDictionary<String, List<RefPtr<ImportOperatorDefSyntaxNode>>>> ImportOperatorsByPath;
 			EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>> Components;
 			EnumerableDictionary<String, List<RefPtr<ShaderComponentSymbol>>> FunctionComponents;
-			EnumerableDictionary<String, EnumerableHashSet<String>> ReachableWorlds, ImplicitlyReachableWorlds;
-			EnumerableDictionary<String, EnumerableHashSet<String>> WorldDependency, ImplicitWorldDependency;
+			EnumerableDictionary<String, EnumerableHashSet<String>> WorldDependency;
 			EnumerableDictionary<String, WorldSymbol> Worlds;
 			bool IsAbstractWorld(String world);
-			bool IsWorldReachable(EnumerableHashSet<String> & src, String targetWorld);
-			bool IsWorldReachable(String src, String targetWorld);
-			bool IsWorldImplicitlyReachable(EnumerableHashSet<String> & src, String targetWorld);
-			bool IsWorldImplicitlyReachable(String src, String targetWorld);
 			bool IsChildOf(PipelineSymbol * parentPipeline);
+			
 			List<String> & GetWorldTopologyOrder();
-			List<ImportPath> FindImplicitImportOperatorChain(String worldSrc, String worldDest);
+			List<ImportPath> & GetPaths(String srcWorld, String destWorld);
 			List<ImportOperatorDefSyntaxNode*> GetImportOperatorsFromSourceWorld(String worldSrc);
+			void AddImportOperator(RefPtr<ImportOperatorDefSyntaxNode> op);
 		};
 
 		class CompileResult;
@@ -182,6 +185,8 @@ namespace Spire
 
 		class SymbolTable
 		{
+		private:
+			bool CheckTypeRequirement(const ImportPath & p, RefPtr<ExpressionType> type);
 		public:
 			EnumerableDictionary<String, List<RefPtr<FunctionSymbol>>> FunctionOverloads; // indexed by original name
 			EnumerableDictionary<String, RefPtr<FunctionSymbol>> Functions; // indexed by internal name
@@ -192,6 +197,12 @@ namespace Spire
 			bool SortShaders(); // return true if success, return false if dependency is cyclic
 			void EvalFunctionReferenceClosure();
 			bool CheckComponentImplementationConsistency(ErrorWriter * err, ShaderComponentSymbol * comp, ShaderComponentImplSymbol * impl);
+
+			bool IsWorldReachable(PipelineSymbol * pipe, EnumerableHashSet<String> & src, String targetWorld, RefPtr<ExpressionType> type);
+			bool IsWorldReachable(PipelineSymbol * pipe, String src, String targetWorld, RefPtr<ExpressionType> type);
+			bool IsWorldImplicitlyReachable(PipelineSymbol * pipe, EnumerableHashSet<String> & src, String targetWorld, RefPtr<ExpressionType> type);
+			bool IsWorldImplicitlyReachable(PipelineSymbol * pipe, String src, String targetWorld, RefPtr<ExpressionType> type);
+			List<ImportPath> FindImplicitImportOperatorChain(PipelineSymbol * pipe, String worldSrc, String worldDest, RefPtr<ExpressionType> type);
 		};
 
 		class GUID

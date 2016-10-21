@@ -947,15 +947,9 @@ namespace Spire
 					}
 					else if (expr->BaseExpression->Type->IsStruct())
 					{
-						if (expr->Access == ExpressionAccess::Read)
-						{
-							int id = expr->BaseExpression->Type->AsBasicType()->Struct->SyntaxNode->FindField(expr->MemberName);
-							GenerateIndexExpression(base, result.Program->ConstantPool->CreateConstant(id),
-								expr->Access == ExpressionAccess::Read);
-						}
-						else
-						{
-						}
+						int id = expr->BaseExpression->Type->AsBasicType()->Struct->SyntaxNode->FindField(expr->MemberName);
+						GenerateIndexExpression(base, result.Program->ConstantPool->CreateConstant(id),
+							expr->Access == ExpressionAccess::Read);
 					}
 					else
 						throw NotImplementedException(L"member expression codegen");

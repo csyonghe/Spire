@@ -206,7 +206,8 @@ namespace Spire
 						// in the second pass, examine all the rest definitions
 						for (auto & depWorld : depWorlds)
 						{
-							bool isPinned = Shader->AllComponents[dep.Dependency.ReferencedComponent]()->Type->PinnedWorlds.Contains(depWorld);
+							auto refComp = Shader->AllComponents[dep.Dependency.ReferencedComponent]();
+							bool isPinned = refComp->Type->PinnedWorlds.Contains(depWorld);
 							if ((pass == 0 && !isPinned) || (pass == 1 && isPinned)) continue;
 							ComponentDefinitionIR * depDef;
 							if (depDefs.TryGetValue(depWorld, depDef))
@@ -233,7 +234,7 @@ namespace Spire
 								}
 								if (depWorld != dep.SourceWorld)
 								{
-									auto importPath = Shader->Pipeline->FindImplicitImportOperatorChain(depWorld, dep.SourceWorld);
+									auto importPath = SymbolTable->FindImplicitImportOperatorChain(Shader->Pipeline, depWorld, dep.SourceWorld, refComp->Type->DataType);
 									if (importPath.Count() == 0)
 										continue;
 									processImportOperatorUsings(importPath.First().Nodes.Last().ImportOperator);

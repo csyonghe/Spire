@@ -1432,6 +1432,7 @@ namespace CoreLib
 			String PadLeft(wchar_t ch, int length);
 			String PadRight(wchar_t ch, int length);
 			String MD5() const;
+			String ReplaceAll(String src, String dst) const;
 		};
 
 		class StringBuilder
@@ -4827,6 +4828,15 @@ namespace CoreLib
 				for (auto && x : items)
 					rs = f(rs, x);
 				return rs;
+			}
+
+			template<typename TFunc>
+			bool Any(const TFunc & condition) const
+			{
+				for (auto && x : items)
+					if (condition(x))
+						return true;
+				return false;
 			}
 
 			template<typename TFunc>

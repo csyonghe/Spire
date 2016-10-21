@@ -77,10 +77,11 @@ namespace Spire
 			   After all references are resolved, all unreferenced definitions (dead code) are eliminated, 
 			   resulting a shader variant ready for code generation.
 			*/
-			RefPtr<ShaderIR> GenerateShaderVariantIR(CompileResult & cresult, ShaderClosure * shader, Schedule & schedule)
+			RefPtr<ShaderIR> GenerateShaderVariantIR(CompileResult & cresult, ShaderClosure * shader, Schedule & schedule, SymbolTable * symbolTable)
 			{
 				RefPtr<ShaderIR> result = new ShaderIR();
 				result->Shader = shader;
+				result->SymbolTable = symbolTable;
 				// mark pinned worlds
 				for (auto & comp : shader->Components)
 				{
@@ -260,7 +261,7 @@ namespace Spire
 						if (shader->IsAbstract)
 							continue;
 						auto shaderClosure = CreateShaderClosure(result.GetErrorWriter(), &symTable, shader);
-						FlattenShaderClosure(result.GetErrorWriter(), shaderClosure.Ptr());
+						FlattenShaderClosure(result.GetErrorWriter(), &symTable, shaderClosure.Ptr());
 						shaderClosures.Add(shaderClosure);
 					}
 					
@@ -282,7 +283,7 @@ namespace Spire
 					for (auto shader : shaderClosures)
 					{
 						// generate shader variant from schedule file, and also apply mechanic deduction rules
-						shader->IR = GenerateShaderVariantIR(result, shader.Ptr(), schedule);
+						shader->IR = GenerateShaderVariantIR(result, shader.Ptr(), schedule, &symTable);
 					}
 					if (options.Mode == CompilerMode::ProduceShader)
 					{
@@ -412,6 +413,7 @@ namespace Spire
 				if (compilerInstances == 0)
 				{
 					BasicExpressionType::Finalize();
+					SpireStdLib::Finalize();
 				}
 			}
 		};

@@ -172,6 +172,7 @@ pipeline TessellationPipeline : StandardPipeline
     [PerCornerIterator]
     extern @perCornerPoint int sysLocalIterator;
     import (vs->perCornerPoint) standardImport()
+        require trait IsTriviallyPassable(vs)
     {
         return vs_tcs[sysLocalIterator];
     } 
@@ -179,6 +180,7 @@ pipeline TessellationPipeline : StandardPipeline
     // implicit import operator tes->fs
     extern @fs tes tes_fs;
     import(tes->fs) standardImport()
+        require trait IsTriviallyPassable(tes)
     {
         return tes_fs;
     } 
@@ -199,23 +201,27 @@ pipeline TessellationPipeline : StandardPipeline
     
     extern @tcs vs[] vs_tcs;
     extern @perPatch vs[] vs_tcs;
-    [InvocationID]
-    extern @tcs vs invocationId;
+    [InvocationId]
+    extern @tcs int invocationId;
     import(vs->tcs) indexImport(int id)
+        require trait IsTriviallyPassable(vs)
     {
         return vs_tcs[id];
     }
     import(vs->perPatch) indexImport(int id)
+        require trait IsTriviallyPassable(vs)
     {
         return vs_tcs[id];
     }
     extern @tes tcs[] tcs_tes;
     import(tcs->tes) indexImport(int id)
+        require trait IsTriviallyPassable(vs)
     {
         return tcs_tes[id];
     }
     extern @tes Patch<perPatch> perPatch_tes;
     import (perPatch->tes) standardImport()
+        require trait IsTriviallyPassable(vs)
     {
         return perPatch_tes;
     }
@@ -224,6 +230,8 @@ pipeline TessellationPipeline : StandardPipeline
     [TessCoord]
     extern @tes vec3 tessCoord;
     import(perCornerPoint->tes) standardImport()
+		require perCornerPoint operator * (perCornerPoint, float)
+		require perCornerPoint operator + (perCornerPoint, perCornerPoint)
     {
         return perCorner_tes[0] * tessCoord.x +
                perCorner_tes[1] * tessCoord.y +

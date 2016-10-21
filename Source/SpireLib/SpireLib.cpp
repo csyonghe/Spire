@@ -125,7 +125,7 @@ namespace SpireLib
 		List<String> unitsToInclude;
 		unitsToInclude.Add(fileName);
 		processedUnits.Add(fileName);
-		auto predefUnit = compiler->Parse(compileResult, LibIncludeString, L"stdlib");
+		auto predefUnit = compiler->Parse(compileResult, SpireStdLib::GetCode(), L"stdlib");
 		for (int i = 0; i < unitsToInclude.Count(); i++)
 		{
 			auto inputFileName = unitsToInclude[i];

@@ -54,7 +54,7 @@ namespace Spire
 				}
 				for (auto & compDef : shaderIR->DefinitionsByComponent[componentUniqueName]())
 				{
-					auto path = shaderIR->Shader->Pipeline->FindImplicitImportOperatorChain(compDef.Value->World, world);
+					auto path = shaderIR->SymbolTable->FindImplicitImportOperatorChain(shaderIR->Shader->Pipeline, compDef.Value->World, world, compDef.Value->Type);
 					if (path.Count() && path.First().Nodes.Count() < currentPathLength)
 					{
 						importPath = path.First();

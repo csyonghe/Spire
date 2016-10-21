@@ -57,6 +57,20 @@ namespace CoreLib
 			return (double)wcstod(str.Buffer(), NULL);
 		}
 
+		String String::ReplaceAll(String src, String dst) const
+		{
+			String rs = *this;
+			int index = 0;
+			int srcLen = src.length;
+			int len = rs.length;
+			while ((index = rs.IndexOf(src, index)) != -1)
+			{
+				rs = rs.SubString(0, index) + dst + rs.SubString(index + srcLen, len - index - srcLen);
+				len = rs.length;
+			}
+			return rs;
+		}
+
 		String String::MD5() const
 		{
 			unsigned char result[16];

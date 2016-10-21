@@ -15,6 +15,7 @@ namespace Spire
 		class Parser
 		{
 		private:
+			int anonymousParamCounter = 0;
 			int pos;
 			List<RefPtr<Scope>> scopeStack;
 			List<Token> & tokens;
@@ -118,7 +119,7 @@ namespace Spire
 			RefPtr<ImportSyntaxNode>				ParseImport();
 			RefPtr<ImportStatementSyntaxNode>		ParseImportStatement();
 			RefPtr<ImportOperatorDefSyntaxNode>		ParseImportOperator();
-			RefPtr<FunctionSyntaxNode>				ParseFunction();
+			RefPtr<FunctionSyntaxNode>				ParseFunction(bool parseBody = true);
 			RefPtr<StructSyntaxNode>				ParseStruct();
 			RefPtr<StatementSyntaxNode>				ParseStatement();
 			RefPtr<BlockStatementSyntaxNode>		ParseBlockStatement();

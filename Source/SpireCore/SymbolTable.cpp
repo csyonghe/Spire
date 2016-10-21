@@ -5,6 +5,7 @@ namespace Spire
 {
 	namespace Compiler
 	{
+
 		bool SymbolTable::SortShaders()
 		{
 			HashSet<ShaderSymbol*> shaderSet;
@@ -72,31 +73,64 @@ namespace Spire
 			}
 		}
 
+		List<ImportPath>& PipelineSymbol::GetPaths(String srcWorld, String destWorld)
+		{
+			if (auto first = pathCache.TryGetValue(srcWorld))
+			{
+				if (auto second = first->TryGetValue(destWorld))
+					return *second;
+			}
+			else
+			{
+				pathCache[srcWorld] = EnumerableDictionary<String, List<ImportPath>>();
+			}
+			auto path = FindPaths(srcWorld, destWorld);
+			auto & dict = pathCache[srcWorld]();
+			dict[destWorld] = _Move(path);
+			return dict[destWorld]();
+		}
+
+		List<ImportPath> PipelineSymbol::FindPaths(String worldSrc, String worldDest)
+		{
+			List<ImportPath> resultPaths;
+			if (worldSrc == worldDest)
+				return resultPaths;
+			List<ImportPath> paths, paths2;
+			paths.Add(ImportPath());
+			paths[0].Nodes.Add(ImportPath::Node(worldSrc, nullptr));
+			while (paths.Count())
+			{
+				paths2.Clear();
+				for (auto & p : paths)
+				{
+					String world0 = p.Nodes.Last().TargetWorld;
+					for (auto op : SyntaxNode->ImportOperators)
+					{
+						if (op->SourceWorld.Content == world0)
+						{
+							ImportPath np = p;
+							if (op->Parameters.Count() != 0)
+								np.IsImplicitPath = false;
+							for (auto &req : op->Requirements)
+								np.TypeRequirements.Add(req.Ptr());
+							np.Nodes.Add(ImportPath::Node(op->DestWorld.Content, op.Ptr()));
+							if (op->DestWorld.Content == worldDest)
+								resultPaths.Add(np);
+							else
+								paths2.Add(np);
+						}
+					}
+				}
+				paths.SwapWith(paths2);
+			}
+			return resultPaths;
+		}
+
 		bool PipelineSymbol::IsAbstractWorld(String world)
 		{
 			WorldSymbol ws;
 			if (Worlds.TryGetValue(world, ws))
 				return ws.IsAbstract;
-			return false;
-		}
-
-		bool PipelineSymbol::IsWorldReachable(String src, String targetWorld)
-		{
-			if (src == targetWorld)
-				return true;
-			if (ReachableWorlds.ContainsKey(src))
-				if (ReachableWorlds[src]().Contains(targetWorld))
-					return true;
-			return false;
-		}
-
-		bool PipelineSymbol::IsWorldImplicitlyReachable(String src, String targetWorld)
-		{
-			if (src == targetWorld)
-				return true;
-			if (ImplicitlyReachableWorlds.ContainsKey(src))
-				if (ImplicitlyReachableWorlds[src]().Contains(targetWorld))
-					return true;
 			return false;
 		}
 
@@ -108,19 +142,6 @@ namespace Spire
 				return ParentPipeline->IsChildOf(parentPipeline);
 			else
 				return false;
-		}
-
-		bool PipelineSymbol::IsWorldImplicitlyReachable(EnumerableHashSet<String>& src, String targetWorld)
-		{
-			for (auto srcW : src)
-			{
-				if (srcW == targetWorld)
-					return true;
-				if (ImplicitlyReachableWorlds.ContainsKey(srcW))
-					if (ImplicitlyReachableWorlds[srcW]().Contains(targetWorld))
-						return true;
-			}
-			return false;
 		}
 
 		List<String>& PipelineSymbol::GetWorldTopologyOrder()
@@ -157,60 +178,46 @@ namespace Spire
 			return WorldTopologyOrder;
 		}
 		
-		bool PipelineSymbol::IsWorldReachable(EnumerableHashSet<String>& src, String targetWorld)
-		{
-			for (auto srcW : src)
-			{
-				if (srcW == targetWorld)
-					return true;
-				if (ReachableWorlds.ContainsKey(srcW))
-					if (ReachableWorlds[srcW]().Contains(targetWorld))
-						return true;
-			}
-			return false;
-		}
-		
-		List<ImportPath> PipelineSymbol::FindImplicitImportOperatorChain(String worldSrc, String worldDest)
-		{
-			List<ImportPath> resultPathes;
-			if (worldSrc == worldDest)
-				return resultPathes;
-			List<ImportPath> pathes, pathes2;
-			pathes.Add(ImportPath());
-			pathes[0].Nodes.Add(ImportPath::Node(worldSrc, nullptr));
-			while (pathes.Count())
-			{
-				pathes2.Clear();
-				for (auto & p : pathes)
-				{
-					String world0 = p.Nodes.Last().TargetWorld;
-					for (auto op : SyntaxNode->ImportOperators)
-					{
-						if (op->SourceWorld.Content == world0 && op->Parameters.Count() == 0)
-						{
-							ImportPath np = p;
-							np.Nodes.Add(ImportPath::Node(op->DestWorld.Content, op.Ptr()));
-							if (op->DestWorld.Content == worldDest)
-								resultPathes.Add(np);
-							else
-								pathes2.Add(np);
-						}
-					}
-				}
-				pathes.SwapWith(pathes2);
-			}
-			return resultPathes;
-		}
 		List<ImportOperatorDefSyntaxNode*> PipelineSymbol::GetImportOperatorsFromSourceWorld(String worldSrc)
 		{
 			List<ImportOperatorDefSyntaxNode*> rs;
-			for (auto & op : this->SyntaxNode->ImportOperators)
+			auto dict = ImportOperatorsByPath.TryGetValue(worldSrc);
+			if (dict)
 			{
-				if (op->SourceWorld.Content == worldSrc)
-					rs.Add(op.Ptr());
+				for (auto & op : *dict)
+				{
+					for (auto & x : op.Value)
+						rs.Add(x.Ptr());
+				}
 			}
 			return rs;
 		}
+		void PipelineSymbol::AddImportOperator(RefPtr<ImportOperatorDefSyntaxNode> op)
+		{
+			auto list = ImportOperators.TryGetValue(op->Name.Content);
+			if (!list)
+			{
+				ImportOperators[op->Name.Content] = List<RefPtr<ImportOperatorDefSyntaxNode>>();
+				list = ImportOperators.TryGetValue(op->Name.Content);
+			}
+			list->Add(op);
+
+			auto first = ImportOperatorsByPath.TryGetValue(op->SourceWorld.Content);
+			if (!first)
+			{
+				ImportOperatorsByPath[op->SourceWorld.Content] = EnumerableDictionary<String, List<RefPtr<ImportOperatorDefSyntaxNode>>>();
+				first = ImportOperatorsByPath.TryGetValue(op->SourceWorld.Content);
+			}
+
+			auto second = first->TryGetValue(op->DestWorld.Content);
+			if (!second)
+			{
+				(*first)[op->DestWorld.Content] = List<RefPtr<ImportOperatorDefSyntaxNode>>();
+				second = first->TryGetValue(op->DestWorld.Content);
+			}
+			second->Add(op);
+		}
+
 		List<ShaderComponentSymbol*> ShaderSymbol::GetComponentDependencyOrder()
 		{
 			List<ShaderComponentSymbol*> components;
@@ -367,6 +374,101 @@ namespace Spire
 				rs = false;
 			}
 			return rs;
+		}
+
+		String PrintType(RefPtr<ExpressionType> type, String recordReplaceStr)
+		{
+			if (auto basic = type->AsBasicType())
+			{
+				if (basic->BaseType == BaseType::Record)
+					return recordReplaceStr;
+				else
+					return basic->ToString();
+			}
+			else if (auto arr = type.As<ArrayExpressionType>())
+			{
+				if (arr->ArrayLength > 0)
+					return PrintType(arr->BaseType, recordReplaceStr) + L"[" + arr->ArrayLength + L"]";
+				else
+					return PrintType(arr->BaseType, recordReplaceStr) + L"[]";
+			}
+			else if (auto gen = type.As<GenericExpressionType>())
+			{
+				return gen->GenericTypeName + L"<" + PrintType(gen->BaseType, recordReplaceStr) + L">";
+			}
+			return L"";
+		}
+
+		bool SymbolTable::CheckTypeRequirement(const ImportPath & p, RefPtr<ExpressionType> type)
+		{
+			for (auto & req : p.TypeRequirements)
+			{
+				auto typeStr = type->ToString();
+				auto retType = PrintType(req->ReturnType, typeStr);
+				StringBuilder sbInternalName;
+				sbInternalName << req->Name;
+				for (auto & op : req->Parameters)
+				{
+					sbInternalName << L"@" << PrintType(op->Type, typeStr);
+				}
+				auto funcName = sbInternalName.ProduceString();
+				auto func = Functions.TryGetValue(funcName);
+				if (!func)
+					return false;
+				if ((*func)->SyntaxNode->ReturnType->ToString() != retType)
+					return false;
+			}
+			return true;
+		}
+
+		bool SymbolTable::IsWorldReachable(PipelineSymbol * pipe, String src, String targetWorld, RefPtr<ExpressionType> type)
+		{
+			if (src == targetWorld)
+				return true;
+			return From(pipe->GetPaths(src, targetWorld)).Any([&](const ImportPath & p)
+			{
+				return CheckTypeRequirement(p, type);
+			});
+		}
+
+		bool SymbolTable::IsWorldImplicitlyReachable(PipelineSymbol * pipe, String src, String targetWorld, RefPtr<ExpressionType> type)
+		{
+			if (src == targetWorld)
+				return true;
+			return From(pipe->GetPaths(src, targetWorld)).Any([&](const ImportPath & p)
+			{
+				return p.IsImplicitPath && CheckTypeRequirement(p, type);
+			});
+		}
+
+		bool SymbolTable::IsWorldImplicitlyReachable(PipelineSymbol * pipe, EnumerableHashSet<String>& src, String targetWorld, RefPtr<ExpressionType> type)
+		{
+			for (auto srcW : src)
+			{
+				if (IsWorldImplicitlyReachable(pipe, srcW, targetWorld, type))
+					return true;
+			}
+			return false;
+		}
+
+		bool SymbolTable::IsWorldReachable(PipelineSymbol * pipe, EnumerableHashSet<String>& src, String targetWorld, RefPtr<ExpressionType> type)
+		{
+			for (auto srcW : src)
+			{
+				if (IsWorldReachable(pipe, srcW, targetWorld, type))
+					return true;
+			}
+			return false;
+		}
+
+		List<ImportPath> SymbolTable::FindImplicitImportOperatorChain(PipelineSymbol * pipe, String worldSrc, String worldDest, RefPtr<ExpressionType> type)
+		{
+			return From(pipe->GetPaths(worldSrc, worldDest)).Where([&](const ImportPath & p)
+			{
+				if (p.IsImplicitPath)
+					return CheckTypeRequirement(p, type);
+				return false;
+			}).ToList();
 		}
 
 		int GUID::currentGUID = 0;

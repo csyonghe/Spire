@@ -626,6 +626,7 @@ namespace Spire
 		public:
 			List<RefPtr<StructField>> Fields;
 			Token Name;
+			bool IsIntrinsic = false;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			int FindField(String name)
 			{
@@ -689,6 +690,28 @@ namespace Spire
 			virtual ParameterSyntaxNode * Clone(CloneContext & ctx);
 		};
 
+		class FunctionSyntaxNode : public SyntaxNode
+		{
+		public:
+			String Name, InternalName;
+			RefPtr<ExpressionType> ReturnType;
+			RefPtr<TypeSyntaxNode> ReturnTypeNode;
+			List<RefPtr<ParameterSyntaxNode>> Parameters;
+			RefPtr<BlockStatementSyntaxNode> Body;
+			bool IsInline;
+			bool IsExtern;
+			bool HasSideEffect;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
+			FunctionSyntaxNode()
+			{
+				IsInline = false;
+				IsExtern = false;
+				HasSideEffect = true;
+			}
+
+			virtual FunctionSyntaxNode * Clone(CloneContext & ctx);
+		};
+
 		class ImportOperatorDefSyntaxNode : public SyntaxNode
 		{
 		public:
@@ -697,6 +720,8 @@ namespace Spire
 			List<RefPtr<ParameterSyntaxNode>> Parameters;
 			RefPtr<BlockStatementSyntaxNode> Body;
 			EnumerableDictionary<String, String> LayoutAttributes;
+			Token TypeName;
+			List<RefPtr<FunctionSyntaxNode>> Requirements;
 			List<String> Usings;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ImportOperatorDefSyntaxNode * Clone(CloneContext & ctx) override;
@@ -745,9 +770,11 @@ namespace Spire
 			BitAnd, BitXor, BitOr,
 			And,
 			Or,
-			Assign, AddAssign, SubAssign, MulAssign, DivAssign, ModAssign,
+			Assign = 200, AddAssign, SubAssign, MulAssign, DivAssign, ModAssign,
 			LshAssign, RshAssign, OrAssign, AndAssign, XorAssign
 		};
+
+		String GetOperatorFunctionName(Operator op);
 		
 		class ImportExpressionSyntaxNode : public ExpressionSyntaxNode
 		{
@@ -852,28 +879,6 @@ namespace Spire
 			{
 				return name == Name;
 			}
-		};
-		class FunctionSyntaxNode : public SyntaxNode
-		{
-		public:
-			String Name, InternalName;
-			RefPtr<ExpressionType> ReturnType;
-			RefPtr<TypeSyntaxNode> ReturnTypeNode;
-			List<RefPtr<ParameterSyntaxNode>> Parameters;
-			RefPtr<BlockStatementSyntaxNode> Body;
-			List<VariableDeclr> Variables;
-			bool IsInline;
-			bool IsExtern;
-			bool HasSideEffect;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			FunctionSyntaxNode()
-			{
-				IsInline = false;
-				IsExtern = false;
-				HasSideEffect = true;
-			}
-
-			virtual FunctionSyntaxNode * Clone(CloneContext & ctx);
 		};
 
 		struct Variable : public SyntaxNode
@@ -1673,6 +1678,7 @@ namespace Spire
 		{
 		public:
 			String TypeName;
+			bool IsIntrinsic = false;
 			class ILStructField
 			{
 			public:
@@ -3900,6 +3906,7 @@ namespace Spire
 		{
 		public:
 			ShaderClosure * Shader;
+			SymbolTable * SymbolTable;
 			List<RefPtr<ComponentDefinitionIR>> Definitions;
 			EnumerableDictionary<String, EnumerableDictionary<String, ComponentDefinitionIR*>> DefinitionsByComponent;
 			void EliminateDeadCode(); // returns remaining definitions in reverse dependency order
@@ -4075,6 +4082,8 @@ namespace Spire
 					: TargetWorld(world), ImportOperator(imp)
 				{}
 			};
+			bool IsImplicitPath = true;
+			EnumerableHashSet<FunctionSyntaxNode*> TypeRequirements;
 			List<Node> Nodes;
 		};
 
@@ -4082,24 +4091,25 @@ namespace Spire
 		{
 		private:
 			List<String> WorldTopologyOrder;
+			EnumerableDictionary<String, EnumerableDictionary<String, List<ImportPath>>> pathCache;
+			List<ImportPath> FindPaths(String worldSrc, String worldDest);
 		public:
 			PipelineSyntaxNode * SyntaxNode;
 			PipelineSymbol * ParentPipeline;
 			EnumerableDictionary<String, List<RefPtr<ImportOperatorDefSyntaxNode>>> ImportOperators;
+			// SourceWorld=>DestinationWorld=>ImportOperator
+			EnumerableDictionary<String, EnumerableDictionary<String, List<RefPtr<ImportOperatorDefSyntaxNode>>>> ImportOperatorsByPath;
 			EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>> Components;
 			EnumerableDictionary<String, List<RefPtr<ShaderComponentSymbol>>> FunctionComponents;
-			EnumerableDictionary<String, EnumerableHashSet<String>> ReachableWorlds, ImplicitlyReachableWorlds;
-			EnumerableDictionary<String, EnumerableHashSet<String>> WorldDependency, ImplicitWorldDependency;
+			EnumerableDictionary<String, EnumerableHashSet<String>> WorldDependency;
 			EnumerableDictionary<String, WorldSymbol> Worlds;
 			bool IsAbstractWorld(String world);
-			bool IsWorldReachable(EnumerableHashSet<String> & src, String targetWorld);
-			bool IsWorldReachable(String src, String targetWorld);
-			bool IsWorldImplicitlyReachable(EnumerableHashSet<String> & src, String targetWorld);
-			bool IsWorldImplicitlyReachable(String src, String targetWorld);
 			bool IsChildOf(PipelineSymbol * parentPipeline);
+			
 			List<String> & GetWorldTopologyOrder();
-			List<ImportPath> FindImplicitImportOperatorChain(String worldSrc, String worldDest);
+			List<ImportPath> & GetPaths(String srcWorld, String destWorld);
 			List<ImportOperatorDefSyntaxNode*> GetImportOperatorsFromSourceWorld(String worldSrc);
+			void AddImportOperator(RefPtr<ImportOperatorDefSyntaxNode> op);
 		};
 
 		class CompileResult;
@@ -4114,6 +4124,8 @@ namespace Spire
 
 		class SymbolTable
 		{
+		private:
+			bool CheckTypeRequirement(const ImportPath & p, RefPtr<ExpressionType> type);
 		public:
 			EnumerableDictionary<String, List<RefPtr<FunctionSymbol>>> FunctionOverloads; // indexed by original name
 			EnumerableDictionary<String, RefPtr<FunctionSymbol>> Functions; // indexed by internal name
@@ -4124,6 +4136,12 @@ namespace Spire
 			bool SortShaders(); // return true if success, return false if dependency is cyclic
 			void EvalFunctionReferenceClosure();
 			bool CheckComponentImplementationConsistency(ErrorWriter * err, ShaderComponentSymbol * comp, ShaderComponentImplSymbol * impl);
+
+			bool IsWorldReachable(PipelineSymbol * pipe, EnumerableHashSet<String> & src, String targetWorld, RefPtr<ExpressionType> type);
+			bool IsWorldReachable(PipelineSymbol * pipe, String src, String targetWorld, RefPtr<ExpressionType> type);
+			bool IsWorldImplicitlyReachable(PipelineSymbol * pipe, EnumerableHashSet<String> & src, String targetWorld, RefPtr<ExpressionType> type);
+			bool IsWorldImplicitlyReachable(PipelineSymbol * pipe, String src, String targetWorld, RefPtr<ExpressionType> type);
+			List<ImportPath> FindImplicitImportOperatorChain(PipelineSymbol * pipe, String worldSrc, String worldDest, RefPtr<ExpressionType> type);
 		};
 
 		class GUID
@@ -4503,7 +4521,7 @@ namespace Spire
 	namespace Compiler
 	{
 		RefPtr<ShaderClosure> CreateShaderClosure(ErrorWriter * err, SymbolTable * symTable, ShaderSymbol * shader);
-		void FlattenShaderClosure(ErrorWriter * err, ShaderClosure * shader);
+		void FlattenShaderClosure(ErrorWriter * err, SymbolTable * symTable, ShaderClosure * shader);
 		void InsertImplicitImportOperators(ShaderIR * shader);
 	}
 }
@@ -4859,6 +4877,7 @@ namespace Spire
 		class Parser
 		{
 		private:
+			int anonymousParamCounter = 0;
 			int pos;
 			List<RefPtr<Scope>> scopeStack;
 			List<Token> & tokens;
@@ -4962,7 +4981,7 @@ namespace Spire
 			RefPtr<ImportSyntaxNode>				ParseImport();
 			RefPtr<ImportStatementSyntaxNode>		ParseImportStatement();
 			RefPtr<ImportOperatorDefSyntaxNode>		ParseImportOperator();
-			RefPtr<FunctionSyntaxNode>				ParseFunction();
+			RefPtr<FunctionSyntaxNode>				ParseFunction(bool parseBody = true);
 			RefPtr<StructSyntaxNode>				ParseStruct();
 			RefPtr<StatementSyntaxNode>				ParseStatement();
 			RefPtr<BlockStatementSyntaxNode>		ParseBlockStatement();
@@ -5017,8 +5036,22 @@ CORE\STDINCLUDE.H
 #ifndef SHADER_COMPILER_STD_LIB_H
 #define SHADER_COMPILER_STD_LIB_H
 
-extern const char * LibIncludeString;
-extern const wchar_t * VertexShaderIncludeString;
+
+namespace Spire
+{
+	namespace Compiler
+	{
+		class SpireStdLib
+		{
+		private:
+			static CoreLib::String code;
+		public:
+			static CoreLib::String GetCode();
+			static void Finalize();
+		};
+	}
+}
+
 #endif
 
 /***********************************************************************

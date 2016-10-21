@@ -68,17 +68,26 @@ namespace Spire
 			case Compiler::BaseType::Int2:
 				res.Append(L"ivec2");
 				break;
+			case Compiler::BaseType::UInt2:
+				res.Append(L"uvec2");
+				break;
 			case Compiler::BaseType::Float2:
 				res.Append(L"vec2");
 				break;
 			case Compiler::BaseType::Int3:
 				res.Append(L"ivec3");
 				break;
+			case Compiler::BaseType::UInt3:
+				res.Append(L"uvec3");
+				break;
 			case Compiler::BaseType::Float3:
 				res.Append(L"vec3");
 				break;
 			case Compiler::BaseType::Int4:
 				res.Append(L"ivec4");
+				break;
+			case Compiler::BaseType::UInt4:
+				res.Append(L"uvec4");
 				break;
 			case Compiler::BaseType::Float4:
 				res.Append(L"vec4");
@@ -772,5 +781,71 @@ namespace Spire
 				comp->BlockStatement = comp->BlockStatement->Accept(this).As<BlockStatementSyntaxNode>();
 			return comp;
 		}
-}
+		String GetOperatorFunctionName(Operator op)
+		{
+			switch (op)
+			{
+			case Operator::Add:
+			case Operator::AddAssign:
+				return L"+";
+			case Operator::Sub:
+			case Operator::SubAssign:
+				return L"-";
+			case Operator::Neg:
+				return L"-";
+			case Operator::Not:
+				return L"!";
+			case Operator::BitNot:
+				return L"~";
+			case Operator::PreInc:
+			case Operator::PostInc:
+				return L"++";
+			case Operator::PreDec:
+			case Operator::PostDec:
+				return L"--";
+			case Operator::Mul:
+			case Operator::MulAssign:
+				return L"*";
+			case Operator::Div:
+			case Operator::DivAssign:
+				return L"/";
+			case Operator::Mod:
+			case Operator::ModAssign:
+				return L"%";
+			case Operator::Lsh:
+			case Operator::LshAssign:
+				return L"<<";
+			case Operator::Rsh:
+			case Operator::RshAssign:
+				return L">>";
+			case Operator::Eql:
+				return L"==";
+			case Operator::Neq:
+				return L"!=";
+			case Operator::Greater:
+				return L">";
+			case Operator::Less:
+				return L"<";
+			case Operator::Geq:
+				return L">=";
+			case Operator::Leq:
+				return L"<=";
+			case Operator::BitAnd:
+			case Operator::AndAssign:
+				return L"&";
+			case Operator::BitXor:
+			case Operator::XorAssign:
+				return L"^";
+			case Operator::BitOr:
+			case Operator::OrAssign:
+				return L"|";
+			case Operator::And:
+				return L"&&";
+			case Operator::Or:
+				return L"||";
+			default:
+				return L"";
+			}
+		}
+	}
 }

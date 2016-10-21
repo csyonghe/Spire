@@ -394,6 +394,15 @@ namespace CoreLib
 			}
 
 			template<typename TFunc>
+			bool Any(const TFunc & condition) const
+			{
+				for (auto && x : items)
+					if (condition(x))
+						return true;
+				return false;
+			}
+
+			template<typename TFunc>
 			T & First(const TFunc & condition) const
 			{
 				for (auto && x : items)

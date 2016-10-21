@@ -522,13 +522,19 @@ namespace Spire
 					break;
 			}
 			ReadToken(TokenType::RParent);
+			while (LookAheadToken(L"require"))
+			{
+				ReadToken(L"require");
+				op->Requirements.Add(ParseFunction(false));
+			}
 			op->Body = ParseBlockStatement();
 			PopScope();
 			return op;
 		}
 
-		RefPtr<FunctionSyntaxNode> Parser::ParseFunction()
+		RefPtr<FunctionSyntaxNode> Parser::ParseFunction(bool parseBody)
 		{
+			anonymousParamCounter = 0;
 			RefPtr<FunctionSyntaxNode> function = new FunctionSyntaxNode();
 			if (LookAheadToken(L"__intrinsic"))
 			{
@@ -555,7 +561,28 @@ namespace Spire
 			try
 			{
 				FillPosition(function.Ptr());
-				Token name = ReadToken();
+				Token name;
+				if (LookAheadToken(L"operator"))
+				{
+					ReadToken();
+					name = ReadToken();
+					switch (name.Type)
+					{
+					case TokenType::OpAdd: case TokenType::OpSub: case TokenType::OpMul: case TokenType::OpDiv:
+					case TokenType::OpMod: case TokenType::OpNot: case TokenType::OpBitNot: case TokenType::OpLsh: case TokenType::OpRsh:
+					case TokenType::OpEql: case TokenType::OpNeq: case TokenType::OpGreater: case TokenType::OpLess: case TokenType::OpGeq:
+					case TokenType::OpLeq: case TokenType::OpAnd: case TokenType::OpOr: case TokenType::OpBitXor: case TokenType::OpBitAnd:
+					case TokenType::OpBitOr: case TokenType::OpInc: case TokenType::OpDec:
+						break;
+					default:
+						errors.Add(CompileError(L"invalid operator '" + name.Content + L"'.", 20008, name.Position));
+						break;
+					}
+				}
+				else
+				{
+					name = ReadToken(TokenType::Identifier);
+				}
 				function->Name = name.Content;
 				ReadToken(TokenType::LParent);
 				while(pos < tokens.Count() && tokens[pos].Type != TokenType::RParent)
@@ -577,10 +604,13 @@ namespace Spire
 					pos++;
 				}
 			}
-			if (!function->IsExtern)
-				function->Body = ParseBlockStatement();
-			else
-				ReadToken(TokenType::Semicolon);
+			if (parseBody)
+			{
+				if (!function->IsExtern)
+					function->Body = ParseBlockStatement();
+				else
+					ReadToken(TokenType::Semicolon);
+			}
 			PopScope();
 			return function;
 		}
@@ -591,6 +621,11 @@ namespace Spire
 			FillPosition(rs.Ptr());
 			ReadToken(L"struct");
 			rs->Name = ReadToken(TokenType::Identifier);
+			if (LookAheadToken(L"__intrinsic"))
+			{
+				ReadToken();
+				rs->IsIntrinsic = true;
+			}
 			ReadToken(L"{");
 			while (!LookAheadToken(L"}") && pos < tokens.Count())
 			{
@@ -904,10 +939,14 @@ namespace Spire
 			RefPtr<ParameterSyntaxNode> parameter = new ParameterSyntaxNode();
 			
 			parameter->TypeNode = ParseType();
-			Token & name = ReadToken(TokenType::Identifier);
-			parameter->Name = name.Content;
+			if (LookAheadToken(TokenType::Identifier))
+			{
+				Token & name = ReadToken(TokenType::Identifier);
+				parameter->Name = name.Content;
+			}
+			else
+				parameter->Name = L"_anonymousParam" + String(anonymousParamCounter++);
 			FillPosition(parameter.Ptr());
-			
 			return parameter;
 		}
 

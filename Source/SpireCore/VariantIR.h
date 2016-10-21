@@ -24,6 +24,7 @@ namespace Spire
 		{
 		public:
 			ShaderClosure * Shader;
+			SymbolTable * SymbolTable;
 			List<RefPtr<ComponentDefinitionIR>> Definitions;
 			EnumerableDictionary<String, EnumerableDictionary<String, ComponentDefinitionIR*>> DefinitionsByComponent;
 			void EliminateDeadCode(); // returns remaining definitions in reverse dependency order

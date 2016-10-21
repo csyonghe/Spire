@@ -512,7 +512,7 @@ namespace Spire
 				GatherComponents(err, closure, sc.Value.Ptr());
 		}
 
-		bool IsWorldFeasible(PipelineSymbol * pipeline, ShaderComponentImplSymbol * impl, String world, ShaderComponentSymbol*& unaccessibleComp)
+		bool IsWorldFeasible(SymbolTable * symTable, PipelineSymbol * pipeline, ShaderComponentImplSymbol * impl, String world, ShaderComponentSymbol*& unaccessibleComp)
 		{
 			bool isWFeasible = true;
 			for (auto & dcomp : impl->DependentComponents)
@@ -522,7 +522,7 @@ namespace Spire
 					bool reachable = false;
 					for (auto & dw : dcomp.Key->Type->FeasibleWorlds)
 					{
-						if (pipeline->IsWorldImplicitlyReachable(dw, world))
+						if (symTable->IsWorldImplicitlyReachable(pipeline, dw, world, dcomp.Key->Type->DataType))
 						{
 							reachable = true;
 							break;
@@ -539,7 +539,7 @@ namespace Spire
 			return isWFeasible;
 		}
 
-		void SolveWorldConstraints(ErrorWriter * err, ShaderClosure * shader)
+		void SolveWorldConstraints(ErrorWriter * err, SymbolTable * symTable, ShaderClosure * shader)
 		{
 			EnumerableHashSet<String> allWorlds;
 			for (auto w : shader->Pipeline->Worlds)
@@ -558,7 +558,7 @@ namespace Spire
 					for (auto & w : impl->Worlds)
 					{
 						ShaderComponentSymbol* unaccessibleComp = nullptr;
-						if (!IsWorldFeasible(shader->Pipeline, impl.Ptr(), w, unaccessibleComp))
+						if (!IsWorldFeasible(symTable, shader->Pipeline, impl.Ptr(), w, unaccessibleComp))
 						{
 							err->Error(33100, L"'" + comp->Name + L"' cannot be computed at '" + w + L"' because the dependent component '" + unaccessibleComp->Name + L"' is not accessible.\nsee definition of '"
 								+ unaccessibleComp->Name + L"' at " + unaccessibleComp->Implementations.First()->SyntaxNode->Position.ToString(),
@@ -576,7 +576,7 @@ namespace Spire
 						for (auto & w : deducedWorlds)
 						{
 							ShaderComponentSymbol* unaccessibleComp = nullptr;
-							bool isWFeasible = IsWorldFeasible(shader->Pipeline, impl.Ptr(), w, unaccessibleComp);
+							bool isWFeasible = IsWorldFeasible(symTable, shader->Pipeline, impl.Ptr(), w, unaccessibleComp);
 							if (isWFeasible)
 								feasibleWorlds.Add(w);
 						}
@@ -599,7 +599,7 @@ namespace Spire
 				{
 					EnumerableHashSet<String> newWorlds;
 					for (auto & w : compSym->Type->ConstrainedWorlds)
-						if (shader->Pipeline->IsWorldReachable(w, world))
+						if (symTable->IsWorldReachable(shader->Pipeline, w, world, compSym->Type->DataType))
 							newWorlds.Add(w);
 					compSym->Type->ConstrainedWorlds = _Move(newWorlds);
 				}
@@ -668,7 +668,7 @@ namespace Spire
 			}
 		}
 
-		void VerifyAndPropagateArgumentConstraints(ErrorWriter * err, ShaderClosure * shader)
+		void VerifyAndPropagateArgumentConstraints(ErrorWriter * err, SymbolTable * symTable, ShaderClosure * shader)
 		{
 			for (auto & map : shader->RefMap)
 			{
@@ -680,7 +680,7 @@ namespace Spire
 					{
 						for (auto w : requirement->Implementations.First()->Worlds)
 						{
-							if (!shader->Pipeline->IsWorldImplicitlyReachable(arg->Type->FeasibleWorlds, w))
+							if (!symTable->IsWorldImplicitlyReachable(shader->Pipeline, arg->Type->FeasibleWorlds, w, requirement->Type->DataType))
 							{
 								err->Error(32015, L"argument '" + arg->Name + L"' is not available in world '" + w + L"' as required by '" + shader->Name
 									+ L"'.\nsee requirement declaration at " +
@@ -692,7 +692,7 @@ namespace Spire
 				}
 			}
 			for (auto & subClosure : shader->SubClosures)
-				VerifyAndPropagateArgumentConstraints(err, subClosure.Value.Ptr());
+				VerifyAndPropagateArgumentConstraints(err, symTable, subClosure.Value.Ptr());
 		}
 
 		void AddPipelineComponents(ShaderClosure * shader)
@@ -870,21 +870,13 @@ namespace Spire
 						if (isDefinedInAbstractWorld)
 							err->Error(33039, L"'" + impl->SyntaxNode->Name.Content + L"': no code allowed for component defined in input world.", impl->SyntaxNode->Position);
 					}
-					if (!comp.Value->IsParam() && !comp.Value->Implementations.First()->SyntaxNode->IsInput && (comp.Value->Type->DataType->IsArray() || comp.Value->Type->DataType->IsStruct() ||
-						comp.Value->Type->DataType->IsTexture()))
-					{
-						if (isDefinedInNonAbstractWorld)
-						{
-							err->Error(33035, L"\'" + comp.Value->Name + L"\': sampler, struct and array types only allowed in input worlds.", impl->SyntaxNode->Position);
-						}
-					}
 				}
 			}
 			for (auto & subShader : shader->SubClosures)
 				CheckPipelineShaderConsistency(err, subShader.Value.Ptr());
 		}
 
-		void FlattenShaderClosure(ErrorWriter * err, ShaderClosure * shader)
+		void FlattenShaderClosure(ErrorWriter * err, SymbolTable * symTable, ShaderClosure * shader)
 		{
 			// add input(extern) components from pipeline
 			AddPipelineComponents(shader);
@@ -901,7 +893,7 @@ namespace Spire
 			if (err->GetErrorCount())
 				return;
 			RemoveTrivialComponents(shader);
-			SolveWorldConstraints(err, shader);
+			SolveWorldConstraints(err, symTable, shader);
 			// check pipeline constraints
 			for (auto & requirement : shader->Pipeline->Components)
 			{
@@ -920,7 +912,7 @@ namespace Spire
 					{
 						for (auto w : impl->Worlds)
 						{
-							if (!shader->Pipeline->IsWorldImplicitlyReachable(comp->Type->FeasibleWorlds, w))
+							if (!symTable->IsWorldImplicitlyReachable(shader->Pipeline, comp->Type->FeasibleWorlds, w, requirement.Value->Type->DataType))
 							{
 								err->Error(32015, L"component '" + comp->Name + L"' is not available in world '" + w + L"' as required by '" + shader->Pipeline->SyntaxNode->Name.Content
 									+ L"'.\nsee requirement declaration at " +
@@ -932,7 +924,7 @@ namespace Spire
 				}
 			}
 			// check argument constraints
-			VerifyAndPropagateArgumentConstraints(err, shader);
+			VerifyAndPropagateArgumentConstraints(err, symTable, shader);
 		}
 	}
 }

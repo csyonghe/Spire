@@ -228,10 +228,6 @@ namespace Spire
 					{
 						psymbol->Worlds.Add(world->Name.Content, worldSym);
 						psymbol->WorldDependency.Add(world->Name.Content, EnumerableHashSet<String>());
-						psymbol->ReachableWorlds.Add(world->Name.Content, EnumerableHashSet<String>());
-						psymbol->ImplicitWorldDependency.Add(world->Name.Content, EnumerableHashSet<String>());
-						psymbol->ImplicitlyReachableWorlds.Add(world->Name.Content, EnumerableHashSet<String>());
-
 					}
 					else
 					{
@@ -250,18 +246,7 @@ namespace Spire
 				}
 				for (auto & op : pipeline->ImportOperators)
 				{
-					if (auto list = psymbol->ImportOperators.TryGetValue(op->Name.Content))
-					{
-						list->Add(op);
-					}
-					else
-					{
-						List<RefPtr<ImportOperatorDefSyntaxNode>> nlist;
-						nlist.Add(op);
-						psymbol->ImportOperators[op->Name.Content] = nlist;
-						for (auto & param : op->Parameters)
-							param->Type = TranslateTypeNode(param->TypeNode);
-					}
+					psymbol->AddImportOperator(op);
 				}
 				// add initial world dependency edges
 				for (auto op : pipeline->ImportOperators)
@@ -284,9 +269,6 @@ namespace Spire
 							else
 							{
 								psymbol->WorldDependency[op->DestWorld.Content].GetValue().Add(op->SourceWorld.Content);
-								if (op->Parameters.Count() == 0)
-									psymbol->ImplicitWorldDependency[op->DestWorld.Content].GetValue().Add(op->SourceWorld.Content);
-
 							}
 						}
 					}
@@ -317,48 +299,6 @@ namespace Spire
 						}
 					}
 				}
-				changed = true;
-				while (changed)
-				{
-					changed = false;
-					for (auto world : pipeline->Worlds)
-					{
-						EnumerableHashSet<String> & dependentWorlds = psymbol->ImplicitWorldDependency[world->Name.Content].GetValue();
-						List<String> loopRange;
-						for (auto w : dependentWorlds)
-							loopRange.Add(w);
-						for (auto w : loopRange)
-						{
-							EnumerableHashSet<String> & ddw = psymbol->ImplicitWorldDependency[w].GetValue();
-							for (auto ww : ddw)
-							{
-								if (!dependentWorlds.Contains(ww))
-								{
-									dependentWorlds.Add(ww);
-									changed = true;
-								}
-							}
-						}
-					}
-				}
-				// fill in reachable worlds
-				for (auto world : psymbol->Worlds)
-				{
-					if (auto depWorlds = psymbol->WorldDependency.TryGetValue(world.Key))
-					{
-						for (auto & dep : *depWorlds)
-						{
-							psymbol->ReachableWorlds[dep].GetValue().Add(world.Key);
-						}
-					}
-					if (auto depWorlds = psymbol->ImplicitWorldDependency.TryGetValue(world.Key))
-					{
-						for (auto & dep : *depWorlds)
-						{
-							psymbol->ImplicitlyReachableWorlds[dep].GetValue().Add(world.Key);
-						}
-					}
-				}
 
 				for (auto & op : pipeline->ImportOperators)
 				{
@@ -378,7 +318,15 @@ namespace Spire
 						if (varEntry.Type.DataType->Equals(ExpressionType::Void.Ptr()))
 							Error(30016, L"'void' can not be parameter type.", para.Ptr());
 					}
+					auto oldSymFuncs = symbolTable->Functions;
+					auto oldSymFuncOverloads = symbolTable->FunctionOverloads;
+					for (auto req : op->Requirements)
+					{
+						VisitFunctionDeclaration(req.Ptr());
+					}
 					op->Body->Accept(this);
+					symbolTable->Functions = oldSymFuncs;
+					symbolTable->FunctionOverloads = oldSymFuncOverloads;
 					currentImportOperator = nullptr;
 				}
 				currentPipeline = nullptr;
@@ -806,10 +754,6 @@ namespace Spire
 				}
 				for (auto & s : program->Structs)
 					VisitStruct(s.Ptr());
-				for (auto & pipeline : program->Pipelines)
-				{
-					VisitPipeline(pipeline.Ptr());
-				}
 				for (auto & func : program->Functions)
 				{
 					VisitFunctionDeclaration(func.Ptr());
@@ -824,7 +768,7 @@ namespace Spire
 								argList << L", ";
 						}
 						argList << L")";
-						Error(30001, L"function \'" + func->Name + argList.ProduceString() + L"\' redefinition.", func.Ptr());
+						Error(30001, L"\'" + func->Name + argList.ProduceString() + L"\': function redefinition.", func.Ptr());
 					}
 					else
 						funcNames.Add(func->InternalName);
@@ -832,6 +776,10 @@ namespace Spire
 				for (auto & func : program->Functions)
 				{
 					func->Accept(this);
+				}
+				for (auto & pipeline : program->Pipelines)
+				{
+					VisitPipeline(pipeline.Ptr());
 				}
 				// build initial symbol table for shaders
 				for (auto & shader : program->Shaders)
@@ -893,6 +841,7 @@ namespace Spire
 				if (symbolTable->Structs.TryGetValue(structNode->Name.Content, st))
 				{
 					st->Type->TypeName = structNode->Name.Content;
+					st->Type->IsIntrinsic = structNode->IsIntrinsic;
 					for (auto node : structNode->Fields)
 					{
 						node->Type = TranslateTypeNode(node->TypeNode);
@@ -1136,109 +1085,6 @@ namespace Spire
 				stmt->Expression = stmt->Expression->Accept(this).As<ExpressionSyntaxNode>();
 				return stmt;
 			}
-			bool MatchType_BinaryImplicit(RefPtr<ExpressionType> & resultType, RefPtr<ExpressionType> &leftType, RefPtr<ExpressionType> &rightType)
-			{
-				if (leftType->Equals(rightType.Ptr()) && !leftType->IsTexture())
-				{
-					resultType = leftType;
-					return true;
-				}
-				else if (leftType->IsVectorType() && rightType->AsBasicType() &&
-					rightType->AsBasicType()->BaseType == GetVectorBaseType(leftType->AsBasicType()->BaseType))
-				{
-					resultType = leftType;
-					return true;
-				}
-				else if (rightType->IsVectorType() && leftType->AsBasicType() 
-					&& leftType->AsBasicType()->BaseType == GetVectorBaseType(rightType->AsBasicType()->BaseType))
-				{
-					resultType = rightType;
-					return true;
-				}
-				else if ((rightType->Equals(ExpressionType::Float.Ptr()) && leftType->Equals(ExpressionType::Int.Ptr())) ||
-					(leftType->Equals(ExpressionType::Float.Ptr()) && rightType->Equals(ExpressionType::Int.Ptr())))
-				{
-					resultType = ExpressionType::Float;
-					return true;
-				}
-				else if ((rightType->Equals(ExpressionType::Float2.Ptr()) && leftType->Equals(ExpressionType::Int2.Ptr())) ||
-					(leftType->Equals(ExpressionType::Float2.Ptr()) && rightType->Equals(ExpressionType::Int2.Ptr())))
-				{
-					resultType = ExpressionType::Float2;
-					return true;
-				}
-				else if ((rightType->Equals(ExpressionType::Float3.Ptr()) && leftType->Equals(ExpressionType::Int3.Ptr())) ||
-					(leftType->Equals(ExpressionType::Float3.Ptr()) && rightType->Equals(ExpressionType::Int3.Ptr())))
-				{
-					resultType = ExpressionType::Float3;
-					return true;
-				}
-				else if ((rightType->Equals(ExpressionType::Float4.Ptr()) && leftType->Equals(ExpressionType::Int4.Ptr())) ||
-					(leftType->Equals(ExpressionType::Float4.Ptr()) && rightType->Equals(ExpressionType::Int4.Ptr())))
-				{
-					resultType = ExpressionType::Float4;
-					return true;
-				}
-				else if ((rightType->Equals(ExpressionType::Float.Ptr()) && leftType->Equals(ExpressionType::UInt.Ptr())) ||
-					(leftType->Equals(ExpressionType::Float.Ptr()) && rightType->Equals(ExpressionType::UInt.Ptr())))
-				{
-					resultType = ExpressionType::Float;
-					return true;
-				}
-				else if ((rightType->Equals(ExpressionType::Float2.Ptr()) && leftType->Equals(ExpressionType::UInt2.Ptr())) ||
-					(leftType->Equals(ExpressionType::Float2.Ptr()) && rightType->Equals(ExpressionType::UInt2.Ptr())))
-				{
-					resultType = ExpressionType::Float2;
-					return true;
-				}
-				else if ((rightType->Equals(ExpressionType::Float3.Ptr()) && leftType->Equals(ExpressionType::UInt3.Ptr())) ||
-					(leftType->Equals(ExpressionType::Float3.Ptr()) && rightType->Equals(ExpressionType::UInt3.Ptr())))
-				{
-					resultType = ExpressionType::Float3;
-					return true;
-				}
-				else if ((rightType->Equals(ExpressionType::Float4.Ptr()) && leftType->Equals(ExpressionType::UInt4.Ptr())) ||
-					(leftType->Equals(ExpressionType::Float4.Ptr()) && rightType->Equals(ExpressionType::UInt4.Ptr())))
-				{
-					resultType = ExpressionType::Float4;
-					return true;
-				}
-				else if ((rightType->Equals(ExpressionType::Int.Ptr()) && leftType->Equals(ExpressionType::UInt.Ptr())) ||
-					(leftType->Equals(ExpressionType::Int.Ptr()) && rightType->Equals(ExpressionType::UInt.Ptr())))
-				{
-					resultType = ExpressionType::Int;
-					return true;
-				}
-				else if ((rightType->Equals(ExpressionType::Int2.Ptr()) && leftType->Equals(ExpressionType::UInt2.Ptr())) ||
-					(leftType->Equals(ExpressionType::Int2.Ptr()) && rightType->Equals(ExpressionType::UInt2.Ptr())))
-				{
-					resultType = ExpressionType::Int2;
-					return true;
-				}
-				else if ((rightType->Equals(ExpressionType::Int3.Ptr()) && leftType->Equals(ExpressionType::UInt3.Ptr())) ||
-					(leftType->Equals(ExpressionType::Int3.Ptr()) && rightType->Equals(ExpressionType::UInt3.Ptr())))
-				{
-					resultType = ExpressionType::Int3;
-					return true;
-				}
-				else if ((rightType->Equals(ExpressionType::Int4.Ptr()) && leftType->Equals(ExpressionType::UInt4.Ptr())) ||
-					(leftType->Equals(ExpressionType::Int4.Ptr()) && rightType->Equals(ExpressionType::UInt4.Ptr())))
-				{
-					resultType = ExpressionType::Int4;
-					return true;
-				}
-				else if (leftType->AsBasicType() && leftType->AsBasicType()->BaseType == BaseType::Record)
-				{
-					resultType = leftType;
-					return true;
-				}
-				else if (rightType->AsBasicType() && rightType->AsBasicType()->BaseType == BaseType::Record)
-				{
-					resultType = rightType;
-					return true;
-				}
-				return false;
-			}
 			virtual RefPtr<ExpressionSyntaxNode> VisitBinaryExpression(BinaryExpressionSyntaxNode *expr) override
 			{
 				expr->LeftExpression = expr->LeftExpression->Accept(this).As<ExpressionSyntaxNode>();
@@ -1268,111 +1114,35 @@ namespace Spire
 					else
 						expr->Type = ExpressionType::Error;
 				};
-				switch (expr->Operator)
+				if (expr->Operator == Operator::Assign)
 				{
-				case Operator::Add:
-				case Operator::Sub:
-				case Operator::Div:
-				case Operator::AddAssign:
-				case Operator::DivAssign:
-				case Operator::SubAssign:
-					if (MatchType_BinaryImplicit(matchedType, leftType, rightType))
-						expr->Type = matchedType;
-					else
-						expr->Type = ExpressionType::Error;
-					if (expr->Operator == Operator::AddAssign || expr->Operator == Operator::DivAssign || expr->Operator == Operator::SubAssign)
-						checkAssign();
-					break;
-				case Operator::Mul:
-				case Operator::MulAssign:
-					if (leftType->AsBasicType() && leftType->AsBasicType()->BaseType != BaseType::Shader)
-					{
-						auto basicType = leftType->AsBasicType();
-						if (MatchType_BinaryImplicit(matchedType, leftType, rightType))
-							expr->Type = matchedType;
-						else if ((basicType->BaseType == BaseType::Float3x3 && rightType->Equals(ExpressionType::Float3.Ptr())) ||
-							(basicType->BaseType == BaseType::Float3 && rightType->AsBasicType() && rightType->AsBasicType()->BaseType == BaseType::Float3x3))
-							expr->Type = ExpressionType::Float3;
-						else if ((basicType->BaseType == BaseType::Float4x4 && rightType->Equals(ExpressionType::Float4.Ptr())) ||
-							(basicType->BaseType == BaseType::Float4 && rightType->AsBasicType() && rightType->AsBasicType()->BaseType == BaseType::Float4x4))
-							expr->Type = ExpressionType::Float4;
-						else
-							expr->Type = ExpressionType::Error;
-					}
-					else
-						expr->Type = ExpressionType::Error;
-					if (expr->Operator == Operator::MulAssign)
-						checkAssign();
-					break;
-				case Operator::Mod:
-				case Operator::Rsh:
-				case Operator::Lsh:
-				case Operator::BitAnd:
-				case Operator::BitOr:
-				case Operator::BitXor:
-				case Operator::And:
-				case Operator::Or:
-				case Operator::ModAssign:
-				case Operator::AndAssign:
-				case Operator::OrAssign:
-				case Operator::XorAssign:
-				case Operator::LshAssign:
-				case Operator::RshAssign:
-					if (leftType->Equals(rightType.Ptr()) && !leftType->IsArray() && !leftType->IsTexture()
-						&& !leftType->IsShader() &&
-						leftType->AsBasicType() && GetVectorBaseType(leftType->AsBasicType()->BaseType) != BaseType::Float)
-						expr->Type = (expr->Operator == Operator::And || expr->Operator == Operator::Or ? ExpressionType::Bool : leftType);
-					else if (leftType->IsIntegral() && rightType->IsIntegral())
-						expr->Type = leftType;
-					else
-						expr->Type = ExpressionType::Error;
-					if (expr->Operator == Operator::ModAssign || expr->Operator == Operator::AndAssign || expr->Operator == Operator::OrAssign ||
-						expr->Operator == Operator::XorAssign || expr->Operator == Operator::LshAssign || expr->Operator == Operator::RshAssign)
-						checkAssign();
-					break;
-				case Operator::Neq:
-				case Operator::Eql:
-					if (leftType->Equals(rightType.Ptr()) && !leftType->IsArray() && !leftType->IsTexture() && !leftType->IsShader())
-						expr->Type = ExpressionType::Bool;
-					else if ((leftType->Equals(ExpressionType::Int.Ptr()) || leftType->Equals(ExpressionType::UInt.Ptr())) &&
-						(rightType->Equals(ExpressionType::Int.Ptr()) || rightType->Equals(ExpressionType::UInt.Ptr())))
-						expr->Type = ExpressionType::Bool;
-					else if (leftType->IsIntegral() && rightType->IsIntegral())
-						expr->Type = ExpressionType::Bool;
-					else if (leftType->Equals(ExpressionType::Float.Ptr()) && rightType->IsIntegral() ||
-						leftType->IsIntegral() && rightType->Equals(ExpressionType::Float.Ptr()))
-						expr->Type = ExpressionType::Bool;
-					else
-						expr->Type = ExpressionType::Error;
-					break;
-				case Operator::Greater:
-				case Operator::Geq:
-				case Operator::Less:
-				case Operator::Leq:
-					if ((leftType->Equals(ExpressionType::Int.Ptr()) || leftType->Equals(ExpressionType::UInt.Ptr())) && 
-						(rightType->Equals(ExpressionType::Int.Ptr()) || rightType->Equals(ExpressionType::UInt.Ptr())))
-						expr->Type = ExpressionType::Bool;
-					else if (leftType->Equals(ExpressionType::Float.Ptr()) && rightType->Equals(ExpressionType::Float.Ptr()))
-						expr->Type = ExpressionType::Bool;
-					else if (leftType->Equals(ExpressionType::Float.Ptr()) && rightType->IsIntegral() ||
-						leftType->IsIntegral() && rightType->Equals(ExpressionType::Float.Ptr()))
-						expr->Type = ExpressionType::Bool;
-					else
-						expr->Type = ExpressionType::Error;
-					break;
-				case Operator::Assign:
 					expr->Type = rightType;
 					checkAssign();
-					break;
-				default:
-					expr->Type = ExpressionType::Error;
-					break;
 				}
-				if (expr->Type->Equals(ExpressionType::Error.Ptr()) &&
-					!leftType->Equals(ExpressionType::Error.Ptr()) && 
-					!rightType->Equals(ExpressionType::Error.Ptr()))
-					Error(30012, L"no overload found for operator " + OperatorToString(expr->Operator)  + L" (" + leftType->ToString() + L", " 
-						+ rightType->ToString() + L").", expr);
+				else
+				{
+					List<RefPtr<ExpressionType>> argTypes;
+					argTypes.Add(leftType);
+					argTypes.Add(rightType);
+					List<RefPtr<FunctionSymbol>> * operatorOverloads = symbolTable->FunctionOverloads.TryGetValue(GetOperatorFunctionName(expr->Operator));
+					auto overload = FindFunctionOverload(*operatorOverloads, [](RefPtr<FunctionSymbol> f)
+					{
+						return f->SyntaxNode->Parameters;
+					}, argTypes);
+					if (!overload)
+					{
+						expr->Type = ExpressionType::Error;
+						if (!leftType->Equals(ExpressionType::Error.Ptr()) && !rightType->Equals(ExpressionType::Error.Ptr()))
+							Error(30012, L"no overload found for operator " + OperatorToString(expr->Operator) + L" (" + leftType->ToString() + L", "
+								+ rightType->ToString() + L").", expr);
+					}
+					else
+					{
+						expr->Type = overload->SyntaxNode->ReturnType;
+					}
+					if (expr->Operator > Operator::Assign)
+						checkAssign();
+				}
 				return expr;
 			}
 			virtual RefPtr<ExpressionSyntaxNode> VisitConstantExpression(ConstantExpressionSyntaxNode *expr) override
@@ -1796,43 +1566,23 @@ namespace Spire
 			virtual RefPtr<ExpressionSyntaxNode> VisitUnaryExpression(UnaryExpressionSyntaxNode *expr) override
 			{
 				expr->Expression = expr->Expression->Accept(this).As<ExpressionSyntaxNode>();
-				
-				switch (expr->Operator)
+				List<RefPtr<ExpressionType>> argTypes;
+				argTypes.Add(expr->Expression->Type);
+				List<RefPtr<FunctionSymbol>> * operatorOverloads = symbolTable->FunctionOverloads.TryGetValue(GetOperatorFunctionName(expr->Operator));
+				auto overload = FindFunctionOverload(*operatorOverloads, [](RefPtr<FunctionSymbol> f)
 				{
-				case Operator::Neg:
-					if (expr->Expression->Type->Equals(ExpressionType::Int.Ptr()) ||
-						expr->Expression->Type->Equals(ExpressionType::Bool.Ptr()) ||
-						expr->Expression->Type->Equals(ExpressionType::Float.Ptr()) ||
-						expr->Expression->Type->IsVectorType())
-						expr->Type = expr->Expression->Type;
-					else
-						expr->Type = ExpressionType::Error;
-					break;
-				case Operator::Not:
-				case Operator::BitNot:
-					if (expr->Expression->Type->Equals(ExpressionType::Int.Ptr()) || expr->Expression->Type->Equals(ExpressionType::Bool.Ptr()) ||
-						expr->Expression->Type->Equals(ExpressionType::Int2.Ptr())
-						|| expr->Expression->Type->Equals(ExpressionType::Int3.Ptr()) || expr->Expression->Type->Equals(ExpressionType::Int4.Ptr()))
-						expr->Type = (expr->Operator == Operator::Not ? ExpressionType::Bool : expr->Expression->Type);
-					else
-						expr->Type = ExpressionType::Error;
-					break;
-				case Operator::PostDec:
-				case Operator::PostInc:
-				case Operator::PreDec:
-				case Operator::PreInc:
-					if (expr->Expression->Type->Equals(ExpressionType::Int.Ptr()))
-						expr->Type = ExpressionType::Int;
-					else
-						expr->Type = ExpressionType::Error;
-					break;
-				default:
+					return f->SyntaxNode->Parameters;
+				}, argTypes);
+				if (!overload)
+				{
 					expr->Type = ExpressionType::Error;
-					break;
+					if (!expr->Expression->Type->Equals(ExpressionType::Error.Ptr()))
+						Error(30012, L"no overload found for operator " + OperatorToString(expr->Operator) + L" (" + expr->Expression->Type->ToString() + L").", expr);
 				}
-
-				if(expr->Type->Equals(ExpressionType::Error.Ptr()) && !expr->Expression->Type->Equals(ExpressionType::Error.Ptr()))
-					Error(30020, L"operator " + OperatorToString(expr->Operator) + L" can not be applied to " + expr->Expression->Type->ToString(), expr);
+				else
+				{
+					expr->Type = overload->SyntaxNode->ReturnType;
+				}
 				return expr;
 			}
 			virtual RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode *expr) override
@@ -2049,6 +1799,10 @@ namespace Spire
 					}
 					else
 						expr->Type = baseType->AsBasicType()->Struct->SyntaxNode->Fields[id]->Type;
+					if (auto bt = expr->Type->AsBasicType())
+					{
+						bt->IsLeftValue = baseType->AsBasicType()->IsLeftValue;
+					}
 				}
 				else
 					expr->Type = ExpressionType::Error;

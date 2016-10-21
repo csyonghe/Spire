@@ -1,8 +1,5 @@
 #include "StdInclude.h"
-
-const wchar_t * VertexShaderIncludeString = LR"(
-__builtin out vec4 gl_Position;
-)";
+#include "Syntax.h"
 
 const char * LibIncludeString = R"(
 __intrinsic float dFdx(float v);
@@ -213,7 +210,161 @@ __intrinsic vec4 vec4(uvec4 val);
 __intrinsic mat3 transpose(mat3 in);
 __intrinsic mat4 transpose(mat4 in);
 
-__intrinsic vec4 mul(mat4 a, vec4 b);
-
+struct trait __intrinsic {};
+__intrinsic trait IsTriviallyPassable(float);
+__intrinsic trait IsTriviallyPassable(vec2);
+__intrinsic trait IsTriviallyPassable(vec3);
+__intrinsic trait IsTriviallyPassable(vec4);
+__intrinsic trait IsTriviallyPassable(mat3);
+__intrinsic trait IsTriviallyPassable(mat4);
+__intrinsic trait IsTriviallyPassable(int);
+__intrinsic trait IsTriviallyPassable(ivec2);
+__intrinsic trait IsTriviallyPassable(ivec3);
+__intrinsic trait IsTriviallyPassable(ivec4);
+__intrinsic trait IsTriviallyPassable(uint);
+__intrinsic trait IsTriviallyPassable(uvec2);
+__intrinsic trait IsTriviallyPassable(uvec3);
+__intrinsic trait IsTriviallyPassable(uvec4);
+__intrinsic trait IsTriviallyPassable(bool);
 #line_reset#
 )";
+
+using namespace CoreLib::Basic;
+
+namespace Spire
+{
+	namespace Compiler
+	{
+		String SpireStdLib::code;
+
+		String SpireStdLib::GetCode()
+		{
+			if (code.Length() > 0)
+				return code;
+			StringBuilder sb;
+			// generate operator overloads
+			Operator floatUnaryOps[] = { Operator::Neg, Operator::Not, Operator::PreInc, Operator::PreDec };
+			Operator intUnaryOps[] = { Operator::Neg, Operator::Not, Operator::BitNot, Operator::PreInc, Operator::PreDec};
+			Operator floatOps[] = { Operator::Mul, Operator::Div,
+				Operator::Add, Operator::Sub, Operator::And, Operator::Or,
+				Operator::Eql, Operator::Neq, Operator::Greater, Operator::Less, Operator::Geq, Operator::Leq };
+			Operator intOps[] = {  Operator::Mul, Operator::Div, Operator::Mod,
+				Operator::Add, Operator::Sub,
+				Operator::Lsh, Operator::Rsh,
+				Operator::Eql, Operator::Neq, Operator::Greater, Operator::Less, Operator::Geq, Operator::Leq,
+				Operator::BitAnd, Operator::BitXor, Operator::BitOr,
+				Operator::And,
+				Operator::Or };
+			String floatTypes[] = { L"float", L"vec2", L"vec3", L"vec4" };
+			String intTypes[] = { L"int", L"ivec2", L"ivec3", L"ivec4" };
+			String uintTypes[] = { L"uint", L"uvec2", L"uvec3", L"uvec4" };
+
+			sb << L"__intrinsic vec3 operator * (vec3, mat3);\n";
+			sb << L"__intrinsic vec3 operator * (mat3, vec3);\n";
+
+			sb << L"__intrinsic vec4 operator * (vec4, mat4);\n";
+			sb << L"__intrinsic vec4 operator * (mat4, vec4);\n";
+
+			sb << L"__intrinsic mat3 operator * (mat3, mat3);\n";
+			sb << L"__intrinsic mat4 operator * (mat4, mat4);\n";
+
+			sb << L"__intrinsic bool operator && (bool, bool);\n";
+			sb << L"__intrinsic bool operator || (bool, bool);\n";
+
+			for (auto type : intTypes)
+			{
+				sb << L"__intrinsic bool operator && (bool, " << type << L");\n";
+				sb << L"__intrinsic bool operator || (bool, " << type << L");\n";
+				sb << L"__intrinsic bool operator && (" << type << ", bool);\n";
+				sb << L"__intrinsic bool operator || (" << type << ", bool);\n";
+			}
+
+			for (auto op : intUnaryOps)
+			{
+				String opName = GetOperatorFunctionName(op);
+				for (int i = 0; i < 4; i++)
+				{
+					auto itype = intTypes[i];
+					auto utype = uintTypes[i];
+					for (int j = 0; j < 2; j++)
+					{
+						auto retType = (op == Operator::Not) ? L"bool" : j == 0 ? itype : utype;
+						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << (j == 0 ? itype : utype) << L");\n";
+					}
+				}
+			}
+
+			for (auto op : floatUnaryOps)
+			{
+				String opName = GetOperatorFunctionName(op);
+				for (int i = 0; i < 4; i++)
+				{
+					auto type = floatTypes[i];
+					auto retType = (op == Operator::Not) ? L"bool" : type;
+					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L");\n";
+				}
+			}
+
+			for (auto op : floatOps)
+			{
+				String opName = GetOperatorFunctionName(op);
+				for (int i = 0; i < 4; i++)
+				{
+					auto type = floatTypes[i];
+					auto itype = intTypes[i];
+					auto utype = uintTypes[i];
+					auto retType = (op >= Operator::Eql && op <= Operator::Leq || op == Operator::And || op == Operator::Or) ? L"bool" : type;
+					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << type << L");\n";
+					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << itype << L", " << type << L");\n";
+					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << utype << L", " << type << L");\n";
+					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << itype << L");\n";
+					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << utype << L");\n";
+					if (i > 0)
+					{
+						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << floatTypes[0] << L");\n";
+						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << floatTypes[0] << L", " << type << L");\n";
+
+						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << intTypes[0] << L");\n";
+						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << intTypes[0] << L", " << type << L");\n";
+
+						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << uintTypes[0] << L");\n";
+						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << uintTypes[0] << L", " << type << L");\n";
+					}
+				}
+			}
+
+			for (auto op : intOps)
+			{
+				String opName = GetOperatorFunctionName(op);
+				for (int i = 0; i < 4; i++)
+				{
+					auto type = intTypes[i];
+					auto utype = uintTypes[i];
+					auto retType = (op >= Operator::Eql && op <= Operator::Leq || op == Operator::And || op == Operator::Or) ? L"bool" : type;
+					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << type << L");\n";
+					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << utype << L", " << type << L");\n";
+					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << utype << L");\n";
+					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << utype << L", " << utype << L");\n";
+					if (i > 0)
+					{
+						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << intTypes[0] << L");\n";
+						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << intTypes[0] << L", " << type << L");\n";
+
+						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << uintTypes[0] << L");\n";
+						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << uintTypes[0] << L", " << type << L");\n";
+					}
+				}
+			}
+			sb << LibIncludeString;
+			code = sb.ProduceString();
+			return code;
+		}
+
+		void SpireStdLib::Finalize()
+		{
+			code = nullptr;
+		}
+
+	}
+}
+
