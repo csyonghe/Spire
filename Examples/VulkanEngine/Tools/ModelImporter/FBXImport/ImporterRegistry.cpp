@@ -53,6 +53,7 @@ corresponding preprocessor flag to selectively disable formats.
 #ifndef ASSIMP_BUILD_NO_FBX_IMPORTER
 #   include "FBXImporter.h"
 #endif
+#include "ObjFileImporter.h"
 
 namespace Assimp {
 
@@ -67,6 +68,7 @@ void GetImporterInstanceList(std::vector< BaseImporter* >& out)
 #if ( !defined ASSIMP_BUILD_NO_FBX_IMPORTER )
     out.push_back( new FBXImporter() );
 #endif
+	out.push_back(new ObjFileImporter());
 }
 
 /** will delete all registered importers. */

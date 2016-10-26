@@ -10,7 +10,7 @@ namespace GameEngine
 	class StaticMeshActor : public Actor
 	{
 	protected:
-		virtual bool ParseField(Level * level, CoreLib::Text::Parser & parser) override;
+		virtual bool ParseField(Level * level, CoreLib::Text::Parser & parser, bool & isInvalid) override;
 	public:
 		CoreLib::String MeshName;
 		Mesh * Mesh = nullptr;

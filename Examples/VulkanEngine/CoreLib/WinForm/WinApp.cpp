@@ -164,7 +164,7 @@ namespace CoreLib
 			wcex.cbWndExtra		= 0;
 			wcex.hInstance		= Application::GetHandle();
 			wcex.hIcon			= 0;
-			wcex.hCursor		= LoadCursor(NULL, IDC_ARROW);
+			wcex.hCursor		= NULL;
 			wcex.hbrBackground	= (HBRUSH)(COLOR_BTNFACE+1);
 			wcex.lpszMenuName	= 0;
 			wcex.lpszClassName	= FormClassName;

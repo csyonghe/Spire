@@ -32,6 +32,7 @@ namespace Spire
 			EnumerableDictionary<String, String> BackendArguments;
 			String ScheduleSource, ScheduleFileName;
 			String SymbolToCompile;
+			List<String> SearchDirectories;
 		};
 
 		class CompileUnit

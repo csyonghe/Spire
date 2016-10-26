@@ -125,6 +125,9 @@ namespace SpireLib
 		List<String> unitsToInclude;
 		unitsToInclude.Add(fileName);
 		processedUnits.Add(fileName);
+		auto searchDirs = options.SearchDirectories;
+		searchDirs.Add(Path::GetDirectoryName(fileName));
+		searchDirs.Reverse();
 		auto predefUnit = compiler->Parse(compileResult, SpireStdLib::GetCode(), L"stdlib");
 		for (int i = 0; i < unitsToInclude.Count(); i++)
 		{
@@ -140,10 +143,23 @@ namespace SpireLib
 				{
 					for (auto inc : unit.SyntaxNode->Usings)
 					{
-						String includeFile = Path::Combine(Path::GetDirectoryName(inputFileName), inc.Content);
-						if (processedUnits.Add(includeFile))
+						bool found = false;
+						for (auto & dir : searchDirs)
 						{
-							unitsToInclude.Add(includeFile);
+							String includeFile = Path::Combine(dir, inc.Content);
+							if (File::Exists(includeFile))
+							{
+								if (processedUnits.Add(includeFile))
+								{
+									unitsToInclude.Add(includeFile);
+								}
+								found = true;
+								break;
+							}
+						}
+						if (!found)
+						{
+							compileResult.GetErrorWriter()->Error(2, L"cannot find file '" + inputFileName + L"'.", inc.Position);
 						}
 					}
 				}

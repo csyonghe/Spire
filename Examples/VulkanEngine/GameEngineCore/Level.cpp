@@ -15,14 +15,19 @@ namespace GameEngine
 		{
 			auto actor = Engine::Instance()->ParseActor(this, parser);
 			if (!actor)
-				throw InvalidOperationException(String(L"invalid object type: ") + parser.NextToken().Str);
-			if (actor->GetEngineType() == EngineActorType::StaticMesh)
-				StaticActors.Add(actor.As<StaticMeshActor>());
+			{
+				Print(L"error: ignoring object.\n");
+			}
 			else
-				GeneralActors.Add(actor);
-			actorRegistry[actor->Name] = actor.Ptr();
-			if (actor->GetEngineType() == EngineActorType::Camera)
-				CurrentCamera = actor.As<CameraActor>();
+			{
+				if (actor->GetEngineType() == EngineActorType::StaticMesh)
+					StaticActors.Add(actor.As<StaticMeshActor>());
+				else
+					GeneralActors.Add(actor);
+				actorRegistry[actor->Name] = actor.Ptr();
+				if (actor->GetEngineType() == EngineActorType::Camera)
+					CurrentCamera = actor.As<CameraActor>();
+			}
 		}
 	}
 	Mesh * Level::LoadMesh(const CoreLib::String & fileName)
@@ -31,9 +36,17 @@ namespace GameEngine
 		if (!Meshes.TryGetValue(fileName, result))
 		{
 			auto actualName = Engine::Instance()->FindFile(fileName, ResourceType::Mesh);
-			result = new Mesh();
-			result->LoadFromFile(actualName);
-			Meshes[fileName] = result;
+			if (actualName.Length())
+			{
+				result = new Mesh();
+				result->LoadFromFile(actualName);
+				Meshes[fileName] = result;
+			}
+			else
+			{
+				printf("error: cannot load mesh \'%S\'\n", fileName.Buffer());
+				return nullptr;
+			}
 		}
 		return result.Ptr();
 	}
@@ -43,9 +56,17 @@ namespace GameEngine
 		if (!Skeletons.TryGetValue(fileName, result))
 		{
 			auto actualName = Engine::Instance()->FindFile(fileName, ResourceType::Mesh);
-			result = new Skeleton();
-			result->LoadFromFile(actualName);
-			Skeletons[fileName] = result;
+			if (actualName.Length())
+			{
+				result = new Skeleton();
+				result->LoadFromFile(actualName);
+				Skeletons[fileName] = result;
+			}
+			else
+			{
+				printf("error: cannot load skeleton \'%S\'\n", fileName.Buffer());
+				return nullptr;
+			}
 		}
 		return result.Ptr();
 	}
@@ -55,9 +76,17 @@ namespace GameEngine
 		if (!Materials.TryGetValue(fileName, result))
 		{
 			auto actualName = Engine::Instance()->FindFile(fileName, ResourceType::Material);
-			result = new Material();
-			result->LoadFromFile(actualName);
-			Materials[fileName] = result;
+			if (actualName.Length())
+			{
+				result = new Material();
+				result->LoadFromFile(actualName);
+				Materials[fileName] = result;
+			}
+			else
+			{
+				printf("error: cannot load material \'%S\'\n", fileName.Buffer());
+				return nullptr;
+			}
 		}
 		return result.Ptr();
 	}
@@ -73,9 +102,17 @@ namespace GameEngine
 		if (!Animations.TryGetValue(fileName, result))
 		{
 			auto actualName = Engine::Instance()->FindFile(fileName, ResourceType::Mesh);
-			result = new SkeletalAnimation();
-			result->LoadFromFile(actualName);
-			Animations[fileName] = result;
+			if (actualName.Length())
+			{
+				result = new SkeletalAnimation();
+				result->LoadFromFile(actualName);
+				Animations[fileName] = result;
+			}
+			else
+			{
+				printf("error: cannot load animation \'%S\'\n", fileName.Buffer());
+				return nullptr;
+			}
 		}
 		return result.Ptr();
 	}

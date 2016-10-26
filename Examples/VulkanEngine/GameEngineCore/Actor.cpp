@@ -60,7 +60,7 @@ namespace GameEngine
 		sb << L"]";
 	}
 
-	bool Actor::ParseField(Level * level, CoreLib::Text::Parser & parser)
+	bool Actor::ParseField(Level * level, CoreLib::Text::Parser & parser, bool &)
 	{
 		if (parser.LookAhead(L"name"))
 		{
@@ -101,13 +101,13 @@ namespace GameEngine
 			comp->SerializeToText(sb);
 		}
 	}
-	void Actor::Parse(Level * level, CoreLib::Text::Parser & parser)
+	void Actor::Parse(Level * level, CoreLib::Text::Parser & parser, bool & isInvalid)
 	{
 		parser.ReadToken(); // skip class name
 		parser.Read(L"{");
 		while (!parser.IsEnd() && !parser.LookAhead(L"}"))
 		{
-			if (!ParseField(level, parser))
+			if (!ParseField(level, parser, isInvalid))
 				parser.ReadToken();
 		}
 		parser.Read(L"}");

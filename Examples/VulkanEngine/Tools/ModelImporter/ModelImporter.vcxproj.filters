@@ -220,6 +220,15 @@
       <Filter>ZLIB</Filter>
     </ClCompile>
     <ClCompile Include="ModelImporter.cpp" />
+    <ClCompile Include="FBXImport\ObjFileImporter.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\ObjFileMtlImporter.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
+    <ClCompile Include="FBXImport\ObjFileParser.cpp">
+      <Filter>FBX</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FBXImport\FBXCompileConfig.h">
@@ -592,6 +601,21 @@
       <Filter>FBX</Filter>
     </ClInclude>
     <ClInclude Include="FBXImport\Defines.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\ObjFileData.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\ObjFileImporter.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\ObjFileMtlImporter.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\ObjFileParser.h">
+      <Filter>FBX</Filter>
+    </ClInclude>
+    <ClInclude Include="FBXImport\ObjTools.h">
       <Filter>FBX</Filter>
     </ClInclude>
   </ItemGroup>

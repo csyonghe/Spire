@@ -4196,6 +4196,10 @@ namespace VK
 		{
 			return (int)RendererState::PhysicalDevice().getProperties().limits.minUniformBufferOffsetAlignment;
 		}
+		virtual int StorageBufferAlignment() override
+		{
+			return (int)RendererState::PhysicalDevice().getProperties().limits.minStorageBufferOffsetAlignment;
+		}
 
 		virtual void * GetWindowHandle() override
 		{

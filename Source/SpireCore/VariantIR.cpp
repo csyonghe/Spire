@@ -295,5 +295,20 @@ namespace Spire
 			}
 			return result;
 		}
-	}
+		EnumerableHashSet<ComponentDefinitionIR*>& ComponentDefinitionIR::GetComponentFunctionDependencyClosure()
+		{
+			if (dependencyClosure.Count() || Dependency.Count() == 0)
+				return dependencyClosure;
+			for (auto & dep : Dependency)
+			{
+				dependencyClosure.Add(dep);
+				if (dep->SyntaxNode->Parameters.Count())
+				{
+					for (auto & x : dep->GetComponentFunctionDependencyClosure())
+						dependencyClosure.Add(x);
+				}
+			}
+			return dependencyClosure;
+		}
+}
 }

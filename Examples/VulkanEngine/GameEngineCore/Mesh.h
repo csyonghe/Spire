@@ -57,6 +57,8 @@ namespace GameEngine
 		int GetTypeId();
 	};
 
+	class Skeleton;
+
 	class Mesh : public CoreLib::Object 
 	{
 	private:
@@ -142,7 +144,7 @@ namespace GameEngine
 				}
 			}
 		}
-		void SetVertexSkinningBinding(int vertId, const CoreLib::ArrayView<int> & boneIds, CoreLib::ArrayView<float> & boneWeights)
+		void SetVertexSkinningBinding(int vertId, const CoreLib::ArrayView<int> & boneIds, const CoreLib::ArrayView<float> & boneWeights)
 		{
 			unsigned int & vBoneIds = *(unsigned int*)((unsigned char *)vertexData.Buffer() + vertId * vertexFormat.GetVertexSize() + vertexFormat.GetBoneIdsOffset());
 			unsigned int & vBoneWeights = *(unsigned int*)((unsigned char *)vertexData.Buffer() + vertId * vertexFormat.GetVertexSize() + vertexFormat.GetBoneWeightsOffset());
@@ -168,7 +170,9 @@ namespace GameEngine
 		void SaveToFile(const CoreLib::String & fileName);
 		void LoadFromStream(CoreLib::IO::Stream * stream);
 		void LoadFromFile(const CoreLib::String & fileName);
+		void FromSkeleton(Skeleton * skeleton, float width);
 	};
+
 }
 
 #endif

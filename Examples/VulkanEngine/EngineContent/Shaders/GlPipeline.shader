@@ -70,6 +70,7 @@ pipeline StandardPipeline
     
     extern @fs vs vsIn;
     import(vs->fs) standardImport()
+        require trait IsTriviallyPassable(vs)
     {
         return vsIn;
     }
@@ -230,8 +231,8 @@ pipeline TessellationPipeline : StandardPipeline
     [TessCoord]
     extern @tes vec3 tessCoord;
     import(perCornerPoint->tes) standardImport()
-		require perCornerPoint operator * (perCornerPoint, float)
-		require perCornerPoint operator + (perCornerPoint, perCornerPoint)
+        require perCornerPoint operator + (perCornerPoint, perCornerPoint)
+        require perCornerPoint operator * (perCornerPoint, float)
     {
         return perCorner_tes[0] * tessCoord.x +
                perCorner_tes[1] * tessCoord.y +

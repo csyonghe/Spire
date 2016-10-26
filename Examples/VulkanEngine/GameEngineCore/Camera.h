@@ -16,7 +16,7 @@ namespace GameEngine
 		float ZNear = 40.0f, ZFar = 400000.0f;
 		float FOV = 75.0f;
 	protected:
-		virtual bool ParseField(Level * level, CoreLib::Text::Parser & parser) override;
+		virtual bool ParseField(Level * level, CoreLib::Text::Parser & parser, bool & isInvalid) override;
 	public:
 		CameraActor()
 		{

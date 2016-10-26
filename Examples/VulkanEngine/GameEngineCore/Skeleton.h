@@ -38,7 +38,12 @@ namespace GameEngine
 		static inline BoneTransformation Lerp(const BoneTransformation & t0, const BoneTransformation & t1, float t)
 		{
 			BoneTransformation result;
-			result.Rotation = VectorMath::Quaternion::Slerp(t0.Rotation, t1.Rotation, t);
+			auto rot1 = t1.Rotation;
+			if (VectorMath::Quaternion::Dot(t0.Rotation, t1.Rotation) < 0.0f)
+			{
+				rot1 = -rot1;
+			}
+			result.Rotation = VectorMath::Quaternion::Slerp(t0.Rotation, rot1, t);
 			result.Translation = VectorMath::Vec3::Lerp(t0.Translation, t1.Translation, t);
 			result.Scale = VectorMath::Vec3::Lerp(t0.Scale, t1.Scale, t);
 			return result;

@@ -78,22 +78,35 @@ module SystemUniforms
     public vec3 lightColor = vec3(1.5, 1.5, 1.5);
 }
 
+module TangentSpaceTransform
+{
+    require vec3 coarseVertTangent;
+    require vec3 coarseVertNormal;
+    require vec3 worldTransformNormal(vec3 pos);
+    
+    public vec3 vNormal = worldTransformNormal(coarseVertNormal).xyz;
+    public vec3 vTangent = worldTransformNormal(coarseVertTangent).xyz;
+    public vec3 vBiTangent = cross(vTangent, vNormal);
+    
+    public vec3 WorldSpaceToTangentSpace(vec3 v)
+    {
+        return vec3(dot(v, vTangent), dot(v, vBiTangent), dot(v, vNormal));    
+    }
+    public vec3 TangentSpaceToWorldSpace(vec3 v)
+    {
+        return v.x * vTangent + v.y * vBiTangent + v.z * vNormal;        
+    }
+}
+
 module VertexTransform
 {
     require vec3 fineVertPos;
-    require vec3 coarseVertTangent;
-    require vec3 coarseVertNormal;
     require vec3 displacement;
     require mat4 viewProjectionTransform;
-    @modelTransform mat4 modelMatrix; 
-    @modelTransform mat4 normalMatrix;
-    
-    vec4 position = modelMatrix * vec4((fineVertPos+displacement), 1); 
-    public vec4 projCoord = viewProjectionTransform * position;
-    public vec3 pos = position.xyz;
-    public vec3 vNormal = (normalMatrix * vec4(coarseVertNormal, 0.0)).xyz;
-    public vec3 vTangent = (normalMatrix * vec4(coarseVertTangent, 0.0)).xyz;
-    public vec3 vBiTangent = cross(vTangent, vNormal);
+    require vec3 worldTransformPos(vec3 pos);
+
+    public vec3 pos = worldTransformPos(fineVertPos+displacement); 
+    public vec4 projCoord = viewProjectionTransform * vec4(pos, 1);
 }
 
 struct BoneTransform
@@ -108,6 +121,18 @@ module StaticVertex
     public @vs vec3 coarseVertPos = vertPos;
     public @vs vec3 coarseVertNormal = vertNormal;
     public @vs vec3 coarseVertTangent = vertTangent;
+    
+    @modelTransform mat4 modelMatrix; 
+    @modelTransform mat4 normalMatrix; 
+    
+    public vec3 worldTransformPos(vec3 pos)
+    {
+        return (modelMatrix * vec4(pos, 1)).xyz;
+    }
+    public vec3 worldTransformNormal(vec3 norm)
+    {
+        return (normalMatrix * vec4(norm, 1)).xyz;
+    }
 }
 
 struct SkinningResult
@@ -143,21 +168,18 @@ module SkinnedVertex
         }
         return result;
     }
-    
     public vec3 coarseVertPos = skinning.pos;
     public vec3 coarseVertNormal = skinning.normal;
     public vec3 coarseVertTangent = skinning.tangent;
-}
 
-module TangentSpaceTransform
-{
-    require vec3 normal_in;
-    require vec3 vNormal;
-    require vec3 vTangent;
-    require vec3 vBiTangent;
-    public vec3 normal = normalize(normal_in.x * vTangent 
-        + normal_in.y * vBiTangent 
-        + normal_in.z * vNormal);
+	public vec3 worldTransformPos(vec3 pos)
+    {
+        return pos;
+    }
+    public vec3 worldTransformNormal(vec3 norm)
+    {
+        return norm;
+    }
 }
 
 module NoTessellation
@@ -243,6 +265,142 @@ module PN_Tessellation : TessellationPipeline
                     indexImport(WorldPos_B111, 0) * 6.0 * w * u * v;
 }
 
+module ParallaxOcclusionMapping
+{
+    require sampler2D heightTexture;
+    require vec3 viewDirTangentSpace;
+    require vec2 uv;
+    require float parallaxScale;
+    
+    vec3 parallaxMapping
+    {
+        vec3 V = viewDirTangentSpace;
+        vec2 T = uv;
+        
+        float parallaxHeight;
+        // determine optimal number of layers
+        float minLayers = 10;
+        float maxLayers = 15;
+        float numLayers = mix(maxLayers, minLayers, abs(V.z));
+
+        // height of each layer
+        float layerHeight = 1.0 / numLayers;
+        // current depth of the layer
+        float curLayerHeight = 0.01;
+        // shift of texture coordinates for each layer
+        vec2 dtex = parallaxScale * V.xy /V.z / numLayers;
+        dtex.y = -dtex.y;
+        // current texture coordinates
+        vec2 currentTextureCoords = T;
+
+        // depth from heightmap
+        float heightFromTexture = 1.0-texture(heightTexture, currentTextureCoords).r;
+
+        // while point is above the surface
+        while (heightFromTexture > curLayerHeight) 
+        {
+            // to the next layer
+            curLayerHeight += layerHeight; 
+            // shift of texture coordinates
+            currentTextureCoords -= dtex;
+            // new depth from heightmap
+            heightFromTexture = 1.0-texture(heightTexture, currentTextureCoords).r;
+        }
+         ///////////////////////////////////////////////////////////
+        // Start of Relief Parallax Mapping
+
+        // decrease shift and height of layer by half
+        vec2 deltaTexCoord = dtex / 2;
+        float deltaHeight = layerHeight / 2;
+
+        // return to the mid point of previous layer
+        currentTextureCoords += deltaTexCoord;
+        curLayerHeight -= deltaHeight;
+
+        // binary search to increase precision of Steep Paralax Mapping
+        int numSearches = 5;
+        for (int i=0:numSearches)
+        {
+            // decrease shift and height of layer by half
+            deltaTexCoord /= 2;
+            deltaHeight /= 2;
+
+            // new depth from heightmap
+            heightFromTexture = 1.0-texture(heightTexture, currentTextureCoords).r;
+
+            // shift along or agains vector V
+            if(heightFromTexture > curLayerHeight) // below the surface
+            {
+                currentTextureCoords -= deltaTexCoord;
+                curLayerHeight += deltaHeight;
+            }
+            else // above the surface
+            {
+                currentTextureCoords += deltaTexCoord;
+                curLayerHeight -= deltaHeight;
+            }
+        }
+        parallaxHeight = curLayerHeight; 
+        return vec3(currentTextureCoords, parallaxHeight);
+    }
+
+    public vec2 uvOut = parallaxMapping.xy;
+    public float heightOut = parallaxMapping.z;
+        
+    public float selfShadow(vec3 L_tangentSpace)
+    {
+        float initialHeight = heightOut - 0.05;
+        vec3 L = L_tangentSpace;
+        vec2 initialTexCoord = uvOut;
+        
+        float shadowMultiplier = 1;
+        float minLayers = 15;
+        float maxLayers = 30;
+
+        // calculate lighting only for surface oriented to the light source
+        if (L.z > 0)
+        {
+            // calculate initial parameters
+            float numSamplesUnderSurface = 0;
+            shadowMultiplier = 0;
+            float numLayers	= mix(maxLayers, minLayers, abs(L.z));
+            float layerHeight = max(0.03, abs(initialHeight / numLayers));
+            vec2 texStep = parallaxScale * L.xy / L.z / numLayers;
+            texStep.y = -texStep.y;        
+            // current parameters
+            float currentLayerHeight = initialHeight - layerHeight;
+            vec2 currentTextureCoords = initialTexCoord + texStep;
+            float heightFromTexture	= 1.0-texture(heightTexture, currentTextureCoords).r;
+            // while point is below depth 0.0 )
+            while(currentLayerHeight > 0)
+            {
+                // if point is under the surface
+                if(heightFromTexture < currentLayerHeight)
+                {
+                    numSamplesUnderSurface += 1;
+                    break;
+                }
+
+                // offset to the next layer
+                currentLayerHeight -= layerHeight;
+                currentTextureCoords += texStep;
+                heightFromTexture = 1.0-texture(heightTexture, currentTextureCoords).r;
+            }
+
+            // Shadowing factor should be 1 if there were no points under the surface
+            if(numSamplesUnderSurface < 1)
+            {
+                shadowMultiplier = 1;
+            }
+            else
+            {
+                shadowMultiplier = 0.0;
+            }
+        }
+        return shadowMultiplier;
+    }
+}
+
 module Lighting
 {
     require vec3 normal;   
@@ -252,7 +410,8 @@ module Lighting
     require vec3 lightDir;
     require vec3 lightColor;
     require vec3 cameraPos;
-    float shadow = 1.0;
+    require float selfShadow(vec3 lightDir);
+    float shadow = selfShadow(lightDir);
     float brightness = clamp(dot(lightDir, normal), 0.0, 1.0) * shadow;
     vec3 view = normalize(cameraPos - pos);
     inline float roughness_in = lightParam.x;

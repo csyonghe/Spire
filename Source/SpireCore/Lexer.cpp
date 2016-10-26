@@ -317,17 +317,25 @@ namespace Spire
 			}
 		}
 
+		enum class LexDerivative
+		{
+			None, Line, File
+		};
+
 		List<Token> Lexer::Parse(const String & fileName, const String & str, List<CompileError> & errorList)
 		{
 			int lastPos = 0, pos = 0;
 			int line = 1, col = 0;
+			String file = fileName;
 			State state = State::Start;
 			StringBuilder tokenBuilder;
 			int tokenLine, tokenCol;
 			List<Token> tokenList;
+			LexDerivative derivative = LexDerivative::None;
 			auto InsertToken = [&](TokenType type)
 			{
-				tokenList.Add(Token(type, tokenBuilder.ToString(), tokenLine, tokenCol, fileName));
+				derivative = LexDerivative::None;
+				tokenList.Add(Token(type, tokenBuilder.ToString(), tokenLine, tokenCol, file));
 				tokenBuilder.Clear();
 			};
 			auto ProcessTransferChar = [&](wchar_t nextChar)
@@ -421,7 +429,7 @@ namespace Spire
 					}
 					else
 					{
-						errorList.Add(CompileError(L"Illegal character '" + String(curChar) + L"'", 10000, CodePosition(line, col, fileName)));
+						errorList.Add(CompileError(L"Illegal character '" + String(curChar) + L"'", 10000, CodePosition(line, col, file)));
 						pos++;
 					}
 					break;
@@ -440,6 +448,18 @@ namespace Spire
 							col = 0;
 							tokenBuilder.Clear();
 						}
+						else if (tokenStr == L"#line")
+						{
+							derivative = LexDerivative::Line;
+							tokenBuilder.Clear();
+						}
+						else if (tokenStr == L"#file")
+						{
+							derivative = LexDerivative::File;
+							tokenBuilder.Clear();
+							line = 0;
+							col = 0;
+						}
 						else
 							InsertToken(GetKeywordTokenType(tokenStr));
 						state = State::Start;
@@ -454,7 +474,7 @@ namespace Spire
 					else
 					{
 						//do token analyze
-						ParseOperators(tokenBuilder.ToString(), tokenList, tokenLine, tokenCol, fileName);
+						ParseOperators(tokenBuilder.ToString(), tokenList, tokenLine, tokenCol, file);
 						tokenBuilder.Clear();
 						state = State::Start;
 					}
@@ -484,7 +504,17 @@ namespace Spire
 					}
 					else
 					{
-						InsertToken(TokenType::IntLiterial);
+						if (derivative == LexDerivative::Line)
+						{
+							derivative = LexDerivative::None;
+							line = StringToInt(tokenBuilder.ToString()) - 1;
+							col = 0;
+							tokenBuilder.Clear();
+						}
+						else
+						{
+							InsertToken(TokenType::IntLiterial);
+						}
 						state = State::Start;
 					}
 					break;
@@ -540,7 +570,16 @@ namespace Spire
 					}
 					else
 					{
-						InsertToken(TokenType::StringLiterial);
+						if (derivative == LexDerivative::File)
+						{
+							derivative = LexDerivative::None;
+							file = tokenBuilder.ToString();
+							tokenBuilder.Clear();
+						}
+						else
+						{
+							InsertToken(TokenType::StringLiterial);
+						}
 						state = State::Start;
 					}
 					pos++;
@@ -559,7 +598,7 @@ namespace Spire
 					else
 					{
 						if (tokenBuilder.Length() > 1)
-							errorList.Add(CompileError(L"Illegal character literial.", 10001, CodePosition(line, col-tokenBuilder.Length(), fileName)));
+							errorList.Add(CompileError(L"Illegal character literial.", 10001, CodePosition(line, col-tokenBuilder.Length(), file)));
 						InsertToken(TokenType::CharLiterial);
 						state = State::Start;
 					}

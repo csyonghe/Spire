@@ -3,9 +3,9 @@
 
 namespace GameEngine
 {
-	bool SkeletalMeshActor::ParseField(Level * level, CoreLib::Text::Parser & parser)
+	bool SkeletalMeshActor::ParseField(Level * level, CoreLib::Text::Parser & parser, bool &isInvalid)
 	{
-		if (Actor::ParseField(level, parser))
+		if (Actor::ParseField(level, parser, isInvalid))
 			return true;
 		if (parser.LookAhead(L"mesh"))
 		{
@@ -13,7 +13,7 @@ namespace GameEngine
 			MeshName = parser.ReadStringLiteral();
 			Mesh = level->LoadMesh(MeshName);
 			if (!Mesh)
-				Print(L"error: mesh '%s' not found.\n", MeshName.Buffer());
+				isInvalid = false;
 			return true;
 		}
 		if (parser.LookAhead(L"material"))
@@ -28,6 +28,8 @@ namespace GameEngine
 				parser.ReadToken();
 				auto materialName = parser.ReadStringLiteral();
 				MaterialInstance = level->LoadMaterial(materialName);
+				if (!MaterialInstance)
+					isInvalid = true;
 			}
 			return true;
 		}
@@ -37,7 +39,7 @@ namespace GameEngine
 			SkeletonName = parser.ReadStringLiteral();
 			Skeleton = level->LoadSkeleton(SkeletonName);
 			if (!Skeleton)
-				Print(L"error: skeleton '%s' not found.\n", SkeletonName.Buffer());
+				isInvalid = true;
 			return true;
 		}
 		if (parser.LookAhead(L"SimpleAnimation"))
@@ -46,7 +48,7 @@ namespace GameEngine
 			SimpleAnimationName = parser.ReadStringLiteral();
 			SimpleAnimation = level->LoadSkeletalAnimation(SimpleAnimationName);
 			if (!SimpleAnimation)
-				Print(L"error: animation '%s' not found.\n", SimpleAnimationName.Buffer());
+				isInvalid = true;
 			return true;
 		}
 		return false;

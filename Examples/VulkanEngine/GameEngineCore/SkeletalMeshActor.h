@@ -11,7 +11,7 @@ namespace GameEngine
 		Pose nextPose;
 		float startTime = 0.0f;
 	protected:
-		virtual bool ParseField(Level * level, CoreLib::Text::Parser & parser) override;
+		virtual bool ParseField(Level * level, CoreLib::Text::Parser & parser, bool &isInvalid) override;
 	public:
 		CoreLib::RefPtr<AnimationSynthesizer> Animation;
 		Mesh * Mesh = nullptr;

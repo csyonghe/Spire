@@ -25,7 +25,7 @@ namespace GameEngine
 		void Serialize(CoreLib::StringBuilder & sb, const VectorMath::Vec4 & v);
 		void Serialize(CoreLib::StringBuilder & sb, const VectorMath::Matrix4 & v);
 
-		virtual bool ParseField(Level * level, CoreLib::Text::Parser & parser);
+		virtual bool ParseField(Level * level, CoreLib::Text::Parser & parser, bool &isInvalid);
 		virtual void SerializeFields(CoreLib::StringBuilder & sb);
 	public:
 		CoreLib::String Name;
@@ -36,7 +36,7 @@ namespace GameEngine
 		virtual EngineActorType GetEngineType() = 0;
 		virtual void OnLoad() {};
 		virtual void OnUnload() {};
-		virtual void Parse(Level * level, CoreLib::Text::Parser & parser);
+		virtual void Parse(Level * level, CoreLib::Text::Parser & parser, bool & isInvalid);
 		virtual void SerializeToText(CoreLib::StringBuilder & sb);
 		virtual CoreLib::String GetTypeName() { return L"Actor"; }
 		Actor()

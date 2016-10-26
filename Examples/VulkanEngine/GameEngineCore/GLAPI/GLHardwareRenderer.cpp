@@ -2635,11 +2635,18 @@ namespace GLL
 			}
 		}
 
-		int UniformBufferAlignment()
+		int UniformBufferAlignment() override
 		{
 			GLint uniformBufferAlignment;
 			glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &uniformBufferAlignment);
 			return uniformBufferAlignment;
+		}
+
+		int StorageBufferAlignment() override
+		{
+			GLint rs;
+			glGetIntegerv(GL_SHADER_STORAGE_BUFFER_OFFSET_ALIGNMENT, &rs);
+			return rs;
 		}
 
 		RenderTargetLayout* CreateRenderTargetLayout(CoreLib::ArrayView<TextureUsage> bindings)

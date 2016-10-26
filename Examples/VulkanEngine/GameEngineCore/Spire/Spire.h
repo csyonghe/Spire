@@ -3893,6 +3893,8 @@ namespace Spire
 
 		class ComponentDefinitionIR
 		{
+		private:
+			EnumerableHashSet<ComponentDefinitionIR *> dependencyClosure;
 		public:
 			String OriginalName, UniqueName, UniqueKey;
 			RefPtr<ComponentSyntaxNode> SyntaxNode;
@@ -3900,6 +3902,12 @@ namespace Spire
 			String World;
 			bool IsEntryPoint = false;
 			EnumerableHashSet<ComponentDefinitionIR *> Users, Dependency; // Bidirectional dependency;
+			EnumerableHashSet<ComponentDefinitionIR *> & GetComponentFunctionDependencyClosure();
+			void ClearDependency()
+			{
+				Dependency.Clear();
+				dependencyClosure.Clear();
+			}
 		};
 
 		class ShaderIR
@@ -4489,6 +4497,7 @@ namespace Spire
 			EnumerableDictionary<String, String> BackendArguments;
 			String ScheduleSource, ScheduleFileName;
 			String SymbolToCompile;
+			List<String> SearchDirectories;
 		};
 
 		class CompileUnit

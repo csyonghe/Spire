@@ -1,8 +1,10 @@
 #include "Mesh.h"
 #include "CoreLib/LibIO.h"
+#include "Skeleton.h"
 
 using namespace CoreLib::Basic;
 using namespace CoreLib::IO;
+using namespace VectorMath;
 
 namespace GameEngine
 {
@@ -75,6 +77,7 @@ namespace GameEngine
 		if (shaderDef.Length() == 0)
 		{
 			StringBuilder sb;
+			sb << L"#file \"VertexDefinition\"\n";
 			sb << L"module MeshVertex\n{\n";
 			sb << L"public @rootVert vec3 vertPos;\n";
 			for (int i = 0; i < numUVs; i++)
@@ -145,5 +148,112 @@ namespace GameEngine
 		return convertor.typeId;
 	}
 
+
+	struct SkeletonMeshVertex
+	{
+		Vec3 pos;
+		Quaternion tangentFrame;
+		int boneId;
+	};
+	void Mesh::FromSkeleton(Skeleton * skeleton, float width)
+	{
+		Bounds.Init();
+		SetVertexFormat(MeshVertexFormat(0, 0, true, true));
+		List<SkeletonMeshVertex> vertices;
+		List<Matrix4> forwardTransforms;
+		List<Vec3> positions;
+		positions.SetSize(skeleton->Bones.Count());
+		forwardTransforms.SetSize(skeleton->Bones.Count());
+		for (int i = 0; i < skeleton->Bones.Count(); i++)
+		{
+			forwardTransforms[i] = skeleton->Bones[i].BindPose.ToMatrix();
+			if (skeleton->Bones[i].ParentId != -1)
+				Matrix4::Multiply(forwardTransforms[i], forwardTransforms[skeleton->Bones[i].ParentId], forwardTransforms[i]);
+			positions[i] = Vec3::Create(forwardTransforms[i].values[12], forwardTransforms[i].values[13], forwardTransforms[i].values[14]);
+		}
+		for (int i = 0; i < skeleton->Bones.Count(); i++)
+		{
+			int parent = skeleton->Bones[i].ParentId;
+			Vec3 bonePos = positions[i];
+			Vec3 parentPos = parent == -1 ? bonePos : positions[parent];
+			if (parent == -1)
+			{
+				bonePos.y -= width;
+				parentPos.y += width;
+			}
+			else
+			{
+				float length = (bonePos - parentPos).Length();
+				if (length < width * 2.0f)
+					width = length * 0.5f;
+			}
+			Bounds.Union(bonePos);
+			Bounds.Union(parentPos);
+
+			Vec3 dir = (bonePos - parentPos).Normalize();
+			Vec3 xAxis, yAxis; 
+			GetOrthoVec(xAxis, dir);
+			Vec3::Cross(yAxis, dir, xAxis);
+			int vCoords[] = { 0, 1, 3, 2 };
+			for (int j = 0; j < 4; j++)
+			{
+				int vCoord = vCoords[j];
+				int vCoord1 = vCoords[(j + 1) & 3];
+				Vec3 v0 = parentPos + dir * width + xAxis * (width * ((float)(vCoord & 1) - 0.5f)) 
+					+ yAxis * (width * ((float)((vCoord >> 1) & 1) - 0.5f));
+				Vec3 v1 = parentPos + dir * width + xAxis * (width * ((float)(vCoord1 & 1) - 0.5f)) 
+					+ yAxis * (width * ((float)((vCoord1 >> 1) & 1) - 0.5f));
+				Bounds.Union(v0);
+
+				// triangle1: v1->v0->parent
+				{
+					Vec3 normal1 = Vec3::Cross(v0 - v1, parentPos - v1).Normalize();
+					Vec3 tangent1 = (v1 - v0).Normalize();
+					Vec3 binormal1 = Vec3::Cross(tangent1, normal1).Normalize();
+					Quaternion q = Quaternion::FromCoordinates(tangent1, normal1, binormal1);
+					SkeletonMeshVertex vert;
+					vert.pos = v1;
+					vert.tangentFrame = q;
+					vert.boneId = (parent == -1 ? i : parent);
+					Indices.Add(vertices.Count());
+					vertices.Add(vert);
+					vert.pos = v0;
+					Indices.Add(vertices.Count());
+					vertices.Add(vert);
+					vert.pos = parentPos;
+					Indices.Add(vertices.Count());
+					vertices.Add(vert);
+				}
+				// triangle2: v0->v1->bone
+				{
+					Vec3 normal1 = Vec3::Cross(v1 - v0, bonePos - v0).Normalize();
+					Vec3 tangent1 = (v1 - v0).Normalize();
+					Vec3 binormal1 = Vec3::Cross(tangent1, normal1).Normalize();
+					Quaternion q = Quaternion::FromCoordinates(tangent1, normal1, binormal1);
+					SkeletonMeshVertex vert;
+					vert.pos = v0;
+					vert.tangentFrame = q;
+					vert.boneId = (parent == -1 ? i : parent);
+					Indices.Add(vertices.Count());
+					vertices.Add(vert);
+					vert.pos = v1;
+					Indices.Add(vertices.Count());
+					vertices.Add(vert);
+					vert.pos = bonePos;
+					Indices.Add(vertices.Count());
+					vertices.Add(vert);
+				}
+			}
+		}
+		vertexData.SetSize(vertices.Count() * vertexFormat.GetVertexSize());
+		for (int i = 0; i<vertices.Count(); i++)
+		{
+			SetVertexPosition(i, vertices[i].pos);
+			SetVertexTangentFrame(i, vertices[i].tangentFrame);
+			SetVertexSkinningBinding(i, MakeArrayView(vertices[i].boneId), MakeArrayView(1.0f));
+		}
+		vertCount = vertices.Count();
+		
+	}
 }
 

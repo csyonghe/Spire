@@ -134,7 +134,7 @@ namespace GameEngine
 					ptr += 16;
 				}
 			}
-			result.SetData(TextureStorageFormat::BC1, w, h, level, data.GetArrayView());
+			result.SetData(TextureStorageFormat::BC5, w, h, level, data.GetArrayView());
 			if (w == 1 && h == 1) break;
 			int nw, nh;
 			input = Resample(input, w, h, nw, nh);

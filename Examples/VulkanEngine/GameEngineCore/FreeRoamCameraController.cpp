@@ -5,9 +5,9 @@ namespace GameEngine
 {
 	using namespace VectorMath;
 
-	bool FreeRoamCameraController::ParseField(Level * level, CoreLib::Text::Parser & parser)
+	bool FreeRoamCameraController::ParseField(Level * level, CoreLib::Text::Parser & parser, bool & isInvalid)
 	{
-		if (Actor::ParseField(level, parser))
+		if (Actor::ParseField(level, parser, isInvalid))
 			return true;
 		if (parser.LookAhead(L"TargetCamera"))
 		{
@@ -102,7 +102,7 @@ namespace GameEngine
 		if (targetCamera)
 		{
 			float dTime = Engine::Instance()->GetTimeDelta(EngineThread::GameLogic);
-			targetCamera->SetPitch(targetCamera->GetPitch() + scale * dTime * turnPrecision);
+			targetCamera->SetPitch(targetCamera->GetPitch() - scale * dTime * turnPrecision);
 			return true;
 		}
 		return false;

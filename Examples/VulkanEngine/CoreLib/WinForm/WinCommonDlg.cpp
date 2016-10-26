@@ -139,6 +139,8 @@ namespace CoreLib
 			}
 			if (FileNames.Count())
 				FileName = FileNames[0];
+			if (FileNames.Count() > 1)
+				FileNames = From(FileNames).Skip(1).Select([&](String x) {return Path::Combine(FileNames[0], x); }).ToList();
 		}
 
 		UINT_PTR CALLBACK ColorHookProc(HWND hdlg, UINT uiMsg, WPARAM /*wParam*/, LPARAM /*lParam*/)

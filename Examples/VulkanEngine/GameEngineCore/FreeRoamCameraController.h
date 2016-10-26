@@ -14,7 +14,7 @@ namespace GameEngine
 		CoreLib::String targetCameraName;
 		CameraActor * targetCamera = nullptr;
 	public:
-		virtual bool ParseField(Level * level, CoreLib::Text::Parser & parser) override;
+		virtual bool ParseField(Level * level, CoreLib::Text::Parser & parser, bool & isInvalid) override;
 	public:
 		virtual void OnLoad() override;
 		virtual void OnUnload() override;

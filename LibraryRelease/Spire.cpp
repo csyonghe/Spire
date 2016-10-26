@@ -1281,7 +1281,7 @@ namespace Spire
 						func->ReturnType = TranslateExpressionType(comp->Type, &recordTypes);
 						symTable->Functions[funcName] = funcSym;
 						result.Program->Functions[funcName] = func;
-						for (auto dep : comp->Dependency)
+						for (auto dep : comp->GetComponentFunctionDependencyClosure())
 						{
 							if (dep->SyntaxNode->Parameters.Count())
 							{
@@ -1292,7 +1292,7 @@ namespace Spire
 						Dictionary<String, ILOperand*> refComponents;
 						variables.PushScope();
 						codeWriter.PushNode();
-						for (auto & dep : comp->Dependency)
+						for (auto & dep : comp->GetComponentFunctionDependencyClosure())
 						{
 							if (dep->SyntaxNode->Parameters.Count() == 0)
 							{
@@ -1415,9 +1415,19 @@ namespace Spire
 					currentComponent->SyntaxNode->BlockStatement->Accept(this);
 					componentVar = returnRegister;
 				}
+
+				if (!currentComponent->Type->IsTexture() && !currentComponent->Type->IsArray())
+				{
+					auto vartype = TranslateExpressionType(currentComponent->Type.Ptr(), &recordTypes);
+					auto var = codeWriter.AllocVar(vartype, result.Program->ConstantPool->CreateConstant(1));
+					var->Name = varName;
+					codeWriter.Store(var, componentVar);
+					componentVar = var;
+				}
+				else
+					componentVar->Name = varName;
 				currentWorld->Components[currentComponent->UniqueName] = componentVar;
 				variables.Add(currentComponent->UniqueName, componentVar);
-				componentVar->Name = varName;
 				currentComponent = nullptr;
 			}
 			virtual RefPtr<FunctionSyntaxNode> VisitFunction(FunctionSyntaxNode* function) override
@@ -1551,7 +1561,7 @@ namespace Spire
 			virtual RefPtr<StatementSyntaxNode> VisitReturnStatement(ReturnStatementSyntaxNode* stmt) override
 			{
 				returnRegister = nullptr;
-				if (currentComponent != nullptr && !currentImportDef)
+				if (currentWorld != nullptr && currentComponent != nullptr && !currentImportDef)
 				{
 					if (stmt->Expression)
 					{
@@ -1946,7 +1956,7 @@ namespace Spire
 						auto funcComp = *(currentShader->DefinitionsByComponent[funcCompName]().TryGetValue(currentComponent->World));
 						funcName = GetComponentFunctionName(funcComp->SyntaxNode.Ptr());
 						// push additional arguments
-						for (auto & dep : funcComp->Dependency)
+						for (auto & dep : funcComp->GetComponentFunctionDependencyClosure())
 						{
 							if (dep->SyntaxNode->Parameters.Count() == 0)
 							{
@@ -2739,6 +2749,8 @@ namespace Spire
 				PrintType(sbCode, type);
 				sbCode << L" ";
 				sbCode << name;
+				if (name.Length() == 0)
+					throw InvalidProgramException(L"unnamed instruction.");
 			}
 
 			String GetFunctionCallName(String name)
@@ -4857,38 +4869,29 @@ namespace Spire
 		}
 		AllInstructionsIterator & AllInstructionsIterator::operator++()
 		{
-			bool done = false;
-			do
+			if (subBlockPtr < curInstr->GetSubBlockCount())
 			{
-				done = true;
-				if (subBlockPtr < curInstr->GetSubBlockCount())
+				StackItem item;
+				item.instr = curInstr;
+				item.subBlockPtr = subBlockPtr + 1;
+				stack.Add(item);
+				curInstr = curInstr->GetSubBlock(subBlockPtr)->begin().Current;
+				subBlockPtr = 0;
+			}
+			else
+				curInstr = curInstr->GetNext();
+			while (curInstr->GetNext() == nullptr && stack.Count() > 0)
+			{
+				auto item = stack.Last();
+				stack.RemoveAt(stack.Count() - 1);
+				curInstr = item.instr;
+				subBlockPtr = item.subBlockPtr;
+				if (subBlockPtr >= curInstr->GetSubBlockCount())
 				{
-					StackItem item;
-					item.instr = curInstr;
-					item.subBlockPtr = subBlockPtr + 1;
-					stack.Add(item);
-					curInstr = curInstr->GetSubBlock(subBlockPtr)->begin().Current;
 					subBlockPtr = 0;
-				}
-				else
 					curInstr = curInstr->GetNext();
-				while (curInstr->GetNext() == nullptr && stack.Count() > 0)
-				{
-					auto item = stack.Last();
-					stack.RemoveAt(stack.Count() - 1);
-					curInstr = item.instr;
-					subBlockPtr = item.subBlockPtr;
-					if (subBlockPtr >= curInstr->GetSubBlockCount())
-					{
-						subBlockPtr = 0;
-						curInstr = curInstr->GetNext();
-					}
-					done = false;
 				}
-				if (curInstr->GetNext() == nullptr)
-					break;
-			} while (!done);
-
+			}
 			return *this;
 		}
 		AllInstructionsIterator AllInstructionsCollection::begin()
@@ -5182,6 +5185,12 @@ namespace Spire
 		void InsertImplicitImportOperators(ShaderIR * shader)
 		{
 			InsertImplicitImportOperatorVisitor visitor(shader, nullptr);
+			for (auto & comp : shader->Definitions)
+			{
+				for (auto & dep : comp->Dependency)
+					dep->Users.Remove(comp.Ptr());
+				comp->ClearDependency();
+			}
 			for (auto & comp : shader->Definitions)
 			{
 				visitor.currentCompDef = comp.Ptr();
@@ -5613,17 +5622,25 @@ namespace Spire
 			}
 		}
 
+		enum class LexDerivative
+		{
+			None, Line, File
+		};
+
 		List<Token> Lexer::Parse(const String & fileName, const String & str, List<CompileError> & errorList)
 		{
 			int lastPos = 0, pos = 0;
 			int line = 1, col = 0;
+			String file = fileName;
 			State state = State::Start;
 			StringBuilder tokenBuilder;
 			int tokenLine, tokenCol;
 			List<Token> tokenList;
+			LexDerivative derivative = LexDerivative::None;
 			auto InsertToken = [&](TokenType type)
 			{
-				tokenList.Add(Token(type, tokenBuilder.ToString(), tokenLine, tokenCol, fileName));
+				derivative = LexDerivative::None;
+				tokenList.Add(Token(type, tokenBuilder.ToString(), tokenLine, tokenCol, file));
 				tokenBuilder.Clear();
 			};
 			auto ProcessTransferChar = [&](wchar_t nextChar)
@@ -5717,7 +5734,7 @@ namespace Spire
 					}
 					else
 					{
-						errorList.Add(CompileError(L"Illegal character '" + String(curChar) + L"'", 10000, CodePosition(line, col, fileName)));
+						errorList.Add(CompileError(L"Illegal character '" + String(curChar) + L"'", 10000, CodePosition(line, col, file)));
 						pos++;
 					}
 					break;
@@ -5736,6 +5753,18 @@ namespace Spire
 							col = 0;
 							tokenBuilder.Clear();
 						}
+						else if (tokenStr == L"#line")
+						{
+							derivative = LexDerivative::Line;
+							tokenBuilder.Clear();
+						}
+						else if (tokenStr == L"#file")
+						{
+							derivative = LexDerivative::File;
+							tokenBuilder.Clear();
+							line = 0;
+							col = 0;
+						}
 						else
 							InsertToken(GetKeywordTokenType(tokenStr));
 						state = State::Start;
@@ -5750,7 +5779,7 @@ namespace Spire
 					else
 					{
 						//do token analyze
-						ParseOperators(tokenBuilder.ToString(), tokenList, tokenLine, tokenCol, fileName);
+						ParseOperators(tokenBuilder.ToString(), tokenList, tokenLine, tokenCol, file);
 						tokenBuilder.Clear();
 						state = State::Start;
 					}
@@ -5780,7 +5809,17 @@ namespace Spire
 					}
 					else
 					{
-						InsertToken(TokenType::IntLiterial);
+						if (derivative == LexDerivative::Line)
+						{
+							derivative = LexDerivative::None;
+							line = StringToInt(tokenBuilder.ToString()) - 1;
+							col = 0;
+							tokenBuilder.Clear();
+						}
+						else
+						{
+							InsertToken(TokenType::IntLiterial);
+						}
 						state = State::Start;
 					}
 					break;
@@ -5836,7 +5875,16 @@ namespace Spire
 					}
 					else
 					{
-						InsertToken(TokenType::StringLiterial);
+						if (derivative == LexDerivative::File)
+						{
+							derivative = LexDerivative::None;
+							file = tokenBuilder.ToString();
+							tokenBuilder.Clear();
+						}
+						else
+						{
+							InsertToken(TokenType::StringLiterial);
+						}
 						state = State::Start;
 					}
 					pos++;
@@ -5855,7 +5903,7 @@ namespace Spire
 					else
 					{
 						if (tokenBuilder.Length() > 1)
-							errorList.Add(CompileError(L"Illegal character literial.", 10001, CodePosition(line, col-tokenBuilder.Length(), fileName)));
+							errorList.Add(CompileError(L"Illegal character literial.", 10001, CodePosition(line, col-tokenBuilder.Length(), file)));
 						InsertToken(TokenType::CharLiterial);
 						state = State::Start;
 					}
@@ -8891,6 +8939,7 @@ namespace Spire
 						funcType->BaseType = BaseType::Function;
 						funcType->Component = func;
 						memberExpr->Type = funcType;
+						memberExpr->MemberName = func->Name;
 						invoke->Type = func->Implementations.First()->SyntaxNode->Type;
 						return invoke;
 					}
@@ -17423,7 +17472,22 @@ namespace Spire
 			}
 			return result;
 		}
-	}
+		EnumerableHashSet<ComponentDefinitionIR*>& ComponentDefinitionIR::GetComponentFunctionDependencyClosure()
+		{
+			if (dependencyClosure.Count() || Dependency.Count() == 0)
+				return dependencyClosure;
+			for (auto & dep : Dependency)
+			{
+				dependencyClosure.Add(dep);
+				if (dep->SyntaxNode->Parameters.Count())
+				{
+					for (auto & x : dep->GetComponentFunctionDependencyClosure())
+						dependencyClosure.Add(x);
+				}
+			}
+			return dependencyClosure;
+		}
+}
 }
 
 /***********************************************************************
@@ -17552,6 +17616,9 @@ namespace SpireLib
 		List<String> unitsToInclude;
 		unitsToInclude.Add(fileName);
 		processedUnits.Add(fileName);
+		auto searchDirs = options.SearchDirectories;
+		searchDirs.Add(Path::GetDirectoryName(fileName));
+		searchDirs.Reverse();
 		auto predefUnit = compiler->Parse(compileResult, SpireStdLib::GetCode(), L"stdlib");
 		for (int i = 0; i < unitsToInclude.Count(); i++)
 		{
@@ -17567,10 +17634,23 @@ namespace SpireLib
 				{
 					for (auto inc : unit.SyntaxNode->Usings)
 					{
-						String includeFile = Path::Combine(Path::GetDirectoryName(inputFileName), inc.Content);
-						if (processedUnits.Add(includeFile))
+						bool found = false;
+						for (auto & dir : searchDirs)
 						{
-							unitsToInclude.Add(includeFile);
+							String includeFile = Path::Combine(dir, inc.Content);
+							if (File::Exists(includeFile))
+							{
+								if (processedUnits.Add(includeFile))
+								{
+									unitsToInclude.Add(includeFile);
+								}
+								found = true;
+								break;
+							}
+						}
+						if (!found)
+						{
+							compileResult.GetErrorWriter()->Error(2, L"cannot find file '" + inputFileName + L"'.", inc.Position);
 						}
 					}
 				}

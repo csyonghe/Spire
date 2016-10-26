@@ -95,7 +95,7 @@ namespace CoreLib
 					buffer.Add((unsigned char)Math::Clamp((pix.x * 255.0f), 0.0f, 255.0f));
 					buffer.Add((unsigned char)Math::Clamp((pix.y * 255.0f), 0.0f, 255.0f));
 					buffer.Add((unsigned char)Math::Clamp((pix.z * 255.0f), 0.0f, 255.0f));
-					buffer.Add((unsigned char)Math::Clamp((pix.z * 255.0f), 0.0f, 255.0f));
+					buffer.Add((unsigned char)Math::Clamp((pix.w * 255.0f), 0.0f, 255.0f));
 					break;
 				case CoreLib::Graphics::TextureStorageFormat::R_F32:
 					buffer.AddRange((unsigned char*)&pix.x, sizeof(float));

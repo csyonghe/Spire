@@ -268,5 +268,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #define AI_MAX_ALLOC(type) ((256U * 1024 * 1024) / sizeof(type))
 
+#define ai_real float
 
 #endif // !! INCLUDED_AI_DEFINES_H

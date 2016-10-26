@@ -167,6 +167,16 @@ namespace CoreLib
 			::BringWindowToTop(handle);
 		}
 
+		void BaseForm::CenterScreen()
+		{
+			RECT rect;
+			GetClientRect(GetDesktopWindow(), &rect);
+			rect.left = (rect.right / 2) - (GetWidth() / 2);
+			rect.top = (rect.bottom / 2) - (GetHeight() / 2);
+			SetLeft(rect.left);
+			SetTop(rect.top);
+		}
+
 		int BaseForm::MessageBox(const String & msg, const String & title, unsigned int style)
 		{
 			return ::MessageBoxW(handle, msg.Buffer(), title.Buffer(), style);

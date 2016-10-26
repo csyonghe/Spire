@@ -183,6 +183,9 @@
     <ClCompile Include="FBXImport\JoinVerticesProcess.cpp" />
     <ClCompile Include="FBXImport\LimitBoneWeightsProcess.cpp" />
     <ClCompile Include="FBXImport\MaterialSystem.cpp" />
+    <ClCompile Include="FBXImport\ObjFileImporter.cpp" />
+    <ClCompile Include="FBXImport\ObjFileMtlImporter.cpp" />
+    <ClCompile Include="FBXImport\ObjFileParser.cpp" />
     <ClCompile Include="FBXImport\OptimizeGraph.cpp" />
     <ClCompile Include="FBXImport\OptimizeMeshes.cpp" />
     <ClCompile Include="FBXImport\PostStepRegistry.cpp" />
@@ -302,6 +305,11 @@
     <ClInclude Include="FBXImport\MaterialSystem.h" />
     <ClInclude Include="FBXImport\MemoryIOWrapper.h" />
     <ClInclude Include="FBXImport\NullLogger.hpp" />
+    <ClInclude Include="FBXImport\ObjFileData.h" />
+    <ClInclude Include="FBXImport\ObjFileImporter.h" />
+    <ClInclude Include="FBXImport\ObjFileMtlImporter.h" />
+    <ClInclude Include="FBXImport\ObjFileParser.h" />
+    <ClInclude Include="FBXImport\ObjTools.h" />
     <ClInclude Include="FBXImport\OptimizeGraph.h" />
     <ClInclude Include="FBXImport\OptimizeMeshes.h" />
     <ClInclude Include="FBXImport\ParsingUtils.h" />

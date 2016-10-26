@@ -1,12 +1,14 @@
 #include "HardwareApiFactory.h"
 #include "HardwareRenderer.h"
 #include "CoreLib/LibIO.h"
+#include "CoreLib/Parser.h"
 
 namespace GameEngine
 {
 	class OpenGLFactory : public HardwareApiFactory
 	{
 	private:
+		CoreLib::String engineShaderDir;
 		CoreLib::String pipelineShaderDef;
 		CoreLib::String defaultShader;
 	public:
@@ -16,21 +18,23 @@ namespace GameEngine
 			auto pipelineDefFile = Engine::Instance()->FindFile(L"GlPipeline.shader", ResourceType::Shader);
 			if (!pipelineDefFile.Length())
 				throw InvalidOperationException(L"'Pipeline.shader' not found. Engine directory is not setup correctly.");
-			pipelineShaderDef = CoreLib::IO::File::ReadAllText(pipelineDefFile);
+			engineShaderDir = CoreLib::IO::Path::GetDirectoryName(pipelineDefFile);
+			pipelineShaderDef = L"\n#file " + CoreLib::Text::Parser::EscapeStringLiteral(pipelineDefFile) + L"\n" + CoreLib::IO::File::ReadAllText(pipelineDefFile);
 			auto utilDefFile = Engine::Instance()->FindFile(L"Utils.shader", ResourceType::Shader);
 			if (!utilDefFile.Length())
 				throw InvalidOperationException(L"'Utils.shader' not found. Engine directory is not setup correctly.");
 			auto utilsDef = CoreLib::IO::File::ReadAllText(utilDefFile);
-			pipelineShaderDef = pipelineShaderDef + utilsDef;
+			pipelineShaderDef = pipelineShaderDef + L"\n#file " + CoreLib::Text::Parser::EscapeStringLiteral(utilDefFile) + L"\n" + utilsDef;
+
 			auto defaultShaderFile = Engine::Instance()->FindFile(L"DefaultPattern.shader", ResourceType::Shader);
 			if (!defaultShaderFile.Length())
 				throw InvalidOperationException(L"'DefaultPattern.shader' not found. Engine directory is not setup correctly.");
-			defaultShader = pipelineShaderDef + CoreLib::IO::File::ReadAllText(defaultShaderFile);
+			defaultShader = pipelineShaderDef + L"\n#file " + CoreLib::Text::Parser::EscapeStringLiteral(defaultShaderFile) + L"\n" + CoreLib::IO::File::ReadAllText(defaultShaderFile);
 
 			return CreateGLHardwareRenderer();
 		}
 
-		virtual bool CompileShader(ShaderCompilationResult & src, const String & filename, const String & additionalDef, const String & vertexDef, const String & symbol) override
+		virtual bool CompileShader(ShaderCompilationResult & src, const String & filename, const String & vertexDef, const String & symbol) override
 		{
 			auto actualFilename = Engine::Instance()->FindFile(filename, ResourceType::Shader);
 
@@ -38,7 +42,7 @@ namespace GameEngine
 			auto cachedShaderFilename =
 				CoreLib::IO::Path::Combine(CoreLib::IO::Path::GetDirectoryName(actualFilename),
 					CoreLib::IO::Path::GetFileNameWithoutEXT(actualFilename) + L"_" + symbol + L"_gl.cse");
-
+			
 			/*if (CoreLib::IO::File::Exists(cachedShaderFilename))
 			{
 				SpireLib::ShaderLibFile cachedShader;
@@ -61,12 +65,13 @@ namespace GameEngine
 			// Compile shader using Spire	
 			String shaderSrc;
 			if (actualFilename.Length())
-				shaderSrc = pipelineShaderDef + vertexDef + additionalDef + CoreLib::IO::File::ReadAllText(actualFilename);
+				shaderSrc = pipelineShaderDef + vertexDef + L"\n#file " + CoreLib::Text::Parser::EscapeStringLiteral(actualFilename) + L"\n" + CoreLib::IO::File::ReadAllText(actualFilename);
 			else
-				shaderSrc = defaultShader + vertexDef + additionalDef;//TODO: remove additionalDef?
+				shaderSrc = defaultShader + vertexDef;
 
 			Spire::Compiler::CompileResult compileResult;
 			Spire::Compiler::CompileOptions options;
+			options.SearchDirectories.Add(engineShaderDir);
 			options.SymbolToCompile = symbol;
 			auto compiledShader = SpireLib::CompileShaderSource(compileResult, shaderSrc, L"", options);
 
@@ -123,7 +128,7 @@ namespace GameEngine
 			return CreateVulkanHardwareRenderer(gpuId);
 		}
 
-		virtual bool CompileShader(ShaderCompilationResult & src, const String & filename, const String & additionalDef, const String & vertexDef, const String & symbol) override
+		virtual bool CompileShader(ShaderCompilationResult & src, const String & filename, const String & vertexDef, const String & symbol) override
 		{
 			// Compile shader using Spire
 			auto actualFilename = Engine::Instance()->FindFile(filename, ResourceType::Shader);
@@ -149,9 +154,9 @@ namespace GameEngine
 
 			String shaderSrc;
 			if (actualFilename.Length())
-				shaderSrc = pipelineShaderDef + vertexDef + additionalDef + CoreLib::IO::File::ReadAllText(actualFilename);
+				shaderSrc = pipelineShaderDef + vertexDef + CoreLib::IO::File::ReadAllText(actualFilename);
 			else
-				shaderSrc = defaultShader + vertexDef + additionalDef;
+				shaderSrc = defaultShader + vertexDef;
 
 			Spire::Compiler::CompileResult compileResult;
 			Spire::Compiler::CompileOptions options;

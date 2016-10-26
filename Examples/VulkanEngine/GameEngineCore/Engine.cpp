@@ -191,10 +191,14 @@ namespace GameEngine
 
 	RefPtr<Actor> Engine::ParseActor(GameEngine::Level * pLevel, Text::Parser & parser)
 	{
-		auto actor = CreateActor(parser.NextToken().Str);
+		RefPtr<Actor> actor = CreateActor(parser.NextToken().Str);
+		bool isInvalid = false;
 		if (actor)
-			actor->Parse(pLevel, parser);
-		return actor;
+			actor->Parse(pLevel, parser, isInvalid);
+		if (!isInvalid)
+			return actor;
+		else
+			return nullptr;
 	}
 
 	CoreLib::String Engine::FindFile(const CoreLib::String & fileName, ResourceType type)

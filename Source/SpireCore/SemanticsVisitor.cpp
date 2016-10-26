@@ -1310,6 +1310,7 @@ namespace Spire
 						funcType->BaseType = BaseType::Function;
 						funcType->Component = func;
 						memberExpr->Type = funcType;
+						memberExpr->MemberName = func->Name;
 						invoke->Type = func->Implementations.First()->SyntaxNode->Type;
 						return invoke;
 					}

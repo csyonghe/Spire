@@ -1,0 +1,16 @@
+HIERARCHY
+ROOT root
+{
+    OFFSET 0.0 0.0 0.0
+    CHANNELS 3 Xrotation Yrotation Zrotation
+    JOINT level1
+    {
+        OFFSET 0.0 10.0 0.0
+    }
+}
+MOTION
+Frames: 3
+Frame Time: 2.0
+0.0 0.0 0.0
+0.0 0.0 90.0
+0.0 0.0 180.0

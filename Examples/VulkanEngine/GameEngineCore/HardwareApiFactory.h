@@ -20,7 +20,7 @@ namespace GameEngine
 	{
 	public:
 		virtual HardwareRenderer * CreateRenderer(int gpuId) = 0;
-		virtual bool CompileShader(ShaderCompilationResult & src, const String & filename, const String & additionalDef, const String & vertexDef, const String & symbol) = 0;
+		virtual bool CompileShader(ShaderCompilationResult & src, const String & filename, const String & vertexDef, const String & symbol) = 0;
 	};
 
 	HardwareApiFactory * CreateOpenGLFactory();

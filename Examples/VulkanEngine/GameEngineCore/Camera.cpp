@@ -56,9 +56,9 @@ namespace GameEngine
 	{
 		collisionRadius = value;
 	}
-	bool CameraActor::ParseField(Level * level, CoreLib::Text::Parser & parser)
+	bool CameraActor::ParseField(Level * level, CoreLib::Text::Parser & parser, bool & isInvalid)
 	{
-		if (Actor::ParseField(level, parser))
+		if (Actor::ParseField(level, parser, isInvalid))
 			return true;
 		if (parser.LookAhead(L"position"))
 		{

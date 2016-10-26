@@ -456,38 +456,29 @@ namespace Spire
 		}
 		AllInstructionsIterator & AllInstructionsIterator::operator++()
 		{
-			bool done = false;
-			do
+			if (subBlockPtr < curInstr->GetSubBlockCount())
 			{
-				done = true;
-				if (subBlockPtr < curInstr->GetSubBlockCount())
+				StackItem item;
+				item.instr = curInstr;
+				item.subBlockPtr = subBlockPtr + 1;
+				stack.Add(item);
+				curInstr = curInstr->GetSubBlock(subBlockPtr)->begin().Current;
+				subBlockPtr = 0;
+			}
+			else
+				curInstr = curInstr->GetNext();
+			while (curInstr->GetNext() == nullptr && stack.Count() > 0)
+			{
+				auto item = stack.Last();
+				stack.RemoveAt(stack.Count() - 1);
+				curInstr = item.instr;
+				subBlockPtr = item.subBlockPtr;
+				if (subBlockPtr >= curInstr->GetSubBlockCount())
 				{
-					StackItem item;
-					item.instr = curInstr;
-					item.subBlockPtr = subBlockPtr + 1;
-					stack.Add(item);
-					curInstr = curInstr->GetSubBlock(subBlockPtr)->begin().Current;
 					subBlockPtr = 0;
-				}
-				else
 					curInstr = curInstr->GetNext();
-				while (curInstr->GetNext() == nullptr && stack.Count() > 0)
-				{
-					auto item = stack.Last();
-					stack.RemoveAt(stack.Count() - 1);
-					curInstr = item.instr;
-					subBlockPtr = item.subBlockPtr;
-					if (subBlockPtr >= curInstr->GetSubBlockCount())
-					{
-						subBlockPtr = 0;
-						curInstr = curInstr->GetNext();
-					}
-					done = false;
 				}
-				if (curInstr->GetNext() == nullptr)
-					break;
-			} while (!done);
-
+			}
 			return *this;
 		}
 		AllInstructionsIterator AllInstructionsCollection::begin()

@@ -320,7 +320,7 @@ namespace Spire
 						func->ReturnType = TranslateExpressionType(comp->Type, &recordTypes);
 						symTable->Functions[funcName] = funcSym;
 						result.Program->Functions[funcName] = func;
-						for (auto dep : comp->Dependency)
+						for (auto dep : comp->GetComponentFunctionDependencyClosure())
 						{
 							if (dep->SyntaxNode->Parameters.Count())
 							{
@@ -331,7 +331,7 @@ namespace Spire
 						Dictionary<String, ILOperand*> refComponents;
 						variables.PushScope();
 						codeWriter.PushNode();
-						for (auto & dep : comp->Dependency)
+						for (auto & dep : comp->GetComponentFunctionDependencyClosure())
 						{
 							if (dep->SyntaxNode->Parameters.Count() == 0)
 							{
@@ -454,9 +454,19 @@ namespace Spire
 					currentComponent->SyntaxNode->BlockStatement->Accept(this);
 					componentVar = returnRegister;
 				}
+
+				if (!currentComponent->Type->IsTexture() && !currentComponent->Type->IsArray())
+				{
+					auto vartype = TranslateExpressionType(currentComponent->Type.Ptr(), &recordTypes);
+					auto var = codeWriter.AllocVar(vartype, result.Program->ConstantPool->CreateConstant(1));
+					var->Name = varName;
+					codeWriter.Store(var, componentVar);
+					componentVar = var;
+				}
+				else
+					componentVar->Name = varName;
 				currentWorld->Components[currentComponent->UniqueName] = componentVar;
 				variables.Add(currentComponent->UniqueName, componentVar);
-				componentVar->Name = varName;
 				currentComponent = nullptr;
 			}
 			virtual RefPtr<FunctionSyntaxNode> VisitFunction(FunctionSyntaxNode* function) override
@@ -590,7 +600,7 @@ namespace Spire
 			virtual RefPtr<StatementSyntaxNode> VisitReturnStatement(ReturnStatementSyntaxNode* stmt) override
 			{
 				returnRegister = nullptr;
-				if (currentComponent != nullptr && !currentImportDef)
+				if (currentWorld != nullptr && currentComponent != nullptr && !currentImportDef)
 				{
 					if (stmt->Expression)
 					{
@@ -985,7 +995,7 @@ namespace Spire
 						auto funcComp = *(currentShader->DefinitionsByComponent[funcCompName]().TryGetValue(currentComponent->World));
 						funcName = GetComponentFunctionName(funcComp->SyntaxNode.Ptr());
 						// push additional arguments
-						for (auto & dep : funcComp->Dependency)
+						for (auto & dep : funcComp->GetComponentFunctionDependencyClosure())
 						{
 							if (dep->SyntaxNode->Parameters.Count() == 0)
 							{

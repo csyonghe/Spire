@@ -155,6 +155,12 @@ namespace Spire
 			InsertImplicitImportOperatorVisitor visitor(shader, nullptr);
 			for (auto & comp : shader->Definitions)
 			{
+				for (auto & dep : comp->Dependency)
+					dep->Users.Remove(comp.Ptr());
+				comp->ClearDependency();
+			}
+			for (auto & comp : shader->Definitions)
+			{
 				visitor.currentCompDef = comp.Ptr();
 				comp->SyntaxNode->Accept(&visitor);
 			}

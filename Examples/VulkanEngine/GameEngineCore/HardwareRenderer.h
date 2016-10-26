@@ -623,6 +623,7 @@ namespace GameEngine
 		virtual CommandBuffer* CreateCommandBuffer() = 0;
 		virtual CoreLib::String GetSpireBackendName() = 0;
 		virtual int UniformBufferAlignment() = 0;
+		virtual int StorageBufferAlignment() = 0;
 	};
 
 	// HardwareRenderer instance constructors

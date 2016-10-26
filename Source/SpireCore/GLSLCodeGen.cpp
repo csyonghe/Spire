@@ -139,6 +139,8 @@ namespace Spire
 				PrintType(sbCode, type);
 				sbCode << L" ";
 				sbCode << name;
+				if (name.Length() == 0)
+					throw InvalidProgramException(L"unnamed instruction.");
 			}
 
 			String GetFunctionCallName(String name)

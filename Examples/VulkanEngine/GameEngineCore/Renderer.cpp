@@ -113,7 +113,8 @@ namespace GameEngine
 		RefPtr<Buffer> sysUniformBuffer;
 		RefPtr<Buffer> skeletalTransformBuffer;
 		RefPtr<Buffer> dynamicInstanceUniformBuffer;
-		int uniformBufferAlignment = 1;
+		int uniformBufferAlignment = 256;
+		int storageBufferAlignment = 32;
 
 		RefPtr<TextureSampler> textureSampler;
 		RefPtr<TextureSampler> deferredSampler;
@@ -293,6 +294,7 @@ namespace GameEngine
 		{
 			MaterialInstance materialInstance;
 			auto identifier = material->ShaderFile + L"!" + symbol;
+			
 			if (materialCache.TryGetValue(identifier, materialInstance))
 			{
 				return materialInstance;
@@ -321,7 +323,7 @@ namespace GameEngine
 
 			// Compile shaders
 			ShaderCompilationResult rs;
-			if (!hardwareFactory->CompileShader(rs, material->ShaderFile, meshProcessingDef, meshVertexFormat.GetShaderDefinition(), symbol))
+			if (!hardwareFactory->CompileShader(rs, material->ShaderFile, meshProcessingDef + meshVertexFormat.GetShaderDefinition(), symbol))
 				throw HardwareRendererException(L"Shader compilation failure");
 
 			for (auto& compiledShader : rs.Shaders)
@@ -523,6 +525,7 @@ namespace GameEngine
 
 			// Fetch uniform buffer alignment requirements
 			uniformBufferAlignment = hardwareRenderer->UniformBufferAlignment();
+			storageBufferAlignment = hardwareRenderer->StorageBufferAlignment();
 
 			// Create and resize uniform buffer
 			sysUniformBuffer = hardwareRenderer->CreateMappedBuffer(BufferUsage::UniformBuffer);
@@ -552,7 +555,7 @@ namespace GameEngine
 			auto meshProcessingFile = Engine::Instance()->FindFile(L"MeshProcessing.shader", ResourceType::Shader);
 			if (!meshProcessingFile.Length())
 				throw InvalidOperationException(L"'MeshProcessing.shader' not found. Engine directory is not setup correctly.");
-			meshProcessingDef = CoreLib::IO::File::ReadAllText(meshProcessingFile);
+			meshProcessingDef = L"\n#file " + CoreLib::Text::Parser::EscapeStringLiteral(meshProcessingFile) + L"\n" + CoreLib::IO::File::ReadAllText(meshProcessingFile);
 
 		}
 		~RendererImpl()
@@ -729,8 +732,8 @@ namespace GameEngine
 							skeletalActor->RenderContext = ctx;
 						}
 						meshIndexRange.TryGetValue(skeletalActor->Mesh, ctx->MeshRange);
+						Align(uniformStream.Ptr(), uniformBufferAlignment);
 						FillInstanceUniformBuffer(ctx, skeletalActor->MaterialInstance, uniformStream.Ptr(), uniformWriter);
-
 						ctx->TransformUniformStart = transformUniformStream->GetBufferSize();
 						List<Matrix4> matrices;
 						skeletalActor->GetCurrentPose().GetMatrices(skeletalActor->Skeleton, matrices);
@@ -744,6 +747,7 @@ namespace GameEngine
 							transformUniformWriter.Write(normMat.values + 4, 4);
 							transformUniformWriter.Write(normMat.values + 8, 4);
 						}
+						Align(transformUniformStream.Ptr(), storageBufferAlignment);
 						ctx->TransformUniformEnd = transformUniformStream->GetBufferSize();
 					}
 				}
@@ -803,6 +807,7 @@ namespace GameEngine
 						skeletalActor->RenderContext = ctx;
 					}
 					meshIndexRange.TryGetValue(skeletalActor->Mesh, ctx->MeshRange);
+					Align(uniformStream.Ptr(), uniformBufferAlignment);
 					FillInstanceUniformBuffer(ctx, skeletalActor->MaterialInstance, uniformStream.Ptr(), uniformWriter);
 
 					ctx->TransformUniformStart = transformUniformStream->GetBufferSize();
@@ -810,6 +815,7 @@ namespace GameEngine
 					skeletalActor->GetCurrentPose().GetMatrices(skeletalActor->Skeleton, matrices);
 					for (int i = 0; i < matrices.Count(); i++)
 					{
+						Matrix4::Multiply(matrices[i], actor->LocalTransform, matrices[i]);
 						transformUniformWriter.Write(matrices[i]);
 						Matrix4 normMat;
 						matrices[i].Inverse(normMat);
@@ -818,6 +824,7 @@ namespace GameEngine
 						transformUniformWriter.Write(normMat.values + 4, 4);
 						transformUniformWriter.Write(normMat.values + 8, 4);
 					}
+					Align(transformUniformStream.Ptr(), storageBufferAlignment);
 					ctx->TransformUniformEnd = transformUniformStream->GetBufferSize();
 				}
 			}

@@ -937,8 +937,8 @@ namespace VectorMath
 
 		Matrix4::CreateIdentityMatrix(rs);
 		rs.m[1][1] = c;
-		rs.m[2][1] = s;
-		rs.m[1][2] = -s;
+		rs.m[2][1] = -s;
+		rs.m[1][2] = s;
 		rs.m[2][2] = c;
 	}
 	inline void Matrix4::RotationY(Matrix4 & rs, float angle)
@@ -959,8 +959,8 @@ namespace VectorMath
 
 		Matrix4::CreateIdentityMatrix(rs);
 		rs.m[0][0] = c;
-		rs.m[1][0] = s;
-		rs.m[0][1] = -s;
+		rs.m[1][0] = -s;
+		rs.m[0][1] = s;
 		rs.m[1][1] = c;
 	}
 
@@ -1803,13 +1803,8 @@ namespace VectorMath
 		
 			return rs;
 		}
-		static inline Quaternion FromCoordinates(const Vec3 & axisX, const Vec3 & axisY, const Vec3 & axisZ)
+		static inline Quaternion FromMatrix(const Matrix3 & a)
 		{
-			Matrix3 a;
-			a.values[0] = axisX.x; a.values[3] = axisX.y, a.values[6] = axisX.z;
-			a.values[1] = axisY.x; a.values[4] = axisY.y, a.values[7] = axisY.z;
-			a.values[2] = axisZ.x; a.values[5] = axisZ.y, a.values[8] = axisZ.z;
-
 			Quaternion q;
 			float trace = a.m[0][0] + a.m[1][1] + a.m[2][2]; // I removed + 1.0f; see discussion with Ethan
 			if (trace > 0)
@@ -1847,7 +1842,16 @@ namespace VectorMath
 					q.z = 0.25f * s;
 				}
 			}
-			return q * (1.0f/q.Length());
+			return q * (1.0f / q.Length());
+		}
+		static inline Quaternion FromCoordinates(const Vec3 & axisX, const Vec3 & axisY, const Vec3 & axisZ)
+		{
+			Matrix3 a;
+			a.values[0] = axisX.x; a.values[3] = axisX.y, a.values[6] = axisX.z;
+			a.values[1] = axisY.x; a.values[4] = axisY.y, a.values[7] = axisY.z;
+			a.values[2] = axisZ.x; a.values[5] = axisZ.y, a.values[8] = axisZ.z;
+
+			return FromMatrix(a);
 		}
 		static inline Quaternion FromAxisAngle(const Vec3 & axis, float angle)
 		{

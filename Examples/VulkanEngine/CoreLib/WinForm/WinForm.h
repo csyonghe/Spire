@@ -90,6 +90,7 @@ namespace CoreLib
 			void RegisterAccel(Accelerator acc, MenuItem * item);
 			void UpdateAccel(Accelerator acc, MenuItem * item);
 			void UpdateAccel();
+			void CenterScreen();
 		};
 
 		class Form : public BaseForm
