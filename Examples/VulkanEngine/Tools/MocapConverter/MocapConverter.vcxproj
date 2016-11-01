@@ -152,6 +152,7 @@
   <ItemGroup>
     <ClCompile Include="BvhFile.cpp" />
     <ClCompile Include="MocapConverter.cpp" />
+    <ClCompile Include="RigMapping.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\CoreLib\CoreLib.vcxproj">
@@ -163,6 +164,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BvhFile.h" />
+    <ClInclude Include="RigMapping.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

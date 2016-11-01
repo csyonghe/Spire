@@ -124,6 +124,23 @@ Matrix4 FlipYZ(const Matrix4 & v)
 	return rs;
 }
 
+void FlipKeyFrame(BoneTransformation & kf)
+{
+	Matrix4 transform = kf.ToMatrix();
+	Matrix4 rotX90, rotXNeg90;
+	Matrix4::RotationX(rotX90, Math::Pi * 0.5f);
+	Matrix4::RotationX(rotXNeg90, -Math::Pi * 0.5f);
+
+	Matrix4::Multiply(transform, transform, rotX90);
+	Matrix4::Multiply(transform, rotXNeg90, transform);
+
+	kf.Rotation = Quaternion::FromMatrix(transform.GetMatrix3());
+	kf.Rotation *= 1.0f / kf.Rotation.Length();
+	kf.Translation = Vec3::Create(transform.values[12], transform.values[13], transform.values[14]);
+
+	Swap(kf.Scale.y, kf.Scale.z);
+}
+
 void Export(ExportArguments args)
 {
 	auto fileName = args.FileName;
@@ -144,7 +161,8 @@ void Export(ExportArguments args)
 		{
 			wprintf(L"error: input file does not contain any meshes.\n");
 		}
-		if (args.ExportSkeleton && scene->mNumMeshes > 0)
+        Skeleton skeleton;
+		if ((args.ExportSkeleton || args.ExportMesh) && scene->mNumMeshes > 0)
 		{
 			if (scene->mNumMeshes > 1)
 				wprintf(L"warning: input file contains more than 1 mesh, animation is exported for the first mesh only.\n");
@@ -155,7 +173,6 @@ void Export(ExportArguments args)
 			}
 			else
 			{
-				Skeleton skeleton;
 				skeleton.Bones.SetSize(mesh->mNumBones);
 				List<aiNode*> nodes;
 				nodes.SetSize(mesh->mNumBones);
@@ -166,8 +183,6 @@ void Export(ExportArguments args)
 					skeleton.Bones[i].ParentId = -1;
 					skeleton.BoneMapping[skeleton.Bones[i].Name] = i;
 					memcpy(skeleton.InversePose[i].values, &mesh->mBones[i]->mOffsetMatrix.Transpose(), sizeof(VectorMath::Matrix4));
-					if (args.FlipYZ)
-						skeleton.InversePose[i] = FlipYZ(skeleton.InversePose[i]);
 					nodes[i] = scene->mRootNode->FindNode(mesh->mBones[i]->mName);
 					aiVector3D scale, pos;
 					aiQuaternion rot;
@@ -175,6 +190,7 @@ void Export(ExportArguments args)
 					skeleton.Bones[i].BindPose.Rotation = ToQuaternion(rot);
 					skeleton.Bones[i].BindPose.Scale = Vec3::Create(scale.x, scale.y, scale.z);
 					skeleton.Bones[i].BindPose.Translation = Vec3::Create(pos.x, pos.y, pos.z);
+					
 				}
 				for (auto i = 0u; i < mesh->mNumBones; i++)
 				{
@@ -190,8 +206,37 @@ void Export(ExportArguments args)
 						}
 					}
 				}
-				skeleton.SaveToFile(Path::ReplaceExt(outFileName, L"skeleton"));
-				wprintf(L"skeleton converted. total bones: %d.\n", skeleton.Bones.Count());
+                skeleton = skeleton.TopologySort();
+				auto node = scene->mRootNode->FindNode(skeleton.Bones[0].Name.ToMultiByteString());
+				aiMatrix4x4 rootTransform = node->mTransformation;
+				while (node->mParent)
+				{
+					rootTransform = rootTransform * node->mParent->mTransformation;
+					node = node->mParent;
+				}
+				aiVector3D rootScale, rootPos;
+				aiQuaternion rootRotation;
+				rootTransform.Decompose(rootScale, rootRotation, rootPos);
+				skeleton.Bones[0].BindPose.Scale = Vec3::Create(rootScale.x, rootScale.y, rootScale.z);
+				skeleton.Bones[0].BindPose.Rotation = ToQuaternion(rootRotation);
+				skeleton.Bones[0].BindPose.Translation = Vec3::Create(rootPos.x, rootPos.y, rootPos.z);
+				if (args.FlipYZ)
+				{
+					auto invRot = Quaternion::FromAxisAngle(Vec3::Create(1.0f, 0.0f, 0.0f), -Math::Pi * 0.5f);
+					skeleton.Bones[0].BindPose.Rotation = invRot * skeleton.Bones[0].BindPose.Rotation;
+					auto mat = skeleton.Bones[0].BindPose.Rotation.ToMatrix3();
+					Matrix4 rotMat;
+					Matrix4::RotationX(rotMat, Math::Pi * 0.5f);
+					for (int i = 0; i < skeleton.Bones.Count(); i++)
+					{
+						Matrix4::Multiply(skeleton.InversePose[i], skeleton.InversePose[i], rotMat);
+					}
+				}
+                if (args.ExportSkeleton)
+                {
+                    skeleton.SaveToFile(Path::ReplaceExt(outFileName, L"skeleton"));
+                    wprintf(L"skeleton converted. total bones: %d.\n", skeleton.Bones.Count());
+                }
 			}
 		}
 
@@ -275,7 +320,7 @@ void Export(ExportArguments args)
 								k++;
 							if (k < 4)
 							{
-								vBoneIds[k] = (unsigned char)i;
+								vBoneIds[k] = (unsigned char)skeleton.BoneMapping[bone->mName.C_Str()]();
 								vBoneWeights[k] = bone->mWeights[j].mWeight;
 								if (vBoneWeights[k] > vBoneWeights[0])
 								{
@@ -411,10 +456,7 @@ void Export(ExportArguments args)
 
 					if (args.FlipYZ)
 					{
-						keyFrame.Transform.Translation = FlipYZ(keyFrame.Transform.Translation);
-						keyFrame.Transform.Scale = FlipYZ(keyFrame.Transform.Scale);
-						Swap(keyFrame.Transform.Rotation.y, keyFrame.Transform.Rotation.z);
-						keyFrame.Transform.Rotation.z = -keyFrame.Transform.Rotation.z;
+						FlipKeyFrame(keyFrame.Transform);
 					}
 					anim.Channels[i].KeyFrames.Add(keyFrame);
 				}

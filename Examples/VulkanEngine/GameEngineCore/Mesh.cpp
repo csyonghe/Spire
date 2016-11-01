@@ -78,16 +78,16 @@ namespace GameEngine
 		{
 			StringBuilder sb;
 			sb << L"#file \"VertexDefinition\"\n";
-			sb << L"module MeshVertex\n{\n";
-			sb << L"public @rootVert vec3 vertPos;\n";
+			sb << L"module VertexAttributes\n{\n";
+			sb << L"public @MeshVertex vec3 vertPos;\n";
 			for (int i = 0; i < numUVs; i++)
-				sb << L"public @rootVert vec2 vertUV" << i << L";\n";
+				sb << L"public @MeshVertex vec2 vertUV" << i << L";\n";
 			for (int i = numUVs; i < 8; i++)
 				sb << L"public inline vec2 vertUV" << i << L" = vec2(0.0);\n";
 			if (hasTangent)
 			{
 				sb << LR"(
-				@rootVert uint tangentFrame;
+				@MeshVertex uint tangentFrame;
 				vec4 tangentFrameQuaternion
 				{
 					vec4 result;
@@ -98,11 +98,11 @@ namespace GameEngine
 					result.w = float((tangentFrame >> 24) & 255) * inv255 - 1.0;
 					return result;
 				}
-				public @vs vec3 vertNormal
+				public @CoarseVertex vec3 vertNormal
 				{
 					return normalize(QuaternionRotate(tangentFrameQuaternion, vec3(0.0, 1.0, 0.0)));
 				}
-				public @vs vec3 vertTangent
+				public @CoarseVertex vec3 vertTangent
 				{
 					return normalize(QuaternionRotate(tangentFrameQuaternion, vec3(1.0, 0.0, 0.0)));
 				}
@@ -112,19 +112,19 @@ namespace GameEngine
 			else
 			{
 				sb << LR"(
-				public @vs vec3 vertNormal = vec3(0.0, 1.0, 0.0);
-				public @vs vec3 vertTangent = vec3(1.0, 0.0, 0.0);
+				public @CoarseVertex vec3 vertNormal = vec3(0.0, 1.0, 0.0);
+				public @CoarseVertex vec3 vertTangent = vec3(1.0, 0.0, 0.0);
 				public vec3 vertBinormal = vec3(0.0, 0.0, 1.0);
 				)";
 			}
 			for (int i = 0; i < numColors; i++)
-				sb << L"public @rootVert vec4 vertColor" << i << L";\n";
+				sb << L"public @MeshVertex vec4 vertColor" << i << L";\n";
 			for (int i = numColors; i < 8; i++)
 				sb << L"public inline vec4 vertColor" << i << L" = vec4(0.0);\n";
 			if (hasSkinning)
 			{
-				sb << "public @rootVert uint boneIds;\n";
-				sb << "public @rootVert uint boneWeights;\n";
+				sb << "public @MeshVertex uint boneIds;\n";
+				sb << "public @MeshVertex uint boneWeights;\n";
 			}
 			else
 			{

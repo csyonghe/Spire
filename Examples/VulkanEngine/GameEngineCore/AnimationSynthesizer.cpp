@@ -30,9 +30,8 @@ namespace GameEngine
 	{
 		p.Transforms.SetSize(skeleton->Bones.Count());
 		float animTime = fmod(time * anim->Speed, anim->Duration);
-		//animTime = 0.0f;
-		for (int i = 0; i < skeleton->Bones.Count(); i++)
-			p.Transforms[i] = skeleton->Bones[i].BindPose;
+        for (int i = 0; i < skeleton->Bones.Count(); i++)
+            p.Transforms[i] = skeleton->Bones[i].BindPose;
 		for (int i = 0; i < anim->Channels.Count(); i++)
 		{
 			if (anim->Channels[i].BoneId == -1)
@@ -55,11 +54,15 @@ namespace GameEngine
 						t = (animTime - anim->Channels[i].KeyFrames[frame0].Time) / b;
 					frame1 = 0;
 				}
-				auto & f0 = anim->Channels[i].KeyFrames[frame0];
+                auto & f0 = anim->Channels[i].KeyFrames[frame0];
 				auto & f1 = anim->Channels[i].KeyFrames[frame1];
-				p.Transforms[anim->Channels[i].BoneId] = BoneTransformation::Lerp(f0.Transform, f1.Transform, t);
+                
+                p.Transforms[anim->Channels[i].BoneId] = BoneTransformation::Lerp(f0.Transform, f1.Transform, t); //BoneTransformation(); //
+				//p.Transforms[anim->Channels[i].BoneId].Rotation = VectorMath::Quaternion();
 			}
 		}
+        /*for (int i = 0; i < p.Transforms.Count(); i++)
+            p.Transforms[i] = BoneTransformation();*/
 	}
 
 }

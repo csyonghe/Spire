@@ -1,15 +1,21 @@
-using "DefaultGeometry.shader";
-
-module SurfacePattern
+//using "DefaultGeometry.shader";
+module MaterialGeometry
+{
+    require vec3 coarseVertPos;
+    require vec3 coarseVertNormal;
+    public using PN_Tessellation;
+    public vec3 displacement = vec3(0.0);
+}
+module MaterialPattern
 {
     require vec2 vertUV;
     require vec3 WorldSpaceToTangentSpace(vec3 v);
     require vec3 cameraPos;
     require vec3 pos;
     
-    @perInstanceUniform sampler2D albedoMap;
-    @perInstanceUniform sampler2D normalMap;
-    @perInstanceUniform sampler2D displacementMap;
+    @MaterialUniform sampler2D albedoMap;
+    @MaterialUniform sampler2D normalMap;
+    @MaterialUniform sampler2D displacementMap;
     vec3 viewDirTan = WorldSpaceToTangentSpace(normalize(cameraPos - pos));
     using pom = ParallaxOcclusionMapping(
         heightTexture: displacementMap,

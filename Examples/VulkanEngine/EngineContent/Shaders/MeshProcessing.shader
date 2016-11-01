@@ -1,59 +1,59 @@
 shader StaticMeshForwardLighting : StandardPipeline
 {
     public using SystemUniforms;
-    public using StaticVertex;
+    public using NoAnimation;
     public inline vec2 vertUV = vertUV0;
     public using TangentSpaceTransform;
-    public using SurfaceGeometry;
+    public using MaterialGeometry;
     public using VertexTransform;
-    public using SurfacePattern;
+    public using MaterialPattern;
     vec3 lightParam = vec3(roughness, metallic, specular);
     using lighting = Lighting(TangentSpaceToWorldSpace(normal));
-    public out @fs vec4 outputColor = vec4(lighting.result, 1.0);
+    public out @Fragment vec4 outputColor = vec4(lighting.result, 1.0);
 }
 
 shader StaticMeshDeferredLighting : StandardPipeline
 {
     public using SystemUniforms;
-    public using StaticVertex;
+    public using NoAnimation;
     public vec2 vertUV = vertUV0;
     public using TangentSpaceTransform;    
-    public using SurfaceGeometry;
+    public using MaterialGeometry;
     public using VertexTransform;
-    public using SurfacePattern;
+    public using MaterialPattern;
     vec3 lightParam = vec3(roughness, metallic, specular);
 
-    public out @fs vec3 outputAlbedo = albedo;
-    public out @fs vec3 outputPbr = lightParam;
-    public out @fs vec3 outputNormal = TangentSpaceToWorldSpace(normal);
+    public out @Fragment vec3 outputAlbedo = albedo;
+    public out @Fragment vec3 outputPbr = lightParam;
+    public out @Fragment vec3 outputNormal = TangentSpaceToWorldSpace(normal);
 }
 
 shader SkeletalMeshForwardLighting : StandardPipeline
 {
     public using SystemUniforms;
-    public using SkinnedVertex;
+    public using SkeletalAnimation;
     public vec2 vertUV = vertUV0;
     public using TangentSpaceTransform;    
-    public using SurfaceGeometry;
+    public using MaterialGeometry;
     public using VertexTransform;
-    public using SurfacePattern;
+    public using MaterialPattern;
     vec3 lightParam = vec3(roughness, metallic, specular);
     using lighting = Lighting(TangentSpaceToWorldSpace(normal));
-    public out @fs vec4 outputColor = vec4(lighting.result, 1.0);
+    public out @Fragment vec4 outputColor = vec4(lighting.result, 1.0);
 }
 
 shader SkeletalMeshDeferredLighting : StandardPipeline
 {
     public using SystemUniforms;
-    public using SkinnedVertex;
+    public using SkeletalAnimation;
     public vec2 vertUV = vertUV0;
     public using TangentSpaceTransform;
-    public using SurfaceGeometry;
+    public using MaterialGeometry;
     public using VertexTransform;
-    public using SurfacePattern;
+    public using MaterialPattern;
     vec3 lightParam = vec3(roughness, metallic, specular);
     
-    public out @fs vec3 outputAlbedo = albedo;
-    public out @fs vec3 outputPbr = lightParam;
-    public out @fs vec3 outputNormal = TangentSpaceToWorldSpace(normal);
+    public out @Fragment vec3 outputAlbedo = albedo;
+    public out @Fragment vec3 outputPbr = lightParam;
+    public out @Fragment vec3 outputNormal = TangentSpaceToWorldSpace(normal);
 }

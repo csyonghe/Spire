@@ -18,7 +18,24 @@ namespace GameEngine
 			Translation.SetZero();
 			Scale.x = Scale.y = Scale.z = 1.0f;
 		}
-		VectorMath::Matrix4 ToMatrix()
+		void FromMatrix(VectorMath::Matrix4 m)
+		{
+			Scale.x = VectorMath::Vec3::Create(m.values[0], m.values[1], m.values[2]).Length();
+			Scale.y = VectorMath::Vec3::Create(m.values[4], m.values[5], m.values[6]).Length();
+			Scale.z = VectorMath::Vec3::Create(m.values[8], m.values[9], m.values[10]).Length();
+			m.values[0] *= (1.0f / Scale.x);
+			m.values[1] *= (1.0f / Scale.x);
+			m.values[2] *= (1.0f / Scale.x);
+			m.values[4] *= (1.0f / Scale.y);
+			m.values[5] *= (1.0f / Scale.y);
+			m.values[6] *= (1.0f / Scale.y);
+			m.values[8] *= (1.0f / Scale.z);
+			m.values[9] *= (1.0f / Scale.z);
+			m.values[10] *= (1.0f / Scale.z);
+			Rotation = VectorMath::Quaternion::FromMatrix(m.GetMatrix3());
+			Translation = VectorMath::Vec3::Create(m.values[12], m.values[13], m.values[14]);
+		}
+		VectorMath::Matrix4 ToMatrix() const
 		{
 			auto rs = Rotation.ToMatrix4();
 			rs.values[12] = Translation.x;
@@ -63,7 +80,8 @@ namespace GameEngine
 	public:
 		CoreLib::List<Bone> Bones;
 		CoreLib::List<VectorMath::Matrix4> InversePose;
-		CoreLib::Dictionary<CoreLib::String, int> BoneMapping;
+		CoreLib::EnumerableDictionary<CoreLib::String, int> BoneMapping;
+        Skeleton TopologySort();
 		void SaveToStream(CoreLib::IO::Stream * stream);
 		void LoadFromStream(CoreLib::IO::Stream * stream);
 		void SaveToFile(const CoreLib::String & filename);
@@ -87,11 +105,7 @@ namespace GameEngine
 					VectorMath::Matrix4::Multiply(matrices[i], matrices[skeleton->Bones[i].ParentId], tmp);
 			}
 			for (int i = 0; i < matrices.Count(); i++)
-			{
-				auto tmp = matrices[i];
-				VectorMath::Matrix4::Multiply(matrices[i], tmp, skeleton->InversePose[i]);
-				//VectorMath::Matrix4::CreateIdentityMatrix(matrices[i]);
-			}
+				VectorMath::Matrix4::Multiply(matrices[i], matrices[i], skeleton->InversePose[i]);
 		}
 	};
 

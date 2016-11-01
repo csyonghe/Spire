@@ -1,5 +1,6 @@
 #include "Closure.h"
 #include "StringObject.h"
+#include "Naming.h"
 
 namespace Spire
 {
@@ -415,11 +416,11 @@ namespace Spire
 			for (auto ch : name)
 			{
 				if (ch == L'.')
-					sb << L"I_I";
+					sb << L"_";
 				else
 					sb << ch;
 			}
-			return sb.ProduceString();
+			return EscapeDoubleUnderscore(sb.ProduceString());
 		}
 
 		bool IsInAbstractWorld(PipelineSymbol * pipeline, ShaderComponentSymbol* comp)

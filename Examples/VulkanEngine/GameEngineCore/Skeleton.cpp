@@ -4,7 +4,43 @@ namespace GameEngine
 {
 	using namespace CoreLib::IO;
 
-	void Skeleton::SaveToStream(CoreLib::IO::Stream * stream)
+    Skeleton Skeleton::TopologySort()
+    {
+        Skeleton result;
+        CoreLib::List<int> workList;
+        CoreLib::HashSet<int> visitedBones;
+        for (int i = 0; i < Bones.Count(); i++)
+        {
+            if (Bones[i].ParentId == -1)
+            {
+                visitedBones.Add(i);
+                workList.Add(i);
+            }
+        }
+        CoreLib::Dictionary<int, int> boneMapping;
+        for (int i = 0; i < workList.Count(); i++)
+        {
+            int originalBoneId = workList[i];
+            boneMapping[originalBoneId] = result.Bones.Count();
+            result.Bones.Add(Bones[originalBoneId]);
+            result.InversePose.Add(InversePose[originalBoneId]);
+            for (int j = 0; j < Bones.Count(); j++)
+            {
+                if (visitedBones.Contains(Bones[j].ParentId))
+                {
+                    if (visitedBones.Add(j))
+                        workList.Add(j);
+                }
+            }
+        }
+        for (auto & bone : result.Bones)
+            bone.ParentId = bone.ParentId == -1?-1:boneMapping[bone.ParentId]();
+        for (auto & mapping : BoneMapping)
+            result.BoneMapping[mapping.Key] = boneMapping[mapping.Value]();
+        return result;
+    }
+
+    void Skeleton::SaveToStream(CoreLib::IO::Stream * stream)
 	{
 		BinaryWriter writer(stream);
 		writer.Write(this->Bones.Count());

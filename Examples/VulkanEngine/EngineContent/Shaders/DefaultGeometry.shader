@@ -1,4 +1,4 @@
-module SurfaceGeometry
+module MaterialGeometry
 {
     require vec3 coarseVertPos;
     public using NoTessellation;

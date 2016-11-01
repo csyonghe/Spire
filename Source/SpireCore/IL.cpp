@@ -293,10 +293,23 @@ namespace Spire
 					NamingCounter = Math::Max(NamingCounter, id + 1);
 				}
 			}
+			HashSet<String> existingNames;
 			for (auto & instr : GetAllInstructions())
 			{
 				if (instr.Name.Length() == 0)
 					instr.Name = String(L"t") + String(NamingCounter++, 16);
+				else
+				{
+					int counter = 1;
+					String newName = instr.Name;
+					while (existingNames.Contains(newName))
+					{
+						newName = instr.Name + String(counter);
+						counter++;
+					}
+					instr.Name = newName;
+				}
+				existingNames.Add(instr.Name);
 			}
 		}
 

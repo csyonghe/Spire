@@ -1,9 +1,9 @@
 using "DefaultGeometry.shader";
 
-module SurfacePattern
+module MaterialPattern
 {
     require vec2 vertUV;
-    @perInstanceUniform sampler2D albedoMap;
+    @MaterialUniform sampler2D albedoMap;
     public vec3 normal = vec3(0.0, 0.0, 1.0);
     public float roughness = 0.4;
     public float metallic = 0.4;

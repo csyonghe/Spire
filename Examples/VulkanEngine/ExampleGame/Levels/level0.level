@@ -35,18 +35,7 @@ StaticMesh
                0.0 0.0 -150.0 1.0]
 }
 */
-StaticMesh
-{
-    name "floor"
-    mesh "plane.mesh"
-    material
-    {
-        shader "ParallaxGround.shader"
-        var albedoMap = texture["pebbles_diffuse.TGA"]
-        var normalMap = texture["pebbles_normal.TGA"]
-        var heightMap = texture["pebbles_height.TGA"]
-    }
-}
+
 /*
 SkeletalMesh
 {
@@ -91,4 +80,17 @@ SkeletalMesh
                0.0 2.0 0.0 0.0
                0.0 0.0 2.0 0.0
                200.0 0.0 -0.0 1.0]
+}
+
+StaticMesh
+{
+    name "floor"
+    mesh "plane.mesh"
+    material
+    {
+        shader "ParallaxGround.shader"
+        var albedoMap = texture["pebbles_diffuse.TGA"]
+        var normalMap = texture["pebbles_normal.TGA"]
+        var heightMap = texture["pebbles_height.TGA"]
+    }
 }

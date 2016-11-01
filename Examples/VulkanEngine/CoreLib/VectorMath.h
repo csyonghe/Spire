@@ -684,6 +684,9 @@ namespace VectorMath
 		static inline void Translation(Matrix4 & rs, float tx, float ty, float tz);
 		inline void Transform(Vec3 & rs_d, const Vec3& vIn) const;
 		inline void Transform(Vec4 & rs_d, const Vec4& vIn) const;
+        inline Vec4 Transform(const Vec4& vIn) const;
+        inline Vec3 TransformNormal(const Vec3& vIn) const;
+
 		inline void TransformNormal(Vec3 & rs, const Vec3& vIn) const;
 		inline void TransposeTransformNormal(Vec3 & rs, const Vec3 & vIn) const;
 		inline void TransposeTransform(Vec3 & rs, const Vec3 & vIn) const;
@@ -1034,6 +1037,23 @@ namespace VectorMath
 		rs.z = m[0][2]*vIn.x + m[1][2]*vIn.y + m[2][2]*vIn.z + m[3][2]*vIn.w;
 		rs.w = m[0][3]*vIn.x + m[1][3]*vIn.y + m[2][3]*vIn.z + m[3][3]*vIn.w;
 	}
+    inline Vec3 Matrix4::TransformNormal(const Vec3& vIn) const
+    {
+        Vec3 rs;
+        rs.x = m[0][0] * vIn.x + m[1][0] * vIn.y + m[2][0] * vIn.z;
+        rs.y = m[0][1] * vIn.x + m[1][1] * vIn.y + m[2][1] * vIn.z;
+        rs.z = m[0][2] * vIn.x + m[1][2] * vIn.y + m[2][2] * vIn.z;
+        return rs;
+    }
+    inline Vec4 Matrix4::Transform(const Vec4& vIn) const
+    {
+        Vec4 rs;
+        rs.x = m[0][0] * vIn.x + m[1][0] * vIn.y + m[2][0] * vIn.z + m[3][0] * vIn.w;
+        rs.y = m[0][1] * vIn.x + m[1][1] * vIn.y + m[2][1] * vIn.z + m[3][1] * vIn.w;
+        rs.z = m[0][2] * vIn.x + m[1][2] * vIn.y + m[2][2] * vIn.z + m[3][2] * vIn.w;
+        rs.w = m[0][3] * vIn.x + m[1][3] * vIn.y + m[2][3] * vIn.z + m[3][3] * vIn.w;
+        return rs;
+    }
 	inline void Matrix4::MultiplyFPU(Matrix4 &mOut, const Matrix4& M1, const Matrix4& M2)
 	{
 		Matrix4 TempMat;
@@ -1855,8 +1875,8 @@ namespace VectorMath
 		}
 		static inline Quaternion FromAxisAngle(const Vec3 & axis, float angle)
 		{
-			float cosAng = cos(angle) * 0.5f;
-			float sinAng = sin(angle) * 0.5f;
+			float cosAng = cos(angle * 0.5f);
+			float sinAng = sin(angle * 0.5f);
 			return Quaternion(axis.x *  sinAng, axis.y * sinAng, axis.z * sinAng, cosAng);
 		}
 		static inline float Dot(const Quaternion & q1, const Quaternion & q2)

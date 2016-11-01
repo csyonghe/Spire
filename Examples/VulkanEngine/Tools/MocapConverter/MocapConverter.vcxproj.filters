@@ -21,9 +21,15 @@
     <ClCompile Include="BvhFile.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="RigMapping.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BvhFile.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RigMapping.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

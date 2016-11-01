@@ -1,6 +1,7 @@
 #include "CodeGenBackend.h"
 #include "../CoreLib/Parser.h"
 #include "Syntax.h"
+#include "Naming.h"
 
 using namespace CoreLib::Basic;
 
@@ -18,6 +19,14 @@ namespace Spire
 				return ExtractRecordType(genType->BaseType.Ptr());
 			else
 				return nullptr;
+		}
+
+		String AddWorldNameSuffix(String name, String suffix)
+		{
+			if (name.EndsWith(suffix))
+				return name;
+			else
+				return EscapeDoubleUnderscore(name + L"_" + suffix);
 		}
 
 		class GLSLCodeGen;
@@ -589,8 +598,7 @@ namespace Spire
 			{
 				if (dynamic_cast<ILConstOperand*>(instr->Size.Ptr()))
 				{
-					PrintDef(ctx.Header, instr->Type.Ptr(), instr->Name);
-					ctx.Header << L";\n";
+					ctx.DefineVariable(instr);
 				}
 				else
 					throw InvalidProgramException(L"size operand of allocVar instr is not an intermediate.");
@@ -687,8 +695,6 @@ namespace Spire
 			{
 				if (instr.Is<LoadInputInstruction>())
 					return true;
-				if (instr.Is<SwizzleInstruction>())
-					return true;
 				if (auto arg = instr.As<FetchArgInstruction>())
 				{
 					if (arg->ArgId == 0)
@@ -718,7 +724,7 @@ namespace Spire
 
 				return (instr.Users.Count() <= 1 && !instr.HasSideEffect() && !instr.Is<MemberUpdateInstruction>()
 					&& !instr.Is<AllocVarInstruction>() && !instr.Is<ImportInstruction>())
-					|| instr.Is<FetchArgInstruction>() ;
+					|| instr.Is<FetchArgInstruction>();
 			}
 
 			void PrintExportInstr(CodeGenContext &ctx, ExportInstruction * exportInstr)
@@ -757,11 +763,7 @@ namespace Spire
 						return;
 					}
 				}
-				auto varName = ctx.DefineVariable(instr);
-				ctx.Body << varName << L" = ";
-				PrintOp(ctx, instr->Operands[0].Ptr());
-				ctx.Body << L";\n";
-				genCode(varName, instr->Operands[0]->Type.Ptr(), instr->Operands[1].Ptr(), instr->Operands[2].Ptr());
+				genCode(instr->Operands[0]->Name, instr->Operands[0]->Type.Ptr(), instr->Operands[1].Ptr(), instr->Operands[2].Ptr());
 			}
 
 			void PrintSwizzleInstrExpr(CodeGenContext & ctx, SwizzleInstruction * swizzle)
@@ -774,8 +776,7 @@ namespace Spire
 			{
 				currentImportInstr = importInstr;
 				
-				PrintDef(ctx.Header, importInstr->Type.Ptr(), importInstr->Name);
-				ctx.Header << L";\n";
+				ctx.DefineVariable(importInstr);
 				GenerateCode(ctx, importInstr->ImportOperator.Ptr());
 				
 				currentImportInstr = nullptr;
@@ -1109,10 +1110,11 @@ namespace Spire
 				}
 				else if (auto recType = ExtractRecordType(info.Type.Ptr()))
 				{
-					sb << currentImportInstr->ComponentName;
+					String declName = currentImportInstr->ComponentName;
 					if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput ||
 						info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
-						sb << L"_at" << recType->ToString();
+						declName = AddWorldNameSuffix(declName, recType->ToString());
+					sb << declName;
 				}
 				else
 				{
@@ -1201,11 +1203,11 @@ namespace Spire
 								}
 								else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
 									sb.GlobalHeader << L"patch in ";
-								String defPostFix;
+								String declName = field.Key;
 								if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput ||
 									info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
-									defPostFix = L"_at" + recType->ToString();
-								PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), field.Key + defPostFix);
+									declName = AddWorldNameSuffix(declName, recType->ToString());
+								PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
 								itemsDeclaredInBlock++;
 								if (info.IsArray)
 								{
@@ -1544,7 +1546,7 @@ namespace Spire
 							{
 								sbCode << L", ";
 							}
-							PrintDef(sbCode, arg->Type.Ptr(), arg->Name);
+						    PrintDef(sbCode, arg->Type.Ptr(), arg->Name);
 							id++;
 						}
 					}
@@ -1593,13 +1595,14 @@ namespace Spire
 					if (field.Value.Type->IsIntegral())
 						ctx.GlobalHeader << L"flat ";
 					ctx.GlobalHeader << L"out ";
-					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), field.Key + L"_at" + world->OutputType->TypeName);
+					String declName = field.Key;
+					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), AddWorldNameSuffix(declName, world->OutputType->TypeName));
 					ctx.GlobalHeader << L";\n";
 				}
 			}
 			virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) override
 			{
-				ctx.Body << instr->ComponentName << L"_at" << world->OutputType->TypeName << L" = ";
+				ctx.Body << AddWorldNameSuffix(instr->ComponentName, world->OutputType->TypeName) << L" = ";
 				codeGen->PrintOp(ctx, instr->Operand.Ptr());
 				ctx.Body << L";\n";
 			}
@@ -1626,7 +1629,7 @@ namespace Spire
 					if (isPatch)
 						ctx.GlobalHeader << L"patch ";
 					ctx.GlobalHeader << L"out ";
-					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), field.Key + L"_at" + world->Name);
+					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), AddWorldNameSuffix(field.Key, world->Name));
 					ctx.GlobalHeader << L"[";
 					if (arraySize != 0)
 						ctx.GlobalHeader << arraySize;
@@ -1635,7 +1638,7 @@ namespace Spire
 			}
 			virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) override
 			{
-				ctx.Body << instr->ComponentName << L"_at" << world->Name << L"[" << outputIndex << L"] = ";
+				ctx.Body << AddWorldNameSuffix(instr->ComponentName, world->Name) << L"[" << outputIndex << L"] = ";
 				codeGen->PrintOp(ctx, instr->Operand.Ptr());
 				ctx.Body << L";\n";
 			}
