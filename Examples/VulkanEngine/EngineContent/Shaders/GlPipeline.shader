@@ -1,249 +1,229 @@
 pipeline StandardPipeline
 {
     [Pinned]
-    input world rootVert;
+    input world MeshVertex;
     
     [Pinned]
-    input world modelTransform;
+    input world ModelInstance;
     
     [Pinned]
-    input world skeletalTransform;
+    input world SkeletonData;
     
     [Pinned]
     
-    input world viewUniform;
+    input world ViewUniform;
     
     [Pinned]
-    input world perInstanceUniform;
+    input world MaterialUniform;
     
-    world vs;// : "glsl(vertex:projCoord)" using projCoord export standardExport;
-    world fs;// : "glsl" export fragmentExport;
+    world CoarseVertex;// : "glsl(vertex:projCoord)" using projCoord export standardExport;
+    world Fragment;// : "glsl" export fragmentExport;
     
-    require @vs vec4 projCoord; 
+    require @CoarseVertex vec4 projCoord; 
     
     [Binding: "2"]
-    extern @(vs*, fs*) Uniform<perInstanceUniform> perInstanceUniformBlock; 
-    import(perInstanceUniform->vs) uniformImport()
+    extern @(CoarseVertex*, Fragment*) Uniform<MaterialUniform> MaterialUniformBlock; 
+    import(MaterialUniform->CoarseVertex) uniformImport()
     {
-        return perInstanceUniformBlock;
+        return MaterialUniformBlock;
     }
-    import(perInstanceUniform->fs) uniformImport()
+    import(MaterialUniform->Fragment) uniformImport()
     {
-        return perInstanceUniformBlock;
+        return MaterialUniformBlock;
     }
 
     [Binding: "1"]
-    extern @(vs*, fs*) Uniform<viewUniform> viewUniformBlock;
-    import(viewUniform->vs) uniformImport()
+    extern @(CoarseVertex*, Fragment*) Uniform<ViewUniform> ViewUniformBlock;
+    import(ViewUniform->CoarseVertex) uniformImport()
     {
-        return viewUniformBlock;
+        return ViewUniformBlock;
     }
-    import(viewUniform->fs) uniformImport()
+    import(ViewUniform->Fragment) uniformImport()
     {
-        return viewUniformBlock;
+        return ViewUniformBlock;
     }
     
     [Binding: "0"]
-    extern @(vs*, fs*) Uniform<modelTransform> modelTransformBlock;
-    import(modelTransform->vs) uniformImport()
+    extern @(CoarseVertex*, Fragment*) Uniform<ModelInstance> ModelInstanceBlock;
+    import(ModelInstance->CoarseVertex) uniformImport()
     {
-        return modelTransformBlock;
+        return ModelInstanceBlock;
     }
-    import(modelTransform->fs) uniformImport()
+    import(ModelInstance->Fragment) uniformImport()
     {
-        return modelTransformBlock;
+        return ModelInstanceBlock;
     }
     
     [Binding: "3"]
-    extern @(vs*) StorageBuffer<skeletalTransform> skeletalTransformBlock;
-    import(skeletalTransform->vs) uniformImport()
+    extern @(CoarseVertex*) StorageBuffer<SkeletonData> SkeletonDataBlock;
+    import(SkeletonData->CoarseVertex) uniformImport()
     {
-        return skeletalTransformBlock;
+        return SkeletonDataBlock;
     }
     
     [VertexInput]
-    extern @vs rootVert vertAttribIn;
-    import(rootVert->vs) vertexImport()
+    extern @CoarseVertex MeshVertex vertAttribIn;
+    import(MeshVertex->CoarseVertex) vertexImport()
     {
         return vertAttribIn;
     }
     
-    extern @fs vs vsIn;
-    import(vs->fs) standardImport()
-        require trait IsTriviallyPassable(vs)
+    extern @Fragment CoarseVertex CoarseVertexIn;
+    import(CoarseVertex->Fragment) standardImport()
+        require trait IsTriviallyPassable(CoarseVertex)
     {
-        return vsIn;
+        return CoarseVertexIn;
     }
     
     stage vs : VertexShader
     {
-        World: vs;
+        World: CoarseVertex;
         Position: projCoord;
     }
     
     stage fs : FragmentShader
     {
-        World: fs;
+        World: Fragment;
     }
 }
 
 pipeline TessellationPipeline : StandardPipeline
 {
     [Pinned]
-    input world rootVert;
+    input world MeshVertex;
     
     [Pinned]
     [Binding: "0"]
-    input world modelTransform;
+    input world ModelInstance;
    
     [Pinned]
     [Binding: "1"]
-    input world viewUniform;
+    input world ViewUniform;
     
     [Pinned]
     [Binding: "2"]
-    input world perInstanceUniform;
+    input world MaterialUniform;
     
     [Pinned]
-    input world skeletalTransform;
+    input world SkeletonData;
     
-    world vs;
-    world tcs;
-    world perCornerPoint;
-    world perPatch;
-    world tes;
-    world fs;
+    world CoarseVertex;
+    world ControlPoint;
+    world CornerPoint;
+    world TessPatch;
+    world FineVertex;
+    world Fragment;
     
     [Binding: "3"]
-    extern @(vs*, fs*, tcs*, tes*) StorageBuffer<skeletalTransform> skeletalTransformBlock;
-    import(skeletalTransform->vs) uniformImport()
+    extern @(CoarseVertex*, Fragment*, ControlPoint*, FineVertex*) StorageBuffer<SkeletonData> SkeletonDataBlock;
+    import(SkeletonData->CoarseVertex) uniformImport()
     {
-        return skeletalTransformBlock;
-    }
-    import(skeletalTransform->fs) uniformImport()
-    {
-        return skeletalTransformBlock;
-    }
-    import(skeletalTransform->tcs) uniformImport()
-    {
-        return skeletalTransformBlock;
-    }
-    import(skeletalTransform->tes) uniformImport()
-    {
-        return skeletalTransformBlock;
+        return SkeletonDataBlock;
     }
     
-    require @tes vec4 projCoord; 
-    require @tcs vec2 tessLevelInner;
-    require @tcs vec4 tessLevelOuter;
+    require @FineVertex vec4 projCoord; 
+    require @ControlPoint vec2 tessLevelInner;
+    require @ControlPoint vec4 tessLevelOuter;
     [Binding: "2"]
-    extern @(vs*, fs*, tcs*, tes*, perPatch*) Uniform<perInstanceUniform> instanceUniformBlock;
+    extern @(CoarseVertex*, Fragment*, ControlPoint*, FineVertex*, TessPatch*) Uniform<MaterialUniform> instanceUniformBlock;
     
-    import(perInstanceUniform->vs) uniformImport() { return instanceUniformBlock; }
-    import(perInstanceUniform->fs) uniformImport() { return instanceUniformBlock; }
-    import(perInstanceUniform->tcs) uniformImport() { return instanceUniformBlock; }
-    import(perInstanceUniform->tes) uniformImport() { return instanceUniformBlock; }
-    import(perInstanceUniform->perPatch) uniformImport() { return instanceUniformBlock; }
+    import(MaterialUniform->CoarseVertex) uniformImport() { return instanceUniformBlock; }
+    import(MaterialUniform->Fragment) uniformImport() { return instanceUniformBlock; }
+    import(MaterialUniform->ControlPoint) uniformImport() { return instanceUniformBlock; }
+    import(MaterialUniform->FineVertex) uniformImport() { return instanceUniformBlock; }
+    import(MaterialUniform->TessPatch) uniformImport() { return instanceUniformBlock; }
     
     [Binding: "1"]
-    extern @(vs*, fs*, tcs*, tes*, perPatch*) Uniform<viewUniform> viewUniformBlock;
+    extern @(CoarseVertex*, Fragment*, ControlPoint*, FineVertex*, TessPatch*) Uniform<ViewUniform> ViewUniformBlock;
     
-    import(viewUniform->vs) uniformImport() { return viewUniformBlock; }
-    import(viewUniform->fs) uniformImport() { return viewUniformBlock; }
-    import(viewUniform->tcs) uniformImport() { return viewUniformBlock; }
-    import(viewUniform->tes) uniformImport() { return viewUniformBlock; }
-    import(viewUniform->perPatch) uniformImport() { return viewUniformBlock; }
+    import(ViewUniform->CoarseVertex) uniformImport() { return ViewUniformBlock; }
+    import(ViewUniform->Fragment) uniformImport() { return ViewUniformBlock; }
+    import(ViewUniform->ControlPoint) uniformImport() { return ViewUniformBlock; }
+    import(ViewUniform->FineVertex) uniformImport() { return ViewUniformBlock; }
+    import(ViewUniform->TessPatch) uniformImport() { return ViewUniformBlock; }
     
     [Binding: "0"]
-    extern @(vs*, fs*, tcs*, tes*, perPatch*) Uniform<modelTransform> modelUniformBlock;
+    extern @(CoarseVertex*, Fragment*, ControlPoint*, FineVertex*, TessPatch*) Uniform<ModelInstance> modelUniformBlock;
     
-    import(modelTransform->vs) uniformImport() { return modelUniformBlock; }
-    import(modelTransform->tcs) uniformImport() { return modelUniformBlock; }
-    import(modelTransform->tes) uniformImport() { return modelUniformBlock; }
-    import(modelTransform->perPatch) uniformImport() { return modelUniformBlock; }
+    import(ModelInstance->CoarseVertex) uniformImport() { return modelUniformBlock; }
+    import(ModelInstance->ControlPoint) uniformImport() { return modelUniformBlock; }
+    import(ModelInstance->FineVertex) uniformImport() { return modelUniformBlock; }
+    import(ModelInstance->TessPatch) uniformImport() { return modelUniformBlock; }
     
-    import(modelTransform->fs) uniformImport() { return modelUniformBlock; }
+    import(ModelInstance->Fragment) uniformImport() { return modelUniformBlock; }
     
     [VertexInput]
-    extern @vs rootVert vertAttribs;
-    import(rootVert->vs) vertexImport() { return vertAttribs; }
+    extern @CoarseVertex MeshVertex vertAttribs;
+    import(MeshVertex->CoarseVertex) vertexImport() { return vertAttribs; }
     
-    // implicit import operator vs->perCornerPoint
-    extern @perCornerPoint vs[] vs_tcs;
+    // implicit import operator CoarseVertex->CornerPoint
+    extern @CornerPoint CoarseVertex[] CoarseVertex_ControlPoint;
     [PerCornerIterator]
-    extern @perCornerPoint int sysLocalIterator;
-    import (vs->perCornerPoint) standardImport()
-        require trait IsTriviallyPassable(vs)
+    extern @CornerPoint int sysLocalIterator;
+    import (CoarseVertex->CornerPoint) standardImport()
+        require trait IsTriviallyPassable(CoarseVertex)
     {
-        return vs_tcs[sysLocalIterator];
+        return CoarseVertex_ControlPoint[sysLocalIterator];
     } 
     
-    // implicit import operator tes->fs
-    extern @fs tes tes_fs;
-    import(tes->fs) standardImport()
-        require trait IsTriviallyPassable(tes)
+    // implicit import operator FineVertex->Fragment
+    extern @Fragment FineVertex tes_Fragment;
+    import(FineVertex->Fragment) standardImport()
+        require trait IsTriviallyPassable(FineVertex)
     {
-        return tes_fs;
+        return tes_Fragment;
     } 
-    
-    //extern @fs vs vertexOutputBlock;
-    //import(vs->fs) standardImport() { return vertexOutputBlock; }
-    
-    stage vs : VertexShader
-    {
-        VertexInput: vertAttribs;
-        World: vs;
-    }
-    stage fs : FragmentShader
-    {
-        World: fs;
-        VSInput: vertexOutputBlock;
-    }
-    
-    extern @tcs vs[] vs_tcs;
-    extern @perPatch vs[] vs_tcs;
+
+    extern @ControlPoint CoarseVertex[] CoarseVertex_ControlPoint;
+    extern @TessPatch CoarseVertex[] CoarseVertex_ControlPoint;
     [InvocationId]
-    extern @tcs int invocationId;
-    import(vs->tcs) indexImport(int id)
-        require trait IsTriviallyPassable(vs)
+    extern @ControlPoint int invocationId;
+    import(CoarseVertex->ControlPoint) indexImport(int id)
+        require trait IsTriviallyPassable(CoarseVertex)
     {
-        return vs_tcs[id];
+        return CoarseVertex_ControlPoint[id];
     }
-    import(vs->perPatch) indexImport(int id)
-        require trait IsTriviallyPassable(vs)
+    import(CoarseVertex->TessPatch) indexImport(int id)
+        require trait IsTriviallyPassable(CoarseVertex)
     {
-        return vs_tcs[id];
+        return CoarseVertex_ControlPoint[id];
     }
-    extern @tes tcs[] tcs_tes;
-    import(tcs->tes) indexImport(int id)
-        require trait IsTriviallyPassable(vs)
+    extern @FineVertex ControlPoint[] ControlPoint_tes;
+    import(ControlPoint->FineVertex) indexImport(int id)
+        require trait IsTriviallyPassable(CoarseVertex)
     {
-        return tcs_tes[id];
+        return ControlPoint_tes[id];
     }
-    extern @tes Patch<perPatch> perPatch_tes;
-    import (perPatch->tes) standardImport()
-        require trait IsTriviallyPassable(vs)
+    extern @FineVertex Patch<TessPatch> perPatch_tes;
+    import (TessPatch->FineVertex) standardImport()
+        require trait IsTriviallyPassable(CoarseVertex)
     {
         return perPatch_tes;
     }
     
-    extern @tes Patch<perCornerPoint[3]> perCorner_tes;
+    extern @FineVertex Patch<CornerPoint[3]> perCorner_tes;
     [TessCoord]
-    extern @tes vec3 tessCoord;
-    import(perCornerPoint->tes) standardImport()
-        require perCornerPoint operator + (perCornerPoint, perCornerPoint)
-        require perCornerPoint operator * (perCornerPoint, float)
+    extern @FineVertex vec3 tessCoord;
+    import(CornerPoint->FineVertex) standardImport()
+        require CornerPoint operator + (CornerPoint, CornerPoint)
+        require CornerPoint operator * (CornerPoint, float)
     {
         return perCorner_tes[0] * tessCoord.x +
                perCorner_tes[1] * tessCoord.y +
                perCorner_tes[2] * tessCoord.z;
     }
-    
+      
+    stage vs : VertexShader
+    {
+        VertexInput: vertAttribs;
+        World: CoarseVertex;
+    }
+
     stage tcs : HullShader
     {
-        PatchWorld: perPatch;
-        ControlPointWorld: tcs;
-        CornerPointWorld: perCornerPoint;
+        PatchWorld: TessPatch;
+        ControlPointWorld: ControlPoint;
+        CornerPointWorld: CornerPoint;
         ControlPointCount: 1;
         Domain: triangles;
         TessLevelOuter: tessLevelOuter;
@@ -252,8 +232,14 @@ pipeline TessellationPipeline : StandardPipeline
     
     stage tes : DomainShader
     {
-        World : tes;
+        World : FineVertex;
         Position : projCoord;
         Domain: triangles;
+    }
+    
+    stage fs : FragmentShader
+    {
+        World: Fragment;
+        CoarseVertexInput: vertexOutputBlock;
     }
 }

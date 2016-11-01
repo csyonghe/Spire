@@ -1,6 +1,6 @@
 using "DefaultGeometry.shader";
 
-module SurfacePattern
+module MaterialPattern
 {
     public vec3 normal = vec3(0.0, 0.0, 1.0);
     public float roughness = 0.4;

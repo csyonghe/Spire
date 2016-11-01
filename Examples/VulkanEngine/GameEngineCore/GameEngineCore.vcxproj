@@ -197,6 +197,8 @@
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="RenderContext.h" />
     <ClInclude Include="Renderer.h" />
+    <ClInclude Include="RenderPass.h" />
+    <ClInclude Include="SharedRenderResource.h" />
     <ClInclude Include="SkeletalMeshActor.h" />
     <ClInclude Include="Skeleton.h" />
     <ClInclude Include="Spire\Basic.h" />

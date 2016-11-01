@@ -1,13 +1,13 @@
 using "DefaultGeometry.shader";
 
-module SurfacePattern
+module MaterialPattern
 {
-    @perInstanceUniform sampler2D maskMap;
-    @perInstanceUniform sampler2D leatherNormalMap;
-    @perInstanceUniform sampler2D baseNormalMap;
-    @perInstanceUniform sampler2D aoMap;
-    @perInstanceUniform sampler2D leatherSpecularMap;
-    @perInstanceUniform sampler2D leatherMap;
+    @MaterialUniform sampler2D maskMap;
+    @MaterialUniform sampler2D leatherNormalMap;
+    @MaterialUniform sampler2D baseNormalMap;
+    @MaterialUniform sampler2D aoMap;
+    @MaterialUniform sampler2D leatherSpecularMap;
+    @MaterialUniform sampler2D leatherMap;
     
     inline vec3 mask = texture(maskMap, vec2(vertUV.x, vertUV.y)).xyz;
     inline vec2 normalCoord = vertUV * 5.79;

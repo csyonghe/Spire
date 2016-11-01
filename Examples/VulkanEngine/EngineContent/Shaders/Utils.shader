@@ -30,50 +30,13 @@ vec3 desaturate(vec3 color, float factor)
     return mix(color, vec3(lum, lum, lum), factor);
 }
 
-/*
-module SimpleStaticMeshVertex
-{
-    public @rootVert vec3 vertPos;
-    public @rootVert vec2 vertUV;
-    public @rootVert uint tangentFrame;
-    
-    vec4 tangentFrameQuaternion
-    {
-        vec4 result;
-        float inv255 = 2.0 / 255.0;
-        result.x = float(tangentFrame & 255) * inv255 - 1.0;   
-        result.y = float((tangentFrame >> 8) & 255) * inv255 - 1.0;   
-        result.z = float((tangentFrame >> 16) & 255) * inv255 - 1.0;
-        result.w = float((tangentFrame >> 24) & 255) * inv255 - 1.0;   
-        return result;
-    }
-    public @vs vec3 vertNormal
-    {
-       return normalize(QuaternionRotate(tangentFrameQuaternion, vec3(0.0, 1.0, 0.0)));
-    } 
-    public @vs vec3 vertTangent
-    {
-       return normalize(QuaternionRotate(tangentFrameQuaternion, vec3(1.0, 0.0, 0.0)));
-    }
-    public vec3 vertBinormal = cross(vertTangent, vertNormal);
-}
-
-module SimpleSkeletalMeshVertex
-{
-    public using SimpleStaticMeshVertex;
-    public @rootVert uint boneIds;
-    public @rootVert uint boneWeights;
-    
-}
-*/
-
 module SystemUniforms
 {
-    public @viewUniform mat4 viewTransform;
-    public @viewUniform mat4 viewProjectionTransform;
-    public @viewUniform mat4 invViewTransform;
-    public @viewUniform mat4 invViewProjTransform;
-    public @viewUniform vec3 cameraPos;
+    public @ViewUniform mat4 viewTransform;
+    public @ViewUniform mat4 viewProjectionTransform;
+    public @ViewUniform mat4 invViewTransform;
+    public @ViewUniform mat4 invViewProjTransform;
+    public @ViewUniform vec3 cameraPos;
     public vec3 lightDir = vec3(1.0, 1.0, 0.0);
     public vec3 lightColor = vec3(1.5, 1.5, 1.5);
 }
@@ -115,15 +78,15 @@ struct BoneTransform
     mat3 normalMatrix;
 }
 
-module StaticVertex
+module NoAnimation
 {
-    public using MeshVertex;
-    public @vs vec3 coarseVertPos = vertPos;
-    public @vs vec3 coarseVertNormal = vertNormal;
-    public @vs vec3 coarseVertTangent = vertTangent;
+    public using VertexAttributes;
+    public @CoarseVertex vec3 coarseVertPos = vertPos;
+    public @CoarseVertex vec3 coarseVertNormal = vertNormal;
+    public @CoarseVertex vec3 coarseVertTangent = vertTangent;
     
-    @modelTransform mat4 modelMatrix; 
-    @modelTransform mat4 normalMatrix; 
+    @ModelInstance mat4 modelMatrix; 
+    @ModelInstance mat4 normalMatrix; 
     
     public vec3 worldTransformPos(vec3 pos)
     {
@@ -142,11 +105,11 @@ struct SkinningResult
     vec3 tangent;
 }
 
-module SkinnedVertex
+module SkeletalAnimation
 {
-    public using MeshVertex;
+    public using VertexAttributes;
     require mat4 viewProjectionTransform;
-    @skeletalTransform BoneTransform[] boneTransforms;
+    @SkeletonData BoneTransform[] boneTransforms;
     
     public SkinningResult skinning
     {
@@ -154,17 +117,20 @@ module SkinnedVertex
         result.pos = vec3(0.0);
         result.normal = vec3(0.0);
         result.tangent = vec3(0.0);
-        for (int i = 0 : 3)
+        for (int i = 0 : 0)
         {
             uint boneId = (boneIds >> (i*8)) & 255;
             if (boneId == 255) continue;
             float boneWeight = float((boneWeights >> (i*8)) & 255) * (1.0/255.0);
             vec3 tp = (boneTransforms[boneId].transformMatrix * vec4(vertPos, 1.0)).xyz;
-            result.pos += tp * boneWeight;
+            //result.pos += tp * boneWeight;
+            result.pos = tp;
             tp = boneTransforms[boneId].normalMatrix * vertNormal;
-            result.normal += tp * boneWeight;
+            //result.normal += tp * boneWeight;
+            result.normal = tp;
             tp = boneTransforms[boneId].normalMatrix * vertTangent;
-            result.tangent += tp * boneWeight;
+            //result.tangent += tp * boneWeight;
+            result.tangent = tp;
         }
         return result;
     }
@@ -193,8 +159,8 @@ module PN_Tessellation : TessellationPipeline
     require vec3 coarseVertPos;
     require vec3 coarseVertNormal;
     
-    public @tcs vec4 tessLevelOuter = vec4(3, 3, 3, 0);
-    public @tcs vec2 tessLevelInner = vec2(3.0);
+    public @ControlPoint vec4 tessLevelOuter = vec4(3, 3, 3, 0);
+    public @ControlPoint vec2 tessLevelInner = vec2(3.0);
     
     vec3 ProjectToPlane(vec3 Point, vec3 PlanePoint, vec3 PlaneNormal)
     {
@@ -204,9 +170,9 @@ module PN_Tessellation : TessellationPipeline
         return (Point - d);
     }
     
-    @tcs vec3 WorldPos_B030 = indexImport(coarseVertPos, 0);
-    @tcs vec3 WorldPos_B003 = indexImport(coarseVertPos, 1);
-    @tcs vec3 WorldPos_B300 = indexImport(coarseVertPos, 2);
+    @ControlPoint vec3 WorldPos_B030 = indexImport(coarseVertPos, 0);
+    @ControlPoint vec3 WorldPos_B003 = indexImport(coarseVertPos, 1);
+    @ControlPoint vec3 WorldPos_B300 = indexImport(coarseVertPos, 2);
 
     // Edges are names according to the opposing vertex
     vec3 EdgeB300 = WorldPos_B003 - WorldPos_B030;
@@ -222,17 +188,17 @@ module PN_Tessellation : TessellationPipeline
     vec3 WorldPos_B120t = WorldPos_B300 + EdgeB003 * 2.0 / 3.0;
 
     // Project each midpoint on the plane defined by the nearest vertex and its normal
-    @tcs vec3 WorldPos_B021 = ProjectToPlane(WorldPos_B021t, WorldPos_B030,
+    @ControlPoint vec3 WorldPos_B021 = ProjectToPlane(WorldPos_B021t, WorldPos_B030,
                                          indexImport(coarseVertNormal, 0));
-    @tcs vec3 WorldPos_B012 = ProjectToPlane(WorldPos_B012t, WorldPos_B003,
+    @ControlPoint vec3 WorldPos_B012 = ProjectToPlane(WorldPos_B012t, WorldPos_B003,
                                          indexImport(coarseVertNormal, 1));
-    @tcs vec3 WorldPos_B102 = ProjectToPlane(WorldPos_B102t, WorldPos_B003,
+    @ControlPoint vec3 WorldPos_B102 = ProjectToPlane(WorldPos_B102t, WorldPos_B003,
                                          indexImport(coarseVertNormal, 1));
-    @tcs vec3 WorldPos_B201 = ProjectToPlane(WorldPos_B201t, WorldPos_B300,
+    @ControlPoint vec3 WorldPos_B201 = ProjectToPlane(WorldPos_B201t, WorldPos_B300,
                                          indexImport(coarseVertNormal, 2));
-    @tcs vec3 WorldPos_B210 = ProjectToPlane(WorldPos_B210t, WorldPos_B300,
+    @ControlPoint vec3 WorldPos_B210 = ProjectToPlane(WorldPos_B210t, WorldPos_B300,
                                          indexImport(coarseVertNormal, 2));
-    @tcs vec3 WorldPos_B120 = ProjectToPlane(WorldPos_B120t, WorldPos_B030,
+    @ControlPoint vec3 WorldPos_B120 = ProjectToPlane(WorldPos_B120t, WorldPos_B030,
                                          indexImport(coarseVertNormal, 0));
 
     // Handle the center
@@ -253,7 +219,7 @@ module PN_Tessellation : TessellationPipeline
     float vPow3 = vPow2 * v;
     float wPow3 = wPow2 * w;
 
-    public @tes float3 fineVertPos = indexImport(WorldPos_B300, 0) * wPow3 +
+    public @FineVertex float3 fineVertPos = indexImport(WorldPos_B300, 0) * wPow3 +
                     indexImport(WorldPos_B030, 0) * uPow3 +
                     indexImport(WorldPos_B003, 0) * vPow3 +
                     indexImport(WorldPos_B210, 0) * 3.0 * wPow2 * u +
@@ -381,7 +347,7 @@ module ParallaxOcclusionMapping
                     break;
                 }
 
-                // offset to the next layer
+                // ofFragmentet to the next layer
                 currentLayerHeight -= layerHeight;
                 currentTextureCoords += texStep;
                 heightFromTexture = 1.0-texture(heightTexture, currentTextureCoords).r;

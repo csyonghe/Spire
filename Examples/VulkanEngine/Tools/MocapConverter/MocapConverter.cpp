@@ -8,8 +8,10 @@
 #include "WinForm/WinApp.h"
 #include "WinForm/WinListBox.h"
 #include "WinForm/WinTextBox.h"
-
+#include "RigMapping.h"
 #include "BvhFile.h"
+#include "Parser.h"
+#include <assert.h>
 
 using namespace CoreLib;
 using namespace CoreLib::IO;
@@ -25,7 +27,8 @@ class ExportArguments
 public:
 	String FileName;
 	String SkeletonFileName;
-	String EulerOrder = L"ZXY";
+	String RigMappingFileName;
+	String EulerOrder = L"AUTO";
 	bool ExportSkeleton = true;
 	bool ExportMesh = false;
 	bool ExportAnimation = true;
@@ -93,6 +96,31 @@ void GatherNonTrivialBvhJoints(List<BvhJoint*> & list, BvhJoint * joint)
 		GatherNonTrivialBvhJoints(list, child.Ptr());
 }
 
+void RotateKeyFrame(BoneTransformation & kf, Vec3 rotation)
+{
+	Matrix4 xMat, yMat, zMat, rot, invRot;
+	Matrix4::RotationX(xMat, rotation.x * (Math::Pi / 180.0f));
+	Matrix4::RotationY(yMat, rotation.y * (Math::Pi / 180.0f));
+	Matrix4::RotationZ(zMat, rotation.z * (Math::Pi / 180.0f));
+	Matrix4::Multiply(rot, yMat, zMat);
+	Matrix4::Multiply(rot, xMat, rot);
+	Matrix4::RotationX(xMat, -rotation.x * (Math::Pi / 180.0f));
+	Matrix4::RotationY(yMat, -rotation.y * (Math::Pi / 180.0f));
+	Matrix4::RotationZ(zMat, -rotation.z * (Math::Pi / 180.0f));
+	Matrix4::Multiply(invRot, yMat, zMat);
+	Matrix4::Multiply(invRot, xMat, invRot);
+
+	Matrix4 transform = kf.ToMatrix();
+
+	Matrix4::Multiply(transform, transform, rot);
+	Matrix4::Multiply(transform, invRot, transform);
+
+	kf.Rotation = Quaternion::FromMatrix(transform.GetMatrix3());
+	kf.Rotation *= 1.0f / kf.Rotation.Length();
+	kf.Translation = Vec3::Create(transform.values[12], transform.values[13], transform.values[14]);
+}
+
+
 void FlipKeyFrame(BoneTransformation & kf)
 {
 	Matrix4 transform = kf.ToMatrix();
@@ -123,7 +151,44 @@ void FlipKeyFrameCoordinateSystem(BoneTransformation & kf)
 	kf.Translation = Vec3::Create(transform.values[12], transform.values[13], transform.values[14]);
 }
 
-void Export(const ExportArguments & args)
+Skeleton Retarget(const Skeleton & modelSkeleton, const Skeleton & motionSkeleton)
+{
+    Skeleton result = modelSkeleton;
+    auto getMatrices = [](const Skeleton & skeleton)
+    {
+        List<Matrix4> mats;
+        mats.SetSize(skeleton.Bones.Count());
+        for (int i = 0; i < skeleton.Bones.Count(); i++)
+        {
+            auto& bone = skeleton.Bones[i];
+            mats[i] = bone.BindPose.ToMatrix();
+            if (bone.ParentId != -1)
+                Matrix4::Multiply(mats[i], mats[bone.ParentId], mats[i]);
+        }
+        return mats;
+    };
+    auto modelSkeletonMatrices = getMatrices(modelSkeleton);
+    auto selectPosition = [](const Matrix4 &mat)
+    {
+        Vec4 rs;
+        mat.Transform(rs, Vec4::Create(0.0f, 0.0f, 0.0f, 1.0f));
+        return rs.xyz();
+    };
+    auto modelSkeletonPositions = From(modelSkeletonMatrices).Select(selectPosition).ToList();
+    EnumerableDictionary<String, Vec3> positions;
+    for (auto & bone : motionSkeleton.Bones)
+        positions[bone.Name] = modelSkeletonPositions[modelSkeleton.BoneMapping[bone.Name]()];
+    for (int i = 0; i < modelSkeleton.Bones.Count(); i++)
+    {
+        auto offset = modelSkeleton.Bones[i].ParentId == -1 ? modelSkeletonPositions[i] : modelSkeletonPositions[i] - modelSkeletonPositions[modelSkeleton.Bones[i].ParentId];
+        result.Bones[i].BindPose.Translation = offset;
+        result.Bones[i].BindPose.Rotation = Quaternion();
+        Matrix4::Translation(result.InversePose[i], -modelSkeletonPositions[i].x, -modelSkeletonPositions[i].y, -modelSkeletonPositions[i].z);
+    }
+    return result;
+}
+
+void Export(ExportArguments args)
 {
 	BvhFile file = BvhFile::FromFile(args.FileName);
 	Skeleton skeleton;
@@ -150,26 +215,51 @@ void Export(const ExportArguments & args)
 		{
 			bone.Inverse(bone);
 		}
-		if (args.ExportSkeleton)
-			skeleton.SaveToFile(Path::ReplaceExt(args.FileName, L"skeleton"));
+		
 	}
 
-	if (args.SkeletonFileName.Length())
-		skeleton.LoadFromFile(args.SkeletonFileName);
-	
+    Skeleton modelSkeleton;
+	Vec3 rootRotate;
+    if (args.SkeletonFileName.Length())
+    {
+        modelSkeleton.LoadFromFile(args.SkeletonFileName);
+		if (args.RigMappingFileName.Length())   // retarget name
+		{
+			RigMappingFile rig(args.RigMappingFileName);
+			for (auto & bone : modelSkeleton.Bones)
+			{
+				String newName;
+				if (rig.Mapping.TryGetValue(bone.Name, newName))
+				{
+					modelSkeleton.BoneMapping[newName] = modelSkeleton.BoneMapping[bone.Name]();
+					bone.Name = newName;
+				}
+			}
+			//rootRotate = rig.RootRotation;
+		}
+		//skeleton = modelSkeleton;
+        skeleton = Retarget(modelSkeleton, skeleton);
+    }
+
+    if (args.ExportSkeleton)
+        skeleton.SaveToFile(Path::ReplaceExt(args.FileName, L"skeleton"));
+
 	if (args.ExportAnimation)
 	{
 		List<BvhJoint*> joints;
 		GatherNonTrivialBvhJoints(joints, file.Hierarchy.Ptr());
 		SkeletalAnimation anim;
 		anim.Speed = 1.0f;
+        Dictionary<int, int> boneIdToChannelId;
 		for (auto & joint : joints)
 		{
 			AnimationChannel ch;
 			int boneId = skeleton.BoneMapping[joint->Name]();
 			ch.BoneId = boneId;
 			ch.BoneName = joint->Name;
-			anim.Channels.Add(ch);
+            boneIdToChannelId[boneId] = anim.Channels.Count();
+            anim.Channels.Add(ch);
+
 		}
 		int frameId = 0;
 		int ptr = 0;
@@ -186,7 +276,8 @@ void Export(const ExportArguments & args)
 				throw InvalidOperationException(L"MOTION data size does not match HIERARCHY channels declaration.");
 			}
 		};
-		
+        bool orderDetermined = args.EulerOrder != L"AUTO";
+        StringBuilder orderSB;
 		while (ptr < file.FrameData.Count())
 		{
 			anim.Duration = file.FrameDuration * frameId;
@@ -223,15 +314,27 @@ void Export(const ExportArguments & args)
 						break;
 					case ChannelType::XRot:
 						rotX = readData();
+                        if (!orderDetermined) 
+                            orderSB.Append(L"X");
 						break;
 					case ChannelType::YRot:
 						rotY = readData();
+                        if (!orderDetermined)
+                            orderSB.Append(L"Y");
 						break;
 					case ChannelType::ZRot:
 						rotZ = readData();
+                        if (!orderDetermined)
+                            orderSB.Append(L"Z");
 						break;
 					}
 				}
+                if (!orderDetermined && orderSB.Length() == 3)
+                {
+                    args.EulerOrder = orderSB.ProduceString();
+                    args.EulerOrder = String(args.EulerOrder[2]) + String(args.EulerOrder[1]) + String(args.EulerOrder[0]);
+                    orderDetermined = true;
+                }
 				Matrix4 xMat, yMat, zMat, rot;
 				Matrix4::RotationX(xMat, rotX * (Math::Pi / 180.0f));
 				Matrix4::RotationY(yMat, rotY * (Math::Pi / 180.0f));
@@ -261,26 +364,41 @@ void Export(const ExportArguments & args)
 					Matrix4::Multiply(rot, zMat, xMat);
 					Matrix4::Multiply(rot, yMat, rot);
 				}
-				else if (args.EulerOrder == L"YZX")
+				else //if (args.EulerOrder == L"YZX")
 				{
 					Matrix4::Multiply(rot, zMat, yMat);
 					Matrix4::Multiply(rot, xMat, rot);
 				}
+				
 				keyFrame.Transform.Rotation = Quaternion::FromMatrix(rot.GetMatrix3());
 				if (args.FlipYZ)
 				{
 					FlipKeyFrame(keyFrame.Transform);
 				}
+                if (args.SkeletonFileName.Length())
+                    keyFrame.Transform.Rotation = keyFrame.Transform.Rotation;// *modelSkeleton.Bones[modelSkeleton.BoneMapping[joint->Name]()].BindPose.Rotation;
 				if (!hasTranslation)
-					keyFrame.Transform.Translation = skeleton.Bones[boneId].BindPose.Translation;
+				{
+					if (args.SkeletonFileName.Length())
+						keyFrame.Transform.Translation = modelSkeleton.Bones[modelSkeleton.BoneMapping[joint->Name]()].BindPose.Translation;
+					else
+						keyFrame.Transform.Translation = skeleton.Bones[boneId].BindPose.Translation;
+				}
+
+				if (rootRotate.Length2() > 0.0f)
+				{
+					RotateKeyFrame(keyFrame.Transform, rootRotate);
+				}
+
 				keyFrame.Time = file.FrameDuration * frameId;
-				anim.Channels[boneId].KeyFrames.Add(keyFrame);
+				anim.Channels[boneIdToChannelId[boneId]].KeyFrames.Add(keyFrame);
 			}
 			frameId++;
 		}
 		anim.SaveToFile(Path::ReplaceExt(args.FileName, L"anim"));
 	}
-	if (args.ExportMesh)
+	
+    if (args.ExportMesh)
 	{
 		BBox bbox;
 		bbox.Init();
@@ -297,15 +415,15 @@ private:
 	RefPtr<Button> btnSelectFiles;
 	RefPtr<CheckBox> chkFlipYZ, chkCreateMesh, chkConvertLHC;
 	RefPtr<ComboBox> cmbEuler;
-	RefPtr<Label> lblSkeleton;
-	RefPtr<TextBox> txtSkeletonFile;
-	RefPtr<Button> btnSelectSkeletonFile;
+	RefPtr<Label> lblSkeleton, lblRig;
+	RefPtr<TextBox> txtSkeletonFile, txtRigFile;
+	RefPtr<Button> btnSelectSkeletonFile, btnSelectRigFile;
 public:
 	MocapConverterForm()
 	{
 		SetText(L"Convert Mocap Data");
 		SetClientWidth(420);
-		SetClientHeight(210);
+		SetClientHeight(240);
 		CenterScreen();
 		SetMaximizeBox(false);
 		SetBorder(fbFixedDialog);
@@ -347,8 +465,28 @@ public:
 				txtSkeletonFile->SetText(dlg.FileName);
 		});
 
+
+		lblRig = new Label(this);
+		lblRig->SetText(L"Rig Mapping:");
+		lblRig->SetPosition(30, 143, 120, 30);
+		txtRigFile = new TextBox(this);
+		txtRigFile->SetText(L"");
+		txtRigFile->SetPosition(150, 140, 140, 25);
+		btnSelectRigFile = new Button(this);
+		btnSelectRigFile->SetText(L"Browse");
+		btnSelectRigFile->SetPosition(300, 140, 80, 25);
+
+		btnSelectRigFile->OnClick.Bind([this](Object*, EventArgs)
+		{
+			FileDialog dlg(this);
+			dlg.Filter = L"Rig Mapping|*.rig";
+			if (dlg.ShowOpen())
+				txtRigFile->SetText(dlg.FileName);
+		});
+
+
 		btnSelectFiles = new Button(this);
-		btnSelectFiles->SetPosition(90, 150, 120, 30);
+		btnSelectFiles->SetPosition(90, 170, 120, 30);
 		btnSelectFiles->SetText(L"Select Files");
 		btnSelectFiles->OnClick.Bind([=](Object*, EventArgs)
 		{
@@ -365,6 +503,7 @@ public:
 						args.ExportMesh = chkCreateMesh->GetChecked();
 						args.FileName = file;
 						args.SkeletonFileName = txtSkeletonFile->GetText();
+						args.RigMappingFileName = txtRigFile->GetText();
 						if (cmbEuler->GetSelectionIndex() > 0)
 							args.EulerOrder = cmbEuler->GetItem(cmbEuler->GetSelectionIndex());
 						SetCursor(LoadCursor(NULL, IDC_WAIT));
@@ -398,7 +537,12 @@ int wmain(int argc, const wchar_t** argv)
 					args.ExportMesh = true;
 				else if (String(argv[i]) == L"-euler" && i < argc - 1)
 					args.EulerOrder = argv[i + 1];
+				else if (String(argv[i]) == L"-skeleton" && i < argc - 1)
+					args.SkeletonFileName = argv[i + 1];
+				else if (String(argv[i]) == L"-rig" && i < argc - 1)
+					args.RigMappingFileName = argv[i + 1];
 			Export(args);
+			CoreLib::Text::Parser::DisposeTextLexer();
 		}
 		catch (const Exception & e)
 		{

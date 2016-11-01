@@ -81,6 +81,8 @@
     <ClInclude Include="RenderContext.h" />
     <ClInclude Include="HardwareApiFactory.h" />
     <ClInclude Include="UISystem_Windows.h" />
+    <ClInclude Include="RenderPass.h" />
+    <ClInclude Include="SharedRenderResource.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Vulkan API">
