@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="DebugClang|Win32">
@@ -368,6 +368,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="CLikeCodeGen.h" />
     <ClInclude Include="Closure.h" />
     <ClInclude Include="CodeGenBackend.h" />
     <ClInclude Include="CodePosition.h" />
@@ -389,11 +390,13 @@
     <ClInclude Include="VariantIR.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="CLikeCodeGen.cpp" />
     <ClCompile Include="Closure.cpp" />
     <ClCompile Include="CodeGenerator.cpp" />
     <ClCompile Include="CompiledProgram.cpp" />
     <ClCompile Include="ConstantPool.cpp" />
     <ClCompile Include="GLSLCodeGen.cpp" />
+    <ClCompile Include="HLSLCodeGen.cpp" />
     <ClCompile Include="InsertImplicitImportOperator.cpp" />
     <ClCompile Include="KeyHoleMatching.cpp" />
     <ClCompile Include="Naming.cpp" />
