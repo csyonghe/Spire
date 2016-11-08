@@ -516,5 +516,19 @@ namespace SpireLib
 			}
 			return result.Errors.Count() == 0;
 		}
+
+		
 	};
+
+	// implementation of C interface
+
+	CompilationContext * CreateCompilationContext(const char * cacheDir)
+	{
+		return new CompilationContext(cacheDir, cacheDir);
+	}
+
+	void SetCodeGenTarget(CompilationContext * ctx, CodeGenTarget target)
+	{
+		ctx->Options.Target = target;
+	}
 }
