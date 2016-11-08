@@ -319,6 +319,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Spire.h" />
     <ClInclude Include="SpireLib.h" />
   </ItemGroup>
   <ItemGroup>

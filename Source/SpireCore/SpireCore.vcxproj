@@ -374,6 +374,7 @@
     <ClInclude Include="CodeWriter.h" />
     <ClInclude Include="CompiledProgram.h" />
     <ClInclude Include="CompileError.h" />
+    <ClInclude Include="Naming.h" />
     <ClInclude Include="Schedule.h" />
     <ClInclude Include="IL.h" />
     <ClInclude Include="Lexer.h" />
@@ -395,6 +396,7 @@
     <ClCompile Include="GLSLCodeGen.cpp" />
     <ClCompile Include="InsertImplicitImportOperator.cpp" />
     <ClCompile Include="KeyHoleMatching.cpp" />
+    <ClCompile Include="Naming.cpp" />
     <ClCompile Include="NewSpirVCodeGen.cpp" />
     <ClCompile Include="Schedule.cpp" />
     <ClCompile Include="IL.cpp" />

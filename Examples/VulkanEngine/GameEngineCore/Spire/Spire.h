@@ -3673,6 +3673,10 @@ namespace Spire
 			{
 				return new MemberUpdateInstruction(*this);
 			}
+			virtual bool HasSideEffect() override
+			{
+				return true;
+			}
 			virtual void Accept(InstructionVisitor * visitor) override;
 		};
 
@@ -4557,6 +4561,23 @@ namespace Spire
 				: Content(str)
 			{}
 		};
+	}
+}
+
+#endif
+
+/***********************************************************************
+CORE\NAMING.H
+***********************************************************************/
+#ifndef SPIRE_NAMING_H
+#define SPIRE_NAMING_H
+
+
+namespace Spire
+{
+	namespace Compiler
+	{
+		CoreLib::String EscapeDoubleUnderscore(CoreLib::String str);
 	}
 }
 

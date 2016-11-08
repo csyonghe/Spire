@@ -366,4 +366,155 @@ namespace SpireLib
 		String src = File::ReadAllText(fileName);
 		FromString(src);
 	}
+
+
+
+
+	class Shader
+	{
+		friend class CompilationContext;
+	private:
+		bool isShader = false;
+		String targetPipeline, shaderName;
+		List<String> usings;
+	public:
+		Shader(String name, bool pIsShader)
+		{
+			shaderName = name;
+			isShader = pIsShader;
+		}
+		void TargetPipeline(CoreLib::String pipelineName)
+		{
+			targetPipeline = pipelineName;
+		}
+		void UseModule(CoreLib::String moduleName)
+		{
+			usings.Add(moduleName);
+		}
+		String GetName() const
+		{
+			return shaderName;
+		}
+		String GetSource() const
+		{
+			StringBuilder codeBuilder;
+			codeBuilder << L"shader " << shaderName;
+			if (targetPipeline.Length())
+				codeBuilder << L":" << targetPipeline;
+			codeBuilder << L"\n{\n";
+			for (auto & m : usings)
+				codeBuilder << L"using " << m << L";\n";
+			codeBuilder << L"\n}\n";
+			return codeBuilder.ToString();
+		}
+	};
+
+	class CompileResult
+	{
+	public:
+		bool Success = false;
+		CoreLib::List<CompileError> Errors, Warnings;
+		CoreLib::EnumerableDictionary<String, CompiledShaderSource> Sources;
+	};
+
+	class CompilationContext
+	{
+	private:
+		bool useCache = false;
+		CoreLib::String cacheDir;
+		List<CompileUnit> moduleUnits;
+		HashSet<String> processedModuleUnits;
+		RefPtr<ShaderCompiler> compiler;
+		CompileResult compileResult;
+	public:
+		CompileOptions Options;
+
+		CompilationContext(bool pUseCache, CoreLib::String pCacheDir)
+		{
+			compiler = CreateShaderCompiler();
+		}
+		void LoadModuleSource(CoreLib::String src, CoreLib::String fileName)
+		{
+			LoadModuleSource(moduleUnits, processedModuleUnits, compileResult, src, fileName);
+		}
+		void LoadModuleSource(List<CompileUnit> & units, HashSet<String> & processedUnits, CompileResult & cresult, CoreLib::String src, CoreLib::String fileName)
+		{
+			Spire::Compiler::CompileResult result;
+			List<String> unitsToInclude;
+			unitsToInclude.Add(fileName);
+			processedUnits.Add(fileName);
+			auto searchDirs = Options.SearchDirectories;
+			searchDirs.Add(Path::GetDirectoryName(fileName));
+			searchDirs.Reverse();
+			auto predefUnit = compiler->Parse(result, SpireStdLib::GetCode(), L"stdlib");
+			for (int i = 0; i < unitsToInclude.Count(); i++)
+			{
+				auto inputFileName = unitsToInclude[i];
+				try
+				{
+					String source = src;
+					if (i > 0)
+						source = File::ReadAllText(inputFileName);
+					auto unit = compiler->Parse(result, source, inputFileName);
+					units.Add(unit);
+					if (unit.SyntaxNode)
+					{
+						for (auto inc : unit.SyntaxNode->Usings)
+						{
+							bool found = false;
+							for (auto & dir : searchDirs)
+							{
+								String includeFile = Path::Combine(dir, inc.Content);
+								if (File::Exists(includeFile))
+								{
+									if (processedUnits.Add(includeFile))
+									{
+										unitsToInclude.Add(includeFile);
+									}
+									found = true;
+									break;
+								}
+							}
+							if (!found)
+							{
+								result.GetErrorWriter()->Error(2, L"cannot find file '" + inputFileName + L"'.", inc.Position);
+							}
+						}
+					}
+				}
+				catch (IOException)
+				{
+					result.GetErrorWriter()->Error(1, L"cannot open file '" + inputFileName + L"'.", CodePosition(0, 0, L""));
+				}
+			}
+			units.Add(predefUnit);
+			cresult.Errors.AddRange(result.ErrorList);
+			cresult.Warnings.AddRange(result.WarningList);
+		}
+		Shader NewShader(CoreLib::String name)
+		{
+			return Shader(name, true);
+		}
+		bool Compile(CompileResult & result, const Shader & shader)
+		{
+			return Compile(result, shader.GetSource(), shader.GetName());
+		}
+		bool Compile(CompileResult & result, CoreLib::String source, CoreLib::String fileName)
+		{
+			List<CompileUnit> userUnits;
+			HashSet<String> processedUserUnits = processedModuleUnits;
+			result = compileResult;
+			LoadModuleSource(userUnits, processedUserUnits, result, source, fileName);
+			if (result.Errors.Count() == 0)
+			{
+				Spire::Compiler::CompileResult cresult;
+				userUnits.AddRange(moduleUnits);
+				compiler->Compile(cresult, userUnits, Options);
+				result.Sources = cresult.CompiledSource;
+				result.Errors = _Move(cresult.ErrorList);
+				result.Warnings = _Move(cresult.WarningList);
+			}
+			return result.Errors.Count() == 0;
+		}
+	};
 }

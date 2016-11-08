@@ -1,3 +1,250 @@
+#file "D:\\Projects\\PersonalProjects\\GameEngine\\EngineContent\\Shaders\\GlPipeline.shader"
+pipeline StandardPipeline
+{
+    [Pinned]
+    input world MeshVertex;
+    
+    [Pinned]
+    input world ModelInstance;
+    
+    [Pinned]
+    input world SkeletonData;
+    
+    [Pinned]
+    
+    input world ViewUniform;
+    
+    [Pinned]
+    input world MaterialUniform;
+    
+    world CoarseVertex;// : "glsl(vertex:projCoord)" using projCoord export standardExport;
+    world Fragment;// : "glsl" export fragmentExport;
+    
+    require @CoarseVertex vec4 projCoord; 
+    
+    [Binding: "2"]
+    extern @(CoarseVertex*, Fragment*) Uniform<MaterialUniform> MaterialUniformBlock; 
+    import(MaterialUniform->CoarseVertex) uniformImport()
+    {
+        return MaterialUniformBlock;
+    }
+    import(MaterialUniform->Fragment) uniformImport()
+    {
+        return MaterialUniformBlock;
+    }
+
+    [Binding: "1"]
+    extern @(CoarseVertex*, Fragment*) Uniform<ViewUniform> ViewUniformBlock;
+    import(ViewUniform->CoarseVertex) uniformImport()
+    {
+        return ViewUniformBlock;
+    }
+    import(ViewUniform->Fragment) uniformImport()
+    {
+        return ViewUniformBlock;
+    }
+    
+    [Binding: "0"]
+    extern @(CoarseVertex*, Fragment*) Uniform<ModelInstance> ModelInstanceBlock;
+    import(ModelInstance->CoarseVertex) uniformImport()
+    {
+        return ModelInstanceBlock;
+    }
+    import(ModelInstance->Fragment) uniformImport()
+    {
+        return ModelInstanceBlock;
+    }
+    
+    [Binding: "3"]
+    extern @(CoarseVertex*) StorageBuffer<SkeletonData> SkeletonDataBlock;
+    import(SkeletonData->CoarseVertex) uniformImport()
+    {
+        return SkeletonDataBlock;
+    }
+    
+    [VertexInput]
+    extern @CoarseVertex MeshVertex vertAttribIn;
+    import(MeshVertex->CoarseVertex) vertexImport()
+    {
+        return vertAttribIn;
+    }
+    
+    extern @Fragment CoarseVertex CoarseVertexIn;
+    import(CoarseVertex->Fragment) standardImport()
+        require trait IsTriviallyPassable(CoarseVertex)
+    {
+        return CoarseVertexIn;
+    }
+    
+    stage vs : VertexShader
+    {
+        World: CoarseVertex;
+        Position: projCoord;
+    }
+    
+    stage fs : FragmentShader
+    {
+        World: Fragment;
+    }
+}
+
+pipeline TessellationPipeline : StandardPipeline
+{
+    [Pinned]
+    input world MeshVertex;
+    
+    [Pinned]
+    [Binding: "0"]
+    input world ModelInstance;
+   
+    [Pinned]
+    [Binding: "1"]
+    input world ViewUniform;
+    
+    [Pinned]
+    [Binding: "2"]
+    input world MaterialUniform;
+    
+    [Pinned]
+    input world SkeletonData;
+    
+    world CoarseVertex;
+    world ControlPoint;
+    world CornerPoint;
+    world TessPatch;
+    world FineVertex;
+    world Fragment;
+    
+    [Binding: "3"]
+    extern @(CoarseVertex*, Fragment*, ControlPoint*, FineVertex*) StorageBuffer<SkeletonData> SkeletonDataBlock;
+    import(SkeletonData->CoarseVertex) uniformImport()
+    {
+        return SkeletonDataBlock;
+    }
+    
+    require @FineVertex vec4 projCoord; 
+    require @ControlPoint vec2 tessLevelInner;
+    require @ControlPoint vec4 tessLevelOuter;
+    [Binding: "2"]
+    extern @(CoarseVertex*, Fragment*, ControlPoint*, FineVertex*, TessPatch*) Uniform<MaterialUniform> instanceUniformBlock;
+    
+    import(MaterialUniform->CoarseVertex) uniformImport() { return instanceUniformBlock; }
+    import(MaterialUniform->Fragment) uniformImport() { return instanceUniformBlock; }
+    import(MaterialUniform->ControlPoint) uniformImport() { return instanceUniformBlock; }
+    import(MaterialUniform->FineVertex) uniformImport() { return instanceUniformBlock; }
+    import(MaterialUniform->TessPatch) uniformImport() { return instanceUniformBlock; }
+    
+    [Binding: "1"]
+    extern @(CoarseVertex*, Fragment*, ControlPoint*, FineVertex*, TessPatch*) Uniform<ViewUniform> ViewUniformBlock;
+    
+    import(ViewUniform->CoarseVertex) uniformImport() { return ViewUniformBlock; }
+    import(ViewUniform->Fragment) uniformImport() { return ViewUniformBlock; }
+    import(ViewUniform->ControlPoint) uniformImport() { return ViewUniformBlock; }
+    import(ViewUniform->FineVertex) uniformImport() { return ViewUniformBlock; }
+    import(ViewUniform->TessPatch) uniformImport() { return ViewUniformBlock; }
+    
+    [Binding: "0"]
+    extern @(CoarseVertex*, Fragment*, ControlPoint*, FineVertex*, TessPatch*) Uniform<ModelInstance> modelUniformBlock;
+    
+    import(ModelInstance->CoarseVertex) uniformImport() { return modelUniformBlock; }
+    import(ModelInstance->ControlPoint) uniformImport() { return modelUniformBlock; }
+    import(ModelInstance->FineVertex) uniformImport() { return modelUniformBlock; }
+    import(ModelInstance->TessPatch) uniformImport() { return modelUniformBlock; }
+    
+    import(ModelInstance->Fragment) uniformImport() { return modelUniformBlock; }
+    
+    [VertexInput]
+    extern @CoarseVertex MeshVertex vertAttribs;
+    import(MeshVertex->CoarseVertex) vertexImport() { return vertAttribs; }
+    
+    // implicit import operator CoarseVertex->CornerPoint
+    extern @CornerPoint CoarseVertex[] CoarseVertex_ControlPoint;
+    [PerCornerIterator]
+    extern @CornerPoint int sysLocalIterator;
+    import (CoarseVertex->CornerPoint) standardImport()
+        require trait IsTriviallyPassable(CoarseVertex)
+    {
+        return CoarseVertex_ControlPoint[sysLocalIterator];
+    } 
+    
+    // implicit import operator FineVertex->Fragment
+    extern @Fragment FineVertex tes_Fragment;
+    import(FineVertex->Fragment) standardImport()
+        require trait IsTriviallyPassable(FineVertex)
+    {
+        return tes_Fragment;
+    } 
+
+    extern @ControlPoint CoarseVertex[] CoarseVertex_ControlPoint;
+    extern @TessPatch CoarseVertex[] CoarseVertex_ControlPoint;
+    [InvocationId]
+    extern @ControlPoint int invocationId;
+    import(CoarseVertex->ControlPoint) indexImport(int id)
+        require trait IsTriviallyPassable(CoarseVertex)
+    {
+        return CoarseVertex_ControlPoint[id];
+    }
+    import(CoarseVertex->TessPatch) indexImport(int id)
+        require trait IsTriviallyPassable(CoarseVertex)
+    {
+        return CoarseVertex_ControlPoint[id];
+    }
+    extern @FineVertex ControlPoint[] ControlPoint_tes;
+    import(ControlPoint->FineVertex) indexImport(int id)
+        require trait IsTriviallyPassable(CoarseVertex)
+    {
+        return ControlPoint_tes[id];
+    }
+    extern @FineVertex Patch<TessPatch> perPatch_tes;
+    import (TessPatch->FineVertex) standardImport()
+        require trait IsTriviallyPassable(CoarseVertex)
+    {
+        return perPatch_tes;
+    }
+    
+    extern @FineVertex Patch<CornerPoint[3]> perCorner_tes;
+    [TessCoord]
+    extern @FineVertex vec3 tessCoord;
+    import(CornerPoint->FineVertex) standardImport()
+        require CornerPoint operator + (CornerPoint, CornerPoint)
+        require CornerPoint operator * (CornerPoint, float)
+    {
+        return perCorner_tes[0] * tessCoord.x +
+               perCorner_tes[1] * tessCoord.y +
+               perCorner_tes[2] * tessCoord.z;
+    }
+      
+    stage vs : VertexShader
+    {
+        VertexInput: vertAttribs;
+        World: CoarseVertex;
+    }
+
+    stage tcs : HullShader
+    {
+        PatchWorld: TessPatch;
+        ControlPointWorld: ControlPoint;
+        CornerPointWorld: CornerPoint;
+        ControlPointCount: 1;
+        Domain: triangles;
+        TessLevelOuter: tessLevelOuter;
+        TessLevelInner: tessLevelInner;
+    }
+    
+    stage tes : DomainShader
+    {
+        World : FineVertex;
+        Position : projCoord;
+        Domain: triangles;
+    }
+    
+    stage fs : FragmentShader
+    {
+        World: Fragment;
+        CoarseVertexInput: vertexOutputBlock;
+    }
+}
+#file "D:\\Projects\\PersonalProjects\\GameEngine\\EngineContent\\Shaders\\Utils.shader"
 
 vec4 QuaternionMul(vec4 q1, vec4 q2)
 {
@@ -443,4 +690,127 @@ module Lighting
     public vec3 result = lightColor * 
                         (albedo * (brightness + 0.7)*(1.0-metallic_in) + 
                         mix(albedo, vec3(1.0), 1.0 - metallic_in) * (highlight * shadow));
+}
+
+#file "D:\\Projects\\PersonalProjects\\GameEngine\\EngineContent\\Shaders\\MeshProcessing.shader"
+shader StaticMeshForwardLighting : StandardPipeline
+{
+    public using SystemUniforms;
+    public using NoAnimation;
+    public inline vec2 vertUV = vertUV0;
+    public using TangentSpaceTransform;
+    public using MaterialGeometry;
+    public using VertexTransform;
+    public using MaterialPattern;
+    vec3 lightParam = vec3(roughness, metallic, specular);
+    using lighting = Lighting(TangentSpaceToWorldSpace(normal));
+    public out @Fragment vec4 outputColor = vec4(lighting.result, 1.0);
+}
+
+shader StaticMeshDeferredLighting : StandardPipeline
+{
+    public using SystemUniforms;
+    public using NoAnimation;
+    public vec2 vertUV = vertUV0;
+    public using TangentSpaceTransform;    
+    public using MaterialGeometry;
+    public using VertexTransform;
+    public using MaterialPattern;
+    vec3 lightParam = vec3(roughness, metallic, specular);
+
+    public out @Fragment vec3 outputAlbedo = albedo;
+    public out @Fragment vec3 outputPbr = lightParam;
+    public out @Fragment vec3 outputNormal = TangentSpaceToWorldSpace(normal);
+}
+
+shader SkeletalMeshForwardLighting : StandardPipeline
+{
+    public using SystemUniforms;
+    public using SkeletalAnimation;
+    public vec2 vertUV = vertUV0;
+    public using TangentSpaceTransform;    
+    public using MaterialGeometry;
+    public using VertexTransform;
+    public using MaterialPattern;
+    vec3 lightParam = vec3(roughness, metallic, specular);
+    using lighting = Lighting(TangentSpaceToWorldSpace(normal));
+    public out @Fragment vec4 outputColor = vec4(lighting.result, 1.0);
+}
+
+shader SkeletalMeshDeferredLighting : StandardPipeline
+{
+    public using SystemUniforms;
+    public using SkeletalAnimation;
+    public vec2 vertUV = vertUV0;
+    public using TangentSpaceTransform;
+    public using MaterialGeometry;
+    public using VertexTransform;
+    public using MaterialPattern;
+    vec3 lightParam = vec3(roughness, metallic, specular);
+    
+    public out @Fragment vec3 outputAlbedo = albedo;
+    public out @Fragment vec3 outputPbr = lightParam;
+    public out @Fragment vec3 outputNormal = TangentSpaceToWorldSpace(normal);
+}
+#file "VertexDefinition"
+module VertexAttributes
+{
+public @MeshVertex vec3 vertPos;
+public @MeshVertex vec2 vertUV0;
+public inline vec2 vertUV1 = vec2(0.0);
+public inline vec2 vertUV2 = vec2(0.0);
+public inline vec2 vertUV3 = vec2(0.0);
+public inline vec2 vertUV4 = vec2(0.0);
+public inline vec2 vertUV5 = vec2(0.0);
+public inline vec2 vertUV6 = vec2(0.0);
+public inline vec2 vertUV7 = vec2(0.0);
+
+				@MeshVertex uint tangentFrame;
+				vec4 tangentFrameQuaternion
+				{
+					vec4 result;
+					float inv255 = 2.0 / 255.0;
+					result.x = float(tangentFrame & 255) * inv255 - 1.0;
+					result.y = float((tangentFrame >> 8) & 255) * inv255 - 1.0;
+					result.z = float((tangentFrame >> 16) & 255) * inv255 - 1.0;
+					result.w = float((tangentFrame >> 24) & 255) * inv255 - 1.0;
+					return result;
+				}
+				public @CoarseVertex vec3 vertNormal
+				{
+					return normalize(QuaternionRotate(tangentFrameQuaternion, vec3(0.0, 1.0, 0.0)));
+				}
+				public @CoarseVertex vec3 vertTangent
+				{
+					return normalize(QuaternionRotate(tangentFrameQuaternion, vec3(1.0, 0.0, 0.0)));
+				}
+				public vec3 vertBinormal = cross(vertTangent, vertNormal);
+				public @MeshVertex vec4 vertColor0;
+public inline vec4 vertColor1 = vec4(0.0);
+public inline vec4 vertColor2 = vec4(0.0);
+public inline vec4 vertColor3 = vec4(0.0);
+public inline vec4 vertColor4 = vec4(0.0);
+public inline vec4 vertColor5 = vec4(0.0);
+public inline vec4 vertColor6 = vec4(0.0);
+public inline vec4 vertColor7 = vec4(0.0);
+public @MeshVertex uint boneIds;
+public @MeshVertex uint boneWeights;
+}
+
+#file "D:\\Projects\\PersonalProjects\\GameEngine\\AnimationLab\\Shaders\\Hero.shader"
+using "DefaultGeometry.shader";
+
+module MaterialPattern
+{
+    require vec2 vertUV;
+    @MaterialUniform sampler2D albedoMap;
+    public vec3 normal = vec3(0.0, 0.0, 1.0);
+    public float roughness = 0.4;
+    public float metallic = 0.4;
+    public float specular = 1.0;
+    public vec3 albedo = texture(albedoMap, vertUV).xyz;
+    public float selfShadow(vec3 lightDir)
+    {
+        return 1.0;
+    }
 }

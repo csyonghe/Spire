@@ -11,28 +11,36 @@ namespace GameEngine
 		RigMappingFile::RigMappingFile(CoreLib::String fileName)
 		{
 			Parser parser(CoreLib::IO::File::ReadAllText(fileName));
-			if (parser.LookAhead(L"rotate"))
+			while (!parser.IsEnd())
 			{
-				parser.ReadToken();
-				RootRotation.x = (float)parser.ReadDouble();
-				parser.Read(L",");
-				RootRotation.y = (float)parser.ReadDouble();
-				parser.Read(L",");
-				RootRotation.z = (float)parser.ReadDouble();
-			}
-			if (parser.LookAhead(L"mapping"))
-			{
-				parser.ReadToken();
-				while (!parser.IsEnd())
+				if (parser.LookAhead(L"mesh_rotate"))
 				{
-					auto src = parser.ReadWord();
-					parser.Read(L"=");
-					auto dest = parser.ReadWord();
-					Mapping[src] = dest;
+					parser.ReadToken();
+					RootRotation.x = (float)parser.ReadDouble();
+					parser.Read(L",");
+					RootRotation.y = (float)parser.ReadDouble();
+					parser.Read(L",");
+					RootRotation.z = (float)parser.ReadDouble();
 				}
-					
+				else if (parser.LookAhead(L"anim_scale"))
+				{
+					parser.ReadToken();
+					TranslationScale = (float)parser.ReadDouble();
+				}
+				else if (parser.LookAhead(L"mapping"))
+				{
+					parser.ReadToken();
+					while (!parser.IsEnd())
+					{
+						auto src = parser.ReadWord();
+						parser.Read(L"=");
+						auto dest = parser.ReadWord();
+						Mapping[src] = dest;
+					}
+				}
+				else
+					throw TextFormatException(L"unknown field");
 			}
 		}
-
 	}
 }

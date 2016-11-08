@@ -1875,8 +1875,8 @@ namespace VectorMath
 		}
 		static inline Quaternion FromAxisAngle(const Vec3 & axis, float angle)
 		{
-			float cosAng = cos(angle) * 0.5f;
-			float sinAng = sin(angle) * 0.5f;
+			float cosAng = cos(angle * 0.5f);
+			float sinAng = sin(angle * 0.5f);
 			return Quaternion(axis.x *  sinAng, axis.y * sinAng, axis.z * sinAng, cosAng);
 		}
 		static inline float Dot(const Quaternion & q1, const Quaternion & q2)

@@ -101,8 +101,18 @@ namespace Spire
 				if (req.Value->IsParam())
 				{
 					for (auto & impl : req.Value->Implementations)
-						for (auto & world : impl->Worlds)
-							MarkUsing(req.Key, world);
+					{
+						if (impl->Worlds.Count())
+						{
+							for (auto & world : impl->Worlds)
+								MarkUsing(req.Key, world);
+						}
+						else
+						{
+							for (auto & world : Shader->Pipeline->Worlds)
+								MarkUsing(req.Key, world.Key);
+						}
+					}
 				}
 			List<ComponentDefinitionIR*> workList;
 			HashSet<ComponentDefinitionIR*> referencedDefs;

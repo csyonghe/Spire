@@ -37,6 +37,7 @@ namespace SpireLib
 		void Reload(CoreLib::Basic::String fileName);
 		bool CompileFrom(CoreLib::Basic::String symbolName, CoreLib::Basic::String sourceFileName, CoreLib::Basic::String schedule);
 	};
+
 }
 
 #endif

@@ -183,8 +183,6 @@ void Export(ExportArguments args)
 					skeleton.Bones[i].ParentId = -1;
 					skeleton.BoneMapping[skeleton.Bones[i].Name] = i;
 					memcpy(skeleton.InversePose[i].values, &mesh->mBones[i]->mOffsetMatrix.Transpose(), sizeof(VectorMath::Matrix4));
-					if (args.FlipYZ)
-						skeleton.InversePose[i] = FlipYZ(skeleton.InversePose[i]);
 					nodes[i] = scene->mRootNode->FindNode(mesh->mBones[i]->mName);
 					aiVector3D scale, pos;
 					aiQuaternion rot;
@@ -192,8 +190,7 @@ void Export(ExportArguments args)
 					skeleton.Bones[i].BindPose.Rotation = ToQuaternion(rot);
 					skeleton.Bones[i].BindPose.Scale = Vec3::Create(scale.x, scale.y, scale.z);
 					skeleton.Bones[i].BindPose.Translation = Vec3::Create(pos.x, pos.y, pos.z);
-					if (args.FlipYZ)
-						FlipKeyFrame(skeleton.Bones[i].BindPose);
+					
 				}
 				for (auto i = 0u; i < mesh->mNumBones; i++)
 				{
@@ -210,6 +207,31 @@ void Export(ExportArguments args)
 					}
 				}
                 skeleton = skeleton.TopologySort();
+				auto node = scene->mRootNode->FindNode(skeleton.Bones[0].Name.ToMultiByteString());
+				aiMatrix4x4 rootTransform = node->mTransformation;
+				while (node->mParent)
+				{
+					rootTransform = rootTransform * node->mParent->mTransformation;
+					node = node->mParent;
+				}
+				aiVector3D rootScale, rootPos;
+				aiQuaternion rootRotation;
+				rootTransform.Decompose(rootScale, rootRotation, rootPos);
+				skeleton.Bones[0].BindPose.Scale = Vec3::Create(rootScale.x, rootScale.y, rootScale.z);
+				skeleton.Bones[0].BindPose.Rotation = ToQuaternion(rootRotation);
+				skeleton.Bones[0].BindPose.Translation = Vec3::Create(rootPos.x, rootPos.y, rootPos.z);
+				if (args.FlipYZ)
+				{
+					auto invRot = Quaternion::FromAxisAngle(Vec3::Create(1.0f, 0.0f, 0.0f), -Math::Pi * 0.5f);
+					skeleton.Bones[0].BindPose.Rotation = invRot * skeleton.Bones[0].BindPose.Rotation;
+					auto mat = skeleton.Bones[0].BindPose.Rotation.ToMatrix3();
+					Matrix4 rotMat;
+					Matrix4::RotationX(rotMat, Math::Pi * 0.5f);
+					for (int i = 0; i < skeleton.Bones.Count(); i++)
+					{
+						Matrix4::Multiply(skeleton.InversePose[i], skeleton.InversePose[i], rotMat);
+					}
+				}
                 if (args.ExportSkeleton)
                 {
                     skeleton.SaveToFile(Path::ReplaceExt(outFileName, L"skeleton"));

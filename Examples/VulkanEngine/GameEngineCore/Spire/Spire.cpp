@@ -447,11 +447,11 @@ namespace Spire
 			for (auto ch : name)
 			{
 				if (ch == L'.')
-					sb << L"I_I";
+					sb << L"_";
 				else
 					sb << ch;
 			}
-			return sb.ProduceString();
+			return EscapeDoubleUnderscore(sb.ProduceString());
 		}
 
 		bool IsInAbstractWorld(PipelineSymbol * pipeline, ShaderComponentSymbol* comp)
@@ -1129,9 +1129,9 @@ namespace Spire
 					if (ch >= L'0' && ch <= L'9' || ch >= L'a' && ch <= L'z' || ch >= 'A' && ch <= 'Z')
 						finalNameSb << ch;
 					else
-						finalNameSb << L'X';
+						finalNameSb << L'_';
 				}
-				return finalNameSb.ProduceString();
+				return EscapeDoubleUnderscore(finalNameSb.ProduceString());
 			}
 		public:
 			virtual RefPtr<StructSyntaxNode> VisitStruct(StructSyntaxNode * st) override
@@ -1297,16 +1297,22 @@ namespace Spire
 							if (dep->SyntaxNode->Parameters.Count() == 0)
 							{
 								auto paramType = TranslateExpressionType(dep->Type, &recordTypes);
-								func->Parameters.Add(dep->OriginalName + String(id), paramType);
-								variables.Add(dep->UniqueName, codeWriter.FetchArg(paramType, id + 1));
+								String paramName = EscapeDoubleUnderscore(L"p" + String(id) + L"_" + dep->OriginalName); 
+								func->Parameters.Add(paramName, paramType);
+								auto argInstr = codeWriter.FetchArg(paramType, id + 1);
+								argInstr->Name = paramName;
+								variables.Add(dep->UniqueName, argInstr);
 								id++;
 							}
 						}
 						for (auto & param : comp->SyntaxNode->Parameters)
 						{
 							auto paramType = TranslateExpressionType(param->Type, &recordTypes);
-							func->Parameters.Add(param->Name + String(id), paramType);
-							variables.Add(param->Name, codeWriter.FetchArg(paramType, id + 1));
+							String paramName = EscapeDoubleUnderscore(L"p" + String(id) + L"_" + param->Name);
+							func->Parameters.Add(paramName, paramType);
+							auto argInstr = codeWriter.FetchArg(paramType, id + 1);
+							argInstr->Name = paramName;
+							variables.Add(param->Name, argInstr);
 							id++;
 						}
 						if (comp->SyntaxNode->Expression)
@@ -1384,7 +1390,7 @@ namespace Spire
 			void VisitComponent(ComponentDefinitionIR * comp)
 			{
 				currentComponent = comp;
-				String varName = L"_vcmp" + currentComponent->UniqueName;
+				String varName = EscapeDoubleUnderscore(currentComponent->OriginalName);
 				RefPtr<ILType> type = TranslateExpressionType(currentComponent->Type, &recordTypes);
 
 				if (comp->SyntaxNode->IsInput)
@@ -1397,7 +1403,6 @@ namespace Spire
 
 				ILOperand * componentVar = nullptr;
 				
-
 				if (currentComponent->SyntaxNode->Expression)
 				{
 					currentComponent->SyntaxNode->Expression->Accept(this);
@@ -1416,7 +1421,7 @@ namespace Spire
 					componentVar = returnRegister;
 				}
 
-				if (!currentComponent->Type->IsTexture() && !currentComponent->Type->IsArray())
+				/*if (!currentComponent->Type->IsTexture() && !currentComponent->Type->IsArray())
 				{
 					auto vartype = TranslateExpressionType(currentComponent->Type.Ptr(), &recordTypes);
 					auto var = codeWriter.AllocVar(vartype, result.Program->ConstantPool->CreateConstant(1));
@@ -1424,7 +1429,7 @@ namespace Spire
 					codeWriter.Store(var, componentVar);
 					componentVar = var;
 				}
-				else
+				else*/
 					componentVar->Name = varName;
 				currentWorld->Components[currentComponent->UniqueName] = componentVar;
 				variables.Add(currentComponent->UniqueName, componentVar);
@@ -1445,7 +1450,7 @@ namespace Spire
 				{
 					func->Parameters.Add(param->Name, TranslateExpressionType(param->Type));
 					auto op = FetchArg(param->Type.Ptr(), ++id);
-					op->Name = String(L"p_") + param->Name;
+					op->Name = EscapeDoubleUnderscore(String(L"p_") + param->Name);
 					variables.Add(param->Name, op);
 				}
 				function->Body->Accept(this);
@@ -1498,7 +1503,7 @@ namespace Spire
 				if (stmt->TypeDef)
 				{
 					AllocVarInstruction * varOp = AllocVar(stmt->IterationVariableType.Ptr());
-					varOp->Name = L"v_" + String(NamingCounter++) + stmt->IterationVariable.Content;
+					varOp->Name = EscapeDoubleUnderscore(stmt->IterationVariable.Content);
 					variables.Add(stmt->IterationVariable.Content, varOp);
 				}
 				ILOperand * iterVar = nullptr;
@@ -1637,7 +1642,7 @@ namespace Spire
 				for (auto & v : stmt->Variables)
 				{
 					AllocVarInstruction * varOp = AllocVar(stmt->Type.Ptr());
-					varOp->Name = L"v" + String(NamingCounter++) + L"_" + v->Name;
+					varOp->Name = EscapeDoubleUnderscore(v->Name);
 					variables.Add(v->Name, varOp);
 					if (v->Expression)
 					{
@@ -1658,14 +1663,13 @@ namespace Spire
 				if (auto add = dynamic_cast<AddInstruction*>(left))
 				{
 					auto baseOp = add->Operands[0].Ptr();
-					codeWriter.Store(add->Operands[0].Ptr(), codeWriter.Update(codeWriter.Load(baseOp), add->Operands[1].Ptr(), right));
+					codeWriter.Update(baseOp, add->Operands[1].Ptr(), right);
 					add->Erase();
 				}
 				else if (auto swizzle = dynamic_cast<SwizzleInstruction*>(left))
 				{
 					auto baseOp = swizzle->Operand.Ptr();
 					int index = 0;
-					auto val = codeWriter.Load(baseOp);
 					for (int i = 0; i < swizzle->SwizzleString.Length(); i++)
 					{
 						switch (swizzle->SwizzleString[i])
@@ -1687,10 +1691,9 @@ namespace Spire
 							index = 3;
 							break;
 						}
-						val = codeWriter.Update(val, result.Program->ConstantPool->CreateConstant(index),
+						codeWriter.Update(baseOp, result.Program->ConstantPool->CreateConstant(index),
 							codeWriter.Retrieve(right, result.Program->ConstantPool->CreateConstant(i)));
 					}
-					codeWriter.Store(baseOp, val);
 					swizzle->Erase();
 				}
 				else
@@ -2630,6 +2633,14 @@ namespace Spire
 				return nullptr;
 		}
 
+		String AddWorldNameSuffix(String name, String suffix)
+		{
+			if (name.EndsWith(suffix))
+				return name;
+			else
+				return EscapeDoubleUnderscore(name + L"_" + suffix);
+		}
+
 		class GLSLCodeGen;
 
 		class CodeGenContext
@@ -3199,8 +3210,7 @@ namespace Spire
 			{
 				if (dynamic_cast<ILConstOperand*>(instr->Size.Ptr()))
 				{
-					PrintDef(ctx.Header, instr->Type.Ptr(), instr->Name);
-					ctx.Header << L";\n";
+					ctx.DefineVariable(instr);
 				}
 				else
 					throw InvalidProgramException(L"size operand of allocVar instr is not an intermediate.");
@@ -3297,8 +3307,6 @@ namespace Spire
 			{
 				if (instr.Is<LoadInputInstruction>())
 					return true;
-				if (instr.Is<SwizzleInstruction>())
-					return true;
 				if (auto arg = instr.As<FetchArgInstruction>())
 				{
 					if (arg->ArgId == 0)
@@ -3328,7 +3336,7 @@ namespace Spire
 
 				return (instr.Users.Count() <= 1 && !instr.HasSideEffect() && !instr.Is<MemberUpdateInstruction>()
 					&& !instr.Is<AllocVarInstruction>() && !instr.Is<ImportInstruction>())
-					|| instr.Is<FetchArgInstruction>() ;
+					|| instr.Is<FetchArgInstruction>();
 			}
 
 			void PrintExportInstr(CodeGenContext &ctx, ExportInstruction * exportInstr)
@@ -3367,11 +3375,7 @@ namespace Spire
 						return;
 					}
 				}
-				auto varName = ctx.DefineVariable(instr);
-				ctx.Body << varName << L" = ";
-				PrintOp(ctx, instr->Operands[0].Ptr());
-				ctx.Body << L";\n";
-				genCode(varName, instr->Operands[0]->Type.Ptr(), instr->Operands[1].Ptr(), instr->Operands[2].Ptr());
+				genCode(instr->Operands[0]->Name, instr->Operands[0]->Type.Ptr(), instr->Operands[1].Ptr(), instr->Operands[2].Ptr());
 			}
 
 			void PrintSwizzleInstrExpr(CodeGenContext & ctx, SwizzleInstruction * swizzle)
@@ -3384,8 +3388,7 @@ namespace Spire
 			{
 				currentImportInstr = importInstr;
 				
-				PrintDef(ctx.Header, importInstr->Type.Ptr(), importInstr->Name);
-				ctx.Header << L";\n";
+				ctx.DefineVariable(importInstr);
 				GenerateCode(ctx, importInstr->ImportOperator.Ptr());
 				
 				currentImportInstr = nullptr;
@@ -3719,10 +3722,11 @@ namespace Spire
 				}
 				else if (auto recType = ExtractRecordType(info.Type.Ptr()))
 				{
-					sb << currentImportInstr->ComponentName;
+					String declName = currentImportInstr->ComponentName;
 					if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput ||
 						info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
-						sb << L"_at" << recType->ToString();
+						declName = AddWorldNameSuffix(declName, recType->ToString());
+					sb << declName;
 				}
 				else
 				{
@@ -3811,11 +3815,11 @@ namespace Spire
 								}
 								else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
 									sb.GlobalHeader << L"patch in ";
-								String defPostFix;
+								String declName = field.Key;
 								if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput ||
 									info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
-									defPostFix = L"_at" + recType->ToString();
-								PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), field.Key + defPostFix);
+									declName = AddWorldNameSuffix(declName, recType->ToString());
+								PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
 								itemsDeclaredInBlock++;
 								if (info.IsArray)
 								{
@@ -4154,7 +4158,7 @@ namespace Spire
 							{
 								sbCode << L", ";
 							}
-							PrintDef(sbCode, arg->Type.Ptr(), arg->Name);
+						    PrintDef(sbCode, arg->Type.Ptr(), arg->Name);
 							id++;
 						}
 					}
@@ -4203,13 +4207,14 @@ namespace Spire
 					if (field.Value.Type->IsIntegral())
 						ctx.GlobalHeader << L"flat ";
 					ctx.GlobalHeader << L"out ";
-					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), field.Key + L"_at" + world->OutputType->TypeName);
+					String declName = field.Key;
+					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), AddWorldNameSuffix(declName, world->OutputType->TypeName));
 					ctx.GlobalHeader << L";\n";
 				}
 			}
 			virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) override
 			{
-				ctx.Body << instr->ComponentName << L"_at" << world->OutputType->TypeName << L" = ";
+				ctx.Body << AddWorldNameSuffix(instr->ComponentName, world->OutputType->TypeName) << L" = ";
 				codeGen->PrintOp(ctx, instr->Operand.Ptr());
 				ctx.Body << L";\n";
 			}
@@ -4236,7 +4241,7 @@ namespace Spire
 					if (isPatch)
 						ctx.GlobalHeader << L"patch ";
 					ctx.GlobalHeader << L"out ";
-					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), field.Key + L"_at" + world->Name);
+					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), AddWorldNameSuffix(field.Key, world->Name));
 					ctx.GlobalHeader << L"[";
 					if (arraySize != 0)
 						ctx.GlobalHeader << arraySize;
@@ -4245,7 +4250,7 @@ namespace Spire
 			}
 			virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) override
 			{
-				ctx.Body << instr->ComponentName << L"_at" << world->Name << L"[" << outputIndex << L"] = ";
+				ctx.Body << AddWorldNameSuffix(instr->ComponentName, world->Name) << L"[" << outputIndex << L"] = ";
 				codeGen->PrintOp(ctx, instr->Operand.Ptr());
 				ctx.Body << L";\n";
 			}
@@ -4706,10 +4711,23 @@ namespace Spire
 					NamingCounter = Math::Max(NamingCounter, id + 1);
 				}
 			}
+			HashSet<String> existingNames;
 			for (auto & instr : GetAllInstructions())
 			{
 				if (instr.Name.Length() == 0)
 					instr.Name = String(L"t") + String(NamingCounter++, 16);
+				else
+				{
+					int counter = 1;
+					String newName = instr.Name;
+					while (existingNames.Contains(newName))
+					{
+						newName = instr.Name + String(counter);
+						counter++;
+					}
+					instr.Name = newName;
+				}
+				existingNames.Add(instr.Name);
 			}
 		}
 
@@ -5059,7 +5077,7 @@ namespace Spire
 			ComponentDefinitionIR * MakeComponentAvailableAtWorldInternal(HashSet<String> & visitedComponents, String componentUniqueName, String world)
 			{
 				RefPtr<ComponentDefinitionIR> refDef;
-				if (passThroughComponents.TryGetValue(componentUniqueName + L"I_at_I" + world, refDef))
+				if (passThroughComponents.TryGetValue(EscapeDoubleUnderscore(componentUniqueName + L"_" + world), refDef))
 					return refDef.Ptr();
 				if (visitedComponents.Contains(componentUniqueName + "@" + world))
 				{
@@ -5098,7 +5116,7 @@ namespace Spire
 				{
 					auto & node = importPath.Nodes.Last();
 					RefPtr<ComponentDefinitionIR> thruDef;
-					auto thruDefName = componentUniqueName + L"I_at_I" + node.TargetWorld;
+					auto thruDefName = EscapeDoubleUnderscore(componentUniqueName + L"_" + node.TargetWorld);
 					if (!passThroughComponents.TryGetValue(thruDefName, thruDef))
 					{
 						auto srcDef = MakeComponentAvailableAtWorldInternal(visitedComponents, componentUniqueName, node.ImportOperator->SourceWorld.Content);
@@ -6042,6 +6060,44 @@ namespace Spire
 			}
 		}
 		
+	}
+}
+
+/***********************************************************************
+CORE\NAMING.CPP
+***********************************************************************/
+
+namespace Spire
+{
+	namespace Compiler
+	{
+		using namespace CoreLib;
+
+		String EscapeDoubleUnderscore(String str)
+		{
+			StringBuilder sb;
+			bool isUnderScore = false;
+			for (auto ch : str)
+			{
+				if (ch == L'_')
+				{
+					if (isUnderScore)
+						sb << L"I_";
+					else
+						sb << L"_";
+					isUnderScore = true;
+				}
+				else
+				{
+					isUnderScore = false;
+					sb << ch;
+				}
+			}
+			if (isUnderScore)
+				sb << L"I";
+			return sb.ProduceString();
+		}
+
 	}
 }
 

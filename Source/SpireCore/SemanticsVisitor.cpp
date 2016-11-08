@@ -495,21 +495,21 @@ namespace Spire
 				auto & shaderSymbol = symbolTable->Shaders[curShader->Name.Content].GetValue();
 				this->currentShader = shaderSymbol.Ptr();
 				
-					if (shader->Pipeline.Content.Length() == 0) // implicit pipeline
+				if (shader->Pipeline.Content.Length() == 0) // implicit pipeline
+				{
+					if (program->Pipelines.Count() == 1)
 					{
-						if (program->Pipelines.Count() == 1)
-						{
-							shader->Pipeline = shader->Name; // get line and col from shader name
-							shader->Pipeline.Content = program->Pipelines.First()->Name.Content;
-						}
-						else if (!shader->IsModule)
-						{
-							// current compilation context has more than one pipeline defined,
-							// in which case we do not allow implicit pipeline specification
-							Error(33002, L"explicit pipeline specification required for shader '" +
-								shader->Name.Content + L"' because multiple pipelines are defined in current context.", curShader->Name);
-						}
+						shader->Pipeline = shader->Name; // get line and col from shader name
+						shader->Pipeline.Content = program->Pipelines.First()->Name.Content;
 					}
+					else if (!shader->IsModule)
+					{
+						// current compilation context has more than one pipeline defined,
+						// in which case we do not allow implicit pipeline specification
+						Error(33002, L"explicit pipeline specification required for shader '" +
+							shader->Name.Content + L"' because multiple pipelines are defined in current context.", curShader->Name);
+					}
+				}
 
 				auto pipelineName = shader->Pipeline.Content;
 				if (pipelineName.Length())

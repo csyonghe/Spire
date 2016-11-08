@@ -1,6 +1,7 @@
 #include "Closure.h"
 #include "VariantIR.h"
 #include "StringObject.h"
+#include "Naming.h"
 
 namespace Spire
 {
@@ -27,7 +28,7 @@ namespace Spire
 			ComponentDefinitionIR * MakeComponentAvailableAtWorldInternal(HashSet<String> & visitedComponents, String componentUniqueName, String world)
 			{
 				RefPtr<ComponentDefinitionIR> refDef;
-				if (passThroughComponents.TryGetValue(componentUniqueName + L"I_at_I" + world, refDef))
+				if (passThroughComponents.TryGetValue(EscapeDoubleUnderscore(componentUniqueName + L"_" + world), refDef))
 					return refDef.Ptr();
 				if (visitedComponents.Contains(componentUniqueName + "@" + world))
 				{
@@ -66,7 +67,7 @@ namespace Spire
 				{
 					auto & node = importPath.Nodes.Last();
 					RefPtr<ComponentDefinitionIR> thruDef;
-					auto thruDefName = componentUniqueName + L"I_at_I" + node.TargetWorld;
+					auto thruDefName = EscapeDoubleUnderscore(componentUniqueName + L"_" + node.TargetWorld);
 					if (!passThroughComponents.TryGetValue(thruDefName, thruDef))
 					{
 						auto srcDef = MakeComponentAvailableAtWorldInternal(visitedComponents, componentUniqueName, node.ImportOperator->SourceWorld.Content);

@@ -57,10 +57,12 @@ namespace GameEngine
                 auto & f0 = anim->Channels[i].KeyFrames[frame0];
 				auto & f1 = anim->Channels[i].KeyFrames[frame1];
                 
-                p.Transforms[anim->Channels[i].BoneId] = BoneTransformation();// BoneTransformation::Lerp(f0.Transform, f1.Transform, t);
+                p.Transforms[anim->Channels[i].BoneId] = BoneTransformation::Lerp(f0.Transform, f1.Transform, t); //BoneTransformation(); //
 				//p.Transforms[anim->Channels[i].BoneId].Rotation = VectorMath::Quaternion();
 			}
 		}
+        /*for (int i = 0; i < p.Transforms.Count(); i++)
+            p.Transforms[i] = BoneTransformation();*/
 	}
 
 }

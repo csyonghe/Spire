@@ -151,7 +151,7 @@ void FlipKeyFrameCoordinateSystem(BoneTransformation & kf)
 	kf.Translation = Vec3::Create(transform.values[12], transform.values[13], transform.values[14]);
 }
 
-Skeleton Retarget(const Skeleton & modelSkeleton, const Skeleton & motionSkeleton)
+Skeleton Retarget(const Skeleton & modelSkeleton, const Skeleton & motionSkeleton, const Vec3 & rootRotatation)
 {
     Skeleton result = modelSkeleton;
     auto getMatrices = [](const Skeleton & skeleton)
@@ -178,12 +178,22 @@ Skeleton Retarget(const Skeleton & modelSkeleton, const Skeleton & motionSkeleto
     EnumerableDictionary<String, Vec3> positions;
     for (auto & bone : motionSkeleton.Bones)
         positions[bone.Name] = modelSkeletonPositions[modelSkeleton.BoneMapping[bone.Name]()];
+	Matrix4 xMat, yMat, zMat, rot;
+	Matrix4::RotationX(xMat, rootRotatation.x * (Math::Pi / 180.0f));
+	Matrix4::RotationY(yMat, rootRotatation.y * (Math::Pi / 180.0f));
+	Matrix4::RotationZ(zMat, rootRotatation.z * (Math::Pi / 180.0f));
+	Matrix4::Multiply(rot, xMat, zMat);
+	Matrix4::Multiply(rot, yMat, rot);
     for (int i = 0; i < modelSkeleton.Bones.Count(); i++)
     {
         auto offset = modelSkeleton.Bones[i].ParentId == -1 ? modelSkeletonPositions[i] : modelSkeletonPositions[i] - modelSkeletonPositions[modelSkeleton.Bones[i].ParentId];
-        result.Bones[i].BindPose.Translation = offset;
+
+        result.Bones[i].BindPose.Translation = rot.TransformNormal(offset);
         result.Bones[i].BindPose.Rotation = Quaternion();
-        Matrix4::Translation(result.InversePose[i], -modelSkeletonPositions[i].x, -modelSkeletonPositions[i].y, -modelSkeletonPositions[i].z);
+		
+		auto absoluteOffset = rot.TransformNormal(modelSkeletonPositions[i]);
+        Matrix4::Translation(result.InversePose[i], -absoluteOffset.x, -absoluteOffset.y, -absoluteOffset.z);
+        Matrix4::Multiply(result.InversePose[i], result.InversePose[i], rot);
     }
     return result;
 }
@@ -209,23 +219,21 @@ void Export(ExportArguments args)
 				Matrix4::Multiply(skeleton.InversePose[i], skeleton.InversePose[bone.ParentId], bone.BindPose.ToMatrix());
 			else
 				skeleton.InversePose[i] = bone.BindPose.ToMatrix();
-
 		}
 		for (auto & bone : skeleton.InversePose)
 		{
 			bone.Inverse(bone);
 		}
-		
 	}
-
-    Skeleton modelSkeleton;
-	Vec3 rootRotate;
+	float animTranslationScale = 1.0f;
     if (args.SkeletonFileName.Length())
     {
+		Skeleton modelSkeleton;
         modelSkeleton.LoadFromFile(args.SkeletonFileName);
 		if (args.RigMappingFileName.Length())   // retarget name
 		{
 			RigMappingFile rig(args.RigMappingFileName);
+			animTranslationScale = rig.TranslationScale;
 			for (auto & bone : modelSkeleton.Bones)
 			{
 				String newName;
@@ -235,10 +243,10 @@ void Export(ExportArguments args)
 					bone.Name = newName;
 				}
 			}
-			//rootRotate = rig.RootRotation;
+			skeleton = Retarget(modelSkeleton, skeleton, rig.RootRotation);
 		}
-		//skeleton = modelSkeleton;
-        skeleton = Retarget(modelSkeleton, skeleton);
+		else
+			skeleton = modelSkeleton;
     }
 
     if (args.ExportSkeleton)
@@ -292,15 +300,15 @@ void Export(ExportArguments args)
 					switch (c)
 					{
 					case ChannelType::XPos:
-						keyFrame.Transform.Translation.x = readData();
+						keyFrame.Transform.Translation.x = readData() * animTranslationScale;
 						hasTranslation = true;
 						break;
 					case ChannelType::YPos:
-						keyFrame.Transform.Translation.y = readData();
+						keyFrame.Transform.Translation.y = readData() * animTranslationScale;
 						hasTranslation = true;
 						break;
 					case ChannelType::ZPos:
-						keyFrame.Transform.Translation.z = readData();
+						keyFrame.Transform.Translation.z = readData() * animTranslationScale;
 						hasTranslation = true;
 						break;
 					case ChannelType::XScale:
@@ -375,21 +383,10 @@ void Export(ExportArguments args)
 				{
 					FlipKeyFrame(keyFrame.Transform);
 				}
-                if (args.SkeletonFileName.Length())
-                    keyFrame.Transform.Rotation = keyFrame.Transform.Rotation;// *modelSkeleton.Bones[modelSkeleton.BoneMapping[joint->Name]()].BindPose.Rotation;
 				if (!hasTranslation)
 				{
-					if (args.SkeletonFileName.Length())
-						keyFrame.Transform.Translation = modelSkeleton.Bones[modelSkeleton.BoneMapping[joint->Name]()].BindPose.Translation;
-					else
-						keyFrame.Transform.Translation = skeleton.Bones[boneId].BindPose.Translation;
+					keyFrame.Transform.Translation = skeleton.Bones[boneId].BindPose.Translation;
 				}
-
-				if (rootRotate.Length2() > 0.0f)
-				{
-					RotateKeyFrame(keyFrame.Transform, rootRotate);
-				}
-
 				keyFrame.Time = file.FrameDuration * frameId;
 				anim.Channels[boneIdToChannelId[boneId]].KeyFrames.Add(keyFrame);
 			}

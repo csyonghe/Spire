@@ -2294,6 +2294,10 @@ namespace Spire
 			{
 				return new MemberUpdateInstruction(*this);
 			}
+			virtual bool HasSideEffect() override
+			{
+				return true;
+			}
 			virtual void Accept(InstructionVisitor * visitor) override;
 		};
 

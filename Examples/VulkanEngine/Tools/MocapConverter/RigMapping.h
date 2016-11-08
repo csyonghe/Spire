@@ -13,7 +13,11 @@ namespace GameEngine
 		public:
 			CoreLib::EnumerableDictionary<CoreLib::String, CoreLib::String> Mapping;
 			VectorMath::Vec3 RootRotation;
-			RigMappingFile() = default;
+			float TranslationScale = 1.0f;
+			RigMappingFile()
+			{
+				RootRotation.SetZero();
+			}
 			RigMappingFile(CoreLib::String fileName);
 		};
 	}

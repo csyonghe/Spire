@@ -59,12 +59,13 @@ interface modelTransform size 128
 interface skeletalTransform size 0
 {
 }
-interface viewUniform size 208
+interface viewUniform size 272
 {
 	mat4 viewTransform : 0,64;
 	mat4 viewProjectionTransform : 64,64;
 	mat4 invViewTransform : 128,64;
-	vec3 cameraPos : 192,12;
+	mat4 invViewProjTransform : 192,64;
+	vec3 cameraPos : 256,12;
 }
 interface perInstanceUniform size 48
 {
@@ -115,6 +116,7 @@ source
 			mat4 viewTransform;
 			mat4 viewProjectionTransform;
 			mat4 invViewTransform;
+			mat4 invViewProjTransform;
 			vec3 cameraPos;
 		} blkviewUniform;
 		//! input from modelTransform

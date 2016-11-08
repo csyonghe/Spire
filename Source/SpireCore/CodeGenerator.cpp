@@ -2,6 +2,7 @@
 #include "ScopeDictionary.h"
 #include "CodeWriter.h"
 #include "StringObject.h"
+#include "Naming.h"
 #include "../CoreLib/Parser.h"
 #include <assert.h>
 
@@ -168,9 +169,9 @@ namespace Spire
 					if (ch >= L'0' && ch <= L'9' || ch >= L'a' && ch <= L'z' || ch >= 'A' && ch <= 'Z')
 						finalNameSb << ch;
 					else
-						finalNameSb << L'X';
+						finalNameSb << L'_';
 				}
-				return finalNameSb.ProduceString();
+				return EscapeDoubleUnderscore(finalNameSb.ProduceString());
 			}
 		public:
 			virtual RefPtr<StructSyntaxNode> VisitStruct(StructSyntaxNode * st) override
@@ -336,16 +337,22 @@ namespace Spire
 							if (dep->SyntaxNode->Parameters.Count() == 0)
 							{
 								auto paramType = TranslateExpressionType(dep->Type, &recordTypes);
-								func->Parameters.Add(dep->OriginalName + String(id), paramType);
-								variables.Add(dep->UniqueName, codeWriter.FetchArg(paramType, id + 1));
+								String paramName = EscapeDoubleUnderscore(L"p" + String(id) + L"_" + dep->OriginalName); 
+								func->Parameters.Add(paramName, paramType);
+								auto argInstr = codeWriter.FetchArg(paramType, id + 1);
+								argInstr->Name = paramName;
+								variables.Add(dep->UniqueName, argInstr);
 								id++;
 							}
 						}
 						for (auto & param : comp->SyntaxNode->Parameters)
 						{
 							auto paramType = TranslateExpressionType(param->Type, &recordTypes);
-							func->Parameters.Add(param->Name + String(id), paramType);
-							variables.Add(param->Name, codeWriter.FetchArg(paramType, id + 1));
+							String paramName = EscapeDoubleUnderscore(L"p" + String(id) + L"_" + param->Name);
+							func->Parameters.Add(paramName, paramType);
+							auto argInstr = codeWriter.FetchArg(paramType, id + 1);
+							argInstr->Name = paramName;
+							variables.Add(param->Name, argInstr);
 							id++;
 						}
 						if (comp->SyntaxNode->Expression)
@@ -423,7 +430,7 @@ namespace Spire
 			void VisitComponent(ComponentDefinitionIR * comp)
 			{
 				currentComponent = comp;
-				String varName = L"_vcmp" + currentComponent->UniqueName;
+				String varName = EscapeDoubleUnderscore(currentComponent->OriginalName);
 				RefPtr<ILType> type = TranslateExpressionType(currentComponent->Type, &recordTypes);
 
 				if (comp->SyntaxNode->IsInput)
@@ -436,7 +443,6 @@ namespace Spire
 
 				ILOperand * componentVar = nullptr;
 				
-
 				if (currentComponent->SyntaxNode->Expression)
 				{
 					currentComponent->SyntaxNode->Expression->Accept(this);
@@ -455,7 +461,7 @@ namespace Spire
 					componentVar = returnRegister;
 				}
 
-				if (!currentComponent->Type->IsTexture() && !currentComponent->Type->IsArray())
+				/*if (!currentComponent->Type->IsTexture() && !currentComponent->Type->IsArray())
 				{
 					auto vartype = TranslateExpressionType(currentComponent->Type.Ptr(), &recordTypes);
 					auto var = codeWriter.AllocVar(vartype, result.Program->ConstantPool->CreateConstant(1));
@@ -463,7 +469,7 @@ namespace Spire
 					codeWriter.Store(var, componentVar);
 					componentVar = var;
 				}
-				else
+				else*/
 					componentVar->Name = varName;
 				currentWorld->Components[currentComponent->UniqueName] = componentVar;
 				variables.Add(currentComponent->UniqueName, componentVar);
@@ -484,7 +490,7 @@ namespace Spire
 				{
 					func->Parameters.Add(param->Name, TranslateExpressionType(param->Type));
 					auto op = FetchArg(param->Type.Ptr(), ++id);
-					op->Name = String(L"p_") + param->Name;
+					op->Name = EscapeDoubleUnderscore(String(L"p_") + param->Name);
 					variables.Add(param->Name, op);
 				}
 				function->Body->Accept(this);
@@ -537,7 +543,7 @@ namespace Spire
 				if (stmt->TypeDef)
 				{
 					AllocVarInstruction * varOp = AllocVar(stmt->IterationVariableType.Ptr());
-					varOp->Name = L"v_" + String(NamingCounter++) + stmt->IterationVariable.Content;
+					varOp->Name = EscapeDoubleUnderscore(stmt->IterationVariable.Content);
 					variables.Add(stmt->IterationVariable.Content, varOp);
 				}
 				ILOperand * iterVar = nullptr;
@@ -676,7 +682,7 @@ namespace Spire
 				for (auto & v : stmt->Variables)
 				{
 					AllocVarInstruction * varOp = AllocVar(stmt->Type.Ptr());
-					varOp->Name = L"v" + String(NamingCounter++) + L"_" + v->Name;
+					varOp->Name = EscapeDoubleUnderscore(v->Name);
 					variables.Add(v->Name, varOp);
 					if (v->Expression)
 					{
@@ -697,14 +703,13 @@ namespace Spire
 				if (auto add = dynamic_cast<AddInstruction*>(left))
 				{
 					auto baseOp = add->Operands[0].Ptr();
-					codeWriter.Store(add->Operands[0].Ptr(), codeWriter.Update(codeWriter.Load(baseOp), add->Operands[1].Ptr(), right));
+					codeWriter.Update(baseOp, add->Operands[1].Ptr(), right);
 					add->Erase();
 				}
 				else if (auto swizzle = dynamic_cast<SwizzleInstruction*>(left))
 				{
 					auto baseOp = swizzle->Operand.Ptr();
 					int index = 0;
-					auto val = codeWriter.Load(baseOp);
 					for (int i = 0; i < swizzle->SwizzleString.Length(); i++)
 					{
 						switch (swizzle->SwizzleString[i])
@@ -726,10 +731,9 @@ namespace Spire
 							index = 3;
 							break;
 						}
-						val = codeWriter.Update(val, result.Program->ConstantPool->CreateConstant(index),
+						codeWriter.Update(baseOp, result.Program->ConstantPool->CreateConstant(index),
 							codeWriter.Retrieve(right, result.Program->ConstantPool->CreateConstant(i)));
 					}
-					codeWriter.Store(baseOp, val);
 					swizzle->Erase();
 				}
 				else

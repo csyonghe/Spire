@@ -1,0 +1,180 @@
+#version 440
+layout(vertices = 1) out;
+struct BoneTransform
+{
+mat4 transformMatrix;
+mat3 normalMatrix;
+};
+struct SkinningResult
+{
+vec3 pos;
+vec3 normal;
+vec3 tangent;
+};
+vec3 PNXTessellationXProjectToPlaneXvec3Xvec3Xvec3(vec3 t13c, vec3 t13d, vec3 t13e);
+vec3 PNXTessellationXProjectToPlaneXvec3Xvec3Xvec3(vec3 t13c, vec3 t13d, vec3 t13e)
+{
+vec3 v2_v;
+float v3_Len;
+vec3 v4_d;
+v2_v = (t13c - t13d);
+v3_Len = dot(v2_v, t13e);
+v4_d = (v3_Len * t13e);
+return (t13c - v4_d);
+}
+layout(binding = 0) uniform sampler2D albedoMap;
+layout(binding = 1) uniform sampler2D normalMap;
+layout(binding = 2) uniform sampler2D displacementMap;
+layout(std140, binding = 1) uniform ViewUniformBlock
+{
+mat4 viewTransform;
+mat4 viewProjectionTransform;
+mat4 invViewTransform;
+mat4 invViewProjTransform;
+vec3 cameraPos;
+} blkViewUniformBlock;
+layout(std140, binding = 0) uniform modelUniformBlock
+{
+mat4 modelMatrix;
+mat4 normalMatrix;
+} blkmodelUniformBlock;
+in vec3 vertPosI_at_ICoarseVertex_atCoarseVertex[];
+in vec3 vertNormal_atCoarseVertex[];
+in vec3 vertTangent_atCoarseVertex[];
+in vec2 vertUV0I_at_ICoarseVertex_atCoarseVertex[];
+out vec4 tessLevelOuter_atControlPoint[]; 
+out vec2 tessLevelInner_atControlPoint[]; 
+out vec3 MaterialGeometryI_IPN_TessellationI_IWorldPos_B300_atControlPoint[]; 
+out vec3 MaterialGeometryI_IPN_TessellationI_IWorldPos_B030_atControlPoint[]; 
+out vec3 MaterialGeometryI_IPN_TessellationI_IWorldPos_B003_atControlPoint[]; 
+out vec3 MaterialGeometryI_IPN_TessellationI_IWorldPos_B210_atControlPoint[]; 
+out vec3 MaterialGeometryI_IPN_TessellationI_IWorldPos_B120_atControlPoint[]; 
+out vec3 MaterialGeometryI_IPN_TessellationI_IWorldPos_B201_atControlPoint[]; 
+out vec3 MaterialGeometryI_IPN_TessellationI_IWorldPos_B021_atControlPoint[]; 
+out vec3 MaterialGeometryI_IPN_TessellationI_IWorldPos_B102_atControlPoint[]; 
+out vec3 MaterialGeometryI_IPN_TessellationI_IWorldPos_B012_atControlPoint[]; 
+out vec3 MaterialGeometryI_IPN_TessellationI_IWorldPos_B111_atControlPoint[]; 
+patch out vec3 vertNormalI_at_ICornerPoint_atCornerPoint[3]; 
+patch out vec3 vertTangentI_at_ICornerPoint_atCornerPoint[3]; 
+patch out vec2 vertUV0I_at_ICornerPoint_atCornerPoint[3]; 
+void main()
+{
+vec4 t14f;
+vec4 _vcmptessLevelOuter;
+vec2 t152;
+vec2 _vcmptessLevelInner;
+vec3 t155;
+vec3 _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B030;
+vec3 t15a;
+vec3 _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B003;
+vec3 t15f;
+vec3 _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B300;
+vec3 _vcmpMaterialGeometryI_IPN_TessellationI_IEdgeB300;
+vec3 _vcmpMaterialGeometryI_IPN_TessellationI_IEdgeB030;
+vec3 _vcmpMaterialGeometryI_IPN_TessellationI_IEdgeB003;
+vec3 _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B021t;
+vec3 _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B012t;
+vec3 _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B102t;
+vec3 _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B201t;
+vec3 _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B210t;
+vec3 _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B120t;
+vec3 t17f;
+vec3 t182;
+vec3 _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B021;
+vec3 t185;
+vec3 t188;
+vec3 _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B012;
+vec3 t18b;
+vec3 t18e;
+vec3 _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B102;
+vec3 t191;
+vec3 t194;
+vec3 _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B201;
+vec3 t197;
+vec3 t19a;
+vec3 _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B210;
+vec3 t19d;
+vec3 t1a0;
+vec3 _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B120;
+vec3 _vcmpMaterialGeometryI_IPN_TessellationI_ICenter;
+vec3 _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B111t;
+vec3 t1b0;
+vec3 _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B111;
+vec3 t1b5;
+vec3 _vcmpvertNormalI_at_ICornerPoint;
+vec3 t1ba;
+vec3 _vcmpvertTangentI_at_ICornerPoint;
+vec2 t1bf;
+vec2 _vcmpvertUV0I_at_ICornerPoint;
+t14f = vec4(3, 3, 3, 0);
+tessLevelOuter_atControlPoint[gl_InvocationID] = t14f;
+_vcmptessLevelOuter = t14f;
+t152 = vec2(3.000000000000e+00);
+tessLevelInner_atControlPoint[gl_InvocationID] = t152;
+_vcmptessLevelInner = t152;
+t155 = vertPosI_at_ICoarseVertex_atCoarseVertex[0];
+MaterialGeometryI_IPN_TessellationI_IWorldPos_B030_atControlPoint[gl_InvocationID] = t155;
+_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B030 = t155;
+t15a = vertPosI_at_ICoarseVertex_atCoarseVertex[1];
+MaterialGeometryI_IPN_TessellationI_IWorldPos_B003_atControlPoint[gl_InvocationID] = t15a;
+_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B003 = t15a;
+t15f = vertPosI_at_ICoarseVertex_atCoarseVertex[2];
+MaterialGeometryI_IPN_TessellationI_IWorldPos_B300_atControlPoint[gl_InvocationID] = t15f;
+_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B300 = t15f;
+_vcmpMaterialGeometryI_IPN_TessellationI_IEdgeB300 = (_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B003 - _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B030);
+_vcmpMaterialGeometryI_IPN_TessellationI_IEdgeB030 = (_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B300 - _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B003);
+_vcmpMaterialGeometryI_IPN_TessellationI_IEdgeB003 = (_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B030 - _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B300);
+_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B021t = (_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B030 + (_vcmpMaterialGeometryI_IPN_TessellationI_IEdgeB300 / 3.000000000000e+00));
+_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B012t = (_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B030 + ((_vcmpMaterialGeometryI_IPN_TessellationI_IEdgeB300 * 2.000000000000e+00) / 3.000000000000e+00));
+_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B102t = (_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B003 + (_vcmpMaterialGeometryI_IPN_TessellationI_IEdgeB030 / 3.000000000000e+00));
+_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B201t = (_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B003 + ((_vcmpMaterialGeometryI_IPN_TessellationI_IEdgeB030 * 2.000000000000e+00) / 3.000000000000e+00));
+_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B210t = (_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B300 + (_vcmpMaterialGeometryI_IPN_TessellationI_IEdgeB003 / 3.000000000000e+00));
+_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B120t = (_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B300 + ((_vcmpMaterialGeometryI_IPN_TessellationI_IEdgeB003 * 2.000000000000e+00) / 3.000000000000e+00));
+t17f = vertNormal_atCoarseVertex[0];
+t182 = PNXTessellationXProjectToPlaneXvec3Xvec3Xvec3(_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B021t, _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B030, t17f);
+MaterialGeometryI_IPN_TessellationI_IWorldPos_B021_atControlPoint[gl_InvocationID] = t182;
+_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B021 = t182;
+t185 = vertNormal_atCoarseVertex[1];
+t188 = PNXTessellationXProjectToPlaneXvec3Xvec3Xvec3(_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B012t, _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B003, t185);
+MaterialGeometryI_IPN_TessellationI_IWorldPos_B012_atControlPoint[gl_InvocationID] = t188;
+_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B012 = t188;
+t18b = vertNormal_atCoarseVertex[1];
+t18e = PNXTessellationXProjectToPlaneXvec3Xvec3Xvec3(_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B102t, _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B003, t18b);
+MaterialGeometryI_IPN_TessellationI_IWorldPos_B102_atControlPoint[gl_InvocationID] = t18e;
+_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B102 = t18e;
+t191 = vertNormal_atCoarseVertex[2];
+t194 = PNXTessellationXProjectToPlaneXvec3Xvec3Xvec3(_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B201t, _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B300, t191);
+MaterialGeometryI_IPN_TessellationI_IWorldPos_B201_atControlPoint[gl_InvocationID] = t194;
+_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B201 = t194;
+t197 = vertNormal_atCoarseVertex[2];
+t19a = PNXTessellationXProjectToPlaneXvec3Xvec3Xvec3(_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B210t, _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B300, t197);
+MaterialGeometryI_IPN_TessellationI_IWorldPos_B210_atControlPoint[gl_InvocationID] = t19a;
+_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B210 = t19a;
+t19d = vertNormal_atCoarseVertex[0];
+t1a0 = PNXTessellationXProjectToPlaneXvec3Xvec3Xvec3(_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B120t, _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B030, t19d);
+MaterialGeometryI_IPN_TessellationI_IWorldPos_B120_atControlPoint[gl_InvocationID] = t1a0;
+_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B120 = t1a0;
+_vcmpMaterialGeometryI_IPN_TessellationI_ICenter = (((_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B003 + _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B030) + _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B300) / 3.000000000000e+00);
+_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B111t = ((((((_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B021 + _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B012) + _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B102) + _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B201) + _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B210) + _vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B120) / 6.000000000000e+00);
+t1b0 = (_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B111t + ((_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B111t - _vcmpMaterialGeometryI_IPN_TessellationI_ICenter) / 2.000000000000e+00));
+MaterialGeometryI_IPN_TessellationI_IWorldPos_B111_atControlPoint[gl_InvocationID] = t1b0;
+_vcmpMaterialGeometryI_IPN_TessellationI_IWorldPos_B111 = t1b0;
+for (int sysLocalIterator = 0; sysLocalIterator < gl_PatchVerticesIn; sysLocalIterator++)
+{
+t1b5 = vertNormal_atCoarseVertex[sysLocalIterator];
+vertNormalI_at_ICornerPoint_atCornerPoint[sysLocalIterator] = t1b5;
+_vcmpvertNormalI_at_ICornerPoint = t1b5;
+t1ba = vertTangent_atCoarseVertex[sysLocalIterator];
+vertTangentI_at_ICornerPoint_atCornerPoint[sysLocalIterator] = t1ba;
+_vcmpvertTangentI_at_ICornerPoint = t1ba;
+t1bf = vertUV0I_at_ICoarseVertex_atCoarseVertex[sysLocalIterator];
+vertUV0I_at_ICornerPoint_atCornerPoint[sysLocalIterator] = t1bf;
+_vcmpvertUV0I_at_ICornerPoint = t1bf;
+}
+gl_TessLevelInner[0] = _vcmptessLevelInner[0];
+gl_TessLevelInner[1] = _vcmptessLevelInner[1];
+gl_TessLevelOuter[0] = _vcmptessLevelOuter[0];
+gl_TessLevelOuter[1] = _vcmptessLevelOuter[1];
+gl_TessLevelOuter[2] = _vcmptessLevelOuter[2];
+gl_TessLevelOuter[3] = _vcmptessLevelOuter[3];
+} 

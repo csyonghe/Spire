@@ -1,5 +1,6 @@
 #include "Closure.h"
 #include "StringObject.h"
+#include "Naming.h"
 
 namespace Spire
 {
@@ -415,11 +416,11 @@ namespace Spire
 			for (auto ch : name)
 			{
 				if (ch == L'.')
-					sb << L"I_I";
+					sb << L"_";
 				else
 					sb << ch;
 			}
-			return sb.ProduceString();
+			return EscapeDoubleUnderscore(sb.ProduceString());
 		}
 
 		bool IsInAbstractWorld(PipelineSymbol * pipeline, ShaderComponentSymbol* comp)
@@ -771,11 +772,6 @@ namespace Spire
 								<< shader->Pipeline->SyntaxNode->Name.Content << L"' requires it to be '" << req.Value->Type->DataType->ToString() 
 								<< L"'.\nsee pipeline requirement definition at " << req.Value->Implementations.First()->SyntaxNode->Position.ToString();
 							err->Error(32051, errMsg.ProduceString(), comp->Implementations.First()->SyntaxNode->Position);
-						}
-						else
-						{
-							for (auto & impl : comp->Implementations)
-								impl->SyntaxNode->IsOutput = true;
 						}
 					}
 					else

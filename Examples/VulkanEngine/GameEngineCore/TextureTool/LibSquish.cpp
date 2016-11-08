@@ -1901,7 +1901,6 @@ void CompressImage( u8 const* rgba, int width, int height, void* blocks, int fla
 					}
 				}
 			}
-			
 			// compress it into the output
 			CompressMasked( sourceRgba, mask, targetBlock, flags, metric );
 			
