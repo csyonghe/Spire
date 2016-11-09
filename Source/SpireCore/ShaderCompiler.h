@@ -21,7 +21,7 @@ namespace Spire
 
 		enum class CodeGenTarget
 		{
-			GLSL, SPIRV
+			GLSL, HLSL, SPIRV
 		};
 
 		class CompileOptions

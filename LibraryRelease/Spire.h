@@ -4490,7 +4490,7 @@ namespace Spire
 
 		enum class CodeGenTarget
 		{
-			GLSL, SPIRV
+			GLSL, HLSL, SPIRV
 		};
 
 		class CompileOptions
@@ -5159,14 +5159,22 @@ class SpireCompilationContext;
 class SpireShader;
 class SpireCompileResult;
 
+struct SpireErrorMessage
+{
+	const char * Message;
+	int ErrorId;
+	const char * FileName;
+	int Line, Col;
+};
+
 SPIRE_API SpireCompilationContext * spCreateCompilationContext(const char * cacheDir);
 SPIRE_API void spSetCodeGenTarget(SpireCompilationContext * ctx, int target);
 SPIRE_API void spAddSearchPath(SpireCompilationContext * ctx, const char * searchDir);
 SPIRE_API void spSetBackendParameter(SpireCompilationContext * ctx, const char * paramName, const char * value);
 SPIRE_API void spDestroyCompilationContext(SpireCompilationContext * ctx);
 
-SPIRE_API bool spLoadModuleLibrary(SpireCompilationContext * ctx, const char * fileName);
-SPIRE_API bool spLoadModuleLibrary(SpireCompilationContext * ctx, const char * source, const char * fileName);
+SPIRE_API void spLoadModuleLibrary(SpireCompilationContext * ctx, const char * fileName);
+SPIRE_API void spLoadModuleLibrary(SpireCompilationContext * ctx, const char * source, const char * fileName);
 SPIRE_API SpireShader* spCreateShader(SpireCompilationContext * ctx, const char * name);
 SPIRE_API void spShaderAddModule(SpireShader * shader, const char * moduleName);
 SPIRE_API void spShaderSetPipeline(SpireShader * shader, const char * pipelineName);
@@ -5175,12 +5183,12 @@ SPIRE_API void spDestroyShader(SpireShader * shader);
 SPIRE_API SpireCompileResult* spCompileShader(SpireCompilationContext * ctx, SpireShader * shader);
 SPIRE_API SpireCompileResult* spCompileShader(SpireCompilationContext * ctx, const char * source, const char * fileName);
 
-SPIRE_API bool spIsCompileSucessful(SpireCompileResult * result);
+SPIRE_API bool spIsCompilationSucessful(SpireCompileResult * result);
 SPIRE_API int spGetMessageCount(SpireCompileResult * result, int messageType);
-SPIRE_API bool spGetMessageContent(SpireCompileResult * result, char * buffer, int & bufferSize, int messageType, int index);
-SPIRE_API int spGetCompiledShaderNames(SpireCompileResult * result, char * buffer, int & bufferSize);
-SPIRE_API int spGetCompiledShaderStageNames(SpireCompileResult * result, const char * shaderName, char * buffer, int & bufferSize);
-SPIRE_API char * spGetShaderStageSource(SpireCompileResult * result, const char * shaderName, const char * stage, int & bufferSize);
+SPIRE_API bool spGetMessageContent(SpireCompileResult * result, int messageType, int index, SpireErrorMessage * pMsg);
+SPIRE_API int spGetCompiledShaderNames(SpireCompileResult * result, char * buffer, int * bufferSize);
+SPIRE_API int spGetCompiledShaderStageNames(SpireCompileResult * result, const char * shaderName, char * buffer, int * bufferSize);
+SPIRE_API char * spGetShaderStageSource(SpireCompileResult * result, const char * shaderName, const char * stage, int * length);
 SPIRE_API void spDestroyCompileResult(SpireCompileResult * result);
 
 #endif
