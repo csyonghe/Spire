@@ -22,9 +22,9 @@
 #define SPIRE_HLSL 1
 #define SPIRE_SPIRV 2
 
-class SpireCompilationContext;
-class SpireShader;
-class SpireCompileResult;
+struct SpireCompilationContext;
+struct SpireShader;
+struct SpireCompileResult;
 
 struct SpireErrorMessage
 {
