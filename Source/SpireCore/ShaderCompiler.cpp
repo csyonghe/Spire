@@ -273,10 +273,21 @@ namespace Spire
 					if (result.ErrorList.Count() > 0)
 						return;
 					CodeGenBackend * backend = nullptr;
-					if (options.Target == CodeGenTarget::SPIRV)
+					switch(options.Target)
+					{
+					case CodeGenTarget::SPIRV:
 						backend = backends[L"spirv"]().Ptr();
-					else
+						break;
+					case CodeGenTarget::GLSL:
 						backend = backends[L"glsl"]().Ptr();
+						break;
+					case CodeGenTarget::HLSL:
+						backend = backends[L"hlsl"]().Ptr();
+						break;
+					default:
+						// TODO: emit an appropriate diagnostic
+						return;
+					}
 
 					Schedule schedule;
 					if (options.ScheduleSource != L"")
@@ -417,6 +428,7 @@ namespace Spire
 				}
 				compilerInstances++;
 				backends.Add(L"glsl", CreateGLSLCodeGen());
+				backends.Add(L"hlsl", CreateHLSLCodeGen());
 				backends.Add(L"spirv", CreateSpirVCodeGen());
 			}
 

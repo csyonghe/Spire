@@ -16,6 +16,7 @@ namespace Spire
 		};
 
 		CodeGenBackend * CreateGLSLCodeGen();
+		CodeGenBackend * CreateHLSLCodeGen();
 		CodeGenBackend * CreateSpirVCodeGen();
 	}
 }

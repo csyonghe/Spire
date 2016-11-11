@@ -11,7 +11,7 @@ namespace Spire
 {
 	namespace Compiler
 	{
-		class GLSLCodeGen : public CLikeCodeGen
+		class HLSLCodeGen : public CLikeCodeGen
 		{
 		protected:
 			OutputStrategy * CreateStandardOutputStrategy(ILWorld * world, String layoutPrefix) override;
@@ -20,9 +20,18 @@ namespace Spire
 
 			void PrintRasterPositionOutputWrite(CodeGenContext & ctx, ILOperand * operand) override
 			{
-				ctx.Body << L"gl_Position = ";
+				ctx.Body << L"stage_output.sv_position = ";
 				PrintOp(ctx, operand);
 				ctx.Body << L";\n";
+			}
+
+			void PrintMatrixMulInstrExpr(CodeGenContext & ctx, ILOperand* op0, ILOperand* op1) override
+			{
+				ctx.Body << L"mul(";
+				PrintOp(ctx, op0);
+				ctx.Body << L", ";
+				PrintOp(ctx, op1);
+				ctx.Body << L")";
 			}
 
 			void PrintUniformBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
@@ -48,11 +57,10 @@ namespace Spire
 				sb << L"blk" << inputName << L".content";
 			}
 
-			void PrintStandardInputReference(StringBuilder& sb, ILRecordType* recType, String inputName, String componentName) override
+			void PrintStandardInputReference(StringBuilder& sb, ILRecordType* /*recType*/, String inputName, String componentName) override
 			{
 				String declName = componentName;
-				declName = AddWorldNameSuffix(declName, recType->ToString());
-				sb << declName;
+				sb << L"stage_input." << declName;
 			}
 
 			void PrintPatchInputReference(StringBuilder& sb, ILRecordType* recType, String inputName, String componentName) override
@@ -96,10 +104,96 @@ namespace Spire
 				}
 			}
 
+			String RemapFuncNameForTarget(String name) override
+			{
+				// Currently, all types are internally named based on their GLSL equivalent, so
+				// for HLSL output we go ahead and maintain a big table to remap the names.
+				//
+				// Note: for right now, this is just a linear array, with no particular sorting.
+				// Eventually it should be turned into a hash table for performance, or at least
+				// just be kept sorted so that we can use a binary search.
+				//
+				// Note 2: Well, actually, the Right Answer is for the type representation to
+				// be better than just a string, so that we don't have to do this string->string map.
+				static const struct {
+					wchar_t const* glslName;
+					wchar_t const* hlslName;
+				} kNameRemaps[] =
+				{
+					{ L"vec2", L"float2" },
+					{ L"vec3", L"float3" },
+					{ L"vec4", L"float4" },
+
+					{ L"ivec2", L"int2" },
+					{ L"ivec3", L"int3" },
+					{ L"ivec4", L"int4" },
+
+					{ L"uvec2", L"uint2" },
+					{ L"uvec3", L"uint3" },
+					{ L"uvec4", L"uint4" },
+
+					{ L"mat3", L"float3x3" },
+					{ L"mat4", L"float4x4" },
+				};
+
+				for(auto remap : kNameRemaps)
+				{
+					if(wcscmp(name.Buffer(), remap.glslName) == 0)
+					{
+						return remap.hlslName;
+					}
+				}
+
+				return name;
+			}
+
+
+
 			void PrintTypeName(StringBuilder& sb, ILType* type) override
 			{
 				// Currently, all types are internally named based on their GLSL equivalent, so
-				// outputting a type for GLSL is trivial.
+				// for HLSL output we go ahead and maintain a big table to remap the names.
+				//
+				// Note: for right now, this is just a linear array, with no particular sorting.
+				// Eventually it should be turned into a hash table for performance, or at least
+				// just be kept sorted so that we can use a binary search.
+				//
+				// Note 2: Well, actually, the Right Answer is for the type representation to
+				// be better than just a string, so that we don't have to do this string->string map.
+				static const struct {
+					wchar_t const* glslName;
+					wchar_t const* hlslName;
+				} kNameRemaps[] =
+				{
+					{ L"vec2", L"float2" },
+					{ L"vec3", L"float3" },
+					{ L"vec4", L"float4" },
+
+					{ L"ivec2", L"int2" },
+					{ L"ivec3", L"int3" },
+					{ L"ivec4", L"int4" },
+
+					{ L"uvec2", L"uint2" },
+					{ L"uvec3", L"uint3" },
+					{ L"uvec4", L"uint4" },
+
+					{ L"mat3", L"float3x3" },
+					{ L"mat4", L"float4x4" },
+				};
+
+				String typeName = type->ToString();
+				for(auto remap : kNameRemaps)
+				{
+					if(wcscmp(typeName.Buffer(), remap.glslName) == 0)
+					{
+						sb << remap.hlslName;
+						return;
+					}
+				}
+
+				// If we don't find the type in our map, then that either means we missed a case,
+				// or this is a user-defined type. I don't see an obvious way to check which of
+				// those cases we are in, so we will just fall back to outputting the "GLSL name" here.
 				sb << type->ToString();
 			}
 
@@ -114,15 +208,19 @@ namespace Spire
 				int declarationStart = sb.GlobalHeader.Length();
 				int itemsDeclaredInBlock = 0;
 
-				sb.GlobalHeader << L"layout(std140";
+				sb.GlobalHeader << L"cbuffer " << input.Name;
 				if (info.Binding != -1)
-					sb.GlobalHeader << L", binding = " << info.Binding;
-				sb.GlobalHeader << L") uniform " << input.Name << L"\n{\n";
+					sb.GlobalHeader << L" : register(b" << info.Binding << L")";
+				sb.GlobalHeader << L"\n{\n";
+
+				// We declare an inline struct inside the `cbuffer` to ensure that
+				// the members have an appropriate prefix on their name.
+				sb.GlobalHeader << L"struct {\n";
 
 				int index = 0;
 				for (auto & field : recType->Members)
 				{
-					if (!useBindlessTexture && field.Value.Type->IsTexture())
+					if (field.Value.Type->IsTexture())
 						continue;
 					String declName = field.Key;
 					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
@@ -138,6 +236,7 @@ namespace Spire
 
 					index++;
 				}
+
 				if (itemsDeclaredInBlock == 0)
 				{
 					sb.GlobalHeader.Remove(declarationStart, sb.GlobalHeader.Length() - declarationStart);
@@ -145,139 +244,37 @@ namespace Spire
 				}
 
 				sb.GlobalHeader << L"} blk" << input.Name << L";\n";
+				sb.GlobalHeader << L"};\n";
 
-				if (!useBindlessTexture)
+				for (auto & field : recType->Members)
 				{
-					for (auto & field : recType->Members)
+					if (field.Value.Type->IsTexture())
 					{
-						if (field.Value.Type->IsTexture())
+						if (field.Value.Attributes.ContainsKey(L"Binding"))
+							sb.GlobalHeader << L"layout(binding = " << field.Value.Attributes[L"Binding"]() << L") ";
+						else
 						{
-							if (field.Value.Attributes.ContainsKey(L"Binding"))
-								sb.GlobalHeader << L"layout(binding = " << field.Value.Attributes[L"Binding"]() << L") ";
-							else
-							{
-								sb.GlobalHeader << L"layout(binding = " << sb.TextureBindingsAllocator << L") ";
-								sb.TextureBindingsAllocator++;
-							}
-							sb.GlobalHeader << L"uniform ";
-							PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), field.Key);
-							sb.GlobalHeader << L";\n";
+							sb.GlobalHeader << L"layout(binding = " << sb.TextureBindingsAllocator << L") ";
+							sb.TextureBindingsAllocator++;
 						}
+						sb.GlobalHeader << L"uniform ";
+						PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), field.Key);
+						sb.GlobalHeader << L";\n";
 					}
 				}
 			}
 
-			void DeclareStorageBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) override
+			void DeclareStorageBuffer(CodeGenContext & /*sb*/, const ILObjectDefinition & /*input*/, bool /*isVertexShader*/) override
 			{
-				auto info = ExtractExternComponentInfo(input);
-				extCompInfo[input.Name] = info;
-				auto recType = ExtractRecordType(input.Type.Ptr());
-				assert(recType);
-				assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StorageBuffer);
-
-				int declarationStart = sb.GlobalHeader.Length();
-				int itemsDeclaredInBlock = 0;
-
-				sb.GlobalHeader << L"layout(std430";
-				if (info.Binding != -1)
-					sb.GlobalHeader << L", binding = " << info.Binding;
-				sb.GlobalHeader << L") buffer " << input.Name << L"\n{\n";
-
-				int index = 0;
-				for (auto & field : recType->Members)
-				{
-					if (!useBindlessTexture && info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer &&
-						field.Value.Type->IsTexture())
-						continue;
-					if (input.Attributes.ContainsKey(L"VertexInput"))
-						sb.GlobalHeader << L"layout(location = " << index << L") ";
-					if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat") ||
-						(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput &&
-							field.Value.Type->IsIntegral())))
-						sb.GlobalHeader << L"flat ";
-					if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput)
-					{
-						sb.GlobalHeader << L"in ";
-					}
-					else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
-						sb.GlobalHeader << L"patch in ";
-					String declName = field.Key;
-					if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput ||
-						info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
-						declName = AddWorldNameSuffix(declName, recType->ToString());
-					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
-					itemsDeclaredInBlock++;
-					if (info.IsArray)
-					{
-						sb.GlobalHeader << L"[";
-						if (info.ArrayLength)
-							sb.GlobalHeader << String(info.ArrayLength);
-						sb.GlobalHeader << L"]";
-					}
-					sb.GlobalHeader << L";\n";
-
-					index++;
-				}
-				if (itemsDeclaredInBlock == 0)
-				{
-					sb.GlobalHeader.Remove(declarationStart, sb.GlobalHeader.Length() - declarationStart);
-					return;
-				}
-
-				sb.GlobalHeader << L"} blk" << input.Name << L";\n";
+				// TODO: HLSL does not make it easy to declare a UAV with an interesting type...
 			}
-
-			void DeclareArrayBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) override
+			void DeclareArrayBuffer(CodeGenContext & /*sb*/, const ILObjectDefinition & /*input*/, bool /*isVertexShader*/) override
 			{
-				auto info = ExtractExternComponentInfo(input);
-				extCompInfo[input.Name] = info;
-				auto recType = ExtractRecordType(input.Type.Ptr());
-				assert(recType);
-				assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::ArrayBuffer);
 
-				int itemsDeclaredInBlock = 0;
-				sb.GlobalHeader << L"struct T" << input.Name << L"\n{\n";
-					
-				int index = 0;
-				for (auto & field : recType->Members)
-				{
-					if (input.Attributes.ContainsKey(L"VertexInput"))
-						sb.GlobalHeader << L"layout(location = " << index << L") ";
-					if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat")))
-						sb.GlobalHeader << L"flat ";
-					String declName = field.Key;
-					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
-					itemsDeclaredInBlock++;
-					if (info.IsArray)
-					{
-						sb.GlobalHeader << L"[";
-						if (info.ArrayLength)
-							sb.GlobalHeader << String(info.ArrayLength);
-						sb.GlobalHeader << L"]";
-					}
-					sb.GlobalHeader << L";\n";
-
-					index++;
-				}
-
-				sb.GlobalHeader << L"};\nlayout(std430";
-				if (info.Binding != -1)
-					sb.GlobalHeader << L", binding = " << info.Binding;
-				sb.GlobalHeader  << ") buffer " << input.Name << L"\n{\nT" << input.Name << L"content[];\n} blk" << input.Name << L";\n";
 			}
-
-			void DeclarePackedBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool /*isVertexShader*/) override
+			void DeclarePackedBuffer(CodeGenContext & /*sb*/, const ILObjectDefinition & /*input*/, bool /*isVertexShader*/) override
 			{
-				auto info = ExtractExternComponentInfo(input);
-				extCompInfo[input.Name] = info;
-				auto recType = ExtractRecordType(input.Type.Ptr());
-				assert(recType);
-				assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::PackedBuffer);
 
-				sb.GlobalHeader << L"layout(std430";
-				if (info.Binding != -1)
-					sb.GlobalHeader << L", binding = " << info.Binding;
-				sb.GlobalHeader << L") uniform " << input.Name << L"\n{\nfloat content[];\n} blk" << input.Name << L";\n";
 			}
 
 			void DeclareTextureInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool /*isVertexShader*/) override
@@ -291,8 +288,16 @@ namespace Spire
 				{
 					if(field.Value.Type->IsFloat() || field.Value.Type->IsFloatVector() && !field.Value.Type->IsFloatMatrix())
 					{
-						sb.GlobalHeader << L"layout(binding = " << sb.TextureBindingsAllocator << L") uniform sampler2D " << field.Key << L";\n";
-						sb.TextureBindingsAllocator++;
+						// TODO(tfoley): texture binding allocation needs to be per-stage in D3D11, but should be global for D3D12
+						int slotIndex = sb.TextureBindingsAllocator++;
+
+						sb.GlobalHeader << L"Texture2D " << field.Key;
+						sb.GlobalHeader << L" : register(t" << slotIndex << L")";
+						sb.GlobalHeader << L";\n";
+
+						sb.GlobalHeader << L"SamplerState " << field.Key << "_sampler";
+						sb.GlobalHeader << L" : register(s" << slotIndex << L")";
+						sb.GlobalHeader << L";\n";
 					}
 					else
 					{
@@ -305,26 +310,23 @@ namespace Spire
 			void DeclareStandardInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) override
 			{
 				auto info = ExtractExternComponentInfo(input);
+				extCompInfo[input.Name] = info;
 				auto recType = ExtractRecordType(input.Type.Ptr());
 				assert(recType);
-				assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput);
 
-				int itemsDeclaredInBlock = 0;
+				// In order to handle ordinary per-stage shader inputs, we need to
+				// declare a `struct` type over all the fields.
+
+				sb.GlobalHeader << L"struct T" << recType->TypeName << L"\n{\n";
 
 				int index = 0;
 				for (auto & field : recType->Members)
 				{
-					if (input.Attributes.ContainsKey(L"VertexInput"))
-						sb.GlobalHeader << L"layout(location = " << index << L") ";
 					if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat") || field.Value.Type->IsIntegral()))
-						sb.GlobalHeader << L"flat ";
-					sb.GlobalHeader << L"in ";
+						sb.GlobalHeader << L"noperspective ";
 
 					String declName = field.Key;
-					declName = AddWorldNameSuffix(declName, recType->ToString());
-
 					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
-					itemsDeclaredInBlock++;
 					if (info.IsArray)
 					{
 						sb.GlobalHeader << L"[";
@@ -332,62 +334,32 @@ namespace Spire
 							sb.GlobalHeader << String(info.ArrayLength);
 						sb.GlobalHeader << L"]";
 					}
+
+					// We synthesize a dummy semantic for every component, just to make things easy
+					// TODO(tfoley): This won't work in presence of `struct`-type fields
+					sb.GlobalHeader << " : A" << index;
+
 					sb.GlobalHeader << L";\n";
 
 					index++;
 				}
+
+				sb.GlobalHeader << L"};\n";
 			}
 
 			void DeclarePatchInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) override
 			{
-				auto info = ExtractExternComponentInfo(input);
-				auto recType = ExtractRecordType(input.Type.Ptr());
-				assert(recType);
-				assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch);
-
-
-				int itemsDeclaredInBlock = 0;
-
-				int index = 0;
-				for (auto & field : recType->Members)
-				{
-					if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat")))
-						sb.GlobalHeader << L"flat ";
-					sb.GlobalHeader << L"patch in ";
-
-					String declName = field.Key;
-					declName = AddWorldNameSuffix(declName, recType->ToString());
-
-					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
-					itemsDeclaredInBlock++;
-					if (info.IsArray)
-					{
-						sb.GlobalHeader << L"[";
-						if (info.ArrayLength)
-							sb.GlobalHeader << String(info.ArrayLength);
-						sb.GlobalHeader << L"]";
-					}
-					sb.GlobalHeader << L";\n";
-
-					index++;
-				}
+				// In HLSL, both standard input/output and per-patch input/output are passed as ordinary `struct` types.
+				DeclareStandardInputRecord(sb, input, isVertexShader);
 			}
 
-			void GenerateHeader(StringBuilder & sb, ILStage * stage)
-			{
-				sb << L"#version 440\n";
-				if (stage->Attributes.ContainsKey(L"BindlessTexture"))
-					sb << L"#extension GL_ARB_bindless_texture: require\n#extension GL_NV_gpu_shader5 : require\n";
-				if (stage->Attributes.ContainsKey(L"NV_CommandList"))
-					sb << L"#extension GL_NV_command_list: require\n";
-			}
 
 			StageSource GenerateSingleWorldShader(ILProgram * program, ILShader * shader, ILStage * stage) override
 			{
 				useBindlessTexture = stage->Attributes.ContainsKey(L"BindlessTexture");
 				StageSource rs;
 				CodeGenContext ctx;
-				GenerateHeader(ctx.GlobalHeader, stage);
+
 				if (stage->StageType == L"DomainShader")
 					GenerateDomainShaderProlog(ctx, stage);
 
@@ -405,9 +377,23 @@ namespace Spire
 					return rs;
 				GenerateReferencedFunctions(ctx.GlobalHeader, program, MakeArrayView(world.Ptr()));
 				extCompInfo.Clear();
+				ILRecordType* stageInputType = nullptr;
 				for (auto & input : world->Inputs)
 				{
 					DeclareInput(ctx, input, stage->StageType == L"VertexShader");
+
+					// We need to detect the world that represents the ordinary stage input...
+					// TODO(tfoley): It seems like this is logically part of the stage definition.
+					auto info = ExtractExternComponentInfo(input);
+					if(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput)
+					{
+						auto recType = ExtractRecordType(input.Type.Ptr());
+						stageInputType = recType;
+					}
+				}
+				if(!stageInputType)
+				{
+					errWriter->Error(99999, L"'" + stage->StageType + L"' doesn't appear to have any input world", stage->Position);
 				}
 		
 				outputStrategy->DeclareOutput(ctx, stage);
@@ -419,8 +405,21 @@ namespace Spire
 
 				StringBuilder sb;
 				sb << ctx.GlobalHeader.ProduceString();
-				sb << L"void main()\n{\n";
+
+				sb << L"struct T" << world->OutputType->TypeName << "Ext\n{\n";
+				sb << L"T" << world->OutputType->TypeName << " user;\n";
+				if(stage->Attributes.TryGetValue(L"Position"))
+				{
+					sb << L"float4 sv_position : SV_Position;\n";
+				}
+				sb << L"};\n";
+
+				sb << L"T" << world->OutputType->TypeName << L"Ext main(";
+				sb << L"T" << stageInputType->TypeName << " stage_input";
+				sb << ")\n{ \n";
+				sb << "T" << world->OutputType->TypeName << "Ext stage_output;\n";
 				sb << ctx.Header.ProduceString() << ctx.Body.ProduceString();
+				sb << "return stage_output;\n";
 				sb << L"}";
 				rs.MainCode = sb.ProduceString();
 				return rs;
@@ -428,7 +427,7 @@ namespace Spire
 
 			StageSource GenerateHullShader(ILProgram * program, ILShader * shader, ILStage * stage) override
 			{
-				useBindlessTexture = stage->Attributes.ContainsKey(L"BindlessTexture");
+				// TODO(tfoley): This is just copy-pasted from the GLSL case, and needs a lot of work
 
 				StageSource rs;
 				StageAttribute patchWorldName, controlPointWorldName, cornerPointWorldName, domain, innerLevel, outerLevel, numControlPoints;
@@ -485,7 +484,9 @@ namespace Spire
 				worlds.Add(patchWorld.Ptr());
 				worlds.Add(controlPointWorld.Ptr());
 				worlds.Add(cornerPointWorld.Ptr());
-				GenerateHeader(ctx.GlobalHeader, stage);
+
+				//GenerateHeader(ctx.GlobalHeader, stage);
+
 				ctx.GlobalHeader << L"layout(vertices = " << numControlPoints.Value << L") out;\n";
 				GenerateStructs(ctx.GlobalHeader, program);
 				GenerateReferencedFunctions(ctx.GlobalHeader, program, worlds.GetArrayView());
@@ -574,48 +575,65 @@ namespace Spire
 				rs.MainCode = sb.ProduceString();
 				return rs;
 			}
-
 		};
 
-
-		class StandardOutputStrategy : public OutputStrategy
+		class HLSLStandardOutputStrategy : public OutputStrategy
 		{
 		private:
 			String declPrefix;
 		public:
-			StandardOutputStrategy(GLSLCodeGen * pCodeGen, ILWorld * world, String prefix)
+			HLSLStandardOutputStrategy(HLSLCodeGen * pCodeGen, ILWorld * world, String prefix)
 				: OutputStrategy(pCodeGen, world), declPrefix(prefix)
 			{}
-			virtual void DeclareOutput(CodeGenContext & ctx, ILStage *) override
+			virtual void DeclareOutput(CodeGenContext & ctx, ILStage * stage) override
 			{
+				ctx.GlobalHeader << L"struct T" << world->OutputType->TypeName << L"\n{\n";
+				int index = 0;
 				for (auto & field : world->OutputType->Members)
 				{
 					if (declPrefix.Length())
 						ctx.GlobalHeader << declPrefix << L" ";
 					if (field.Value.Type->IsIntegral())
-						ctx.GlobalHeader << L"flat ";
-					ctx.GlobalHeader << L"out ";
+						ctx.GlobalHeader << L"noperspective ";
 					String declName = field.Key;
 					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), AddWorldNameSuffix(declName, world->OutputType->TypeName));
+
+					// We synthesize a dummy semantic for every component, just to make things easy
+					// TODO(tfoley): This won't work in presence of `struct`-type fields
+
+					// Note(tfoley): The fragment shader outputs needs to use the `SV_Target` semantic
+					// instead of a user-defined semantic. This is annoyingly non-orthogonal.
+					if(stage->StageType == L"FragmentShader")
+					{
+						ctx.GlobalHeader << " : SV_Target" << index;
+					}
+					else
+					{
+						ctx.GlobalHeader << " : A" << index;
+					}
+
 					ctx.GlobalHeader << L";\n";
+
+					index++;
 				}
+				ctx.GlobalHeader << L"};\n";
 			}
 			virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) override
 			{
-				ctx.Body << AddWorldNameSuffix(instr->ComponentName, world->OutputType->TypeName) << L" = ";
+				ctx.Body << "stage_output.user." << AddWorldNameSuffix(instr->ComponentName, world->OutputType->TypeName) << L" = ";
 				codeGen->PrintOp(ctx, instr->Operand.Ptr());
 				ctx.Body << L";\n";
 			}
 		};
 
-		class ArrayOutputStrategy : public OutputStrategy
+		class HLSLArrayOutputStrategy : public OutputStrategy
 		{
 		protected:
 			bool isPatch = false;
 			int arraySize = 0;
 		public:
 			String outputIndex;
-			ArrayOutputStrategy(GLSLCodeGen * pCodeGen, ILWorld * world, bool pIsPatch, int pArraySize, String pOutputIndex)
+			HLSLArrayOutputStrategy(HLSLCodeGen * pCodeGen, ILWorld * world, bool pIsPatch, int pArraySize, String pOutputIndex)
 				: OutputStrategy(pCodeGen, world)
 			{
 				isPatch = pIsPatch;
@@ -644,10 +662,10 @@ namespace Spire
 			}
 		};
 
-		class PackedBufferOutputStrategy : public OutputStrategy
+		class HLSLPackedBufferOutputStrategy : public OutputStrategy
 		{
 		public:
-			PackedBufferOutputStrategy(GLSLCodeGen * pCodeGen, ILWorld * world)
+			HLSLPackedBufferOutputStrategy(HLSLCodeGen * pCodeGen, ILWorld * world)
 				: OutputStrategy(pCodeGen, world)
 			{}
 			virtual void DeclareOutput(CodeGenContext & ctx, ILStage *) override
@@ -764,22 +782,22 @@ namespace Spire
 			}
 		};
 
-		OutputStrategy * GLSLCodeGen::CreateStandardOutputStrategy(ILWorld * world, String layoutPrefix)
+		OutputStrategy * HLSLCodeGen::CreateStandardOutputStrategy(ILWorld * world, String layoutPrefix)
 		{
-			return new StandardOutputStrategy(this, world, layoutPrefix);
+			return new HLSLStandardOutputStrategy(this, world, layoutPrefix);
 		}
-		OutputStrategy * GLSLCodeGen::CreatePackedBufferOutputStrategy(ILWorld * world)
+		OutputStrategy * HLSLCodeGen::CreatePackedBufferOutputStrategy(ILWorld * world)
 		{
-			return new PackedBufferOutputStrategy(this, world);
+			return new HLSLPackedBufferOutputStrategy(this, world);
 		}
-		OutputStrategy * GLSLCodeGen::CreateArrayOutputStrategy(ILWorld * world, bool pIsPatch, int pArraySize, String arrayIndex)
+		OutputStrategy * HLSLCodeGen::CreateArrayOutputStrategy(ILWorld * world, bool pIsPatch, int pArraySize, String arrayIndex)
 		{
-			return new ArrayOutputStrategy(this, world, pIsPatch, pArraySize, arrayIndex);
+			return new HLSLArrayOutputStrategy(this, world, pIsPatch, pArraySize, arrayIndex);
 		}
 
-		CodeGenBackend * CreateGLSLCodeGen()
+		CodeGenBackend * CreateHLSLCodeGen()
 		{
-			return new GLSLCodeGen();
+			return new HLSLCodeGen();
 		}
 	}
 }
