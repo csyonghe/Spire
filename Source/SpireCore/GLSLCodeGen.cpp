@@ -35,7 +35,7 @@ namespace Spire
 
 			void PrintStorageBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
 			{
-				sb << componentName;
+				sb << L"blk" << inputName << L"." << componentName;
 			}
 
 			void PrintArrayBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
@@ -141,11 +141,11 @@ namespace Spire
 				if (itemsDeclaredInBlock == 0)
 				{
 					sb.GlobalHeader.Remove(declarationStart, sb.GlobalHeader.Length() - declarationStart);
-					return;
 				}
-
-				sb.GlobalHeader << L"} blk" << input.Name << L";\n";
-
+				else
+				{
+					sb.GlobalHeader << L"} blk" << input.Name << L";\n";
+				}
 				if (!useBindlessTexture)
 				{
 					for (auto & field : recType->Members)
