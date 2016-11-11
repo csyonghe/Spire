@@ -131,11 +131,9 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\Basic.cpp" />
     <ClCompile Include="..\Spire.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\Basic.h" />
     <ClInclude Include="..\Spire.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

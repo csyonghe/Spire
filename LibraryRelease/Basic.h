@@ -1,4 +1,4 @@
-﻿/***********************************************************************
+/***********************************************************************
 
 Spire - The MIT License (MIT)
 Copyright (c) 2016, Carnegie Mellon University
@@ -547,7 +547,7 @@ namespace CoreLib
 				return pointer != ptr.pointer;
 			}
 			template<typename U>
-			typename RefPtrImpl<U, 0, Destructor> As() const
+			RefPtrImpl<U, 0, Destructor> As() const
 			{
 				RefPtrImpl<U, 0, Destructor> result;
 				if (pointer)
@@ -745,7 +745,7 @@ namespace CoreLib
 				return pointer != ptr.pointer;
 			}
 			template<typename U>
-			typename RefPtrImpl<U, 1, Destructor> As() const
+			RefPtrImpl<U, 1, Destructor> As() const
 			{
 				RefPtrImpl<U, 1, Destructor> result;
 				if (pointer)
@@ -2920,23 +2920,23 @@ namespace CoreLib
 				}
 				return 0;
 			};
-			LinkedNode<T> * FirstNode()
+			LinkedNode<T> * FirstNode() const
 			{
 				return FHead;
 			};
-			T & First()
+			T & First() const
 			{
 				if (!FHead)
 					throw IndexOutofRangeException("LinkedList: index out of range.");
 				return FHead->Value;
 			}
-			T & Last()
+			T & Last() const
 			{
 				if (!FTail)
 					throw IndexOutofRangeException("LinkedList: index out of range.");
 				return FTail->Value;
 			}
-			LinkedNode<T> * LastNode()
+			LinkedNode<T> * LastNode() const
 			{
 				return FTail;
 			};
@@ -4055,6 +4055,14 @@ namespace CoreLib
 			{
 				return _count;
 			}
+			KeyValuePair<TKey, TValue> & First() const
+			{
+				return kvPairs.First();
+			}
+			KeyValuePair<TKey, TValue> & Last() const
+			{
+				return kvPairs.Last();
+			}
 		public:
 			EnumerableDictionary()
 			{
@@ -4110,7 +4118,7 @@ namespace CoreLib
 		template<typename T, typename DictionaryType>
 		class HashSetBase
 		{
-		private:
+		protected:
 			DictionaryType dict;
 		public:
 			HashSetBase()
@@ -4181,14 +4189,6 @@ namespace CoreLib
 				return Iterator(dict.end());
 			}
 		public:
-			T & First() const
-			{
-				return *begin();
-			}
-			T & Last() const
-			{
-				return *end();
-			}
 			int Count() const
 			{
 				return dict.Count();
@@ -4220,7 +4220,17 @@ namespace CoreLib
 
 		template <typename T>
 		class EnumerableHashSet : public HashSetBase<T, EnumerableDictionary<T, _DummyClass>>
-		{};
+		{
+		public:
+			T & First() const
+			{
+				return dict.First().Key;
+			}
+			T & Last() const
+			{
+				return dict.Last().Key;
+			}
+		};
 	}
 }
 

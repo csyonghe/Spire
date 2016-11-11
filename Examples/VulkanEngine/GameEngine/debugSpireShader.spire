@@ -88,6 +88,7 @@ pipeline StandardPipeline
     }
 }
 
+
 pipeline TessellationPipeline : StandardPipeline
 {
     [Pinned]
@@ -327,7 +328,10 @@ struct BoneTransform
 
 module NoAnimation
 {
-    public using VertexAttributes;
+    require vec3 vertPos;
+    require vec3 vertNormal;
+    require vec3 vertTangent;
+    
     public @CoarseVertex vec3 coarseVertPos = vertPos;
     public @CoarseVertex vec3 coarseVertNormal = vertNormal;
     public @CoarseVertex vec3 coarseVertTangent = vertTangent;
@@ -354,7 +358,12 @@ struct SkinningResult
 
 module SkeletalAnimation
 {
-    public using VertexAttributes;
+    require vec3 vertPos;
+    require vec3 vertNormal;
+    require vec3 vertTangent;
+    require uint boneIds;
+    require uint boneWeights;
+
     require mat4 viewProjectionTransform;
     @SkeletonData BoneTransform[] boneTransforms;
     
@@ -375,7 +384,7 @@ module SkeletalAnimation
             tp = boneTransforms[boneId].normalMatrix * vertNormal;
             result.normal += tp * boneWeight;
             //result.normal = tp;
-            tp = boneTransforms[boneId].normalMatrix * vertTangent;
+            tp = (boneTransforms[boneId].transformMatrix * vec4(vertTangent, 0.0)).xyz;
             result.tangent += tp * boneWeight;
             //result.tangent = tp;
         }
@@ -691,72 +700,11 @@ module Lighting
                         (albedo * (brightness + 0.7)*(1.0-metallic_in) + 
                         mix(albedo, vec3(1.0), 1.0 - metallic_in) * (highlight * shadow));
 }
-
-#file "D:\\Projects\\PersonalProjects\\GameEngine\\EngineContent\\Shaders\\MeshProcessing.shader"
-shader StaticMeshForwardLighting : StandardPipeline
-{
-    public using SystemUniforms;
-    public using NoAnimation;
-    public inline vec2 vertUV = vertUV0;
-    public using TangentSpaceTransform;
-    public using MaterialGeometry;
-    public using VertexTransform;
-    public using MaterialPattern;
-    vec3 lightParam = vec3(roughness, metallic, specular);
-    using lighting = Lighting(TangentSpaceToWorldSpace(normal));
-    public out @Fragment vec4 outputColor = vec4(lighting.result, 1.0);
-}
-
-shader StaticMeshDeferredLighting : StandardPipeline
-{
-    public using SystemUniforms;
-    public using NoAnimation;
-    public vec2 vertUV = vertUV0;
-    public using TangentSpaceTransform;    
-    public using MaterialGeometry;
-    public using VertexTransform;
-    public using MaterialPattern;
-    vec3 lightParam = vec3(roughness, metallic, specular);
-
-    public out @Fragment vec3 outputAlbedo = albedo;
-    public out @Fragment vec3 outputPbr = lightParam;
-    public out @Fragment vec3 outputNormal = TangentSpaceToWorldSpace(normal);
-}
-
-shader SkeletalMeshForwardLighting : StandardPipeline
-{
-    public using SystemUniforms;
-    public using SkeletalAnimation;
-    public vec2 vertUV = vertUV0;
-    public using TangentSpaceTransform;    
-    public using MaterialGeometry;
-    public using VertexTransform;
-    public using MaterialPattern;
-    vec3 lightParam = vec3(roughness, metallic, specular);
-    using lighting = Lighting(TangentSpaceToWorldSpace(normal));
-    public out @Fragment vec4 outputColor = vec4(lighting.result, 1.0);
-}
-
-shader SkeletalMeshDeferredLighting : StandardPipeline
-{
-    public using SystemUniforms;
-    public using SkeletalAnimation;
-    public vec2 vertUV = vertUV0;
-    public using TangentSpaceTransform;
-    public using MaterialGeometry;
-    public using VertexTransform;
-    public using MaterialPattern;
-    vec3 lightParam = vec3(roughness, metallic, specular);
-    
-    public out @Fragment vec3 outputAlbedo = albedo;
-    public out @Fragment vec3 outputPbr = lightParam;
-    public out @Fragment vec3 outputNormal = TangentSpaceToWorldSpace(normal);
-}
 #file "VertexDefinition"
 module VertexAttributes
 {
 public @MeshVertex vec3 vertPos;
-public @MeshVertex vec2 vertUV0;
+public inline vec2 vertUV0 = vec2(0.0);
 public inline vec2 vertUV1 = vec2(0.0);
 public inline vec2 vertUV2 = vec2(0.0);
 public inline vec2 vertUV3 = vec2(0.0);
@@ -785,7 +733,66 @@ public inline vec2 vertUV7 = vec2(0.0);
 					return normalize(QuaternionRotate(tangentFrameQuaternion, vec3(1.0, 0.0, 0.0)));
 				}
 				public vec3 vertBinormal = cross(vertTangent, vertNormal);
-				public @MeshVertex vec4 vertColor0;
+				public inline vec4 vertColor0 = vec4(0.0);
+public inline vec4 vertColor1 = vec4(0.0);
+public inline vec4 vertColor2 = vec4(0.0);
+public inline vec4 vertColor3 = vec4(0.0);
+public inline vec4 vertColor4 = vec4(0.0);
+public inline vec4 vertColor5 = vec4(0.0);
+public inline vec4 vertColor6 = vec4(0.0);
+public inline vec4 vertColor7 = vec4(0.0);
+public @MeshVertex uint boneIds;
+public @MeshVertex uint boneWeights;
+}
+using "DefaultGeometry.shader";
+
+module MaterialPattern
+{
+	require vec3 pos;
+    public vec3 normal = vec3(0.0, 0.0, 1.0);
+    public float roughness = 0.4;
+    public float metallic = 0.4;
+    public float specular = 1.0;
+    public vec3 albedo = mix(vec3(0.0, 0.6, 0.8), vec3(1.0,0.0,0.0), clamp((6.0-pos.y)/6.0, 0.0, 1.0));
+    public float selfShadow(vec3 lightDir)
+    {
+        return 1.0;
+    }
+}
+#file "VertexDefinition"
+module VertexAttributes
+{
+public @MeshVertex vec3 vertPos;
+public inline vec2 vertUV0 = vec2(0.0);
+public inline vec2 vertUV1 = vec2(0.0);
+public inline vec2 vertUV2 = vec2(0.0);
+public inline vec2 vertUV3 = vec2(0.0);
+public inline vec2 vertUV4 = vec2(0.0);
+public inline vec2 vertUV5 = vec2(0.0);
+public inline vec2 vertUV6 = vec2(0.0);
+public inline vec2 vertUV7 = vec2(0.0);
+
+				@MeshVertex uint tangentFrame;
+				vec4 tangentFrameQuaternion
+				{
+					vec4 result;
+					float inv255 = 2.0 / 255.0;
+					result.x = float(tangentFrame & 255) * inv255 - 1.0;
+					result.y = float((tangentFrame >> 8) & 255) * inv255 - 1.0;
+					result.z = float((tangentFrame >> 16) & 255) * inv255 - 1.0;
+					result.w = float((tangentFrame >> 24) & 255) * inv255 - 1.0;
+					return result;
+				}
+				public @CoarseVertex vec3 vertNormal
+				{
+					return normalize(QuaternionRotate(tangentFrameQuaternion, vec3(0.0, 1.0, 0.0)));
+				}
+				public @CoarseVertex vec3 vertTangent
+				{
+					return normalize(QuaternionRotate(tangentFrameQuaternion, vec3(1.0, 0.0, 0.0)));
+				}
+				public vec3 vertBinormal = cross(vertTangent, vertNormal);
+				public inline vec4 vertColor0 = vec4(0.0);
 public inline vec4 vertColor1 = vec4(0.0);
 public inline vec4 vertColor2 = vec4(0.0);
 public inline vec4 vertColor3 = vec4(0.0);
@@ -797,20 +804,67 @@ public @MeshVertex uint boneIds;
 public @MeshVertex uint boneWeights;
 }
 
-#file "D:\\Projects\\PersonalProjects\\GameEngine\\AnimationLab\\Shaders\\Hero.shader"
-using "DefaultGeometry.shader";
-
-module MaterialPattern
+#file "D:\\Projects\\PersonalProjects\\GameEngine\\EngineContent\\Shaders\\MeshProcessing.shader"
+shader StaticMeshForwardLighting : StandardPipeline
 {
-    require vec2 vertUV;
-    @MaterialUniform sampler2D albedoMap;
-    public vec3 normal = vec3(0.0, 0.0, 1.0);
-    public float roughness = 0.4;
-    public float metallic = 0.4;
-    public float specular = 1.0;
-    public vec3 albedo = texture(albedoMap, vertUV).xyz;
-    public float selfShadow(vec3 lightDir)
-    {
-        return 1.0;
-    }
+    public using VertexAttributes;
+    public using SystemUniforms;
+    public using NoAnimation;
+    public inline vec2 vertUV = vertUV0;
+    public using TangentSpaceTransform;
+    public using MaterialGeometry;
+    public using VertexTransform;
+    public using MaterialPattern;
+    vec3 lightParam = vec3(roughness, metallic, specular);
+    using lighting = Lighting(TangentSpaceToWorldSpace(normal));
+    public out @Fragment vec4 outputColor = vec4(lighting.result, 1.0);
+}
+
+shader StaticMeshDeferredLighting : StandardPipeline
+{
+    public using VertexAttributes;    
+    public using SystemUniforms;
+    public using NoAnimation;
+    public vec2 vertUV = vertUV0;
+    public using TangentSpaceTransform;    
+    public using MaterialGeometry;
+    public using VertexTransform;
+    public using MaterialPattern;
+    vec3 lightParam = vec3(roughness, metallic, specular);
+
+    public out @Fragment vec3 outputAlbedo = albedo;
+    public out @Fragment vec3 outputPbr = lightParam;
+    public out @Fragment vec3 outputNormal = TangentSpaceToWorldSpace(normal);
+}
+
+shader SkeletalMeshForwardLighting : StandardPipeline
+{
+    public using VertexAttributes;    
+    public using SystemUniforms;
+    public using SkeletalAnimation;
+    public vec2 vertUV = vertUV0;
+    public using TangentSpaceTransform;    
+    public using MaterialGeometry;
+    public using VertexTransform;
+    public using MaterialPattern;
+    vec3 lightParam = vec3(roughness, metallic, specular);
+    using lighting = Lighting(TangentSpaceToWorldSpace(normal));
+    public out @Fragment vec4 outputColor = vec4(lighting.result, 1.0);
+}
+
+shader SkeletalMeshDeferredLighting : StandardPipeline
+{
+    public using VertexAttributes;    
+    public using SystemUniforms;
+    public using SkeletalAnimation;
+    public vec2 vertUV = vertUV0;
+    public using TangentSpaceTransform;
+    public using MaterialGeometry;
+    public using VertexTransform;
+    public using MaterialPattern;
+    vec3 lightParam = vec3(roughness, metallic, specular);
+    
+    public out @Fragment vec3 outputAlbedo = albedo;
+    public out @Fragment vec3 outputPbr = lightParam;
+    public out @Fragment vec3 outputNormal = TangentSpaceToWorldSpace(normal);
 }

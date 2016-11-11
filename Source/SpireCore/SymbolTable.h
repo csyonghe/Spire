@@ -14,6 +14,8 @@ namespace Spire
 		class FunctionSymbol
 		{
 		public:
+			bool IsReferencedFunctionsTransitiveClosureEvaluated = false;
+
 			FunctionSyntaxNode * SyntaxNode;
 			EnumerableHashSet<String> ReferencedFunctions;
 		};
@@ -88,6 +90,7 @@ namespace Spire
 		{
 		public:
 			bool IsAbstract = false;
+			bool SemanticallyChecked = false;
 			ShaderSyntaxNode * SyntaxNode = nullptr;
 			PipelineSymbol * Pipeline = nullptr;
 
@@ -205,7 +208,7 @@ namespace Spire
 			List<ImportPath> FindImplicitImportOperatorChain(PipelineSymbol * pipe, String worldSrc, String worldDest, RefPtr<ExpressionType> type);
 		};
 
-		class GUID
+		class UniqueIdGenerator
 		{
 		private:
 			static int currentGUID;

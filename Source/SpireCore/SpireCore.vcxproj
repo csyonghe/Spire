@@ -386,6 +386,7 @@
     <ClInclude Include="StdInclude.h" />
     <ClInclude Include="Syntax.h" />
     <ClInclude Include="SyntaxVisitors.h" />
+    <ClInclude Include="TypeTranslation.h" />
     <ClInclude Include="VariantIR.h" />
   </ItemGroup>
   <ItemGroup>
@@ -419,6 +420,7 @@
     <ClCompile Include="SymbolTable.cpp" />
     <ClCompile Include="StdInclude.cpp" />
     <ClCompile Include="Syntax.cpp" />
+    <ClCompile Include="TypeTranslation.cpp" />
     <ClCompile Include="VariantIR.cpp" />
   </ItemGroup>
   <ItemGroup>

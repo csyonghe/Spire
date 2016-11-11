@@ -92,7 +92,7 @@ namespace GameEngine
 	{
 	public:
 		CoreLib::List<BoneTransformation> Transforms;
-		void GetMatrices(Skeleton * skeleton, CoreLib::List<VectorMath::Matrix4> & matrices)
+		void GetMatrices(const Skeleton * skeleton, CoreLib::List<VectorMath::Matrix4> & matrices)
 		{
 			matrices.Clear();
 			matrices.SetSize(Transforms.Count());

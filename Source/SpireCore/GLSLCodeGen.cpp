@@ -702,7 +702,7 @@ namespace Spire
 				}
 				if (auto import = instr.As<ImportInstruction>())
 				{
-					if (!useBindlessTexture && import->Type->IsTexture() || import->Type.As<ILArrayType>())
+					if ((!useBindlessTexture && import->Type->IsTexture()) || import->Type.As<ILArrayType>())
 						return true;
 				}
 				for (auto &&usr : instr.Users)
@@ -1177,7 +1177,7 @@ namespace Spire
 						{
 							if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Texture)
 							{
-								if (field.Value.Type->IsFloat() || field.Value.Type->IsFloatVector() && !field.Value.Type->IsFloatMatrix())
+								if (field.Value.Type->IsFloat() || (field.Value.Type->IsFloatVector() && !field.Value.Type->IsFloatMatrix()))
 								{
 									sb.GlobalHeader << L"layout(binding = " << sb.TextureBindingsAllocator << L") uniform sampler2D " << field.Key << L";\n";
 									sb.TextureBindingsAllocator++;
@@ -1753,7 +1753,7 @@ namespace Spire
 				}
 				for (int i = 0; i < size; i++)
 				{
-					ctx.Body << L"sysOutputBuffer.content[gl_InvocationId.x * " << recTypeSize << L" + " + memberOffsets[exportInstr->ComponentName]()
+					ctx.Body << L"sysOutputBuffer.content[gl_InvocationId.x * " << recTypeSize << L" + " << memberOffsets[exportInstr->ComponentName]()
 						<< L"] = " << conversionFunction << L"(";
 					codeGen->PrintOp(ctx, exportInstr->Operand.Ptr());
 					if (size <= 4)

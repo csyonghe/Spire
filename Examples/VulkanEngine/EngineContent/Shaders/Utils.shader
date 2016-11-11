@@ -80,7 +80,10 @@ struct BoneTransform
 
 module NoAnimation
 {
-    public using VertexAttributes;
+    require vec3 vertPos;
+    require vec3 vertNormal;
+    require vec3 vertTangent;
+    
     public @CoarseVertex vec3 coarseVertPos = vertPos;
     public @CoarseVertex vec3 coarseVertNormal = vertNormal;
     public @CoarseVertex vec3 coarseVertTangent = vertTangent;
@@ -107,7 +110,12 @@ struct SkinningResult
 
 module SkeletalAnimation
 {
-    public using VertexAttributes;
+    require vec3 vertPos;
+    require vec3 vertNormal;
+    require vec3 vertTangent;
+    require uint boneIds;
+    require uint boneWeights;
+
     require mat4 viewProjectionTransform;
     @SkeletonData BoneTransform[] boneTransforms;
     
@@ -128,7 +136,7 @@ module SkeletalAnimation
             tp = boneTransforms[boneId].normalMatrix * vertNormal;
             result.normal += tp * boneWeight;
             //result.normal = tp;
-            tp = boneTransforms[boneId].normalMatrix * vertTangent;
+            tp = (boneTransforms[boneId].transformMatrix * vec4(vertTangent, 0.0)).xyz;
             result.tangent += tp * boneWeight;
             //result.tangent = tp;
         }

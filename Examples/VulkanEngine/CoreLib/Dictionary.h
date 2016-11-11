@@ -852,6 +852,14 @@ namespace CoreLib
 			{
 				return _count;
 			}
+			KeyValuePair<TKey, TValue> & First() const
+			{
+				return kvPairs.First();
+			}
+			KeyValuePair<TKey, TValue> & Last() const
+			{
+				return kvPairs.Last();
+			}
 		public:
 			EnumerableDictionary()
 			{
@@ -907,7 +915,7 @@ namespace CoreLib
 		template<typename T, typename DictionaryType>
 		class HashSetBase
 		{
-		private:
+		protected:
 			DictionaryType dict;
 		public:
 			HashSetBase()
@@ -978,14 +986,6 @@ namespace CoreLib
 				return Iterator(dict.end());
 			}
 		public:
-			T & First() const
-			{
-				return *begin();
-			}
-			T & Last() const
-			{
-				return *end();
-			}
 			int Count() const
 			{
 				return dict.Count();
@@ -1017,7 +1017,17 @@ namespace CoreLib
 
 		template <typename T>
 		class EnumerableHashSet : public HashSetBase<T, EnumerableDictionary<T, _DummyClass>>
-		{};
+		{
+		public:
+			T & First() const
+			{
+				return dict.First().Key;
+			}
+			T & Last() const
+			{
+				return dict.Last().Key;
+			}
+		};
 	}
 }
 

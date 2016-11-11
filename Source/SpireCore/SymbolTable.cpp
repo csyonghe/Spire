@@ -50,26 +50,38 @@ namespace Spire
 		{
 			for (auto & func : Functions)
 			{
-				List<String> funcList;
-				EnumerableHashSet<String> funcSet;
-				for (auto & ref : func.Value->ReferencedFunctions)
+				if (!func.Value->IsReferencedFunctionsTransitiveClosureEvaluated)
 				{
-					funcList.Add(ref);
-					funcSet.Add(ref);
-				}
-				for (int i = 0; i < funcList.Count(); i++)
-				{
-					RefPtr<FunctionSymbol> funcSym;
-					if (Functions.TryGetValue(funcList[i], funcSym))
+					List<String> funcList;
+					EnumerableHashSet<String> funcSet;
+					for (auto & ref : func.Value->ReferencedFunctions)
 					{
-						for (auto rfunc : funcSym->ReferencedFunctions)
+						funcList.Add(ref);
+						funcSet.Add(ref);
+					}
+					for (int i = 0; i < funcList.Count(); i++)
+					{
+						RefPtr<FunctionSymbol> funcSym;
+						if (Functions.TryGetValue(funcList[i], funcSym))
 						{
-							if (funcSet.Add(rfunc))
-								funcList.Add(rfunc);
+							if (funcSym->IsReferencedFunctionsTransitiveClosureEvaluated)
+							{
+								for (auto rfunc : funcSym->ReferencedFunctions)
+									funcSet.Add(rfunc);
+							}
+							else
+							{
+								for (auto rfunc : funcSym->ReferencedFunctions)
+								{
+									if (funcSet.Add(rfunc))
+										funcList.Add(rfunc);
+								}
+							}
 						}
 					}
+					func.Value->ReferencedFunctions = _Move(funcSet);
+					func.Value->IsReferencedFunctionsTransitiveClosureEvaluated = true;
 				}
-				func.Value->ReferencedFunctions = _Move(funcSet);
 			}
 		}
 
@@ -471,12 +483,12 @@ namespace Spire
 			}).ToList();
 		}
 
-		int GUID::currentGUID = 0;
-		void GUID::Clear()
+		int UniqueIdGenerator::currentGUID = 0;
+		void UniqueIdGenerator::Clear()
 		{
 			currentGUID = 0;
 		}
-		int GUID::Next()
+		int UniqueIdGenerator::Next()
 		{
 			return currentGUID++;
 		}

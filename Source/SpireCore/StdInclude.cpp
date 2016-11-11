@@ -313,7 +313,7 @@ namespace Spire
 					auto type = floatTypes[i];
 					auto itype = intTypes[i];
 					auto utype = uintTypes[i];
-					auto retType = (op >= Operator::Eql && op <= Operator::Leq || op == Operator::And || op == Operator::Or) ? L"bool" : type;
+					auto retType = ((op >= Operator::Eql && op <= Operator::Leq) || op == Operator::And || op == Operator::Or) ? L"bool" : type;
 					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << type << L");\n";
 					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << itype << L", " << type << L");\n";
 					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << utype << L", " << type << L");\n";
@@ -340,7 +340,7 @@ namespace Spire
 				{
 					auto type = intTypes[i];
 					auto utype = uintTypes[i];
-					auto retType = (op >= Operator::Eql && op <= Operator::Leq || op == Operator::And || op == Operator::Or) ? L"bool" : type;
+					auto retType = ((op >= Operator::Eql && op <= Operator::Leq) || op == Operator::And || op == Operator::Or) ? L"bool" : type;
 					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << type << L");\n";
 					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << utype << L", " << type << L");\n";
 					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << utype << L");\n";

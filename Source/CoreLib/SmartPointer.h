@@ -174,7 +174,7 @@ namespace CoreLib
 				return pointer != ptr.pointer;
 			}
 			template<typename U>
-			typename RefPtrImpl<U, 0, Destructor> As() const
+			RefPtrImpl<U, 0, Destructor> As() const
 			{
 				RefPtrImpl<U, 0, Destructor> result;
 				if (pointer)
@@ -372,7 +372,7 @@ namespace CoreLib
 				return pointer != ptr.pointer;
 			}
 			template<typename U>
-			typename RefPtrImpl<U, 1, Destructor> As() const
+			RefPtrImpl<U, 1, Destructor> As() const
 			{
 				RefPtrImpl<U, 1, Destructor> result;
 				if (pointer)

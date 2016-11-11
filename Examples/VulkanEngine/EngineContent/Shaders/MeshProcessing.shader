@@ -1,5 +1,6 @@
 shader StaticMeshForwardLighting : StandardPipeline
 {
+    public using VertexAttributes;
     public using SystemUniforms;
     public using NoAnimation;
     public inline vec2 vertUV = vertUV0;
@@ -14,6 +15,7 @@ shader StaticMeshForwardLighting : StandardPipeline
 
 shader StaticMeshDeferredLighting : StandardPipeline
 {
+    public using VertexAttributes;    
     public using SystemUniforms;
     public using NoAnimation;
     public vec2 vertUV = vertUV0;
@@ -30,6 +32,7 @@ shader StaticMeshDeferredLighting : StandardPipeline
 
 shader SkeletalMeshForwardLighting : StandardPipeline
 {
+    public using VertexAttributes;    
     public using SystemUniforms;
     public using SkeletalAnimation;
     public vec2 vertUV = vertUV0;
@@ -44,6 +47,7 @@ shader SkeletalMeshForwardLighting : StandardPipeline
 
 shader SkeletalMeshDeferredLighting : StandardPipeline
 {
+    public using VertexAttributes;    
     public using SystemUniforms;
     public using SkeletalAnimation;
     public vec2 vertUV = vertUV0;

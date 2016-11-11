@@ -234,7 +234,7 @@ namespace Spire
 				rs.SyntaxNode = parser.Parse();
 				return rs;
 			}
-			virtual void Compile(CompileResult & result, List<CompileUnit> & units, const CompileOptions & options) override
+			virtual void Compile(CompileResult & result, CompilationContext & context, List<CompileUnit> & units, const CompileOptions & options) override
 			{
 				result.Success = false;
 				RefPtr<ProgramSyntaxNode> programSyntaxNode = new ProgramSyntaxNode();
@@ -243,7 +243,8 @@ namespace Spire
 					programSyntaxNode->Include(unit.SyntaxNode.Ptr());
 				}
 
-				SymbolTable symTable;
+				SymbolTable & symTable = context.Symbols;
+				auto & shaderClosures = context.ShaderClosures;
 				RefPtr<SyntaxVisitor> visitor = CreateSemanticsVisitor(&symTable, result.GetErrorWriter());
 				try
 				{
@@ -254,15 +255,17 @@ namespace Spire
 					symTable.EvalFunctionReferenceClosure();
 					if (result.ErrorList.Count() > 0)
 						return;
-					List<RefPtr<ShaderClosure>> shaderClosures;
 
 					for (auto & shader : symTable.ShaderDependenceOrder)
 					{
 						if (shader->IsAbstract)
 							continue;
-						auto shaderClosure = CreateShaderClosure(result.GetErrorWriter(), &symTable, shader);
-						FlattenShaderClosure(result.GetErrorWriter(), &symTable, shaderClosure.Ptr());
-						shaderClosures.Add(shaderClosure);
+						if (!shaderClosures.ContainsKey(shader->SyntaxNode->Name.Content))
+						{
+							auto shaderClosure = CreateShaderClosure(result.GetErrorWriter(), &symTable, shader);
+							FlattenShaderClosure(result.GetErrorWriter(), &symTable, shaderClosure.Ptr());
+							shaderClosures.Add(shader->SyntaxNode->Name.Content, shaderClosure);
+						}
 					}
 					
 					ResolveAttributes(&symTable);
@@ -283,14 +286,23 @@ namespace Spire
 					for (auto shader : shaderClosures)
 					{
 						// generate shader variant from schedule file, and also apply mechanic deduction rules
-						shader->IR = GenerateShaderVariantIR(result, shader.Ptr(), schedule, &symTable);
+						if (!shader.Value->IR)
+							shader.Value->IR = GenerateShaderVariantIR(result, shader.Value.Ptr(), schedule, &symTable);
 					}
 					if (options.Mode == CompilerMode::ProduceShader)
 					{
 						if (result.ErrorList.Count() > 0)
 							return;
 						// generate IL code
+						
 						RefPtr<ICodeGenerator> codeGen = CreateCodeGenerator(&symTable, result);
+						if (context.Program)
+						{
+							result.Program->Functions = context.Program->Functions;
+							result.Program->Shaders = context.Program->Shaders;
+							result.Program->Structs = context.Program->Structs;
+							result.Program->ConstantPool = context.Program->ConstantPool;
+						}
 						for (auto & s : programSyntaxNode->Structs)
 							codeGen->ProcessStruct(s.Ptr());
 
@@ -298,13 +310,13 @@ namespace Spire
 							codeGen->ProcessFunction(func.Ptr());
 						for (auto & shader : shaderClosures)
 						{
-							InsertImplicitImportOperators(shader->IR.Ptr());
+							InsertImplicitImportOperators(shader.Value->IR.Ptr());
 						}
 						if (result.ErrorList.Count() > 0)
 							return;
 						for (auto & shader : shaderClosures)
 						{
-							codeGen->ProcessShader(shader->IR.Ptr());
+							codeGen->ProcessShader(shader.Value->IR.Ptr());
 						}
 						if (result.ErrorList.Count() > 0)
 							return;
@@ -344,10 +356,10 @@ namespace Spire
 					{
 						for (auto shader : shaderClosures)
 						{
-							if (options.SymbolToCompile.Length() == 0 || shader->Name == options.SymbolToCompile)
+							if (options.SymbolToCompile.Length() == 0 || shader.Value->Name == options.SymbolToCompile)
 							{
-								auto &worldOrder = shader->Pipeline->GetWorldTopologyOrder();
-								for (auto & comp : shader->AllComponents)
+								auto &worldOrder = shader.Value->Pipeline->GetWorldTopologyOrder();
+								for (auto & comp : shader.Value->AllComponents)
 								{
 									ShaderChoice choice;
 									if (comp.Value->ChoiceNames.Count() == 0)
@@ -361,7 +373,7 @@ namespace Spire
 											if (comp.Value->Type->ConstrainedWorlds.Contains(w))
 												choice.Options.Add(ShaderChoiceValue(w, impl->AlternateName));
 									}
-									if (auto defs = shader->IR->DefinitionsByComponent.TryGetValue(comp.Key))
+									if (auto defs = shader.Value->IR->DefinitionsByComponent.TryGetValue(comp.Key))
 									{
 										int latestWorldOrder = -1;
 										for (auto & def : *defs)
@@ -384,6 +396,7 @@ namespace Spire
 						result.GetErrorWriter()->Error(2, L"unsupported compiler mode.", CodePosition());
 						return;
 					}
+					context.Program = result.Program;
 					result.Success = true;
 				}
 				catch (int)

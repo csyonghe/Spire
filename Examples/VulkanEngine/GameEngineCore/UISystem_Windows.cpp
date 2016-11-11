@@ -785,30 +785,26 @@ namespace GraphicsUI
 			clipRect = Vec4::Create(0.0f, 0.0f, 1e20f, 1e20f);
 			rendererApi = hw;
 
-			Spire::Compiler::CompileResult compileResult;
-			Spire::Compiler::CompileOptions options;
-			String spireShaderSrc(uberSpireShader);
-			spireShaderSrc = spireShaderSrc.ReplaceAll(L"BACKEND_NAME", rendererApi->GetSpireBackendName());
-			auto compiledUIShaders = SpireLib::CompileShaderSource(compileResult, spireShaderSrc, L"", options);
-			auto compiledUIShader = compiledUIShaders.First();
-
-			if (rendererApi->GetSpireBackendName() == L"glsl")
-			{
-				auto vsCode = compiledUIShader.Sources[L"vs"]().MainCode;
-				auto fsCode = compiledUIShader.Sources[L"fs"]().MainCode;
-
-				uberVs = rendererApi->CreateShader(ShaderType::VertexShader, (char*)vsCode.ToMultiByteString(),
-					(int)strlen(vsCode.ToMultiByteString()));
-				uberFs = rendererApi->CreateShader(ShaderType::FragmentShader, (char*)fsCode.ToMultiByteString(),
-					(int)strlen(fsCode.ToMultiByteString()));
-			}
+			SpireCompilationContext * spireCtx = spCreateCompilationContext(nullptr);
+			auto backend = rendererApi->GetSpireBackendName();
+			if (backend == L"glsl")
+				spSetCodeGenTarget(spireCtx, SPIRE_GLSL);
+			else if (backend == L"hlsl")
+				spSetCodeGenTarget(spireCtx, SPIRE_HLSL);
 			else
+				spSetCodeGenTarget(spireCtx, SPIRE_SPIRV);
+			String spireShaderSrc(uberSpireShader);
+			auto result = spCompileShader(spireCtx, uberSpireShader, "ui_uber_shader");
+			if (spIsCompilationSucessful(result))
 			{
-				uberVs = rendererApi->CreateShader(ShaderType::VertexShader, (char*)compiledUIShader.Sources[L"vs"]().BinaryCode.Buffer(), compiledUIShader.Sources[L"vs"]().BinaryCode.Count());
-				uberFs = rendererApi->CreateShader(ShaderType::FragmentShader, (char*)compiledUIShader.Sources[L"fs"]().BinaryCode.Buffer(), compiledUIShader.Sources[L"fs"]().BinaryCode.Count());
+				int len = 0;
+				auto vsSrc = (char*)spGetShaderStageSource(result, "UberUIShader", "vs", &len);
+				uberVs = rendererApi->CreateShader(ShaderType::VertexShader, vsSrc, len);
+				auto fsSrc = (char*)spGetShaderStageSource(result, "UberUIShader", "fs", &len);
+				uberFs = rendererApi->CreateShader(ShaderType::FragmentShader, fsSrc, len);
 			}
-			//uberVs = rendererApi->CreateShader(ShaderType::VertexShader, (char*)uberVsSrc, strlen(uberVsSrc));
-			//uberFs = rendererApi->CreateShader(ShaderType::FragmentShader, (char*)uberFsSrc, strlen(uberFsSrc));
+			spDestroyCompilationResult(result);
+			spDestroyCompilationContext(spireCtx);
 
 			Array<Shader*, 2> shaderList;
 			shaderList.Add(uberVs.Ptr()); shaderList.Add(uberFs.Ptr());

@@ -2,7 +2,8 @@
 #include "../CoreLib/LibIO.h"
 #include "../CoreLib/Parser.h"
 #include "../SpireCore/StdInclude.h"
-#include "Spire.h"
+#include "include/Spire.h"
+#include "../SpireCore/TypeTranslation.h"
 
 using namespace CoreLib::Basic;
 using namespace CoreLib::IO;
@@ -175,9 +176,9 @@ namespace SpireLib
 			return CompileUnits(compileResult, compiler.Ptr(), units, options);
 		else
 			return List<ShaderLibFile>();
-	}
+	}                                                                                             
 
-	List<ShaderLibFile> CompileShaderSourceFromFile(Spire::Compiler::CompileResult & compileResult, 
+	List<ShaderLibFile> CompileShaderSourceFromFile(Spire::Compiler::CompileResult & compileResult,
 		const CoreLib::Basic::String & sourceFileName,
 		Spire::Compiler::CompileOptions & options)
 	{
@@ -243,7 +244,7 @@ namespace SpireLib
 				for (int i = 0; i < src.Value.BinaryCode.Count() / 4; i++)
 				{
 					writer << String((long long)binaryBuffer[i]) << L",";
-					if ((i+1) % 10)
+					if ((i + 1) % 10)
 						writer << EndLine;
 				}
 				writer << EndLine << L"}" << EndLine;
@@ -258,7 +259,7 @@ namespace SpireLib
 		IndentString(formatSB, writer.ProduceString());
 		return formatSB.ProduceString();
 	}
-	
+
 	void ShaderLibFile::Clear()
 	{
 		Sources.Clear();
@@ -289,7 +290,7 @@ namespace SpireLib
 				ReadSource(Sources, parser, src);
 				parser.Read(L"}");
 			}
-			
+
 			else if (fieldName == L"stage")
 			{
 				StageMetaData stage;
@@ -418,26 +419,124 @@ namespace SpireLib
 		CoreLib::EnumerableDictionary<String, CompiledShaderSource> Sources;
 	};
 
+	class ComponentMetaData
+	{
+	public:
+		RefPtr<ILType> Type;
+		String TypeName;
+		String Register;
+		String Name;
+		int Offset = 0;
+		int GetHashCode()
+		{
+			return Name.GetHashCode();
+		}
+		bool operator == (const ComponentMetaData & other)
+		{
+			return Name == other.Name;
+		}
+	};
+
+	class ModuleMetaData
+	{
+	public:
+		EnumerableDictionary<String, EnumerableHashSet<ComponentMetaData>> ComponentsByWorld;
+		EnumerableHashSet<ComponentMetaData> Requirements;
+	};
+	
 	class CompilationContext
 	{
 	private:
 		bool useCache = false;
 		CoreLib::String cacheDir;
 		List<CompileUnit> moduleUnits;
+		RefPtr<Spire::Compiler::CompilationContext> compileContext;
 		HashSet<String> processedModuleUnits;
 		RefPtr<ShaderCompiler> compiler;
+		RefPtr<ProgramSyntaxNode> programToCompile;
 		CompileResult compileResult;
+		EnumerableDictionary<String, ModuleMetaData> modules;
 	public:
 		CompileOptions Options;
 
 		CompilationContext(bool /*pUseCache*/, CoreLib::String /*pCacheDir*/)
 		{
 			compiler = CreateShaderCompiler();
+			compileContext = new Spire::Compiler::CompilationContext();
+			LoadModuleSource(SpireStdLib::GetCode(), L"stdlib");
 		}
+
+		~CompilationContext()
+		{
+			SpireStdLib::Finalize();
+		}
+
+		ModuleMetaData * FindModule(CoreLib::String moduleName)
+		{
+			return modules.TryGetValue(moduleName);
+		}
+
+		void UpdateModuleLibrary(List<CompileUnit> & units)
+		{
+			Spire::Compiler::CompileResult result;
+			compiler->Compile(result, *compileContext, units, Options);
+			compileResult.Errors = _Move(result.ErrorList);
+			compileResult.Warnings = _Move(result.WarningList);
+			compileResult.Success = result.ErrorList.Count() == 0;
+			for (auto & shader : compileContext->Symbols.Shaders)
+			{
+				if (!modules.ContainsKey(shader.Key))
+				{
+					ModuleMetaData meta;
+					for (auto & comp : shader.Value->Components)
+					{
+						ComponentMetaData compMeta;
+						compMeta.Name = comp.Key;
+						compMeta.Type = TranslateExpressionType(comp.Value->Type->DataType);
+						compMeta.TypeName = compMeta.Type->ToString();
+						for (auto & impl : comp.Value->Implementations)
+						{
+							impl->SyntaxNode->LayoutAttributes.TryGetValue(L"Binding", compMeta.Register);
+							if (impl->SyntaxNode->IsParam)
+							{
+								meta.Requirements.Add(compMeta);
+							}
+							else
+							{
+								for (auto & world : impl->Worlds)
+								{
+									auto list = meta.ComponentsByWorld.TryGetValue(world);
+									if (!list)
+									{
+										meta.ComponentsByWorld[world] = EnumerableHashSet<ComponentMetaData>();
+										list = meta.ComponentsByWorld.TryGetValue(world);
+									}
+									if (!list->Contains(compMeta))
+									{
+										if (list->Count())
+										{
+											compMeta.Offset = list->Last().Offset + list->Last().Type->GetSize();
+											compMeta.Offset = RoundToAlignment(compMeta.Offset, compMeta.Type->GetAlignment());
+										}
+										list->Add(compMeta);
+									}
+								}
+							}
+						}
+					}
+					modules.Add(shader.Key, _Move(meta));
+				}
+			}
+		}
+
 		void LoadModuleSource(CoreLib::String src, CoreLib::String fileName)
 		{
-			LoadModuleSource(moduleUnits, processedModuleUnits, compileResult, src, fileName);
+			List<CompileUnit> units;
+			LoadModuleSource(units, processedModuleUnits, compileResult, src, fileName);
+			moduleUnits.AddRange(units);
+			UpdateModuleLibrary(units);
 		}
+
 		void LoadModuleSource(List<CompileUnit> & units, HashSet<String> & processedUnits, CompileResult & cresult, CoreLib::String src, CoreLib::String fileName)
 		{
 			Spire::Compiler::CompileResult result;
@@ -447,7 +546,6 @@ namespace SpireLib
 			auto searchDirs = Options.SearchDirectories;
 			searchDirs.Add(Path::GetDirectoryName(fileName));
 			searchDirs.Reverse();
-			auto predefUnit = compiler->Parse(result, SpireStdLib::GetCode(), L"stdlib");
 			for (int i = 0; i < unitsToInclude.Count(); i++)
 			{
 				auto inputFileName = unitsToInclude[i];
@@ -488,7 +586,6 @@ namespace SpireLib
 					result.GetErrorWriter()->Error(1, L"cannot open file '" + inputFileName + L"'.", CodePosition(0, 0, L""));
 				}
 			}
-			units.Add(predefUnit);
 			cresult.Errors.AddRange(result.ErrorList);
 			cresult.Warnings.AddRange(result.WarningList);
 		}
@@ -505,15 +602,20 @@ namespace SpireLib
 			List<CompileUnit> userUnits;
 			HashSet<String> processedUserUnits = processedModuleUnits;
 			result = compileResult;
-			LoadModuleSource(userUnits, processedUserUnits, result, source, fileName);
+			result.Errors = compileResult.Errors;
+			result.Warnings = compileResult.Warnings;
 			if (result.Errors.Count() == 0)
 			{
-				Spire::Compiler::CompileResult cresult;
-				userUnits.AddRange(moduleUnits);
-				compiler->Compile(cresult, userUnits, Options);
-				result.Sources = cresult.CompiledSource;
-				result.Errors = _Move(cresult.ErrorList);
-				result.Warnings = _Move(cresult.WarningList);
+				LoadModuleSource(userUnits, processedUserUnits, result, source, fileName);
+				if (result.Errors.Count() == 0)
+				{
+					Spire::Compiler::CompilationContext tmpCtx(*compileContext);
+					Spire::Compiler::CompileResult cresult;
+					compiler->Compile(cresult, tmpCtx, userUnits, Options);
+					result.Sources = cresult.CompiledSource;
+					result.Errors = _Move(cresult.ErrorList);
+					result.Warnings = _Move(cresult.WarningList);
+				}
 			}
 			result.Success = (result.Errors.Count() == 0);
 			return result.Success;
@@ -525,13 +627,14 @@ using namespace SpireLib;
 
 // implementation of C interface
 
-#define CTX(x) reinterpret_cast<CompilationContext *>(x)
-#define SHADER(x) reinterpret_cast<Shader*>(x)
+#define CTX(x) reinterpret_cast<SpireLib::CompilationContext *>(x)
+#define SHADER(x) reinterpret_cast<SpireLib::Shader*>(x)
 #define RS(x) reinterpret_cast<SpireLib::CompileResult*>(x)
+#define MODULE(x) reinterpret_cast<SpireLib::ModuleMetaData*>(x)
 
 SpireCompilationContext * spCreateCompilationContext(const char * cacheDir)
 {
-	return reinterpret_cast<SpireCompilationContext *>(new CompilationContext((cacheDir?true:false), cacheDir));
+	return reinterpret_cast<SpireCompilationContext *>(new SpireLib::CompilationContext((cacheDir?true:false), cacheDir));
 }
 
 void spSetCodeGenTarget(SpireCompilationContext * ctx, int target)
@@ -547,6 +650,11 @@ void spAddSearchPath(SpireCompilationContext * ctx, const char * searchDir)
 void spSetBackendParameter(SpireCompilationContext * ctx, const char * paramName, const char * value)
 {
 	CTX(ctx)->Options.BackendArguments[paramName] = value;
+}
+
+void spSetShaderToCompile(SpireCompilationContext * ctx, const char * shaderName)
+{
+	CTX(ctx)->Options.SymbolToCompile = shaderName;
 }
 
 void spDestroyCompilationContext(SpireCompilationContext * ctx)
@@ -579,36 +687,87 @@ void spShaderSetPipeline(SpireShader * shader, const char * pipelineName)
 	SHADER(shader)->TargetPipeline(pipelineName);
 }
 
+SpireModule * spFindModule(SpireCompilationContext * ctx, const char * moduleName)
+{
+	return reinterpret_cast<SpireModule*>(CTX(ctx)->FindModule(moduleName));
+}
+
+int spModuleGetComponentsByWorld(SpireModule * module, const char * worldName, SpireComponentInfo * buffer, int bufferSize)
+{
+	auto moduleNode = MODULE(module);
+	String worldNameStr = worldName;
+	if (auto components = moduleNode->ComponentsByWorld.TryGetValue(worldNameStr))
+	{
+		if (!buffer)
+			return components->Count();
+		if (bufferSize < components->Count())
+			return SPIRE_ERROR_INSUFFICIENT_BUFFER;
+		int ptr = 0;
+		for (auto & comp : *components)
+		{
+			buffer[ptr].Name = comp.Name.ToMultiByteString();
+			buffer[ptr].TypeName = comp.TypeName.ToMultiByteString();
+			buffer[ptr].Alignment = comp.Type->GetAlignment();
+			buffer[ptr].Size = comp.Type->GetSize();
+			buffer[ptr].Offset = comp.Offset;
+			ptr++;
+		}
+		return ptr;
+	}
+	return 0;
+}
+
+int spModuleGetRequiredComponents(SpireModule * module, SpireComponentInfo * buffer, int bufferSize)
+{
+	auto moduleNode = MODULE(module);
+	auto & components = moduleNode->Requirements;
+	if (!buffer)
+		return components.Count();
+	if (bufferSize < components.Count())
+		return SPIRE_ERROR_INSUFFICIENT_BUFFER;
+	int ptr = 0;
+	for (auto & comp : components)
+	{
+		buffer[ptr].Name = comp.Name.ToMultiByteString();
+		buffer[ptr].TypeName = comp.TypeName.ToMultiByteString();
+		buffer[ptr].Alignment = comp.Type->GetAlignment();
+		buffer[ptr].Size = comp.Type->GetSize();
+		buffer[ptr].Offset = comp.Offset;
+		ptr++;
+	}
+	return ptr;
+}
+
 void spDestroyShader(SpireShader * shader)
 {
 	delete SHADER(shader);
 }
 
-SpireCompileResult * spCompileShader(SpireCompilationContext * ctx, SpireShader * shader)
+SpireCompilationResult * spCompileShader(SpireCompilationContext * ctx, SpireShader * shader)
 {
 	SpireLib::CompileResult * rs = new SpireLib::CompileResult();
 	CTX(ctx)->Compile(*rs, *SHADER(shader));
-	return reinterpret_cast<SpireCompileResult*>(rs);
+	return reinterpret_cast<SpireCompilationResult*>(rs);
 }
 
-SpireCompileResult * spCompileShader(SpireCompilationContext * ctx, const char * source, const char * fileName)
+SpireCompilationResult * spCompileShader(SpireCompilationContext * ctx, const char * source, const char * fileName)
 {
 	SpireLib::CompileResult * rs = new SpireLib::CompileResult();
 	CTX(ctx)->Compile(*rs, source, fileName);
-	return reinterpret_cast<SpireCompileResult*>(rs);
+	return reinterpret_cast<SpireCompilationResult*>(rs);
 }
 
-bool spIsCompilationSucessful(SpireCompileResult * result)
+int spIsCompilationSucessful(SpireCompilationResult * result)
 {
-	return RS(result)->Success;
+	return RS(result)->Success ? 1 : 0;
 }
 
-int spGetMessageCount(SpireCompileResult * result, int messageType)
+int spGetMessageCount(SpireCompilationResult * result, int messageType)
 {
 	return messageType == SPIRE_ERROR ? RS(result)->Errors.Count() : RS(result)->Warnings.Count();
 }
 
-bool spGetMessageContent(SpireCompileResult * result, int messageType, int index, SpireErrorMessage * pMsg)
+int spGetMessageContent(SpireCompilationResult * result, int messageType, int index, SpireErrorMessage * pMsg)
 {
 	auto * list = (messageType == SPIRE_ERROR) ? &(RS(result)->Errors) : (messageType == SPIRE_WARNING) ? &(RS(result)->Warnings) : nullptr;
 	if (list)
@@ -621,28 +780,30 @@ bool spGetMessageContent(SpireCompileResult * result, int messageType, int index
 			pMsg->FileName = msg.Position.FileName.ToMultiByteString();
 			pMsg->Line = msg.Position.Line;
 			pMsg->Col = msg.Position.Col;
-			return true;
+			return 1;
 		}
 	}
-	return false;
+	return SPIRE_ERROR_INVALID_PARAMETER;
 }
 
-int ReturnStr(const char * content, char * buffer, int * bufferSize)
+int ReturnStr(const char * content, char * buffer, int bufferSize)
 {
 	int len = (int)strlen(content);
-	if (*bufferSize < len)
+	if (buffer)
 	{
-		*bufferSize = len;
-		return 0;
+		if (bufferSize >= len + 1)
+		{
+			memcpy(buffer, content, len + 1);
+			return len + 1;
+		}
+		else
+			return SPIRE_ERROR_INSUFFICIENT_BUFFER;
 	}
 	else
-	{
-		memcpy(buffer, content, len);
-		return len;
-	}
+		return len + 1;
 }
 
-int spGetCompiledShaderNames(SpireCompileResult * result, char * buffer, int * bufferSize)
+int spGetCompiledShaderNames(SpireCompilationResult * result, char * buffer, int bufferSize)
 {
 	StringBuilder sb;
 	auto rs = RS(result);
@@ -654,11 +815,11 @@ int spGetCompiledShaderNames(SpireCompileResult * result, char * buffer, int * b
 		sb << x.Key;
 		first = false;
 	}
-	auto str = sb.ProduceString().ToMultiByteString();
-	return ReturnStr(str, buffer, bufferSize);
+	auto str = sb.ProduceString();
+	return ReturnStr(str.ToMultiByteString(), buffer, bufferSize);
 }
 
-int spGetCompiledShaderStageNames(SpireCompileResult * result, const char * shaderName, char * buffer, int * bufferSize)
+int spGetCompiledShaderStageNames(SpireCompilationResult * result, const char * shaderName, char * buffer, int bufferSize)
 {
 	auto rs = RS(result);
 	if (auto src = rs->Sources.TryGetValue(shaderName))
@@ -672,16 +833,16 @@ int spGetCompiledShaderStageNames(SpireCompileResult * result, const char * shad
 			sb << x.Key;
 			first = false;
 		}
-		auto str = sb.ProduceString().ToMultiByteString();
-		return ReturnStr(str, buffer, bufferSize);
+		auto str = sb.ProduceString();
+		return ReturnStr(str.ToMultiByteString(), buffer, bufferSize);
 	}
 	else
 	{
-		return -1;
+		return SPIRE_ERROR_INVALID_PARAMETER;
 	}
 }
 
-char * spGetShaderStageSource(SpireCompileResult * result, const char * shaderName, const char * stage, int * length)
+char * spGetShaderStageSource(SpireCompilationResult * result, const char * shaderName, const char * stage, int * length)
 {
 	auto rs = RS(result);
 	if (auto src = rs->Sources.TryGetValue(shaderName))
@@ -703,7 +864,7 @@ char * spGetShaderStageSource(SpireCompileResult * result, const char * shaderNa
 	return nullptr;
 }
 
-void spDestroyCompileResult(SpireCompileResult * result)
+void spDestroyCompilationResult(SpireCompilationResult * result)
 {
 	delete RS(result);
 }

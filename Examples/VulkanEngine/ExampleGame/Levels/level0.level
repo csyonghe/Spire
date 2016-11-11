@@ -53,9 +53,9 @@ SkeletalMesh
 SkeletalMesh
 {
     name "yyz"
-    mesh "yyz/simple_sit_01.mesh"
-    Skeleton "yyz/simple_sit_01.skeleton"
-    SimpleAnimation "yyz/simple_sit_01.anim"
+    mesh "yyz/pick_up.mesh"
+    Skeleton "yyz/pick_up.skeleton"
+    SimpleAnimation "yyz/pick_up.anim"
     material
     {
         shader "SkeletalMesh.shader"

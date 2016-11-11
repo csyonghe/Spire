@@ -2,6 +2,7 @@
 #define ANIMATION_SYNTHESIZER_H
 
 #include "Skeleton.h"
+#include "MotionGraph.h"
 
 namespace GameEngine
 {
@@ -28,6 +29,25 @@ namespace GameEngine
 		}
 		virtual void GetPose(Pose & p, float time) override;
 	};
+
+    class MotionGraphAnimationSynthesizer : public AnimationSynthesizer
+    {
+    private:
+        Skeleton * skeleton = nullptr;
+        MotionGraph * motionGraph = nullptr;
+    public:
+        MotionGraphAnimationSynthesizer() = default;
+        MotionGraphAnimationSynthesizer(Skeleton * pSkeleton, MotionGraph * pMotionGraph)
+            : skeleton(pSkeleton), motionGraph(pMotionGraph)
+        {}
+        void SetSource(Skeleton * pSkeleton, MotionGraph * pMotionGraph)
+        {
+            this->skeleton = pSkeleton;
+            this->motionGraph = pMotionGraph;
+        }
+        virtual void GetPose(Pose & p, float time) override;
+    };
+
 }
 
 #endif

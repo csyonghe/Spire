@@ -27,7 +27,6 @@ namespace Spire
 
 		SyntaxVisitor * CreateSemanticsVisitor(SymbolTable * symbols, ErrorWriter * err);
 		ICodeGenerator * CreateCodeGenerator(SymbolTable * symbols, CompileResult & result);
-		RefPtr<ILType> TranslateExpressionType(const ExpressionType * type);
 	}
 }
 

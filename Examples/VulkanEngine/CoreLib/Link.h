@@ -217,23 +217,23 @@ namespace CoreLib
 				}
 				return 0;
 			};
-			LinkedNode<T> * FirstNode()
+			LinkedNode<T> * FirstNode() const
 			{
 				return FHead;
 			};
-			T & First()
+			T & First() const
 			{
 				if (!FHead)
 					throw IndexOutofRangeException("LinkedList: index out of range.");
 				return FHead->Value;
 			}
-			T & Last()
+			T & Last() const
 			{
 				if (!FTail)
 					throw IndexOutofRangeException("LinkedList: index out of range.");
 				return FTail->Value;
 			}
-			LinkedNode<T> * LastNode()
+			LinkedNode<T> * LastNode() const
 			{
 				return FTail;
 			};

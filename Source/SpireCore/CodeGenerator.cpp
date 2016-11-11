@@ -3,6 +3,7 @@
 #include "CodeWriter.h"
 #include "StringObject.h"
 #include "Naming.h"
+#include "TypeTranslation.h"
 #include "../CoreLib/Parser.h"
 #include <assert.h>
 
@@ -10,63 +11,13 @@ namespace Spire
 {
 	namespace Compiler
 	{
-		RefPtr<ILType> TranslateExpressionType(const ExpressionType * type, Dictionary<String, RefPtr<ILRecordType>> * recordTypes)
-		{
-			RefPtr<ILType> resultType = 0;
-			if (auto basicType = type->AsBasicType())
-			{
-				if (basicType->BaseType == BaseType::Struct)
-				{
-					resultType = basicType->Struct->Type;
-				}
-				else if (basicType->BaseType == BaseType::Record)
-				{
-					if (recordTypes)
-						return (*recordTypes)[basicType->RecordTypeName]();
-					else
-						throw InvalidProgramException(L"unexpected record type.");
-				}
-				else
-				{
-					auto base = new ILBasicType();
-					base->Type = (ILBaseType)basicType->BaseType;
-					resultType = base;
-				}
-			}
-			else if (auto arrType = type->AsArrayType())
-			{
-				auto nArrType = new ILArrayType();
-				nArrType->BaseType = TranslateExpressionType(arrType->BaseType.Ptr(), recordTypes);
-				nArrType->ArrayLength = arrType->ArrayLength;
-				resultType = nArrType;
-			}
-			else if (auto genType = type->AsGenericType())
-			{
-				auto gType = new ILGenericType();
-				gType->GenericTypeName = genType->GenericTypeName;
-				gType->BaseType = TranslateExpressionType(genType->BaseType.Ptr(), recordTypes);
-				resultType = gType;
-			}
-			return resultType;
-		}
-
-		RefPtr<ILType> TranslateExpressionType(const ExpressionType * type)
-		{
-			return TranslateExpressionType(type, nullptr);
-		}
-
-		RefPtr<ILType> TranslateExpressionType(const RefPtr<ExpressionType> & type, Dictionary<String, RefPtr<ILRecordType>> * recordTypes = nullptr)
-		{
-			return TranslateExpressionType(type.Ptr(), recordTypes);
-		}
-
 		template<typename Func>
 		class ImportNodeVisitor : public SyntaxVisitor
 		{
 		public:
 			const Func & func;
 			ImportNodeVisitor(const Func & f)
-				: func(f), SyntaxVisitor(nullptr)
+				: SyntaxVisitor(nullptr), func(f)
 			{}
 			virtual RefPtr<ExpressionSyntaxNode> VisitImportExpression(ImportExpressionSyntaxNode * expr) override
 			{
@@ -110,7 +61,7 @@ namespace Spire
 			AllocVarInstruction * AllocVar(ExpressionType * etype)
 			{
 				AllocVarInstruction * varOp = 0;
-				RefPtr<ILType> type = TranslateExpressionType(const_cast<const ExpressionType*>(etype), &recordTypes);
+				RefPtr<ILType> type = TranslateExpressionType(etype, &recordTypes);
 				auto arrType = dynamic_cast<ILArrayType*>(type.Ptr());
 
 				if (arrType)
@@ -166,7 +117,7 @@ namespace Spire
 				StringBuilder finalNameSb;
 				for (auto ch : nameSb.ProduceString())
 				{
-					if (ch >= L'0' && ch <= L'9' || ch >= L'a' && ch <= L'z' || ch >= 'A' && ch <= 'Z')
+					if ((ch >= L'0' && ch <= L'9') || (ch >= L'a' && ch <= L'z') || (ch >= 'A' && ch <= 'Z'))
 						finalNameSb << ch;
 					else
 						finalNameSb << L'_';

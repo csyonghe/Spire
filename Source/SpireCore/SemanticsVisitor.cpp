@@ -1,5 +1,6 @@
 #include "SyntaxVisitors.h"
 #include "IL.h"
+#include "TypeTranslation.h"
 
 namespace Spire
 {
@@ -201,7 +202,7 @@ namespace Spire
 				return typeNode;
 			}
 		public:
-			RefPtr<PipelineSyntaxNode> VisitPipeline(PipelineSyntaxNode * pipeline)
+			RefPtr<PipelineSyntaxNode> VisitPipeline(PipelineSyntaxNode * pipeline) override
 			{
 				RefPtr<PipelineSymbol> psymbol = new PipelineSymbol();
 				psymbol->SyntaxNode = pipeline;
@@ -792,13 +793,9 @@ namespace Spire
 					}
 					symbolTable->Shaders[shader->Name.Content] = shaderSym;
 				}
-				HashSet<ShaderSyntaxNode*> validShaders;
 				for (auto & shader : program->Shaders)
 				{
-					int lastErrorCount = err->GetErrorCount();
 					VisitShaderPass1(shader.Ptr());
-					if (err->GetErrorCount() == lastErrorCount)
-						validShaders.Add(shader.Ptr());
 				}
 				if (err->GetErrorCount() != 0)
 					return programNode;
@@ -817,21 +814,12 @@ namespace Spire
 
 				for (auto & shader : symbolTable->ShaderDependenceOrder)
 				{
-					if (!validShaders.Contains(shader->SyntaxNode))
-						continue;
-					int lastErrorCount = err->GetErrorCount();
-					VisitShaderPass2(shader->SyntaxNode);
-					if (err->GetErrorCount() != lastErrorCount)
-						validShaders.Remove(shader->SyntaxNode);
+					if (!shader->SemanticallyChecked)
+					{
+						VisitShaderPass2(shader->SyntaxNode);
+						shader->SemanticallyChecked = true;
+					}
 				}
-				// update symbol table with only valid shaders
-				EnumerableDictionary<String, RefPtr<ShaderSymbol>> newShaderSymbols;
-				for (auto & shader : symbolTable->Shaders)
-				{
-					if (validShaders.Contains(shader.Value->SyntaxNode))
-						newShaderSymbols.AddIfNotExists(shader.Key, shader.Value);
-				}
-				symbolTable->Shaders = _Move(newShaderSymbols);
 				return programNode;
 			}
 
@@ -1173,10 +1161,12 @@ namespace Spire
 					expr->Type = ExpressionType::Error;
 				else
 				{
-					if (expr->BaseExpression->Type->AsGenericType() && 
-						(expr->BaseExpression->Type->AsGenericType()->GenericTypeName != L"ArrayBuffer" || expr->BaseExpression->Type->AsGenericType()->GenericTypeName != L"PackedBuffer") ||
-						expr->BaseExpression->Type->AsBasicType() &&
-						GetVectorSize(expr->BaseExpression->Type->AsBasicType()->BaseType) == 0)
+					auto & baseExprType = expr->BaseExpression->Type;
+					bool isError = baseExprType->AsGenericType() &&
+							(baseExprType->AsGenericType()->GenericTypeName != L"ArrayBuffer" ||
+							 baseExprType->AsGenericType()->GenericTypeName != L"PackedBuffer");
+					isError = isError || (baseExprType->AsBasicType() && GetVectorSize(baseExprType->AsBasicType()->BaseType) == 0);
+					if (isError)
 					{
 						Error(30013, L"'[]' can only index on arrays.", expr);
 						expr->Type = ExpressionType::Error;

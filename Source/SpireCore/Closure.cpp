@@ -118,7 +118,7 @@ namespace Spire
 						{
 							refClosure->IsInPlace = true;
 							CheckComponentRedefinition(err, rs.Ptr(), refClosure.Ptr());
-							rs->SubClosures[L"annonymousObj" + String(GUID::Next())] = refClosure;
+							rs->SubClosures[L"annonymousObj" + String(UniqueIdGenerator::Next())] = refClosure;
 						}
 						else
 						{
@@ -287,7 +287,7 @@ namespace Spire
 			ShaderComponentImplSymbol * currentImpl = nullptr;
 
 			ResolveDependencyVisitor(ErrorWriter * err, ShaderClosure * pRootShader, ShaderClosure * closure, ShaderComponentSymbol * comp)
-				: SyntaxVisitor(err), rootShader(pRootShader), shaderClosure(closure), currentComponent(comp)
+				: SyntaxVisitor(err), shaderClosure(closure), rootShader(pRootShader), currentComponent(comp)
 			{}
 
 			RefPtr<ExpressionSyntaxNode> VisitImportExpression(ImportExpressionSyntaxNode * import) override

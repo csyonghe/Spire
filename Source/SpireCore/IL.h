@@ -11,8 +11,6 @@ namespace Spire
 	{
 		using namespace CoreLib::Basic;
 
-		const int MaxSIMDSize = 8;
-
 		enum ILBaseType
 		{
 			Int = 16, Int2 = 17, Int3 = 18, Int4 = 19,
@@ -879,11 +877,11 @@ namespace Spire
 			{
 				return Arguments.end();
 			}
-			virtual int GetSubBlockCount()
+			virtual int GetSubBlockCount() override
 			{
 				return 1;
 			}
-			virtual CFGNode * GetSubBlock(int i)
+			virtual CFGNode * GetSubBlock(int i) override
 			{
 				if (i == 0)
 					return ImportOperator.Ptr();
@@ -2353,11 +2351,11 @@ namespace Spire
 		{
 		public:
 			RefPtr<CFGNode> ConditionCode, SideEffectCode, BodyCode;
-			virtual int GetSubBlockCount()
+			virtual int GetSubBlockCount() override
 			{
 				return 3;
 			}
-			virtual CFGNode * GetSubBlock(int i)
+			virtual CFGNode * GetSubBlock(int i) override
 			{
 				if (i == 0)
 					return ConditionCode.Ptr();
@@ -2383,14 +2381,14 @@ namespace Spire
 		{
 		public:
 			RefPtr<CFGNode> TrueCode, FalseCode;
-			virtual int GetSubBlockCount()
+			virtual int GetSubBlockCount() override
 			{
 				if (FalseCode)
 					return 2;
 				else
 					return 1;
 			}
-			virtual CFGNode * GetSubBlock(int i)
+			virtual CFGNode * GetSubBlock(int i) override
 			{
 				if (i == 0)
 					return TrueCode.Ptr();
@@ -2420,11 +2418,11 @@ namespace Spire
 		{
 		public:
 			RefPtr<CFGNode> ConditionCode, BodyCode;
-			virtual int GetSubBlockCount()
+			virtual int GetSubBlockCount() override
 			{
 				return 2;
 			}
-			virtual CFGNode * GetSubBlock(int i)
+			virtual CFGNode * GetSubBlock(int i) override
 			{
 				if (i == 0)
 					return ConditionCode.Ptr();
@@ -2447,11 +2445,11 @@ namespace Spire
 		{
 		public:
 			RefPtr<CFGNode> ConditionCode, BodyCode;
-			virtual int GetSubBlockCount()
+			virtual int GetSubBlockCount() override
 			{
 				return 2;
 			}
-			virtual CFGNode * GetSubBlock(int i)
+			virtual CFGNode * GetSubBlock(int i) override
 			{
 				if (i == 1)
 					return ConditionCode.Ptr();

@@ -121,8 +121,6 @@ namespace GameEngine
 
 		RefPtr<RenderTargetLayout> renderTargetLayout;
 		RefPtr<RenderTargetLayout> deferredLayout;
-
-		CoreLib::String meshProcessingDef;
 	private:
 		void Align(MemoryStream * mem, int alignment)
 		{
@@ -323,7 +321,7 @@ namespace GameEngine
 
 			// Compile shaders
 			ShaderCompilationResult rs;
-			if (!hardwareFactory->CompileShader(rs, material->ShaderFile, meshProcessingDef + meshVertexFormat.GetShaderDefinition(), symbol))
+			if (!hardwareFactory->CompileShader(rs, material->ShaderFile, meshVertexFormat.GetShaderDefinition(), symbol))
 				throw HardwareRendererException(L"Shader compilation failure");
 
 			for (auto& compiledShader : rs.Shaders)
@@ -550,13 +548,6 @@ namespace GameEngine
 			targetLayout.Add(TextureUsage::DepthAttachment);
 
 			renderTargetLayout = hardwareRenderer->CreateRenderTargetLayout(ArrayView<TextureUsage>(targetLayout.Buffer(), targetLayout.Count()));
-
-
-			auto meshProcessingFile = Engine::Instance()->FindFile(L"MeshProcessing.shader", ResourceType::Shader);
-			if (!meshProcessingFile.Length())
-				throw InvalidOperationException(L"'MeshProcessing.shader' not found. Engine directory is not setup correctly.");
-			meshProcessingDef = L"\n#file " + CoreLib::Text::Parser::EscapeStringLiteral(meshProcessingFile) + L"\n" + CoreLib::IO::File::ReadAllText(meshProcessingFile);
-
 		}
 		~RendererImpl()
 		{

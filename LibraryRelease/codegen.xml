@@ -2,17 +2,17 @@
 <codegen>
   <license name="license.txt"/>
   <folders>
-    <folder path="..\Source" />
+    <folder path="..\Source\SpireCore" />
+    <folder path="..\Source\SpireLib" />
+    <folder path="..\Source\CoreLib" ifndef="SPIRE_NO_CORE_LIB"/>
   </folders>
   <categories>
     <category name="spire" pattern="\Source\" >
-    <except pattern="\SceneViewer\"/>
-    <except pattern="\SpireCompiler\"/>
-    <except pattern="\RealtimeEngine\"/>
-    <except pattern="\LibGL\"/>
-    <except pattern="\CoreLib\Graphics\"/>
-    <except pattern="\CoreLib\Imaging\"/>
-    <except pattern="\CoreLib\WinForm\"/>
+      <except pattern="\Source\SpireCompiler\"/>
+      <except pattern="\CoreLib\Graphics\"/>
+      <except pattern="\CoreLib\Imaging\"/>
+      <except pattern="\CoreLib\WinForm\"/>
+      <except pattern="\CoreLib\LibGL\"/>
     </category>
   </categories>
   <output path=".">

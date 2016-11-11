@@ -61,9 +61,6 @@
     <ClInclude Include="..\CoreLib\LibGL\glew\wglew.h">
       <Filter>OpenGL API</Filter>
     </ClInclude>
-    <ClInclude Include="Spire\Basic.h">
-      <Filter>Spire</Filter>
-    </ClInclude>
     <ClInclude Include="Spire\Spire.h">
       <Filter>Spire</Filter>
     </ClInclude>

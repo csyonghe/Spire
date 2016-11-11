@@ -41,11 +41,24 @@ namespace Spire
 			RefPtr<ProgramSyntaxNode> SyntaxNode;
 		};
 
+		class CompilationContext
+		{
+		public:
+			SymbolTable Symbols;
+			EnumerableDictionary<String, RefPtr<ShaderClosure>> ShaderClosures;
+			RefPtr<ILProgram> Program;
+		};
+
 		class ShaderCompiler : public CoreLib::Basic::Object
 		{
 		public:
 			virtual CompileUnit Parse(CompileResult & result, String source, String fileName) = 0;
-			virtual void Compile(CompileResult & result, List<CompileUnit> & units, const CompileOptions & options) = 0;
+			virtual void Compile(CompileResult & result, CompilationContext & context, List<CompileUnit> & units, const CompileOptions & options) = 0;
+			void Compile(CompileResult & result, List<CompileUnit> & units, const CompileOptions & options)
+			{
+				CompilationContext context;
+				Compile(result, context, units, options);
+			}
 		};
 
 		ShaderCompiler * CreateShaderCompiler();

@@ -696,7 +696,7 @@ namespace Spire
 		{
 		public:
 			List<RateWorld> Worlds;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) 
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override
 			{
 				return this;
 			}
