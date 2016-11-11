@@ -9,7 +9,7 @@ using namespace Spire::Compiler;
 wchar_t const* tryReadCommandLineArgument(wchar_t const* option, wchar_t***ioCursor, wchar_t**end)
 {
 	wchar_t**& cursor = *ioCursor;
-	if(cursor == end)
+	if (cursor == end)
 	{
 		fprintf(stderr, "expected an argument for command-line option '%s'", String(option).ToMultiByteString());
 		exit(1);
@@ -30,15 +30,15 @@ int wmain(int argc, wchar_t* argv[])
 
 		// As we parse the command line, we will rewrite the
 		// entries in `argv` to collect any "ordinary" arguments.
-		wchar_t const** inputPaths = (wchar_t const**) &argv[1];
+		wchar_t const** inputPaths = (wchar_t const**)&argv[1];
 		wchar_t const** inputPathCursor = inputPaths;
 
 		wchar_t** argCursor = &argv[1];
 		wchar_t** argEnd = &argv[argc];
-		while(argCursor != argEnd)
+		while (argCursor != argEnd)
 		{
 			wchar_t const* arg = *argCursor++;
-			if(arg[0] == L'-')
+			if (arg[0] == L'-')
 			{
 				String argStr(arg);
 
@@ -71,11 +71,11 @@ int wmain(int argc, wchar_t* argv[])
 				}
 				else if (argStr == L"-genchoice")
 					options.Mode = CompilerMode::GenerateChoice;
-				else if(argStr == L"--")
+				else if (argStr == L"--")
 				{
 					// The `--` option causes us to stop trying to parse options,
 					// and treat the rest of the command line as input file names:
-					while(argCursor != argEnd)
+					while (argCursor != argEnd)
 					{
 						*inputPathCursor++ = *argCursor++;
 					}
@@ -94,13 +94,13 @@ int wmain(int argc, wchar_t* argv[])
 			}
 		}
 
-		int inputPathCount = inputPathCursor - inputPaths;
-		if(inputPathCount == 0)
+		int inputPathCount = (int)(inputPathCursor - inputPaths);
+		if (inputPathCount == 0)
 		{
 			fprintf(stderr, "error: no input file specified\n");
 			exit(1);
 		}
-		else if(inputPathCount > 1)
+		else if (inputPathCount > 1)
 		{
 			fprintf(stderr, "error: multiple input files specified\n");
 			exit(1);
@@ -109,7 +109,7 @@ int wmain(int argc, wchar_t* argv[])
 		String fileName = inputPaths[0];
 
 		// Output directory defaults to the path of the input file
-		if(outputDir.Length() == 0)
+		if (outputDir.Length() == 0)
 		{
 			outputDir = Path::GetDirectoryName(fileName);
 		}
@@ -160,4 +160,3 @@ end:;
 #endif
 	return returnValue;
 }
-

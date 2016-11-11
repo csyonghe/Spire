@@ -5160,1226 +5160,6 @@ namespace Spire
 #endif
 
 /***********************************************************************
-SPIRECORE\LEXER.H
-***********************************************************************/
-#ifndef RASTER_RENDERER_LEXER_H
-#define RASTER_RENDERER_LEXER_H
-
-
-namespace Spire
-{
-	namespace Compiler
-	{
-		using namespace CoreLib::Basic;
-
-		enum class TokenType
-		{
-			// illegal
-			Unkown,
-			// identifier
-			Identifier,
-			KeywordReturn, KeywordBreak, KeywordContinue,
-			KeywordIf, KeywordElse, KeywordFor, KeywordWhile, KeywordDo,
-			// constant
-			IntLiterial, DoubleLiterial, StringLiterial, CharLiterial,
-			// operators
-			Semicolon, Comma, Dot, LBrace, RBrace, LBracket, RBracket, LParent, RParent,
-			OpAssign, OpAdd, OpSub, OpMul, OpDiv, OpMod, OpNot, OpBitNot, OpLsh, OpRsh, 
-			OpEql, OpNeq, OpGreater, OpLess, OpGeq, OpLeq,
-			OpAnd, OpOr, OpBitXor, OpBitAnd, OpBitOr,
-			OpInc, OpDec, OpAddAssign, OpSubAssign, OpMulAssign, OpDivAssign, OpModAssign,
-			OpShlAssign, OpShrAssign, OpOrAssign, OpAndAssign, OpXorAssign,
-			
-			QuestionMark, Colon, RightArrow, At,
-		};
-
-		String TokenTypeToString(TokenType type);
-
-		class Token
-		{
-		public:
-			TokenType Type = TokenType::Unkown;
-			String Content;
-			CodePosition Position;
-			Token() = default;
-			Token(TokenType type, const String & content, int line, int col, String fileName)
-			{
-				Type = type;
-				Content = content;
-				Position = CodePosition(line, col, fileName);
-			}
-		};
-
-		class Lexer
-		{
-		public:
-			List<Token> Parse(const String & fileName, const String & str, List<CompileError> & errorList);
-		};
-	}
-}
-
-#endif
-
-/***********************************************************************
-SPIRECORE\SYNTAX.H
-***********************************************************************/
-#ifndef RASTER_RENDERER_SYNTAX_H
-#define RASTER_RENDERER_SYNTAX_H
-
-
-namespace Spire
-{
-	namespace Compiler
-	{
-		using namespace CoreLib::Basic;
-		class SyntaxVisitor;
-		class FunctionSyntaxNode;
-
-		enum class VariableModifier
-		{
-			None = 0,
-			Uniform = 1,
-			Out = 2,
-			In = 4,
-			Centroid = 128,
-			Const = 16,
-			Instance = 1024,
-			Builtin = 256,
-			Parameter = 513
-		};
-
-		enum class BaseType
-		{
-			Void = 0,
-			Int = 16, Int2 = 17, Int3 = 18, Int4 = 19,
-			Float = 32, Float2 = 33, Float3 = 34, Float4 = 35,
-			UInt = 512, UInt2 = 513, UInt3 = 514, UInt4 = 515,
-			Float3x3 = 40, Float4x4 = 47,
-			Texture2D = 48,
-			TextureShadow = 49,
-			TextureCube = 50,
-			TextureCubeShadow = 51,
-			Function = 64,
-			Bool = 128,
-			Shader = 256,
-			Struct = 1024,
-			Record = 2048,
-			Error = 4096,
-		};
-
-		inline const wchar_t * BaseTypeToString(BaseType t)
-		{
-			switch (t)
-			{
-			case BaseType::Void:
-				return L"void";
-			case BaseType::Bool:
-			case BaseType::Int:
-				return L"int";
-			case BaseType::Int2:
-				return L"int2";
-			case BaseType::Int3:
-				return L"int3";
-			case BaseType::Int4:
-				return L"int4";
-			case BaseType::Float:
-				return L"float";
-			case BaseType::Float2:
-				return L"float2";
-			case BaseType::Float3:
-				return L"float3";
-			case BaseType::Float4:
-				return L"float4";
-			case BaseType::Float3x3:
-				return L"float3x3";
-			case BaseType::Float4x4:
-				return L"float4x4";
-			case BaseType::Texture2D:
-				return L"sampler2D";
-			case BaseType::TextureCube:
-				return L"samplerCube";
-			case BaseType::TextureShadow:
-				return L"sampler2DShadow";
-			case BaseType::TextureCubeShadow:
-				return L"samplerCubeShadow";
-			default:
-				return L"<err-type>";
-			}
-		}
-
-		inline bool IsVector(BaseType type)
-		{
-			return (((int)type) & 15) != 0;
-		}
-
-		inline int GetVectorSize(BaseType type)
-		{
-			return (((int)type) & 15) + 1;
-		}
-
-		inline BaseType GetVectorBaseType(BaseType type)
-		{
-			return (BaseType)(((int)type) & (~15));
-		}
-
-		class SymbolTable;
-		class ShaderSymbol;
-		class StructSymbol;
-		class ShaderClosure;
-		class StructSyntaxNode;
-		class ShaderComponentSymbol;
-		class FunctionSymbol;
-		class BasicExpressionType;
-		class ArrayExpressionType;
-		class GenericExpressionType;
-
-		class ExpressionType : public Object
-		{
-		public:
-			static RefPtr<ExpressionType> Bool;
-			static RefPtr<ExpressionType> UInt;
-			static RefPtr<ExpressionType> UInt2;
-			static RefPtr<ExpressionType> UInt3;
-			static RefPtr<ExpressionType> UInt4;
-			static RefPtr<ExpressionType> Int;
-			static RefPtr<ExpressionType> Int2;
-			static RefPtr<ExpressionType> Int3;
-			static RefPtr<ExpressionType> Int4;
-			static RefPtr<ExpressionType> Float;
-			static RefPtr<ExpressionType> Float2;
-			static RefPtr<ExpressionType> Float3;
-			static RefPtr<ExpressionType> Float4;
-			static RefPtr<ExpressionType> Void;
-			static RefPtr<ExpressionType> Error;
-		public:
-			virtual String ToString() const = 0;
-			virtual int GetSize() const = 0;
-			virtual bool IsIntegral() const = 0;
-			virtual bool Equals(const ExpressionType * type) const = 0;
-			virtual bool IsVectorType() const = 0;
-			virtual bool IsArray() const = 0;
-			virtual bool IsGenericType(String typeName) const = 0;
-			virtual BasicExpressionType * AsBasicType() const = 0;
-			virtual ArrayExpressionType * AsArrayType() const = 0;
-			virtual GenericExpressionType * AsGenericType() const = 0;
-			virtual ExpressionType * Clone() = 0;
-			bool IsTexture() const;
-			bool IsStruct() const;
-			bool IsShader() const;
-			static void Init();
-			static void Finalize();
-		};
-
-		class BasicExpressionType : public ExpressionType
-		{
-		public:
-			bool IsLeftValue;
-			bool IsReference;
-			bool IsMaskedVector = false;
-			BaseType BaseType;
-			ShaderSymbol * Shader = nullptr;
-			ShaderClosure * ShaderClosure = nullptr;
-			FunctionSymbol * Func = nullptr;
-			ShaderComponentSymbol * Component = nullptr;
-			StructSymbol * Struct = nullptr;
-			String RecordTypeName;
-
-			BasicExpressionType()
-			{
-				BaseType = Compiler::BaseType::Int;
-				Func = 0;
-				IsLeftValue = false;
-				IsReference = false;
-			}
-			BasicExpressionType(Compiler::BaseType baseType)
-			{
-				BaseType = baseType;
-				Func = 0;
-				IsLeftValue = false;
-				IsReference = false;
-			}
-			BasicExpressionType(ShaderSymbol * shaderSym, Compiler::ShaderClosure * closure)
-			{
-				this->BaseType = BaseType::Shader;
-				this->ShaderClosure = closure;
-				this->Shader = shaderSym;
-			}
-			virtual bool IsIntegral() const override;
-			virtual int GetSize() const override;
-			virtual bool Equals(const ExpressionType * type) const override;
-			virtual bool IsVectorType() const override;
-			virtual bool IsArray() const override;
-			virtual CoreLib::Basic::String ToString() const override;
-			virtual ExpressionType * Clone() override;
-			virtual bool IsGenericType(String typeName) const override
-			{
-				return false;
-			}
-			virtual BasicExpressionType * AsBasicType() const override
-			{
-				return const_cast<BasicExpressionType*>(this);
-			}
-			virtual ArrayExpressionType * AsArrayType() const override
-			{
-				return nullptr;
-			}
-			virtual GenericExpressionType * AsGenericType() const override
-			{
-				return nullptr;
-			}
-		};
-
-		class ArrayExpressionType : public ExpressionType
-		{
-		public:
-			RefPtr<ExpressionType> BaseType;
-			int ArrayLength = 0;
-			virtual bool IsIntegral() const override;
-			virtual bool IsArray() const override;
-
-			virtual int GetSize() const override;
-			virtual bool Equals(const ExpressionType * type) const override;
-			virtual bool IsVectorType() const override;
-			virtual CoreLib::Basic::String ToString() const override;
-			virtual ExpressionType * Clone() override;
-			virtual bool IsGenericType(String typeName) const override
-			{
-				return false;
-			}
-			virtual BasicExpressionType * AsBasicType() const override
-			{
-				return nullptr;
-			}
-			virtual ArrayExpressionType * AsArrayType() const override
-			{
-				return const_cast<ArrayExpressionType*>(this);
-			}
-			virtual GenericExpressionType * AsGenericType() const override
-			{
-				return nullptr;
-			}
-		};
-
-		class GenericExpressionType : public ExpressionType
-		{
-		public:
-			RefPtr<ExpressionType> BaseType;
-			String GenericTypeName;
-			virtual bool IsIntegral() const override;
-			virtual int GetSize() const override;
-			virtual bool IsArray() const override;
-
-			virtual bool Equals(const ExpressionType * type) const override;
-			virtual bool IsVectorType() const override;
-			virtual CoreLib::Basic::String ToString() const override;
-			virtual ExpressionType * Clone() override;
-			virtual bool IsGenericType(String typeName) const override
-			{
-				return GenericTypeName == typeName;
-			}
-			virtual BasicExpressionType * AsBasicType() const override
-			{
-				return nullptr;
-			}
-			virtual ArrayExpressionType * AsArrayType() const override
-			{
-				return nullptr;
-			}
-			virtual GenericExpressionType * AsGenericType() const override
-			{
-				return const_cast<GenericExpressionType*>(this);
-			}
-		};
-		
-		class Type
-		{
-		public:
-			RefPtr<ExpressionType> DataType;
-			// ContrainedWorlds: Implementation must be defined at at least one of of these worlds in order to satisfy global dependency
-			// FeasibleWorlds: The component can be computed at any of these worlds
-			EnumerableHashSet<String> ConstrainedWorlds, FeasibleWorlds;
-			EnumerableHashSet<String> PinnedWorlds; 
-		};
-
-
-		class VariableEntry
-		{
-		public:
-			String Name;
-			Type Type;
-			bool IsComponent = false;
-		};
-
-		class Scope
-		{
-		public:
-			Scope * Parent;
-			Dictionary<String, VariableEntry> Variables;
-			bool FindVariable(const String & name, VariableEntry & variable);
-			Scope()
-				: Parent(0)
-			{}
-		};
-
-		class CloneContext
-		{
-		public:
-			Dictionary<Spire::Compiler::Scope*, RefPtr<Spire::Compiler::Scope>> ScopeTranslateTable;
-		};
-
-		class SyntaxNode : public RefObject
-		{
-		protected:
-			template<typename T>
-			T* CloneSyntaxNodeFields(T * target, CloneContext & ctx)
-			{
-				if (this->Scope)
-				{
-					RefPtr<Spire::Compiler::Scope> newScope;
-					if (ctx.ScopeTranslateTable.TryGetValue(this->Scope.Ptr(), newScope))
-						target->Scope = newScope;
-					else
-					{
-						target->Scope = new Spire::Compiler::Scope(*this->Scope);
-						ctx.ScopeTranslateTable[this->Scope.Ptr()] = target->Scope;
-						RefPtr<Spire::Compiler::Scope> parentScope;
-						if (ctx.ScopeTranslateTable.TryGetValue(target->Scope->Parent, parentScope))
-							target->Scope->Parent = parentScope.Ptr();
-					}
-					
-				}
-				target->Position = this->Position;
-				target->Tags = this->Tags;
-				return target;
-			}
-		public:
-			EnumerableDictionary<String, RefPtr<Object>> Tags;
-			CodePosition Position;
-			RefPtr<Scope> Scope;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) = 0;
-			virtual SyntaxNode * Clone(CloneContext & ctx) = 0;
-		};
-
-		class TypeSyntaxNode : public SyntaxNode
-		{
-		public:
-			static RefPtr<TypeSyntaxNode> FromExpressionType(ExpressionType * t);
-			virtual TypeSyntaxNode * Clone(CloneContext & ctx) = 0;
-		};
-
-		class BasicTypeSyntaxNode : public TypeSyntaxNode
-		{
-		public:
-			String TypeName;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual BasicTypeSyntaxNode * Clone(CloneContext & ctx)
-			{
-				return CloneSyntaxNodeFields(new BasicTypeSyntaxNode(*this), ctx);
-			}
-		};
-
-		class ArrayTypeSyntaxNode : public TypeSyntaxNode
-		{
-		public:
-			RefPtr<TypeSyntaxNode> BaseType;
-			int ArrayLength;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual ArrayTypeSyntaxNode * Clone(CloneContext & ctx)
-			{
-				auto rs = CloneSyntaxNodeFields(new ArrayTypeSyntaxNode(*this), ctx);
-				rs->BaseType = BaseType->Clone(ctx);
-				return rs;
-			}
-		};
-
-		class GenericTypeSyntaxNode : public TypeSyntaxNode
-		{
-		public:
-			RefPtr<TypeSyntaxNode> BaseType;
-			String GenericTypeName;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual GenericTypeSyntaxNode * Clone(CloneContext & ctx)
-			{
-				auto rs = CloneSyntaxNodeFields(new GenericTypeSyntaxNode(*this), ctx);
-				rs->BaseType = BaseType->Clone(ctx);
-				return rs;
-			}
-		};
-
-		class StructField : public SyntaxNode
-		{
-		public:
-			RefPtr<TypeSyntaxNode> TypeNode;
-			RefPtr<ExpressionType> Type;
-			Token Name;
-			StructField()
-			{}
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-			virtual StructField * Clone(CloneContext & ctx) override
-			{
-				auto rs = CloneSyntaxNodeFields(new StructField(*this), ctx);
-				rs->TypeNode = TypeNode->Clone(ctx);
-				return rs;
-			}
-		};
-
-		class StructSyntaxNode : public SyntaxNode
-		{
-		public:
-			List<RefPtr<StructField>> Fields;
-			Token Name;
-			bool IsIntrinsic = false;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-			int FindField(String name)
-			{
-				for (int i = 0; i < Fields.Count(); i++)
-				{
-					if (Fields[i]->Name.Content == name)
-						return i;
-				}
-				return -1;
-			}
-			virtual StructSyntaxNode * Clone(CloneContext & ctx) override
-			{
-				auto rs = CloneSyntaxNodeFields(new StructSyntaxNode(*this), ctx);
-				rs->Fields.Clear();
-				for (auto & f : Fields)
-					rs->Fields.Add(f->Clone(ctx));
-				return rs;
-			}
-		};
-
-		enum class ExpressionAccess
-		{
-			Read, Write
-		};
-
-		class ExpressionSyntaxNode : public SyntaxNode
-		{
-		public:
-			RefPtr<ExpressionType> Type;
-			ExpressionAccess Access;
-			ExpressionSyntaxNode()
-			{
-				Access = ExpressionAccess::Read;
-			}
-			ExpressionSyntaxNode(const ExpressionSyntaxNode & expr) = default;
-			virtual ExpressionSyntaxNode* Clone(CloneContext & ctx) = 0;
-		};
-
-		class StatementSyntaxNode : public SyntaxNode
-		{
-		public:
-			virtual StatementSyntaxNode* Clone(CloneContext & ctx) = 0;
-		};
-
-		class BlockStatementSyntaxNode : public StatementSyntaxNode
-		{
-		public:
-			List<RefPtr<StatementSyntaxNode>> Statements;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual BlockStatementSyntaxNode * Clone(CloneContext & ctx);
-		};
-
-		class ParameterSyntaxNode : public SyntaxNode
-		{
-		public:
-			RefPtr<TypeSyntaxNode> TypeNode;
-			RefPtr<ExpressionType> Type;
-			String Name;
-			RefPtr<ExpressionSyntaxNode> Expr;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual ParameterSyntaxNode * Clone(CloneContext & ctx);
-		};
-
-		class FunctionSyntaxNode : public SyntaxNode
-		{
-		public:
-			String Name, InternalName;
-			RefPtr<ExpressionType> ReturnType;
-			RefPtr<TypeSyntaxNode> ReturnTypeNode;
-			List<RefPtr<ParameterSyntaxNode>> Parameters;
-			RefPtr<BlockStatementSyntaxNode> Body;
-			bool IsInline;
-			bool IsExtern;
-			bool HasSideEffect;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			FunctionSyntaxNode()
-			{
-				IsInline = false;
-				IsExtern = false;
-				HasSideEffect = true;
-			}
-
-			virtual FunctionSyntaxNode * Clone(CloneContext & ctx);
-		};
-
-		class ImportOperatorDefSyntaxNode : public SyntaxNode
-		{
-		public:
-			Token Name;
-			Token SourceWorld, DestWorld;
-			List<RefPtr<ParameterSyntaxNode>> Parameters;
-			RefPtr<BlockStatementSyntaxNode> Body;
-			EnumerableDictionary<String, String> LayoutAttributes;
-			Token TypeName;
-			List<RefPtr<FunctionSyntaxNode>> Requirements;
-			List<String> Usings;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-			virtual ImportOperatorDefSyntaxNode * Clone(CloneContext & ctx) override;
-		};
-
-		class ChoiceValueSyntaxNode : public ExpressionSyntaxNode
-		{
-		public:
-			String WorldName, AlternateName;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) { return this; }
-			virtual ChoiceValueSyntaxNode * Clone(CloneContext & ctx);
-		};
-
-		class VarExpressionSyntaxNode : public ExpressionSyntaxNode
-		{
-		public:
-			String Variable;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual VarExpressionSyntaxNode * Clone(CloneContext & ctx);
-		};
-
-		class ConstantExpressionSyntaxNode : public ExpressionSyntaxNode
-		{
-		public:
-			enum class ConstantType
-			{
-				Int, Bool, Float
-			};
-			ConstantType ConstType;
-			union
-			{
-				int IntValue;
-				float FloatValue;
-			};
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual ConstantExpressionSyntaxNode * Clone(CloneContext & ctx);
-		};
-
-		enum class Operator
-		{
-			Neg, Not, BitNot, PreInc, PreDec, PostInc, PostDec,
-			Mul, Div, Mod,
-			Add, Sub, 
-			Lsh, Rsh,
-			Eql, Neq, Greater, Less, Geq, Leq,
-			BitAnd, BitXor, BitOr,
-			And,
-			Or,
-			Assign = 200, AddAssign, SubAssign, MulAssign, DivAssign, ModAssign,
-			LshAssign, RshAssign, OrAssign, AndAssign, XorAssign
-		};
-
-		String GetOperatorFunctionName(Operator op);
-		
-		class ImportExpressionSyntaxNode : public ExpressionSyntaxNode
-		{
-		public:
-			RefPtr<ExpressionSyntaxNode> Component;
-			String ComponentUniqueName; // filled by RsolveDependence
-			RefPtr<ImportOperatorDefSyntaxNode> ImportOperatorDef; // filled by semantics
-			List<RefPtr<ExpressionSyntaxNode>> Arguments;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-			virtual ImportExpressionSyntaxNode * Clone(CloneContext & ctx) override;
-		};
-
-		class UnaryExpressionSyntaxNode : public ExpressionSyntaxNode
-		{
-		public:
-			Operator Operator;
-			RefPtr<ExpressionSyntaxNode> Expression;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual UnaryExpressionSyntaxNode * Clone(CloneContext & ctx);
-		};
-		
-		class BinaryExpressionSyntaxNode : public ExpressionSyntaxNode
-		{
-		public:
-			Operator Operator;
-			RefPtr<ExpressionSyntaxNode> LeftExpression;
-			RefPtr<ExpressionSyntaxNode> RightExpression;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual BinaryExpressionSyntaxNode * Clone(CloneContext & ctx);
-		};
-
-		class IndexExpressionSyntaxNode : public ExpressionSyntaxNode
-		{
-		public:
-			RefPtr<ExpressionSyntaxNode> BaseExpression;
-			RefPtr<ExpressionSyntaxNode> IndexExpression;
-			virtual IndexExpressionSyntaxNode * Clone(CloneContext & ctx);
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-		};
-
-		class MemberExpressionSyntaxNode : public ExpressionSyntaxNode
-		{
-		public:
-			RefPtr<ExpressionSyntaxNode> BaseExpression;
-			String MemberName;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual MemberExpressionSyntaxNode * Clone(CloneContext & ctx);
-		};
-
-		class InvokeExpressionSyntaxNode : public ExpressionSyntaxNode
-		{
-		public:
-			RefPtr<ExpressionSyntaxNode> FunctionExpr;
-			List<RefPtr<ExpressionSyntaxNode>> Arguments;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual InvokeExpressionSyntaxNode * Clone(CloneContext & ctx);
-		};
-
-		class TypeCastExpressionSyntaxNode : public ExpressionSyntaxNode
-		{
-		public:
-			RefPtr<TypeSyntaxNode> TargetType;
-			RefPtr<ExpressionSyntaxNode> Expression;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual TypeCastExpressionSyntaxNode * Clone(CloneContext & ctx);
-		};
-
-		class SelectExpressionSyntaxNode : public ExpressionSyntaxNode
-		{
-		public:
-			RefPtr<ExpressionSyntaxNode> SelectorExpr, Expr0, Expr1;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual SelectExpressionSyntaxNode * Clone(CloneContext & ctx);
-		};
-
-
-		class EmptyStatementSyntaxNode : public StatementSyntaxNode
-		{
-		public:
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual EmptyStatementSyntaxNode * Clone(CloneContext & ctx);
-		};
-
-		class DiscardStatementSyntaxNode : public StatementSyntaxNode
-		{
-		public:
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual DiscardStatementSyntaxNode * Clone(CloneContext & ctx);
-		};
-
-		class VariableDeclr
-		{
-		public:
-			RefPtr<ExpressionType> Type;
-			String Name;
-
-			bool operator ==(const VariableDeclr & var)
-			{
-				return Name == var.Name;
-			}
-			bool operator ==(const String & name)
-			{
-				return name == Name;
-			}
-		};
-
-		struct Variable : public SyntaxNode
-		{
-			String Name;
-			RefPtr<ExpressionSyntaxNode> Expression;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual Variable * Clone(CloneContext & ctx);
-		};
-
-		class VarDeclrStatementSyntaxNode : public StatementSyntaxNode
-		{
-		public:
-			RefPtr<TypeSyntaxNode> TypeNode;
-			RefPtr<ExpressionType> Type;
-			String LayoutString;
-			List<RefPtr<Variable>> Variables;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual VarDeclrStatementSyntaxNode * Clone(CloneContext & ctx);
-		};
-
-		class RateWorld
-		{
-		public:
-			Token World;
-			bool Pinned = false;
-			RateWorld() {}
-			RateWorld(String world)
-			{
-				World.Content = world;
-				World.Type = TokenType::Identifier;
-			}
-		};
-
-		class RateSyntaxNode : public SyntaxNode
-		{
-		public:
-			List<RateWorld> Worlds;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override
-			{
-				return this;
-			}
-			virtual RateSyntaxNode * Clone(CloneContext & ctx) override;
-		};
-
-		class ShaderMemberNode : public SyntaxNode
-		{
-		public:
-			Token ParentModuleName;
-			virtual ShaderMemberNode * Clone(CloneContext & ctx) = 0;
-		};
-
-		class ComponentSyntaxNode : public ShaderMemberNode
-		{
-		public:
-			bool IsOutput = false, IsPublic = false, IsInline = false, IsParam = false, IsInput = false;
-			RefPtr<TypeSyntaxNode> TypeNode;
-			RefPtr<ExpressionType> Type;
-			RefPtr<RateSyntaxNode> Rate;
-			Token Name, AlternateName;
-			EnumerableDictionary<String, String> LayoutAttributes;
-			RefPtr<BlockStatementSyntaxNode> BlockStatement;
-			RefPtr<ExpressionSyntaxNode> Expression;
-			List<RefPtr<ParameterSyntaxNode>> Parameters;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-			virtual ComponentSyntaxNode * Clone(CloneContext & ctx) override;
-		};
-
-		class WorldSyntaxNode : public SyntaxNode
-		{
-		public:
-			bool IsAbstract = false;
-			Token Name;
-			EnumerableDictionary<String, String> LayoutAttributes;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override { return this; }
-			virtual WorldSyntaxNode * Clone(CloneContext & ctx) override;
-		};
-
-		class StageSyntaxNode : public SyntaxNode
-		{
-		public:
-			Token Name;
-			Token StageType;
-			EnumerableDictionary<String, Token> Attributes;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override { return this; }
-			virtual StageSyntaxNode * Clone(CloneContext & ctx) override;
-		};
-		
-		class PipelineSyntaxNode : public SyntaxNode
-		{
-		public:
-			Token Name;
-			Token ParentPipeline;
-			List<RefPtr<WorldSyntaxNode>> Worlds;
-			List<RefPtr<ImportOperatorDefSyntaxNode>> ImportOperators;
-			List<RefPtr<StageSyntaxNode>> Stages;
-			List<RefPtr<ComponentSyntaxNode>> AbstractComponents;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override { return this; }
-			virtual PipelineSyntaxNode * Clone(CloneContext & ctx) override;
-		};
-
-		class ImportArgumentSyntaxNode : public SyntaxNode
-		{
-		public:
-			RefPtr<ExpressionSyntaxNode> Expression;
-			Token ArgumentName;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override;
-			virtual ImportArgumentSyntaxNode * Clone(CloneContext & ctx) override;
-		};
-
-		class ImportSyntaxNode : public ShaderMemberNode
-		{
-		public:
-			bool IsInplace = false;
-			bool IsPublic = false;
-			Token ShaderName;
-			Token ObjectName;
-			List<RefPtr<ImportArgumentSyntaxNode>> Arguments;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override;
-			virtual ImportSyntaxNode * Clone(CloneContext & ctx) override;
-
-		};
-
-		class ShaderSyntaxNode : public SyntaxNode
-		{
-		public:
-			Token Name;
-			Token Pipeline;
-			List<RefPtr<ShaderMemberNode>> Members;
-			bool IsModule = false;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-			virtual ShaderSyntaxNode * Clone(CloneContext & ctx) override;
-		};
-
-		class ProgramSyntaxNode : public SyntaxNode
-		{
-		public:
-			List<Token> Usings;
-			List<RefPtr<FunctionSyntaxNode>> Functions;
-			List<RefPtr<PipelineSyntaxNode>> Pipelines;
-			List<RefPtr<ShaderSyntaxNode>> Shaders;
-			List<RefPtr<StructSyntaxNode>> Structs;
-			void Include(ProgramSyntaxNode * other)
-			{
-				Functions.AddRange(other->Functions);
-				Pipelines.AddRange(other->Pipelines);
-				Shaders.AddRange(other->Shaders);
-				Structs.AddRange(other->Structs);
-			}
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-			virtual ProgramSyntaxNode * Clone(CloneContext & ctx) override;
-		};
-
-		class ImportStatementSyntaxNode : public StatementSyntaxNode
-		{
-		public:
-			RefPtr<ImportSyntaxNode> Import;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-			virtual ImportStatementSyntaxNode * Clone(CloneContext & ctx) override;
-		};
-
-		class IfStatementSyntaxNode : public StatementSyntaxNode
-		{
-		public:
-			RefPtr<ExpressionSyntaxNode> Predicate;
-			RefPtr<StatementSyntaxNode> PositiveStatement;
-			RefPtr<StatementSyntaxNode> NegativeStatement;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-			virtual IfStatementSyntaxNode * Clone(CloneContext & ctx) override;
-		};
-
-		class ForStatementSyntaxNode : public StatementSyntaxNode
-		{
-		public:
-			RefPtr<TypeSyntaxNode> TypeDef;
-			RefPtr<ExpressionType> IterationVariableType;
-			Token IterationVariable;
-
-			RefPtr<ExpressionSyntaxNode> InitialExpression, StepExpression, EndExpression;
-			RefPtr<StatementSyntaxNode> Statement;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-			virtual ForStatementSyntaxNode * Clone(CloneContext & ctx) override;
-		};
-
-		class WhileStatementSyntaxNode : public StatementSyntaxNode
-		{
-		public:
-			RefPtr<ExpressionSyntaxNode> Predicate;
-			RefPtr<StatementSyntaxNode> Statement;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-			virtual WhileStatementSyntaxNode * Clone(CloneContext & ctx) override;
-		};
-
-		class DoWhileStatementSyntaxNode : public StatementSyntaxNode
-		{
-		public:
-			RefPtr<StatementSyntaxNode> Statement;
-			RefPtr<ExpressionSyntaxNode> Predicate;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-			virtual DoWhileStatementSyntaxNode * Clone(CloneContext & ctx) override;
-		};
-
-		class BreakStatementSyntaxNode : public StatementSyntaxNode
-		{
-		public:
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-			virtual BreakStatementSyntaxNode * Clone(CloneContext & ctx) override;
-		};
-
-		class ContinueStatementSyntaxNode : public StatementSyntaxNode
-		{
-		public:
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-			virtual ContinueStatementSyntaxNode * Clone(CloneContext & ctx) override;
-		};
-
-		class ReturnStatementSyntaxNode : public StatementSyntaxNode
-		{
-		public:
-			RefPtr<ExpressionSyntaxNode> Expression;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-			virtual ReturnStatementSyntaxNode * Clone(CloneContext & ctx) override;
-		};
-
-		class ExpressionStatementSyntaxNode : public StatementSyntaxNode
-		{
-		public:
-			RefPtr<ExpressionSyntaxNode> Expression;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-			virtual ExpressionStatementSyntaxNode * Clone(CloneContext & ctx) override;
-		};
-
-		class SyntaxVisitor : public Object
-		{
-		protected:
-			ErrorWriter * err = nullptr;
-			void Error(int id, const String & text, SyntaxNode * node)
-			{
-				err->Error(id, text, node->Position);
-			}
-			void Error(int id, const String & text, Token node)
-			{
-				err->Error(id, text, node.Position);
-			}
-			void Warning(int id, const String & text, SyntaxNode * node)
-			{
-				err->Warning(id, text, node->Position);
-			}
-			void Warning(int id, const String & text, Token node)
-			{
-				err->Warning(id, text, node.Position);
-			}
-		public:
-			SyntaxVisitor(ErrorWriter * pErr)
-				: err(pErr)
-			{}
-			virtual RefPtr<ProgramSyntaxNode> VisitProgram(ProgramSyntaxNode* program)
-			{
-				for (auto & f : program->Functions)
-					f = f->Accept(this).As<FunctionSyntaxNode>();
-				for (auto & shader : program->Shaders)
-					shader = shader->Accept(this).As<ShaderSyntaxNode>();
-				return program;
-			}
-			virtual RefPtr<ShaderSyntaxNode> VisitShader(ShaderSyntaxNode * shader)
-			{
-				for (auto & comp : shader->Members)
-					comp = comp->Accept(this).As<ShaderMemberNode>();
-				return shader;
-			}
-			virtual RefPtr<ComponentSyntaxNode> VisitComponent(ComponentSyntaxNode * comp);
-			virtual RefPtr<FunctionSyntaxNode> VisitFunction(FunctionSyntaxNode* func)
-			{
-				func->ReturnTypeNode = func->ReturnTypeNode->Accept(this).As<TypeSyntaxNode>();
-				for (auto & param : func->Parameters)
-					param = param->Accept(this).As<ParameterSyntaxNode>();
-				if (func->Body)
-					func->Body = func->Body->Accept(this).As<BlockStatementSyntaxNode>();
-				return func;
-			}
-			virtual RefPtr<StructSyntaxNode> VisitStruct(StructSyntaxNode * s)
-			{
-				for (auto & f : s->Fields)
-					f = f->Accept(this).As<StructField>();
-				return s;
-			}
-			virtual RefPtr<StatementSyntaxNode> VisitDiscardStatement(DiscardStatementSyntaxNode * stmt)
-			{
-				return stmt;
-			}
-			virtual RefPtr<StructField> VisitStructField(StructField * f)
-			{
-				f->TypeNode = f->TypeNode->Accept(this).As<TypeSyntaxNode>();
-				return f;
-			}
-			virtual RefPtr<StatementSyntaxNode> VisitBlockStatement(BlockStatementSyntaxNode* stmt)
-			{
-				for (auto & s : stmt->Statements)
-					s = s->Accept(this).As<StatementSyntaxNode>();
-				return stmt;
-			}
-			virtual RefPtr<StatementSyntaxNode> VisitBreakStatement(BreakStatementSyntaxNode* stmt)
-			{
-				return stmt;
-			}
-			virtual RefPtr<StatementSyntaxNode> VisitContinueStatement(ContinueStatementSyntaxNode* stmt)
-			{
-				return stmt;
-			}
-
-			virtual RefPtr<StatementSyntaxNode> VisitDoWhileStatement(DoWhileStatementSyntaxNode* stmt)
-			{
-				if (stmt->Predicate)
-					stmt->Predicate = stmt->Predicate->Accept(this).As<ExpressionSyntaxNode>();
-				if (stmt->Statement)
-					stmt->Statement = stmt->Statement->Accept(this).As<StatementSyntaxNode>();
-				return stmt;
-			}
-			virtual RefPtr<StatementSyntaxNode> VisitEmptyStatement(EmptyStatementSyntaxNode* stmt)
-			{
-				return stmt;
-			}
-			virtual RefPtr<StatementSyntaxNode> VisitForStatement(ForStatementSyntaxNode* stmt)
-			{
-				if (stmt->InitialExpression)
-					stmt->InitialExpression = stmt->InitialExpression->Accept(this).As<ExpressionSyntaxNode>();
-				if (stmt->StepExpression)
-					stmt->StepExpression = stmt->StepExpression->Accept(this).As<ExpressionSyntaxNode>();
-				if (stmt->EndExpression)
-					stmt->EndExpression = stmt->EndExpression->Accept(this).As<ExpressionSyntaxNode>();
-				if (stmt->Statement)
-					stmt->Statement = stmt->Statement->Accept(this).As<StatementSyntaxNode>();
-				return stmt;
-			}
-			virtual RefPtr<StatementSyntaxNode> VisitIfStatement(IfStatementSyntaxNode* stmt)
-			{
-				if (stmt->Predicate)
-					stmt->Predicate = stmt->Predicate->Accept(this).As<ExpressionSyntaxNode>();
-				if (stmt->PositiveStatement)
-					stmt->PositiveStatement = stmt->PositiveStatement->Accept(this).As<StatementSyntaxNode>();
-				if (stmt->NegativeStatement)
-					stmt->NegativeStatement = stmt->NegativeStatement->Accept(this).As<StatementSyntaxNode>();
-				return stmt;
-			}
-			virtual RefPtr<StatementSyntaxNode> VisitReturnStatement(ReturnStatementSyntaxNode* stmt)
-			{
-				if (stmt->Expression)
-					stmt->Expression = stmt->Expression->Accept(this).As<ExpressionSyntaxNode>();
-				return stmt;
-			}
-			virtual RefPtr<StatementSyntaxNode> VisitVarDeclrStatement(VarDeclrStatementSyntaxNode* stmt)
-			{
-				for (auto & var : stmt->Variables)
-					var = var->Accept(this).As<Variable>();
-				return stmt;
-			}
-			virtual RefPtr<StatementSyntaxNode> VisitWhileStatement(WhileStatementSyntaxNode* stmt)
-			{
-				if (stmt->Predicate)
-					stmt->Predicate = stmt->Predicate->Accept(this).As<ExpressionSyntaxNode>();
-				if (stmt->Statement)
-					stmt->Statement = stmt->Statement->Accept(this).As<StatementSyntaxNode>();
-				return stmt;
-			}
-			virtual RefPtr<StatementSyntaxNode> VisitExpressionStatement(ExpressionStatementSyntaxNode* stmt)
-			{
-				if (stmt->Expression)
-					stmt->Expression = stmt->Expression->Accept(this).As<ExpressionSyntaxNode>();
-				return stmt;
-			}
-
-			virtual RefPtr<ExpressionSyntaxNode> VisitBinaryExpression(BinaryExpressionSyntaxNode* expr)
-			{
-				if (expr->LeftExpression)
-					expr->LeftExpression = expr->LeftExpression->Accept(this).As<ExpressionSyntaxNode>();
-				if (expr->RightExpression)
-					expr->RightExpression = expr->RightExpression->Accept(this).As<ExpressionSyntaxNode>();
-				return expr;
-			}
-			virtual RefPtr<ExpressionSyntaxNode> VisitConstantExpression(ConstantExpressionSyntaxNode* expr)
-			{
-				return expr;
-			}
-			virtual RefPtr<ExpressionSyntaxNode> VisitIndexExpression(IndexExpressionSyntaxNode* expr)
-			{
-				if (expr->BaseExpression)
-					expr->BaseExpression = expr->BaseExpression->Accept(this).As<ExpressionSyntaxNode>();
-				if (expr->IndexExpression)
-					expr->IndexExpression = expr->IndexExpression->Accept(this).As<ExpressionSyntaxNode>();
-				return expr;
-			}
-			virtual RefPtr<ExpressionSyntaxNode> VisitMemberExpression(MemberExpressionSyntaxNode * stmt)
-			{
-				if (stmt->BaseExpression)
-					stmt->BaseExpression = stmt->BaseExpression->Accept(this).As<ExpressionSyntaxNode>();
-				return stmt;
-			}
-			virtual RefPtr<ExpressionSyntaxNode> VisitInvokeExpression(InvokeExpressionSyntaxNode* stmt)
-			{
-				stmt->FunctionExpr->Accept(this);
-				for (auto & arg : stmt->Arguments)
-					arg = arg->Accept(this).As<ExpressionSyntaxNode>();
-				return stmt;
-			}
-			virtual RefPtr<ExpressionSyntaxNode> VisitImportExpression(ImportExpressionSyntaxNode * expr)
-			{
-				for (auto & arg : expr->Arguments)
-					arg = arg->Accept(this).As<ExpressionSyntaxNode>();
-				return expr;
-			}
-			virtual RefPtr<ExpressionSyntaxNode> VisitTypeCastExpression(TypeCastExpressionSyntaxNode * stmt)
-			{
-				if (stmt->Expression)
-					stmt->Expression = stmt->Expression->Accept(this).As<ExpressionSyntaxNode>();
-				return stmt->Expression;
-			}
-			virtual RefPtr<ExpressionSyntaxNode> VisitSelectExpression(SelectExpressionSyntaxNode * expr)
-			{
-				if (expr->SelectorExpr)
-					expr->SelectorExpr = expr->SelectorExpr->Accept(this).As<ExpressionSyntaxNode>();
-				if (expr->Expr0)
-					expr->Expr0 = expr->Expr0->Accept(this).As<ExpressionSyntaxNode>();
-				if (expr->Expr1)
-					expr->Expr1 = expr->Expr1->Accept(this).As<ExpressionSyntaxNode>();
-				return expr;
-			}
-			virtual RefPtr<ExpressionSyntaxNode> VisitUnaryExpression(UnaryExpressionSyntaxNode* expr)
-			{
-				if (expr->Expression)
-					expr->Expression = expr->Expression->Accept(this).As<ExpressionSyntaxNode>();
-				return expr;
-			}
-			virtual RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode* expr)
-			{
-				return expr;
-			}
-			virtual RefPtr<PipelineSyntaxNode> VisitPipeline(PipelineSyntaxNode * pipe)
-			{
-				for (auto & comp : pipe->AbstractComponents)
-					comp = comp->Accept(this).As<ComponentSyntaxNode>();
-				for (auto & imp : pipe->ImportOperators)
-					imp = imp->Accept(this).As<ImportOperatorDefSyntaxNode>();
-				return pipe;
-			}
-			virtual RefPtr<ImportOperatorDefSyntaxNode> VisitImportOperatorDef(ImportOperatorDefSyntaxNode * imp)
-			{
-				imp->Body = imp->Body->Accept(this).As<BlockStatementSyntaxNode>();
-				return imp;
-			}
-			virtual RefPtr<ParameterSyntaxNode> VisitParameter(ParameterSyntaxNode* param)
-			{
-				return param;
-			}
-			virtual RefPtr<TypeSyntaxNode> VisitBasicType(BasicTypeSyntaxNode* type)
-			{
-				return type;
-			}
-			virtual RefPtr<TypeSyntaxNode> VisitArrayType(ArrayTypeSyntaxNode* type)
-			{
-				return type;
-			}
-			virtual RefPtr<TypeSyntaxNode> VisitGenericType(GenericTypeSyntaxNode* type)
-			{
-				return type;
-			}
-
-			virtual RefPtr<Variable> VisitDeclrVariable(Variable* dclr)
-			{
-				if (dclr->Expression)
-					dclr->Expression = dclr->Expression->Accept(this).As<ExpressionSyntaxNode>();
-				return dclr;
-			}
-			virtual RefPtr<ImportSyntaxNode> VisitImport(ImportSyntaxNode* imp)
-			{
-				for (auto & arg : imp->Arguments)
-					if (arg->Expression)
-						arg->Expression = arg->Expression->Accept(this).As<ExpressionSyntaxNode>();
-				return imp;
-			}
-			virtual RefPtr<StatementSyntaxNode> VisitImportStatement(ImportStatementSyntaxNode* stmt)
-			{
-				if (stmt->Import)
-					stmt->Import = stmt->Import->Accept(this).As<ImportSyntaxNode>();
-				return stmt;
-			}
-			virtual RefPtr<ImportArgumentSyntaxNode> VisitImportArgument(ImportArgumentSyntaxNode * arg)
-			{
-				if (arg->Expression)
-					arg->Expression = arg->Expression->Accept(this).As<ExpressionSyntaxNode>();
-				return arg;
-			}
-
-		};
-	}
-}
-
-#endif
-
-/***********************************************************************
 CORELIB\REGEX\REGEXTREE.H
 ***********************************************************************/
 #ifndef GX_REGEX_PARSER_H
@@ -9651,6 +8431,1466 @@ namespace Spire
 #endif
 
 /***********************************************************************
+SPIRECORE\LEXER.H
+***********************************************************************/
+#ifndef RASTER_RENDERER_LEXER_H
+#define RASTER_RENDERER_LEXER_H
+
+
+namespace Spire
+{
+	namespace Compiler
+	{
+		using namespace CoreLib::Basic;
+
+		enum class TokenType
+		{
+			// illegal
+			Unkown,
+			// identifier
+			Identifier,
+			KeywordReturn, KeywordBreak, KeywordContinue,
+			KeywordIf, KeywordElse, KeywordFor, KeywordWhile, KeywordDo,
+			// constant
+			IntLiterial, DoubleLiterial, StringLiterial, CharLiterial,
+			// operators
+			Semicolon, Comma, Dot, LBrace, RBrace, LBracket, RBracket, LParent, RParent,
+			OpAssign, OpAdd, OpSub, OpMul, OpDiv, OpMod, OpNot, OpBitNot, OpLsh, OpRsh, 
+			OpEql, OpNeq, OpGreater, OpLess, OpGeq, OpLeq,
+			OpAnd, OpOr, OpBitXor, OpBitAnd, OpBitOr,
+			OpInc, OpDec, OpAddAssign, OpSubAssign, OpMulAssign, OpDivAssign, OpModAssign,
+			OpShlAssign, OpShrAssign, OpOrAssign, OpAndAssign, OpXorAssign,
+			
+			QuestionMark, Colon, RightArrow, At,
+		};
+
+		String TokenTypeToString(TokenType type);
+
+		class Token
+		{
+		public:
+			TokenType Type = TokenType::Unkown;
+			String Content;
+			CodePosition Position;
+			Token() = default;
+			Token(TokenType type, const String & content, int line, int col, String fileName)
+			{
+				Type = type;
+				Content = content;
+				Position = CodePosition(line, col, fileName);
+			}
+		};
+
+		class Lexer
+		{
+		public:
+			List<Token> Parse(const String & fileName, const String & str, List<CompileError> & errorList);
+		};
+	}
+}
+
+#endif
+
+/***********************************************************************
+SPIRECORE\SYNTAX.H
+***********************************************************************/
+#ifndef RASTER_RENDERER_SYNTAX_H
+#define RASTER_RENDERER_SYNTAX_H
+
+
+namespace Spire
+{
+	namespace Compiler
+	{
+		using namespace CoreLib::Basic;
+		class SyntaxVisitor;
+		class FunctionSyntaxNode;
+
+		enum class VariableModifier
+		{
+			None = 0,
+			Uniform = 1,
+			Out = 2,
+			In = 4,
+			Centroid = 128,
+			Const = 16,
+			Instance = 1024,
+			Builtin = 256,
+			Parameter = 513
+		};
+
+		enum class BaseType
+		{
+			Void = 0,
+			Int = 16, Int2 = 17, Int3 = 18, Int4 = 19,
+			Float = 32, Float2 = 33, Float3 = 34, Float4 = 35,
+			UInt = 512, UInt2 = 513, UInt3 = 514, UInt4 = 515,
+			Float3x3 = 40, Float4x4 = 47,
+			Texture2D = 48,
+			TextureShadow = 49,
+			TextureCube = 50,
+			TextureCubeShadow = 51,
+			Function = 64,
+			Bool = 128,
+			Shader = 256,
+			Struct = 1024,
+			Record = 2048,
+			Error = 4096,
+		};
+
+		inline const wchar_t * BaseTypeToString(BaseType t)
+		{
+			switch (t)
+			{
+			case BaseType::Void:
+				return L"void";
+			case BaseType::Bool:
+			case BaseType::Int:
+				return L"int";
+			case BaseType::Int2:
+				return L"int2";
+			case BaseType::Int3:
+				return L"int3";
+			case BaseType::Int4:
+				return L"int4";
+			case BaseType::Float:
+				return L"float";
+			case BaseType::Float2:
+				return L"float2";
+			case BaseType::Float3:
+				return L"float3";
+			case BaseType::Float4:
+				return L"float4";
+			case BaseType::Float3x3:
+				return L"float3x3";
+			case BaseType::Float4x4:
+				return L"float4x4";
+			case BaseType::Texture2D:
+				return L"sampler2D";
+			case BaseType::TextureCube:
+				return L"samplerCube";
+			case BaseType::TextureShadow:
+				return L"sampler2DShadow";
+			case BaseType::TextureCubeShadow:
+				return L"samplerCubeShadow";
+			default:
+				return L"<err-type>";
+			}
+		}
+
+		inline bool IsVector(BaseType type)
+		{
+			return (((int)type) & 15) != 0;
+		}
+
+		inline int GetVectorSize(BaseType type)
+		{
+			return (((int)type) & 15) + 1;
+		}
+
+		inline BaseType GetVectorBaseType(BaseType type)
+		{
+			return (BaseType)(((int)type) & (~15));
+		}
+
+		class SymbolTable;
+		class ShaderSymbol;
+		class StructSymbol;
+		class ShaderClosure;
+		class StructSyntaxNode;
+		class ShaderComponentSymbol;
+		class FunctionSymbol;
+		class BasicExpressionType;
+		class ArrayExpressionType;
+		class GenericExpressionType;
+
+		class ExpressionType : public Object
+		{
+		public:
+			static RefPtr<ExpressionType> Bool;
+			static RefPtr<ExpressionType> UInt;
+			static RefPtr<ExpressionType> UInt2;
+			static RefPtr<ExpressionType> UInt3;
+			static RefPtr<ExpressionType> UInt4;
+			static RefPtr<ExpressionType> Int;
+			static RefPtr<ExpressionType> Int2;
+			static RefPtr<ExpressionType> Int3;
+			static RefPtr<ExpressionType> Int4;
+			static RefPtr<ExpressionType> Float;
+			static RefPtr<ExpressionType> Float2;
+			static RefPtr<ExpressionType> Float3;
+			static RefPtr<ExpressionType> Float4;
+			static RefPtr<ExpressionType> Void;
+			static RefPtr<ExpressionType> Error;
+		public:
+			virtual String ToString() const = 0;
+			virtual int GetSize() const = 0;
+			virtual bool IsIntegral() const = 0;
+			virtual bool Equals(const ExpressionType * type) const = 0;
+			virtual bool IsVectorType() const = 0;
+			virtual bool IsArray() const = 0;
+			virtual bool IsGenericType(String typeName) const = 0;
+			virtual BasicExpressionType * AsBasicType() const = 0;
+			virtual ArrayExpressionType * AsArrayType() const = 0;
+			virtual GenericExpressionType * AsGenericType() const = 0;
+			virtual ExpressionType * Clone() = 0;
+			bool IsTexture() const;
+			bool IsStruct() const;
+			bool IsShader() const;
+			static void Init();
+			static void Finalize();
+		};
+
+		class BasicExpressionType : public ExpressionType
+		{
+		public:
+			bool IsLeftValue;
+			bool IsReference;
+			bool IsMaskedVector = false;
+			BaseType BaseType;
+			ShaderSymbol * Shader = nullptr;
+			ShaderClosure * ShaderClosure = nullptr;
+			FunctionSymbol * Func = nullptr;
+			ShaderComponentSymbol * Component = nullptr;
+			StructSymbol * Struct = nullptr;
+			String RecordTypeName;
+
+			BasicExpressionType()
+			{
+				BaseType = Compiler::BaseType::Int;
+				Func = 0;
+				IsLeftValue = false;
+				IsReference = false;
+			}
+			BasicExpressionType(Compiler::BaseType baseType)
+			{
+				BaseType = baseType;
+				Func = 0;
+				IsLeftValue = false;
+				IsReference = false;
+			}
+			BasicExpressionType(ShaderSymbol * shaderSym, Compiler::ShaderClosure * closure)
+			{
+				this->BaseType = BaseType::Shader;
+				this->ShaderClosure = closure;
+				this->Shader = shaderSym;
+			}
+			virtual bool IsIntegral() const override;
+			virtual int GetSize() const override;
+			virtual bool Equals(const ExpressionType * type) const override;
+			virtual bool IsVectorType() const override;
+			virtual bool IsArray() const override;
+			virtual CoreLib::Basic::String ToString() const override;
+			virtual ExpressionType * Clone() override;
+			virtual bool IsGenericType(String typeName) const override
+			{
+				return false;
+			}
+			virtual BasicExpressionType * AsBasicType() const override
+			{
+				return const_cast<BasicExpressionType*>(this);
+			}
+			virtual ArrayExpressionType * AsArrayType() const override
+			{
+				return nullptr;
+			}
+			virtual GenericExpressionType * AsGenericType() const override
+			{
+				return nullptr;
+			}
+		};
+
+		class ArrayExpressionType : public ExpressionType
+		{
+		public:
+			RefPtr<ExpressionType> BaseType;
+			int ArrayLength = 0;
+			virtual bool IsIntegral() const override;
+			virtual bool IsArray() const override;
+
+			virtual int GetSize() const override;
+			virtual bool Equals(const ExpressionType * type) const override;
+			virtual bool IsVectorType() const override;
+			virtual CoreLib::Basic::String ToString() const override;
+			virtual ExpressionType * Clone() override;
+			virtual bool IsGenericType(String typeName) const override
+			{
+				return false;
+			}
+			virtual BasicExpressionType * AsBasicType() const override
+			{
+				return nullptr;
+			}
+			virtual ArrayExpressionType * AsArrayType() const override
+			{
+				return const_cast<ArrayExpressionType*>(this);
+			}
+			virtual GenericExpressionType * AsGenericType() const override
+			{
+				return nullptr;
+			}
+		};
+
+		class GenericExpressionType : public ExpressionType
+		{
+		public:
+			RefPtr<ExpressionType> BaseType;
+			String GenericTypeName;
+			virtual bool IsIntegral() const override;
+			virtual int GetSize() const override;
+			virtual bool IsArray() const override;
+
+			virtual bool Equals(const ExpressionType * type) const override;
+			virtual bool IsVectorType() const override;
+			virtual CoreLib::Basic::String ToString() const override;
+			virtual ExpressionType * Clone() override;
+			virtual bool IsGenericType(String typeName) const override
+			{
+				return GenericTypeName == typeName;
+			}
+			virtual BasicExpressionType * AsBasicType() const override
+			{
+				return nullptr;
+			}
+			virtual ArrayExpressionType * AsArrayType() const override
+			{
+				return nullptr;
+			}
+			virtual GenericExpressionType * AsGenericType() const override
+			{
+				return const_cast<GenericExpressionType*>(this);
+			}
+		};
+		
+		class Type
+		{
+		public:
+			RefPtr<ExpressionType> DataType;
+			// ContrainedWorlds: Implementation must be defined at at least one of of these worlds in order to satisfy global dependency
+			// FeasibleWorlds: The component can be computed at any of these worlds
+			EnumerableHashSet<String> ConstrainedWorlds, FeasibleWorlds;
+			EnumerableHashSet<String> PinnedWorlds; 
+		};
+
+
+		class VariableEntry
+		{
+		public:
+			String Name;
+			Type Type;
+			bool IsComponent = false;
+		};
+
+		class Scope
+		{
+		public:
+			Scope * Parent;
+			Dictionary<String, VariableEntry> Variables;
+			bool FindVariable(const String & name, VariableEntry & variable);
+			Scope()
+				: Parent(0)
+			{}
+		};
+
+		class CloneContext
+		{
+		public:
+			Dictionary<Spire::Compiler::Scope*, RefPtr<Spire::Compiler::Scope>> ScopeTranslateTable;
+		};
+
+		class SyntaxNode : public RefObject
+		{
+		protected:
+			template<typename T>
+			T* CloneSyntaxNodeFields(T * target, CloneContext & ctx)
+			{
+				if (this->Scope)
+				{
+					RefPtr<Spire::Compiler::Scope> newScope;
+					if (ctx.ScopeTranslateTable.TryGetValue(this->Scope.Ptr(), newScope))
+						target->Scope = newScope;
+					else
+					{
+						target->Scope = new Spire::Compiler::Scope(*this->Scope);
+						ctx.ScopeTranslateTable[this->Scope.Ptr()] = target->Scope;
+						RefPtr<Spire::Compiler::Scope> parentScope;
+						if (ctx.ScopeTranslateTable.TryGetValue(target->Scope->Parent, parentScope))
+							target->Scope->Parent = parentScope.Ptr();
+					}
+					
+				}
+				target->Position = this->Position;
+				target->Tags = this->Tags;
+				return target;
+			}
+		public:
+			EnumerableDictionary<String, RefPtr<Object>> Tags;
+			CodePosition Position;
+			RefPtr<Scope> Scope;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) = 0;
+			virtual SyntaxNode * Clone(CloneContext & ctx) = 0;
+		};
+
+		class TypeSyntaxNode : public SyntaxNode
+		{
+		public:
+			static RefPtr<TypeSyntaxNode> FromExpressionType(ExpressionType * t);
+			virtual TypeSyntaxNode * Clone(CloneContext & ctx) = 0;
+		};
+
+		class BasicTypeSyntaxNode : public TypeSyntaxNode
+		{
+		public:
+			String TypeName;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
+			virtual BasicTypeSyntaxNode * Clone(CloneContext & ctx)
+			{
+				return CloneSyntaxNodeFields(new BasicTypeSyntaxNode(*this), ctx);
+			}
+		};
+
+		class ArrayTypeSyntaxNode : public TypeSyntaxNode
+		{
+		public:
+			RefPtr<TypeSyntaxNode> BaseType;
+			int ArrayLength;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
+			virtual ArrayTypeSyntaxNode * Clone(CloneContext & ctx)
+			{
+				auto rs = CloneSyntaxNodeFields(new ArrayTypeSyntaxNode(*this), ctx);
+				rs->BaseType = BaseType->Clone(ctx);
+				return rs;
+			}
+		};
+
+		class GenericTypeSyntaxNode : public TypeSyntaxNode
+		{
+		public:
+			RefPtr<TypeSyntaxNode> BaseType;
+			String GenericTypeName;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
+			virtual GenericTypeSyntaxNode * Clone(CloneContext & ctx)
+			{
+				auto rs = CloneSyntaxNodeFields(new GenericTypeSyntaxNode(*this), ctx);
+				rs->BaseType = BaseType->Clone(ctx);
+				return rs;
+			}
+		};
+
+		class StructField : public SyntaxNode
+		{
+		public:
+			RefPtr<TypeSyntaxNode> TypeNode;
+			RefPtr<ExpressionType> Type;
+			Token Name;
+			StructField()
+			{}
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual StructField * Clone(CloneContext & ctx) override
+			{
+				auto rs = CloneSyntaxNodeFields(new StructField(*this), ctx);
+				rs->TypeNode = TypeNode->Clone(ctx);
+				return rs;
+			}
+		};
+
+		class StructSyntaxNode : public SyntaxNode
+		{
+		public:
+			List<RefPtr<StructField>> Fields;
+			Token Name;
+			bool IsIntrinsic = false;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			int FindField(String name)
+			{
+				for (int i = 0; i < Fields.Count(); i++)
+				{
+					if (Fields[i]->Name.Content == name)
+						return i;
+				}
+				return -1;
+			}
+			virtual StructSyntaxNode * Clone(CloneContext & ctx) override
+			{
+				auto rs = CloneSyntaxNodeFields(new StructSyntaxNode(*this), ctx);
+				rs->Fields.Clear();
+				for (auto & f : Fields)
+					rs->Fields.Add(f->Clone(ctx));
+				return rs;
+			}
+		};
+
+		enum class ExpressionAccess
+		{
+			Read, Write
+		};
+
+		class ExpressionSyntaxNode : public SyntaxNode
+		{
+		public:
+			RefPtr<ExpressionType> Type;
+			ExpressionAccess Access;
+			ExpressionSyntaxNode()
+			{
+				Access = ExpressionAccess::Read;
+			}
+			ExpressionSyntaxNode(const ExpressionSyntaxNode & expr) = default;
+			virtual ExpressionSyntaxNode* Clone(CloneContext & ctx) = 0;
+		};
+
+		class StatementSyntaxNode : public SyntaxNode
+		{
+		public:
+			virtual StatementSyntaxNode* Clone(CloneContext & ctx) = 0;
+		};
+
+		class BlockStatementSyntaxNode : public StatementSyntaxNode
+		{
+		public:
+			List<RefPtr<StatementSyntaxNode>> Statements;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
+			virtual BlockStatementSyntaxNode * Clone(CloneContext & ctx);
+		};
+
+		class ParameterSyntaxNode : public SyntaxNode
+		{
+		public:
+			RefPtr<TypeSyntaxNode> TypeNode;
+			RefPtr<ExpressionType> Type;
+			String Name;
+			RefPtr<ExpressionSyntaxNode> Expr;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
+			virtual ParameterSyntaxNode * Clone(CloneContext & ctx);
+		};
+
+		class FunctionSyntaxNode : public SyntaxNode
+		{
+		public:
+			String Name, InternalName;
+			RefPtr<ExpressionType> ReturnType;
+			RefPtr<TypeSyntaxNode> ReturnTypeNode;
+			List<RefPtr<ParameterSyntaxNode>> Parameters;
+			RefPtr<BlockStatementSyntaxNode> Body;
+			bool IsInline;
+			bool IsExtern;
+			bool HasSideEffect;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
+			FunctionSyntaxNode()
+			{
+				IsInline = false;
+				IsExtern = false;
+				HasSideEffect = true;
+			}
+
+			virtual FunctionSyntaxNode * Clone(CloneContext & ctx);
+		};
+
+		class ImportOperatorDefSyntaxNode : public SyntaxNode
+		{
+		public:
+			Token Name;
+			Token SourceWorld, DestWorld;
+			List<RefPtr<ParameterSyntaxNode>> Parameters;
+			RefPtr<BlockStatementSyntaxNode> Body;
+			EnumerableDictionary<String, String> LayoutAttributes;
+			Token TypeName;
+			List<RefPtr<FunctionSyntaxNode>> Requirements;
+			List<String> Usings;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual ImportOperatorDefSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
+		class ChoiceValueSyntaxNode : public ExpressionSyntaxNode
+		{
+		public:
+			String WorldName, AlternateName;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) { return this; }
+			virtual ChoiceValueSyntaxNode * Clone(CloneContext & ctx);
+		};
+
+		class VarExpressionSyntaxNode : public ExpressionSyntaxNode
+		{
+		public:
+			String Variable;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
+			virtual VarExpressionSyntaxNode * Clone(CloneContext & ctx);
+		};
+
+		class ConstantExpressionSyntaxNode : public ExpressionSyntaxNode
+		{
+		public:
+			enum class ConstantType
+			{
+				Int, Bool, Float
+			};
+			ConstantType ConstType;
+			union
+			{
+				int IntValue;
+				float FloatValue;
+			};
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
+			virtual ConstantExpressionSyntaxNode * Clone(CloneContext & ctx);
+		};
+
+		enum class Operator
+		{
+			Neg, Not, BitNot, PreInc, PreDec, PostInc, PostDec,
+			Mul, Div, Mod,
+			Add, Sub, 
+			Lsh, Rsh,
+			Eql, Neq, Greater, Less, Geq, Leq,
+			BitAnd, BitXor, BitOr,
+			And,
+			Or,
+			Assign = 200, AddAssign, SubAssign, MulAssign, DivAssign, ModAssign,
+			LshAssign, RshAssign, OrAssign, AndAssign, XorAssign
+		};
+
+		String GetOperatorFunctionName(Operator op);
+		
+		class ImportExpressionSyntaxNode : public ExpressionSyntaxNode
+		{
+		public:
+			RefPtr<ExpressionSyntaxNode> Component;
+			String ComponentUniqueName; // filled by RsolveDependence
+			RefPtr<ImportOperatorDefSyntaxNode> ImportOperatorDef; // filled by semantics
+			List<RefPtr<ExpressionSyntaxNode>> Arguments;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual ImportExpressionSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
+		class UnaryExpressionSyntaxNode : public ExpressionSyntaxNode
+		{
+		public:
+			Operator Operator;
+			RefPtr<ExpressionSyntaxNode> Expression;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
+			virtual UnaryExpressionSyntaxNode * Clone(CloneContext & ctx);
+		};
+		
+		class BinaryExpressionSyntaxNode : public ExpressionSyntaxNode
+		{
+		public:
+			Operator Operator;
+			RefPtr<ExpressionSyntaxNode> LeftExpression;
+			RefPtr<ExpressionSyntaxNode> RightExpression;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
+			virtual BinaryExpressionSyntaxNode * Clone(CloneContext & ctx);
+		};
+
+		class IndexExpressionSyntaxNode : public ExpressionSyntaxNode
+		{
+		public:
+			RefPtr<ExpressionSyntaxNode> BaseExpression;
+			RefPtr<ExpressionSyntaxNode> IndexExpression;
+			virtual IndexExpressionSyntaxNode * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
+		};
+
+		class MemberExpressionSyntaxNode : public ExpressionSyntaxNode
+		{
+		public:
+			RefPtr<ExpressionSyntaxNode> BaseExpression;
+			String MemberName;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
+			virtual MemberExpressionSyntaxNode * Clone(CloneContext & ctx);
+		};
+
+		class InvokeExpressionSyntaxNode : public ExpressionSyntaxNode
+		{
+		public:
+			RefPtr<ExpressionSyntaxNode> FunctionExpr;
+			List<RefPtr<ExpressionSyntaxNode>> Arguments;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
+			virtual InvokeExpressionSyntaxNode * Clone(CloneContext & ctx);
+		};
+
+		class TypeCastExpressionSyntaxNode : public ExpressionSyntaxNode
+		{
+		public:
+			RefPtr<TypeSyntaxNode> TargetType;
+			RefPtr<ExpressionSyntaxNode> Expression;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
+			virtual TypeCastExpressionSyntaxNode * Clone(CloneContext & ctx);
+		};
+
+		class SelectExpressionSyntaxNode : public ExpressionSyntaxNode
+		{
+		public:
+			RefPtr<ExpressionSyntaxNode> SelectorExpr, Expr0, Expr1;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
+			virtual SelectExpressionSyntaxNode * Clone(CloneContext & ctx);
+		};
+
+
+		class EmptyStatementSyntaxNode : public StatementSyntaxNode
+		{
+		public:
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
+			virtual EmptyStatementSyntaxNode * Clone(CloneContext & ctx);
+		};
+
+		class DiscardStatementSyntaxNode : public StatementSyntaxNode
+		{
+		public:
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
+			virtual DiscardStatementSyntaxNode * Clone(CloneContext & ctx);
+		};
+
+		class VariableDeclr
+		{
+		public:
+			RefPtr<ExpressionType> Type;
+			String Name;
+
+			bool operator ==(const VariableDeclr & var)
+			{
+				return Name == var.Name;
+			}
+			bool operator ==(const String & name)
+			{
+				return name == Name;
+			}
+		};
+
+		struct Variable : public SyntaxNode
+		{
+			String Name;
+			RefPtr<ExpressionSyntaxNode> Expression;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
+			virtual Variable * Clone(CloneContext & ctx);
+		};
+
+		class VarDeclrStatementSyntaxNode : public StatementSyntaxNode
+		{
+		public:
+			RefPtr<TypeSyntaxNode> TypeNode;
+			RefPtr<ExpressionType> Type;
+			String LayoutString;
+			List<RefPtr<Variable>> Variables;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
+			virtual VarDeclrStatementSyntaxNode * Clone(CloneContext & ctx);
+		};
+
+		class RateWorld
+		{
+		public:
+			Token World;
+			bool Pinned = false;
+			RateWorld() {}
+			RateWorld(String world)
+			{
+				World.Content = world;
+				World.Type = TokenType::Identifier;
+			}
+		};
+
+		class RateSyntaxNode : public SyntaxNode
+		{
+		public:
+			List<RateWorld> Worlds;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override
+			{
+				return this;
+			}
+			virtual RateSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
+		class ShaderMemberNode : public SyntaxNode
+		{
+		public:
+			Token ParentModuleName;
+			virtual ShaderMemberNode * Clone(CloneContext & ctx) = 0;
+		};
+
+		class ComponentSyntaxNode : public ShaderMemberNode
+		{
+		public:
+			bool IsOutput = false, IsPublic = false, IsInline = false, IsParam = false, IsInput = false;
+			RefPtr<TypeSyntaxNode> TypeNode;
+			RefPtr<ExpressionType> Type;
+			RefPtr<RateSyntaxNode> Rate;
+			Token Name, AlternateName;
+			EnumerableDictionary<String, String> LayoutAttributes;
+			RefPtr<BlockStatementSyntaxNode> BlockStatement;
+			RefPtr<ExpressionSyntaxNode> Expression;
+			List<RefPtr<ParameterSyntaxNode>> Parameters;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual ComponentSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
+		class WorldSyntaxNode : public SyntaxNode
+		{
+		public:
+			bool IsAbstract = false;
+			Token Name;
+			EnumerableDictionary<String, String> LayoutAttributes;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override { return this; }
+			virtual WorldSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
+		class StageSyntaxNode : public SyntaxNode
+		{
+		public:
+			Token Name;
+			Token StageType;
+			EnumerableDictionary<String, Token> Attributes;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override { return this; }
+			virtual StageSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+		
+		class PipelineSyntaxNode : public SyntaxNode
+		{
+		public:
+			Token Name;
+			Token ParentPipeline;
+			List<RefPtr<WorldSyntaxNode>> Worlds;
+			List<RefPtr<ImportOperatorDefSyntaxNode>> ImportOperators;
+			List<RefPtr<StageSyntaxNode>> Stages;
+			List<RefPtr<ComponentSyntaxNode>> AbstractComponents;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override { return this; }
+			virtual PipelineSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
+		class ImportArgumentSyntaxNode : public SyntaxNode
+		{
+		public:
+			RefPtr<ExpressionSyntaxNode> Expression;
+			Token ArgumentName;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override;
+			virtual ImportArgumentSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
+		class ImportSyntaxNode : public ShaderMemberNode
+		{
+		public:
+			bool IsInplace = false;
+			bool IsPublic = false;
+			Token ShaderName;
+			Token ObjectName;
+			List<RefPtr<ImportArgumentSyntaxNode>> Arguments;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override;
+			virtual ImportSyntaxNode * Clone(CloneContext & ctx) override;
+
+		};
+
+		class ShaderSyntaxNode : public SyntaxNode
+		{
+		public:
+			Token Name;
+			Token Pipeline;
+			List<RefPtr<ShaderMemberNode>> Members;
+			bool IsModule = false;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual ShaderSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
+		class ProgramSyntaxNode : public SyntaxNode
+		{
+		public:
+			List<Token> Usings;
+			List<RefPtr<FunctionSyntaxNode>> Functions;
+			List<RefPtr<PipelineSyntaxNode>> Pipelines;
+			List<RefPtr<ShaderSyntaxNode>> Shaders;
+			List<RefPtr<StructSyntaxNode>> Structs;
+			void Include(ProgramSyntaxNode * other)
+			{
+				Functions.AddRange(other->Functions);
+				Pipelines.AddRange(other->Pipelines);
+				Shaders.AddRange(other->Shaders);
+				Structs.AddRange(other->Structs);
+			}
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual ProgramSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
+		class ImportStatementSyntaxNode : public StatementSyntaxNode
+		{
+		public:
+			RefPtr<ImportSyntaxNode> Import;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual ImportStatementSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
+		class IfStatementSyntaxNode : public StatementSyntaxNode
+		{
+		public:
+			RefPtr<ExpressionSyntaxNode> Predicate;
+			RefPtr<StatementSyntaxNode> PositiveStatement;
+			RefPtr<StatementSyntaxNode> NegativeStatement;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual IfStatementSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
+		class ForStatementSyntaxNode : public StatementSyntaxNode
+		{
+		public:
+			RefPtr<TypeSyntaxNode> TypeDef;
+			RefPtr<ExpressionType> IterationVariableType;
+			Token IterationVariable;
+
+			RefPtr<ExpressionSyntaxNode> InitialExpression, StepExpression, EndExpression;
+			RefPtr<StatementSyntaxNode> Statement;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual ForStatementSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
+		class WhileStatementSyntaxNode : public StatementSyntaxNode
+		{
+		public:
+			RefPtr<ExpressionSyntaxNode> Predicate;
+			RefPtr<StatementSyntaxNode> Statement;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual WhileStatementSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
+		class DoWhileStatementSyntaxNode : public StatementSyntaxNode
+		{
+		public:
+			RefPtr<StatementSyntaxNode> Statement;
+			RefPtr<ExpressionSyntaxNode> Predicate;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual DoWhileStatementSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
+		class BreakStatementSyntaxNode : public StatementSyntaxNode
+		{
+		public:
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual BreakStatementSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
+		class ContinueStatementSyntaxNode : public StatementSyntaxNode
+		{
+		public:
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual ContinueStatementSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
+		class ReturnStatementSyntaxNode : public StatementSyntaxNode
+		{
+		public:
+			RefPtr<ExpressionSyntaxNode> Expression;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual ReturnStatementSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
+		class ExpressionStatementSyntaxNode : public StatementSyntaxNode
+		{
+		public:
+			RefPtr<ExpressionSyntaxNode> Expression;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual ExpressionStatementSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
+		class SyntaxVisitor : public Object
+		{
+		protected:
+			ErrorWriter * err = nullptr;
+			void Error(int id, const String & text, SyntaxNode * node)
+			{
+				err->Error(id, text, node->Position);
+			}
+			void Error(int id, const String & text, Token node)
+			{
+				err->Error(id, text, node.Position);
+			}
+			void Warning(int id, const String & text, SyntaxNode * node)
+			{
+				err->Warning(id, text, node->Position);
+			}
+			void Warning(int id, const String & text, Token node)
+			{
+				err->Warning(id, text, node.Position);
+			}
+		public:
+			SyntaxVisitor(ErrorWriter * pErr)
+				: err(pErr)
+			{}
+			virtual RefPtr<ProgramSyntaxNode> VisitProgram(ProgramSyntaxNode* program)
+			{
+				for (auto & f : program->Functions)
+					f = f->Accept(this).As<FunctionSyntaxNode>();
+				for (auto & shader : program->Shaders)
+					shader = shader->Accept(this).As<ShaderSyntaxNode>();
+				return program;
+			}
+			virtual RefPtr<ShaderSyntaxNode> VisitShader(ShaderSyntaxNode * shader)
+			{
+				for (auto & comp : shader->Members)
+					comp = comp->Accept(this).As<ShaderMemberNode>();
+				return shader;
+			}
+			virtual RefPtr<ComponentSyntaxNode> VisitComponent(ComponentSyntaxNode * comp);
+			virtual RefPtr<FunctionSyntaxNode> VisitFunction(FunctionSyntaxNode* func)
+			{
+				func->ReturnTypeNode = func->ReturnTypeNode->Accept(this).As<TypeSyntaxNode>();
+				for (auto & param : func->Parameters)
+					param = param->Accept(this).As<ParameterSyntaxNode>();
+				if (func->Body)
+					func->Body = func->Body->Accept(this).As<BlockStatementSyntaxNode>();
+				return func;
+			}
+			virtual RefPtr<StructSyntaxNode> VisitStruct(StructSyntaxNode * s)
+			{
+				for (auto & f : s->Fields)
+					f = f->Accept(this).As<StructField>();
+				return s;
+			}
+			virtual RefPtr<StatementSyntaxNode> VisitDiscardStatement(DiscardStatementSyntaxNode * stmt)
+			{
+				return stmt;
+			}
+			virtual RefPtr<StructField> VisitStructField(StructField * f)
+			{
+				f->TypeNode = f->TypeNode->Accept(this).As<TypeSyntaxNode>();
+				return f;
+			}
+			virtual RefPtr<StatementSyntaxNode> VisitBlockStatement(BlockStatementSyntaxNode* stmt)
+			{
+				for (auto & s : stmt->Statements)
+					s = s->Accept(this).As<StatementSyntaxNode>();
+				return stmt;
+			}
+			virtual RefPtr<StatementSyntaxNode> VisitBreakStatement(BreakStatementSyntaxNode* stmt)
+			{
+				return stmt;
+			}
+			virtual RefPtr<StatementSyntaxNode> VisitContinueStatement(ContinueStatementSyntaxNode* stmt)
+			{
+				return stmt;
+			}
+
+			virtual RefPtr<StatementSyntaxNode> VisitDoWhileStatement(DoWhileStatementSyntaxNode* stmt)
+			{
+				if (stmt->Predicate)
+					stmt->Predicate = stmt->Predicate->Accept(this).As<ExpressionSyntaxNode>();
+				if (stmt->Statement)
+					stmt->Statement = stmt->Statement->Accept(this).As<StatementSyntaxNode>();
+				return stmt;
+			}
+			virtual RefPtr<StatementSyntaxNode> VisitEmptyStatement(EmptyStatementSyntaxNode* stmt)
+			{
+				return stmt;
+			}
+			virtual RefPtr<StatementSyntaxNode> VisitForStatement(ForStatementSyntaxNode* stmt)
+			{
+				if (stmt->InitialExpression)
+					stmt->InitialExpression = stmt->InitialExpression->Accept(this).As<ExpressionSyntaxNode>();
+				if (stmt->StepExpression)
+					stmt->StepExpression = stmt->StepExpression->Accept(this).As<ExpressionSyntaxNode>();
+				if (stmt->EndExpression)
+					stmt->EndExpression = stmt->EndExpression->Accept(this).As<ExpressionSyntaxNode>();
+				if (stmt->Statement)
+					stmt->Statement = stmt->Statement->Accept(this).As<StatementSyntaxNode>();
+				return stmt;
+			}
+			virtual RefPtr<StatementSyntaxNode> VisitIfStatement(IfStatementSyntaxNode* stmt)
+			{
+				if (stmt->Predicate)
+					stmt->Predicate = stmt->Predicate->Accept(this).As<ExpressionSyntaxNode>();
+				if (stmt->PositiveStatement)
+					stmt->PositiveStatement = stmt->PositiveStatement->Accept(this).As<StatementSyntaxNode>();
+				if (stmt->NegativeStatement)
+					stmt->NegativeStatement = stmt->NegativeStatement->Accept(this).As<StatementSyntaxNode>();
+				return stmt;
+			}
+			virtual RefPtr<StatementSyntaxNode> VisitReturnStatement(ReturnStatementSyntaxNode* stmt)
+			{
+				if (stmt->Expression)
+					stmt->Expression = stmt->Expression->Accept(this).As<ExpressionSyntaxNode>();
+				return stmt;
+			}
+			virtual RefPtr<StatementSyntaxNode> VisitVarDeclrStatement(VarDeclrStatementSyntaxNode* stmt)
+			{
+				for (auto & var : stmt->Variables)
+					var = var->Accept(this).As<Variable>();
+				return stmt;
+			}
+			virtual RefPtr<StatementSyntaxNode> VisitWhileStatement(WhileStatementSyntaxNode* stmt)
+			{
+				if (stmt->Predicate)
+					stmt->Predicate = stmt->Predicate->Accept(this).As<ExpressionSyntaxNode>();
+				if (stmt->Statement)
+					stmt->Statement = stmt->Statement->Accept(this).As<StatementSyntaxNode>();
+				return stmt;
+			}
+			virtual RefPtr<StatementSyntaxNode> VisitExpressionStatement(ExpressionStatementSyntaxNode* stmt)
+			{
+				if (stmt->Expression)
+					stmt->Expression = stmt->Expression->Accept(this).As<ExpressionSyntaxNode>();
+				return stmt;
+			}
+
+			virtual RefPtr<ExpressionSyntaxNode> VisitBinaryExpression(BinaryExpressionSyntaxNode* expr)
+			{
+				if (expr->LeftExpression)
+					expr->LeftExpression = expr->LeftExpression->Accept(this).As<ExpressionSyntaxNode>();
+				if (expr->RightExpression)
+					expr->RightExpression = expr->RightExpression->Accept(this).As<ExpressionSyntaxNode>();
+				return expr;
+			}
+			virtual RefPtr<ExpressionSyntaxNode> VisitConstantExpression(ConstantExpressionSyntaxNode* expr)
+			{
+				return expr;
+			}
+			virtual RefPtr<ExpressionSyntaxNode> VisitIndexExpression(IndexExpressionSyntaxNode* expr)
+			{
+				if (expr->BaseExpression)
+					expr->BaseExpression = expr->BaseExpression->Accept(this).As<ExpressionSyntaxNode>();
+				if (expr->IndexExpression)
+					expr->IndexExpression = expr->IndexExpression->Accept(this).As<ExpressionSyntaxNode>();
+				return expr;
+			}
+			virtual RefPtr<ExpressionSyntaxNode> VisitMemberExpression(MemberExpressionSyntaxNode * stmt)
+			{
+				if (stmt->BaseExpression)
+					stmt->BaseExpression = stmt->BaseExpression->Accept(this).As<ExpressionSyntaxNode>();
+				return stmt;
+			}
+			virtual RefPtr<ExpressionSyntaxNode> VisitInvokeExpression(InvokeExpressionSyntaxNode* stmt)
+			{
+				stmt->FunctionExpr->Accept(this);
+				for (auto & arg : stmt->Arguments)
+					arg = arg->Accept(this).As<ExpressionSyntaxNode>();
+				return stmt;
+			}
+			virtual RefPtr<ExpressionSyntaxNode> VisitImportExpression(ImportExpressionSyntaxNode * expr)
+			{
+				for (auto & arg : expr->Arguments)
+					arg = arg->Accept(this).As<ExpressionSyntaxNode>();
+				return expr;
+			}
+			virtual RefPtr<ExpressionSyntaxNode> VisitTypeCastExpression(TypeCastExpressionSyntaxNode * stmt)
+			{
+				if (stmt->Expression)
+					stmt->Expression = stmt->Expression->Accept(this).As<ExpressionSyntaxNode>();
+				return stmt->Expression;
+			}
+			virtual RefPtr<ExpressionSyntaxNode> VisitSelectExpression(SelectExpressionSyntaxNode * expr)
+			{
+				if (expr->SelectorExpr)
+					expr->SelectorExpr = expr->SelectorExpr->Accept(this).As<ExpressionSyntaxNode>();
+				if (expr->Expr0)
+					expr->Expr0 = expr->Expr0->Accept(this).As<ExpressionSyntaxNode>();
+				if (expr->Expr1)
+					expr->Expr1 = expr->Expr1->Accept(this).As<ExpressionSyntaxNode>();
+				return expr;
+			}
+			virtual RefPtr<ExpressionSyntaxNode> VisitUnaryExpression(UnaryExpressionSyntaxNode* expr)
+			{
+				if (expr->Expression)
+					expr->Expression = expr->Expression->Accept(this).As<ExpressionSyntaxNode>();
+				return expr;
+			}
+			virtual RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode* expr)
+			{
+				return expr;
+			}
+			virtual RefPtr<PipelineSyntaxNode> VisitPipeline(PipelineSyntaxNode * pipe)
+			{
+				for (auto & comp : pipe->AbstractComponents)
+					comp = comp->Accept(this).As<ComponentSyntaxNode>();
+				for (auto & imp : pipe->ImportOperators)
+					imp = imp->Accept(this).As<ImportOperatorDefSyntaxNode>();
+				return pipe;
+			}
+			virtual RefPtr<ImportOperatorDefSyntaxNode> VisitImportOperatorDef(ImportOperatorDefSyntaxNode * imp)
+			{
+				imp->Body = imp->Body->Accept(this).As<BlockStatementSyntaxNode>();
+				return imp;
+			}
+			virtual RefPtr<ParameterSyntaxNode> VisitParameter(ParameterSyntaxNode* param)
+			{
+				return param;
+			}
+			virtual RefPtr<TypeSyntaxNode> VisitBasicType(BasicTypeSyntaxNode* type)
+			{
+				return type;
+			}
+			virtual RefPtr<TypeSyntaxNode> VisitArrayType(ArrayTypeSyntaxNode* type)
+			{
+				return type;
+			}
+			virtual RefPtr<TypeSyntaxNode> VisitGenericType(GenericTypeSyntaxNode* type)
+			{
+				return type;
+			}
+
+			virtual RefPtr<Variable> VisitDeclrVariable(Variable* dclr)
+			{
+				if (dclr->Expression)
+					dclr->Expression = dclr->Expression->Accept(this).As<ExpressionSyntaxNode>();
+				return dclr;
+			}
+			virtual RefPtr<ImportSyntaxNode> VisitImport(ImportSyntaxNode* imp)
+			{
+				for (auto & arg : imp->Arguments)
+					if (arg->Expression)
+						arg->Expression = arg->Expression->Accept(this).As<ExpressionSyntaxNode>();
+				return imp;
+			}
+			virtual RefPtr<StatementSyntaxNode> VisitImportStatement(ImportStatementSyntaxNode* stmt)
+			{
+				if (stmt->Import)
+					stmt->Import = stmt->Import->Accept(this).As<ImportSyntaxNode>();
+				return stmt;
+			}
+			virtual RefPtr<ImportArgumentSyntaxNode> VisitImportArgument(ImportArgumentSyntaxNode * arg)
+			{
+				if (arg->Expression)
+					arg->Expression = arg->Expression->Accept(this).As<ExpressionSyntaxNode>();
+				return arg;
+			}
+
+		};
+	}
+}
+
+#endif
+
+/***********************************************************************
+SPIRECORE\COMPILEDPROGRAM.H
+***********************************************************************/
+#ifndef BAKER_SL_COMPILED_PROGRAM_H
+#define BAKER_SL_COMPILED_PROGRAM_H
+
+
+namespace Spire
+{
+	namespace Compiler
+	{
+		class ConstantPoolImpl;
+
+		class ConstantPool
+		{
+		private:
+			ConstantPoolImpl * impl;
+		public:
+			ILConstOperand * CreateConstant(ILConstOperand * c);
+			ILConstOperand * CreateConstantIntVec(int val0, int val1);
+			ILConstOperand * CreateConstantIntVec(int val0, int val1, int val2);
+			ILConstOperand * CreateConstantIntVec(int val0, int val1, int val3, int val4);
+			ILConstOperand * CreateConstant(int val, int vectorSize = 0);
+			ILConstOperand * CreateConstant(float val, int vectorSize = 0);
+			ILConstOperand * CreateConstant(float val, float val1);
+			ILConstOperand * CreateConstant(float val, float val1, float val2);
+			ILConstOperand * CreateConstant(float val, float val1, float val2, float val3);
+			ILConstOperand * CreateConstant(bool b);
+			ILOperand * CreateDefaultValue(ILType * type);
+			ILUndefinedOperand * GetUndefinedOperand();
+			ConstantPool();
+			~ConstantPool();
+		};
+
+		class ILShader;
+
+		class ILWorld : public Object
+		{
+		public:
+			String Name;
+			CodePosition Position;
+			RefPtr<ILRecordType> OutputType;
+			List<ILObjectDefinition> Inputs;
+			RefPtr<CFGNode> Code;
+			EnumerableDictionary<String, ILOperand*> Components;
+			bool IsAbstract = false;
+			EnumerableDictionary<String, String> Attributes;
+			EnumerableHashSet<String> ReferencedFunctions; // internal names of referenced functions
+			ILShader * Shader = nullptr;
+		};
+
+		class StageAttribute
+		{
+		public:
+			String Name;
+			String Value;
+			CodePosition Position;
+		};
+
+		class ILStage : public Object
+		{
+		public:
+			CodePosition Position;
+			String Name;
+			String StageType;
+			EnumerableDictionary<String, StageAttribute> Attributes;
+		};
+
+		class ILShader
+		{
+		public:
+			CodePosition Position;
+			String Name;
+			EnumerableDictionary<String, RefPtr<ILWorld>> Worlds;
+			EnumerableDictionary<String, RefPtr<ILStage>> Stages;
+		};
+
+		class ILFunction
+		{
+		public:
+			EnumerableDictionary<String, RefPtr<ILType>> Parameters;
+			RefPtr<ILType> ReturnType;
+			RefPtr<CFGNode> Code;
+			String Name;
+		};
+
+		class ILProgram
+		{
+		public:
+			RefPtr<ConstantPool> ConstantPool = new Compiler::ConstantPool();
+			List<RefPtr<ILShader>> Shaders;
+			EnumerableDictionary<String, RefPtr<ILFunction>> Functions;
+			List<RefPtr<ILStructType>> Structs;
+		};
+
+		class ShaderChoiceValue
+		{
+		public:
+			String WorldName, AlternateName;
+			ShaderChoiceValue() = default;
+			ShaderChoiceValue(String world, String alt)
+			{
+				WorldName = world;
+				AlternateName = alt;
+			}
+			static ShaderChoiceValue Parse(String str);
+			String ToString()
+			{
+				if (AlternateName.Length() == 0)
+					return WorldName;
+				else
+					return WorldName + L":" + AlternateName;
+			}
+			bool operator == (const ShaderChoiceValue & val)
+			{
+				return WorldName == val.WorldName && AlternateName == val.AlternateName;
+			}
+			bool operator != (const ShaderChoiceValue & val)
+			{
+				return WorldName != val.WorldName || AlternateName != val.AlternateName;
+			}
+			int GetHashCode()
+			{
+				return WorldName.GetHashCode() ^ AlternateName.GetHashCode();
+			}
+		};
+
+		class ShaderChoice
+		{
+		public:
+			String ChoiceName;
+			String DefaultValue;
+			List<ShaderChoiceValue> Options;
+		};
+
+
+		class InterfaceMetaData
+		{
+		public:
+			CoreLib::Basic::String Name;
+			RefPtr<Spire::Compiler::ILType> Type;
+			EnumerableDictionary<String, String> Attributes;
+
+			int GetHashCode()
+			{
+				return Name.GetHashCode();
+			}
+			bool operator == (const InterfaceMetaData & other)
+			{
+				return Name == other.Name;
+			}
+		};
+
+		class StageMetaData
+		{
+		public:
+			CoreLib::Basic::String Name;
+			CoreLib::Basic::String TargetName;
+			CoreLib::Basic::String OutputBlock;
+			CoreLib::Basic::List<CoreLib::Basic::String> InputBlocks;
+			CoreLib::Basic::List<CoreLib::Basic::String> Components;
+		};
+
+		class InterfaceBlockEntry : public InterfaceMetaData
+		{
+		public:
+			int Offset = 0, Size = 0;
+		};
+		class InterfaceBlockMetaData
+		{
+		public:
+			String Name;
+			int Size = 0;
+			EnumerableHashSet<InterfaceBlockEntry> Entries;
+			EnumerableDictionary<String, String> Attributes;
+			EnumerableHashSet<String> UserWorlds;
+		};
+		class ShaderMetaData
+		{
+		public:
+			CoreLib::String ShaderName;
+			CoreLib::EnumerableDictionary<CoreLib::String, StageMetaData> Stages;
+			EnumerableDictionary<String, InterfaceBlockMetaData> InterfaceBlocks;
+		};
+
+		class StageSource
+		{
+		public:
+			String MainCode;
+			List<unsigned char> BinaryCode;
+		};
+
+		class CompiledShaderSource
+		{
+		public:
+			EnumerableDictionary<String, StageSource> Stages;
+			ShaderMetaData MetaData;
+		};
+
+		void IndentString(StringBuilder & sb, String src);
+
+		class CompileResult
+		{
+		private:
+			ErrorWriter errWriter;
+		public:
+			bool Success;
+			List<CompileError> ErrorList, WarningList;
+			String ScheduleFile;
+			RefPtr<ILProgram> Program;
+			List<ShaderChoice> Choices;
+			EnumerableDictionary<String, CompiledShaderSource> CompiledSource; // shader -> stage -> code
+			void PrintError(bool printWarning = false)
+			{
+				for (int i = 0; i < ErrorList.Count(); i++)
+				{
+					printf("%s(%d): error %d: %s\n", ErrorList[i].Position.FileName.ToMultiByteString(), ErrorList[i].Position.Line,
+						ErrorList[i].ErrorID, ErrorList[i].Message.ToMultiByteString());
+				}
+				if (printWarning)
+					for (int i = 0; i < WarningList.Count(); i++)
+					{
+						printf("%s(%d): warning %d: %s\n", WarningList[i].Position.FileName.ToMultiByteString(),
+							WarningList[i].Position.Line, WarningList[i].ErrorID, WarningList[i].Message.ToMultiByteString());
+					}
+			}
+			CompileResult()
+				: errWriter(ErrorList, WarningList)
+			{}
+			ErrorWriter * GetErrorWriter()
+			{
+				return &errWriter;
+			}
+		};
+
+	}
+}
+
+#endif
+
+/***********************************************************************
 SPIRECORE\VARIANTIR.H
 ***********************************************************************/
 #ifndef VARIANT_IR_H
@@ -9977,246 +10217,6 @@ namespace Spire
 #endif
 
 /***********************************************************************
-SPIRECORE\COMPILEDPROGRAM.H
-***********************************************************************/
-#ifndef BAKER_SL_COMPILED_PROGRAM_H
-#define BAKER_SL_COMPILED_PROGRAM_H
-
-
-namespace Spire
-{
-	namespace Compiler
-	{
-		class ConstantPoolImpl;
-
-		class ConstantPool
-		{
-		private:
-			ConstantPoolImpl * impl;
-		public:
-			ILConstOperand * CreateConstant(ILConstOperand * c);
-			ILConstOperand * CreateConstantIntVec(int val0, int val1);
-			ILConstOperand * CreateConstantIntVec(int val0, int val1, int val2);
-			ILConstOperand * CreateConstantIntVec(int val0, int val1, int val3, int val4);
-			ILConstOperand * CreateConstant(int val, int vectorSize = 0);
-			ILConstOperand * CreateConstant(float val, int vectorSize = 0);
-			ILConstOperand * CreateConstant(float val, float val1);
-			ILConstOperand * CreateConstant(float val, float val1, float val2);
-			ILConstOperand * CreateConstant(float val, float val1, float val2, float val3);
-			ILConstOperand * CreateConstant(bool b);
-			ILOperand * CreateDefaultValue(ILType * type);
-			ILUndefinedOperand * GetUndefinedOperand();
-			ConstantPool();
-			~ConstantPool();
-		};
-
-		class ILShader;
-
-		class ILWorld : public Object
-		{
-		public:
-			String Name;
-			CodePosition Position;
-			RefPtr<ILRecordType> OutputType;
-			List<ILObjectDefinition> Inputs;
-			RefPtr<CFGNode> Code;
-			EnumerableDictionary<String, ILOperand*> Components;
-			bool IsAbstract = false;
-			EnumerableDictionary<String, String> Attributes;
-			EnumerableHashSet<String> ReferencedFunctions; // internal names of referenced functions
-			ILShader * Shader = nullptr;
-		};
-
-		class StageAttribute
-		{
-		public:
-			String Name;
-			String Value;
-			CodePosition Position;
-		};
-
-		class ILStage : public Object
-		{
-		public:
-			CodePosition Position;
-			String Name;
-			String StageType;
-			EnumerableDictionary<String, StageAttribute> Attributes;
-		};
-
-		class ILShader
-		{
-		public:
-			CodePosition Position;
-			String Name;
-			EnumerableDictionary<String, RefPtr<ILWorld>> Worlds;
-			EnumerableDictionary<String, RefPtr<ILStage>> Stages;
-		};
-
-		class ILFunction
-		{
-		public:
-			EnumerableDictionary<String, RefPtr<ILType>> Parameters;
-			RefPtr<ILType> ReturnType;
-			RefPtr<CFGNode> Code;
-			String Name;
-		};
-
-		class ILProgram
-		{
-		public:
-			RefPtr<ConstantPool> ConstantPool = new Compiler::ConstantPool();
-			List<RefPtr<ILShader>> Shaders;
-			EnumerableDictionary<String, RefPtr<ILFunction>> Functions;
-			List<RefPtr<ILStructType>> Structs;
-		};
-
-		class ShaderChoiceValue
-		{
-		public:
-			String WorldName, AlternateName;
-			ShaderChoiceValue() = default;
-			ShaderChoiceValue(String world, String alt)
-			{
-				WorldName = world;
-				AlternateName = alt;
-			}
-			static ShaderChoiceValue Parse(String str);
-			String ToString()
-			{
-				if (AlternateName.Length() == 0)
-					return WorldName;
-				else
-					return WorldName + L":" + AlternateName;
-			}
-			bool operator == (const ShaderChoiceValue & val)
-			{
-				return WorldName == val.WorldName && AlternateName == val.AlternateName;
-			}
-			bool operator != (const ShaderChoiceValue & val)
-			{
-				return WorldName != val.WorldName || AlternateName != val.AlternateName;
-			}
-			int GetHashCode()
-			{
-				return WorldName.GetHashCode() ^ AlternateName.GetHashCode();
-			}
-		};
-
-		class ShaderChoice
-		{
-		public:
-			String ChoiceName;
-			String DefaultValue;
-			List<ShaderChoiceValue> Options;
-		};
-
-
-		class InterfaceMetaData
-		{
-		public:
-			CoreLib::Basic::String Name;
-			RefPtr<Spire::Compiler::ILType> Type;
-			EnumerableDictionary<String, String> Attributes;
-
-			int GetHashCode()
-			{
-				return Name.GetHashCode();
-			}
-			bool operator == (const InterfaceMetaData & other)
-			{
-				return Name == other.Name;
-			}
-		};
-
-		class StageMetaData
-		{
-		public:
-			CoreLib::Basic::String Name;
-			CoreLib::Basic::String TargetName;
-			CoreLib::Basic::String OutputBlock;
-			CoreLib::Basic::List<CoreLib::Basic::String> InputBlocks;
-			CoreLib::Basic::List<CoreLib::Basic::String> Components;
-		};
-
-		class InterfaceBlockEntry : public InterfaceMetaData
-		{
-		public:
-			int Offset = 0, Size = 0;
-		};
-		class InterfaceBlockMetaData
-		{
-		public:
-			String Name;
-			int Size = 0;
-			EnumerableHashSet<InterfaceBlockEntry> Entries;
-			EnumerableDictionary<String, String> Attributes;
-			EnumerableHashSet<String> UserWorlds;
-		};
-		class ShaderMetaData
-		{
-		public:
-			CoreLib::String ShaderName;
-			CoreLib::EnumerableDictionary<CoreLib::String, StageMetaData> Stages;
-			EnumerableDictionary<String, InterfaceBlockMetaData> InterfaceBlocks;
-		};
-
-		class StageSource
-		{
-		public:
-			String MainCode;
-			List<unsigned char> BinaryCode;
-		};
-
-		class CompiledShaderSource
-		{
-		public:
-			EnumerableDictionary<String, StageSource> Stages;
-			ShaderMetaData MetaData;
-		};
-
-		void IndentString(StringBuilder & sb, String src);
-
-		class CompileResult
-		{
-		private:
-			ErrorWriter errWriter;
-		public:
-			bool Success;
-			List<CompileError> ErrorList, WarningList;
-			String ScheduleFile;
-			RefPtr<ILProgram> Program;
-			List<ShaderChoice> Choices;
-			EnumerableDictionary<String, CompiledShaderSource> CompiledSource; // shader -> stage -> code
-			void PrintError(bool printWarning = false)
-			{
-				for (int i = 0; i < ErrorList.Count(); i++)
-				{
-					printf("%s(%d): error %d: %s\n", ErrorList[i].Position.FileName.ToMultiByteString(), ErrorList[i].Position.Line,
-						ErrorList[i].ErrorID, ErrorList[i].Message.ToMultiByteString());
-				}
-				if (printWarning)
-					for (int i = 0; i < WarningList.Count(); i++)
-					{
-						printf("%s(%d): warning %d: %s\n", WarningList[i].Position.FileName.ToMultiByteString(),
-							WarningList[i].Position.Line, WarningList[i].ErrorID, WarningList[i].Message.ToMultiByteString());
-					}
-			}
-			CompileResult()
-				: errWriter(ErrorList, WarningList)
-			{}
-			ErrorWriter * GetErrorWriter()
-			{
-				return &errWriter;
-			}
-		};
-
-	}
-}
-
-#endif
-
-/***********************************************************************
 SPIRECORE\CODEGENBACKEND.H
 ***********************************************************************/
 #ifndef CODE_GEN_BACKEND_H
@@ -10234,7 +10234,25 @@ namespace Spire
 		};
 
 		CodeGenBackend * CreateGLSLCodeGen();
+		CodeGenBackend * CreateHLSLCodeGen();
 		CodeGenBackend * CreateSpirVCodeGen();
+	}
+}
+
+#endif
+
+/***********************************************************************
+SPIRECORE\NAMING.H
+***********************************************************************/
+#ifndef SPIRE_NAMING_H
+#define SPIRE_NAMING_H
+
+
+namespace Spire
+{
+	namespace Compiler
+	{
+		CoreLib::String EscapeDoubleUnderscore(CoreLib::String str);
 	}
 }
 
@@ -10949,6 +10967,216 @@ namespace CoreLib
 #endif
 
 /***********************************************************************
+SPIRECORE\CLIKECODEGEN.H
+***********************************************************************/
+// CLikeCodeGen.h
+#ifndef SPIRE_C_LIKE_CODE_GEN_H
+#define SPIRE_C_LIKE_CODE_GEN_H
+
+//
+// This file implements the shared logic for code generation in C-like
+// languages, such as GLSL and HLSL.
+//
+
+
+namespace Spire
+{
+	namespace Compiler
+	{
+		using namespace CoreLib::Basic;
+
+		ILRecordType * ExtractRecordType(ILType * type);
+		String AddWorldNameSuffix(String name, String suffix);
+
+		class CLikeCodeGen;
+
+		class CodeGenContext
+		{
+		public:
+			CLikeCodeGen * codeGen;
+			HashSet<String> GeneratedDefinitions;
+			Dictionary<String, String> SubstituteNames;
+			Dictionary<ILOperand*, String> VarName;
+			CompileResult * Result = nullptr;
+			HashSet<String> UsedVarNames;
+			int TextureBindingsAllocator = 0;
+			StringBuilder Body, Header, GlobalHeader;
+			List<ILType*> Arguments;
+			String ReturnVarName;
+			String GenerateCodeName(String name, String prefix)
+			{
+				StringBuilder nameBuilder;
+				int startPos = 0;
+				if (name.StartsWith(L"_sys_"))
+					startPos = name.IndexOf(L'_', 5) + 1;
+				nameBuilder << prefix;
+				for (int i = startPos; i < name.Length(); i++)
+				{
+					if ((name[i] >= L'a' && name[i] <= L'z') || 
+						(name[i] >= L'A' && name[i] <= L'Z') ||
+						name[i] == L'_' || 
+						(name[i] >= L'0' && name[i] <= L'9'))
+					{
+						nameBuilder << name[i];
+					}
+					else
+						nameBuilder << L'_';
+				}
+				auto rs = nameBuilder.ToString();
+				int i = 0;
+				while (UsedVarNames.Contains(rs))
+				{
+					i++;
+					rs = nameBuilder.ToString() + String(i);
+				}
+				UsedVarNames.Add(rs);
+
+				return rs;
+			}
+
+
+			String DefineVariable(ILOperand * op);
+		};
+
+		class ExternComponentCodeGenInfo
+		{
+		public:
+			enum class DataStructureType
+			{
+				StandardInput, UniformBuffer, ArrayBuffer, PackedBuffer, StorageBuffer, Texture, Patch
+			};
+			enum class SystemVarType
+			{
+				None, TessCoord, InvocationId, ThreadId, FragCoord, PatchVertexCount, PrimitiveId
+			};
+			DataStructureType DataStructure = DataStructureType::StandardInput;
+			RefPtr<ILType> Type;
+			SystemVarType SystemVar = SystemVarType::None;
+			bool IsArray = false;
+			int ArrayLength = 0;
+			int Binding = -1;
+		};
+
+		class OutputStrategy : public Object
+		{
+		protected:
+			CLikeCodeGen * codeGen = nullptr;
+			ILWorld * world = nullptr;
+		public:
+			OutputStrategy(CLikeCodeGen * pCodeGen, ILWorld * pWorld)
+			{
+				codeGen = pCodeGen;
+				world = pWorld;
+			}
+
+			virtual void DeclareOutput(CodeGenContext & ctx, ILStage * stage) = 0;
+			virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) = 0;
+		};
+
+		class CLikeCodeGen : public CodeGenBackend
+		{
+		protected:
+			//ILWorld * currentWorld = nullptr;
+			//ILRecordType * currentRecordType = nullptr;
+			//bool exportWriteToPackedBuffer = false;
+			CoreLib::Basic::RefPtr<OutputStrategy> outputStrategy;
+			Dictionary<String, ExternComponentCodeGenInfo> extCompInfo;
+			ImportInstruction * currentImportInstr = nullptr;
+			bool useBindlessTexture = false;
+			ErrorWriter * errWriter;
+
+			virtual OutputStrategy * CreateStandardOutputStrategy(ILWorld * world, String layoutPrefix) = 0;
+			virtual OutputStrategy * CreatePackedBufferOutputStrategy(ILWorld * world) = 0;
+			virtual OutputStrategy * CreateArrayOutputStrategy(ILWorld * world, bool pIsPatch, int pArraySize, String arrayIndex) = 0;
+
+			// Hooks for declaring an input record based on the storage mode used (uniform, SSBO, etc.)
+			virtual void DeclareUniformBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) = 0;
+			virtual void DeclareStorageBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) = 0;
+			virtual void DeclareArrayBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) = 0;
+			virtual void DeclarePackedBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) = 0;
+			virtual void DeclareTextureInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) = 0;
+			virtual void DeclareStandardInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) = 0;
+			virtual void DeclarePatchInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) = 0;
+
+			// Hooks for generating per-stage kernels
+			virtual StageSource GenerateSingleWorldShader(ILProgram * program, ILShader * shader, ILStage * stage) = 0;
+			virtual StageSource GenerateHullShader(ILProgram * program, ILShader * shader, ILStage * stage) = 0;
+
+			// Print a reference to some entity that is input to a kernel
+			virtual void PrintUniformBufferInputReference(StringBuilder& sb, String inputName, String componentName) = 0;
+			virtual void PrintStorageBufferInputReference(StringBuilder& sb, String inputName, String componentName) = 0;
+			virtual void PrintArrayBufferInputReference(StringBuilder& sb, String inputName, String componentName) = 0;
+			virtual void PrintPackedBufferInputReference(StringBuilder& sb, String inputName, String componentName) = 0;
+			virtual void PrintStandardInputReference(StringBuilder& sb, ILRecordType* recType, String inputName, String componentName) = 0;
+			virtual void PrintPatchInputReference(StringBuilder& sb, ILRecordType* recType, String inputName, String componentName) = 0;
+			virtual void PrintDefaultInputReference(StringBuilder& sb, ILRecordType* recType, String inputName, String componentName) = 0;
+			virtual void PrintSystemVarReference(StringBuilder& sb, String inputName, ExternComponentCodeGenInfo::SystemVarType systemVar) = 0;
+
+			//
+			virtual void PrintTypeName(StringBuilder& sb, ILType* type) = 0;
+			virtual String RemapFuncNameForTarget(String name);
+			virtual void PrintMatrixMulInstrExpr(CodeGenContext & ctx, ILOperand* op0, ILOperand* op1);
+			virtual void PrintRasterPositionOutputWrite(CodeGenContext & ctx, ILOperand * operand) = 0;
+
+		public:
+			void Error(int errId, String msg, CodePosition pos);
+			void PrintType(StringBuilder & sbCode, ILType* type);
+
+			void PrintDef(StringBuilder & sbCode, ILType* type, const String & name);
+
+			String GetFunctionCallName(String name);
+
+			String GetFuncOriginalName(const String & name);
+
+			void PrintOp(CodeGenContext & ctx, ILOperand * op, bool forceExpression = false);
+			void PrintBinaryInstrExpr(CodeGenContext & ctx, BinaryInstruction * instr);
+			void PrintBinaryInstr(CodeGenContext & ctx, BinaryInstruction * instr);
+			void PrintUnaryInstrExpr(CodeGenContext & ctx, UnaryInstruction * instr);
+			void PrintUnaryInstr(CodeGenContext & ctx, UnaryInstruction * instr);
+			void PrintAllocVarInstrExpr(CodeGenContext & ctx, AllocVarInstruction * instr);
+			void PrintAllocVarInstr(CodeGenContext & ctx, AllocVarInstruction * instr);
+			void PrintFetchArgInstrExpr(CodeGenContext & ctx, FetchArgInstruction * instr);
+			void PrintFetchArgInstr(CodeGenContext & ctx, FetchArgInstruction * instr);
+			void PrintSelectInstrExpr(CodeGenContext & ctx, SelectInstruction * instr);
+			void PrintSelectInstr(CodeGenContext & ctx, SelectInstruction * instr);
+			void PrintCallInstrExpr(CodeGenContext & ctx, CallInstruction * instr);
+			void PrintCallInstr(CodeGenContext & ctx, CallInstruction * instr);
+			void PrintCastF2IInstrExpr(CodeGenContext & ctx, Float2IntInstruction * instr);
+			void PrintCastF2IInstr(CodeGenContext & ctx, Float2IntInstruction * instr);
+			void PrintCastI2FInstrExpr(CodeGenContext & ctx, Int2FloatInstruction * instr);
+			void PrintCastI2FInstr(CodeGenContext & ctx, Int2FloatInstruction * instr);
+			bool AppearAsExpression(ILInstruction & instr, bool force);
+			void PrintExportInstr(CodeGenContext &ctx, ExportInstruction * exportInstr);
+			void PrintUpdateInstr(CodeGenContext & ctx, MemberUpdateInstruction * instr);
+			void PrintSwizzleInstrExpr(CodeGenContext & ctx, SwizzleInstruction * swizzle);
+			void PrintImportInstr(CodeGenContext & ctx, ImportInstruction * importInstr);
+			void PrintImportInstrExpr(CodeGenContext & ctx, ImportInstruction * importInstr);
+			void PrintInstrExpr(CodeGenContext & ctx, ILInstruction & instr);
+			void PrintInstr(CodeGenContext & ctx, ILInstruction & instr);
+			void PrintLoadInputInstrExpr(CodeGenContext & ctx, LoadInputInstruction * instr);
+			void GenerateCode(CodeGenContext & context, CFGNode * code);
+
+		public:
+			virtual CompiledShaderSource GenerateShader(CompileResult & result, SymbolTable *, ILShader * shader, ErrorWriter * err) override;
+			void GenerateStructs(StringBuilder & sb, ILProgram * program);
+			void GenerateReferencedFunctions(StringBuilder & sb, ILProgram * program, ArrayView<ILWorld*> worlds);
+			ExternComponentCodeGenInfo ExtractExternComponentInfo(const ILObjectDefinition & input);
+			void PrintInputReference(StringBuilder & sb, String input);
+			void DeclareInput(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader);
+			void GenerateVertexShaderEpilog(CodeGenContext & ctx, ILWorld * world, ILStage * stage);
+			void GenerateDomainShaderProlog(CodeGenContext & ctx, ILStage * stage);
+
+			StageSource GenerateVertexFragmentDomainShader(ILProgram * program, ILShader * shader, ILStage * stage);
+			StageSource GenerateComputeShader(ILProgram * program, ILShader * shader, ILStage * stage);
+			void GenerateFunctionDeclaration(StringBuilder & sbCode, ILFunction * function);
+			String GenerateFunction(ILFunction * function);
+		};
+	}
+}
+
+#endif // SPIRE_C_LIKE_CODE_GEN_H
+
+/***********************************************************************
 SPIRECORE\CLOSURE.H
 ***********************************************************************/
 #ifndef BAKERSL_SHADER_CLOSURE_H
@@ -10986,23 +11214,6 @@ namespace Spire
 				: Content(str)
 			{}
 		};
-	}
-}
-
-#endif
-
-/***********************************************************************
-SPIRECORE\NAMING.H
-***********************************************************************/
-#ifndef SPIRE_NAMING_H
-#define SPIRE_NAMING_H
-
-
-namespace Spire
-{
-	namespace Compiler
-	{
-		CoreLib::String EscapeDoubleUnderscore(CoreLib::String str);
 	}
 }
 
@@ -13972,6 +14183,1257 @@ WARNING: THIS FILE IS AUTOMATICALLY GENERATED. DO NOT MODIFY
 #include "Spire.h"
 
 /***********************************************************************
+SPIRECORE\CLIKECODEGEN.CPP
+***********************************************************************/
+
+using namespace CoreLib::Basic;
+
+namespace Spire
+{
+	namespace Compiler
+	{
+		ILRecordType * ExtractRecordType(ILType * type)
+		{
+			if (auto recType = dynamic_cast<ILRecordType*>(type))
+				return recType;
+			else if (auto arrType = dynamic_cast<ILArrayType*>(type))
+				return ExtractRecordType(arrType->BaseType.Ptr());
+			else if (auto genType = dynamic_cast<ILGenericType*>(type))
+				return ExtractRecordType(genType->BaseType.Ptr());
+			else
+				return nullptr;
+		}
+
+		String AddWorldNameSuffix(String name, String suffix)
+		{
+			if (name.EndsWith(suffix))
+				return name;
+			else
+				return EscapeDoubleUnderscore(name + L"_" + suffix);
+		}
+
+
+		void CLikeCodeGen::Error(int errId, String msg, CodePosition pos)
+		{
+			errWriter->Error(errId, msg, pos);
+		}
+
+		void CLikeCodeGen::PrintType(StringBuilder & sbCode, ILType* type)
+		{
+			if (dynamic_cast<ILRecordType*>(type))
+				PrintType(sbCode, currentImportInstr->Type.Ptr());
+			else
+				PrintTypeName(sbCode, type);
+		}
+
+		void CLikeCodeGen::PrintDef(StringBuilder & sbCode, ILType* type, const String & name)
+		{
+			PrintType(sbCode, type);
+			sbCode << L" ";
+			sbCode << name;
+			if (name.Length() == 0)
+				throw InvalidProgramException(L"unnamed instruction.");
+		}
+
+		String CLikeCodeGen::GetFunctionCallName(String name)
+		{
+			StringBuilder rs;
+			for (int i = 0; i < name.Length(); i++)
+			{
+				if ((name[i] >= L'a' && name[i] <= L'z') || (name[i] >= L'A' && name[i] <= L'Z') || 
+					name[i] == L'_' || (name[i] >= L'0' && name[i] <= L'9'))
+				{
+					rs << name[i];
+				}
+				else if (i != name.Length() - 1)
+					rs << L'_';
+			}
+			return rs.ProduceString();
+		}
+
+		String CLikeCodeGen::GetFuncOriginalName(const String & name)
+		{
+			String originalName;
+			int splitPos = name.IndexOf(L'@');
+			if (splitPos == 0)
+				return name;
+			if (splitPos != -1)
+				originalName = name.SubString(0, splitPos);
+			else
+				originalName = name;
+			return originalName;
+		}
+
+		void CLikeCodeGen::PrintOp(CodeGenContext & ctx, ILOperand * op, bool forceExpression)
+		{
+			auto makeFloat = [](float v)
+			{
+				String rs(v, L"%.12e");
+				if (!rs.Contains(L'.') && !rs.Contains(L'e') && !rs.Contains(L'E'))
+					rs = rs + L".0";
+				if (rs.StartsWith(L"-"))
+					rs = L"(" + rs + L")";
+				return rs;
+			};
+			if (auto c = dynamic_cast<ILConstOperand*>(op))
+			{
+				auto type = c->Type.Ptr();
+				if (type->IsFloat())
+					ctx.Body << makeFloat(c->FloatValues[0]);
+				else if (type->IsInt())
+					ctx.Body << (c->IntValues[0]);
+				else if (type->IsBool())
+					ctx.Body << ((c->IntValues[0] != 0) ? L"true" : L"false");
+				else if (auto baseType = dynamic_cast<ILBasicType*>(type))
+				{
+					PrintType(ctx.Body, baseType);
+					ctx.Body << "(";
+
+					if (baseType->Type == ILBaseType::Float2)
+						ctx.Body << makeFloat(c->FloatValues[0]) << L", " << makeFloat(c->FloatValues[1]);
+					else if (baseType->Type == ILBaseType::Float3)
+						ctx.Body << makeFloat(c->FloatValues[0]) << L", " << makeFloat(c->FloatValues[1]) << L", " << makeFloat(c->FloatValues[2]);
+					else if (baseType->Type == ILBaseType::Float4)
+						ctx.Body << makeFloat(c->FloatValues[0]) << L", " << makeFloat(c->FloatValues[1]) << L", " << makeFloat(c->FloatValues[2]) << L", " << makeFloat(c->FloatValues[3]);
+					else if (baseType->Type == ILBaseType::Float3x3)
+					{
+						ctx.Body << L"mat3(";
+						for (int i = 0; i < 9; i++)
+						{
+							ctx.Body << makeFloat(c->FloatValues[i]);
+							if (i != 8)
+								ctx.Body << L", ";
+						}
+						ctx.Body;
+					}
+					else if (baseType->Type == ILBaseType::Float4x4)
+					{
+						for (int i = 0; i < 16; i++)
+						{
+							ctx.Body << makeFloat(c->FloatValues[i]);
+							if (i != 15)
+								ctx.Body << L", ";
+						}
+					}
+					else if (baseType->Type == ILBaseType::Int2)
+						ctx.Body << c->IntValues[0] << L", " << c->IntValues[1];
+					else if (baseType->Type == ILBaseType::Int3)
+						ctx.Body << c->IntValues[0] << L", " << c->IntValues[1] << L", " << c->IntValues[2];
+					else if (baseType->Type == ILBaseType::Int4)
+						ctx.Body << c->IntValues[0] << L", " << c->IntValues[1] << L", " << c->IntValues[2] << L", " << c->IntValues[3];
+
+					ctx.Body << ")";
+				}
+				else
+					throw InvalidOperationException(L"Illegal constant.");
+			}
+			else if (auto instr = dynamic_cast<ILInstruction*>(op))
+			{
+				if (AppearAsExpression(*instr, forceExpression))
+				{
+					PrintInstrExpr(ctx, *instr);
+				}
+				else
+				{
+					if (forceExpression)
+						throw InvalidProgramException(L"cannot generate code block as an expression.");
+					String substituteName;
+					if (ctx.SubstituteNames.TryGetValue(instr->Name, substituteName))
+						ctx.Body << substituteName;
+					else
+						ctx.Body << instr->Name;
+				}
+			}
+			else
+				throw InvalidOperationException(L"Unsupported operand type.");
+		}
+
+		static bool IsMatrix(ILOperand* operand)
+		{
+			auto type = operand->Type;
+			// TODO(tfoley): This needs to be expanded once other matrix types are supported
+			return type->IsFloatMatrix();
+		}
+
+		void CLikeCodeGen::PrintMatrixMulInstrExpr(CodeGenContext & ctx, ILOperand* op0, ILOperand* op1)
+		{
+			ctx.Body << L"(";
+			PrintOp(ctx, op0);
+			ctx.Body << L" * ";
+			PrintOp(ctx, op1);
+			ctx.Body << L")";
+		}
+
+		void CLikeCodeGen::PrintBinaryInstrExpr(CodeGenContext & ctx, BinaryInstruction * instr)
+		{
+			if (instr->Is<StoreInstruction>())
+			{
+				auto op0 = instr->Operands[0].Ptr();
+				auto op1 = instr->Operands[1].Ptr();
+				ctx.Body << L"(";
+				PrintOp(ctx, op0);
+				ctx.Body << L" = ";
+				PrintOp(ctx, op1);
+				ctx.Body << L")";
+				return;
+			}
+			auto op0 = instr->Operands[0].Ptr();
+			auto op1 = instr->Operands[1].Ptr();
+			if (instr->Is<StoreInstruction>())
+			{
+				throw InvalidOperationException(L"store instruction cannot appear as expression.");
+			}
+			if (instr->Is<MemberLoadInstruction>())
+			{
+				auto genType = dynamic_cast<ILGenericType*>(op0->Type.Ptr());
+				if (genType && genType->GenericTypeName == L"PackedBuffer")
+				{
+					// load record type from packed buffer
+					String conversionFunction;
+					int size = 0;
+					if (instr->Type->ToString() == L"int")
+					{
+						conversionFunction = L"floatBitsToInt";
+						size = 1;
+					}
+					else if (instr->Type->ToString() == L"ivec2")
+					{
+						conversionFunction = L"floatBitsToInt";
+						size = 2;
+					}
+					else if (instr->Type->ToString() == L"ivec3")
+					{
+						conversionFunction = L"floatBitsToInt";
+						size = 3;
+					}
+					else if (instr->Type->ToString() == L"ivec4")
+					{
+						conversionFunction = L"floatBitsToInt";
+						size = 4;
+					}
+					else if (instr->Type->ToString() == L"uint")
+					{
+						conversionFunction = L"floatBitsToUint";
+						size = 1;
+					}
+					else if (instr->Type->ToString() == L"uvec2")
+					{
+						conversionFunction = L"floatBitsToUint";
+						size = 2;
+					}
+					else if (instr->Type->ToString() == L"uvec3")
+					{
+						conversionFunction = L"floatBitsToUint";
+						size = 3;
+					}
+					else if (instr->Type->ToString() == L"uvec4")
+					{
+						conversionFunction = L"floatBitsToUint";
+						size = 4;
+					}
+					else if (instr->Type->ToString() == L"float")
+					{
+						conversionFunction = L"";
+						size = 1;
+					}
+					else if (instr->Type->ToString() == L"vec2")
+					{
+						conversionFunction = L"";
+						size = 2;
+					}
+					else if (instr->Type->ToString() == L"vec3")
+					{
+						conversionFunction = L"";
+						size = 3;
+					}
+					else if (instr->Type->ToString() == L"vec4")
+					{
+						conversionFunction = L"";
+						size = 4;
+					}
+					else if (instr->Type->ToString() == L"mat3")
+					{
+						conversionFunction = L"";
+						size = 9;
+					}
+					else if (instr->Type->ToString() == L"mat4")
+					{
+						conversionFunction = L"";
+						size = 16;
+					}
+					else
+					{
+						errWriter->Error(50082, L"importing type '" + instr->Type->ToString() + L"' from PackedBuffer is not supported by the GLSL backend.",
+							CodePosition());
+					}
+					ctx.Body << instr->Type->ToString() << L"(";
+					auto recType = dynamic_cast<ILRecordType*>(genType->BaseType.Ptr());
+					int recTypeSize = 0;
+					EnumerableDictionary<String, int> memberOffsets;
+					for (auto & member : recType->Members)
+					{
+						memberOffsets[member.Key] = recTypeSize;
+						recTypeSize += member.Value.Type->GetVectorSize();
+					}
+					for (int i = 0; i < size; i++)
+					{
+						ctx.Body << conversionFunction << L"(";
+						PrintOp(ctx, op0);
+						ctx.Body << L"[(";
+						PrintOp(ctx, op1);
+						ctx.Body << L") * " << recTypeSize << L" + " << memberOffsets[currentImportInstr->ComponentName]() << L"])";
+						if (i != size - 1)
+							ctx.Body << L", ";
+					}
+					ctx.Body << L")";
+				}
+				else
+				{
+					PrintOp(ctx, op0);
+					bool printDefault = true;
+					if (op0->Type->IsVector())
+					{
+						if (auto c = dynamic_cast<ILConstOperand*>(op1))
+						{
+							switch (c->IntValues[0])
+							{
+							case 0:
+								ctx.Body << L".x";
+								break;
+							case 1:
+								ctx.Body << L".y";
+								break;
+							case 2:
+								ctx.Body << L".z";
+								break;
+							case 3:
+								ctx.Body << L".w";
+								break;
+							default:
+								throw InvalidOperationException(L"Invalid member access.");
+							}
+							printDefault = false;
+						}
+					}
+					else if (auto structType = dynamic_cast<ILStructType*>(op0->Type.Ptr()))
+					{
+						if (auto c = dynamic_cast<ILConstOperand*>(op1))
+						{
+							ctx.Body << L"." << structType->Members[c->IntValues[0]].FieldName;
+						}
+						printDefault = false;
+					}
+					if (printDefault)
+					{
+						ctx.Body << L"[";
+						PrintOp(ctx, op1);
+						ctx.Body << L"]";
+					}
+					if (genType)
+					{
+						if (genType->GenericTypeName == L"Buffer" && dynamic_cast<ILRecordType*>(genType->BaseType.Ptr()))
+							ctx.Body << L"." << currentImportInstr->ComponentName;
+					}
+				}
+				return;
+			}
+			const wchar_t * op = L"";
+			if (instr->Is<AddInstruction>())
+			{
+				op = L"+";
+			}
+			else if (instr->Is<SubInstruction>())
+			{
+				op = L"-";
+			}
+			else if (instr->Is<MulInstruction>())
+			{
+				// For matrix-matrix, matrix-vector, and vector-matrix `*`,
+				// GLSL performs a linear-algebraic inner product, while HLSL
+				// always does element-wise product. We need to give the
+				// codegen backend a change to handle this case.
+				if(IsMatrix(op0) || IsMatrix(op1))
+				{
+					PrintMatrixMulInstrExpr(ctx, op0, op1);
+					return;
+				}
+
+				op = L"*";
+			}
+			else if (instr->Is<DivInstruction>())
+			{
+				op = L"/";
+			}
+			else if (instr->Is<ModInstruction>())
+			{
+				op = L"%";
+			}
+			else if (instr->Is<ShlInstruction>())
+			{
+				op = L"<<";
+			}
+			else if (instr->Is<ShrInstruction>())
+			{
+				op = L">>";
+			}
+			else if (instr->Is<CmpeqlInstruction>())
+			{
+				op = L"==";
+				//ctx.Body << L"int";
+			}
+			else if (instr->Is<CmpgeInstruction>())
+			{
+				op = L">=";
+				//ctx.Body << L"int";
+			}
+			else if (instr->Is<CmpgtInstruction>())
+			{
+				op = L">";
+				//ctx.Body << L"int";
+			}
+			else if (instr->Is<CmpleInstruction>())
+			{
+				op = L"<=";
+				//ctx.Body << L"int";
+			}
+			else if (instr->Is<CmpltInstruction>())
+			{
+				op = L"<";
+				//ctx.Body << L"int";
+			}
+			else if (instr->Is<CmpneqInstruction>())
+			{
+				op = L"!=";
+				//ctx.Body << L"int";
+			}
+			else if (instr->Is<AndInstruction>())
+			{
+				op = L"&&";
+			}
+			else if (instr->Is<OrInstruction>())
+			{
+				op = L"||";
+			}
+			else if (instr->Is<BitXorInstruction>())
+			{
+				op = L"^";
+			}
+			else if (instr->Is<BitAndInstruction>())
+			{
+				op = L"&";
+			}
+			else if (instr->Is<BitOrInstruction>())
+			{
+				op = L"|";
+			}
+			else
+				throw InvalidProgramException(L"unsupported binary instruction.");
+			ctx.Body << L"(";
+			PrintOp(ctx, op0);
+			ctx.Body << L" " << op << L" ";
+			PrintOp(ctx, op1);
+			ctx.Body << L")";
+		}
+
+		void CLikeCodeGen::PrintBinaryInstr(CodeGenContext & ctx, BinaryInstruction * instr)
+		{
+			auto op0 = instr->Operands[0].Ptr();
+			auto op1 = instr->Operands[1].Ptr();
+			if (instr->Is<StoreInstruction>())
+			{
+				PrintOp(ctx, op0);
+				ctx.Body << L" = ";
+				PrintOp(ctx, op1);
+				ctx.Body << L";\n";
+				return;
+			}
+			auto varName = ctx.DefineVariable(instr);
+			if (instr->Is<MemberLoadInstruction>())
+			{
+				ctx.Body << varName << L" = ";
+				PrintBinaryInstrExpr(ctx, instr);
+				ctx.Body << L";\n";
+				return;
+			}
+			ctx.Body << varName << L" = ";
+			PrintBinaryInstrExpr(ctx, instr);
+			ctx.Body << L";\n";
+		}
+
+		void CLikeCodeGen::PrintUnaryInstrExpr(CodeGenContext & ctx, UnaryInstruction * instr)
+		{
+			auto op0 = instr->Operand.Ptr();
+			if (instr->Is<LoadInstruction>())
+			{
+				PrintOp(ctx, op0);
+				return;
+			}
+			else if (instr->Is<SwizzleInstruction>())
+			{
+				PrintSwizzleInstrExpr(ctx, instr->As<SwizzleInstruction>());
+				return;
+			}
+			const wchar_t * op = L"";
+			if (instr->Is<BitNotInstruction>())
+				op = L"~";
+			else if (instr->Is<Float2IntInstruction>())
+				op = L"(int)";
+			else if (instr->Is<Int2FloatInstruction>())
+				op = L"(float)";
+			else if (instr->Is<CopyInstruction>())
+				op = L"";
+			else if (instr->Is<NegInstruction>())
+				op = L"-";
+			else if (instr->Is<NotInstruction>())
+				op = L"!";
+			else
+				throw InvalidProgramException(L"unsupported unary instruction.");
+			ctx.Body << L"(" << op;
+			PrintOp(ctx, op0);
+			ctx.Body << L")";
+		}
+
+		void CLikeCodeGen::PrintUnaryInstr(CodeGenContext & ctx, UnaryInstruction * instr)
+		{
+			auto varName = ctx.DefineVariable(instr);
+			ctx.Body << varName << L" = ";
+			PrintUnaryInstrExpr(ctx, instr);
+			ctx.Body << L";\n";
+		}
+
+		void CLikeCodeGen::PrintAllocVarInstrExpr(CodeGenContext & ctx, AllocVarInstruction * instr)
+		{
+			ctx.Body << instr->Name;
+		}
+
+		void CLikeCodeGen::PrintAllocVarInstr(CodeGenContext & ctx, AllocVarInstruction * instr)
+		{
+			if (dynamic_cast<ILConstOperand*>(instr->Size.Ptr()))
+			{
+				ctx.DefineVariable(instr);
+			}
+			else
+				throw InvalidProgramException(L"size operand of allocVar instr is not an intermediate.");
+		}
+
+		void CLikeCodeGen::PrintFetchArgInstrExpr(CodeGenContext & ctx, FetchArgInstruction * instr)
+		{
+			ctx.Body << instr->Name;
+		}
+
+		void CLikeCodeGen::PrintFetchArgInstr(CodeGenContext & ctx, FetchArgInstruction * instr)
+		{
+			if (instr->ArgId == 0)
+			{
+				ctx.ReturnVarName = ctx.DefineVariable(instr);
+			}
+		}
+
+		void CLikeCodeGen::PrintSelectInstrExpr(CodeGenContext & ctx, SelectInstruction * instr)
+		{
+			ctx.Body << L"(";
+			PrintOp(ctx, instr->Operands[0].Ptr());
+			ctx.Body << L"?";
+			PrintOp(ctx, instr->Operands[1].Ptr());
+			ctx.Body << L":";
+			PrintOp(ctx, instr->Operands[2].Ptr());
+			ctx.Body << L")";
+		}
+
+		void CLikeCodeGen::PrintSelectInstr(CodeGenContext & ctx, SelectInstruction * instr)
+		{
+			auto varName = ctx.DefineVariable(instr);
+			ctx.Body << varName << L" = ";
+			PrintSelectInstrExpr(ctx, instr);
+			ctx.Body << L";\n";
+		}
+
+		String CLikeCodeGen::RemapFuncNameForTarget(String name)
+		{
+			return name;
+		}
+
+		void CLikeCodeGen::PrintCallInstrExpr(CodeGenContext & ctx, CallInstruction * instr)
+		{
+			String callName;
+			callName = GetFuncOriginalName(instr->Function);
+			callName = RemapFuncNameForTarget(callName);
+			ctx.Body << callName;
+			ctx.Body << L"(";
+			int id = 0;
+			for (auto & arg : instr->Arguments)
+			{
+				PrintOp(ctx, arg.Ptr());
+				if (id != instr->Arguments.Count() - 1)
+					ctx.Body << L", ";
+				id++;
+			}
+			ctx.Body << L")";
+		}
+
+		void CLikeCodeGen::PrintCallInstr(CodeGenContext & ctx, CallInstruction * instr)
+		{
+			auto varName = ctx.DefineVariable(instr);
+			ctx.Body << varName;
+			ctx.Body << L" = ";
+			PrintCallInstrExpr(ctx, instr);
+			ctx.Body << L";\n";
+		}
+
+		void CLikeCodeGen::PrintCastF2IInstrExpr(CodeGenContext & ctx, Float2IntInstruction * instr)
+		{
+			ctx.Body << L"((int)(";
+			PrintOp(ctx, instr->Operand.Ptr());
+			ctx.Body << L"))";
+		}
+		void CLikeCodeGen::PrintCastF2IInstr(CodeGenContext & ctx, Float2IntInstruction * instr)
+		{
+			auto varName = ctx.DefineVariable(instr);
+			ctx.Body << varName;
+			ctx.Body << L" = ";
+			PrintCastF2IInstrExpr(ctx, instr);
+			ctx.Body << L";\n";
+		}
+		void CLikeCodeGen::PrintCastI2FInstrExpr(CodeGenContext & ctx, Int2FloatInstruction * instr)
+		{
+			ctx.Body << L"((float)(";
+			PrintOp(ctx, instr->Operand.Ptr());
+			ctx.Body << L"))";
+		}
+		void CLikeCodeGen::PrintCastI2FInstr(CodeGenContext & ctx, Int2FloatInstruction * instr)
+		{
+			auto varName = ctx.DefineVariable(instr);
+			ctx.Body << varName;
+			ctx.Body << L" = ";
+			PrintCastI2FInstrExpr(ctx, instr);
+			ctx.Body << L";\n";
+		}
+
+		bool CLikeCodeGen::AppearAsExpression(ILInstruction & instr, bool force)
+		{
+			if (instr.Is<LoadInputInstruction>())
+				return true;
+			if (auto arg = instr.As<FetchArgInstruction>())
+			{
+				if (arg->ArgId == 0)
+					return false;
+			}
+			if (auto import = instr.As<ImportInstruction>())
+			{
+				if (!useBindlessTexture && import->Type->IsTexture() || import->Type.As<ILArrayType>())
+					return true;
+			}
+			for (auto &&usr : instr.Users)
+			{
+				if (auto update = dynamic_cast<MemberUpdateInstruction*>(usr))
+				{
+					if (&instr == update->Operands[0].Ptr())
+						return false;
+				}
+				else if (dynamic_cast<MemberLoadInstruction*>(usr))
+					return false;
+				else if (dynamic_cast<ExportInstruction*>(usr))
+					return false;
+				else if (dynamic_cast<ImportInstruction*>(usr))
+					return false;
+			}
+			if (instr.Is<StoreInstruction>() && force)
+				return true;
+
+			return (instr.Users.Count() <= 1 && !instr.HasSideEffect() && !instr.Is<MemberUpdateInstruction>()
+				&& !instr.Is<AllocVarInstruction>() && !instr.Is<ImportInstruction>())
+				|| instr.Is<FetchArgInstruction>();
+		}
+
+		void CLikeCodeGen::PrintExportInstr(CodeGenContext &ctx, ExportInstruction * exportInstr)
+		{
+			outputStrategy->ProcessExportInstruction(ctx, exportInstr);
+		}
+
+		void CLikeCodeGen::PrintUpdateInstr(CodeGenContext & ctx, MemberUpdateInstruction * instr)
+		{
+			auto genCode = [&](String varName, ILType * srcType, ILOperand * op1, ILOperand * op2)
+			{
+				ctx.Body << varName;
+				if (auto structType = dynamic_cast<ILStructType*>(srcType))
+				{
+					ctx.Body << L".";
+					ctx.Body << structType->Members[dynamic_cast<ILConstOperand*>(op1)->IntValues[0]].FieldName;
+				}
+				else
+				{
+					ctx.Body << L"[";
+					PrintOp(ctx, op1);
+					ctx.Body << L"]";
+				}
+				ctx.Body << L" = ";
+				PrintOp(ctx, op2);
+				ctx.Body << L";\n";
+			};
+			if (auto srcInstr = dynamic_cast<ILInstruction*>(instr->Operands[0].Ptr()))
+			{
+				if (srcInstr->Users.Count() == 1)
+				{
+					auto srcName = srcInstr->Name;
+					while (ctx.SubstituteNames.TryGetValue(srcName, srcName));
+					genCode(srcName, srcInstr->Type.Ptr(), instr->Operands[1].Ptr(), instr->Operands[2].Ptr());
+					ctx.SubstituteNames[instr->Name] = srcName;
+					return;
+				}
+			}
+			genCode(instr->Operands[0]->Name, instr->Operands[0]->Type.Ptr(), instr->Operands[1].Ptr(), instr->Operands[2].Ptr());
+		}
+
+		void CLikeCodeGen::PrintSwizzleInstrExpr(CodeGenContext & ctx, SwizzleInstruction * swizzle)
+		{
+			PrintOp(ctx, swizzle->Operand.Ptr());
+			ctx.Body << L"." << swizzle->SwizzleString;
+		}
+
+		void CLikeCodeGen::PrintImportInstr(CodeGenContext & ctx, ImportInstruction * importInstr)
+		{
+			currentImportInstr = importInstr;
+				
+			ctx.DefineVariable(importInstr);
+			GenerateCode(ctx, importInstr->ImportOperator.Ptr());
+				
+			currentImportInstr = nullptr;
+		}
+
+		void CLikeCodeGen::PrintImportInstrExpr(CodeGenContext & ctx, ImportInstruction * importInstr)
+		{
+			currentImportInstr = importInstr;
+			PrintOp(ctx, importInstr->ImportOperator->GetLastInstruction()->As<ReturnInstruction>()->Operand.Ptr());
+			currentImportInstr = nullptr;
+		}
+
+		void CLikeCodeGen::PrintInstrExpr(CodeGenContext & ctx, ILInstruction & instr)
+		{
+			if (auto binInstr = instr.As<BinaryInstruction>())
+				PrintBinaryInstrExpr(ctx, binInstr);
+			else if (auto unaryInstr = instr.As<UnaryInstruction>())
+				PrintUnaryInstrExpr(ctx, unaryInstr);
+			else if (auto allocVar = instr.As<AllocVarInstruction>())
+				PrintAllocVarInstrExpr(ctx, allocVar);
+			else if (auto fetchArg = instr.As<FetchArgInstruction>())
+				PrintFetchArgInstrExpr(ctx, fetchArg);
+			else if (auto select = instr.As<SelectInstruction>())
+				PrintSelectInstrExpr(ctx, select);
+			else if (auto call = instr.As<CallInstruction>())
+				PrintCallInstrExpr(ctx, call);
+			else if (auto castf2i = instr.As<Float2IntInstruction>())
+				PrintCastF2IInstrExpr(ctx, castf2i);
+			else if (auto casti2f = instr.As<Int2FloatInstruction>())
+				PrintCastI2FInstrExpr(ctx, casti2f);
+			else if (auto ldInput = instr.As<LoadInputInstruction>())
+				PrintLoadInputInstrExpr(ctx, ldInput);
+			else if (auto import = instr.As<ImportInstruction>())
+				PrintImportInstrExpr(ctx, import);
+			else if (instr.As<MemberUpdateInstruction>())
+				throw InvalidOperationException(L"member update instruction cannot appear as expression.");
+		}
+
+		void CLikeCodeGen::PrintInstr(CodeGenContext & ctx, ILInstruction & instr)
+		{
+			// ctx.Body << L"// " << instr.ToString() << L";\n";
+			if (!AppearAsExpression(instr, false))
+			{
+				if (auto binInstr = instr.As<BinaryInstruction>())
+					PrintBinaryInstr(ctx, binInstr);
+				else if (auto exportInstr = instr.As<ExportInstruction>())
+					PrintExportInstr(ctx, exportInstr);
+				else if (auto unaryInstr = instr.As<UnaryInstruction>())
+					PrintUnaryInstr(ctx, unaryInstr);
+				else if (auto allocVar = instr.As<AllocVarInstruction>())
+					PrintAllocVarInstr(ctx, allocVar);
+				else if (auto fetchArg = instr.As<FetchArgInstruction>())
+					PrintFetchArgInstr(ctx, fetchArg);
+				else if (auto select = instr.As<SelectInstruction>())
+					PrintSelectInstr(ctx, select);
+				else if (auto call = instr.As<CallInstruction>())
+					PrintCallInstr(ctx, call);
+				else if (auto castf2i = instr.As<Float2IntInstruction>())
+					PrintCastF2IInstr(ctx, castf2i);
+				else if (auto casti2f = instr.As<Int2FloatInstruction>())
+					PrintCastI2FInstr(ctx, casti2f);
+				else if (auto update = instr.As<MemberUpdateInstruction>())
+					PrintUpdateInstr(ctx, update);
+				else if (auto importInstr = instr.As<ImportInstruction>())
+					PrintImportInstr(ctx, importInstr);
+					
+			}
+		}
+
+		void CLikeCodeGen::PrintLoadInputInstrExpr(CodeGenContext & ctx, LoadInputInstruction * instr)
+		{
+			PrintInputReference(ctx.Body, instr->InputName);
+		}
+
+		void CLikeCodeGen::GenerateCode(CodeGenContext & context, CFGNode * code)
+		{
+			for (auto & instr : *code)
+			{
+				if (auto ifInstr = instr.As<IfInstruction>())
+				{
+					context.Body << L"if (bool(";
+					PrintOp(context, ifInstr->Operand.Ptr(), true);
+					context.Body << L"))\n{\n";
+					GenerateCode(context, ifInstr->TrueCode.Ptr());
+					context.Body << L"}\n";
+					if (ifInstr->FalseCode)
+					{
+						context.Body << L"else\n{\n";
+						GenerateCode(context, ifInstr->FalseCode.Ptr());
+						context.Body << L"}\n";
+					}
+				}
+				else if (auto forInstr = instr.As<ForInstruction>())
+				{
+					context.Body << L"for (;bool(";
+					PrintOp(context, forInstr->ConditionCode->GetLastInstruction(), true);
+					context.Body << L"); ";
+					PrintOp(context, forInstr->SideEffectCode->GetLastInstruction(), true);
+					context.Body << L")\n{\n";
+					GenerateCode(context, forInstr->BodyCode.Ptr());
+					context.Body << L"}\n";
+				}
+				else if (auto doInstr = instr.As<DoInstruction>())
+				{
+					context.Body << L"do\n{\n";
+					GenerateCode(context, doInstr->BodyCode.Ptr());
+					context.Body << L"} while (bool(";
+					PrintOp(context, doInstr->ConditionCode->GetLastInstruction()->As<ReturnInstruction>()->Operand.Ptr(), true);
+					context.Body << L"));\n";
+				}
+				else if (auto whileInstr = instr.As<WhileInstruction>())
+				{
+					context.Body << L"while (bool(";
+					PrintOp(context, whileInstr->ConditionCode->GetLastInstruction()->As<ReturnInstruction>()->Operand.Ptr(), true);
+					context.Body << L"))\n{\n";
+					GenerateCode(context, whileInstr->BodyCode.Ptr());
+					context.Body << L"}\n";
+				}
+				else if (auto ret = instr.As<ReturnInstruction>())
+				{
+					if (currentImportInstr) 
+					{
+						context.Body << currentImportInstr->Name << L" = ";
+						PrintOp(context, ret->Operand.Ptr());
+						context.Body << L";\n";
+					}
+					else
+					{
+						context.Body << L"return ";
+						PrintOp(context, ret->Operand.Ptr());
+						context.Body << L";\n";
+					}
+				}
+				else if (instr.Is<BreakInstruction>())
+				{
+					context.Body << L"break;\n";
+				}
+				else if (instr.Is<ContinueInstruction>())
+				{
+					context.Body << L"continue;\n";
+				}
+				else if (instr.Is<DiscardInstruction>())
+				{
+					context.Body << L"discard;\n";
+				}
+					
+				else
+					PrintInstr(context, instr);
+			}
+		}
+
+		CompiledShaderSource CLikeCodeGen::GenerateShader(CompileResult & result, SymbolTable *, ILShader * shader, ErrorWriter * err)
+		{
+			this->errWriter = err;
+
+			CompiledShaderSource rs;
+
+			for (auto & stage : shader->Stages)
+			{
+				StageSource src;
+				if (stage.Value->StageType == L"VertexShader" || stage.Value->StageType == L"FragmentShader" || stage.Value->StageType == L"DomainShader")
+					src = GenerateVertexFragmentDomainShader(result.Program.Ptr(), shader, stage.Value.Ptr());
+				else if (stage.Value->StageType == L"ComputeShader")
+					src = GenerateComputeShader(result.Program.Ptr(), shader, stage.Value.Ptr());
+				else if (stage.Value->StageType == L"HullShader")
+					src = GenerateHullShader(result.Program.Ptr(), shader, stage.Value.Ptr());
+				else
+					errWriter->Error(50020, L"Unknown stage type '" + stage.Value->StageType + L"'.", stage.Value->Position);
+				rs.Stages[stage.Key] = src;
+			}
+				
+			// TODO: fill metadatas
+			rs.MetaData.ShaderName = shader->Name;
+				
+			return rs;
+		}
+
+		void CLikeCodeGen::GenerateStructs(StringBuilder & sb, ILProgram * program)
+		{
+			for (auto & st : program->Structs)
+			{
+				if (!st->IsIntrinsic)
+				{
+					sb << L"struct " << st->TypeName << L"\n{\n";
+					for (auto & f : st->Members)
+					{
+						sb << f.Type->ToString();
+						sb << " " << f.FieldName << L";\n";
+					}
+					sb << L"};\n";
+				}
+			}
+		}
+
+		void CLikeCodeGen::GenerateReferencedFunctions(StringBuilder & sb, ILProgram * program, ArrayView<ILWorld*> worlds)
+		{
+			EnumerableHashSet<String> refFuncs;
+			for (auto & world : worlds)
+				for (auto & func : world->ReferencedFunctions)
+					refFuncs.Add(func);
+			for (auto & func : program->Functions)
+			{
+				if (refFuncs.Contains(func.Value->Name))
+				{
+					GenerateFunctionDeclaration(sb, func.Value.Ptr());
+					sb << L";\n";
+				}
+			}
+			for (auto & func : program->Functions)
+			{
+				if (refFuncs.Contains(func.Value->Name))
+					sb << GenerateFunction(func.Value.Ptr());
+			}
+		}
+
+		ExternComponentCodeGenInfo CLikeCodeGen::ExtractExternComponentInfo(const ILObjectDefinition & input)
+		{
+			auto type = input.Type.Ptr();
+			auto recType = ExtractRecordType(type);
+			ExternComponentCodeGenInfo info;
+			info.Type = type;
+			String bindingVal;
+			if (input.Attributes.TryGetValue(L"Binding", bindingVal))
+				info.Binding = StringToInt(bindingVal);
+			if (recType)
+			{
+				if (auto genType = dynamic_cast<ILGenericType*>(type))
+				{
+					type = genType->BaseType.Ptr();
+					if (genType->GenericTypeName == L"Uniform")
+						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::UniformBuffer;
+					else if (genType->GenericTypeName == L"Patch")
+						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::Patch;
+					else if (genType->GenericTypeName == L"Texture")
+						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::Texture;
+					else if (genType->GenericTypeName == L"PackedBuffer")
+						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::PackedBuffer;
+					else if (genType->GenericTypeName == L"ArrayBuffer")
+						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::ArrayBuffer;
+					else if (genType->GenericTypeName == L"StorageBuffer")
+						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::StorageBuffer;
+				}
+				if (auto arrType = dynamic_cast<ILArrayType*>(type))
+				{
+					if (info.DataStructure != ExternComponentCodeGenInfo::DataStructureType::StandardInput &&
+						info.DataStructure != ExternComponentCodeGenInfo::DataStructureType::UniformBuffer &&
+						info.DataStructure != ExternComponentCodeGenInfo::DataStructureType::Patch)
+						errWriter->Error(51090, L"cannot generate code for extern component type '" + type->ToString() + L"'.",
+							input.Position);
+					type = arrType->BaseType.Ptr();
+					info.IsArray = true;
+					info.ArrayLength = arrType->ArrayLength;
+				}
+				if (type != recType)
+				{
+					errWriter->Error(51090, L"cannot generate code for extern component type '" + type->ToString() + L"'.",
+						input.Position);
+				}
+			}
+			else
+			{
+				// check for attributes 
+				if (input.Attributes.ContainsKey(L"TessCoord"))
+				{
+					info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::TessCoord;
+					if (!(input.Type->IsFloatVector() && input.Type->GetVectorSize() <= 3))
+						Error(50020, L"TessCoord must have vec2 or vec3 type.", input.Position);
+				}
+				else if (input.Attributes.ContainsKey(L"FragCoord"))
+				{
+					info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::FragCoord;
+					if (!(input.Type->IsFloatVector() && input.Type->GetVectorSize() == 4))
+						Error(50020, L"FragCoord must be a vec4.", input.Position);
+				}
+				else if (input.Attributes.ContainsKey(L"InvocationId"))
+				{
+					info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::InvocationId;
+					if (!input.Type->IsInt())
+						Error(50020, L"InvocationId must have int type.", input.Position);
+				}
+				else if (input.Attributes.ContainsKey(L"ThreadId"))
+				{
+					info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::InvocationId;
+					if (!input.Type->IsInt())
+						Error(50020, L"ThreadId must have int type.", input.Position);
+				}
+				else if (input.Attributes.ContainsKey(L"PrimitiveId"))
+				{
+					info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::PrimitiveId;
+					if (!input.Type->IsInt())
+						Error(50020, L"PrimitiveId must have int type.", input.Position);
+				}
+				else if (input.Attributes.ContainsKey(L"PatchVertexCount"))
+				{
+					info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::PatchVertexCount;
+					if (!input.Type->IsInt())
+						Error(50020, L"PatchVertexCount must have int type.", input.Position);
+				}
+			}
+			return info;
+		}
+
+		void CLikeCodeGen::PrintInputReference(StringBuilder & sb, String input)
+		{
+			auto info = extCompInfo[input]();
+
+			// TODO(tfoley): Is there any reason why this isn't just a `switch`?
+			if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer)
+			{
+				PrintUniformBufferInputReference(sb, input, currentImportInstr->ComponentName);
+			}
+			else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StorageBuffer)
+			{
+				PrintStorageBufferInputReference(sb, input, currentImportInstr->ComponentName);
+			}
+			else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::ArrayBuffer)
+			{
+				PrintArrayBufferInputReference(sb, input, currentImportInstr->ComponentName);
+			}
+			else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::PackedBuffer)
+			{
+				PrintPackedBufferInputReference(sb, input, currentImportInstr->ComponentName);
+			}
+			else if (auto recType = ExtractRecordType(info.Type.Ptr()))
+			{
+				// TODO(tfoley): hoist this logic up to the top-level if chain?
+				if(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput)
+				{
+					PrintStandardInputReference(sb, recType, input, currentImportInstr->ComponentName);
+				}
+				else if(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
+				{
+					PrintPatchInputReference(sb, recType, input, currentImportInstr->ComponentName);
+				}
+				else
+				{
+					// TODO(tfoley): Does this case ever actually trigger?
+					PrintDefaultInputReference(sb, recType, input, currentImportInstr->ComponentName);
+				}
+			}
+			else
+			{
+				PrintSystemVarReference(sb, input, info.SystemVar);
+			}
+		}
+
+		void CLikeCodeGen::DeclareInput(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader)
+		{
+			auto info = ExtractExternComponentInfo(input);
+			extCompInfo[input.Name] = info;
+			auto recType = ExtractRecordType(input.Type.Ptr());
+			if (recType)
+			{
+				switch(info.DataStructure)
+				{
+				case ExternComponentCodeGenInfo::DataStructureType::UniformBuffer:
+					DeclareUniformBuffer(sb, input, isVertexShader);
+					return;
+
+				case ExternComponentCodeGenInfo::DataStructureType::StorageBuffer:
+					DeclareStorageBuffer(sb, input, isVertexShader);
+					return;
+
+				case ExternComponentCodeGenInfo::DataStructureType::ArrayBuffer:
+					DeclareArrayBuffer(sb, input, isVertexShader);
+					return;
+
+				case ExternComponentCodeGenInfo::DataStructureType::PackedBuffer:
+					DeclareArrayBuffer(sb, input, isVertexShader);
+					return;
+
+				case ExternComponentCodeGenInfo::DataStructureType::Texture:
+					DeclareTextureInputRecord(sb, input, isVertexShader);
+					return;
+
+				case ExternComponentCodeGenInfo::DataStructureType::StandardInput:
+					DeclareStandardInputRecord(sb, input, isVertexShader);
+					return;
+
+				case ExternComponentCodeGenInfo::DataStructureType::Patch:
+					DeclarePatchInputRecord(sb, input, isVertexShader);
+					return;
+
+				default:
+					errWriter->Error(99999, L"internal error: unexpected data structure for record type",
+							input.Position);
+					break;
+				}
+			}
+		}
+
+		void CLikeCodeGen::GenerateVertexShaderEpilog(CodeGenContext & ctx, ILWorld * world, ILStage * stage)
+		{
+			StageAttribute positionVar;
+			if (stage->Attributes.TryGetValue(L"Position", positionVar))
+			{
+				ILOperand * operand;
+				if (world->Components.TryGetValue(positionVar.Value, operand))
+				{
+					if(operand->Type->IsFloatVector() && operand->Type->GetVectorSize() == 4)
+					{
+						PrintRasterPositionOutputWrite(ctx, operand);
+					}
+					else
+						errWriter->Error(50040, L"'" + positionVar.Value + L"': component used as 'Position' output must be of vec4 type.",
+							positionVar.Position);
+				}
+				else
+					errWriter->Error(50041, L"'" + positionVar.Value + L"': component not defined.",
+						positionVar.Position);
+			}
+		}
+
+		void CLikeCodeGen::GenerateDomainShaderProlog(CodeGenContext & ctx, ILStage * stage)
+		{
+			ctx.GlobalHeader << L"layout(";
+			StageAttribute val;
+			if (stage->Attributes.TryGetValue(L"Domain", val))
+				ctx.GlobalHeader << ((val.Value == L"quads") ? L"quads" : L"triangles");
+			else
+				ctx.GlobalHeader << L"triangles";
+			if (val.Value != L"triangles" && val.Value != L"quads")
+				Error(50093, L"'Domain' should be either 'triangles' or 'quads'.", val.Position);
+			if (stage->Attributes.TryGetValue(L"Winding", val))
+			{
+				if (val.Value == L"cw")
+					ctx.GlobalHeader << L", cw";
+				else
+					ctx.GlobalHeader << L", ccw";
+			}
+			if (stage->Attributes.TryGetValue(L"EqualSpacing", val))
+			{
+				if (val.Value == L"1" || val.Value == L"true")
+					ctx.GlobalHeader << L", equal_spacing";
+			}
+			ctx.GlobalHeader << L") in;\n";
+		}
+
+		StageSource CLikeCodeGen::GenerateVertexFragmentDomainShader(ILProgram * program, ILShader * shader, ILStage * stage)
+		{
+			RefPtr<ILWorld> world = nullptr;
+			StageAttribute worldName;
+			if (stage->Attributes.TryGetValue(L"World", worldName))
+			{
+				if (!shader->Worlds.TryGetValue(worldName.Value, world))
+					errWriter->Error(50022, L"world '" + worldName.Value + L"' is not defined.", worldName.Position);
+			}
+			outputStrategy = CreateStandardOutputStrategy(world.Ptr(), L"");
+			return GenerateSingleWorldShader(program, shader, stage);
+		}
+
+		StageSource CLikeCodeGen::GenerateComputeShader(ILProgram * program, ILShader * shader, ILStage * stage)
+		{
+			RefPtr<ILWorld> world = nullptr;
+			StageAttribute worldName;
+			if (stage->Attributes.TryGetValue(L"World", worldName))
+			{
+				if (!shader->Worlds.TryGetValue(worldName.Value, world))
+					errWriter->Error(50022, L"world '" + worldName.Value + L"' is not defined.", worldName.Position);
+			}
+			outputStrategy = CreatePackedBufferOutputStrategy(world.Ptr());
+			return GenerateSingleWorldShader(program, shader, stage);
+		}
+
+		void CLikeCodeGen::GenerateFunctionDeclaration(StringBuilder & sbCode, ILFunction * function)
+		{
+			function->Code->NameAllInstructions();
+			auto retType = function->ReturnType.Ptr();
+			if (retType)
+				PrintType(sbCode, retType);
+			else
+				sbCode << L"void";
+			sbCode << L" " << GetFuncOriginalName(function->Name) << L"(";
+			int id = 0;
+			for (auto & instr : *function->Code)
+			{
+				if (auto arg = instr.As<FetchArgInstruction>())
+				{
+					if (arg->ArgId != 0)
+					{
+						if (id > 0)
+						{
+							sbCode << L", ";
+						}
+						PrintDef(sbCode, arg->Type.Ptr(), arg->Name);
+						id++;
+					}
+				}
+			}
+			sbCode << L")";
+		}
+		String CLikeCodeGen::GenerateFunction(ILFunction * function)
+		{
+			StringBuilder sbCode;
+			CodeGenContext ctx;
+			ctx.codeGen = this;
+			ctx.UsedVarNames.Clear();
+			ctx.Body.Clear();
+			ctx.Header.Clear();
+			ctx.Arguments.Clear();
+			ctx.ReturnVarName = L"";
+			ctx.VarName.Clear();
+				
+			function->Code->NameAllInstructions();
+			GenerateFunctionDeclaration(sbCode, function);
+			sbCode << L"\n{\n";
+			GenerateCode(ctx, function->Code.Ptr());
+			sbCode << ctx.Header.ToString() << ctx.Body.ToString();
+			if (ctx.ReturnVarName.Length())
+				sbCode << L"return " << ctx.ReturnVarName << L";\n";
+			sbCode << L"}\n";
+			return sbCode.ProduceString();
+		}
+
+		String CodeGenContext::DefineVariable(ILOperand * op)
+		{
+			String rs;
+			if (VarName.TryGetValue(op, rs))
+			{
+				return rs;
+			}
+			else
+			{
+				auto name = GenerateCodeName(op->Name, L"");
+				codeGen->PrintDef(Header, op->Type.Ptr(), name);
+				if (op->Type->IsInt() || op->Type->IsUInt())
+				{
+					Header << L" = 0;";
+				}
+				Header << L";\n";
+				VarName.Add(op, name);
+				op->Name = name;
+				return op->Name;
+			}
+		}
+	}
+}
+
+/***********************************************************************
 SPIRECORE\CLOSURE.CPP
 ***********************************************************************/
 
@@ -16502,971 +17964,373 @@ namespace Spire
 SPIRECORE\GLSLCODEGEN.CPP
 ***********************************************************************/
 
+#include <cassert>
+
 using namespace CoreLib::Basic;
 
 namespace Spire
 {
 	namespace Compiler
 	{
-		ILRecordType * ExtractRecordType(ILType * type)
-		{
-			if (auto recType = dynamic_cast<ILRecordType*>(type))
-				return recType;
-			else if (auto arrType = dynamic_cast<ILArrayType*>(type))
-				return ExtractRecordType(arrType->BaseType.Ptr());
-			else if (auto genType = dynamic_cast<ILGenericType*>(type))
-				return ExtractRecordType(genType->BaseType.Ptr());
-			else
-				return nullptr;
-		}
-
-		String AddWorldNameSuffix(String name, String suffix)
-		{
-			if (name.EndsWith(suffix))
-				return name;
-			else
-				return EscapeDoubleUnderscore(name + L"_" + suffix);
-		}
-
-		class GLSLCodeGen;
-
-		class CodeGenContext
-		{
-		public:
-			GLSLCodeGen * codeGen;
-			HashSet<String> GeneratedDefinitions;
-			Dictionary<String, String> SubstituteNames;
-			Dictionary<ILOperand*, String> VarName;
-			CompileResult * Result = nullptr;
-			HashSet<String> UsedVarNames;
-			int TextureBindingsAllocator = 0;
-			StringBuilder Body, Header, GlobalHeader;
-			List<ILType*> Arguments;
-			String ReturnVarName;
-			String GenerateCodeName(String name, String prefix)
-			{
-				StringBuilder nameBuilder;
-				int startPos = 0;
-				if (name.StartsWith(L"_sys_"))
-					startPos = name.IndexOf(L'_', 5) + 1;
-				nameBuilder << prefix;
-				for (int i = startPos; i < name.Length(); i++)
-				{
-					if ((name[i] >= L'a' && name[i] <= L'z') || 
-						(name[i] >= L'A' && name[i] <= L'Z') ||
-						name[i] == L'_' || 
-						(name[i] >= L'0' && name[i] <= L'9'))
-					{
-						nameBuilder << name[i];
-					}
-					else
-						nameBuilder << L'_';
-				}
-				auto rs = nameBuilder.ToString();
-				int i = 0;
-				while (UsedVarNames.Contains(rs))
-				{
-					i++;
-					rs = nameBuilder.ToString() + String(i);
-				}
-				UsedVarNames.Add(rs);
-
-				return rs;
-			}
-
-
-			String DefineVariable(ILOperand * op);
-		};
-
-		class ExternComponentCodeGenInfo
-		{
-		public:
-			enum class DataStructureType
-			{
-				StandardInput, UniformBuffer, ArrayBuffer, PackedBuffer, StorageBuffer, Texture, Patch
-			};
-			enum class SystemVarType
-			{
-				None, TessCoord, InvocationId, ThreadId, FragCoord, PatchVertexCount, PrimitiveId
-			};
-			DataStructureType DataStructure = DataStructureType::StandardInput;
-			RefPtr<ILType> Type;
-			SystemVarType SystemVar = SystemVarType::None;
-			bool IsArray = false;
-			int ArrayLength = 0;
-			int Binding = -1;
-		};
-
-		class OutputStrategy : public Object
+		class GLSLCodeGen : public CLikeCodeGen
 		{
 		protected:
-			GLSLCodeGen * codeGen = nullptr;
-			ILWorld * world = nullptr;
-		public:
-			OutputStrategy(GLSLCodeGen * pCodeGen, ILWorld * pWorld)
+			OutputStrategy * CreateStandardOutputStrategy(ILWorld * world, String layoutPrefix) override;
+			OutputStrategy * CreatePackedBufferOutputStrategy(ILWorld * world) override;
+			OutputStrategy * CreateArrayOutputStrategy(ILWorld * world, bool pIsPatch, int pArraySize, String arrayIndex) override;
+
+			void PrintRasterPositionOutputWrite(CodeGenContext & ctx, ILOperand * operand) override
 			{
-				codeGen = pCodeGen;
-				world = pWorld;
+				ctx.Body << L"gl_Position = ";
+				PrintOp(ctx, operand);
+				ctx.Body << L";\n";
 			}
 
-			virtual void DeclareOutput(CodeGenContext & ctx, ILStage * stage) = 0;
-			virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) = 0;
-		};
-
-		OutputStrategy * CreateStandardOutputStrategy(GLSLCodeGen * codeGen, ILWorld * world, String prefix);
-		OutputStrategy * CreatePackedBufferOutputStrategy(GLSLCodeGen * codeGen, ILWorld * world);
-		OutputStrategy * CreateArrayOutputStrategy(GLSLCodeGen * codeGen, ILWorld * world, bool pIsPatch, int pArraySize, String arrayIndex);
-
-
-		class GLSLCodeGen : public CodeGenBackend
-		{
-		private:
-			//ILWorld * currentWorld = nullptr;
-			//ILRecordType * currentRecordType = nullptr;
-			//bool exportWriteToPackedBuffer = false;
-			RefPtr<OutputStrategy> outputStrategy;
-			Dictionary<String, ExternComponentCodeGenInfo> extCompInfo;
-			ImportInstruction * currentImportInstr = nullptr;
-			bool useBindlessTexture = false;
-			ErrorWriter * errWriter;
-		public:
-			void Error(int errId, String msg, CodePosition pos)
+			void PrintUniformBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
 			{
-				errWriter->Error(errId, msg, pos);
-			}
-			void PrintType(StringBuilder & sbCode, ILType* type)
-			{
-				if (dynamic_cast<ILRecordType*>(type))
-					PrintType(sbCode, currentImportInstr->Type.Ptr());
+				if (!currentImportInstr->Type->IsTexture() || useBindlessTexture)
+					sb << L"blk" << inputName << L"." << componentName;
 				else
-					sbCode << type->ToString();
+					sb << componentName;
 			}
 
-			void PrintDef(StringBuilder & sbCode, ILType* type, const String & name)
+			void PrintStorageBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
 			{
-				PrintType(sbCode, type);
-				sbCode << L" ";
-				sbCode << name;
-				if (name.Length() == 0)
-					throw InvalidProgramException(L"unnamed instruction.");
+				sb << componentName;
 			}
 
-			String GetFunctionCallName(String name)
+			void PrintArrayBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
 			{
-				StringBuilder rs;
-				for (int i = 0; i < name.Length(); i++)
+				sb << L"blk" << inputName << L".content";
+			}
+
+			void PrintPackedBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
+			{
+				sb << L"blk" << inputName << L".content";
+			}
+
+			void PrintStandardInputReference(StringBuilder& sb, ILRecordType* recType, String inputName, String componentName) override
+			{
+				String declName = componentName;
+				declName = AddWorldNameSuffix(declName, recType->ToString());
+				sb << declName;
+			}
+
+			void PrintPatchInputReference(StringBuilder& sb, ILRecordType* recType, String inputName, String componentName) override
+			{
+				String declName = componentName;
+				declName = AddWorldNameSuffix(declName, recType->ToString());
+				sb << declName;
+			}
+
+			void PrintDefaultInputReference(StringBuilder& sb, ILRecordType* /*recType*/, String inputName, String componentName) override
+			{
+				String declName = componentName;
+				sb << declName;
+			}
+
+			void PrintSystemVarReference(StringBuilder& sb, String inputName, ExternComponentCodeGenInfo::SystemVarType systemVar) override
+			{
+				switch(systemVar)
 				{
-					if ((name[i] >= L'a' && name[i] <= L'z') || (name[i] >= L'A' && name[i] <= L'Z') || 
-						name[i] == L'_' || (name[i] >= L'0' && name[i] <= L'9'))
-					{
-						rs << name[i];
-					}
-					else if (i != name.Length() - 1)
-						rs << L'_';
+				case ExternComponentCodeGenInfo::SystemVarType::FragCoord:
+					sb << L"gl_FragCoord";
+					break;
+				case ExternComponentCodeGenInfo::SystemVarType::TessCoord:
+					sb << L"gl_TessCoord";
+					break;
+				case ExternComponentCodeGenInfo::SystemVarType::InvocationId:
+					sb << L"gl_InvocationID";
+					break;
+				case ExternComponentCodeGenInfo::SystemVarType::ThreadId:
+					sb << L"gl_GlobalInvocationID.x";
+					break;
+				case ExternComponentCodeGenInfo::SystemVarType::PatchVertexCount:
+					sb << L"gl_PatchVerticesIn";
+					break;
+				case ExternComponentCodeGenInfo::SystemVarType::PrimitiveId:
+					sb << L"gl_PrimitiveID";
+					break;
+				default:
+					sb << inputName;
+					break;
 				}
-				return rs.ProduceString();
 			}
 
-			String GetFuncOriginalName(const String & name)
+			void PrintTypeName(StringBuilder& sb, ILType* type) override
 			{
-				String originalName;
-				int splitPos = name.IndexOf(L'@');
-				if (splitPos == 0)
-					return name;
-				if (splitPos != -1)
-					originalName = name.SubString(0, splitPos);
-				else
-					originalName = name;
-				return originalName;
+				// Currently, all types are internally named based on their GLSL equivalent, so
+				// outputting a type for GLSL is trivial.
+				sb << type->ToString();
 			}
 
-			void PrintOp(CodeGenContext & ctx, ILOperand * op, bool forceExpression = false)
+			void DeclareUniformBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool /*isVertexShader*/) override
 			{
-				auto makeFloat = [](float v)
+				auto info = ExtractExternComponentInfo(input);
+				extCompInfo[input.Name] = info;
+				auto recType = ExtractRecordType(input.Type.Ptr());
+				assert(recType);
+				assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer);
+
+				int declarationStart = sb.GlobalHeader.Length();
+				int itemsDeclaredInBlock = 0;
+
+				sb.GlobalHeader << L"layout(std140";
+				if (info.Binding != -1)
+					sb.GlobalHeader << L", binding = " << info.Binding;
+				sb.GlobalHeader << L") uniform " << input.Name << L"\n{\n";
+
+				int index = 0;
+				for (auto & field : recType->Members)
 				{
-					String rs(v, L"%.12e");
-					if (!rs.Contains(L'.') && !rs.Contains(L'e') && !rs.Contains(L'E'))
-						rs = rs + L".0";
-					if (rs.StartsWith(L"-"))
-						rs = L"(" + rs + L")";
-					return rs;
-				};
-				if (auto c = dynamic_cast<ILConstOperand*>(op))
-				{
-					auto type = c->Type.Ptr();
-					if (type->IsFloat())
-						ctx.Body << makeFloat(c->FloatValues[0]);
-					else if (type->IsInt())
-						ctx.Body << (c->IntValues[0]);
-					else if (type->IsBool())
-						ctx.Body << ((c->IntValues[0] != 0) ? L"true" : L"false");
-					else if (auto baseType = dynamic_cast<ILBasicType*>(type))
+					if (!useBindlessTexture && field.Value.Type->IsTexture())
+						continue;
+					String declName = field.Key;
+					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
+					itemsDeclaredInBlock++;
+					if (info.IsArray)
 					{
-						if (baseType->Type == ILBaseType::Float2)
-							ctx.Body << L"vec2(" << makeFloat(c->FloatValues[0]) << L", " << makeFloat(c->FloatValues[1]) << L")";
-						else if (baseType->Type == ILBaseType::Float3)
-							ctx.Body << L"vec3(" << makeFloat(c->FloatValues[0]) << L", " << makeFloat(c->FloatValues[1]) << L", " << makeFloat(c->FloatValues[2]) << L")";
-						else if (baseType->Type == ILBaseType::Float4)
-							ctx.Body << L"vec4(" << makeFloat(c->FloatValues[0]) << L", " << makeFloat(c->FloatValues[1]) << L", " << makeFloat(c->FloatValues[2]) << L", " << makeFloat(c->FloatValues[3]) << L")";
-						else if (baseType->Type == ILBaseType::Float3x3)
+						sb.GlobalHeader << L"[";
+						if (info.ArrayLength)
+							sb.GlobalHeader << String(info.ArrayLength);
+						sb.GlobalHeader << L"]";
+					}
+					sb.GlobalHeader << L";\n";
+
+					index++;
+				}
+				if (itemsDeclaredInBlock == 0)
+				{
+					sb.GlobalHeader.Remove(declarationStart, sb.GlobalHeader.Length() - declarationStart);
+					return;
+				}
+
+				sb.GlobalHeader << L"} blk" << input.Name << L";\n";
+
+				if (!useBindlessTexture)
+				{
+					for (auto & field : recType->Members)
+					{
+						if (field.Value.Type->IsTexture())
 						{
-							ctx.Body << L"mat3(";
-							for (int i = 0; i < 9; i++)
+							if (field.Value.Attributes.ContainsKey(L"Binding"))
+								sb.GlobalHeader << L"layout(binding = " << field.Value.Attributes[L"Binding"]() << L") ";
+							else
 							{
-								ctx.Body << makeFloat(c->FloatValues[i]);
-								if (i != 8)
-									ctx.Body << L", ";
+								sb.GlobalHeader << L"layout(binding = " << sb.TextureBindingsAllocator << L") ";
+								sb.TextureBindingsAllocator++;
 							}
-							ctx.Body << L")";
+							sb.GlobalHeader << L"uniform ";
+							PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), field.Key);
+							sb.GlobalHeader << L";\n";
 						}
-						else if (baseType->Type == ILBaseType::Float4x4)
-						{
-							ctx.Body << L"mat4(";
-							for (int i = 0; i < 16; i++)
-							{
-								ctx.Body << makeFloat(c->FloatValues[i]);
-								if (i != 15)
-									ctx.Body << L", ";
-							}
-							ctx.Body << L")";
-						}
-						else if (baseType->Type == ILBaseType::Int2)
-							ctx.Body << L"ivec2(" << c->IntValues[0] << L", " << c->IntValues[1] << L")";
-						else if (baseType->Type == ILBaseType::Int3)
-							ctx.Body << L"ivec3(" << c->IntValues[0] << L", " << c->IntValues[1] << L", " << c->IntValues[2] << L")";
-						else if (baseType->Type == ILBaseType::Int4)
-							ctx.Body << L"ivec4(" << c->IntValues[0] << L", " << c->IntValues[1] << L", " << c->IntValues[2] << L", " << c->IntValues[3] << L")";
-					}
-					else
-						throw InvalidOperationException(L"Illegal constant.");
-				}
-				else if (auto instr = dynamic_cast<ILInstruction*>(op))
-				{
-					if (AppearAsExpression(*instr, forceExpression))
-					{
-						PrintInstrExpr(ctx, *instr);
-					}
-					else
-					{
-						if (forceExpression)
-							throw InvalidProgramException(L"cannot generate code block as an expression.");
-						String substituteName;
-						if (ctx.SubstituteNames.TryGetValue(instr->Name, substituteName))
-							ctx.Body << substituteName;
-						else
-							ctx.Body << instr->Name;
 					}
 				}
-				else
-					throw InvalidOperationException(L"Unsupported operand type.");
 			}
 
-			void PrintBinaryInstrExpr(CodeGenContext & ctx, BinaryInstruction * instr)
+			void DeclareStorageBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) override
 			{
-				if (instr->Is<StoreInstruction>())
+				auto info = ExtractExternComponentInfo(input);
+				extCompInfo[input.Name] = info;
+				auto recType = ExtractRecordType(input.Type.Ptr());
+				assert(recType);
+				assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StorageBuffer);
+
+				int declarationStart = sb.GlobalHeader.Length();
+				int itemsDeclaredInBlock = 0;
+
+				sb.GlobalHeader << L"layout(std430";
+				if (info.Binding != -1)
+					sb.GlobalHeader << L", binding = " << info.Binding;
+				sb.GlobalHeader << L") buffer " << input.Name << L"\n{\n";
+
+				int index = 0;
+				for (auto & field : recType->Members)
 				{
-					auto op0 = instr->Operands[0].Ptr();
-					auto op1 = instr->Operands[1].Ptr();
-					ctx.Body << L"(";
-					PrintOp(ctx, op0);
-					ctx.Body << L" = ";
-					PrintOp(ctx, op1);
-					ctx.Body << L")";
+					if (!useBindlessTexture && info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer &&
+						field.Value.Type->IsTexture())
+						continue;
+					if (input.Attributes.ContainsKey(L"VertexInput"))
+						sb.GlobalHeader << L"layout(location = " << index << L") ";
+					if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat") ||
+						(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput &&
+							field.Value.Type->IsIntegral())))
+						sb.GlobalHeader << L"flat ";
+					if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput)
+					{
+						sb.GlobalHeader << L"in ";
+					}
+					else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
+						sb.GlobalHeader << L"patch in ";
+					String declName = field.Key;
+					if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput ||
+						info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
+						declName = AddWorldNameSuffix(declName, recType->ToString());
+					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
+					itemsDeclaredInBlock++;
+					if (info.IsArray)
+					{
+						sb.GlobalHeader << L"[";
+						if (info.ArrayLength)
+							sb.GlobalHeader << String(info.ArrayLength);
+						sb.GlobalHeader << L"]";
+					}
+					sb.GlobalHeader << L";\n";
+
+					index++;
+				}
+				if (itemsDeclaredInBlock == 0)
+				{
+					sb.GlobalHeader.Remove(declarationStart, sb.GlobalHeader.Length() - declarationStart);
 					return;
 				}
-				auto op0 = instr->Operands[0].Ptr();
-				auto op1 = instr->Operands[1].Ptr();
-				if (instr->Is<StoreInstruction>())
-				{
-					throw InvalidOperationException(L"store instruction cannot appear as expression.");
-				}
-				if (instr->Is<MemberLoadInstruction>())
-				{
-					auto genType = dynamic_cast<ILGenericType*>(op0->Type.Ptr());
-					if (genType && genType->GenericTypeName == L"PackedBuffer")
-					{
-						// load record type from packed buffer
-						String conversionFunction;
-						int size = 0;
-						if (instr->Type->ToString() == L"int")
-						{
-							conversionFunction = L"floatBitsToInt";
-							size = 1;
-						}
-						else if (instr->Type->ToString() == L"ivec2")
-						{
-							conversionFunction = L"floatBitsToInt";
-							size = 2;
-						}
-						else if (instr->Type->ToString() == L"ivec3")
-						{
-							conversionFunction = L"floatBitsToInt";
-							size = 3;
-						}
-						else if (instr->Type->ToString() == L"ivec4")
-						{
-							conversionFunction = L"floatBitsToInt";
-							size = 4;
-						}
-						else if (instr->Type->ToString() == L"uint")
-						{
-							conversionFunction = L"floatBitsToUint";
-							size = 1;
-						}
-						else if (instr->Type->ToString() == L"uvec2")
-						{
-							conversionFunction = L"floatBitsToUint";
-							size = 2;
-						}
-						else if (instr->Type->ToString() == L"uvec3")
-						{
-							conversionFunction = L"floatBitsToUint";
-							size = 3;
-						}
-						else if (instr->Type->ToString() == L"uvec4")
-						{
-							conversionFunction = L"floatBitsToUint";
-							size = 4;
-						}
-						else if (instr->Type->ToString() == L"float")
-						{
-							conversionFunction = L"";
-							size = 1;
-						}
-						else if (instr->Type->ToString() == L"vec2")
-						{
-							conversionFunction = L"";
-							size = 2;
-						}
-						else if (instr->Type->ToString() == L"vec3")
-						{
-							conversionFunction = L"";
-							size = 3;
-						}
-						else if (instr->Type->ToString() == L"vec4")
-						{
-							conversionFunction = L"";
-							size = 4;
-						}
-						else if (instr->Type->ToString() == L"mat3")
-						{
-							conversionFunction = L"";
-							size = 9;
-						}
-						else if (instr->Type->ToString() == L"mat4")
-						{
-							conversionFunction = L"";
-							size = 16;
-						}
-						else
-						{
-							errWriter->Error(50082, L"importing type '" + instr->Type->ToString() + L"' from PackedBuffer is not supported by the GLSL backend.",
-								CodePosition());
-						}
-						ctx.Body << instr->Type->ToString() << L"(";
-						auto recType = dynamic_cast<ILRecordType*>(genType->BaseType.Ptr());
-						int recTypeSize = 0;
-						EnumerableDictionary<String, int> memberOffsets;
-						for (auto & member : recType->Members)
-						{
-							memberOffsets[member.Key] = recTypeSize;
-							recTypeSize += member.Value.Type->GetVectorSize();
-						}
-						for (int i = 0; i < size; i++)
-						{
-							ctx.Body << conversionFunction << L"(";
-							PrintOp(ctx, op0);
-							ctx.Body << L"[(";
-							PrintOp(ctx, op1);
-							ctx.Body << L") * " << recTypeSize << L" + " << memberOffsets[currentImportInstr->ComponentName]() << L"])";
-							if (i != size - 1)
-								ctx.Body << L", ";
-						}
-						ctx.Body << L")";
-					}
-					else
-					{
-						PrintOp(ctx, op0);
-						bool printDefault = true;
-						if (op0->Type->IsVector())
-						{
-							if (auto c = dynamic_cast<ILConstOperand*>(op1))
-							{
-								switch (c->IntValues[0])
-								{
-								case 0:
-									ctx.Body << L".x";
-									break;
-								case 1:
-									ctx.Body << L".y";
-									break;
-								case 2:
-									ctx.Body << L".z";
-									break;
-								case 3:
-									ctx.Body << L".w";
-									break;
-								default:
-									throw InvalidOperationException(L"Invalid member access.");
-								}
-								printDefault = false;
-							}
-						}
-						else if (auto structType = dynamic_cast<ILStructType*>(op0->Type.Ptr()))
-						{
-							if (auto c = dynamic_cast<ILConstOperand*>(op1))
-							{
-								ctx.Body << L"." << structType->Members[c->IntValues[0]].FieldName;
-							}
-							printDefault = false;
-						}
-						if (printDefault)
-						{
-							ctx.Body << L"[";
-							PrintOp(ctx, op1);
-							ctx.Body << L"]";
-						}
-						if (genType)
-						{
-							if (genType->GenericTypeName == L"Buffer" && dynamic_cast<ILRecordType*>(genType->BaseType.Ptr()))
-								ctx.Body << L"." << currentImportInstr->ComponentName;
-						}
-					}
-					return;
-				}
-				const wchar_t * op = L"";
-				if (instr->Is<AddInstruction>())
-				{
-					op = L"+";
-				}
-				else if (instr->Is<SubInstruction>())
-				{
-					op = L"-";
-				}
-				else if (instr->Is<MulInstruction>())
-				{
-					op = L"*";
-				}
-				else if (instr->Is<DivInstruction>())
-				{
-					op = L"/";
-				}
-				else if (instr->Is<ModInstruction>())
-				{
-					op = L"%";
-				}
-				else if (instr->Is<ShlInstruction>())
-				{
-					op = L"<<";
-				}
-				else if (instr->Is<ShrInstruction>())
-				{
-					op = L">>";
-				}
-				else if (instr->Is<CmpeqlInstruction>())
-				{
-					op = L"==";
-					//ctx.Body << L"int";
-				}
-				else if (instr->Is<CmpgeInstruction>())
-				{
-					op = L">=";
-					//ctx.Body << L"int";
-				}
-				else if (instr->Is<CmpgtInstruction>())
-				{
-					op = L">";
-					//ctx.Body << L"int";
-				}
-				else if (instr->Is<CmpleInstruction>())
-				{
-					op = L"<=";
-					//ctx.Body << L"int";
-				}
-				else if (instr->Is<CmpltInstruction>())
-				{
-					op = L"<";
-					//ctx.Body << L"int";
-				}
-				else if (instr->Is<CmpneqInstruction>())
-				{
-					op = L"!=";
-					//ctx.Body << L"int";
-				}
-				else if (instr->Is<AndInstruction>())
-				{
-					op = L"&&";
-				}
-				else if (instr->Is<OrInstruction>())
-				{
-					op = L"||";
-				}
-				else if (instr->Is<BitXorInstruction>())
-				{
-					op = L"^";
-				}
-				else if (instr->Is<BitAndInstruction>())
-				{
-					op = L"&";
-				}
-				else if (instr->Is<BitOrInstruction>())
-				{
-					op = L"|";
-				}
-				else
-					throw InvalidProgramException(L"unsupported binary instruction.");
-				ctx.Body << L"(";
-				PrintOp(ctx, op0);
-				ctx.Body << L" " << op << L" ";
-				PrintOp(ctx, op1);
-				ctx.Body << L")";
+
+				sb.GlobalHeader << L"} blk" << input.Name << L";\n";
 			}
 
-			void PrintBinaryInstr(CodeGenContext & ctx, BinaryInstruction * instr)
+			void DeclareArrayBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) override
 			{
-				auto op0 = instr->Operands[0].Ptr();
-				auto op1 = instr->Operands[1].Ptr();
-				if (instr->Is<StoreInstruction>())
-				{
-					PrintOp(ctx, op0);
-					ctx.Body << L" = ";
-					PrintOp(ctx, op1);
-					ctx.Body << L";\n";
-					return;
-				}
-				auto varName = ctx.DefineVariable(instr);
-				if (instr->Is<MemberLoadInstruction>())
-				{
-					ctx.Body << varName << L" = ";
-					PrintBinaryInstrExpr(ctx, instr);
-					ctx.Body << L";\n";
-					return;
-				}
-				ctx.Body << varName << L" = ";
-				PrintBinaryInstrExpr(ctx, instr);
-				ctx.Body << L";\n";
-			}
+				auto info = ExtractExternComponentInfo(input);
+				extCompInfo[input.Name] = info;
+				auto recType = ExtractRecordType(input.Type.Ptr());
+				assert(recType);
+				assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::ArrayBuffer);
 
-			void PrintUnaryInstrExpr(CodeGenContext & ctx, UnaryInstruction * instr)
-			{
-				auto op0 = instr->Operand.Ptr();
-				if (instr->Is<LoadInstruction>())
-				{
-					PrintOp(ctx, op0);
-					return;
-				}
-				else if (instr->Is<SwizzleInstruction>())
-				{
-					PrintSwizzleInstrExpr(ctx, instr->As<SwizzleInstruction>());
-					return;
-				}
-				const wchar_t * op = L"";
-				if (instr->Is<BitNotInstruction>())
-					op = L"~";
-				else if (instr->Is<Float2IntInstruction>())
-					op = L"(int)";
-				else if (instr->Is<Int2FloatInstruction>())
-					op = L"(float)";
-				else if (instr->Is<CopyInstruction>())
-					op = L"";
-				else if (instr->Is<NegInstruction>())
-					op = L"-";
-				else if (instr->Is<NotInstruction>())
-					op = L"!";
-				else
-					throw InvalidProgramException(L"unsupported unary instruction.");
-				ctx.Body << L"(" << op;
-				PrintOp(ctx, op0);
-				ctx.Body << L")";
-			}
-
-			void PrintUnaryInstr(CodeGenContext & ctx, UnaryInstruction * instr)
-			{
-				auto varName = ctx.DefineVariable(instr);
-				ctx.Body << varName << L" = ";
-				PrintUnaryInstrExpr(ctx, instr);
-				ctx.Body << L";\n";
-			}
-
-			void PrintAllocVarInstrExpr(CodeGenContext & ctx, AllocVarInstruction * instr)
-			{
-				ctx.Body << instr->Name;
-			}
-
-			void PrintAllocVarInstr(CodeGenContext & ctx, AllocVarInstruction * instr)
-			{
-				if (dynamic_cast<ILConstOperand*>(instr->Size.Ptr()))
-				{
-					ctx.DefineVariable(instr);
-				}
-				else
-					throw InvalidProgramException(L"size operand of allocVar instr is not an intermediate.");
-			}
-
-			void PrintFetchArgInstrExpr(CodeGenContext & ctx, FetchArgInstruction * instr)
-			{
-				ctx.Body << instr->Name;
-			}
-
-			void PrintFetchArgInstr(CodeGenContext & ctx, FetchArgInstruction * instr)
-			{
-				if (instr->ArgId == 0)
-				{
-					ctx.ReturnVarName = ctx.DefineVariable(instr);
-				}
-			}
-
-			void PrintSelectInstrExpr(CodeGenContext & ctx, SelectInstruction * instr)
-			{
-				ctx.Body << L"(";
-				PrintOp(ctx, instr->Operands[0].Ptr());
-				ctx.Body << L"?";
-				PrintOp(ctx, instr->Operands[1].Ptr());
-				ctx.Body << L":";
-				PrintOp(ctx, instr->Operands[2].Ptr());
-				ctx.Body << L")";
-			}
-
-			void PrintSelectInstr(CodeGenContext & ctx, SelectInstruction * instr)
-			{
-				auto varName = ctx.DefineVariable(instr);
-				ctx.Body << varName << L" = ";
-				PrintSelectInstrExpr(ctx, instr);
-				ctx.Body << L";\n";
-			}
-
-			void PrintCallInstrExpr(CodeGenContext & ctx, CallInstruction * instr)
-			{
-				String callName;
-				callName = GetFuncOriginalName(instr->Function);
-				ctx.Body << callName;
-				ctx.Body << L"(";
-				int id = 0;
-				for (auto & arg : instr->Arguments)
-				{
-					PrintOp(ctx, arg.Ptr());
-					if (id != instr->Arguments.Count() - 1)
-						ctx.Body << L", ";
-					id++;
-				}
-				ctx.Body << L")";
-			}
-
-			void PrintCallInstr(CodeGenContext & ctx, CallInstruction * instr)
-			{
-				auto varName = ctx.DefineVariable(instr);
-				ctx.Body << varName;
-				ctx.Body << L" = ";
-				PrintCallInstrExpr(ctx, instr);
-				ctx.Body << L";\n";
-			}
-
-			void PrintCastF2IInstrExpr(CodeGenContext & ctx, Float2IntInstruction * instr)
-			{
-				ctx.Body << L"((int)(";
-				PrintOp(ctx, instr->Operand.Ptr());
-				ctx.Body << L"))";
-			}
-			void PrintCastF2IInstr(CodeGenContext & ctx, Float2IntInstruction * instr)
-			{
-				auto varName = ctx.DefineVariable(instr);
-				ctx.Body << varName;
-				ctx.Body << L" = ";
-				PrintCastF2IInstrExpr(ctx, instr);
-				ctx.Body << L";\n";
-			}
-			void PrintCastI2FInstrExpr(CodeGenContext & ctx, Int2FloatInstruction * instr)
-			{
-				ctx.Body << L"((float)(";
-				PrintOp(ctx, instr->Operand.Ptr());
-				ctx.Body << L"))";
-			}
-			void PrintCastI2FInstr(CodeGenContext & ctx, Int2FloatInstruction * instr)
-			{
-				auto varName = ctx.DefineVariable(instr);
-				ctx.Body << varName;
-				ctx.Body << L" = ";
-				PrintCastI2FInstrExpr(ctx, instr);
-				ctx.Body << L";\n";
-			}
-
-			bool AppearAsExpression(ILInstruction & instr, bool force)
-			{
-				if (instr.Is<LoadInputInstruction>())
-					return true;
-				if (auto arg = instr.As<FetchArgInstruction>())
-				{
-					if (arg->ArgId == 0)
-						return false;
-				}
-				if (auto import = instr.As<ImportInstruction>())
-				{
-					if ((!useBindlessTexture && import->Type->IsTexture()) || import->Type.As<ILArrayType>())
-						return true;
-				}
-				for (auto &&usr : instr.Users)
-				{
-					if (auto update = dynamic_cast<MemberUpdateInstruction*>(usr))
-					{
-						if (&instr == update->Operands[0].Ptr())
-							return false;
-					}
-					else if (dynamic_cast<MemberLoadInstruction*>(usr))
-						return false;
-					else if (dynamic_cast<ExportInstruction*>(usr))
-						return false;
-					else if (dynamic_cast<ImportInstruction*>(usr))
-						return false;
-				}
-				if (instr.Is<StoreInstruction>() && force)
-					return true;
-
-				return (instr.Users.Count() <= 1 && !instr.HasSideEffect() && !instr.Is<MemberUpdateInstruction>()
-					&& !instr.Is<AllocVarInstruction>() && !instr.Is<ImportInstruction>())
-					|| instr.Is<FetchArgInstruction>();
-			}
-
-			void PrintExportInstr(CodeGenContext &ctx, ExportInstruction * exportInstr)
-			{
-				outputStrategy->ProcessExportInstruction(ctx, exportInstr);
-			}
-
-			void PrintUpdateInstr(CodeGenContext & ctx, MemberUpdateInstruction * instr)
-			{
-				auto genCode = [&](String varName, ILType * srcType, ILOperand * op1, ILOperand * op2)
-				{
-					ctx.Body << varName;
-					if (auto structType = dynamic_cast<ILStructType*>(srcType))
-					{
-						ctx.Body << L".";
-						ctx.Body << structType->Members[dynamic_cast<ILConstOperand*>(op1)->IntValues[0]].FieldName;
-					}
-					else
-					{
-						ctx.Body << L"[";
-						PrintOp(ctx, op1);
-						ctx.Body << L"]";
-					}
-					ctx.Body << L" = ";
-					PrintOp(ctx, op2);
-					ctx.Body << L";\n";
-				};
-				if (auto srcInstr = dynamic_cast<ILInstruction*>(instr->Operands[0].Ptr()))
-				{
-					if (srcInstr->Users.Count() == 1)
-					{
-						auto srcName = srcInstr->Name;
-						while (ctx.SubstituteNames.TryGetValue(srcName, srcName));
-						genCode(srcName, srcInstr->Type.Ptr(), instr->Operands[1].Ptr(), instr->Operands[2].Ptr());
-						ctx.SubstituteNames[instr->Name] = srcName;
-						return;
-					}
-				}
-				genCode(instr->Operands[0]->Name, instr->Operands[0]->Type.Ptr(), instr->Operands[1].Ptr(), instr->Operands[2].Ptr());
-			}
-
-			void PrintSwizzleInstrExpr(CodeGenContext & ctx, SwizzleInstruction * swizzle)
-			{
-				PrintOp(ctx, swizzle->Operand.Ptr());
-				ctx.Body << L"." << swizzle->SwizzleString;
-			}
-
-			void PrintImportInstr(CodeGenContext & ctx, ImportInstruction * importInstr)
-			{
-				currentImportInstr = importInstr;
-				
-				ctx.DefineVariable(importInstr);
-				GenerateCode(ctx, importInstr->ImportOperator.Ptr());
-				
-				currentImportInstr = nullptr;
-			}
-
-			void PrintImportInstrExpr(CodeGenContext & ctx, ImportInstruction * importInstr)
-			{
-				currentImportInstr = importInstr;
-				PrintOp(ctx, importInstr->ImportOperator->GetLastInstruction()->As<ReturnInstruction>()->Operand.Ptr());
-				currentImportInstr = nullptr;
-			}
-
-			void PrintInstrExpr(CodeGenContext & ctx, ILInstruction & instr)
-			{
-				if (auto binInstr = instr.As<BinaryInstruction>())
-					PrintBinaryInstrExpr(ctx, binInstr);
-				else if (auto unaryInstr = instr.As<UnaryInstruction>())
-					PrintUnaryInstrExpr(ctx, unaryInstr);
-				else if (auto allocVar = instr.As<AllocVarInstruction>())
-					PrintAllocVarInstrExpr(ctx, allocVar);
-				else if (auto fetchArg = instr.As<FetchArgInstruction>())
-					PrintFetchArgInstrExpr(ctx, fetchArg);
-				else if (auto select = instr.As<SelectInstruction>())
-					PrintSelectInstrExpr(ctx, select);
-				else if (auto call = instr.As<CallInstruction>())
-					PrintCallInstrExpr(ctx, call);
-				else if (auto castf2i = instr.As<Float2IntInstruction>())
-					PrintCastF2IInstrExpr(ctx, castf2i);
-				else if (auto casti2f = instr.As<Int2FloatInstruction>())
-					PrintCastI2FInstrExpr(ctx, casti2f);
-				else if (auto ldInput = instr.As<LoadInputInstruction>())
-					PrintLoadInputInstrExpr(ctx, ldInput);
-				else if (auto import = instr.As<ImportInstruction>())
-					PrintImportInstrExpr(ctx, import);
-				else if (instr.As<MemberUpdateInstruction>())
-					throw InvalidOperationException(L"member update instruction cannot appear as expression.");
-			}
-
-			void PrintInstr(CodeGenContext & ctx, ILInstruction & instr)
-			{
-				// ctx.Body << L"// " << instr.ToString() << L";\n";
-				if (!AppearAsExpression(instr, false))
-				{
-					if (auto binInstr = instr.As<BinaryInstruction>())
-						PrintBinaryInstr(ctx, binInstr);
-					else if (auto exportInstr = instr.As<ExportInstruction>())
-						PrintExportInstr(ctx, exportInstr);
-					else if (auto unaryInstr = instr.As<UnaryInstruction>())
-						PrintUnaryInstr(ctx, unaryInstr);
-					else if (auto allocVar = instr.As<AllocVarInstruction>())
-						PrintAllocVarInstr(ctx, allocVar);
-					else if (auto fetchArg = instr.As<FetchArgInstruction>())
-						PrintFetchArgInstr(ctx, fetchArg);
-					else if (auto select = instr.As<SelectInstruction>())
-						PrintSelectInstr(ctx, select);
-					else if (auto call = instr.As<CallInstruction>())
-						PrintCallInstr(ctx, call);
-					else if (auto castf2i = instr.As<Float2IntInstruction>())
-						PrintCastF2IInstr(ctx, castf2i);
-					else if (auto casti2f = instr.As<Int2FloatInstruction>())
-						PrintCastI2FInstr(ctx, casti2f);
-					else if (auto update = instr.As<MemberUpdateInstruction>())
-						PrintUpdateInstr(ctx, update);
-					else if (auto importInstr = instr.As<ImportInstruction>())
-						PrintImportInstr(ctx, importInstr);
+				int itemsDeclaredInBlock = 0;
+				sb.GlobalHeader << L"struct T" << input.Name << L"\n{\n";
 					
-				}
-			}
-
-			void PrintLoadInputInstrExpr(CodeGenContext & ctx, LoadInputInstruction * instr)
-			{
-				PrintInputReference(ctx.Body, instr->InputName);
-			}
-
-			void GenerateCode(CodeGenContext & context, CFGNode * code)
-			{
-				for (auto & instr : *code)
+				int index = 0;
+				for (auto & field : recType->Members)
 				{
-					if (auto ifInstr = instr.As<IfInstruction>())
+					if (input.Attributes.ContainsKey(L"VertexInput"))
+						sb.GlobalHeader << L"layout(location = " << index << L") ";
+					if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat")))
+						sb.GlobalHeader << L"flat ";
+					String declName = field.Key;
+					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
+					itemsDeclaredInBlock++;
+					if (info.IsArray)
 					{
-						context.Body << L"if (bool(";
-						PrintOp(context, ifInstr->Operand.Ptr(), true);
-						context.Body << L"))\n{\n";
-						GenerateCode(context, ifInstr->TrueCode.Ptr());
-						context.Body << L"}\n";
-						if (ifInstr->FalseCode)
-						{
-							context.Body << L"else\n{\n";
-							GenerateCode(context, ifInstr->FalseCode.Ptr());
-							context.Body << L"}\n";
-						}
+						sb.GlobalHeader << L"[";
+						if (info.ArrayLength)
+							sb.GlobalHeader << String(info.ArrayLength);
+						sb.GlobalHeader << L"]";
 					}
-					else if (auto forInstr = instr.As<ForInstruction>())
+					sb.GlobalHeader << L";\n";
+
+					index++;
+				}
+
+				sb.GlobalHeader << L"};\nlayout(std430";
+				if (info.Binding != -1)
+					sb.GlobalHeader << L", binding = " << info.Binding;
+				sb.GlobalHeader  << ") buffer " << input.Name << L"\n{\nT" << input.Name << L"content[];\n} blk" << input.Name << L";\n";
+			}
+
+			void DeclarePackedBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool /*isVertexShader*/) override
+			{
+				auto info = ExtractExternComponentInfo(input);
+				extCompInfo[input.Name] = info;
+				auto recType = ExtractRecordType(input.Type.Ptr());
+				assert(recType);
+				assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::PackedBuffer);
+
+				sb.GlobalHeader << L"layout(std430";
+				if (info.Binding != -1)
+					sb.GlobalHeader << L", binding = " << info.Binding;
+				sb.GlobalHeader << L") uniform " << input.Name << L"\n{\nfloat content[];\n} blk" << input.Name << L";\n";
+			}
+
+			void DeclareTextureInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool /*isVertexShader*/) override
+			{
+				auto info = ExtractExternComponentInfo(input);
+				auto recType = ExtractRecordType(input.Type.Ptr());
+				assert(recType);
+				assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Texture);
+
+				for(auto & field : recType->Members)
+				{
+					if(field.Value.Type->IsFloat() || field.Value.Type->IsFloatVector() && !field.Value.Type->IsFloatMatrix())
 					{
-						context.Body << L"for (;bool(";
-						PrintOp(context, forInstr->ConditionCode->GetLastInstruction(), true);
-						context.Body << L"); ";
-						PrintOp(context, forInstr->SideEffectCode->GetLastInstruction(), true);
-						context.Body << L")\n{\n";
-						GenerateCode(context, forInstr->BodyCode.Ptr());
-						context.Body << L"}\n";
+						sb.GlobalHeader << L"layout(binding = " << sb.TextureBindingsAllocator << L") uniform sampler2D " << field.Key << L";\n";
+						sb.TextureBindingsAllocator++;
 					}
-					else if (auto doInstr = instr.As<DoInstruction>())
-					{
-						context.Body << L"do\n{\n";
-						GenerateCode(context, doInstr->BodyCode.Ptr());
-						context.Body << L"} while (bool(";
-						PrintOp(context, doInstr->ConditionCode->GetLastInstruction()->As<ReturnInstruction>()->Operand.Ptr(), true);
-						context.Body << L"));\n";
-					}
-					else if (auto whileInstr = instr.As<WhileInstruction>())
-					{
-						context.Body << L"while (bool(";
-						PrintOp(context, whileInstr->ConditionCode->GetLastInstruction()->As<ReturnInstruction>()->Operand.Ptr(), true);
-						context.Body << L"))\n{\n";
-						GenerateCode(context, whileInstr->BodyCode.Ptr());
-						context.Body << L"}\n";
-					}
-					else if (auto ret = instr.As<ReturnInstruction>())
-					{
-						if (currentImportInstr) 
-						{
-							context.Body << currentImportInstr->Name << L" = ";
-							PrintOp(context, ret->Operand.Ptr());
-							context.Body << L";\n";
-						}
-						else
-						{
-							context.Body << L"return ";
-							PrintOp(context, ret->Operand.Ptr());
-							context.Body << L";\n";
-						}
-					}
-					else if (instr.Is<BreakInstruction>())
-					{
-						context.Body << L"break;\n";
-					}
-					else if (instr.Is<ContinueInstruction>())
-					{
-						context.Body << L"continue;\n";
-					}
-					else if (instr.Is<DiscardInstruction>())
-					{
-						context.Body << L"discard;\n";
-					}
-					
 					else
-						PrintInstr(context, instr);
-				}
-			}
-		public:
-			virtual CompiledShaderSource GenerateShader(CompileResult & result, SymbolTable *, ILShader * shader, ErrorWriter * err) override
-			{
-				this->errWriter = err;
-
-				CompiledShaderSource rs;
-
-				for (auto & stage : shader->Stages)
-				{
-					StageSource src;
-					if (stage.Value->StageType == L"VertexShader" || stage.Value->StageType == L"FragmentShader" || stage.Value->StageType == L"DomainShader")
-						src = GenerateVertexFragmentDomainShader(result.Program.Ptr(), shader, stage.Value.Ptr());
-					else if (stage.Value->StageType == L"ComputeShader")
-						src = GenerateComputeShader(result.Program.Ptr(), shader, stage.Value.Ptr());
-					else if (stage.Value->StageType == L"HullShader")
-						src = GenerateHullShader(result.Program.Ptr(), shader, stage.Value.Ptr());
-					else
-						errWriter->Error(50020, L"Unknown stage type '" + stage.Value->StageType + L"'.", stage.Value->Position);
-					rs.Stages[stage.Key] = src;
-				}
-				
-				// TODO: fill metadatas
-				rs.MetaData.ShaderName = shader->Name;
-				
-				return rs;
-			}
-
-			void GenerateStructs(StringBuilder & sb, ILProgram * program)
-			{
-				for (auto & st : program->Structs)
-				{
-					if (!st->IsIntrinsic)
 					{
-						sb << L"struct " << st->TypeName << L"\n{\n";
-						for (auto & f : st->Members)
-						{
-							sb << f.Type->ToString();
-							sb << " " << f.FieldName << L";\n";
-						}
-						sb << L"};\n";
+						errWriter->Error(51091, L"type '" + field.Value.Type->ToString() + L"' cannot be placed in a texture.",
+							field.Value.Position);
 					}
+				}
+			}
+
+			void DeclareStandardInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) override
+			{
+				auto info = ExtractExternComponentInfo(input);
+				auto recType = ExtractRecordType(input.Type.Ptr());
+				assert(recType);
+				assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput);
+
+				int itemsDeclaredInBlock = 0;
+
+				int index = 0;
+				for (auto & field : recType->Members)
+				{
+					if (input.Attributes.ContainsKey(L"VertexInput"))
+						sb.GlobalHeader << L"layout(location = " << index << L") ";
+					if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat") || field.Value.Type->IsIntegral()))
+						sb.GlobalHeader << L"flat ";
+					sb.GlobalHeader << L"in ";
+
+					String declName = field.Key;
+					declName = AddWorldNameSuffix(declName, recType->ToString());
+
+					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
+					itemsDeclaredInBlock++;
+					if (info.IsArray)
+					{
+						sb.GlobalHeader << L"[";
+						if (info.ArrayLength)
+							sb.GlobalHeader << String(info.ArrayLength);
+						sb.GlobalHeader << L"]";
+					}
+					sb.GlobalHeader << L";\n";
+
+					index++;
+				}
+			}
+
+			void DeclarePatchInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) override
+			{
+				auto info = ExtractExternComponentInfo(input);
+				auto recType = ExtractRecordType(input.Type.Ptr());
+				assert(recType);
+				assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch);
+
+
+				int itemsDeclaredInBlock = 0;
+
+				int index = 0;
+				for (auto & field : recType->Members)
+				{
+					if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat")))
+						sb.GlobalHeader << L"flat ";
+					sb.GlobalHeader << L"patch in ";
+
+					String declName = field.Key;
+					declName = AddWorldNameSuffix(declName, recType->ToString());
+
+					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
+					itemsDeclaredInBlock++;
+					if (info.IsArray)
+					{
+						sb.GlobalHeader << L"[";
+						if (info.ArrayLength)
+							sb.GlobalHeader << String(info.ArrayLength);
+						sb.GlobalHeader << L"]";
+					}
+					sb.GlobalHeader << L";\n";
+
+					index++;
 				}
 			}
 
@@ -17479,338 +18343,7 @@ namespace Spire
 					sb << L"#extension GL_NV_command_list: require\n";
 			}
 
-			void GenerateReferencedFunctions(StringBuilder & sb, ILProgram * program, ArrayView<ILWorld*> worlds)
-			{
-				EnumerableHashSet<String> refFuncs;
-				for (auto & world : worlds)
-					for (auto & func : world->ReferencedFunctions)
-						refFuncs.Add(func);
-				for (auto & func : program->Functions)
-				{
-					if (refFuncs.Contains(func.Value->Name))
-					{
-						GenerateFunctionDeclaration(sb, func.Value.Ptr());
-						sb << L";\n";
-					}
-				}
-				for (auto & func : program->Functions)
-				{
-					if (refFuncs.Contains(func.Value->Name))
-						sb << GenerateFunction(func.Value.Ptr());
-				}
-			}
-
-			ExternComponentCodeGenInfo ExtractExternComponentInfo(const ILObjectDefinition & input)
-			{
-				auto type = input.Type.Ptr();
-				auto recType = ExtractRecordType(type);
-				ExternComponentCodeGenInfo info;
-				info.Type = type;
-				String bindingVal;
-				if (input.Attributes.TryGetValue(L"Binding", bindingVal))
-					info.Binding = StringToInt(bindingVal);
-				if (recType)
-				{
-					if (auto genType = dynamic_cast<ILGenericType*>(type))
-					{
-						type = genType->BaseType.Ptr();
-						if (genType->GenericTypeName == L"Uniform")
-							info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::UniformBuffer;
-						else if (genType->GenericTypeName == L"Patch")
-							info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::Patch;
-						else if (genType->GenericTypeName == L"Texture")
-							info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::Texture;
-						else if (genType->GenericTypeName == L"PackedBuffer")
-							info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::PackedBuffer;
-						else if (genType->GenericTypeName == L"ArrayBuffer")
-							info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::ArrayBuffer;
-						else if (genType->GenericTypeName == L"StorageBuffer")
-							info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::StorageBuffer;
-					}
-					if (auto arrType = dynamic_cast<ILArrayType*>(type))
-					{
-						if (info.DataStructure != ExternComponentCodeGenInfo::DataStructureType::StandardInput &&
-							info.DataStructure != ExternComponentCodeGenInfo::DataStructureType::UniformBuffer &&
-							info.DataStructure != ExternComponentCodeGenInfo::DataStructureType::Patch)
-							errWriter->Error(51090, L"cannot generate code for extern component type '" + type->ToString() + L"'.",
-								input.Position);
-						type = arrType->BaseType.Ptr();
-						info.IsArray = true;
-						info.ArrayLength = arrType->ArrayLength;
-					}
-					if (type != recType)
-					{
-						errWriter->Error(51090, L"cannot generate code for extern component type '" + type->ToString() + L"'.",
-							input.Position);
-					}
-				}
-				else
-				{
-					// check for attributes 
-					if (input.Attributes.ContainsKey(L"TessCoord"))
-					{
-						info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::TessCoord;
-						if (!(input.Type->IsFloatVector() && input.Type->GetVectorSize() <= 3))
-							Error(50020, L"TessCoord must have vec2 or vec3 type.", input.Position);
-					}
-					else if (input.Attributes.ContainsKey(L"FragCoord"))
-					{
-						info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::FragCoord;
-						if (!(input.Type->IsFloatVector() && input.Type->GetVectorSize() == 4))
-							Error(50020, L"FragCoord must be a vec4.", input.Position);
-					}
-					else if (input.Attributes.ContainsKey(L"InvocationId"))
-					{
-						info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::InvocationId;
-						if (!input.Type->IsInt())
-							Error(50020, L"InvocationId must have int type.", input.Position);
-					}
-					else if (input.Attributes.ContainsKey(L"ThreadId"))
-					{
-						info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::InvocationId;
-						if (!input.Type->IsInt())
-							Error(50020, L"ThreadId must have int type.", input.Position);
-					}
-					else if (input.Attributes.ContainsKey(L"PrimitiveId"))
-					{
-						info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::PrimitiveId;
-						if (!input.Type->IsInt())
-							Error(50020, L"PrimitiveId must have int type.", input.Position);
-					}
-					else if (input.Attributes.ContainsKey(L"PatchVertexCount"))
-					{
-						info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::PatchVertexCount;
-						if (!input.Type->IsInt())
-							Error(50020, L"PatchVertexCount must have int type.", input.Position);
-					}
-				}
-				return info;
-			}
-
-			void PrintInputReference(StringBuilder & sb, String input)
-			{
-				auto info = extCompInfo[input]();
-				
-				if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer ||
-					info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StorageBuffer)
-				{
-					if (!currentImportInstr->Type->IsTexture() || useBindlessTexture)
-						sb << L"blk" << input << L"." << currentImportInstr->ComponentName;
-					else
-						sb << currentImportInstr->ComponentName;
-				}
-				else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::ArrayBuffer)
-				{
-					sb << L"blk" << input << L".content";
-				}
-				else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::PackedBuffer)
-				{
-					sb << L"blk" << input << L".content";
-				}
-				else if (auto recType = ExtractRecordType(info.Type.Ptr()))
-				{
-					String declName = currentImportInstr->ComponentName;
-					if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput ||
-						info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
-						declName = AddWorldNameSuffix(declName, recType->ToString());
-					sb << declName;
-				}
-				else
-				{
-					if (info.SystemVar == ExternComponentCodeGenInfo::SystemVarType::FragCoord)
-						sb << L"gl_FragCoord";
-					else if (info.SystemVar == ExternComponentCodeGenInfo::SystemVarType::TessCoord)
-						sb << L"gl_TessCoord";
-					else if (info.SystemVar == ExternComponentCodeGenInfo::SystemVarType::InvocationId)
-						sb << L"gl_InvocationID";
-					else if (info.SystemVar == ExternComponentCodeGenInfo::SystemVarType::ThreadId)
-						sb << L"gl_GlobalInvocationID.x";
-					else if (info.SystemVar == ExternComponentCodeGenInfo::SystemVarType::PatchVertexCount)
-						sb << L"gl_PatchVerticesIn";
-					else if (info.SystemVar == ExternComponentCodeGenInfo::SystemVarType::PrimitiveId)
-						sb << L"gl_PrimitiveID";
-					else
-						sb << input;
-				}
-			}
-
-			void DeclareInput(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader)
-			{
-				auto info = ExtractExternComponentInfo(input);
-				extCompInfo[input.Name] = info;
-				auto recType = ExtractRecordType(input.Type.Ptr());
-				if (recType)
-				{
-					int declarationStart = sb.GlobalHeader.Length();
-					int itemsDeclaredInBlock = 0;
-					if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer)
-					{
-						sb.GlobalHeader << L"layout(std140";
-						if (info.Binding != -1)
-							sb.GlobalHeader << L", binding = " << info.Binding;
-						sb.GlobalHeader << L") uniform " << input.Name << L"\n{\n";
-					}
-					else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StorageBuffer)
-					{
-						sb.GlobalHeader << L"layout(std430";
-						if (info.Binding != -1)
-							sb.GlobalHeader << L", binding = " << info.Binding;
-						sb.GlobalHeader << L") buffer " << input.Name << L"\n{\n";
-					}
-					else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::ArrayBuffer)
-					{
-						sb.GlobalHeader << L"struct T" << input.Name << L"\n{\n";
-					}
-					
-					if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::PackedBuffer)
-					{
-						sb.GlobalHeader << L"layout(std430";
-						if (info.Binding != -1)
-							sb.GlobalHeader << L", binding = " << info.Binding;
-						sb.GlobalHeader << L") uniform " << input.Name << L"\n{\nfloat content[];\n} blk" << input.Name << L";\n";
-					}
-					else
-					{
-						int index = 0;
-						for (auto & field : recType->Members)
-						{
-							if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Texture)
-							{
-								if (field.Value.Type->IsFloat() || (field.Value.Type->IsFloatVector() && !field.Value.Type->IsFloatMatrix()))
-								{
-									sb.GlobalHeader << L"layout(binding = " << sb.TextureBindingsAllocator << L") uniform sampler2D " << field.Key << L";\n";
-									sb.TextureBindingsAllocator++;
-								}
-								else
-									errWriter->Error(51091, L"type '" + field.Value.Type->ToString() + L"' cannot be placed in a texture.",
-										field.Value.Position);
-							}
-							else
-							{
-								if (!useBindlessTexture && info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer &&
-									field.Value.Type->IsTexture())
-									continue;
-								if (input.Attributes.ContainsKey(L"VertexInput"))
-									sb.GlobalHeader << L"layout(location = " << index << L") ";
-								if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat") ||
-									(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput &&
-									 field.Value.Type->IsIntegral())))
-									sb.GlobalHeader << L"flat ";
-								if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput)
-								{
-									sb.GlobalHeader << L"in ";
-								}
-								else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
-									sb.GlobalHeader << L"patch in ";
-								String declName = field.Key;
-								if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput ||
-									info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
-									declName = AddWorldNameSuffix(declName, recType->ToString());
-								PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
-								itemsDeclaredInBlock++;
-								if (info.IsArray)
-								{
-									sb.GlobalHeader << L"[";
-									if (info.ArrayLength)
-										sb.GlobalHeader << String(info.ArrayLength);
-									sb.GlobalHeader << L"]";
-								}
-								sb.GlobalHeader << L";\n";
-							}
-							index++;
-						}
-					}
-
-					auto removeEmptyBlock = [&]()
-					{
-						if (itemsDeclaredInBlock == 0)
-							sb.GlobalHeader.Remove(declarationStart, sb.GlobalHeader.Length() - declarationStart);
-					};
-					if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer ||
-						info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StorageBuffer)
-					{
-						sb.GlobalHeader << L"} blk" << input.Name << L";\n";
-						removeEmptyBlock();
-					}
-					else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::ArrayBuffer)
-					{
-						sb.GlobalHeader << L"};\nlayout(std430";
-						if (info.Binding != -1)
-							sb.GlobalHeader << L", binding = " << info.Binding;
-						sb.GlobalHeader  << ") buffer " << input.Name << L"\n{\nT" << input.Name << L"content[];\n} blk" << input.Name << L";\n";
-					}
-					if (!useBindlessTexture && info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer)
-					{
-						for (auto & field : recType->Members)
-						{
-							if (field.Value.Type->IsTexture())
-							{
-								if (field.Value.Attributes.ContainsKey(L"Binding"))
-									sb.GlobalHeader << L"layout(binding = " << field.Value.Attributes[L"Binding"]() << L") ";
-								else
-								{
-									sb.GlobalHeader << L"layout(binding = " << sb.TextureBindingsAllocator << L") ";
-									sb.TextureBindingsAllocator++;
-								}
-								sb.GlobalHeader << L"uniform ";
-								PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), field.Key);
-								sb.GlobalHeader << L";\n";
-							}
-						}
-					}
-				}
-			}
-
-			void GenerateVertexShaderEpilog(CodeGenContext & ctx, ILWorld * world, ILStage * stage)
-			{
-				StageAttribute positionVar;
-				if (stage->Attributes.TryGetValue(L"Position", positionVar))
-				{
-					ILOperand * operand;
-					if (world->Components.TryGetValue(positionVar.Value, operand))
-					{
-						if (operand->Type->IsFloatVector() && operand->Type->GetVectorSize() == 4)
-						{
-							ctx.Body << L"gl_Position = ";
-							PrintOp(ctx, operand);
-							ctx.Body << L";\n";
-						}
-						else
-							errWriter->Error(50040, L"'" + positionVar.Value + L"': component used as 'Position' output must be of vec4 type.",
-								positionVar.Position);
-					}
-					else
-						errWriter->Error(50041, L"'" + positionVar.Value + L"': component not defined.",
-							positionVar.Position);
-				}
-			}
-
-			void GenerateDomainShaderProlog(CodeGenContext & ctx, ILStage * stage)
-			{
-				ctx.GlobalHeader << L"layout(";
-				StageAttribute val;
-				if (stage->Attributes.TryGetValue(L"Domain", val))
-					ctx.GlobalHeader << ((val.Value == L"quads") ? L"quads" : L"triangles");
-				else
-					ctx.GlobalHeader << L"triangles";
-				if (val.Value != L"triangles" && val.Value != L"quads")
-					Error(50093, L"'Domain' should be either 'triangles' or 'quads'.", val.Position);
-				if (stage->Attributes.TryGetValue(L"Winding", val))
-				{
-					if (val.Value == L"cw")
-						ctx.GlobalHeader << L", cw";
-					else
-						ctx.GlobalHeader << L", ccw";
-				}
-				if (stage->Attributes.TryGetValue(L"EqualSpacing", val))
-				{
-					if (val.Value == L"1" || val.Value == L"true")
-						ctx.GlobalHeader << L", equal_spacing";
-				}
-				ctx.GlobalHeader << L") in;\n";
-			}
-
-			StageSource GenerateSingleWorldShader(ILProgram * program, ILShader * shader, ILStage * stage)
+			StageSource GenerateSingleWorldShader(ILProgram * program, ILShader * shader, ILStage * stage) override
 			{
 				useBindlessTexture = stage->Attributes.ContainsKey(L"BindlessTexture");
 				StageSource rs;
@@ -17854,33 +18387,7 @@ namespace Spire
 				return rs;
 			}
 
-			StageSource GenerateVertexFragmentDomainShader(ILProgram * program, ILShader * shader, ILStage * stage)
-			{
-				RefPtr<ILWorld> world = nullptr;
-				StageAttribute worldName;
-				if (stage->Attributes.TryGetValue(L"World", worldName))
-				{
-					if (!shader->Worlds.TryGetValue(worldName.Value, world))
-						errWriter->Error(50022, L"world '" + worldName.Value + L"' is not defined.", worldName.Position);
-				}
-				outputStrategy = CreateStandardOutputStrategy(this, world.Ptr(), L"");
-				return GenerateSingleWorldShader(program, shader, stage);
-			}
-
-			StageSource GenerateComputeShader(ILProgram * program, ILShader * shader, ILStage * stage)
-			{
-				RefPtr<ILWorld> world = nullptr;
-				StageAttribute worldName;
-				if (stage->Attributes.TryGetValue(L"World", worldName))
-				{
-					if (!shader->Worlds.TryGetValue(worldName.Value, world))
-						errWriter->Error(50022, L"world '" + worldName.Value + L"' is not defined.", worldName.Position);
-				}
-				outputStrategy = CreatePackedBufferOutputStrategy(this, world.Ptr());
-				return GenerateSingleWorldShader(program, shader, stage);
-			}
-
-			StageSource GenerateHullShader(ILProgram * program, ILShader * shader, ILStage * stage)
+			StageSource GenerateHullShader(ILProgram * program, ILShader * shader, ILStage * stage) override
 			{
 				useBindlessTexture = stage->Attributes.ContainsKey(L"BindlessTexture");
 
@@ -17948,7 +18455,7 @@ namespace Spire
 				HashSet<String> declaredInputs;
 
 				patchWorld->Code->NameAllInstructions();
-				outputStrategy = CreateStandardOutputStrategy(this, patchWorld.Ptr(), L"patch");
+				outputStrategy = CreateStandardOutputStrategy(patchWorld.Ptr(), L"patch");
 				for (auto & input : patchWorld->Inputs)
 				{
 					if (declaredInputs.Add(input.Name))
@@ -17958,7 +18465,7 @@ namespace Spire
 				GenerateCode(ctx, patchWorld->Code.Ptr());
 
 				controlPointWorld->Code->NameAllInstructions();
-				outputStrategy = CreateArrayOutputStrategy(this, controlPointWorld.Ptr(), false, 0, L"gl_InvocationID");
+				outputStrategy = CreateArrayOutputStrategy(controlPointWorld.Ptr(), false, 0, L"gl_InvocationID");
 				for (auto & input : controlPointWorld->Inputs)
 				{
 					if (declaredInputs.Add(input.Name))
@@ -17968,7 +18475,7 @@ namespace Spire
 				GenerateCode(ctx, controlPointWorld->Code.Ptr());
 
 				cornerPointWorld->Code->NameAllInstructions();
-				outputStrategy = CreateArrayOutputStrategy(this, cornerPointWorld.Ptr(), true, (domain.Value == L"triangles" ? 3 : 4), L"sysLocalIterator");
+				outputStrategy = CreateArrayOutputStrategy(cornerPointWorld.Ptr(), true, (domain.Value == L"triangles" ? 3 : 4), L"sysLocalIterator");
 				for (auto & input : cornerPointWorld->Inputs)
 				{
 					if (declaredInputs.Add(input.Name))
@@ -18029,55 +18536,6 @@ namespace Spire
 				return rs;
 			}
 
-			void GenerateFunctionDeclaration(StringBuilder & sbCode, ILFunction * function)
-			{
-				function->Code->NameAllInstructions();
-				auto retType = function->ReturnType.Ptr();
-				if (retType)
-					PrintType(sbCode, retType);
-				else
-					sbCode << L"void";
-				sbCode << L" " << GetFuncOriginalName(function->Name) << L"(";
-				int id = 0;
-				for (auto & instr : *function->Code)
-				{
-					if (auto arg = instr.As<FetchArgInstruction>())
-					{
-						if (arg->ArgId != 0)
-						{
-							if (id > 0)
-							{
-								sbCode << L", ";
-							}
-						    PrintDef(sbCode, arg->Type.Ptr(), arg->Name);
-							id++;
-						}
-					}
-				}
-				sbCode << L")";
-			}
-			String GenerateFunction(ILFunction * function)
-			{
-				StringBuilder sbCode;
-				CodeGenContext ctx;
-				ctx.codeGen = this;
-				ctx.UsedVarNames.Clear();
-				ctx.Body.Clear();
-				ctx.Header.Clear();
-				ctx.Arguments.Clear();
-				ctx.ReturnVarName = L"";
-				ctx.VarName.Clear();
-				
-				function->Code->NameAllInstructions();
-				GenerateFunctionDeclaration(sbCode, function);
-				sbCode << L"\n{\n";
-				GenerateCode(ctx, function->Code.Ptr());
-				sbCode << ctx.Header.ToString() << ctx.Body.ToString();
-				if (ctx.ReturnVarName.Length())
-					sbCode << L"return " << ctx.ReturnVarName << L";\n";
-				sbCode << L"}\n";
-				return sbCode.ProduceString();
-			}
 		};
 
 
@@ -18252,7 +18710,7 @@ namespace Spire
 				}
 				for (int i = 0; i < size; i++)
 				{
-					ctx.Body << L"sysOutputBuffer.content[gl_InvocationId.x * " << recTypeSize << L" + " << memberOffsets[exportInstr->ComponentName]()
+					ctx.Body << L"sysOutputBuffer.content[gl_InvocationId.x * " << recTypeSize << L" + " + memberOffsets[exportInstr->ComponentName]()
 						<< L"] = " << conversionFunction << L"(";
 					codeGen->PrintOp(ctx, exportInstr->Operand.Ptr());
 					if (size <= 4)
@@ -18267,44 +18725,824 @@ namespace Spire
 			}
 		};
 
-		String CodeGenContext::DefineVariable(ILOperand * op)
+		OutputStrategy * GLSLCodeGen::CreateStandardOutputStrategy(ILWorld * world, String layoutPrefix)
 		{
-			String rs;
-			if (VarName.TryGetValue(op, rs))
-			{
-				return rs;
-			}
-			else
-			{
-				auto name = GenerateCodeName(op->Name, L"");
-				codeGen->PrintDef(Header, op->Type.Ptr(), name);
-				if (op->Type->IsInt() || op->Type->IsUInt())
-				{
-					Header << L" = 0;";
-				}
-				Header << L";\n";
-				VarName.Add(op, name);
-				op->Name = name;
-				return op->Name;
-			}
+			return new StandardOutputStrategy(this, world, layoutPrefix);
 		}
-
-		OutputStrategy * CreateStandardOutputStrategy(GLSLCodeGen * codeGen, ILWorld * world, String layoutPrefix)
+		OutputStrategy * GLSLCodeGen::CreatePackedBufferOutputStrategy(ILWorld * world)
 		{
-			return new StandardOutputStrategy(codeGen, world, layoutPrefix);
+			return new PackedBufferOutputStrategy(this, world);
 		}
-		OutputStrategy * CreatePackedBufferOutputStrategy(GLSLCodeGen * codeGen, ILWorld * world)
+		OutputStrategy * GLSLCodeGen::CreateArrayOutputStrategy(ILWorld * world, bool pIsPatch, int pArraySize, String arrayIndex)
 		{
-			return new PackedBufferOutputStrategy(codeGen, world);
-		}
-		OutputStrategy * CreateArrayOutputStrategy(GLSLCodeGen * codeGen, ILWorld * world, bool pIsPatch, int pArraySize, String arrayIndex)
-		{
-			return new ArrayOutputStrategy(codeGen, world, pIsPatch, pArraySize, arrayIndex);
+			return new ArrayOutputStrategy(this, world, pIsPatch, pArraySize, arrayIndex);
 		}
 
 		CodeGenBackend * CreateGLSLCodeGen()
 		{
 			return new GLSLCodeGen();
+		}
+	}
+}
+
+/***********************************************************************
+SPIRECORE\HLSLCODEGEN.CPP
+***********************************************************************/
+
+
+using namespace CoreLib::Basic;
+
+namespace Spire
+{
+	namespace Compiler
+	{
+		class HLSLCodeGen : public CLikeCodeGen
+		{
+		protected:
+			OutputStrategy * CreateStandardOutputStrategy(ILWorld * world, String layoutPrefix) override;
+			OutputStrategy * CreatePackedBufferOutputStrategy(ILWorld * world) override;
+			OutputStrategy * CreateArrayOutputStrategy(ILWorld * world, bool pIsPatch, int pArraySize, String arrayIndex) override;
+
+			void PrintRasterPositionOutputWrite(CodeGenContext & ctx, ILOperand * operand) override
+			{
+				ctx.Body << L"stage_output.sv_position = ";
+				PrintOp(ctx, operand);
+				ctx.Body << L";\n";
+			}
+
+			void PrintMatrixMulInstrExpr(CodeGenContext & ctx, ILOperand* op0, ILOperand* op1) override
+			{
+				ctx.Body << L"mul(";
+				PrintOp(ctx, op0);
+				ctx.Body << L", ";
+				PrintOp(ctx, op1);
+				ctx.Body << L")";
+			}
+
+			void PrintUniformBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
+			{
+				if (!currentImportInstr->Type->IsTexture() || useBindlessTexture)
+					sb << L"blk" << inputName << L"." << componentName;
+				else
+					sb << componentName;
+			}
+
+			void PrintStorageBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
+			{
+				sb << componentName;
+			}
+
+			void PrintArrayBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
+			{
+				sb << L"blk" << inputName << L".content";
+			}
+
+			void PrintPackedBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
+			{
+				sb << L"blk" << inputName << L".content";
+			}
+
+			void PrintStandardInputReference(StringBuilder& sb, ILRecordType* /*recType*/, String inputName, String componentName) override
+			{
+				String declName = componentName;
+				sb << L"stage_input." << declName;
+			}
+
+			void PrintPatchInputReference(StringBuilder& sb, ILRecordType* recType, String inputName, String componentName) override
+			{
+				String declName = componentName;
+				declName = AddWorldNameSuffix(declName, recType->ToString());
+				sb << declName;
+			}
+
+			void PrintDefaultInputReference(StringBuilder& sb, ILRecordType* /*recType*/, String inputName, String componentName) override
+			{
+				String declName = componentName;
+				sb << declName;
+			}
+
+			void PrintSystemVarReference(StringBuilder& sb, String inputName, ExternComponentCodeGenInfo::SystemVarType systemVar) override
+			{
+				switch(systemVar)
+				{
+				case ExternComponentCodeGenInfo::SystemVarType::FragCoord:
+					sb << L"gl_FragCoord";
+					break;
+				case ExternComponentCodeGenInfo::SystemVarType::TessCoord:
+					sb << L"gl_TessCoord";
+					break;
+				case ExternComponentCodeGenInfo::SystemVarType::InvocationId:
+					sb << L"gl_InvocationID";
+					break;
+				case ExternComponentCodeGenInfo::SystemVarType::ThreadId:
+					sb << L"gl_GlobalInvocationID.x";
+					break;
+				case ExternComponentCodeGenInfo::SystemVarType::PatchVertexCount:
+					sb << L"gl_PatchVerticesIn";
+					break;
+				case ExternComponentCodeGenInfo::SystemVarType::PrimitiveId:
+					sb << L"gl_PrimitiveID";
+					break;
+				default:
+					sb << inputName;
+					break;
+				}
+			}
+
+			String RemapFuncNameForTarget(String name) override
+			{
+				// Currently, all types are internally named based on their GLSL equivalent, so
+				// for HLSL output we go ahead and maintain a big table to remap the names.
+				//
+				// Note: for right now, this is just a linear array, with no particular sorting.
+				// Eventually it should be turned into a hash table for performance, or at least
+				// just be kept sorted so that we can use a binary search.
+				//
+				// Note 2: Well, actually, the Right Answer is for the type representation to
+				// be better than just a string, so that we don't have to do this string->string map.
+				static const struct {
+					wchar_t const* glslName;
+					wchar_t const* hlslName;
+				} kNameRemaps[] =
+				{
+					{ L"vec2", L"float2" },
+					{ L"vec3", L"float3" },
+					{ L"vec4", L"float4" },
+
+					{ L"ivec2", L"int2" },
+					{ L"ivec3", L"int3" },
+					{ L"ivec4", L"int4" },
+
+					{ L"uvec2", L"uint2" },
+					{ L"uvec3", L"uint3" },
+					{ L"uvec4", L"uint4" },
+
+					{ L"mat3", L"float3x3" },
+					{ L"mat4", L"float4x4" },
+				};
+
+				for(auto remap : kNameRemaps)
+				{
+					if(wcscmp(name.Buffer(), remap.glslName) == 0)
+					{
+						return remap.hlslName;
+					}
+				}
+
+				return name;
+			}
+
+
+
+			void PrintTypeName(StringBuilder& sb, ILType* type) override
+			{
+				// Currently, all types are internally named based on their GLSL equivalent, so
+				// for HLSL output we go ahead and maintain a big table to remap the names.
+				//
+				// Note: for right now, this is just a linear array, with no particular sorting.
+				// Eventually it should be turned into a hash table for performance, or at least
+				// just be kept sorted so that we can use a binary search.
+				//
+				// Note 2: Well, actually, the Right Answer is for the type representation to
+				// be better than just a string, so that we don't have to do this string->string map.
+				static const struct {
+					wchar_t const* glslName;
+					wchar_t const* hlslName;
+				} kNameRemaps[] =
+				{
+					{ L"vec2", L"float2" },
+					{ L"vec3", L"float3" },
+					{ L"vec4", L"float4" },
+
+					{ L"ivec2", L"int2" },
+					{ L"ivec3", L"int3" },
+					{ L"ivec4", L"int4" },
+
+					{ L"uvec2", L"uint2" },
+					{ L"uvec3", L"uint3" },
+					{ L"uvec4", L"uint4" },
+
+					{ L"mat3", L"float3x3" },
+					{ L"mat4", L"float4x4" },
+				};
+
+				String typeName = type->ToString();
+				for(auto remap : kNameRemaps)
+				{
+					if(wcscmp(typeName.Buffer(), remap.glslName) == 0)
+					{
+						sb << remap.hlslName;
+						return;
+					}
+				}
+
+				// If we don't find the type in our map, then that either means we missed a case,
+				// or this is a user-defined type. I don't see an obvious way to check which of
+				// those cases we are in, so we will just fall back to outputting the "GLSL name" here.
+				sb << type->ToString();
+			}
+
+			void DeclareUniformBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool /*isVertexShader*/) override
+			{
+				auto info = ExtractExternComponentInfo(input);
+				extCompInfo[input.Name] = info;
+				auto recType = ExtractRecordType(input.Type.Ptr());
+				assert(recType);
+				assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer);
+
+				int declarationStart = sb.GlobalHeader.Length();
+				int itemsDeclaredInBlock = 0;
+
+				sb.GlobalHeader << L"cbuffer " << input.Name;
+				if (info.Binding != -1)
+					sb.GlobalHeader << L" : register(b" << info.Binding << L")";
+				sb.GlobalHeader << L"\n{\n";
+
+				// We declare an inline struct inside the `cbuffer` to ensure that
+				// the members have an appropriate prefix on their name.
+				sb.GlobalHeader << L"struct {\n";
+
+				int index = 0;
+				for (auto & field : recType->Members)
+				{
+					if (field.Value.Type->IsTexture())
+						continue;
+					String declName = field.Key;
+					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
+					itemsDeclaredInBlock++;
+					if (info.IsArray)
+					{
+						sb.GlobalHeader << L"[";
+						if (info.ArrayLength)
+							sb.GlobalHeader << String(info.ArrayLength);
+						sb.GlobalHeader << L"]";
+					}
+					sb.GlobalHeader << L";\n";
+
+					index++;
+				}
+
+				if (itemsDeclaredInBlock == 0)
+				{
+					sb.GlobalHeader.Remove(declarationStart, sb.GlobalHeader.Length() - declarationStart);
+					return;
+				}
+
+				sb.GlobalHeader << L"} blk" << input.Name << L";\n";
+				sb.GlobalHeader << L"};\n";
+
+				for (auto & field : recType->Members)
+				{
+					if (field.Value.Type->IsTexture())
+					{
+						if (field.Value.Attributes.ContainsKey(L"Binding"))
+							sb.GlobalHeader << L"layout(binding = " << field.Value.Attributes[L"Binding"]() << L") ";
+						else
+						{
+							sb.GlobalHeader << L"layout(binding = " << sb.TextureBindingsAllocator << L") ";
+							sb.TextureBindingsAllocator++;
+						}
+						sb.GlobalHeader << L"uniform ";
+						PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), field.Key);
+						sb.GlobalHeader << L";\n";
+					}
+				}
+			}
+
+			void DeclareStorageBuffer(CodeGenContext & /*sb*/, const ILObjectDefinition & /*input*/, bool /*isVertexShader*/) override
+			{
+				// TODO: HLSL does not make it easy to declare a UAV with an interesting type...
+			}
+			void DeclareArrayBuffer(CodeGenContext & /*sb*/, const ILObjectDefinition & /*input*/, bool /*isVertexShader*/) override
+			{
+
+			}
+			void DeclarePackedBuffer(CodeGenContext & /*sb*/, const ILObjectDefinition & /*input*/, bool /*isVertexShader*/) override
+			{
+
+			}
+
+			void DeclareTextureInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool /*isVertexShader*/) override
+			{
+				auto info = ExtractExternComponentInfo(input);
+				auto recType = ExtractRecordType(input.Type.Ptr());
+				assert(recType);
+				assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Texture);
+
+				for(auto & field : recType->Members)
+				{
+					if(field.Value.Type->IsFloat() || field.Value.Type->IsFloatVector() && !field.Value.Type->IsFloatMatrix())
+					{
+						// TODO(tfoley): texture binding allocation needs to be per-stage in D3D11, but should be global for D3D12
+						int slotIndex = sb.TextureBindingsAllocator++;
+
+						sb.GlobalHeader << L"Texture2D " << field.Key;
+						sb.GlobalHeader << L" : register(t" << slotIndex << L")";
+						sb.GlobalHeader << L";\n";
+
+						sb.GlobalHeader << L"SamplerState " << field.Key << "_sampler";
+						sb.GlobalHeader << L" : register(s" << slotIndex << L")";
+						sb.GlobalHeader << L";\n";
+					}
+					else
+					{
+						errWriter->Error(51091, L"type '" + field.Value.Type->ToString() + L"' cannot be placed in a texture.",
+							field.Value.Position);
+					}
+				}
+			}
+
+			void DeclareStandardInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) override
+			{
+				auto info = ExtractExternComponentInfo(input);
+				extCompInfo[input.Name] = info;
+				auto recType = ExtractRecordType(input.Type.Ptr());
+				assert(recType);
+
+				// In order to handle ordinary per-stage shader inputs, we need to
+				// declare a `struct` type over all the fields.
+
+				sb.GlobalHeader << L"struct T" << recType->TypeName << L"\n{\n";
+
+				int index = 0;
+				for (auto & field : recType->Members)
+				{
+					if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat") || field.Value.Type->IsIntegral()))
+						sb.GlobalHeader << L"noperspective ";
+
+					String declName = field.Key;
+					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
+					if (info.IsArray)
+					{
+						sb.GlobalHeader << L"[";
+						if (info.ArrayLength)
+							sb.GlobalHeader << String(info.ArrayLength);
+						sb.GlobalHeader << L"]";
+					}
+
+					// We synthesize a dummy semantic for every component, just to make things easy
+					// TODO(tfoley): This won't work in presence of `struct`-type fields
+					sb.GlobalHeader << " : A" << index;
+
+					sb.GlobalHeader << L";\n";
+
+					index++;
+				}
+
+				sb.GlobalHeader << L"};\n";
+			}
+
+			void DeclarePatchInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) override
+			{
+				// In HLSL, both standard input/output and per-patch input/output are passed as ordinary `struct` types.
+				DeclareStandardInputRecord(sb, input, isVertexShader);
+			}
+
+
+			StageSource GenerateSingleWorldShader(ILProgram * program, ILShader * shader, ILStage * stage) override
+			{
+				useBindlessTexture = stage->Attributes.ContainsKey(L"BindlessTexture");
+				StageSource rs;
+				CodeGenContext ctx;
+
+				if (stage->StageType == L"DomainShader")
+					GenerateDomainShaderProlog(ctx, stage);
+
+				GenerateStructs(ctx.GlobalHeader, program);
+				StageAttribute worldName;
+				RefPtr<ILWorld> world = nullptr;
+				if (stage->Attributes.TryGetValue(L"World", worldName))
+				{
+					if (!shader->Worlds.TryGetValue(worldName.Value, world))
+						errWriter->Error(50022, L"world '" + worldName.Value + L"' is not defined.", worldName.Position);
+				}
+				else
+					errWriter->Error(50023, L"'" + stage->StageType + L"' should provide 'World' attribute.", stage->Position);
+				if (!world)
+					return rs;
+				GenerateReferencedFunctions(ctx.GlobalHeader, program, MakeArrayView(world.Ptr()));
+				extCompInfo.Clear();
+				ILRecordType* stageInputType = nullptr;
+				for (auto & input : world->Inputs)
+				{
+					DeclareInput(ctx, input, stage->StageType == L"VertexShader");
+
+					// We need to detect the world that represents the ordinary stage input...
+					// TODO(tfoley): It seems like this is logically part of the stage definition.
+					auto info = ExtractExternComponentInfo(input);
+					if(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput)
+					{
+						auto recType = ExtractRecordType(input.Type.Ptr());
+						stageInputType = recType;
+					}
+				}
+				if(!stageInputType)
+				{
+					errWriter->Error(99999, L"'" + stage->StageType + L"' doesn't appear to have any input world", stage->Position);
+				}
+		
+				outputStrategy->DeclareOutput(ctx, stage);
+				ctx.codeGen = this;
+				world->Code->NameAllInstructions();
+				GenerateCode(ctx, world->Code.Ptr());
+				if (stage->StageType == L"VertexShader" || stage->StageType == L"DomainShader")
+					GenerateVertexShaderEpilog(ctx, world.Ptr(), stage);
+
+				StringBuilder sb;
+				sb << ctx.GlobalHeader.ProduceString();
+
+				sb << L"struct T" << world->OutputType->TypeName << "Ext\n{\n";
+				sb << L"T" << world->OutputType->TypeName << " user;\n";
+				if(stage->Attributes.TryGetValue(L"Position"))
+				{
+					sb << L"float4 sv_position : SV_Position;\n";
+				}
+				sb << L"};\n";
+
+				sb << L"T" << world->OutputType->TypeName << L"Ext main(";
+				sb << L"T" << stageInputType->TypeName << " stage_input";
+				sb << ")\n{ \n";
+				sb << "T" << world->OutputType->TypeName << "Ext stage_output;\n";
+				sb << ctx.Header.ProduceString() << ctx.Body.ProduceString();
+				sb << "return stage_output;\n";
+				sb << L"}";
+				rs.MainCode = sb.ProduceString();
+				return rs;
+			}
+
+			StageSource GenerateHullShader(ILProgram * program, ILShader * shader, ILStage * stage) override
+			{
+				// TODO(tfoley): This is just copy-pasted from the GLSL case, and needs a lot of work
+
+				StageSource rs;
+				StageAttribute patchWorldName, controlPointWorldName, cornerPointWorldName, domain, innerLevel, outerLevel, numControlPoints;
+				RefPtr<ILWorld> patchWorld, controlPointWorld, cornerPointWorld;
+				if (!stage->Attributes.TryGetValue(L"PatchWorld", patchWorldName))
+				{
+					errWriter->Error(50052, L"'HullShader' requires attribute 'PatchWorld'.", stage->Position);
+					return rs;
+				}
+				if (!shader->Worlds.TryGetValue(patchWorldName.Value, patchWorld))
+					errWriter->Error(50022, L"world '" + patchWorldName.Value + L"' is not defined.", patchWorldName.Position);
+				if (!stage->Attributes.TryGetValue(L"ControlPointWorld", controlPointWorldName))
+				{
+					errWriter->Error(50052, L"'HullShader' requires attribute 'ControlPointWorld'.", stage->Position); 
+					return rs;
+				}
+				if (!shader->Worlds.TryGetValue(controlPointWorldName.Value, controlPointWorld))
+					errWriter->Error(50022, L"world '" + controlPointWorldName.Value + L"' is not defined.", controlPointWorldName.Position);
+				if (!stage->Attributes.TryGetValue(L"CornerPointWorld", cornerPointWorldName))
+				{
+					errWriter->Error(50052, L"'HullShader' requires attribute 'CornerPointWorld'.", stage->Position);
+					return rs;
+				}
+				if (!shader->Worlds.TryGetValue(cornerPointWorldName.Value, cornerPointWorld))
+					errWriter->Error(50022, L"world '" + cornerPointWorldName.Value + L"' is not defined.", cornerPointWorldName.Position);
+				if (!stage->Attributes.TryGetValue(L"Domain", domain))
+				{
+					errWriter->Error(50052, L"'HullShader' requires attribute 'Domain'.", stage->Position);
+					return rs;
+				}
+				if (domain.Value != L"triangles" && domain.Value != L"quads")
+				{
+					errWriter->Error(50053, L"'Domain' should be either 'triangles' or 'quads'.", domain.Position);
+					return rs;
+				}
+				if (!stage->Attributes.TryGetValue(L"TessLevelOuter", outerLevel))
+				{
+					errWriter->Error(50052, L"'HullShader' requires attribute 'TessLevelOuter'.", stage->Position);
+					return rs;
+				}
+				if (!stage->Attributes.TryGetValue(L"TessLevelInner", innerLevel))
+				{
+					errWriter->Error(50052, L"'HullShader' requires attribute 'TessLevelInner'.", stage->Position);
+					return rs;
+				}
+				if (!stage->Attributes.TryGetValue(L"ControlPointCount", numControlPoints))
+				{
+					errWriter->Error(50052, L"'HullShader' requires attribute 'ControlPointCount'.", stage->Position);
+					return rs;
+				}
+				CodeGenContext ctx;
+				ctx.codeGen = this;
+				List<ILWorld*> worlds;
+				worlds.Add(patchWorld.Ptr());
+				worlds.Add(controlPointWorld.Ptr());
+				worlds.Add(cornerPointWorld.Ptr());
+
+				//GenerateHeader(ctx.GlobalHeader, stage);
+
+				ctx.GlobalHeader << L"layout(vertices = " << numControlPoints.Value << L") out;\n";
+				GenerateStructs(ctx.GlobalHeader, program);
+				GenerateReferencedFunctions(ctx.GlobalHeader, program, worlds.GetArrayView());
+				extCompInfo.Clear();
+
+				HashSet<String> declaredInputs;
+
+				patchWorld->Code->NameAllInstructions();
+				outputStrategy = CreateStandardOutputStrategy(patchWorld.Ptr(), L"patch");
+				for (auto & input : patchWorld->Inputs)
+				{
+					if (declaredInputs.Add(input.Name))
+						DeclareInput(ctx, input, false);
+				}
+				outputStrategy->DeclareOutput(ctx, stage);
+				GenerateCode(ctx, patchWorld->Code.Ptr());
+
+				controlPointWorld->Code->NameAllInstructions();
+				outputStrategy = CreateArrayOutputStrategy(controlPointWorld.Ptr(), false, 0, L"gl_InvocationID");
+				for (auto & input : controlPointWorld->Inputs)
+				{
+					if (declaredInputs.Add(input.Name))
+						DeclareInput(ctx, input, false);
+				}
+				outputStrategy->DeclareOutput(ctx, stage);
+				GenerateCode(ctx, controlPointWorld->Code.Ptr());
+
+				cornerPointWorld->Code->NameAllInstructions();
+				outputStrategy = CreateArrayOutputStrategy(cornerPointWorld.Ptr(), true, (domain.Value == L"triangles" ? 3 : 4), L"sysLocalIterator");
+				for (auto & input : cornerPointWorld->Inputs)
+				{
+					if (declaredInputs.Add(input.Name))
+						DeclareInput(ctx, input, false);
+				}
+				outputStrategy->DeclareOutput(ctx, stage);
+				ctx.Body << L"for (int sysLocalIterator = 0; sysLocalIterator < gl_PatchVerticesIn; sysLocalIterator++)\n{\n";
+				GenerateCode(ctx, cornerPointWorld->Code.Ptr());
+				auto debugStr = cornerPointWorld->Code->ToString();
+				ctx.Body << L"}\n";
+
+				// generate epilog
+				bool found = false;
+				for (auto & world : worlds)
+				{
+					ILOperand * operand;
+					if (world->Components.TryGetValue(innerLevel.Value, operand))
+					{
+						for (int i = 0; i < 2; i++)
+						{
+							ctx.Body << L"gl_TessLevelInner[" << i << L"] = ";
+							PrintOp(ctx, operand);
+							ctx.Body << L"[" << i << L"];\n";
+						}
+						found = true;
+						break;
+					}
+				}
+				if (!found)
+					errWriter->Error(50041, L"'" + innerLevel.Value + L"': component not defined.",
+						innerLevel.Position);
+
+				found = false;
+				for (auto & world : worlds)
+				{
+					ILOperand * operand;
+					if (world->Components.TryGetValue(outerLevel.Value, operand))
+					{
+						for (int i = 0; i < 4; i++)
+						{
+							ctx.Body << L"gl_TessLevelOuter[" << i << L"] = ";
+							PrintOp(ctx, operand);
+							ctx.Body << L"[" << i << L"];\n";
+						}
+						found = true;
+						break;
+					}
+
+				}
+				if (!found)
+					errWriter->Error(50041, L"'" + outerLevel.Value + L"': component not defined.",
+						outerLevel.Position);
+
+				StringBuilder sb;
+				sb << ctx.GlobalHeader.ProduceString();
+				sb << L"void main()\n{\n" << ctx.Header.ProduceString() << ctx.Body.ProduceString() << L"}";
+				rs.MainCode = sb.ProduceString();
+				return rs;
+			}
+		};
+
+		class HLSLStandardOutputStrategy : public OutputStrategy
+		{
+		private:
+			String declPrefix;
+		public:
+			HLSLStandardOutputStrategy(HLSLCodeGen * pCodeGen, ILWorld * world, String prefix)
+				: OutputStrategy(pCodeGen, world), declPrefix(prefix)
+			{}
+			virtual void DeclareOutput(CodeGenContext & ctx, ILStage * stage) override
+			{
+				ctx.GlobalHeader << L"struct T" << world->OutputType->TypeName << L"\n{\n";
+				int index = 0;
+				for (auto & field : world->OutputType->Members)
+				{
+					if (declPrefix.Length())
+						ctx.GlobalHeader << declPrefix << L" ";
+					if (field.Value.Type->IsIntegral())
+						ctx.GlobalHeader << L"noperspective ";
+					String declName = field.Key;
+					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), AddWorldNameSuffix(declName, world->OutputType->TypeName));
+
+					// We synthesize a dummy semantic for every component, just to make things easy
+					// TODO(tfoley): This won't work in presence of `struct`-type fields
+
+					// Note(tfoley): The fragment shader outputs needs to use the `SV_Target` semantic
+					// instead of a user-defined semantic. This is annoyingly non-orthogonal.
+					if(stage->StageType == L"FragmentShader")
+					{
+						ctx.GlobalHeader << " : SV_Target" << index;
+					}
+					else
+					{
+						ctx.GlobalHeader << " : A" << index;
+					}
+
+					ctx.GlobalHeader << L";\n";
+
+					index++;
+				}
+				ctx.GlobalHeader << L"};\n";
+			}
+			virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) override
+			{
+				ctx.Body << "stage_output.user." << AddWorldNameSuffix(instr->ComponentName, world->OutputType->TypeName) << L" = ";
+				codeGen->PrintOp(ctx, instr->Operand.Ptr());
+				ctx.Body << L";\n";
+			}
+		};
+
+		class HLSLArrayOutputStrategy : public OutputStrategy
+		{
+		protected:
+			bool isPatch = false;
+			int arraySize = 0;
+		public:
+			String outputIndex;
+			HLSLArrayOutputStrategy(HLSLCodeGen * pCodeGen, ILWorld * world, bool pIsPatch, int pArraySize, String pOutputIndex)
+				: OutputStrategy(pCodeGen, world)
+			{
+				isPatch = pIsPatch;
+				arraySize = pArraySize;
+				outputIndex = pOutputIndex;
+			}
+			virtual void DeclareOutput(CodeGenContext & ctx, ILStage *) override
+			{
+				for (auto & field : world->OutputType->Members)
+				{
+					if (isPatch)
+						ctx.GlobalHeader << L"patch ";
+					ctx.GlobalHeader << L"out ";
+					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), AddWorldNameSuffix(field.Key, world->Name));
+					ctx.GlobalHeader << L"[";
+					if (arraySize != 0)
+						ctx.GlobalHeader << arraySize;
+					ctx.GlobalHeader<<L"]; \n";
+				}
+			}
+			virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) override
+			{
+				ctx.Body << AddWorldNameSuffix(instr->ComponentName, world->Name) << L"[" << outputIndex << L"] = ";
+				codeGen->PrintOp(ctx, instr->Operand.Ptr());
+				ctx.Body << L";\n";
+			}
+		};
+
+		class HLSLPackedBufferOutputStrategy : public OutputStrategy
+		{
+		public:
+			HLSLPackedBufferOutputStrategy(HLSLCodeGen * pCodeGen, ILWorld * world)
+				: OutputStrategy(pCodeGen, world)
+			{}
+			virtual void DeclareOutput(CodeGenContext & ctx, ILStage *) override
+			{
+				for (auto & field : world->OutputType->Members)
+				{
+					ctx.GlobalHeader << L"out ";
+					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), field.Key);
+					ctx.GlobalHeader << L";\n";
+				}
+			}
+			virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * exportInstr) override
+			{
+				String conversionFunction;
+				int size = 0;
+				String typeName = exportInstr->Type->ToString();
+				if (typeName == L"int")
+				{
+					conversionFunction = L"intBitsToFloat";
+					size = 1;
+				}
+				else if (typeName == L"ivec2")
+				{
+					conversionFunction = L"intBitsToFloat";
+					size = 2;
+				}
+				else if (typeName == L"ivec3")
+				{
+					conversionFunction = L"intBitsToFloat";
+					size = 3;
+				}
+				else if (typeName == L"ivec4")
+				{
+					conversionFunction = L"intBitsToFloat";
+					size = 4;
+				}
+				else if (typeName == L"uint")
+				{
+					conversionFunction = L"uintBitsToFloat";
+					size = 1;
+				}
+				else if (typeName == L"uvec2")
+				{
+					conversionFunction = L"uintBitsToFloat";
+					size = 2;
+				}
+				else if (typeName == L"uvec3")
+				{
+					conversionFunction = L"uintBitsToFloat";
+					size = 3;
+				}
+				else if (typeName == L"uvec4")
+				{
+					conversionFunction = L"uintBitsToFloat";
+					size = 4;
+				}
+				else if (typeName == L"float")
+				{
+					conversionFunction = L"";
+					size = 1;
+				}
+				else if (typeName == L"vec2")
+				{
+					conversionFunction = L"";
+					size = 2;
+				}
+				else if (typeName == L"vec3")
+				{
+					conversionFunction = L"";
+					size = 3;
+				}
+				else if (typeName == L"vec4")
+				{
+					conversionFunction = L"";
+					size = 4;
+				}
+				else if (typeName == L"mat3")
+				{
+					conversionFunction = L"";
+					size = 9;
+				}
+				else if (typeName == L"mat4")
+				{
+					conversionFunction = L"";
+					size = 16;
+				}
+				else
+				{
+					codeGen->Error(50082, L"importing type '" + typeName + L"' from PackedBuffer is not supported by the GLSL backend.",
+						CodePosition());
+				}
+				auto recType = world->OutputType.Ptr();
+				int recTypeSize = 0;
+				EnumerableDictionary<String, int> memberOffsets;
+				for (auto & member : recType->Members)
+				{
+					memberOffsets[member.Key] = recTypeSize;
+					recTypeSize += member.Value.Type->GetVectorSize();
+				}
+				for (int i = 0; i < size; i++)
+				{
+					ctx.Body << L"sysOutputBuffer.content[gl_InvocationId.x * " << recTypeSize << L" + " + memberOffsets[exportInstr->ComponentName]()
+						<< L"] = " << conversionFunction << L"(";
+					codeGen->PrintOp(ctx, exportInstr->Operand.Ptr());
+					if (size <= 4)
+						ctx.Body << L"[" << i << L"]";
+					else
+					{
+						int width = size == 9 ? 3 : 4;
+						ctx.Body << L"[" << i / width << L"][" << i % width << L"]";
+					}
+					ctx.Body << L");\n";
+				}
+			}
+		};
+
+		OutputStrategy * HLSLCodeGen::CreateStandardOutputStrategy(ILWorld * world, String layoutPrefix)
+		{
+			return new HLSLStandardOutputStrategy(this, world, layoutPrefix);
+		}
+		OutputStrategy * HLSLCodeGen::CreatePackedBufferOutputStrategy(ILWorld * world)
+		{
+			return new HLSLPackedBufferOutputStrategy(this, world);
+		}
+		OutputStrategy * HLSLCodeGen::CreateArrayOutputStrategy(ILWorld * world, bool pIsPatch, int pArraySize, String arrayIndex)
+		{
+			return new HLSLArrayOutputStrategy(this, world, pIsPatch, pArraySize, arrayIndex);
+		}
+
+		CodeGenBackend * CreateHLSLCodeGen()
+		{
+			return new HLSLCodeGen();
 		}
 	}
 }
@@ -23657,10 +24895,21 @@ namespace Spire
 					if (result.ErrorList.Count() > 0)
 						return;
 					CodeGenBackend * backend = nullptr;
-					if (options.Target == CodeGenTarget::SPIRV)
+					switch(options.Target)
+					{
+					case CodeGenTarget::SPIRV:
 						backend = backends[L"spirv"]().Ptr();
-					else
+						break;
+					case CodeGenTarget::GLSL:
 						backend = backends[L"glsl"]().Ptr();
+						break;
+					case CodeGenTarget::HLSL:
+						backend = backends[L"hlsl"]().Ptr();
+						break;
+					default:
+						// TODO: emit an appropriate diagnostic
+						return;
+					}
 
 					Schedule schedule;
 					if (options.ScheduleSource != L"")
@@ -23801,6 +25050,7 @@ namespace Spire
 				}
 				compilerInstances++;
 				backends.Add(L"glsl", CreateGLSLCodeGen());
+				backends.Add(L"hlsl", CreateHLSLCodeGen());
 				backends.Add(L"spirv", CreateSpirVCodeGen());
 			}
 
@@ -32951,7 +34201,6 @@ void MD5_Final(unsigned char *result, MD5_CTX *ctx)
 CORELIB\MEMORYPOOL.CPP
 ***********************************************************************/
 #ifndef SPIRE_NO_CORE_LIB
-#include <cassert>
 
 namespace CoreLib
 {
