@@ -1,0 +1,4 @@
+DebugClang/
+*.user
+autotuneLog.txt
+LibraryRelease/CodePack.exe
