@@ -33616,7 +33616,7 @@ char * spGetShaderStageSource(SpireCompilationResult * result, const char * shad
 		{
 			if (state->MainCode.Length())
 			{
-				*length = (int)strlen(state->MainCode.ToMultiByteString());
+				*length = (int)strlen(state->MainCode.ToMultiByteString()) + 1;
 				return state->MainCode.ToMultiByteString();
 			}
 			else
