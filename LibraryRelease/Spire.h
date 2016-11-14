@@ -42,6 +42,10 @@ extern "C" {  // only need to export C interface if
 #define SPIRE_HLSL 1
 #define SPIRE_SPIRV 2
 
+#define SPIRE_LAYOUT_UNIFORM 0
+#define SPIRE_LAYOUT_PACKED 1
+#define SPIRE_LAYOUT_STORAGE 2
+
 #define SPIRE_ERROR_INSUFFICIENT_BUFFER -1
 #define SPIRE_ERROR_INVALID_PARAMETER -2
 
@@ -76,7 +80,9 @@ extern "C" {  // only need to export C interface if
 	Related Functions
 	- spLoadModuleLibrary()
 	- spFindModule()
-	- spModuleGetComponentsByWorld()
+	- spModuleGetAllComponentsByWorld()
+	- spModuleGetComponentCountByWorld()
+	- spModuleGetComponentByWorld()
 	- spModuleGetRequiredComponents()
 	*/
 	struct SpireModule {};
@@ -120,6 +126,11 @@ extern "C" {  // only need to export C interface if
 		int Alignment;             /**< The alignment (in bytes) of the component. For opaque types (e.g. sampler and texture), this value is 0.*/
 		int Offset;				   /**< The offset (in bytes) of the component. For opaque types (e.g. sampler and texture), this value is 0.*/
 	};
+
+	/*!
+	@brief Represents a collection of SpireComponentInfo.
+	*/
+	struct SpireComponentInfoCollection {};
 
 	/*!
 	@brief Create a compilation context.
@@ -199,7 +210,14 @@ extern "C" {  // only need to export C interface if
 	@param shader A shader object.
 	@param moduleName The name of the module to add to @p shader.
 	*/
-	SPIRE_API void spShaderAddModule(SpireShader * shader, const char * moduleName);
+	SPIRE_API void spShaderAddModuleByName(SpireShader * shader, const char * moduleName);
+
+	/*!
+	@brief Adds a module to a shader.
+	@param shader A shader object.
+	@param module The handle of the module to add to @p shader.
+	*/
+	SPIRE_API void spShaderAddModule(SpireShader * shader, SpireModule * moduleName);
 
 	/*!
 	@brief Sets the target pipeline of a shader
@@ -219,19 +237,38 @@ extern "C" {  // only need to export C interface if
 
 	/*!
 	@brief Retrieves components that are qualified with the specified world.
-	@param module The module from where to retrieve components.
+	@param module The module from which to retrieve components.
 	@param worldName The world name of requesting components.
-	@param buffer A user allocated buffer of SpireComponentInfo for receiving outputs.
-	@param bufferSize The size (in number of SpireComponentInfo structs) of the specified buffer.
+	@param layout The layout rule used to compute offsets of the components. Can be SPIRE_LAYOUT_UNIFORM, SPIRE_LAYOUT_STORAGE or SPIRE_LAYOUT_PACKED.
 	@return
-	If @p buffer is NULL, the return value is the required size, in number of SpireComponentInfo.
-	Otherwise, if the function suceeds, the return value is the number of SpireComponentInfo instances written to
-	@p buffer. The function returns a negative value if it does not suceed. Possible error codes are:
-	- SPIRE_ERROR_INSUFFICIENT_BUFFER. The supplied buffer size was not large enough.
-	- SPIRE_ERROR_INVALID_PARAMETER. Any of the parameter values was invalid.
+	A handle to a collection of SpireComponentInfo structures. Individual components can be retrieved from
+	the collection using spComponentInfoCollectionGetComponent() function.
 	*/
-	SPIRE_API int spModuleGetComponentsByWorld(SpireModule * module, const char * worldName, SpireComponentInfo * buffer, int bufferSize);
+	SPIRE_API SpireComponentInfoCollection * spModuleGetComponentsByWorld(SpireModule * module, const char * worldName, int layout);
 
+	/*!
+	@brief Retrieves component info from SpireComponentInfoCollection.
+	@param collection The collection from which to retrieve components.
+	@param index Index of the requesting component.
+	@param result A pointer to a SpireComponentInfo structure used to recieve info on the specified component.
+	@return
+	If successful, this function returns 0. 
+	Otherwise, the return value is one of the following error codes:
+	- SPIRE_ERROR_INVALID_PARAMETER if any of the parameters are invalid.
+	*/
+	SPIRE_API int spComponentInfoCollectionGetComponent(SpireComponentInfoCollection * collection, int index, SpireComponentInfo * result);
+
+	/*!
+	@brief Get the number of components contained in a SpireComponentInfoCollection.
+	@param collection The collection from which to retrieve components.
+	@return
+	If successful, this function the number of components in @p collection.
+	Otherwise, the return value is one of the following error codes:
+	- SPIRE_ERROR_INVALID_PARAMETER if any of the parameters are invalid.
+	*/
+	SPIRE_API int spComponentInfoCollectionGetCount(SpireComponentInfoCollection * collection);
+
+	
 	/*!
 	@brief Retrieve a list of components that are required by the specified module.
 	@param module The module from where to retrieve components.
@@ -333,9 +370,9 @@ extern "C" {  // only need to export C interface if
 	/*!
 	@brief Retrieve the compiled code (binary or textual, depending on the target language) of a stage in a compiled shader.
 	@param result A SpireCompilationResult object.
-	@param shaderName The name of a shader.
+	@param shaderName The name of a shader. If @p shaderName is NULL, the function returns the source code of the first shader in @p result.
 	@param stage The name of a stage.
-	@param[out] length A pointer used to receive the length of the compiled code.
+	@param[out] length A pointer used to receive the length of the compiled code, can be set to NULL.
 	@return If sucessful, the return value is a pointer to the buffer storing the compiled code. Otherwise, the return value is NULL.
 	@note The backing memory of the returned code buffer is owned by the SpireCompilationResult object. Destroying the SpireCompilationResult object will render this code
 	buffer unusable.

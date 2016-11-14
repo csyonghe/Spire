@@ -31,13 +31,13 @@ namespace Spire
 			Int = 16, Int2 = 17, Int3 = 18, Int4 = 19,
 			Float = 32, Float2 = 33, Float3 = 34, Float4 = 35,
 			UInt = 512, UInt2 = 513, UInt3 = 514, UInt4 = 515,
+			Bool = 128, Bool2 = 129, Bool3 = 130, Bool4 = 131,
 			Float3x3 = 40, Float4x4 = 47,
 			Texture2D = 48,
 			TextureShadow = 49,
 			TextureCube = 50,
 			TextureCubeShadow = 51,
 			Function = 64,
-			Bool = 128,
 			Shader = 256,
 			Struct = 1024,
 			Record = 2048,
@@ -130,7 +130,6 @@ namespace Spire
 			static RefPtr<ExpressionType> Error;
 		public:
 			virtual String ToString() const = 0;
-			virtual int GetSize() const = 0;
 			virtual bool IsIntegral() const = 0;
 			virtual bool Equals(const ExpressionType * type) const = 0;
 			virtual bool IsVectorType() const = 0;
@@ -182,7 +181,6 @@ namespace Spire
 				this->Shader = shaderSym;
 			}
 			virtual bool IsIntegral() const override;
-			virtual int GetSize() const override;
 			virtual bool Equals(const ExpressionType * type) const override;
 			virtual bool IsVectorType() const override;
 			virtual bool IsArray() const override;
@@ -214,7 +212,6 @@ namespace Spire
 			virtual bool IsIntegral() const override;
 			virtual bool IsArray() const override;
 
-			virtual int GetSize() const override;
 			virtual bool Equals(const ExpressionType * type) const override;
 			virtual bool IsVectorType() const override;
 			virtual CoreLib::Basic::String ToString() const override;
@@ -243,7 +240,6 @@ namespace Spire
 			RefPtr<ExpressionType> BaseType;
 			String GenericTypeName;
 			virtual bool IsIntegral() const override;
-			virtual int GetSize() const override;
 			virtual bool IsArray() const override;
 
 			virtual bool Equals(const ExpressionType * type) const override;

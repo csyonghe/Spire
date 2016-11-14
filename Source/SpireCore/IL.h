@@ -10,7 +10,10 @@ namespace Spire
 	namespace Compiler
 	{
 		using namespace CoreLib::Basic;
-
+		enum class LayoutRule
+		{
+			Std140, Std430, Packed
+		};
 		enum ILBaseType
 		{
 			Int = 16, Int2 = 17, Int3 = 18, Int4 = 19,
@@ -20,7 +23,7 @@ namespace Spire
 			TextureShadow = 49,
 			TextureCube = 50,
 			TextureCubeShadow = 51,
-			Bool = 128,
+			Bool = 128, Bool2 = 129, Bool3 = 130, Bool4 = 131,
 			UInt = 512, UInt2 = 513, UInt3 = 514, UInt4 = 515,
 		};
 		int SizeofBaseType(ILBaseType type);
@@ -36,15 +39,16 @@ namespace Spire
 			bool IsFloat();
 			bool IsScalar()
 			{
-				return IsInt() || IsUInt() || IsFloat();
+				return IsInt() || IsUInt() || IsFloat() || IsBool();
 			}
+			bool IsBoolVector(); 
 			bool IsIntVector();
 			bool IsUIntVector();
 			bool IsFloatVector();
 			bool IsFloatMatrix();
 			bool IsVector()
 			{
-				return IsIntVector() || IsUIntVector() || IsFloatVector();
+				return IsIntVector() || IsUIntVector() || IsFloatVector() || IsBoolVector();
 			}
 			bool IsTexture();
 			bool IsNonShadowTexture();
@@ -52,8 +56,8 @@ namespace Spire
 			virtual ILType * Clone() = 0;
 			virtual String ToString() = 0;
 			virtual bool Equals(ILType* type) = 0;
-			virtual int GetSize() = 0;
-			virtual int GetAlignment() = 0;
+			virtual int GetSize(LayoutRule rule = LayoutRule::Std430) = 0;
+			virtual int GetAlignment(LayoutRule rule = LayoutRule::Std430) = 0;
 		};
 
 		RefPtr<ILType> TypeFromString(CoreLib::Text::Parser & parser);
@@ -75,8 +79,8 @@ namespace Spire
 			virtual ILType * Clone() override;
 			virtual String ToString() override;
 			virtual bool Equals(ILType* type) override;
-			virtual int GetSize() override;
-			virtual int GetAlignment() override;
+			virtual int GetSize(LayoutRule rule) override;
+			virtual int GetAlignment(LayoutRule rule) override;
 		};
 
 		class ILBasicType : public ILType
@@ -148,8 +152,10 @@ namespace Spire
 				else
 					return L"?unkown";
 			}
-			virtual int GetAlignment() override
+			virtual int GetAlignment(LayoutRule rule) override
 			{
+				if (rule == LayoutRule::Packed)
+					return 0;
 				switch (Type)
 				{
 				case ILBaseType::Int:
@@ -189,7 +195,7 @@ namespace Spire
 					return 0;
 				}
 			}
-			virtual int GetSize() override
+			virtual int GetSize(LayoutRule /*rule*/) override
 			{
 				switch (Type)
 				{
@@ -250,13 +256,19 @@ namespace Spire
 				else
 					return BaseType->ToString() + L"[]";
 			}
-			virtual int GetSize() override
+			virtual int GetSize(LayoutRule layoutRule) override
 			{
-				return BaseType->GetSize() * ArrayLength;
+				return BaseType->GetSize(layoutRule) * ArrayLength;
 			}
-			virtual int GetAlignment() override
+			virtual int GetAlignment(LayoutRule layoutRule) override
 			{
-				return BaseType->GetAlignment();
+				int baseAlignment = BaseType->GetAlignment(layoutRule);
+				if (layoutRule == LayoutRule::Std140)
+				{
+					if (baseAlignment < 16)
+						return 16;
+				}
+				return baseAlignment;
 			}
 		};
 
@@ -283,13 +295,13 @@ namespace Spire
 			{
 				return GenericTypeName + L"<" + BaseType->ToString() + L">";
 			}
-			virtual int GetSize() override
+			virtual int GetSize(LayoutRule rule) override
 			{
-				return 0;
+				return BaseType->GetSize(rule);
 			}
-			virtual int GetAlignment() override
+			virtual int GetAlignment(LayoutRule rule) override
 			{
-				return BaseType->GetAlignment();
+				return BaseType->GetAlignment(rule);
 			}
 		};
 
@@ -308,8 +320,8 @@ namespace Spire
 			virtual ILType * Clone() override;
 			virtual String ToString() override;
 			virtual bool Equals(ILType * type) override;
-			virtual int GetSize() override;
-			virtual int GetAlignment() override;
+			virtual int GetSize(LayoutRule rule) override;
+			virtual int GetAlignment(LayoutRule rule) override;
 		};
 
 		class ILOperand;

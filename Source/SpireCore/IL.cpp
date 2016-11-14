@@ -170,6 +170,15 @@ namespace Spire
 				return false;
 		}
 
+		bool ILType::IsBoolVector()
+		{
+			auto basicType = dynamic_cast<ILBasicType*>(this);
+			if (basicType)
+				return basicType->Type == ILBaseType::Bool2 || basicType->Type == ILBaseType::Bool3 || basicType->Type == ILBaseType::Bool4;
+			else
+				return false;
+		}
+
 		bool ILType::IsIntVector()
 		{
 			auto basicType = dynamic_cast<ILBasicType*>(this);
@@ -558,24 +567,24 @@ namespace Spire
 				ptr = (ptr / alignment + 1) * alignment;
 			}
 		}
-		int ILStructType::GetSize()
+		int ILStructType::GetSize(LayoutRule rule)
 		{
 			int rs = 0;
 			for (auto & m : Members)
 			{
-				int size = m.Type->GetSize();
-				int alignment = m.Type->GetAlignment();
+				int size = m.Type->GetSize(rule);
+				int alignment = m.Type->GetAlignment(rule);
 				Align(rs, alignment);
 				rs += size;
 			}
 			return rs;
 		}
-		int ILStructType::GetAlignment()
+		int ILStructType::GetAlignment(LayoutRule rule)
 		{
 			int rs = 1;
 			for (auto & m : Members)
 			{
-				int alignment = m.Type->GetAlignment();
+				int alignment = m.Type->GetAlignment(rule);
 				rs = Math::Max(rs, alignment);
 			}
 			return rs;
@@ -607,11 +616,11 @@ namespace Spire
 			else
 				return false;
 		}
-		int ILRecordType::GetSize()
+		int ILRecordType::GetSize(LayoutRule /*rule*/)
 		{
 			return 0;
 		}
-		int ILRecordType::GetAlignment()
+		int ILRecordType::GetAlignment(LayoutRule /*rule*/)
 		{
 			return 0;
 		}

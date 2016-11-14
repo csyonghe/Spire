@@ -15,17 +15,6 @@ namespace Spire
 			return false;
 		}
 
-		int BasicExpressionType::GetSize() const
-		{
-			int baseSize = GetVectorSize(BaseType);
-			if (BaseType == Compiler::BaseType::Texture2D || BaseType == Compiler::BaseType::TextureCube ||
-				BaseType == Compiler::BaseType::TextureCubeShadow || BaseType == Compiler::BaseType::TextureShadow)
-				baseSize = sizeof(void*) / sizeof(int);
-			else if (BaseType == Compiler::BaseType::Struct)
-				baseSize = Struct->Type->GetSize();
-			return baseSize;
-		}
-
 		bool BasicExpressionType::Equals(const ExpressionType * type) const
 		{
 			auto basicType = dynamic_cast<const BasicExpressionType*>(type);
@@ -684,10 +673,6 @@ namespace Spire
 		{
 			return true;
 		}
-		int ArrayExpressionType::GetSize() const
-		{
-			return ArrayLength * BaseType->GetSize();
-		}
 		bool ArrayExpressionType::Equals(const ExpressionType * type) const
 		{
 			auto arrType = dynamic_cast<const ArrayExpressionType*>(type);
@@ -723,10 +708,6 @@ namespace Spire
 		bool GenericExpressionType::IsIntegral() const
 		{
 			return false;
-		}
-		int GenericExpressionType::GetSize() const
-		{
-			return 0;
 		}
 		bool GenericExpressionType::IsArray() const
 		{
