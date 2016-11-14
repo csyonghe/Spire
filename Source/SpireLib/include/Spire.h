@@ -185,7 +185,7 @@ Related Functions
 	@param source The spire source code to precompile. All strings should be in UTF-8 encoding.
 	@param fileName The filename used to report error messages regarding to code in @p source.
 	*/
-	SPIRE_API void spLoadModuleLibrary(SpireCompilationContext * ctx, const char * source, const char * fileName);
+	SPIRE_API void spLoadModuleLibraryFromSource(SpireCompilationContext * ctx, const char * source, const char * fileName);
 
 	/*!
 	@brief Create a shader object that can be used to assemble a final shader from modules.
@@ -274,7 +274,7 @@ Related Functions
 	does not automatically destroy SpireCompilationResult objects.
 	@see spDestroyCompilationResult()
 	*/
-	SPIRE_API SpireCompilationResult* spCompileShader(SpireCompilationContext * ctx, const char * source, const char * fileName);
+	SPIRE_API SpireCompilationResult* spCompileShaderFromSource(SpireCompilationContext * ctx, const char * source, const char * fileName);
 
 	/*!
 	@brief Checks if a compilation operation has succeeded.
