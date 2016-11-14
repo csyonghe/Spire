@@ -1,4 +1,4 @@
-/***********************************************************************
+﻿/***********************************************************************
 
 Spire - The MIT License (MIT)
 Copyright (c) 2016, Carnegie Mellon University
@@ -12067,6 +12067,14 @@ extern "C" {  // only need to export C interface if
 	@note All SpireModule objects are destroyed when its containing SpireCompilationContext is destroyed.
 	*/
 	SPIRE_API SpireModule * spFindModule(SpireCompilationContext * ctx, const char * moduleName);
+
+	/*!
+	@brief Retrieve the name of a SpireModule.
+	@param module The module to get the name of.
+	@return The name of the module as a null-terminated string, or NULL if ther are any errors.
+	@note The memory for the return value will be freed when the containing SpireCopmilationContext is destroyed.
+	*/
+	SPIRE_API const char * spGetModuleName(SpireModule * module);
 
 	/*!
 	@brief Retrieves components that are qualified with the specified world.
@@ -33214,6 +33222,7 @@ namespace SpireLib
 	class ModuleMetaData
 	{
 	public:
+		String Name;
 		EnumerableDictionary<String, EnumerableHashSet<ComponentMetaData>> ComponentsByWorld;
 		EnumerableHashSet<ComponentMetaData> Requirements;
 	};
@@ -33262,6 +33271,7 @@ namespace SpireLib
 				if (!modules.ContainsKey(shader.Key))
 				{
 					ModuleMetaData meta;
+					meta.Name = shader.Key;
 					for (auto & comp : shader.Value->Components)
 					{
 						ComponentMetaData compMeta;
@@ -33465,6 +33475,14 @@ SpireModule * spFindModule(SpireCompilationContext * ctx, const char * moduleNam
 {
 	return reinterpret_cast<SpireModule*>(CTX(ctx)->FindModule(moduleName));
 }
+
+const char * spGetModuleName(SpireModule * module)
+{
+	if(!module) return NULL;
+	auto moduleNode = MODULE(module);
+	return moduleNode->Name.ToMultiByteString();
+}
+
 
 int spModuleGetComponentsByWorld(SpireModule * module, const char * worldName, SpireComponentInfo * buffer, int bufferSize)
 {
