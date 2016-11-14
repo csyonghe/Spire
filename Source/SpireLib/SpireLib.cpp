@@ -667,7 +667,7 @@ void spLoadModuleLibrary(SpireCompilationContext * ctx, const char * fileName)
 	CTX(ctx)->LoadModuleSource(File::ReadAllText(fileName), fileName);
 }
 
-void spLoadModuleLibrary(SpireCompilationContext * ctx, const char * source, const char * fileName)
+void spLoadModuleLibraryFromSource(SpireCompilationContext * ctx, const char * source, const char * fileName)
 {
 	CTX(ctx)->LoadModuleSource(source, fileName);
 }
@@ -750,7 +750,7 @@ SpireCompilationResult * spCompileShader(SpireCompilationContext * ctx, SpireSha
 	return reinterpret_cast<SpireCompilationResult*>(rs);
 }
 
-SpireCompilationResult * spCompileShader(SpireCompilationContext * ctx, const char * source, const char * fileName)
+SpireCompilationResult * spCompileShaderFromSource(SpireCompilationContext * ctx, const char * source, const char * fileName)
 {
 	SpireLib::CompileResult * rs = new SpireLib::CompileResult();
 	CTX(ctx)->Compile(*rs, source, fileName);
