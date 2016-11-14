@@ -20,20 +20,20 @@ extern "C" {  // only need to export C interface if
 			  // used by C++ source code  
 #endif  
 
-/*!
-@mainpage Introduction
-Spire is a shading language and compiler framework that facilitates modular shader authoring and rapid exploration of
-shader optimization choices (such as frequency reduction and algorithmic approximation) afforded by modern real-time
-graphics engines. The current implementation of the Spire compiler can generate either GLSL or SPIR-V output for use
-with OpenGL and Vulkan based engines.
+			  /*!
+			  @mainpage Introduction
+			  Spire is a shading language and compiler framework that facilitates modular shader authoring and rapid exploration of
+			  shader optimization choices (such as frequency reduction and algorithmic approximation) afforded by modern real-time
+			  graphics engines. The current implementation of the Spire compiler can generate either GLSL or SPIR-V output for use
+			  with OpenGL and Vulkan based engines.
 
-Paper: http://graphics.cs.cmu.edu/projects/spire/
+			  Paper: http://graphics.cs.cmu.edu/projects/spire/
 
 
-API Reference: Spire.h
+			  API Reference: Spire.h
 
-@file Spire.h
-*/
+			  @file Spire.h
+			  */
 
 #define SPIRE_ERROR 0
 #define SPIRE_WARNING 1
@@ -45,39 +45,39 @@ API Reference: Spire.h
 #define SPIRE_ERROR_INSUFFICIENT_BUFFER -1
 #define SPIRE_ERROR_INVALID_PARAMETER -2
 
-/*!
-@brief Represents a compilation context. Created by spCreateCompilationContext().
+			  /*!
+			  @brief Represents a compilation context. Created by spCreateCompilationContext().
 
-Related Functions
-	- spCreateCompilationContext()
-	- spDestroyCompilationContext()
-	- spCreateShader()
-	- spCompileShader()
-	- spSetCodeGenTarget()
-	- spAddSearchPath()
-	- spSetBackendParameter()
-*/
+			  Related Functions
+			  - spCreateCompilationContext()
+			  - spDestroyCompilationContext()
+			  - spCreateShader()
+			  - spCompileShader()
+			  - spSetCodeGenTarget()
+			  - spAddSearchPath()
+			  - spSetBackendParameter()
+			  */
 	struct SpireCompilationContext {};
 
 	/*!
 	@brief Represents a shader. A SpireShader can be assembled by calling spCreateShader().
-		   Modules can be added to a shader by calling spShaderAddModule().
+	Modules can be added to a shader by calling spShaderAddModule().
 
 	Related Functions
-		   - spShaderAddModule()
-		   - spShaderTargetPipeline()
+	- spShaderAddModule()
+	- spShaderTargetPipeline()
 	*/
 	struct SpireShader {};
 
 	/*!
 	@brief SpireModule objects provide reflection data about a module.
-		Module objects can be obtained by calling spFindModule() once a module library is loaded via spLoadModuleLibrary().
+	Module objects can be obtained by calling spFindModule() once a module library is loaded via spLoadModuleLibrary().
 
 	Related Functions
-		- spLoadModuleLibrary()
-		- spFindModule()
-		- spModuleGetComponentsByWorld()
-		- spModuleGetRequiredComponents()
+	- spLoadModuleLibrary()
+	- spFindModule()
+	- spModuleGetComponentsByWorld()
+	- spModuleGetRequiredComponents()
 	*/
 	struct SpireModule {};
 
@@ -85,14 +85,14 @@ Related Functions
 	@brief Represents the compilation result, including error messages and compiled source code for each stage.
 
 	Related Functions
-		- spCompileShader()
-		- spIsCompilationSucessful()
-		- spGetMessageCount()
-		- spGetMessageContent()
-		- spGetCompiledShaderNames()
-		- spGetCompiledShaderStageNames()
-		- spGetShaderStageSource()
-		- spDestroyCompilationResult()
+	- spCompileShader()
+	- spIsCompilationSucessful()
+	- spGetMessageCount()
+	- spGetMessageContent()
+	- spGetCompiledShaderNames()
+	- spGetCompiledShaderStageNames()
+	- spGetShaderStageSource()
+	- spDestroyCompilationResult()
 	*/
 	struct SpireCompilationResult {};
 
@@ -132,15 +132,15 @@ Related Functions
 	@brief Sets the target for code generation.
 	@param ctx The compilation context.
 	@param target The code generation target. Possible values are:
-		- SPIRE_GLSL. Generates GLSL code.
-		- SPIRE_HLSL. Generates HLSL code.
-		- SPIRE_SPIRV. Generates SPIR-V code.
+	- SPIRE_GLSL. Generates GLSL code.
+	- SPIRE_HLSL. Generates HLSL code.
+	- SPIRE_SPIRV. Generates SPIR-V code.
 	*/
 	SPIRE_API void spSetCodeGenTarget(SpireCompilationContext * ctx, int target);
 
 	/*!
 	@brief Add a path in which source files are being search. When the programmer specifies @code using <file_name> @endcode in code, the compiler searches the file
-		   in all search pathes in order.
+	in all search pathes in order.
 	@param ctx The compilation context.
 	@param searchDir The additional search directory.
 	*/
@@ -156,7 +156,7 @@ Related Functions
 
 	/*!
 	@brief Sets a shader to compile. By default, the compiler will generate code for all shaders in current context. After setting this option,
-		   the compiler will only generate code for the specified shader.
+	the compiler will only generate code for the specified shader.
 	@param ctx The compilation context.
 	@param shaderName The name of the shader to compile.
 	*/
@@ -164,15 +164,15 @@ Related Functions
 
 	/*!
 	@brief Destorys the compilation context. Destorying a compilation context will free the memory for all strings owned by the
-		   SpireComilationContext and all SpireModule objects. These objects will not be available after a call to spDestroyCompilationContext.
-		   However, all SpireCompilationResult objects will continue to be available until they are destroyed.
+	SpireComilationContext and all SpireModule objects. These objects will not be available after a call to spDestroyCompilationContext.
+	However, all SpireCompilationResult objects will continue to be available until they are destroyed.
 	@param ctx The compilation context to destroy.
 	*/
 	SPIRE_API void spDestroyCompilationContext(SpireCompilationContext * ctx);
 
 	/*!
 	@brief Load and precompile spire modules from spire source file. Compilation status and error messages can be obtained via spIsCompilationSucessful(),
-		   spGetMessageCount() and spGetMessageContent() functions.
+	spGetMessageCount() and spGetMessageContent() functions.
 	@param ctx The compilation context.
 	@param fileName The filename of the spire source code.
 	*/
@@ -224,11 +224,11 @@ Related Functions
 	@param buffer A user allocated buffer of SpireComponentInfo for receiving outputs.
 	@param bufferSize The size (in number of SpireComponentInfo structs) of the specified buffer.
 	@return
-		If @p buffer is NULL, the return value is the required size, in number of SpireComponentInfo.
-		Otherwise, if the function suceeds, the return value is the number of SpireComponentInfo instances written to
-		@p buffer. The function returns a negative value if it does not suceed. Possible error codes are:
-		- SPIRE_ERROR_INSUFFICIENT_BUFFER. The supplied buffer size was not large enough.
-		- SPIRE_ERROR_INVALID_PARAMETER. Any of the parameter values was invalid.
+	If @p buffer is NULL, the return value is the required size, in number of SpireComponentInfo.
+	Otherwise, if the function suceeds, the return value is the number of SpireComponentInfo instances written to
+	@p buffer. The function returns a negative value if it does not suceed. Possible error codes are:
+	- SPIRE_ERROR_INSUFFICIENT_BUFFER. The supplied buffer size was not large enough.
+	- SPIRE_ERROR_INVALID_PARAMETER. Any of the parameter values was invalid.
 	*/
 	SPIRE_API int spModuleGetComponentsByWorld(SpireModule * module, const char * worldName, SpireComponentInfo * buffer, int bufferSize);
 
@@ -238,11 +238,11 @@ Related Functions
 	@param buffer A user allocated buffer of SpireComponentInfo for receiving outputs.
 	@param bufferSize The size (in number of SpireComponentInfo structs) of the specified buffer.
 	@return
-		If @p buffer is NULL, the return value is the required size, in number of SpireComponentInfo.
-		Otherwise, if the function suceeds, the return value is the number of SpireComponentInfo instances written to
-		@p buffer. The function returns a negative value if it does not suceed. Possible error codes are:
-		- SPIRE_ERROR_INSUFFICIENT_BUFFER. The supplied buffer size was not large enough.
-		- SPIRE_ERROR_INVALID_PARAMETER. Any of the parameter values was invalid.
+	If @p buffer is NULL, the return value is the required size, in number of SpireComponentInfo.
+	Otherwise, if the function suceeds, the return value is the number of SpireComponentInfo instances written to
+	@p buffer. The function returns a negative value if it does not suceed. Possible error codes are:
+	- SPIRE_ERROR_INSUFFICIENT_BUFFER. The supplied buffer size was not large enough.
+	- SPIRE_ERROR_INVALID_PARAMETER. Any of the parameter values was invalid.
 	*/
 	SPIRE_API int spModuleGetRequiredComponents(SpireModule * module, SpireComponentInfo * buffer, int bufferSize);
 
@@ -250,7 +250,7 @@ Related Functions
 	@brief Destroys a shader object.
 	@param shader The shader object to destroy.
 	@note You are responsible for destorying a shader object when it is no longer used (e.g. after it has been compiled). Destroying a SpireCompilationContext
-		  does not automatically destroy SpireShader objects.
+	does not automatically destroy SpireShader objects.
 	*/
 	SPIRE_API void spDestroyShader(SpireShader * shader);
 
@@ -287,8 +287,8 @@ Related Functions
 	@brief Retrieve the number of compiler messages in a SpireCompilationResult object.
 	@param result A SpireCompilationResult object.
 	@param messageType The type of compiler message to check. Possible values are:
-		- SPIRE_ERROR. compilation errors.
-		- SPIRE_WARNING. compiler warnings.
+	- SPIRE_ERROR. compilation errors.
+	- SPIRE_WARNING. compiler warnings.
 	@return The number of messages of specified type.
 	*/
 	SPIRE_API int spGetMessageCount(SpireCompilationResult * result, int messageType);
@@ -311,9 +311,9 @@ Related Functions
 	@param buffer A buffer used to receive shader names. Shader names are separated by '\\n'. If this parameter is NULL, the function returns the required buffer size.
 	@param bufferSize The size (in bytes) of @p buffer.
 	@return If sucessful, the return value is greater or equal to 0 representing the number of charaters required or written to buffer, including the trailing 0.
-			Otherwise, it returns one of the following error codes:
-			- SPIRE_ERROR_INSUFFICIENT_BUFFER. The supplied buffer size was not large enough.
-			- SPIRE_ERROR_INVALID_PARAMETER. Any of the parameter values was invalid.
+	Otherwise, it returns one of the following error codes:
+	- SPIRE_ERROR_INSUFFICIENT_BUFFER. The supplied buffer size was not large enough.
+	- SPIRE_ERROR_INVALID_PARAMETER. Any of the parameter values was invalid.
 	*/
 	SPIRE_API int spGetCompiledShaderNames(SpireCompilationResult * result, char * buffer, int bufferSize);
 
@@ -338,7 +338,7 @@ Related Functions
 	@param[out] length A pointer used to receive the length of the compiled code.
 	@return If sucessful, the return value is a pointer to the buffer storing the compiled code. Otherwise, the return value is NULL.
 	@note The backing memory of the returned code buffer is owned by the SpireCompilationResult object. Destroying the SpireCompilationResult object will render this code
-		  buffer unusable.
+	buffer unusable.
 	*/
 	SPIRE_API char * spGetShaderStageSource(SpireCompilationResult * result, const char * shaderName, const char * stage, int * length);
 
@@ -346,7 +346,7 @@ Related Functions
 	@brief Destroys the SpireCompilationResult object.
 	@param result A SpireCompilationResult object to destroy.
 	@note Destroying a SpireCompilationContext object does not automatically destroy SpireCompilationResult objects. You are required to destroy a SpireCompilationResult object
-		  once it is no longer in use.
+	once it is no longer in use.
 	*/
 	SPIRE_API void spDestroyCompilationResult(SpireCompilationResult * result);
 
