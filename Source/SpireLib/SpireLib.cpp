@@ -440,6 +440,7 @@ namespace SpireLib
 	class ModuleMetaData
 	{
 	public:
+		String Name;
 		EnumerableDictionary<String, EnumerableHashSet<ComponentMetaData>> ComponentsByWorld;
 		EnumerableHashSet<ComponentMetaData> Requirements;
 	};
@@ -488,6 +489,7 @@ namespace SpireLib
 				if (!modules.ContainsKey(shader.Key))
 				{
 					ModuleMetaData meta;
+					meta.Name = shader.Key;
 					for (auto & comp : shader.Value->Components)
 					{
 						ComponentMetaData compMeta;
@@ -691,6 +693,14 @@ SpireModule * spFindModule(SpireCompilationContext * ctx, const char * moduleNam
 {
 	return reinterpret_cast<SpireModule*>(CTX(ctx)->FindModule(moduleName));
 }
+
+const char * spGetModuleName(SpireModule * module)
+{
+	if(!module) return NULL;
+	auto moduleNode = MODULE(module);
+	return moduleNode->Name.ToMultiByteString();
+}
+
 
 int spModuleGetComponentsByWorld(SpireModule * module, const char * worldName, SpireComponentInfo * buffer, int bufferSize)
 {
