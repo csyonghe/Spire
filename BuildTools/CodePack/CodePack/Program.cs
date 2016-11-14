@@ -10,39 +10,43 @@ namespace Codepack
 {
     class Program
     {
-        static string[] GetCppFiles(string folder)
+        static FolderItem[] GetCppFiles(FolderItem folder)
         {
             return Directory
-                .GetFiles(folder, "*.cpp", SearchOption.AllDirectories)
-                .Select(s => s.ToUpper())
+                .GetFiles(folder.Path, "*.cpp", SearchOption.AllDirectories).Concat(
+                Directory.GetFiles(folder.Path, "*.c", SearchOption.AllDirectories)
+                )
+                .Select(s => new FolderItem() { Path = s.ToUpper(), IfNDef = folder.IfNDef})
                 .ToArray()
                 ;
         }
-        static string[] GetHeaderFiles(string folder)
+        static string[] GetHeaderFiles(FolderItem folder)
         {
             return Directory
-                .GetFiles(folder, "*.h", SearchOption.AllDirectories)
+                .GetFiles(folder.Path, "*.h", SearchOption.AllDirectories).Concat(
+                Directory.GetFiles(folder.Path, "*.hpp", SearchOption.AllDirectories)
+                )
                 .Select(s => s.ToUpper())
                 .ToArray()
                 ;
         }
 
-        static Dictionary<string, string[]> CategorizeCodeFiles(XDocument config, string[] files)
+        static Dictionary<string, FolderItem[]> CategorizeCodeFiles(XDocument config, FolderItem[] files)
         {
-            Dictionary<string, string[]> categorizedFiles = new Dictionary<string, string[]>();
+            Dictionary<string, FolderItem[]> categorizedFiles = new Dictionary<string, FolderItem[]>();
             foreach (var e in config.Root.Element("categories").Elements("category"))
             {
                 string name = e.Attribute("name").Value;
                 string pattern = e.Attribute("pattern").Value.ToUpper();
                 string[] exceptions = e.Elements("except").Select(x => x.Attribute("pattern").Value.ToUpper()).ToArray();
-                string[] filteredFiles = files
+                var filteredFiles = files
                         .Where(f =>
                         {
-                            string path = f.ToUpper();
+                            string path = f.Path.ToUpper();
                             return path.Contains(pattern) && exceptions.All(ex => !path.Contains(ex));
                         })
                         .ToArray();
-                string[] previousFiles = null;
+                FolderItem[] previousFiles = null;
                 if (categorizedFiles.TryGetValue(name, out previousFiles))
                 {
                     filteredFiles = filteredFiles.Concat(previousFiles).ToArray();
@@ -56,7 +60,8 @@ namespace Codepack
                 {
                     if (a != b)
                     {
-                        if (categorizedFiles[a].Intersect(categorizedFiles[b]).Count() != 0)
+                        var intersection = categorizedFiles[a].Intersect(categorizedFiles[b]);
+                        if (intersection.Count() != 0)
                         {
                             throw new ArgumentException();
                         }
@@ -69,7 +74,7 @@ namespace Codepack
         static Dictionary<string, string[]> ScannedFiles = new Dictionary<string, string[]>();
         static Regex IncludeRegex = new Regex(@"^\s*\#include\s*""(?<path>[^""]+)""\s*$");
         static Regex IncludeSystemRegex = new Regex(@"^\s*\#include\s*\<(?<path>[^""]+)\>\s*$");
-        static HashSet<String> proceseedIncludes = new HashSet<string>();
+
         static string[] GetIncludedFiles(string codeFile)
         {
             codeFile = Path.GetFullPath(codeFile).ToUpper();
@@ -77,22 +82,20 @@ namespace Codepack
             if (!ScannedFiles.TryGetValue(codeFile, out result))
             {
                 List<string> directIncludeFiles = new List<string>();
-                if (File.Exists(codeFile))
+                foreach (var line in File.ReadAllLines(codeFile))
                 {
-                    foreach (var line in File.ReadAllLines(codeFile))
+                    Match match = IncludeRegex.Match(line);
+                    if (match.Success)
                     {
-                        Match match = IncludeRegex.Match(line);
-                        if (match.Success)
+                        string path = match.Groups["path"].Value;
+                        path = Path.GetFullPath(Path.GetDirectoryName(codeFile) + @"\" + path).ToUpper();
+                        if (!directIncludeFiles.Contains(path))
                         {
-                            string path = match.Groups["path"].Value;
-                            path = Path.GetFullPath(Path.GetDirectoryName(codeFile) + @"\" + path).ToUpper();
-                            if (!directIncludeFiles.Contains(path))
-                            {
-                                directIncludeFiles.Add(path);
-                            }
+                            directIncludeFiles.Add(path);
                         }
                     }
                 }
+
                 for (int i = directIncludeFiles.Count - 1; i >= 0; i--)
                 {
                     directIncludeFiles.InsertRange(i, GetIncludedFiles(directIncludeFiles[i]));
@@ -143,25 +146,23 @@ namespace Codepack
                 .First();
         }
 
-        static void Combine(string license, string[] files, string outputFilename, HashSet<string> systemIncludes, params string[] externalIncludes)
+        static void Combine(string licenseContent, FolderItem[] files, string outputFilename, HashSet<string> systemIncludes, params string[] externalIncludes)
         {
             try
             {
-                string prefix = GetLongestCommonPrefix(files.Select(s => s.ToUpper()).ToArray());
+                string prefix = GetLongestCommonPrefix(files.Select(s => s.Path.ToUpper()).ToArray());
                 {
                     int index = prefix.LastIndexOf('/');
                     prefix = prefix.Substring(index + 1);
                 }
-                using (StreamWriter writer = new StreamWriter(new FileStream(outputFilename, FileMode.Create), Encoding.UTF8))
+                using (StreamWriter writer = new StreamWriter(new FileStream(outputFilename, FileMode.Create), new UTF8Encoding(false)))
                 {
                     writer.WriteLine("/***********************************************************************");
-                    writer.WriteLine(license);
-                    writer.WriteLine("***********************************************************************/");
+                    writer.WriteLine(licenseContent);
                     writer.WriteLine();
-                    writer.WriteLine("/***********************************************************************");
-                    writer.WriteLine("WARNING: This is an automatically generated file.");
+                    writer.WriteLine("========================================================================");
+                    writer.WriteLine("WARNING: THIS FILE IS AUTOMATICALLY GENERATED. DO NOT MODIFY");
                     writer.WriteLine("***********************************************************************/");
-
                     foreach (var inc in externalIncludes)
                     {
                         writer.WriteLine("#include \"{0}\"", inc);
@@ -169,33 +170,38 @@ namespace Codepack
 
                     foreach (var file in files)
                     {
-                        if (File.Exists(file))
+                        writer.WriteLine("");
+                        writer.WriteLine("/***********************************************************************");
+                        writer.WriteLine(file.Path.Substring(prefix.Length));
+                        writer.WriteLine("***********************************************************************/");
+                        if (file.IfNDef != null && file.IfNDef != "")
                         {
-                            writer.WriteLine("");
-                            writer.WriteLine("/***********************************************************************");
-                            writer.WriteLine(file.Substring(prefix.Length));
-                            writer.WriteLine("***********************************************************************/");
-                            foreach (var line in File.ReadAllLines(file, Encoding.Default))
-                            {
-                                Match match = null;
+                            writer.WriteLine("#ifndef " + file.IfNDef);
+                        }
+                        foreach (var line in File.ReadAllLines(file.Path, Encoding.Default))
+                        {
+                            Match match = null;
 
-                                match = IncludeSystemRegex.Match(line);
-                                if (match.Success)
+                            match = IncludeSystemRegex.Match(line);
+                            if (match.Success)
+                            {
+                                if (systemIncludes.Add(match.Groups["path"].Value.ToUpper()))
                                 {
-                                    if (systemIncludes.Add(match.Groups["path"].Value.ToUpper()))
-                                    {
-                                        writer.WriteLine(line);
-                                    }
-                                }
-                                else
-                                {
-                                    match = IncludeRegex.Match(line);
-                                    if (!match.Success)
-                                    {
-                                        writer.WriteLine(line);
-                                    }
+                                    writer.WriteLine(line);
                                 }
                             }
+                            else
+                            {
+                                match = IncludeRegex.Match(line);
+                                if (!match.Success)
+                                {
+                                    writer.WriteLine(line);
+                                }
+                            }
+                        }
+                        if (file.IfNDef != null && file.IfNDef != "")
+                        {
+                            writer.WriteLine("#endif");
                         }
                     }
                 }
@@ -207,13 +213,17 @@ namespace Codepack
             }
         }
 
-        static void Combine(string license, string inputFilename, string outputFilename, params string[] externalIncludes)
+        static void Combine(string licenseContent, string inputFilename, string outputFilename, params string[] externalIncludes)
         {
             HashSet<string> systemIncludes = new HashSet<string>();
             string[] files = GetIncludedFiles(inputFilename).Concat(new string[] { inputFilename }).Distinct().ToArray();
-            Combine(license, files, outputFilename, systemIncludes, externalIncludes);
+            Combine(licenseContent, files.Select(x=>new FolderItem() { Path = x, IfNDef = "" }).ToArray(), outputFilename, systemIncludes, externalIncludes);
         }
-
+        struct FolderItem
+        {
+            public string Path;
+            public string IfNDef;
+        }
         static void Main(string[] args)
         {
             if (args.Length != 1)
@@ -225,19 +235,24 @@ namespace Codepack
             XDocument config = XDocument.Load(args[0]);
             string folder = Path.GetDirectoryName(Path.GetFullPath(args[0])) + "\\";
 
+            string licenseContent = "";
+            try
+            {
+                string licenseFile = config.Root.Element("license").Attribute("name").Value;
+                licenseContent = File.ReadAllText(licenseFile);
+            }
+            catch
+            {
+            }
             // collect project files
-
-            string licenseFile = config.Root.Element("license").Attribute("name").Value;
-            string licenseContent = File.ReadAllText(licenseFile);
-
-            string[] folders = config.Root
+            var folders = config.Root
                 .Element("folders")
                 .Elements("folder")
-                .Select(e => Path.GetFullPath(folder + e.Attribute("path").Value))
+                .Select(e => new FolderItem() { Path = Path.GetFullPath(folder + e.Attribute("path").Value), IfNDef = e.Attribute("ifndef")?.Value })
                 .ToArray();
 
             // collect code files
-            string[] unprocessedCppFiles = folders
+            var unprocessedCppFiles = folders
                 .SelectMany(GetCppFiles)
                 .Distinct()
                 .ToArray();
@@ -247,14 +262,14 @@ namespace Codepack
                 .ToArray();
             unprocessedHeaderFiles = folders
                 .SelectMany(GetHeaderFiles)
-                .Concat(unprocessedCppFiles)
+                .Concat(unprocessedCppFiles.Select(x=>x.Path))
                 .SelectMany(GetIncludedFiles)
                 .Concat(unprocessedHeaderFiles)
                 .Distinct().ToArray();
 
             // categorize code files
             var categorizedCppFiles = CategorizeCodeFiles(config, unprocessedCppFiles);
-            var categorizedHeaderFiles = CategorizeCodeFiles(config, unprocessedHeaderFiles);
+            var categorizedHeaderFiles = CategorizeCodeFiles(config, unprocessedHeaderFiles.Select(x=>new FolderItem() { Path =x, IfNDef=""}).ToArray());
             var outputFolder = Path.GetFullPath(folder + config.Root.Element("output").Attribute("path").Value);
             var categorizedOutput = config.Root
                 .Element("output")
@@ -269,12 +284,12 @@ namespace Codepack
                 .Keys
                 .Select(k =>
                 {
-                    var headerFiles = categorizedCppFiles[k]
+                    var headerFiles = categorizedCppFiles[k].Select(x=>x.Path)
                         .SelectMany(GetIncludedFiles)
                         .Distinct()
                         .ToArray();
                     var keys = categorizedHeaderFiles
-                        .Where(p => p.Value.Any(h => headerFiles.Contains(h)))
+                        .Where(p => p.Value.Any(h => headerFiles.Contains(h.Path)))
                         .Select(p => p.Key)
                         .Except(new string[] { k })
                         .ToArray();
