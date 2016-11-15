@@ -66,6 +66,11 @@ namespace Spire
 				sb << declName;
 			}
 
+			void PrintStandardArrayInputReference(StringBuilder& sb, ILRecordType* recType, String inputName, String componentName) override
+			{
+				PrintStandardArrayInputReference(sb, recType, inputName, componentName);
+			}
+
 			void PrintPatchInputReference(StringBuilder& sb, ILRecordType* recType, String inputName, String componentName) override
 			{
 				String declName = componentName;
@@ -79,7 +84,7 @@ namespace Spire
 				sb << declName;
 			}
 
-			void PrintSystemVarReference(StringBuilder& sb, String inputName, ExternComponentCodeGenInfo::SystemVarType systemVar) override
+			void PrintSystemVarReference(CodeGenContext & ctx, StringBuilder& sb, String inputName, ExternComponentCodeGenInfo::SystemVarType systemVar) override
 			{
 				switch(systemVar)
 				{
@@ -539,6 +544,30 @@ namespace Spire
 					sb << L"#extension GL_NV_command_list: require\n";
 			}
 
+			void GenerateDomainShaderProlog(CodeGenContext & ctx, ILStage * stage)
+			{
+				ctx.GlobalHeader << L"layout(";
+				StageAttribute val;
+				if (stage->Attributes.TryGetValue(L"Domain", val))
+					ctx.GlobalHeader << ((val.Value == L"quads") ? L"quads" : L"triangles");
+				else
+					ctx.GlobalHeader << L"triangles";
+				if (val.Value != L"triangles" && val.Value != L"quads")
+					Error(50093, L"'Domain' should be either 'triangles' or 'quads'.", val.Position);
+				if (stage->Attributes.TryGetValue(L"Winding", val))
+				{
+					if (val.Value == L"cw")
+						ctx.GlobalHeader << L", cw";
+					else
+						ctx.GlobalHeader << L", ccw";
+				}
+				if (stage->Attributes.TryGetValue(L"EqualSpacing", val))
+				{
+					if (val.Value == L"1" || val.Value == L"true")
+						ctx.GlobalHeader << L", equal_spacing";
+				}
+				ctx.GlobalHeader << L") in;\n";
+			}
 			StageSource GenerateSingleWorldShader(ILProgram * program, ILShader * shader, ILStage * stage) override
 			{
 				useBindlessTexture = stage->Attributes.ContainsKey(L"BindlessTexture");

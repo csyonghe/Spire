@@ -646,6 +646,7 @@ namespace CoreLib
 				rs.buffer = buffer;
 				rs.length = length;
 				buffer = 0;
+				bufferSize = 0;
 				length = 0;
 				return rs;
 
