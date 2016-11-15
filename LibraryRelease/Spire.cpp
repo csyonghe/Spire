@@ -16213,6 +16213,10 @@ namespace Spire
 			EnumerableDictionary<String, String> compSub;
 			for (auto & comp : shader->AllComponents)
 			{
+				// if this component is required by pipeline (e.g. gl_Position), do not attempt to remove it
+				if (shader->Pipeline->Components.ContainsKey(comp.Key))
+					continue;
+
 				if (comp.Value->Implementations.Count() == 1 &&
 					comp.Value->Implementations.First()->SyntaxNode->Expression &&
 					!comp.Value->Implementations.First()->SyntaxNode->IsOutput)
