@@ -846,18 +846,34 @@ namespace Spire
 			ReadToken(TokenType::KeywordFor);
 			ReadToken(TokenType::LParent);
 			if (IsTypeKeyword())
-				stmt->TypeDef = ParseType();
-			stmt->IterationVariable = ReadToken(TokenType::Identifier);
-			ReadToken(TokenType::OpAssign);
-			stmt->InitialExpression = ParseExpression();
-			ReadToken(TokenType::Colon);
-			stmt->EndExpression = ParseExpression();
-			if (LookAheadToken(TokenType::Colon))
 			{
-				stmt->StepExpression = stmt->EndExpression;
-				ReadToken(TokenType::Colon);
-				stmt->EndExpression = ParseExpression();
+				stmt->TypeDef = ParseType();
+				stmt->IterationVariable = ReadToken(TokenType::Identifier);
+				ReadToken(TokenType::OpAssign);
+				stmt->InitialExpression = ParseExpression();
+				RefPtr<BinaryExpressionSyntaxNode> assignment = new BinaryExpressionSyntaxNode();
+				assignment->Operator = Operator::Assign;
+				FillPosition(assignment.Ptr());
+				assignment->Position = stmt->IterationVariable.Position;
+				RefPtr<VarExpressionSyntaxNode> varExpr = new VarExpressionSyntaxNode();
+				FillPosition(varExpr.Ptr());
+				varExpr->Position = stmt->IterationVariable.Position;
+				varExpr->Variable = stmt->IterationVariable.Content;
+				assignment->LeftExpression = varExpr;
+				assignment->RightExpression = stmt->InitialExpression;
+				stmt->InitialExpression = assignment;
 			}
+			else
+			{
+				if (!LookAheadToken(TokenType::Semicolon))
+					stmt->InitialExpression = ParseExpression();
+			}
+			ReadToken(TokenType::Semicolon);
+			if (!LookAheadToken(TokenType::Semicolon))
+				stmt->PredicateExpression = ParseExpression();
+			ReadToken(TokenType::Semicolon);
+			if (!LookAheadToken(TokenType::RParent))
+				stmt->SideEffectExpression = ParseExpression();
 			ReadToken(TokenType::RParent);
 			stmt->Statement = ParseStatement();
 			PopScope();

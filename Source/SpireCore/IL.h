@@ -2362,26 +2362,49 @@ namespace Spire
 		class ForInstruction : public ILInstruction
 		{
 		public:
-			RefPtr<CFGNode> ConditionCode, SideEffectCode, BodyCode;
+			RefPtr<CFGNode> InitialCode, ConditionCode, SideEffectCode, BodyCode;
 			virtual int GetSubBlockCount() override
 			{
-				return 3;
+				int count = 0;
+				if (InitialCode)
+					count++;
+				if (ConditionCode)
+					count++;
+				if (SideEffectCode)
+					count++;
+				if (BodyCode)
+					count++;
+				return count;
 			}
 			virtual CFGNode * GetSubBlock(int i) override
 			{
-				if (i == 0)
-					return ConditionCode.Ptr();
-				else if (i == 1)
-					return SideEffectCode.Ptr();
-				else if (i == 2)
-					return BodyCode.Ptr();
+				int id = 0;
+				if (InitialCode)
+				{
+					if (id == i) return InitialCode.Ptr();
+					id++;
+				}
+				if (ConditionCode)
+				{
+					if (id == i) return ConditionCode.Ptr();
+					id++;
+				}
+				if (SideEffectCode)
+				{
+					if (id == i) return SideEffectCode.Ptr();
+					id++;
+				}
+				if (BodyCode)
+				{
+					if (id == i) return BodyCode.Ptr();
+				}
 				return nullptr;
 			}
 
 			virtual String ToString() override
 			{
 				StringBuilder sb;
-				sb << L"for (; " << ConditionCode->ToString() << L"; ";
+				sb << L"for (" << InitialCode->ToString() << L"; " << ConditionCode->ToString() << L"; ";
 				sb << SideEffectCode->ToString() << L")" << EndLine;
 				sb << L"{" << EndLine;
 				sb << BodyCode->ToString() << EndLine;

@@ -939,29 +939,25 @@ namespace Spire
 					varEntry.Type.DataType = stmt->IterationVariableType;
 					stmt->Scope->Variables.AddIfNotExists(stmt->IterationVariable.Content, varEntry);
 				}
-				if (!stmt->Scope->FindVariable(stmt->IterationVariable.Content, iterVar))
-					Error(30015, L"undefined identifier \'" + stmt->IterationVariable.Content + L"\'", stmt->IterationVariable);
-				else
+				
+				if (stmt->InitialExpression)
 				{
-					if (!iterVar.Type.DataType->Equals(ExpressionType::Float.Ptr()) && !iterVar.Type.DataType->Equals(ExpressionType::Int.Ptr()))
-						Error(30035, L"iteration variable \'" + stmt->IterationVariable.Content + L"\' can only be a int or float", stmt->IterationVariable);
 					stmt->InitialExpression = stmt->InitialExpression->Accept(this).As<ExpressionSyntaxNode>();
-					if (!stmt->InitialExpression->Type->Equals(iterVar.Type.DataType.Ptr()))
-						Error(30019, L"type mismatch \'" + stmt->InitialExpression->Type->ToString() + L"\' and \'" +
-							iterVar.Type.DataType->ToString() + L"\'", stmt->InitialExpression.Ptr());
-					stmt->EndExpression = stmt->EndExpression->Accept(this).As<ExpressionSyntaxNode>();
-					if (!stmt->EndExpression->Type->Equals(iterVar.Type.DataType.Ptr()))
-						Error(30019, L"type mismatch \'" + stmt->EndExpression->Type->ToString() + L"\' and \'" +
-							iterVar.Type.DataType->ToString() + L"\'", stmt->EndExpression.Ptr());
-					if (stmt->StepExpression != nullptr)
+				}
+				if (stmt->PredicateExpression)
+				{
+					stmt->PredicateExpression = stmt->PredicateExpression->Accept(this).As<ExpressionSyntaxNode>();
+					if (!stmt->PredicateExpression->Type->Equals(ExpressionType::Bool.Ptr()) && 
+						!stmt->PredicateExpression->Type->Equals(ExpressionType::Int.Ptr()) &&
+						!stmt->PredicateExpression->Type->Equals(ExpressionType::UInt.Ptr()))
 					{
-						stmt->StepExpression = stmt->StepExpression->Accept(this).As<ExpressionSyntaxNode>();
-						if (!stmt->StepExpression->Type->Equals(iterVar.Type.DataType.Ptr()))
-							Error(30019, L"type mismatch \'" + stmt->StepExpression->Type->ToString() + L"\' and \'" +
-								iterVar.Type.DataType->ToString() + L"\'", stmt->StepExpression.Ptr());
+						Error(30028, L"'for': predicate expression must evaluate to bool.", stmt->PredicateExpression.Ptr());
 					}
 				}
-
+				if (stmt->SideEffectExpression)
+				{
+					stmt->SideEffectExpression = stmt->SideEffectExpression->Accept(this).As<ExpressionSyntaxNode>();
+				}
 				stmt->Statement->Accept(this);
 
 				loops.RemoveAt(loops.Count() - 1);

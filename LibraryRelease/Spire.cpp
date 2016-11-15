@@ -8291,26 +8291,49 @@ namespace Spire
 		class ForInstruction : public ILInstruction
 		{
 		public:
-			RefPtr<CFGNode> ConditionCode, SideEffectCode, BodyCode;
+			RefPtr<CFGNode> InitialCode, ConditionCode, SideEffectCode, BodyCode;
 			virtual int GetSubBlockCount() override
 			{
-				return 3;
+				int count = 0;
+				if (InitialCode)
+					count++;
+				if (ConditionCode)
+					count++;
+				if (SideEffectCode)
+					count++;
+				if (BodyCode)
+					count++;
+				return count;
 			}
 			virtual CFGNode * GetSubBlock(int i) override
 			{
-				if (i == 0)
-					return ConditionCode.Ptr();
-				else if (i == 1)
-					return SideEffectCode.Ptr();
-				else if (i == 2)
-					return BodyCode.Ptr();
+				int id = 0;
+				if (InitialCode)
+				{
+					if (id == i) return InitialCode.Ptr();
+					id++;
+				}
+				if (ConditionCode)
+				{
+					if (id == i) return ConditionCode.Ptr();
+					id++;
+				}
+				if (SideEffectCode)
+				{
+					if (id == i) return SideEffectCode.Ptr();
+					id++;
+				}
+				if (BodyCode)
+				{
+					if (id == i) return BodyCode.Ptr();
+				}
 				return nullptr;
 			}
 
 			virtual String ToString() override
 			{
 				StringBuilder sb;
-				sb << L"for (; " << ConditionCode->ToString() << L"; ";
+				sb << L"for (" << InitialCode->ToString() << L"; " << ConditionCode->ToString() << L"; ";
 				sb << SideEffectCode->ToString() << L")" << EndLine;
 				sb << L"{" << EndLine;
 				sb << BodyCode->ToString() << EndLine;
@@ -9338,7 +9361,7 @@ namespace Spire
 			RefPtr<ExpressionType> IterationVariableType;
 			Token IterationVariable;
 
-			RefPtr<ExpressionSyntaxNode> InitialExpression, StepExpression, EndExpression;
+			RefPtr<ExpressionSyntaxNode> InitialExpression, SideEffectExpression, PredicateExpression;
 			RefPtr<StatementSyntaxNode> Statement;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ForStatementSyntaxNode * Clone(CloneContext & ctx) override;
@@ -9486,10 +9509,10 @@ namespace Spire
 			{
 				if (stmt->InitialExpression)
 					stmt->InitialExpression = stmt->InitialExpression->Accept(this).As<ExpressionSyntaxNode>();
-				if (stmt->StepExpression)
-					stmt->StepExpression = stmt->StepExpression->Accept(this).As<ExpressionSyntaxNode>();
-				if (stmt->EndExpression)
-					stmt->EndExpression = stmt->EndExpression->Accept(this).As<ExpressionSyntaxNode>();
+				if (stmt->PredicateExpression)
+					stmt->PredicateExpression = stmt->PredicateExpression->Accept(this).As<ExpressionSyntaxNode>();
+				if (stmt->SideEffectExpression)
+					stmt->SideEffectExpression = stmt->SideEffectExpression->Accept(this).As<ExpressionSyntaxNode>();
 				if (stmt->Statement)
 					stmt->Statement = stmt->Statement->Accept(this).As<StatementSyntaxNode>();
 				return stmt;
@@ -15070,10 +15093,15 @@ namespace Spire
 				}
 				else if (auto forInstr = instr.As<ForInstruction>())
 				{
-					context.Body << L"for (;bool(";
-					PrintOp(context, forInstr->ConditionCode->GetLastInstruction(), true);
-					context.Body << L"); ";
-					PrintOp(context, forInstr->SideEffectCode->GetLastInstruction(), true);
+					context.Body << L"for (";
+					if (forInstr->InitialCode)
+						PrintOp(context, forInstr->InitialCode->GetLastInstruction(), true);
+					context.Body << L"; ";
+					if (forInstr->ConditionCode)
+						PrintOp(context, forInstr->ConditionCode->GetLastInstruction(), true);
+					context.Body << L"; ";
+					if (forInstr->SideEffectCode)
+						PrintOp(context, forInstr->SideEffectCode->GetLastInstruction(), true);
 					context.Body << L")\n{\n";
 					GenerateCode(context, forInstr->BodyCode.Ptr());
 					context.Body << L"}\n";
@@ -16941,35 +16969,31 @@ namespace Spire
 					variables.Add(stmt->IterationVariable.Content, varOp);
 				}
 				ILOperand * iterVar = nullptr;
-				if (!variables.TryGetValue(stmt->IterationVariable.Content, iterVar))
+				if (stmt->IterationVariable.Content.Length() && !variables.TryGetValue(stmt->IterationVariable.Content, iterVar))
 					throw InvalidProgramException(L"Iteration variable not found in variables dictionary. This should have been checked by semantics analyzer.");
-				stmt->InitialExpression->Accept(this);
-				Assign(iterVar, PopStack());
-
-				codeWriter.PushNode();
-				stmt->EndExpression->Accept(this);
-				auto val = PopStack();
-				codeWriter.Insert(new CmpleInstruction(codeWriter.Load(iterVar), val));
-				instr->ConditionCode = codeWriter.PopNode();
-
-				codeWriter.PushNode();
-				ILOperand * stepVal = nullptr;
-				if (stmt->StepExpression)
+				if (stmt->InitialExpression)
 				{
-					stmt->StepExpression->Accept(this);
-					stepVal = PopStack();
+					codeWriter.PushNode();
+					stmt->InitialExpression->Accept(this);
+					PopStack();
+					instr->InitialCode = codeWriter.PopNode();
 				}
-				else
+
+				if (stmt->PredicateExpression)
 				{
-					if (iterVar->Type->IsFloat())
-						stepVal = result.Program->ConstantPool->CreateConstant(1.0f);
-					else
-						stepVal = result.Program->ConstantPool->CreateConstant(1);
+					codeWriter.PushNode();
+					stmt->PredicateExpression->Accept(this);
+					PopStack();
+					instr->ConditionCode = codeWriter.PopNode();
 				}
-				auto afterVal = new AddInstruction(codeWriter.Load(iterVar), stepVal);
-				codeWriter.Insert(afterVal);
-				Assign(iterVar, afterVal);
-				instr->SideEffectCode = codeWriter.PopNode();
+			
+				if (stmt->SideEffectExpression)
+				{
+					codeWriter.PushNode();
+					stmt->SideEffectExpression->Accept(this);
+					PopStack();
+					instr->SideEffectCode = codeWriter.PopNode();
+				}
 
 				codeWriter.PushNode();
 				stmt->Statement->Accept(this);
@@ -22246,18 +22270,34 @@ namespace Spire
 			ReadToken(TokenType::KeywordFor);
 			ReadToken(TokenType::LParent);
 			if (IsTypeKeyword())
-				stmt->TypeDef = ParseType();
-			stmt->IterationVariable = ReadToken(TokenType::Identifier);
-			ReadToken(TokenType::OpAssign);
-			stmt->InitialExpression = ParseExpression();
-			ReadToken(TokenType::Colon);
-			stmt->EndExpression = ParseExpression();
-			if (LookAheadToken(TokenType::Colon))
 			{
-				stmt->StepExpression = stmt->EndExpression;
-				ReadToken(TokenType::Colon);
-				stmt->EndExpression = ParseExpression();
+				stmt->TypeDef = ParseType();
+				stmt->IterationVariable = ReadToken(TokenType::Identifier);
+				ReadToken(TokenType::OpAssign);
+				stmt->InitialExpression = ParseExpression();
+				RefPtr<BinaryExpressionSyntaxNode> assignment = new BinaryExpressionSyntaxNode();
+				assignment->Operator = Operator::Assign;
+				FillPosition(assignment.Ptr());
+				assignment->Position = stmt->IterationVariable.Position;
+				RefPtr<VarExpressionSyntaxNode> varExpr = new VarExpressionSyntaxNode();
+				FillPosition(varExpr.Ptr());
+				varExpr->Position = stmt->IterationVariable.Position;
+				varExpr->Variable = stmt->IterationVariable.Content;
+				assignment->LeftExpression = varExpr;
+				assignment->RightExpression = stmt->InitialExpression;
+				stmt->InitialExpression = assignment;
 			}
+			else
+			{
+				if (!LookAheadToken(TokenType::Semicolon))
+					stmt->InitialExpression = ParseExpression();
+			}
+			ReadToken(TokenType::Semicolon);
+			if (!LookAheadToken(TokenType::Semicolon))
+				stmt->PredicateExpression = ParseExpression();
+			ReadToken(TokenType::Semicolon);
+			if (!LookAheadToken(TokenType::RParent))
+				stmt->SideEffectExpression = ParseExpression();
 			ReadToken(TokenType::RParent);
 			stmt->Statement = ParseStatement();
 			PopScope();
@@ -23846,29 +23886,25 @@ namespace Spire
 					varEntry.Type.DataType = stmt->IterationVariableType;
 					stmt->Scope->Variables.AddIfNotExists(stmt->IterationVariable.Content, varEntry);
 				}
-				if (!stmt->Scope->FindVariable(stmt->IterationVariable.Content, iterVar))
-					Error(30015, L"undefined identifier \'" + stmt->IterationVariable.Content + L"\'", stmt->IterationVariable);
-				else
+				
+				if (stmt->InitialExpression)
 				{
-					if (!iterVar.Type.DataType->Equals(ExpressionType::Float.Ptr()) && !iterVar.Type.DataType->Equals(ExpressionType::Int.Ptr()))
-						Error(30035, L"iteration variable \'" + stmt->IterationVariable.Content + L"\' can only be a int or float", stmt->IterationVariable);
 					stmt->InitialExpression = stmt->InitialExpression->Accept(this).As<ExpressionSyntaxNode>();
-					if (!stmt->InitialExpression->Type->Equals(iterVar.Type.DataType.Ptr()))
-						Error(30019, L"type mismatch \'" + stmt->InitialExpression->Type->ToString() + L"\' and \'" +
-							iterVar.Type.DataType->ToString() + L"\'", stmt->InitialExpression.Ptr());
-					stmt->EndExpression = stmt->EndExpression->Accept(this).As<ExpressionSyntaxNode>();
-					if (!stmt->EndExpression->Type->Equals(iterVar.Type.DataType.Ptr()))
-						Error(30019, L"type mismatch \'" + stmt->EndExpression->Type->ToString() + L"\' and \'" +
-							iterVar.Type.DataType->ToString() + L"\'", stmt->EndExpression.Ptr());
-					if (stmt->StepExpression != nullptr)
+				}
+				if (stmt->PredicateExpression)
+				{
+					stmt->PredicateExpression = stmt->PredicateExpression->Accept(this).As<ExpressionSyntaxNode>();
+					if (!stmt->PredicateExpression->Type->Equals(ExpressionType::Bool.Ptr()) && 
+						!stmt->PredicateExpression->Type->Equals(ExpressionType::Int.Ptr()) &&
+						!stmt->PredicateExpression->Type->Equals(ExpressionType::UInt.Ptr()))
 					{
-						stmt->StepExpression = stmt->StepExpression->Accept(this).As<ExpressionSyntaxNode>();
-						if (!stmt->StepExpression->Type->Equals(iterVar.Type.DataType.Ptr()))
-							Error(30019, L"type mismatch \'" + stmt->StepExpression->Type->ToString() + L"\' and \'" +
-								iterVar.Type.DataType->ToString() + L"\'", stmt->StepExpression.Ptr());
+						Error(30028, L"'for': predicate expression must evaluate to bool.", stmt->PredicateExpression.Ptr());
 					}
 				}
-
+				if (stmt->SideEffectExpression)
+				{
+					stmt->SideEffectExpression = stmt->SideEffectExpression->Accept(this).As<ExpressionSyntaxNode>();
+				}
 				stmt->Statement->Accept(this);
 
 				loops.RemoveAt(loops.Count() - 1);
@@ -31854,13 +31890,14 @@ namespace Spire
 			auto rs = CloneSyntaxNodeFields(new ForStatementSyntaxNode(*this), ctx);
 			if (InitialExpression)
 				rs->InitialExpression = InitialExpression->Clone(ctx);
-			if (StepExpression)
-				rs->StepExpression = StepExpression->Clone(ctx);
-			if (EndExpression)
-				rs->EndExpression = EndExpression->Clone(ctx);
+			if (SideEffectExpression)
+				rs->SideEffectExpression = SideEffectExpression->Clone(ctx);
+			if (PredicateExpression)
+				rs->PredicateExpression = PredicateExpression->Clone(ctx);
 			if (Statement)
 				rs->Statement = Statement->Clone(ctx);
-			rs->TypeDef = TypeDef->Clone(ctx);
+			if (rs->TypeDef)
+				rs->TypeDef = TypeDef->Clone(ctx);
 			return rs;
 		}
 		RefPtr<SyntaxNode> IfStatementSyntaxNode::Accept(SyntaxVisitor * visitor)

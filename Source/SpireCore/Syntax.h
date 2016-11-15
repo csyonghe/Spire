@@ -832,7 +832,7 @@ namespace Spire
 			RefPtr<ExpressionType> IterationVariableType;
 			Token IterationVariable;
 
-			RefPtr<ExpressionSyntaxNode> InitialExpression, StepExpression, EndExpression;
+			RefPtr<ExpressionSyntaxNode> InitialExpression, SideEffectExpression, PredicateExpression;
 			RefPtr<StatementSyntaxNode> Statement;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ForStatementSyntaxNode * Clone(CloneContext & ctx) override;
@@ -980,10 +980,10 @@ namespace Spire
 			{
 				if (stmt->InitialExpression)
 					stmt->InitialExpression = stmt->InitialExpression->Accept(this).As<ExpressionSyntaxNode>();
-				if (stmt->StepExpression)
-					stmt->StepExpression = stmt->StepExpression->Accept(this).As<ExpressionSyntaxNode>();
-				if (stmt->EndExpression)
-					stmt->EndExpression = stmt->EndExpression->Accept(this).As<ExpressionSyntaxNode>();
+				if (stmt->PredicateExpression)
+					stmt->PredicateExpression = stmt->PredicateExpression->Accept(this).As<ExpressionSyntaxNode>();
+				if (stmt->SideEffectExpression)
+					stmt->SideEffectExpression = stmt->SideEffectExpression->Accept(this).As<ExpressionSyntaxNode>();
 				if (stmt->Statement)
 					stmt->Statement = stmt->Statement->Accept(this).As<StatementSyntaxNode>();
 				return stmt;

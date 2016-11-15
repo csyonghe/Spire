@@ -498,35 +498,31 @@ namespace Spire
 					variables.Add(stmt->IterationVariable.Content, varOp);
 				}
 				ILOperand * iterVar = nullptr;
-				if (!variables.TryGetValue(stmt->IterationVariable.Content, iterVar))
+				if (stmt->IterationVariable.Content.Length() && !variables.TryGetValue(stmt->IterationVariable.Content, iterVar))
 					throw InvalidProgramException(L"Iteration variable not found in variables dictionary. This should have been checked by semantics analyzer.");
-				stmt->InitialExpression->Accept(this);
-				Assign(iterVar, PopStack());
-
-				codeWriter.PushNode();
-				stmt->EndExpression->Accept(this);
-				auto val = PopStack();
-				codeWriter.Insert(new CmpleInstruction(codeWriter.Load(iterVar), val));
-				instr->ConditionCode = codeWriter.PopNode();
-
-				codeWriter.PushNode();
-				ILOperand * stepVal = nullptr;
-				if (stmt->StepExpression)
+				if (stmt->InitialExpression)
 				{
-					stmt->StepExpression->Accept(this);
-					stepVal = PopStack();
+					codeWriter.PushNode();
+					stmt->InitialExpression->Accept(this);
+					PopStack();
+					instr->InitialCode = codeWriter.PopNode();
 				}
-				else
+
+				if (stmt->PredicateExpression)
 				{
-					if (iterVar->Type->IsFloat())
-						stepVal = result.Program->ConstantPool->CreateConstant(1.0f);
-					else
-						stepVal = result.Program->ConstantPool->CreateConstant(1);
+					codeWriter.PushNode();
+					stmt->PredicateExpression->Accept(this);
+					PopStack();
+					instr->ConditionCode = codeWriter.PopNode();
 				}
-				auto afterVal = new AddInstruction(codeWriter.Load(iterVar), stepVal);
-				codeWriter.Insert(afterVal);
-				Assign(iterVar, afterVal);
-				instr->SideEffectCode = codeWriter.PopNode();
+			
+				if (stmt->SideEffectExpression)
+				{
+					codeWriter.PushNode();
+					stmt->SideEffectExpression->Accept(this);
+					PopStack();
+					instr->SideEffectCode = codeWriter.PopNode();
+				}
 
 				codeWriter.PushNode();
 				stmt->Statement->Accept(this);

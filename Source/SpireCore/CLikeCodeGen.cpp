@@ -806,10 +806,15 @@ namespace Spire
 				}
 				else if (auto forInstr = instr.As<ForInstruction>())
 				{
-					context.Body << L"for (;bool(";
-					PrintOp(context, forInstr->ConditionCode->GetLastInstruction(), true);
-					context.Body << L"); ";
-					PrintOp(context, forInstr->SideEffectCode->GetLastInstruction(), true);
+					context.Body << L"for (";
+					if (forInstr->InitialCode)
+						PrintOp(context, forInstr->InitialCode->GetLastInstruction(), true);
+					context.Body << L"; ";
+					if (forInstr->ConditionCode)
+						PrintOp(context, forInstr->ConditionCode->GetLastInstruction(), true);
+					context.Body << L"; ";
+					if (forInstr->SideEffectCode)
+						PrintOp(context, forInstr->SideEffectCode->GetLastInstruction(), true);
 					context.Body << L")\n{\n";
 					GenerateCode(context, forInstr->BodyCode.Ptr());
 					context.Body << L"}\n";
