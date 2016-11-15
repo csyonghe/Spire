@@ -20,7 +20,7 @@ namespace Spire
 			EnumerableHashSet<String> ReferencedFunctions;
 		};
 		class ShaderComponentSymbol;
-		class ShaderComponentImplSymbol : public Object
+		class ShaderComponentImplSymbol : public RefObject
 		{
 		public:
 			String AlternateName;
@@ -40,7 +40,7 @@ namespace Spire
 			}
 		};
 
-		class ShaderComponentSymbol : public Object
+		class ShaderComponentSymbol : public RefObject
 		{
 		public:
 			bool IsDceEntryPoint = false;

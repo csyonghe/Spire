@@ -396,10 +396,10 @@ namespace Spire
 											varExpr->Variable = funcType->Component->Name;
 									}
 									else
-										Error(33042, L"ordinary functions not allowed as argument to function-typed module parameter.", arg.Ptr());
+										Error(30052, L"ordinary functions not allowed as argument to function-typed module parameter.", arg.Ptr());
 								}
 								else
-									Error(33041, L"invalid value for argument '" + arg->ArgumentName.Content, arg.Ptr());
+									Error(30051, L"invalid value for argument '" + arg->ArgumentName.Content, arg.Ptr());
 							}
 							else
 							{

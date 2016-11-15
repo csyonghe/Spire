@@ -57,7 +57,7 @@ namespace Spire
 			{
 				if (shader->Pipeline->IsChildOf(rootShader->Pipeline))
 					rootShader->Pipeline = shader->Pipeline;
-				else
+				else if (!rootShader->Pipeline->IsChildOf(shader->Pipeline))
 				{
 					StringBuilder sb;
 					sb << L"pipeline '" << shader->Pipeline->SyntaxNode->Name.Content << L"' targeted by module '" <<
@@ -393,8 +393,25 @@ namespace Spire
 				ResolveReference(err, rootShader, subClosure.Value.Ptr());
 		}
 
+		void ReplaceRefMapReference(ShaderClosure * root, ShaderClosure * shader, EnumerableDictionary<String, String> & replacements)
+		{
+			for (auto & map : shader->RefMap)
+			{
+				String newName = map.Value->UniqueName;
+				while (replacements.TryGetValue(newName, newName))
+				{
+				}
+				if (newName != map.Value->UniqueName)
+					map.Value = root->AllComponents[newName]();
+			}
+			for (auto & subclosure : shader->SubClosures)
+				ReplaceRefMapReference(root, subclosure.Value.Ptr(), replacements);
+		}
+
+
 		void ReplaceReference(ShaderClosure * shader, EnumerableDictionary<String, String> & replacements)
 		{
+			ReplaceRefMapReference(shader, shader, replacements);
 			for (auto & comp : shader->AllComponents)
 			{
 				ReplaceReferenceVisitor replaceVisitor(shader, comp.Value, replacements);
