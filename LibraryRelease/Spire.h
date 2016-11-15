@@ -49,18 +49,18 @@ extern "C" {  // only need to export C interface if
 #define SPIRE_ERROR_INSUFFICIENT_BUFFER -1
 #define SPIRE_ERROR_INVALID_PARAMETER -2
 
-			  /*!
-			  @brief Represents a compilation context. Created by spCreateCompilationContext().
+	/*!
+	@brief Represents a compilation context. Created by spCreateCompilationContext().
 
-			  Related Functions
-			  - spCreateCompilationContext()
-			  - spDestroyCompilationContext()
-			  - spCreateShader()
-			  - spCompileShader()
-			  - spSetCodeGenTarget()
-			  - spAddSearchPath()
-			  - spSetBackendParameter()
-			  */
+	Related Functions
+	- spCreateCompilationContext()
+	- spDestroyCompilationContext()
+	- spCreateShader()
+	- spCompileShader()
+	- spSetCodeGenTarget()
+	- spAddSearchPath()
+	- spSetBackendParameter()
+	*/
 	struct SpireCompilationContext {};
 
 	/*!
@@ -69,6 +69,7 @@ extern "C" {  // only need to export C interface if
 
 	Related Functions
 	- spShaderAddModule()
+	- spShaderAddModuleByName()
 	- spShaderTargetPipeline()
 	*/
 	struct SpireShader {};
@@ -79,10 +80,9 @@ extern "C" {  // only need to export C interface if
 
 	Related Functions
 	- spLoadModuleLibrary()
+	- spLoadModuleLibraryFromSource()
 	- spFindModule()
-	- spModuleGetAllComponentsByWorld()
-	- spModuleGetComponentCountByWorld()
-	- spModuleGetComponentByWorld()
+	- spModuleGetComponentsByWorld()
 	- spModuleGetRequiredComponents()
 	*/
 	struct SpireModule {};
@@ -92,7 +92,9 @@ extern "C" {  // only need to export C interface if
 
 	Related Functions
 	- spCompileShader()
+	- spCompileShaderFromSource()
 	- spIsCompilationSucessful()
+	- spGetCompilerOutput()
 	- spGetMessageCount()
 	- spGetMessageContent()
 	- spGetCompiledShaderNames()
@@ -129,6 +131,10 @@ extern "C" {  // only need to export C interface if
 
 	/*!
 	@brief Represents a collection of SpireComponentInfo.
+
+	Related Functions
+	- spComponentInfoCollectionGetCount()
+	- spComponentInfoCollectionGetComponent()
 	*/
 	struct SpireComponentInfoCollection {};
 
@@ -258,7 +264,7 @@ extern "C" {  // only need to export C interface if
 	@brief Retrieves component info from SpireComponentInfoCollection.
 	@param collection The collection from which to retrieve components.
 	@param index Index of the requesting component.
-	@param result A pointer to a SpireComponentInfo structure used to recieve info on the specified component.
+	@param result A pointer to a SpireComponentInfo structure used to receive info on the specified component.
 	@return
 	If successful, this function returns 0. 
 	Otherwise, the return value is one of the following error codes:
@@ -346,9 +352,22 @@ extern "C" {  // only need to export C interface if
 	- SPIRE_WARNING. compiler warnings.
 	@param index The index of the compiler message to retrieve.
 	@param pMsg A pointer to a SpireErrorMessage structure to receive the error message.
-	@return 1 if successful. SPIRE_ERROR_INVALID_PARAMETER if any of the parameters are invalid.
+	@return 1 if successful. SPIRE_ERROR_INVALID_PARAMETER if any of the parameters is invalid.
 	*/
 	SPIRE_API int spGetMessageContent(SpireCompilationResult * result, int messageType, int index, SpireErrorMessage * pMsg);
+
+	/*!
+	@brief Get compiler output messages as a single string.
+	@param result A SpireCompilationResult object.
+	@param buffer The buffer used to receive compiler messages. If this parameter is NULL, the function returns the number of bytes required for the buffer.
+	@param bufferSize The size of @p buffer (in bytes).
+	@return
+		If successful, the return value is the number of bytes written to @p buffer. If @p buffer is NULL, the return value is the number of bytes required for @p buffer
+		to store the entire output message. Otherwise, the function returns one of the following error codes:
+		- SPIRE_ERROR_INSUFFICIENT_BUFFER. if @p bufferSize is smaller than required buffer size.
+		- SPIRE_ERROR_INVALID_PARAMETER. if any of the parameters is invalid.
+	*/
+	SPIRE_API int spGetCompilerOutput(SpireCompilationResult * result, char * buffer, int bufferSize);
 
 	/*!
 	@brief Retrieve a list of shader names that has been compiled.

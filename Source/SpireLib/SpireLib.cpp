@@ -842,6 +842,18 @@ int ReturnStr(const char * content, char * buffer, int bufferSize)
 		return len + 1;
 }
 
+int spGetCompilerOutput(SpireCompilationResult * result, char * buffer, int bufferSize)
+{
+	StringBuilder sb;
+	auto rs = RS(result);
+	for (auto & x : rs->Errors)
+		sb << L"error " << x.Message << L":" << x.Position.ToString() << L": " << x.Message << L"\n";
+	for (auto & x : rs->Warnings)
+		sb << L"error " << x.Message << L":" << x.Position.ToString() << L": " << x.Message << L"\n";
+	auto str = sb.ProduceString();
+	return ReturnStr(str.ToMultiByteString(), buffer, bufferSize);
+}
+
 int spGetCompiledShaderNames(SpireCompilationResult * result, char * buffer, int bufferSize)
 {
 	StringBuilder sb;
