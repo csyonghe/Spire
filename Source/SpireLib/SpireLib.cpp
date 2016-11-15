@@ -690,6 +690,13 @@ SpireModule * spFindModule(SpireCompilationContext * ctx, const char * moduleNam
 	return reinterpret_cast<SpireModule*>(CTX(ctx)->FindModule(moduleName));
 }
 
+const char * spGetModuleName(SpireModule * module)
+{
+	if (!module) return nullptr;
+	auto moduleNode = MODULE(module);
+	return moduleNode->Name.ToMultiByteString();
+}
+
 int spComponentInfoCollectionGetComponent(SpireComponentInfoCollection * collection, int index, SpireComponentInfo * result)
 {
 	auto list = reinterpret_cast<List<ComponentMetaData>*>(collection);

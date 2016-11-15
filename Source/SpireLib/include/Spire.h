@@ -236,6 +236,14 @@ extern "C" {  // only need to export C interface if
 	SPIRE_API SpireModule * spFindModule(SpireCompilationContext * ctx, const char * moduleName);
 
 	/*!
+	@brief Retrieve the name of a SpireModule.
+	@param module The module to get the name of.
+	@return The name of the module as a null-terminated string, or NULL if ther are any errors.
+	@note The memory for the return value will be freed when the containing SpireCopmilationContext is destroyed.
+	*/
+	SPIRE_API const char * spGetModuleName(SpireModule * module);
+
+	/*!
 	@brief Retrieves components that are qualified with the specified world.
 	@param module The module from which to retrieve components.
 	@param worldName The world name of requesting components.
