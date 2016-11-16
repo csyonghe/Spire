@@ -289,7 +289,7 @@ namespace Spire
 							{
 								auto paramType = TranslateExpressionType(dep->Type, &recordTypes);
 								String paramName = EscapeDoubleUnderscore(L"p" + String(id) + L"_" + dep->OriginalName); 
-								func->Parameters.Add(paramName, paramType);
+								func->Parameters.Add(paramName, ILParameter(paramType));
 								auto argInstr = codeWriter.FetchArg(paramType, id + 1);
 								argInstr->Name = paramName;
 								variables.Add(dep->UniqueName, argInstr);
@@ -300,7 +300,7 @@ namespace Spire
 						{
 							auto paramType = TranslateExpressionType(param->Type, &recordTypes);
 							String paramName = EscapeDoubleUnderscore(L"p" + String(id) + L"_" + param->Name);
-							func->Parameters.Add(paramName, paramType);
+							func->Parameters.Add(paramName, ILParameter(paramType, param->Qualifier));
 							auto argInstr = codeWriter.FetchArg(paramType, id + 1);
 							argInstr->Name = paramName;
 							variables.Add(param->Name, argInstr);
@@ -439,7 +439,7 @@ namespace Spire
 				int id = 0;
 				for (auto &param : function->Parameters)
 				{
-					func->Parameters.Add(param->Name, TranslateExpressionType(param->Type));
+					func->Parameters.Add(param->Name, ILParameter(TranslateExpressionType(param->Type), param->Qualifier));
 					auto op = FetchArg(param->Type.Ptr(), ++id);
 					op->Name = EscapeDoubleUnderscore(String(L"p_") + param->Name);
 					variables.Add(param->Name, op);
@@ -936,15 +936,34 @@ namespace Spire
 			{
 				List<ILOperand*> args;
 				String funcName;
+				bool hasSideEffect = false;
 				if (auto basicType = expr->FunctionExpr->Type->AsBasicType())
 				{
 					if (basicType->Func)
+					{
 						funcName = basicType->Func->SyntaxNode->IsExtern ? basicType->Func->SyntaxNode->Name : basicType->Func->SyntaxNode->InternalName;
+						for (auto & param : basicType->Func->SyntaxNode->Parameters)
+						{
+							if (param->Qualifier == ParameterQualifier::Out || param->Qualifier == ParameterQualifier::InOut)
+							{
+								hasSideEffect = true;
+								break;
+							}
+						}
+					}
 					else if (basicType->Component)
 					{
 						auto funcCompName = expr->FunctionExpr->Tags[L"ComponentReference"]().As<StringObject>()->Content;
 						auto funcComp = *(currentShader->DefinitionsByComponent[funcCompName]().TryGetValue(currentComponent->World));
 						funcName = GetComponentFunctionName(funcComp->SyntaxNode.Ptr());
+						for (auto & param : funcComp->SyntaxNode->Parameters)
+						{
+							if (param->Qualifier == ParameterQualifier::Out || param->Qualifier == ParameterQualifier::InOut)
+							{
+								hasSideEffect = true;
+								break;
+							}
+						}
 						// push additional arguments
 						for (auto & dep : funcComp->GetComponentFunctionDependencyClosure())
 						{
@@ -969,6 +988,7 @@ namespace Spire
 					args.Add(PopStack());
 				}
 				auto instr = new CallInstruction(args.Count());
+				instr->SideEffect = hasSideEffect;
 				instr->Function = funcName;
 				for (int i = 0; i < args.Count(); i++)
 					instr->Arguments[i] = args[i];

@@ -598,9 +598,12 @@ namespace Spire
 
 		void CLikeCodeGen::PrintCallInstr(CodeGenContext & ctx, CallInstruction * instr)
 		{
-			auto varName = ctx.DefineVariable(instr);
-			ctx.Body << varName;
-			ctx.Body << L" = ";
+			if (!instr->Type->IsVoid())
+			{
+				auto varName = ctx.DefineVariable(instr);
+				ctx.Body << varName;
+				ctx.Body << L" = ";
+			}
 			PrintCallInstrExpr(ctx, instr);
 			ctx.Body << L";\n";
 		}
@@ -1206,6 +1209,7 @@ namespace Spire
 				sbCode << L"void";
 			sbCode << L" " << GetFuncOriginalName(function->Name) << L"(";
 			int id = 0;
+			auto paramIter = function->Parameters.begin();
 			for (auto & instr : *function->Code)
 			{
 				if (auto arg = instr.As<FetchArgInstruction>())
@@ -1216,9 +1220,17 @@ namespace Spire
 						{
 							sbCode << L", ";
 						}
+						auto qualifier = (*paramIter).Value.Qualifier;
+						if (qualifier == ParameterQualifier::InOut)
+							sbCode << L"inout ";
+						else if (qualifier == ParameterQualifier::Out)
+							sbCode << L"out ";
+						else if (qualifier == ParameterQualifier::Uniform)
+							sbCode << L"uniform ";
 						PrintDef(sbCode, arg->Type.Ptr(), arg->Name);
 						id++;
 					}
+					++paramIter;
 				}
 			}
 			sbCode << L")";

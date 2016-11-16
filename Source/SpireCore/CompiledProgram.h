@@ -76,10 +76,21 @@ namespace Spire
 			EnumerableDictionary<String, RefPtr<ILStage>> Stages;
 		};
 
+		class ILParameter
+		{
+		public:
+			RefPtr<ILType> Type;
+			ParameterQualifier Qualifier;
+			ILParameter() = default;
+			ILParameter(RefPtr<ILType> type, ParameterQualifier qualifier = ParameterQualifier::In)
+				: Type(type), Qualifier(qualifier)
+			{}
+		};
+
 		class ILFunction
 		{
 		public:
-			EnumerableDictionary<String, RefPtr<ILType>> Parameters;
+			EnumerableDictionary<String, ILParameter> Parameters;
 			RefPtr<ILType> ReturnType;
 			RefPtr<CFGNode> Code;
 			String Name;

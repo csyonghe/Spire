@@ -1494,7 +1494,40 @@ namespace Spire
 				for (auto & arg : expr->Arguments)
 					arg = arg->Accept(this).As<ExpressionSyntaxNode>();
 
-				return ResolveInvoke(expr);
+				auto rs = ResolveInvoke(expr);
+				if (auto invoke = dynamic_cast<InvokeExpressionSyntaxNode*>(rs.Ptr()))
+				{
+					// if this is still an invoke expression, test arguments passed to inout/out parameter are LValues
+					if (auto basicType = dynamic_cast<BasicExpressionType*>(invoke->FunctionExpr->Type.Ptr()))
+					{
+						List<RefPtr<ParameterSyntaxNode>> * params = nullptr;
+						if (basicType->Func)
+						{
+							params = &basicType->Func->SyntaxNode->Parameters;
+						}
+						else if (basicType->Component)
+						{
+							params = &basicType->Component->Implementations.First()->SyntaxNode->Parameters;
+						}
+						if (params)
+						{
+							for (int i = 0; i < (*params).Count(); i++)
+							{
+								if ((*params)[i]->Qualifier == ParameterQualifier::Out ||
+									(*params)[i]->Qualifier == ParameterQualifier::InOut)
+								{
+									if (i < expr->Arguments.Count() && expr->Arguments[i]->Type->AsBasicType() &&
+										!expr->Arguments[i]->Type->AsBasicType()->IsLeftValue)
+									{
+										Error(30047, L"argument passed to parameter '" + (*params)[i]->Name + L"' must be l-value.",
+											expr->Arguments[i].Ptr());
+									}
+								}
+							}
+						}
+					}
+				}
+				return rs;
 			}
 
 			String OperatorToString(Operator op)

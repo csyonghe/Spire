@@ -16,6 +16,7 @@ namespace Spire
 		};
 		enum ILBaseType
 		{
+			Void = 0,
 			Int = 16, Int2 = 17, Int3 = 18, Int4 = 19,
 			Float = 32, Float2 = 33, Float3 = 34, Float4 = 35,
 			Float3x3 = 40, Float4x4 = 47,
@@ -38,6 +39,7 @@ namespace Spire
 			bool IsUInt();
 			bool IsIntegral();
 			bool IsFloat();
+			bool IsVoid();
 			bool IsScalar()
 			{
 				return IsInt() || IsUInt() || IsFloat() || IsBool();
@@ -151,8 +153,18 @@ namespace Spire
 					return L"sampler2DShadow";
 				else if (Type == ILBaseType::Bool)
 					return L"bool";
+				else if (Type == ILBaseType::Bool2)
+					return L"bvec2";
+				else if (Type == ILBaseType::Bool3)
+					return L"bvec3";
+				else if (Type == ILBaseType::Bool4)
+					return L"bvec4";
+				else if (Type == ILBaseType::SamplerState)
+					return L"SamplerState";
+				else if (Type == ILBaseType::Void)
+					return L"void";
 				else
-					return L"?unkown";
+					return L"?unknown";
 			}
 			virtual int GetAlignment(LayoutRule rule) override
 			{
@@ -1503,6 +1515,7 @@ namespace Spire
 		public:
 			String Function;
 			List<UseReference> Arguments;
+			bool SideEffect = false;
 			virtual OperandIterator begin() override
 			{
 				return Arguments.begin();
@@ -1531,7 +1544,7 @@ namespace Spire
 			}
 			virtual bool HasSideEffect() override
 			{
-				return false;
+				return SideEffect;
 			}
 			CallInstruction(int argSize)
 			{
@@ -1543,6 +1556,7 @@ namespace Spire
 				: ILInstruction(other)
 			{
 				Function = other.Function;
+				SideEffect = other.SideEffect;
 				Arguments.SetSize(other.Arguments.Count());
 				for (int i = 0; i < other.Arguments.Count(); i++)
 				{

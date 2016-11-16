@@ -5945,6 +5945,7 @@ namespace Spire
 		};
 		enum ILBaseType
 		{
+			Void = 0,
 			Int = 16, Int2 = 17, Int3 = 18, Int4 = 19,
 			Float = 32, Float2 = 33, Float3 = 34, Float4 = 35,
 			Float3x3 = 40, Float4x4 = 47,
@@ -5967,6 +5968,7 @@ namespace Spire
 			bool IsUInt();
 			bool IsIntegral();
 			bool IsFloat();
+			bool IsVoid();
 			bool IsScalar()
 			{
 				return IsInt() || IsUInt() || IsFloat() || IsBool();
@@ -6080,8 +6082,18 @@ namespace Spire
 					return L"sampler2DShadow";
 				else if (Type == ILBaseType::Bool)
 					return L"bool";
+				else if (Type == ILBaseType::Bool2)
+					return L"bvec2";
+				else if (Type == ILBaseType::Bool3)
+					return L"bvec3";
+				else if (Type == ILBaseType::Bool4)
+					return L"bvec4";
+				else if (Type == ILBaseType::SamplerState)
+					return L"SamplerState";
+				else if (Type == ILBaseType::Void)
+					return L"void";
 				else
-					return L"?unkown";
+					return L"?unknown";
 			}
 			virtual int GetAlignment(LayoutRule rule) override
 			{
@@ -7432,6 +7444,7 @@ namespace Spire
 		public:
 			String Function;
 			List<UseReference> Arguments;
+			bool SideEffect = false;
 			virtual OperandIterator begin() override
 			{
 				return Arguments.begin();
@@ -7460,7 +7473,7 @@ namespace Spire
 			}
 			virtual bool HasSideEffect() override
 			{
-				return false;
+				return SideEffect;
 			}
 			CallInstruction(int argSize)
 			{
@@ -7472,6 +7485,7 @@ namespace Spire
 				: ILInstruction(other)
 			{
 				Function = other.Function;
+				SideEffect = other.SideEffect;
 				Arguments.SetSize(other.Arguments.Count());
 				for (int i = 0; i < other.Arguments.Count(); i++)
 				{
@@ -8976,19 +8990,25 @@ namespace Spire
 		{
 		public:
 			List<RefPtr<StatementSyntaxNode>> Statements;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual BlockStatementSyntaxNode * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual BlockStatementSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
+		enum class ParameterQualifier
+		{
+			In, Out, InOut, Uniform
 		};
 
 		class ParameterSyntaxNode : public SyntaxNode
 		{
 		public:
+			ParameterQualifier Qualifier = ParameterQualifier::In;
 			RefPtr<TypeSyntaxNode> TypeNode;
 			RefPtr<ExpressionType> Type;
 			String Name;
 			RefPtr<ExpressionSyntaxNode> Expr;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual ParameterSyntaxNode * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual ParameterSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class FunctionSyntaxNode : public SyntaxNode
@@ -9002,7 +9022,7 @@ namespace Spire
 			bool IsInline;
 			bool IsExtern;
 			bool HasSideEffect;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			FunctionSyntaxNode()
 			{
 				IsInline = false;
@@ -9010,7 +9030,7 @@ namespace Spire
 				HasSideEffect = true;
 			}
 
-			virtual FunctionSyntaxNode * Clone(CloneContext & ctx);
+			virtual FunctionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class ImportOperatorDefSyntaxNode : public SyntaxNode
@@ -9040,8 +9060,8 @@ namespace Spire
 		{
 		public:
 			String Variable;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual VarExpressionSyntaxNode * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual VarExpressionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class ConstantExpressionSyntaxNode : public ExpressionSyntaxNode
@@ -9057,8 +9077,8 @@ namespace Spire
 				int IntValue;
 				float FloatValue;
 			};
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual ConstantExpressionSyntaxNode * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual ConstantExpressionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		enum class Operator
@@ -9093,8 +9113,8 @@ namespace Spire
 		public:
 			Operator Operator;
 			RefPtr<ExpressionSyntaxNode> Expression;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual UnaryExpressionSyntaxNode * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual UnaryExpressionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 		
 		class BinaryExpressionSyntaxNode : public ExpressionSyntaxNode
@@ -9103,8 +9123,8 @@ namespace Spire
 			Operator Operator;
 			RefPtr<ExpressionSyntaxNode> LeftExpression;
 			RefPtr<ExpressionSyntaxNode> RightExpression;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual BinaryExpressionSyntaxNode * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual BinaryExpressionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class IndexExpressionSyntaxNode : public ExpressionSyntaxNode
@@ -9112,17 +9132,17 @@ namespace Spire
 		public:
 			RefPtr<ExpressionSyntaxNode> BaseExpression;
 			RefPtr<ExpressionSyntaxNode> IndexExpression;
-			virtual IndexExpressionSyntaxNode * Clone(CloneContext & ctx);
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-		};
+			virtual IndexExpressionSyntaxNode * Clone(CloneContext & ctx) override;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+		}; 
 
 		class MemberExpressionSyntaxNode : public ExpressionSyntaxNode
 		{
 		public:
 			RefPtr<ExpressionSyntaxNode> BaseExpression;
 			String MemberName;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual MemberExpressionSyntaxNode * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual MemberExpressionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class InvokeExpressionSyntaxNode : public ExpressionSyntaxNode
@@ -9130,8 +9150,8 @@ namespace Spire
 		public:
 			RefPtr<ExpressionSyntaxNode> FunctionExpr;
 			List<RefPtr<ExpressionSyntaxNode>> Arguments;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual InvokeExpressionSyntaxNode * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual InvokeExpressionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class TypeCastExpressionSyntaxNode : public ExpressionSyntaxNode
@@ -9139,31 +9159,31 @@ namespace Spire
 		public:
 			RefPtr<TypeSyntaxNode> TargetType;
 			RefPtr<ExpressionSyntaxNode> Expression;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual TypeCastExpressionSyntaxNode * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual TypeCastExpressionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class SelectExpressionSyntaxNode : public ExpressionSyntaxNode
 		{
 		public:
 			RefPtr<ExpressionSyntaxNode> SelectorExpr, Expr0, Expr1;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual SelectExpressionSyntaxNode * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual SelectExpressionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 
 		class EmptyStatementSyntaxNode : public StatementSyntaxNode
 		{
 		public:
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual EmptyStatementSyntaxNode * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual EmptyStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class DiscardStatementSyntaxNode : public StatementSyntaxNode
 		{
 		public:
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual DiscardStatementSyntaxNode * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual DiscardStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class VariableDeclr
@@ -9186,8 +9206,8 @@ namespace Spire
 		{
 			String Name;
 			RefPtr<ExpressionSyntaxNode> Expression;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual Variable * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual Variable * Clone(CloneContext & ctx) override;
 		};
 
 		class VarDeclrStatementSyntaxNode : public StatementSyntaxNode
@@ -9197,8 +9217,8 @@ namespace Spire
 			RefPtr<ExpressionType> Type;
 			String LayoutString;
 			List<RefPtr<Variable>> Variables;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual VarDeclrStatementSyntaxNode * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual VarDeclrStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class RateWorld
@@ -9757,10 +9777,21 @@ namespace Spire
 			EnumerableDictionary<String, RefPtr<ILStage>> Stages;
 		};
 
+		class ILParameter
+		{
+		public:
+			RefPtr<ILType> Type;
+			ParameterQualifier Qualifier;
+			ILParameter() = default;
+			ILParameter(RefPtr<ILType> type, ParameterQualifier qualifier = ParameterQualifier::In)
+				: Type(type), Qualifier(qualifier)
+			{}
+		};
+
 		class ILFunction
 		{
 		public:
-			EnumerableDictionary<String, RefPtr<ILType>> Parameters;
+			EnumerableDictionary<String, ILParameter> Parameters;
 			RefPtr<ILType> ReturnType;
 			RefPtr<CFGNode> Code;
 			String Name;
@@ -14936,9 +14967,12 @@ namespace Spire
 
 		void CLikeCodeGen::PrintCallInstr(CodeGenContext & ctx, CallInstruction * instr)
 		{
-			auto varName = ctx.DefineVariable(instr);
-			ctx.Body << varName;
-			ctx.Body << L" = ";
+			if (!instr->Type->IsVoid())
+			{
+				auto varName = ctx.DefineVariable(instr);
+				ctx.Body << varName;
+				ctx.Body << L" = ";
+			}
 			PrintCallInstrExpr(ctx, instr);
 			ctx.Body << L";\n";
 		}
@@ -15544,6 +15578,7 @@ namespace Spire
 				sbCode << L"void";
 			sbCode << L" " << GetFuncOriginalName(function->Name) << L"(";
 			int id = 0;
+			auto paramIter = function->Parameters.begin();
 			for (auto & instr : *function->Code)
 			{
 				if (auto arg = instr.As<FetchArgInstruction>())
@@ -15554,9 +15589,17 @@ namespace Spire
 						{
 							sbCode << L", ";
 						}
+						auto qualifier = (*paramIter).Value.Qualifier;
+						if (qualifier == ParameterQualifier::InOut)
+							sbCode << L"inout ";
+						else if (qualifier == ParameterQualifier::Out)
+							sbCode << L"out ";
+						else if (qualifier == ParameterQualifier::Uniform)
+							sbCode << L"uniform ";
 						PrintDef(sbCode, arg->Type.Ptr(), arg->Name);
 						id++;
 					}
+					++paramIter;
 				}
 			}
 			sbCode << L")";
@@ -16844,7 +16887,7 @@ namespace Spire
 							{
 								auto paramType = TranslateExpressionType(dep->Type, &recordTypes);
 								String paramName = EscapeDoubleUnderscore(L"p" + String(id) + L"_" + dep->OriginalName); 
-								func->Parameters.Add(paramName, paramType);
+								func->Parameters.Add(paramName, ILParameter(paramType));
 								auto argInstr = codeWriter.FetchArg(paramType, id + 1);
 								argInstr->Name = paramName;
 								variables.Add(dep->UniqueName, argInstr);
@@ -16855,7 +16898,7 @@ namespace Spire
 						{
 							auto paramType = TranslateExpressionType(param->Type, &recordTypes);
 							String paramName = EscapeDoubleUnderscore(L"p" + String(id) + L"_" + param->Name);
-							func->Parameters.Add(paramName, paramType);
+							func->Parameters.Add(paramName, ILParameter(paramType, param->Qualifier));
 							auto argInstr = codeWriter.FetchArg(paramType, id + 1);
 							argInstr->Name = paramName;
 							variables.Add(param->Name, argInstr);
@@ -16994,7 +17037,7 @@ namespace Spire
 				int id = 0;
 				for (auto &param : function->Parameters)
 				{
-					func->Parameters.Add(param->Name, TranslateExpressionType(param->Type));
+					func->Parameters.Add(param->Name, ILParameter(TranslateExpressionType(param->Type), param->Qualifier));
 					auto op = FetchArg(param->Type.Ptr(), ++id);
 					op->Name = EscapeDoubleUnderscore(String(L"p_") + param->Name);
 					variables.Add(param->Name, op);
@@ -17491,15 +17534,34 @@ namespace Spire
 			{
 				List<ILOperand*> args;
 				String funcName;
+				bool hasSideEffect = false;
 				if (auto basicType = expr->FunctionExpr->Type->AsBasicType())
 				{
 					if (basicType->Func)
+					{
 						funcName = basicType->Func->SyntaxNode->IsExtern ? basicType->Func->SyntaxNode->Name : basicType->Func->SyntaxNode->InternalName;
+						for (auto & param : basicType->Func->SyntaxNode->Parameters)
+						{
+							if (param->Qualifier == ParameterQualifier::Out || param->Qualifier == ParameterQualifier::InOut)
+							{
+								hasSideEffect = true;
+								break;
+							}
+						}
+					}
 					else if (basicType->Component)
 					{
 						auto funcCompName = expr->FunctionExpr->Tags[L"ComponentReference"]().As<StringObject>()->Content;
 						auto funcComp = *(currentShader->DefinitionsByComponent[funcCompName]().TryGetValue(currentComponent->World));
 						funcName = GetComponentFunctionName(funcComp->SyntaxNode.Ptr());
+						for (auto & param : funcComp->SyntaxNode->Parameters)
+						{
+							if (param->Qualifier == ParameterQualifier::Out || param->Qualifier == ParameterQualifier::InOut)
+							{
+								hasSideEffect = true;
+								break;
+							}
+						}
 						// push additional arguments
 						for (auto & dep : funcComp->GetComponentFunctionDependencyClosure())
 						{
@@ -17524,6 +17586,7 @@ namespace Spire
 					args.Add(PopStack());
 				}
 				auto instr = new CallInstruction(args.Count());
+				instr->SideEffect = hasSideEffect;
 				instr->Function = funcName;
 				for (int i = 0; i < args.Count(); i++)
 					instr->Arguments[i] = args[i];
@@ -20043,6 +20106,15 @@ namespace Spire
 				return basicType->Type == ILBaseType::Int || basicType->Type == ILBaseType::Int2 || basicType->Type == ILBaseType::Int3 || basicType->Type == ILBaseType::Int4 
 				|| basicType->Type == ILBaseType::UInt || basicType->Type == ILBaseType::UInt2 || basicType->Type == ILBaseType::UInt3 || basicType->Type == ILBaseType::UInt4 ||
 				basicType->Type == ILBaseType::Bool;
+			else
+				return false;
+		}
+
+		bool ILType::IsVoid()
+		{
+			auto basicType = dynamic_cast<ILBasicType*>(this);
+			if (basicType)
+				return basicType->Type == ILBaseType::Void;
 			else
 				return false;
 		}
@@ -22629,7 +22701,28 @@ namespace Spire
 		RefPtr<ParameterSyntaxNode> Parser::ParseParameter()
 		{
 			RefPtr<ParameterSyntaxNode> parameter = new ParameterSyntaxNode();
-			
+			if (LookAheadToken(L"in"))
+			{
+				parameter->Qualifier = ParameterQualifier::In;
+				ReadToken(L"in");
+			}
+			else if (LookAheadToken(L"inout"))
+			{
+				parameter->Qualifier = ParameterQualifier::InOut;
+				ReadToken(L"inout");
+			}
+			else if (LookAheadToken(L"out"))
+			{
+				parameter->Qualifier = ParameterQualifier::Out;
+				ReadToken(L"out");
+			}
+			else if (LookAheadToken(L"uniform"))
+			{
+				parameter->Qualifier = ParameterQualifier::Uniform;
+				ReadToken(L"uniform");
+				if (LookAheadToken(L"in"))
+					ReadToken(L"in");
+			}
 			parameter->TypeNode = ParseType();
 			if (LookAheadToken(TokenType::Identifier))
 			{
@@ -24693,7 +24786,40 @@ namespace Spire
 				for (auto & arg : expr->Arguments)
 					arg = arg->Accept(this).As<ExpressionSyntaxNode>();
 
-				return ResolveInvoke(expr);
+				auto rs = ResolveInvoke(expr);
+				if (auto invoke = dynamic_cast<InvokeExpressionSyntaxNode*>(rs.Ptr()))
+				{
+					// if this is still an invoke expression, test arguments passed to inout/out parameter are LValues
+					if (auto basicType = dynamic_cast<BasicExpressionType*>(invoke->FunctionExpr->Type.Ptr()))
+					{
+						List<RefPtr<ParameterSyntaxNode>> * params = nullptr;
+						if (basicType->Func)
+						{
+							params = &basicType->Func->SyntaxNode->Parameters;
+						}
+						else if (basicType->Component)
+						{
+							params = &basicType->Component->Implementations.First()->SyntaxNode->Parameters;
+						}
+						if (params)
+						{
+							for (int i = 0; i < (*params).Count(); i++)
+							{
+								if ((*params)[i]->Qualifier == ParameterQualifier::Out ||
+									(*params)[i]->Qualifier == ParameterQualifier::InOut)
+								{
+									if (i < expr->Arguments.Count() && expr->Arguments[i]->Type->AsBasicType() &&
+										!expr->Arguments[i]->Type->AsBasicType()->IsLeftValue)
+									{
+										Error(30047, L"argument passed to parameter '" + (*params)[i]->Name + L"' must be l-value.",
+											expr->Arguments[i].Ptr());
+									}
+								}
+							}
+						}
+					}
+				}
+				return rs;
 			}
 
 			String OperatorToString(Operator op)

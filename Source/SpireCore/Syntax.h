@@ -445,19 +445,25 @@ namespace Spire
 		{
 		public:
 			List<RefPtr<StatementSyntaxNode>> Statements;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual BlockStatementSyntaxNode * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual BlockStatementSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
+		enum class ParameterQualifier
+		{
+			In, Out, InOut, Uniform
 		};
 
 		class ParameterSyntaxNode : public SyntaxNode
 		{
 		public:
+			ParameterQualifier Qualifier = ParameterQualifier::In;
 			RefPtr<TypeSyntaxNode> TypeNode;
 			RefPtr<ExpressionType> Type;
 			String Name;
 			RefPtr<ExpressionSyntaxNode> Expr;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual ParameterSyntaxNode * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual ParameterSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class FunctionSyntaxNode : public SyntaxNode
@@ -471,7 +477,7 @@ namespace Spire
 			bool IsInline;
 			bool IsExtern;
 			bool HasSideEffect;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			FunctionSyntaxNode()
 			{
 				IsInline = false;
@@ -479,7 +485,7 @@ namespace Spire
 				HasSideEffect = true;
 			}
 
-			virtual FunctionSyntaxNode * Clone(CloneContext & ctx);
+			virtual FunctionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class ImportOperatorDefSyntaxNode : public SyntaxNode
@@ -509,8 +515,8 @@ namespace Spire
 		{
 		public:
 			String Variable;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual VarExpressionSyntaxNode * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual VarExpressionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class ConstantExpressionSyntaxNode : public ExpressionSyntaxNode
@@ -526,8 +532,8 @@ namespace Spire
 				int IntValue;
 				float FloatValue;
 			};
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual ConstantExpressionSyntaxNode * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual ConstantExpressionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		enum class Operator
@@ -562,8 +568,8 @@ namespace Spire
 		public:
 			Operator Operator;
 			RefPtr<ExpressionSyntaxNode> Expression;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual UnaryExpressionSyntaxNode * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual UnaryExpressionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 		
 		class BinaryExpressionSyntaxNode : public ExpressionSyntaxNode
@@ -572,8 +578,8 @@ namespace Spire
 			Operator Operator;
 			RefPtr<ExpressionSyntaxNode> LeftExpression;
 			RefPtr<ExpressionSyntaxNode> RightExpression;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual BinaryExpressionSyntaxNode * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual BinaryExpressionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class IndexExpressionSyntaxNode : public ExpressionSyntaxNode
@@ -581,17 +587,17 @@ namespace Spire
 		public:
 			RefPtr<ExpressionSyntaxNode> BaseExpression;
 			RefPtr<ExpressionSyntaxNode> IndexExpression;
-			virtual IndexExpressionSyntaxNode * Clone(CloneContext & ctx);
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-		};
+			virtual IndexExpressionSyntaxNode * Clone(CloneContext & ctx) override;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+		}; 
 
 		class MemberExpressionSyntaxNode : public ExpressionSyntaxNode
 		{
 		public:
 			RefPtr<ExpressionSyntaxNode> BaseExpression;
 			String MemberName;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual MemberExpressionSyntaxNode * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual MemberExpressionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class InvokeExpressionSyntaxNode : public ExpressionSyntaxNode
@@ -599,8 +605,8 @@ namespace Spire
 		public:
 			RefPtr<ExpressionSyntaxNode> FunctionExpr;
 			List<RefPtr<ExpressionSyntaxNode>> Arguments;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual InvokeExpressionSyntaxNode * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual InvokeExpressionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class TypeCastExpressionSyntaxNode : public ExpressionSyntaxNode
@@ -608,31 +614,31 @@ namespace Spire
 		public:
 			RefPtr<TypeSyntaxNode> TargetType;
 			RefPtr<ExpressionSyntaxNode> Expression;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual TypeCastExpressionSyntaxNode * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual TypeCastExpressionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class SelectExpressionSyntaxNode : public ExpressionSyntaxNode
 		{
 		public:
 			RefPtr<ExpressionSyntaxNode> SelectorExpr, Expr0, Expr1;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual SelectExpressionSyntaxNode * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual SelectExpressionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 
 		class EmptyStatementSyntaxNode : public StatementSyntaxNode
 		{
 		public:
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual EmptyStatementSyntaxNode * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual EmptyStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class DiscardStatementSyntaxNode : public StatementSyntaxNode
 		{
 		public:
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual DiscardStatementSyntaxNode * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual DiscardStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class VariableDeclr
@@ -655,8 +661,8 @@ namespace Spire
 		{
 			String Name;
 			RefPtr<ExpressionSyntaxNode> Expression;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual Variable * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual Variable * Clone(CloneContext & ctx) override;
 		};
 
 		class VarDeclrStatementSyntaxNode : public StatementSyntaxNode
@@ -666,8 +672,8 @@ namespace Spire
 			RefPtr<ExpressionType> Type;
 			String LayoutString;
 			List<RefPtr<Variable>> Variables;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual VarDeclrStatementSyntaxNode * Clone(CloneContext & ctx);
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual VarDeclrStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class RateWorld

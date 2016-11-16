@@ -953,7 +953,28 @@ namespace Spire
 		RefPtr<ParameterSyntaxNode> Parser::ParseParameter()
 		{
 			RefPtr<ParameterSyntaxNode> parameter = new ParameterSyntaxNode();
-			
+			if (LookAheadToken(L"in"))
+			{
+				parameter->Qualifier = ParameterQualifier::In;
+				ReadToken(L"in");
+			}
+			else if (LookAheadToken(L"inout"))
+			{
+				parameter->Qualifier = ParameterQualifier::InOut;
+				ReadToken(L"inout");
+			}
+			else if (LookAheadToken(L"out"))
+			{
+				parameter->Qualifier = ParameterQualifier::Out;
+				ReadToken(L"out");
+			}
+			else if (LookAheadToken(L"uniform"))
+			{
+				parameter->Qualifier = ParameterQualifier::Uniform;
+				ReadToken(L"uniform");
+				if (LookAheadToken(L"in"))
+					ReadToken(L"in");
+			}
 			parameter->TypeNode = ParseType();
 			if (LookAheadToken(TokenType::Identifier))
 			{
