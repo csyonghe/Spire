@@ -2,6 +2,7 @@
 #include "VariantIR.h"
 #include "StringObject.h"
 #include "Naming.h"
+#include "GetDependencyVisitor.h"
 
 namespace Spire
 {
@@ -11,6 +12,7 @@ namespace Spire
 		{
 		private:
 			ShaderIR * shaderIR;
+			GetDependencyVisitor depVisitor;
 		public:
 			ComponentDefinitionIR * currentCompDef = nullptr;
 			EnumerableDictionary<String, RefPtr<ComponentDefinitionIR>> passThroughComponents;
@@ -148,6 +150,12 @@ namespace Spire
 				auto refDef = MakeComponentAvailableAtWorld(import->ComponentUniqueName, import->ImportOperatorDef->SourceWorld.Content);
 				if (refDef)
 					import->ComponentUniqueName = refDef->UniqueName;
+				depVisitor.Result.Clear();
+				import->ImportOperatorDef->Accept(&depVisitor);
+				for (auto & x : depVisitor.Result)
+				{
+					ProcessComponentReference(x.ReferencedComponent);
+				}
 				return import;
 			}
 		};

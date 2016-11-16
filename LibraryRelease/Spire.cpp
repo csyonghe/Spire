@@ -9591,6 +9591,8 @@ namespace Spire
 			{
 				for (auto & arg : expr->Arguments)
 					arg = arg->Accept(this).As<ExpressionSyntaxNode>();
+				if (expr->ImportOperatorDef)
+					expr->ImportOperatorDef->Accept(this);
 				return expr;
 			}
 			virtual RefPtr<ExpressionSyntaxNode> VisitTypeCastExpression(TypeCastExpressionSyntaxNode * stmt)
@@ -10351,6 +10353,49 @@ namespace Spire
 		};
 
 		ShaderCompiler * CreateShaderCompiler();
+	}
+}
+
+#endif
+
+/***********************************************************************
+SPIRECORE\CLOSURE.H
+***********************************************************************/
+#ifndef BAKERSL_SHADER_CLOSURE_H
+#define BAKERSL_SHADER_CLOSURE_H
+
+namespace Spire
+{
+	namespace Compiler
+	{
+		RefPtr<ShaderClosure> CreateShaderClosure(ErrorWriter * err, SymbolTable * symTable, ShaderSymbol * shader);
+		void FlattenShaderClosure(ErrorWriter * err, SymbolTable * symTable, ShaderClosure * shader);
+		void InsertImplicitImportOperators(ShaderIR * shader);
+	}
+}
+
+#endif
+
+/***********************************************************************
+SPIRECORE\STRINGOBJECT.H
+***********************************************************************/
+#ifndef SPIRE_STRING_OBJECT_H
+#define SPIRE_STRING_OBJECT_H
+
+
+namespace Spire
+{
+	namespace Compiler
+	{
+		class StringObject : public CoreLib::Object
+		{
+		public:
+			CoreLib::String Content;
+			StringObject() {}
+			StringObject(const CoreLib::String & str)
+				: Content(str)
+			{}
+		};
 	}
 }
 
@@ -11208,49 +11253,6 @@ namespace Spire
 #endif // SPIRE_C_LIKE_CODE_GEN_H
 
 /***********************************************************************
-SPIRECORE\CLOSURE.H
-***********************************************************************/
-#ifndef BAKERSL_SHADER_CLOSURE_H
-#define BAKERSL_SHADER_CLOSURE_H
-
-namespace Spire
-{
-	namespace Compiler
-	{
-		RefPtr<ShaderClosure> CreateShaderClosure(ErrorWriter * err, SymbolTable * symTable, ShaderSymbol * shader);
-		void FlattenShaderClosure(ErrorWriter * err, SymbolTable * symTable, ShaderClosure * shader);
-		void InsertImplicitImportOperators(ShaderIR * shader);
-	}
-}
-
-#endif
-
-/***********************************************************************
-SPIRECORE\STRINGOBJECT.H
-***********************************************************************/
-#ifndef SPIRE_STRING_OBJECT_H
-#define SPIRE_STRING_OBJECT_H
-
-
-namespace Spire
-{
-	namespace Compiler
-	{
-		class StringObject : public CoreLib::Object
-		{
-		public:
-			CoreLib::String Content;
-			StringObject() {}
-			StringObject(const CoreLib::String & str)
-				: Content(str)
-			{}
-		};
-	}
-}
-
-#endif
-
-/***********************************************************************
 SPIRECORE\SYNTAXVISITORS.H
 ***********************************************************************/
 #ifndef RASTER_RENDERER_SYNTAX_PRINTER_H
@@ -11571,6 +11573,55 @@ namespace Spire
 	}
 }
 
+#endif
+
+/***********************************************************************
+SPIRECORE\GETDEPENDENCYVISITOR.H
+***********************************************************************/
+#ifndef GET_DEPENDENCY_VISITOR_H
+
+
+namespace Spire
+{
+	namespace Compiler
+	{
+		class ComponentDependency
+		{
+		public:
+			String ReferencedComponent;
+			ImportOperatorDefSyntaxNode * ImportOperator = nullptr;
+			ComponentDependency() = default;
+			ComponentDependency(String compName, ImportOperatorDefSyntaxNode * impOp)
+				: ReferencedComponent(compName), ImportOperator(impOp)
+			{}
+			int GetHashCode()
+			{
+				return ReferencedComponent.GetHashCode() ^ (int)(CoreLib::PtrInt)(void*)(ImportOperator);
+			}
+			bool operator == (const ComponentDependency & other)
+			{
+				return ReferencedComponent == other.ReferencedComponent && ImportOperator == other.ImportOperator;
+			}
+		};
+
+		class GetDependencyVisitor : public SyntaxVisitor
+		{
+		public:
+			EnumerableHashSet<ComponentDependency> Result;
+			GetDependencyVisitor()
+				: SyntaxVisitor(nullptr)
+			{}
+
+			RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode * var) override;
+
+			RefPtr<ExpressionSyntaxNode> VisitMemberExpression(MemberExpressionSyntaxNode * member) override;
+
+			RefPtr<ExpressionSyntaxNode> VisitImportExpression(ImportExpressionSyntaxNode * syntax) override;
+		};
+
+		EnumerableHashSet<ComponentDependency> GetDependentComponents(SyntaxNode * tree);
+	}
+}
 #endif
 
 /***********************************************************************
@@ -14635,7 +14686,9 @@ namespace Spire
 					}
 					if (genType)
 					{
-						if (genType->GenericTypeName == L"Buffer" && dynamic_cast<ILRecordType*>(genType->BaseType.Ptr()))
+						if ((genType->GenericTypeName == L"Buffer" ||
+							genType->GenericTypeName == L"ArrayBuffer") 
+							&& dynamic_cast<ILRecordType*>(genType->BaseType.Ptr()))
 							ctx.Body << L"." << currentImportInstr->ComponentName;
 					}
 				}
@@ -15849,6 +15902,7 @@ namespace Spire
 				currentImport = nullptr;
 				for (auto & arg : import->Arguments)
 					arg->Accept(this);
+				import->ImportOperatorDef->Accept(this);
 				return import;
 			}
 
@@ -18087,6 +18141,54 @@ namespace Spire
 #endif
 
 /***********************************************************************
+SPIRECORE\GETDEPENDENCYVISITOR.CPP
+***********************************************************************/
+
+namespace Spire
+{
+	namespace Compiler
+	{
+		EnumerableHashSet<ComponentDependency> GetDependentComponents(SyntaxNode * tree)
+		{
+			GetDependencyVisitor visitor;
+			tree->Accept(&visitor);
+			return visitor.Result;
+		}
+
+		RefPtr<ExpressionSyntaxNode> GetDependencyVisitor::VisitImportExpression(ImportExpressionSyntaxNode * syntax)
+		{
+			for (auto & comp : syntax->ImportOperatorDef->Usings)
+				Result.Add(ComponentDependency(comp, nullptr));
+			Result.Add(ComponentDependency(syntax->ComponentUniqueName, syntax->ImportOperatorDef.Ptr()));
+			return SyntaxVisitor::VisitImportExpression(syntax);
+		}
+		RefPtr<ExpressionSyntaxNode> GetDependencyVisitor::VisitMemberExpression(MemberExpressionSyntaxNode * member)
+		{
+			RefPtr<Object> refCompObj;
+			if (member->Tags.TryGetValue(L"ComponentReference", refCompObj))
+			{
+				auto refComp = refCompObj.As<StringObject>().Ptr();
+				Result.Add(ComponentDependency(refComp->Content, nullptr));
+			}
+			else
+				member->BaseExpression->Accept(this);
+			return member;
+		}
+		RefPtr<ExpressionSyntaxNode> GetDependencyVisitor::VisitVarExpression(VarExpressionSyntaxNode * var)
+		{
+			RefPtr<Object> refCompObj;
+			if (var->Tags.TryGetValue(L"ComponentReference", refCompObj))
+			{
+				auto refComp = refCompObj.As<StringObject>().Ptr();
+				Result.Add(ComponentDependency(refComp->Content, nullptr));
+			}
+			return var;
+		}
+	}
+}
+
+
+/***********************************************************************
 SPIRECORE\GLSLCODEGEN.CPP
 ***********************************************************************/
 
@@ -18335,22 +18437,14 @@ namespace Spire
 					String declName = field.Key;
 					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
 					itemsDeclaredInBlock++;
-					if (info.IsArray)
-					{
-						sb.GlobalHeader << L"[";
-						if (info.ArrayLength)
-							sb.GlobalHeader << String(info.ArrayLength);
-						sb.GlobalHeader << L"]";
-					}
 					sb.GlobalHeader << L";\n";
-
 					index++;
 				}
 
 				sb.GlobalHeader << L"};\nlayout(std430";
 				if (info.Binding != -1)
 					sb.GlobalHeader << L", binding = " << info.Binding;
-				sb.GlobalHeader  << ") buffer " << input.Name << L"\n{\nT" << input.Name << L"content[];\n} blk" << input.Name << L";\n";
+				sb.GlobalHeader  << ") buffer " << input.Name << L"\n{\nT" << input.Name << L" content[];\n} blk" << input.Name << L";\n";
 			}
 
 			void DeclarePackedBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool /*isVertexShader*/) override
@@ -20324,6 +20418,7 @@ namespace Spire
 		{
 		private:
 			ShaderIR * shaderIR;
+			GetDependencyVisitor depVisitor;
 		public:
 			ComponentDefinitionIR * currentCompDef = nullptr;
 			EnumerableDictionary<String, RefPtr<ComponentDefinitionIR>> passThroughComponents;
@@ -20461,6 +20556,12 @@ namespace Spire
 				auto refDef = MakeComponentAvailableAtWorld(import->ComponentUniqueName, import->ImportOperatorDef->SourceWorld.Content);
 				if (refDef)
 					import->ComponentUniqueName = refDef->UniqueName;
+				depVisitor.Result.Clear();
+				import->ImportOperatorDef->Accept(&depVisitor);
+				for (auto & x : depVisitor.Result)
+				{
+					ProcessComponentReference(x.ReferencedComponent);
+				}
 				return import;
 			}
 		};
@@ -24122,11 +24223,12 @@ namespace Spire
 				else
 				{
 					auto & baseExprType = expr->BaseExpression->Type;
-					bool isError = baseExprType->AsGenericType() &&
-							(baseExprType->AsGenericType()->GenericTypeName != L"ArrayBuffer" ||
-							 baseExprType->AsGenericType()->GenericTypeName != L"PackedBuffer");
-					isError = isError || (baseExprType->AsBasicType() && GetVectorSize(baseExprType->AsBasicType()->BaseType) == 0);
-					if (isError)
+					bool isValid = baseExprType->AsGenericType() &&
+							(baseExprType->AsGenericType()->GenericTypeName == L"ArrayBuffer" ||
+							 baseExprType->AsGenericType()->GenericTypeName == L"PackedBuffer");
+					isValid = isValid || (baseExprType->AsBasicType() && GetVectorSize(baseExprType->AsBasicType()->BaseType) != 0);
+					isValid = isValid || baseExprType->AsArrayType();
+					if (!isValid)
 					{
 						Error(30013, L"'[]' can only index on arrays.", expr);
 						expr->Type = ExpressionType::Error;
@@ -32578,72 +32680,6 @@ namespace Spire
 {
 	namespace Compiler
 	{
-		class ComponentDependency
-		{
-		public:
-			String ReferencedComponent;
-			ImportOperatorDefSyntaxNode * ImportOperator = nullptr;
-			ComponentDependency() = default;
-			ComponentDependency(String compName, ImportOperatorDefSyntaxNode * impOp)
-				: ReferencedComponent(compName), ImportOperator(impOp)
-			{}
-			int GetHashCode()
-			{
-				return ReferencedComponent.GetHashCode() ^ (int)(CoreLib::PtrInt)(void*)(ImportOperator);
-			}
-			bool operator == (const ComponentDependency & other)
-			{
-				return ReferencedComponent == other.ReferencedComponent && ImportOperator == other.ImportOperator;
-			}
-		};
-		class GetDependencyVisitor : public SyntaxVisitor
-		{
-		public:
-			EnumerableHashSet<ComponentDependency> Result;
-			GetDependencyVisitor()
-				: SyntaxVisitor(nullptr)
-			{}
-
-			RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode * var) override
-			{
-				RefPtr<Object> refCompObj;
-				if (var->Tags.TryGetValue(L"ComponentReference", refCompObj))
-				{
-					auto refComp = refCompObj.As<StringObject>().Ptr();
-					Result.Add(ComponentDependency(refComp->Content, nullptr));
-				}
-				return var;
-			}
-
-			RefPtr<ExpressionSyntaxNode> VisitMemberExpression(MemberExpressionSyntaxNode * member) override
-			{
-				RefPtr<Object> refCompObj;
-				if (member->Tags.TryGetValue(L"ComponentReference", refCompObj))
-				{
-					auto refComp = refCompObj.As<StringObject>().Ptr();
-					Result.Add(ComponentDependency(refComp->Content, nullptr));
-				}
-				else
-					member->BaseExpression->Accept(this);
-				return member;
-			}
-
-			RefPtr<ExpressionSyntaxNode> VisitImportExpression(ImportExpressionSyntaxNode * syntax) override
-			{
-				for (auto & comp : syntax->ImportOperatorDef->Usings)
-					Result.Add(ComponentDependency(comp, nullptr));
-				Result.Add(ComponentDependency(syntax->ComponentUniqueName, syntax->ImportOperatorDef.Ptr()));
-				return SyntaxVisitor::VisitImportExpression(syntax);
-			}
-		};
-
-		EnumerableHashSet<ComponentDependency> GetDependentComponents(SyntaxNode * tree)
-		{
-			GetDependencyVisitor visitor;
-			tree->Accept(&visitor);
-			return visitor.Result;
-		}
-
 		void ShaderIR::EliminateDeadCode()
 		{
 			// mark entry points

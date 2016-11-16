@@ -1062,6 +1062,8 @@ namespace Spire
 			{
 				for (auto & arg : expr->Arguments)
 					arg = arg->Accept(this).As<ExpressionSyntaxNode>();
+				if (expr->ImportOperatorDef)
+					expr->ImportOperatorDef->Accept(this);
 				return expr;
 			}
 			virtual RefPtr<ExpressionSyntaxNode> VisitTypeCastExpression(TypeCastExpressionSyntaxNode * stmt)

@@ -1158,11 +1158,12 @@ namespace Spire
 				else
 				{
 					auto & baseExprType = expr->BaseExpression->Type;
-					bool isError = baseExprType->AsGenericType() &&
-							(baseExprType->AsGenericType()->GenericTypeName != L"ArrayBuffer" ||
-							 baseExprType->AsGenericType()->GenericTypeName != L"PackedBuffer");
-					isError = isError || (baseExprType->AsBasicType() && GetVectorSize(baseExprType->AsBasicType()->BaseType) == 0);
-					if (isError)
+					bool isValid = baseExprType->AsGenericType() &&
+							(baseExprType->AsGenericType()->GenericTypeName == L"ArrayBuffer" ||
+							 baseExprType->AsGenericType()->GenericTypeName == L"PackedBuffer");
+					isValid = isValid || (baseExprType->AsBasicType() && GetVectorSize(baseExprType->AsBasicType()->BaseType) != 0);
+					isValid = isValid || baseExprType->AsArrayType();
+					if (!isValid)
 					{
 						Error(30013, L"'[]' can only index on arrays.", expr);
 						expr->Type = ExpressionType::Error;

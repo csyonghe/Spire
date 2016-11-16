@@ -72,6 +72,9 @@
     <ClInclude Include="CLikeCodeGen.h">
       <Filter>Back End</Filter>
     </ClInclude>
+    <ClInclude Include="GetDependencyVisitor.h">
+      <Filter>Front End</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Lexer.cpp">
@@ -142,6 +145,9 @@
     </ClCompile>
     <ClCompile Include="CLikeCodeGen.cpp">
       <Filter>Back End</Filter>
+    </ClCompile>
+    <ClCompile Include="GetDependencyVisitor.cpp">
+      <Filter>Front End</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

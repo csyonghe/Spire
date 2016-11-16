@@ -248,22 +248,14 @@ namespace Spire
 					String declName = field.Key;
 					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
 					itemsDeclaredInBlock++;
-					if (info.IsArray)
-					{
-						sb.GlobalHeader << L"[";
-						if (info.ArrayLength)
-							sb.GlobalHeader << String(info.ArrayLength);
-						sb.GlobalHeader << L"]";
-					}
 					sb.GlobalHeader << L";\n";
-
 					index++;
 				}
 
 				sb.GlobalHeader << L"};\nlayout(std430";
 				if (info.Binding != -1)
 					sb.GlobalHeader << L", binding = " << info.Binding;
-				sb.GlobalHeader  << ") buffer " << input.Name << L"\n{\nT" << input.Name << L"content[];\n} blk" << input.Name << L";\n";
+				sb.GlobalHeader  << ") buffer " << input.Name << L"\n{\nT" << input.Name << L" content[];\n} blk" << input.Name << L";\n";
 			}
 
 			void DeclarePackedBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool /*isVertexShader*/) override

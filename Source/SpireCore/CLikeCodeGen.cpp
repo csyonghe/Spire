@@ -348,7 +348,9 @@ namespace Spire
 					}
 					if (genType)
 					{
-						if (genType->GenericTypeName == L"Buffer" && dynamic_cast<ILRecordType*>(genType->BaseType.Ptr()))
+						if ((genType->GenericTypeName == L"Buffer" ||
+							genType->GenericTypeName == L"ArrayBuffer") 
+							&& dynamic_cast<ILRecordType*>(genType->BaseType.Ptr()))
 							ctx.Body << L"." << currentImportInstr->ComponentName;
 					}
 				}

@@ -1,77 +1,12 @@
 #include "VariantIR.h"
 #include "Closure.h"
 #include "StringObject.h"
+#include "GetDependencyVisitor.h"
 
 namespace Spire
 {
 	namespace Compiler
 	{
-		class ComponentDependency
-		{
-		public:
-			String ReferencedComponent;
-			ImportOperatorDefSyntaxNode * ImportOperator = nullptr;
-			ComponentDependency() = default;
-			ComponentDependency(String compName, ImportOperatorDefSyntaxNode * impOp)
-				: ReferencedComponent(compName), ImportOperator(impOp)
-			{}
-			int GetHashCode()
-			{
-				return ReferencedComponent.GetHashCode() ^ (int)(CoreLib::PtrInt)(void*)(ImportOperator);
-			}
-			bool operator == (const ComponentDependency & other)
-			{
-				return ReferencedComponent == other.ReferencedComponent && ImportOperator == other.ImportOperator;
-			}
-		};
-		class GetDependencyVisitor : public SyntaxVisitor
-		{
-		public:
-			EnumerableHashSet<ComponentDependency> Result;
-			GetDependencyVisitor()
-				: SyntaxVisitor(nullptr)
-			{}
-
-			RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode * var) override
-			{
-				RefPtr<Object> refCompObj;
-				if (var->Tags.TryGetValue(L"ComponentReference", refCompObj))
-				{
-					auto refComp = refCompObj.As<StringObject>().Ptr();
-					Result.Add(ComponentDependency(refComp->Content, nullptr));
-				}
-				return var;
-			}
-
-			RefPtr<ExpressionSyntaxNode> VisitMemberExpression(MemberExpressionSyntaxNode * member) override
-			{
-				RefPtr<Object> refCompObj;
-				if (member->Tags.TryGetValue(L"ComponentReference", refCompObj))
-				{
-					auto refComp = refCompObj.As<StringObject>().Ptr();
-					Result.Add(ComponentDependency(refComp->Content, nullptr));
-				}
-				else
-					member->BaseExpression->Accept(this);
-				return member;
-			}
-
-			RefPtr<ExpressionSyntaxNode> VisitImportExpression(ImportExpressionSyntaxNode * syntax) override
-			{
-				for (auto & comp : syntax->ImportOperatorDef->Usings)
-					Result.Add(ComponentDependency(comp, nullptr));
-				Result.Add(ComponentDependency(syntax->ComponentUniqueName, syntax->ImportOperatorDef.Ptr()));
-				return SyntaxVisitor::VisitImportExpression(syntax);
-			}
-		};
-
-		EnumerableHashSet<ComponentDependency> GetDependentComponents(SyntaxNode * tree)
-		{
-			GetDependencyVisitor visitor;
-			tree->Accept(&visitor);
-			return visitor.Result;
-		}
-
 		void ShaderIR::EliminateDeadCode()
 		{
 			// mark entry points

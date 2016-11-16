@@ -305,6 +305,7 @@ namespace Spire
 				currentImport = nullptr;
 				for (auto & arg : import->Arguments)
 					arg->Accept(this);
+				import->ImportOperatorDef->Accept(this);
 				return import;
 			}
 
