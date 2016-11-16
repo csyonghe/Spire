@@ -112,8 +112,9 @@ namespace Spire
 			//ILWorld * currentWorld = nullptr;
 			//ILRecordType * currentRecordType = nullptr;
 			//bool exportWriteToPackedBuffer = false;
-			CoreLib::Basic::RefPtr<OutputStrategy> outputStrategy;
+			RefPtr<OutputStrategy> outputStrategy;
 			Dictionary<String, ExternComponentCodeGenInfo> extCompInfo;
+			HashSet<String> intrinsicTextureFunctions;
 			ImportInstruction * currentImportInstr = nullptr;
 			bool useBindlessTexture = false;
 			ErrorWriter * errWriter;
@@ -191,6 +192,7 @@ namespace Spire
 			void GenerateCode(CodeGenContext & context, CFGNode * code);
 
 		public:
+			CLikeCodeGen();
 			virtual CompiledShaderSource GenerateShader(CompileResult & result, SymbolTable *, ILShader * shader, ErrorWriter * err) override;
 			void GenerateStructs(StringBuilder & sb, ILProgram * program);
 			void GenerateReferencedFunctions(StringBuilder & sb, ILProgram * program, ArrayView<ILWorld*> worlds);

@@ -11152,8 +11152,9 @@ namespace Spire
 			//ILWorld * currentWorld = nullptr;
 			//ILRecordType * currentRecordType = nullptr;
 			//bool exportWriteToPackedBuffer = false;
-			CoreLib::Basic::RefPtr<OutputStrategy> outputStrategy;
+			RefPtr<OutputStrategy> outputStrategy;
 			Dictionary<String, ExternComponentCodeGenInfo> extCompInfo;
+			HashSet<String> intrinsicTextureFunctions;
 			ImportInstruction * currentImportInstr = nullptr;
 			bool useBindlessTexture = false;
 			ErrorWriter * errWriter;
@@ -11231,6 +11232,7 @@ namespace Spire
 			void GenerateCode(CodeGenContext & context, CFGNode * code);
 
 		public:
+			CLikeCodeGen();
 			virtual CompiledShaderSource GenerateShader(CompileResult & result, SymbolTable *, ILShader * shader, ErrorWriter * err) override;
 			void GenerateStructs(StringBuilder & sb, ILProgram * program);
 			void GenerateReferencedFunctions(StringBuilder & sb, ILProgram * program, ArrayView<ILWorld*> worlds);
@@ -14911,7 +14913,7 @@ namespace Spire
 
 		void CLikeCodeGen::PrintCallInstrExpr(CodeGenContext & ctx, CallInstruction * instr)
 		{
-			if (instr->Arguments.Count() > 0 && instr->Arguments.First()->Type->IsTexture())
+			if (instr->Arguments.Count() > 0 && instr->Arguments.First()->Type->IsTexture() && intrinsicTextureFunctions.Contains(instr->Function))
 			{
 				PrintTextureCall(ctx, instr);
 				return;
@@ -15210,6 +15212,13 @@ namespace Spire
 				else
 					PrintInstr(context, instr);
 			}
+		}
+
+		CLikeCodeGen::CLikeCodeGen()
+		{
+			intrinsicTextureFunctions.Add(L"Sample");
+			intrinsicTextureFunctions.Add(L"SampleBias");
+			intrinsicTextureFunctions.Add(L"SampleGrad");
 		}
 
 		CompiledShaderSource CLikeCodeGen::GenerateShader(CompileResult & result, SymbolTable *, ILShader * shader, ErrorWriter * err)
