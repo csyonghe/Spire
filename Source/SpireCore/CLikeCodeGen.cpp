@@ -574,6 +574,11 @@ namespace Spire
 
 		void CLikeCodeGen::PrintCallInstrExpr(CodeGenContext & ctx, CallInstruction * instr)
 		{
+			if (instr->Arguments.Count() > 0 && instr->Arguments.First()->Type->IsTexture())
+			{
+				PrintTextureCall(ctx, instr);
+				return;
+			}
 			String callName;
 			callName = GetFuncOriginalName(instr->Function);
 			callName = RemapFuncNameForTarget(callName);
@@ -639,7 +644,7 @@ namespace Spire
 			}
 			if (auto import = instr.As<ImportInstruction>())
 			{
-				if (!useBindlessTexture && import->Type->IsTexture() || import->Type.As<ILArrayType>())
+				if ((!useBindlessTexture && import->Type->IsTexture()) || import->Type.As<ILArrayType>() || import->Type->IsSamplerState())
 					return true;
 			}
 			for (auto &&usr : instr.Users)

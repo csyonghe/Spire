@@ -235,6 +235,15 @@ namespace Spire
 				return false;
 		}
 
+		bool ILType::IsSamplerState()
+		{
+			auto basicType = dynamic_cast<ILBasicType*>(this);
+			if (basicType)
+				return basicType->Type == ILBaseType::SamplerState;
+			else
+				return false;
+		}
+
 		int ILType::GetVectorSize()
 		{
 			if (auto basicType = dynamic_cast<ILBasicType*>(this))

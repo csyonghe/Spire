@@ -94,12 +94,6 @@ namespace Spire
 			case Compiler::BaseType::TextureCube:
 				res.Append(L"samplerCube");
 				break;
-			case Compiler::BaseType::TextureShadow:
-				res.Append(L"samplerShadow");
-				break;
-			case Compiler::BaseType::TextureCubeShadow:
-				res.Append(L"samplerCubeShadow");
-				break;
 			case Compiler::BaseType::Function:
 				res.Append(Func->SyntaxNode->InternalName);
 				break;
@@ -460,10 +454,6 @@ namespace Spire
 					rs->TypeName = L"sampler2D";
 				else if (t.BaseType == BaseType::TextureCube)
 					rs->TypeName = L"samplerCube";
-				else if (t.BaseType == BaseType::TextureShadow)
-					rs->TypeName = L"samplerShadow";
-				else if (t.BaseType == BaseType::TextureCubeShadow)
-					rs->TypeName = L"samplerCubeShadow";
 				return rs;
 			}
 			else if (auto arrayType = dynamic_cast<ArrayExpressionType*>(type))
@@ -595,9 +585,7 @@ namespace Spire
 			auto basicType = AsBasicType();
 			if (basicType)
 				return basicType->BaseType == BaseType::Texture2D ||
-					basicType->BaseType == BaseType::TextureCube ||
-					basicType->BaseType == BaseType::TextureCubeShadow ||
-					basicType->BaseType == BaseType::TextureShadow;
+					basicType->BaseType == BaseType::TextureCube;
 			return false;
 		}
 		bool ExpressionType::IsStruct() const

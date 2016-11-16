@@ -147,7 +147,22 @@ namespace Spire
 				return name;
 			}
 
-
+			void PrintTextureCall(CodeGenContext & ctx, CallInstruction * instr)
+			{
+				// texture functions are defined based on HLSL, so this is trivial
+				// internally, texObj.Sample(sampler_obj, uv, ..) is represented as Sample(texObj, sampler_obj, uv, ...)
+				// so we need to lift first argument to the front
+				PrintOp(ctx, instr->Arguments[0].Ptr(), true);
+				ctx.Body << L"." << instr->Function;
+				ctx.Body << L"(";
+				for (int i = 1; i < instr->Arguments.Count(); i++)
+				{
+					PrintOp(ctx, instr->Arguments[i].Ptr());
+					if (i < instr->Arguments.Count() - 1)
+						ctx.Body << L", ";
+				}
+				ctx.Body << L")";
+			}
 
 			void PrintTypeName(StringBuilder& sb, ILType* type) override
 			{

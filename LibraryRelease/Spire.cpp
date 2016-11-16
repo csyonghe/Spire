@@ -5954,6 +5954,7 @@ namespace Spire
 			TextureCubeShadow = 51,
 			Bool = 128, Bool2 = 129, Bool3 = 130, Bool4 = 131,
 			UInt = 512, UInt2 = 513, UInt3 = 514, UInt4 = 515,
+			SamplerState = 4096,
 		};
 		int SizeofBaseType(ILBaseType type);
 		int RoundToAlignment(int offset, int alignment);
@@ -5980,6 +5981,7 @@ namespace Spire
 				return IsIntVector() || IsUIntVector() || IsFloatVector() || IsBoolVector();
 			}
 			bool IsTexture();
+			bool IsSamplerState();
 			bool IsNonShadowTexture();
 			int GetVectorSize();
 			virtual ILType * Clone() = 0;
@@ -8563,14 +8565,13 @@ namespace Spire
 			Bool = 128, Bool2 = 129, Bool3 = 130, Bool4 = 131,
 			Float3x3 = 40, Float4x4 = 47,
 			Texture2D = 48,
-			TextureShadow = 49,
 			TextureCube = 50,
-			TextureCubeShadow = 51,
+			SamplerState = 4096,
 			Function = 64,
 			Shader = 256,
 			Struct = 1024,
 			Record = 2048,
-			Error = 4096,
+			Error = 8192,
 		};
 
 		inline const wchar_t * BaseTypeToString(BaseType t)
@@ -8604,10 +8605,6 @@ namespace Spire
 				return L"sampler2D";
 			case BaseType::TextureCube:
 				return L"samplerCube";
-			case BaseType::TextureShadow:
-				return L"sampler2DShadow";
-			case BaseType::TextureCubeShadow:
-				return L"samplerCubeShadow";
 			default:
 				return L"<err-type>";
 			}
@@ -8873,8 +8870,8 @@ namespace Spire
 		{
 		public:
 			String TypeName;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual BasicTypeSyntaxNode * Clone(CloneContext & ctx)
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual BasicTypeSyntaxNode * Clone(CloneContext & ctx) override
 			{
 				return CloneSyntaxNodeFields(new BasicTypeSyntaxNode(*this), ctx);
 			}
@@ -8885,8 +8882,8 @@ namespace Spire
 		public:
 			RefPtr<TypeSyntaxNode> BaseType;
 			int ArrayLength;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual ArrayTypeSyntaxNode * Clone(CloneContext & ctx)
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual ArrayTypeSyntaxNode * Clone(CloneContext & ctx) override
 			{
 				auto rs = CloneSyntaxNodeFields(new ArrayTypeSyntaxNode(*this), ctx);
 				rs->BaseType = BaseType->Clone(ctx);
@@ -8899,8 +8896,8 @@ namespace Spire
 		public:
 			RefPtr<TypeSyntaxNode> BaseType;
 			String GenericTypeName;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual GenericTypeSyntaxNode * Clone(CloneContext & ctx)
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual GenericTypeSyntaxNode * Clone(CloneContext & ctx) override
 			{
 				auto rs = CloneSyntaxNodeFields(new GenericTypeSyntaxNode(*this), ctx);
 				rs->BaseType = BaseType->Clone(ctx);
@@ -11193,6 +11190,7 @@ namespace Spire
 			virtual String RemapFuncNameForTarget(String name);
 			virtual void PrintMatrixMulInstrExpr(CodeGenContext & ctx, ILOperand* op0, ILOperand* op1);
 			virtual void PrintRasterPositionOutputWrite(CodeGenContext & ctx, ILOperand * operand) = 0;
+			virtual void PrintTextureCall(CodeGenContext & ctx, CallInstruction * instr) = 0;
 
 		public:
 			void Error(int errId, String msg, CodePosition pos);
@@ -11779,6 +11777,9 @@ namespace Spire
 				typeNames.Add(L"half3x3");
 				typeNames.Add(L"half4x4");
 				typeNames.Add(L"Texture2D");
+				typeNames.Add(L"sampler");
+				typeNames.Add(L"SamplerState");
+				typeNames.Add(L"sampler_state");
 				typeNames.Add(L"sampler2D");
 				typeNames.Add(L"sampler2DShadow");
 				typeNames.Add(L"samplerCube");
@@ -14912,6 +14913,11 @@ namespace Spire
 
 		void CLikeCodeGen::PrintCallInstrExpr(CodeGenContext & ctx, CallInstruction * instr)
 		{
+			if (instr->Arguments.Count() > 0 && instr->Arguments.First()->Type->IsTexture())
+			{
+				PrintTextureCall(ctx, instr);
+				return;
+			}
 			String callName;
 			callName = GetFuncOriginalName(instr->Function);
 			callName = RemapFuncNameForTarget(callName);
@@ -14977,7 +14983,7 @@ namespace Spire
 			}
 			if (auto import = instr.As<ImportInstruction>())
 			{
-				if (!useBindlessTexture && import->Type->IsTexture() || import->Type.As<ILArrayType>())
+				if ((!useBindlessTexture && import->Type->IsTexture()) || import->Type.As<ILArrayType>() || import->Type->IsSamplerState())
 					return true;
 			}
 			for (auto &&usr : instr.Users)
@@ -18292,6 +18298,69 @@ namespace Spire
 				sb << type->ToString();
 			}
 
+			void PrintTextureCall(CodeGenContext & ctx, CallInstruction * instr)
+			{
+				if (instr->Function == L"Sample")
+				{
+					if (instr->Arguments.Count() == 4)
+						ctx.Body << L"textureOffset";
+					else
+						ctx.Body << L"texture";
+					ctx.Body << L"(";
+					for (int i = 0; i < instr->Arguments.Count(); i++)
+					{
+						if (i == 1) continue; // skip sampler_state parameter
+						PrintOp(ctx, instr->Arguments[i].Ptr());
+						if (i < instr->Arguments.Count() - 1)
+							ctx.Body << L", ";
+					}
+					ctx.Body << L")";
+				}
+				else if (instr->Function == L"SampleGrad")
+				{
+					if (instr->Arguments.Count() == 6)
+						ctx.Body << L"textureGradOffset";
+					else
+						ctx.Body << L"textureGrad";
+					ctx.Body << L"(";
+					for (int i = 0; i < instr->Arguments.Count(); i++)
+					{
+						if (i == 1) continue; // skip sampler_state parameter
+						PrintOp(ctx, instr->Arguments[i].Ptr());
+						if (i < instr->Arguments.Count() - 1)
+							ctx.Body << L", ";
+					}
+					ctx.Body << L")";
+				}
+				else if (instr->Function == L"SampleBias")
+				{
+					if (instr->Arguments.Count() == 5) // loc, bias, offset
+					{
+						ctx.Body << L"textureOffset(";
+						PrintOp(ctx, instr->Arguments[0].Ptr());
+						ctx.Body << L", ";
+						PrintOp(ctx, instr->Arguments[2].Ptr());
+						ctx.Body << L", ";
+						PrintOp(ctx, instr->Arguments[4].Ptr());
+						ctx.Body << L", ";
+						PrintOp(ctx, instr->Arguments[3].Ptr());
+						ctx.Body << L")";
+					}
+					else
+					{
+						ctx.Body << L"texture(";
+						PrintOp(ctx, instr->Arguments[0].Ptr());
+						ctx.Body << L", ";
+						PrintOp(ctx, instr->Arguments[2].Ptr());
+						ctx.Body << L", ";
+						PrintOp(ctx, instr->Arguments[3].Ptr());
+						ctx.Body << L")";
+					}
+				}
+				else
+					throw NotImplementedException(L"CodeGen for texture function '" + instr->Function + L"' is not implemented.");
+			}
+
 			void DeclareUniformBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool /*isVertexShader*/) override
 			{
 				auto info = ExtractExternComponentInfo(input);
@@ -18312,6 +18381,8 @@ namespace Spire
 				for (auto & field : recType->Members)
 				{
 					if (!useBindlessTexture && field.Value.Type->IsTexture())
+						continue;
+					if (field.Value.Type->IsSamplerState())
 						continue;
 					String declName = field.Key;
 					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
@@ -18378,6 +18449,8 @@ namespace Spire
 					if (!useBindlessTexture && info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer &&
 						field.Value.Type->IsTexture())
 						continue;
+					if (field.Value.Type->IsSamplerState())
+						continue;
 					if (input.Attributes.ContainsKey(L"VertexInput"))
 						sb.GlobalHeader << L"layout(location = " << index << L") ";
 					if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat") ||
@@ -18430,6 +18503,8 @@ namespace Spire
 				int index = 0;
 				for (auto & field : recType->Members)
 				{
+					if (field.Value.Type->IsSamplerState())
+						continue;
 					if (input.Attributes.ContainsKey(L"VertexInput"))
 						sb.GlobalHeader << L"layout(location = " << index << L") ";
 					if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat")))
@@ -18495,6 +18570,8 @@ namespace Spire
 				int index = 0;
 				for (auto & field : recType->Members)
 				{
+					if (field.Value.Type->IsSamplerState())
+						continue;
 					if (input.Attributes.ContainsKey(L"VertexInput"))
 						sb.GlobalHeader << L"layout(location = " << index << L") ";
 					if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat") || field.Value.Type->IsIntegral()))
@@ -18532,6 +18609,8 @@ namespace Spire
 				int index = 0;
 				for (auto & field : recType->Members)
 				{
+					if (field.Value.Type->IsSamplerState())
+						continue;
 					if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat")))
 						sb.GlobalHeader << L"flat ";
 					sb.GlobalHeader << L"patch in ";
@@ -19112,7 +19191,22 @@ namespace Spire
 				return name;
 			}
 
-
+			void PrintTextureCall(CodeGenContext & ctx, CallInstruction * instr)
+			{
+				// texture functions are defined based on HLSL, so this is trivial
+				// internally, texObj.Sample(sampler_obj, uv, ..) is represented as Sample(texObj, sampler_obj, uv, ...)
+				// so we need to lift first argument to the front
+				PrintOp(ctx, instr->Arguments[0].Ptr(), true);
+				ctx.Body << L"." << instr->Function;
+				ctx.Body << L"(";
+				for (int i = 1; i < instr->Arguments.Count(); i++)
+				{
+					PrintOp(ctx, instr->Arguments[i].Ptr());
+					if (i < instr->Arguments.Count() - 1)
+						ctx.Body << L", ";
+				}
+				ctx.Body << L")";
+			}
 
 			void PrintTypeName(StringBuilder& sb, ILType* type) override
 			{
@@ -19998,6 +20092,15 @@ namespace Spire
 			if (basicType)
 				return basicType->Type == ILBaseType::Texture2D || basicType->Type == ILBaseType::TextureCube || basicType->Type == ILBaseType::TextureCubeShadow ||
 				basicType->Type == ILBaseType::TextureShadow;
+			else
+				return false;
+		}
+
+		bool ILType::IsSamplerState()
+		{
+			auto basicType = dynamic_cast<ILBasicType*>(this);
+			if (basicType)
+				return basicType->Type == ILBaseType::SamplerState;
 			else
 				return false;
 		}
@@ -23210,12 +23313,10 @@ namespace Spire
 					expType->BaseType = BaseType::Float4x4;
 				else if (typeNode->TypeName == L"sampler2D" || typeNode->TypeName == L"Texture2D")
 					expType->BaseType = BaseType::Texture2D;
-				else if (typeNode->TypeName == L"samplerCube")
+				else if (typeNode->TypeName == L"samplerCube" || typeNode->TypeName == L"TextureCube")
 					expType->BaseType = BaseType::TextureCube;
-				else if (typeNode->TypeName == L"sampler2DShadow")
-					expType->BaseType = BaseType::TextureShadow;
-				else if (typeNode->TypeName == L"samplerCubeShadow")
-					expType->BaseType = BaseType::TextureCubeShadow;
+				else if (typeNode->TypeName == L"SamplerState" || typeNode->TypeName == L"sampler" || typeNode->TypeName == L"sampler_state")
+					expType->BaseType = BaseType::SamplerState;
 				else if (typeNode->TypeName == L"void")
 					expType->BaseType = BaseType::Void;
 				else if (typeNode->TypeName == L"bool")
@@ -24378,6 +24479,16 @@ namespace Spire
 						invoke->Type = func->Implementations.First()->SyntaxNode->Type;
 						return invoke;
 					}
+				}
+				else
+				{
+					invoke->Arguments.Insert(0, memberExpr->BaseExpression);
+					auto funcExpr = new VarExpressionSyntaxNode();
+					funcExpr->Scope = invoke->Scope;
+					funcExpr->Position = invoke->Position;
+					funcExpr->Variable = memberExpr->MemberName;
+					invoke->FunctionExpr = funcExpr;
+					return ResolveFunctionOverload(invoke, funcExpr, invoke->Arguments);
 				}
 				return invoke;
 			}
@@ -30935,18 +31046,23 @@ __intrinsic float smoothstep(float e0, float e1, float v);
 __intrinsic vec2 smoothstep(vec2 e0, vec2 e1, vec2 v);
 __intrinsic vec3 smoothstep(vec3 e0, vec3 e1, vec3 v);
 __intrinsic vec4 smoothstep(vec4 e0, vec4 e1, vec4 v);
-__intrinsic vec4 texture(sampler2D tex, vec2 coord);
-__intrinsic vec4 texture(samplerCube tex, vec3 coord);
-__intrinsic vec4 textureGrad(sampler2D tex, vec2 coord, vec2 dPdx, vec2 dPdy);
-__intrinsic vec4 textureGrad(samplerCube tex, vec3 coord, vec3 dPdx, vec3 dPdy);
-__intrinsic vec4 texture(samplerCube tex, vec3 coord, float bias);
-__intrinsic float texture(sampler2DShadow tex, vec3 coord);
-__intrinsic float texture(samplerCubeShadow tex, vec4 coord);
-__intrinsic vec4 textureProj(sampler2D tex, vec3 coord);
-__intrinsic vec4 textureProj(samplerCube tex, vec4 coord);
-__intrinsic float textureProj(sampler2DShadow tex, vec4 coord);
-__intrinsic float textureProj(samplerCubeShadow tex, vec4 coord);
-__intrinsic vec4 texelFetch(sampler2D sampler, ivec2 P, int lod);
+__intrinsic vec4 Sample(Texture2D tex, SamplerState sampler, vec2 uv);
+__intrinsic vec4 Sample(Texture2D tex, SamplerState sampler, vec2 uv, ivec2 offset);
+__intrinsic vec4 Sample(TextureCube tex, SamplerState sampler, vec3 uv);
+__intrinsic vec4 SampleGrad(Texture2D tex, SamplerState sampler, vec2 uv, vec2 ddx, vec2 ddy);
+__intrinsic vec4 SampleGrad(Texture2D tex, SamplerState sampler, vec2 uv, vec2 ddx, vec2 ddy, ivec2 offset);
+__intrinsic vec4 SampleGrad(TextureCube tex, SamplerState sampler, vec3 uv, vec3 ddx, vec3 ddy);
+__intrinsic vec4 SampleBias(Texture2D tex, SamplerState sampler, vec2 uv, float bias);
+__intrinsic vec4 SampleBias(Texture2D tex, SamplerState sampler, vec2 uv, float bias, ivec2 offset);
+__intrinsic vec4 SampleBias(TextureCube tex, SamplerState sampler, vec3 uv, float bias);
+__intrinsic vec4 texture(Texture2D tex, vec2 coord);
+__intrinsic vec4 texture(TextureCube tex, vec3 coord);
+__intrinsic vec4 textureGrad(Texture2D tex, vec2 coord, vec2 dPdx, vec2 dPdy);
+__intrinsic vec4 textureGrad(TextureCube tex, vec3 coord, vec3 dPdx, vec3 dPdy);
+__intrinsic vec4 texture(TextureCube tex, vec3 coord, float bias);
+__intrinsic vec4 textureProj(Texture2D tex, vec3 coord);
+__intrinsic vec4 textureProj(TextureCube tex, vec4 coord);
+__intrinsic vec4 texelFetch(Texture2D sampler, ivec2 P, int lod);
 __intrinsic float diff(float v);
 __intrinsic float mod(float x, float y);
 __intrinsic float max(float v);
@@ -31891,12 +32007,6 @@ namespace Spire
 			case Compiler::BaseType::TextureCube:
 				res.Append(L"samplerCube");
 				break;
-			case Compiler::BaseType::TextureShadow:
-				res.Append(L"samplerShadow");
-				break;
-			case Compiler::BaseType::TextureCubeShadow:
-				res.Append(L"samplerCubeShadow");
-				break;
 			case Compiler::BaseType::Function:
 				res.Append(Func->SyntaxNode->InternalName);
 				break;
@@ -32257,10 +32367,6 @@ namespace Spire
 					rs->TypeName = L"sampler2D";
 				else if (t.BaseType == BaseType::TextureCube)
 					rs->TypeName = L"samplerCube";
-				else if (t.BaseType == BaseType::TextureShadow)
-					rs->TypeName = L"samplerShadow";
-				else if (t.BaseType == BaseType::TextureCubeShadow)
-					rs->TypeName = L"samplerCubeShadow";
 				return rs;
 			}
 			else if (auto arrayType = dynamic_cast<ArrayExpressionType*>(type))
@@ -32392,9 +32498,7 @@ namespace Spire
 			auto basicType = AsBasicType();
 			if (basicType)
 				return basicType->BaseType == BaseType::Texture2D ||
-					basicType->BaseType == BaseType::TextureCube ||
-					basicType->BaseType == BaseType::TextureCubeShadow ||
-					basicType->BaseType == BaseType::TextureShadow;
+					basicType->BaseType == BaseType::TextureCube;
 			return false;
 		}
 		bool ExpressionType::IsStruct() const

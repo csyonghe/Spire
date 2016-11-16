@@ -25,6 +25,7 @@ namespace Spire
 			TextureCubeShadow = 51,
 			Bool = 128, Bool2 = 129, Bool3 = 130, Bool4 = 131,
 			UInt = 512, UInt2 = 513, UInt3 = 514, UInt4 = 515,
+			SamplerState = 4096,
 		};
 		int SizeofBaseType(ILBaseType type);
 		int RoundToAlignment(int offset, int alignment);
@@ -51,6 +52,7 @@ namespace Spire
 				return IsIntVector() || IsUIntVector() || IsFloatVector() || IsBoolVector();
 			}
 			bool IsTexture();
+			bool IsSamplerState();
 			bool IsNonShadowTexture();
 			int GetVectorSize();
 			virtual ILType * Clone() = 0;

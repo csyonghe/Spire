@@ -34,14 +34,13 @@ namespace Spire
 			Bool = 128, Bool2 = 129, Bool3 = 130, Bool4 = 131,
 			Float3x3 = 40, Float4x4 = 47,
 			Texture2D = 48,
-			TextureShadow = 49,
 			TextureCube = 50,
-			TextureCubeShadow = 51,
+			SamplerState = 4096,
 			Function = 64,
 			Shader = 256,
 			Struct = 1024,
 			Record = 2048,
-			Error = 4096,
+			Error = 8192,
 		};
 
 		inline const wchar_t * BaseTypeToString(BaseType t)
@@ -75,10 +74,6 @@ namespace Spire
 				return L"sampler2D";
 			case BaseType::TextureCube:
 				return L"samplerCube";
-			case BaseType::TextureShadow:
-				return L"sampler2DShadow";
-			case BaseType::TextureCubeShadow:
-				return L"samplerCubeShadow";
 			default:
 				return L"<err-type>";
 			}
@@ -344,8 +339,8 @@ namespace Spire
 		{
 		public:
 			String TypeName;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual BasicTypeSyntaxNode * Clone(CloneContext & ctx)
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual BasicTypeSyntaxNode * Clone(CloneContext & ctx) override
 			{
 				return CloneSyntaxNodeFields(new BasicTypeSyntaxNode(*this), ctx);
 			}
@@ -356,8 +351,8 @@ namespace Spire
 		public:
 			RefPtr<TypeSyntaxNode> BaseType;
 			int ArrayLength;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual ArrayTypeSyntaxNode * Clone(CloneContext & ctx)
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual ArrayTypeSyntaxNode * Clone(CloneContext & ctx) override
 			{
 				auto rs = CloneSyntaxNodeFields(new ArrayTypeSyntaxNode(*this), ctx);
 				rs->BaseType = BaseType->Clone(ctx);
@@ -370,8 +365,8 @@ namespace Spire
 		public:
 			RefPtr<TypeSyntaxNode> BaseType;
 			String GenericTypeName;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor);
-			virtual GenericTypeSyntaxNode * Clone(CloneContext & ctx)
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual GenericTypeSyntaxNode * Clone(CloneContext & ctx) override
 			{
 				auto rs = CloneSyntaxNodeFields(new GenericTypeSyntaxNode(*this), ctx);
 				rs->BaseType = BaseType->Clone(ctx);

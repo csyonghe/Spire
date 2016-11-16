@@ -139,12 +139,10 @@ namespace Spire
 					expType->BaseType = BaseType::Float4x4;
 				else if (typeNode->TypeName == L"sampler2D" || typeNode->TypeName == L"Texture2D")
 					expType->BaseType = BaseType::Texture2D;
-				else if (typeNode->TypeName == L"samplerCube")
+				else if (typeNode->TypeName == L"samplerCube" || typeNode->TypeName == L"TextureCube")
 					expType->BaseType = BaseType::TextureCube;
-				else if (typeNode->TypeName == L"sampler2DShadow")
-					expType->BaseType = BaseType::TextureShadow;
-				else if (typeNode->TypeName == L"samplerCubeShadow")
-					expType->BaseType = BaseType::TextureCubeShadow;
+				else if (typeNode->TypeName == L"SamplerState" || typeNode->TypeName == L"sampler" || typeNode->TypeName == L"sampler_state")
+					expType->BaseType = BaseType::SamplerState;
 				else if (typeNode->TypeName == L"void")
 					expType->BaseType = BaseType::Void;
 				else if (typeNode->TypeName == L"bool")
@@ -1307,6 +1305,16 @@ namespace Spire
 						invoke->Type = func->Implementations.First()->SyntaxNode->Type;
 						return invoke;
 					}
+				}
+				else
+				{
+					invoke->Arguments.Insert(0, memberExpr->BaseExpression);
+					auto funcExpr = new VarExpressionSyntaxNode();
+					funcExpr->Scope = invoke->Scope;
+					funcExpr->Position = invoke->Position;
+					funcExpr->Variable = memberExpr->MemberName;
+					invoke->FunctionExpr = funcExpr;
+					return ResolveFunctionOverload(invoke, funcExpr, invoke->Arguments);
 				}
 				return invoke;
 			}

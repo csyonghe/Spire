@@ -103,6 +103,69 @@ namespace Spire
 				sb << type->ToString();
 			}
 
+			void PrintTextureCall(CodeGenContext & ctx, CallInstruction * instr)
+			{
+				if (instr->Function == L"Sample")
+				{
+					if (instr->Arguments.Count() == 4)
+						ctx.Body << L"textureOffset";
+					else
+						ctx.Body << L"texture";
+					ctx.Body << L"(";
+					for (int i = 0; i < instr->Arguments.Count(); i++)
+					{
+						if (i == 1) continue; // skip sampler_state parameter
+						PrintOp(ctx, instr->Arguments[i].Ptr());
+						if (i < instr->Arguments.Count() - 1)
+							ctx.Body << L", ";
+					}
+					ctx.Body << L")";
+				}
+				else if (instr->Function == L"SampleGrad")
+				{
+					if (instr->Arguments.Count() == 6)
+						ctx.Body << L"textureGradOffset";
+					else
+						ctx.Body << L"textureGrad";
+					ctx.Body << L"(";
+					for (int i = 0; i < instr->Arguments.Count(); i++)
+					{
+						if (i == 1) continue; // skip sampler_state parameter
+						PrintOp(ctx, instr->Arguments[i].Ptr());
+						if (i < instr->Arguments.Count() - 1)
+							ctx.Body << L", ";
+					}
+					ctx.Body << L")";
+				}
+				else if (instr->Function == L"SampleBias")
+				{
+					if (instr->Arguments.Count() == 5) // loc, bias, offset
+					{
+						ctx.Body << L"textureOffset(";
+						PrintOp(ctx, instr->Arguments[0].Ptr());
+						ctx.Body << L", ";
+						PrintOp(ctx, instr->Arguments[2].Ptr());
+						ctx.Body << L", ";
+						PrintOp(ctx, instr->Arguments[4].Ptr());
+						ctx.Body << L", ";
+						PrintOp(ctx, instr->Arguments[3].Ptr());
+						ctx.Body << L")";
+					}
+					else
+					{
+						ctx.Body << L"texture(";
+						PrintOp(ctx, instr->Arguments[0].Ptr());
+						ctx.Body << L", ";
+						PrintOp(ctx, instr->Arguments[2].Ptr());
+						ctx.Body << L", ";
+						PrintOp(ctx, instr->Arguments[3].Ptr());
+						ctx.Body << L")";
+					}
+				}
+				else
+					throw NotImplementedException(L"CodeGen for texture function '" + instr->Function + L"' is not implemented.");
+			}
+
 			void DeclareUniformBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool /*isVertexShader*/) override
 			{
 				auto info = ExtractExternComponentInfo(input);
@@ -123,6 +186,8 @@ namespace Spire
 				for (auto & field : recType->Members)
 				{
 					if (!useBindlessTexture && field.Value.Type->IsTexture())
+						continue;
+					if (field.Value.Type->IsSamplerState())
 						continue;
 					String declName = field.Key;
 					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
@@ -189,6 +254,8 @@ namespace Spire
 					if (!useBindlessTexture && info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer &&
 						field.Value.Type->IsTexture())
 						continue;
+					if (field.Value.Type->IsSamplerState())
+						continue;
 					if (input.Attributes.ContainsKey(L"VertexInput"))
 						sb.GlobalHeader << L"layout(location = " << index << L") ";
 					if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat") ||
@@ -241,6 +308,8 @@ namespace Spire
 				int index = 0;
 				for (auto & field : recType->Members)
 				{
+					if (field.Value.Type->IsSamplerState())
+						continue;
 					if (input.Attributes.ContainsKey(L"VertexInput"))
 						sb.GlobalHeader << L"layout(location = " << index << L") ";
 					if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat")))
@@ -306,6 +375,8 @@ namespace Spire
 				int index = 0;
 				for (auto & field : recType->Members)
 				{
+					if (field.Value.Type->IsSamplerState())
+						continue;
 					if (input.Attributes.ContainsKey(L"VertexInput"))
 						sb.GlobalHeader << L"layout(location = " << index << L") ";
 					if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat") || field.Value.Type->IsIntegral()))
@@ -343,6 +414,8 @@ namespace Spire
 				int index = 0;
 				for (auto & field : recType->Members)
 				{
+					if (field.Value.Type->IsSamplerState())
+						continue;
 					if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat")))
 						sb.GlobalHeader << L"flat ";
 					sb.GlobalHeader << L"patch in ";
