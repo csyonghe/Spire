@@ -137,9 +137,9 @@ namespace Spire
 					expType->BaseType = BaseType::Float3x3;
 				else if (typeNode->TypeName == L"mat4" || typeNode->TypeName == L"mat4x4" || typeNode->TypeName == L"float4x4" || typeNode->TypeName == L"half4x4")
 					expType->BaseType = BaseType::Float4x4;
-				else if (typeNode->TypeName == L"sampler2D" || typeNode->TypeName == L"Texture2D")
+				else if (typeNode->TypeName == L"texture" || typeNode->TypeName == L"Texture" || typeNode->TypeName == L"Texture2D")
 					expType->BaseType = BaseType::Texture2D;
-				else if (typeNode->TypeName == L"samplerCube" || typeNode->TypeName == L"TextureCube")
+				else if (typeNode->TypeName == L"TextureCUBE" || typeNode->TypeName == L"TextureCube")
 					expType->BaseType = BaseType::TextureCube;
 				else if (typeNode->TypeName == L"SamplerState" || typeNode->TypeName == L"sampler" || typeNode->TypeName == L"sampler_state")
 					expType->BaseType = BaseType::SamplerState;

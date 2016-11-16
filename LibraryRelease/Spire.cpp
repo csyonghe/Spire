@@ -11202,7 +11202,7 @@ namespace Spire
 
 			String GetFuncOriginalName(const String & name);
 
-			void PrintOp(CodeGenContext & ctx, ILOperand * op, bool forceExpression = false);
+			virtual void PrintOp(CodeGenContext & ctx, ILOperand * op, bool forceExpression = false);
 			void PrintBinaryInstrExpr(CodeGenContext & ctx, BinaryInstruction * instr);
 			void PrintBinaryInstr(CodeGenContext & ctx, BinaryInstruction * instr);
 			void PrintUnaryInstrExpr(CodeGenContext & ctx, UnaryInstruction * instr);
@@ -11777,14 +11777,11 @@ namespace Spire
 				typeNames.Add(L"half3x3");
 				typeNames.Add(L"half4x4");
 				typeNames.Add(L"Texture2D");
+				typeNames.Add(L"texture");
+				typeNames.Add(L"Texture");
 				typeNames.Add(L"sampler");
 				typeNames.Add(L"SamplerState");
 				typeNames.Add(L"sampler_state");
-				typeNames.Add(L"sampler2D");
-				typeNames.Add(L"sampler2DShadow");
-				typeNames.Add(L"samplerCube");
-				typeNames.Add(L"samplerCubeShadow");
-				typeNames.Add(L"Texture");
 				typeNames.Add(L"Uniform");
 				typeNames.Add(L"ArrayBuffer");
 				typeNames.Add(L"PackedBuffer");
@@ -14431,6 +14428,7 @@ namespace Spire
 					rs = L"(" + rs + L")";
 				return rs;
 			};
+			
 			if (auto c = dynamic_cast<ILConstOperand*>(op))
 			{
 				auto type = c->Type.Ptr();
@@ -18213,6 +18211,17 @@ namespace Spire
 			OutputStrategy * CreatePackedBufferOutputStrategy(ILWorld * world) override;
 			OutputStrategy * CreateArrayOutputStrategy(ILWorld * world, bool pIsPatch, int pArraySize, String arrayIndex) override;
 
+			void PrintOp(CodeGenContext & ctx, ILOperand * op, bool forceExpression = false) override
+			{
+				// GLSL does not have sampler type, print 0 as placeholder
+				if (op->Type->IsSamplerState())
+				{
+					ctx.Body << L"0";
+					return;
+				}
+				CLikeCodeGen::PrintOp(ctx, op, forceExpression);
+			}
+
 			void PrintRasterPositionOutputWrite(CodeGenContext & ctx, ILOperand * operand) override
 			{
 				ctx.Body << L"gl_Position = ";
@@ -18295,7 +18304,12 @@ namespace Spire
 			{
 				// Currently, all types are internally named based on their GLSL equivalent, so
 				// outputting a type for GLSL is trivial.
-				sb << type->ToString();
+
+				// GLSL does not have sampler type, use int as placeholder
+				if (type->IsSamplerState())
+					sb << L"int";
+				else
+					sb << type->ToString();
 			}
 
 			void PrintTextureCall(CodeGenContext & ctx, CallInstruction * instr)
@@ -18410,6 +18424,8 @@ namespace Spire
 				{
 					for (auto & field : recType->Members)
 					{
+						//if (field.Value.Type->IsSamplerState())
+							//continue;
 						if (field.Value.Type->IsTexture())
 						{
 							if (field.Value.Attributes.ContainsKey(L"Binding"))
@@ -23311,9 +23327,9 @@ namespace Spire
 					expType->BaseType = BaseType::Float3x3;
 				else if (typeNode->TypeName == L"mat4" || typeNode->TypeName == L"mat4x4" || typeNode->TypeName == L"float4x4" || typeNode->TypeName == L"half4x4")
 					expType->BaseType = BaseType::Float4x4;
-				else if (typeNode->TypeName == L"sampler2D" || typeNode->TypeName == L"Texture2D")
+				else if (typeNode->TypeName == L"texture" || typeNode->TypeName == L"Texture" || typeNode->TypeName == L"Texture2D")
 					expType->BaseType = BaseType::Texture2D;
-				else if (typeNode->TypeName == L"samplerCube" || typeNode->TypeName == L"TextureCube")
+				else if (typeNode->TypeName == L"TextureCUBE" || typeNode->TypeName == L"TextureCube")
 					expType->BaseType = BaseType::TextureCube;
 				else if (typeNode->TypeName == L"SamplerState" || typeNode->TypeName == L"sampler" || typeNode->TypeName == L"sampler_state")
 					expType->BaseType = BaseType::SamplerState;
@@ -31055,14 +31071,6 @@ __intrinsic vec4 SampleGrad(TextureCube tex, SamplerState sampler, vec3 uv, vec3
 __intrinsic vec4 SampleBias(Texture2D tex, SamplerState sampler, vec2 uv, float bias);
 __intrinsic vec4 SampleBias(Texture2D tex, SamplerState sampler, vec2 uv, float bias, ivec2 offset);
 __intrinsic vec4 SampleBias(TextureCube tex, SamplerState sampler, vec3 uv, float bias);
-__intrinsic vec4 texture(Texture2D tex, vec2 coord);
-__intrinsic vec4 texture(TextureCube tex, vec3 coord);
-__intrinsic vec4 textureGrad(Texture2D tex, vec2 coord, vec2 dPdx, vec2 dPdy);
-__intrinsic vec4 textureGrad(TextureCube tex, vec3 coord, vec3 dPdx, vec3 dPdy);
-__intrinsic vec4 texture(TextureCube tex, vec3 coord, float bias);
-__intrinsic vec4 textureProj(Texture2D tex, vec3 coord);
-__intrinsic vec4 textureProj(TextureCube tex, vec4 coord);
-__intrinsic vec4 texelFetch(Texture2D sampler, ivec2 P, int lod);
 __intrinsic float diff(float v);
 __intrinsic float mod(float x, float y);
 __intrinsic float max(float v);

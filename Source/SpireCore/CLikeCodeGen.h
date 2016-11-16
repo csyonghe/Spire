@@ -162,7 +162,7 @@ namespace Spire
 
 			String GetFuncOriginalName(const String & name);
 
-			void PrintOp(CodeGenContext & ctx, ILOperand * op, bool forceExpression = false);
+			virtual void PrintOp(CodeGenContext & ctx, ILOperand * op, bool forceExpression = false);
 			void PrintBinaryInstrExpr(CodeGenContext & ctx, BinaryInstruction * instr);
 			void PrintBinaryInstr(CodeGenContext & ctx, BinaryInstruction * instr);
 			void PrintUnaryInstrExpr(CodeGenContext & ctx, UnaryInstruction * instr);

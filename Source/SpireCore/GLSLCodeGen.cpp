@@ -18,6 +18,17 @@ namespace Spire
 			OutputStrategy * CreatePackedBufferOutputStrategy(ILWorld * world) override;
 			OutputStrategy * CreateArrayOutputStrategy(ILWorld * world, bool pIsPatch, int pArraySize, String arrayIndex) override;
 
+			void PrintOp(CodeGenContext & ctx, ILOperand * op, bool forceExpression = false) override
+			{
+				// GLSL does not have sampler type, print 0 as placeholder
+				if (op->Type->IsSamplerState())
+				{
+					ctx.Body << L"0";
+					return;
+				}
+				CLikeCodeGen::PrintOp(ctx, op, forceExpression);
+			}
+
 			void PrintRasterPositionOutputWrite(CodeGenContext & ctx, ILOperand * operand) override
 			{
 				ctx.Body << L"gl_Position = ";
@@ -100,7 +111,12 @@ namespace Spire
 			{
 				// Currently, all types are internally named based on their GLSL equivalent, so
 				// outputting a type for GLSL is trivial.
-				sb << type->ToString();
+
+				// GLSL does not have sampler type, use int as placeholder
+				if (type->IsSamplerState())
+					sb << L"int";
+				else
+					sb << type->ToString();
 			}
 
 			void PrintTextureCall(CodeGenContext & ctx, CallInstruction * instr)
@@ -215,6 +231,8 @@ namespace Spire
 				{
 					for (auto & field : recType->Members)
 					{
+						//if (field.Value.Type->IsSamplerState())
+							//continue;
 						if (field.Value.Type->IsTexture())
 						{
 							if (field.Value.Attributes.ContainsKey(L"Binding"))

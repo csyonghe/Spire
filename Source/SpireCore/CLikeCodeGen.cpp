@@ -92,6 +92,7 @@ namespace Spire
 					rs = L"(" + rs + L")";
 				return rs;
 			};
+			
 			if (auto c = dynamic_cast<ILConstOperand*>(op))
 			{
 				auto type = c->Type.Ptr();

@@ -114,14 +114,6 @@ __intrinsic vec4 SampleGrad(TextureCube tex, SamplerState sampler, vec3 uv, vec3
 __intrinsic vec4 SampleBias(Texture2D tex, SamplerState sampler, vec2 uv, float bias);
 __intrinsic vec4 SampleBias(Texture2D tex, SamplerState sampler, vec2 uv, float bias, ivec2 offset);
 __intrinsic vec4 SampleBias(TextureCube tex, SamplerState sampler, vec3 uv, float bias);
-__intrinsic vec4 texture(Texture2D tex, vec2 coord);
-__intrinsic vec4 texture(TextureCube tex, vec3 coord);
-__intrinsic vec4 textureGrad(Texture2D tex, vec2 coord, vec2 dPdx, vec2 dPdy);
-__intrinsic vec4 textureGrad(TextureCube tex, vec3 coord, vec3 dPdx, vec3 dPdy);
-__intrinsic vec4 texture(TextureCube tex, vec3 coord, float bias);
-__intrinsic vec4 textureProj(Texture2D tex, vec3 coord);
-__intrinsic vec4 textureProj(TextureCube tex, vec4 coord);
-__intrinsic vec4 texelFetch(Texture2D sampler, ivec2 P, int lod);
 __intrinsic float diff(float v);
 __intrinsic float mod(float x, float y);
 __intrinsic float max(float v);
