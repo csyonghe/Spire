@@ -722,6 +722,12 @@ namespace Spire
 					if (comp->IsParam)
 						Error(33029, L"\'" + compImpl->SyntaxNode->Name.Content + L"\': requirement clash with previous definition.",
 							compImpl->SyntaxNode.Ptr());
+					else
+					{
+						if (!compSym->Type->DataType->Equals(comp->Type.Ptr()))
+							Error(30035, L"'" + comp->Name.Content + L"': type of overloaded component mismatches previous definition.\nsee previous definition at " +
+								compSym->Implementations.First()->SyntaxNode->Position.ToString(), comp->Name);
+					}
 					if (compImpl->SyntaxNode->Parameters.Count())
 						Error(33032, L"\'" + compImpl->SyntaxNode->Name.Content + L"\': function redefinition.\nsee previous definition at " +
 							compSym->Implementations.Last()->SyntaxNode->Position.ToString(), compImpl->SyntaxNode.Ptr());
@@ -1367,8 +1373,8 @@ namespace Spire
 									argList << L", ";
 							}
 							Error(33072, L"'" + varExpr->Variable + L"' is an import operator defined in pipeline '" + currentShader->Pipeline->SyntaxNode->Name.Content
-								+ L"', but none of the import operator overloads matches argument list '(" +
-								argList.ProduceString() + L"').",
+								+ L"', but none of the import operator overloads converting to world '" + currentCompNode->Rate->Worlds.First().World.Content + L"' matches argument list (" +
+								argList.ProduceString() + L").",
 								varExpr);
 							invoke->Type = ExpressionType::Error;
 						}

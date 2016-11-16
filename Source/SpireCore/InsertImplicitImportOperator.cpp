@@ -104,7 +104,13 @@ namespace Spire
 				}
 				else
 				{
-					throw InvalidProgramException(L"import operator not found, should have been checked in semantics pass.");
+					StringBuilder sb;
+					auto targetComp = shaderIR->Shader->AllComponents[componentUniqueName]();
+					sb << L"cannot find import operator to import component '" << targetComp->Name << "' to world '"
+						<< world << L"' when compiling '" << currentCompDef->OriginalName << L"'.\nsee definition of '" << targetComp->Name << L"' at " <<
+						targetComp->Implementations.First()->SyntaxNode->Position.ToString() << L".";
+					Error(34064, sb.ProduceString(), currentCompDef->SyntaxNode.Ptr());
+					return currentCompDef;
 				}
 			}
 
@@ -159,9 +165,9 @@ namespace Spire
 				return import;
 			}
 		};
-		void InsertImplicitImportOperators(ShaderIR * shader)
+		void InsertImplicitImportOperators(ErrorWriter * err, ShaderIR * shader)
 		{
-			InsertImplicitImportOperatorVisitor visitor(shader, nullptr);
+			InsertImplicitImportOperatorVisitor visitor(shader, err);
 			for (auto & comp : shader->Definitions)
 			{
 				for (auto & dep : comp->Dependency)

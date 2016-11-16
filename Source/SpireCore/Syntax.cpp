@@ -23,7 +23,8 @@ namespace Spire
 			return (basicType->BaseType == BaseType &&
 				basicType->Func == Func &&
 				basicType->Shader == Shader &&
-				basicType->Struct == Struct);
+				basicType->Struct == Struct &&
+				basicType->RecordTypeName == RecordTypeName);
 		}
 
 		bool BasicExpressionType::IsVectorType() const

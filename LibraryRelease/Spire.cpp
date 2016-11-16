@@ -10370,7 +10370,7 @@ namespace Spire
 	{
 		RefPtr<ShaderClosure> CreateShaderClosure(ErrorWriter * err, SymbolTable * symTable, ShaderSymbol * shader);
 		void FlattenShaderClosure(ErrorWriter * err, SymbolTable * symTable, ShaderClosure * shader);
-		void InsertImplicitImportOperators(ShaderIR * shader);
+		void InsertImplicitImportOperators(ErrorWriter * err, ShaderIR * shader);
 	}
 }
 
@@ -20510,7 +20510,13 @@ namespace Spire
 				}
 				else
 				{
-					throw InvalidProgramException(L"import operator not found, should have been checked in semantics pass.");
+					StringBuilder sb;
+					auto targetComp = shaderIR->Shader->AllComponents[componentUniqueName]();
+					sb << L"cannot find import operator to import component '" << targetComp->Name << "' to world '"
+						<< world << L"' when compiling '" << currentCompDef->OriginalName << L"'.\nsee definition of '" << targetComp->Name << L"' at " <<
+						targetComp->Implementations.First()->SyntaxNode->Position.ToString() << L".";
+					Error(34064, sb.ProduceString(), currentCompDef->SyntaxNode.Ptr());
+					return currentCompDef;
 				}
 			}
 
@@ -20565,9 +20571,9 @@ namespace Spire
 				return import;
 			}
 		};
-		void InsertImplicitImportOperators(ShaderIR * shader)
+		void InsertImplicitImportOperators(ErrorWriter * err, ShaderIR * shader)
 		{
-			InsertImplicitImportOperatorVisitor visitor(shader, nullptr);
+			InsertImplicitImportOperatorVisitor visitor(shader, err);
 			for (auto & comp : shader->Definitions)
 			{
 				for (auto & dep : comp->Dependency)
@@ -23787,6 +23793,12 @@ namespace Spire
 					if (comp->IsParam)
 						Error(33029, L"\'" + compImpl->SyntaxNode->Name.Content + L"\': requirement clash with previous definition.",
 							compImpl->SyntaxNode.Ptr());
+					else
+					{
+						if (!compSym->Type->DataType->Equals(comp->Type.Ptr()))
+							Error(30035, L"'" + comp->Name.Content + L"': type of overloaded component mismatches previous definition.\nsee previous definition at " +
+								compSym->Implementations.First()->SyntaxNode->Position.ToString(), comp->Name);
+					}
 					if (compImpl->SyntaxNode->Parameters.Count())
 						Error(33032, L"\'" + compImpl->SyntaxNode->Name.Content + L"\': function redefinition.\nsee previous definition at " +
 							compSym->Implementations.Last()->SyntaxNode->Position.ToString(), compImpl->SyntaxNode.Ptr());
@@ -24432,8 +24444,8 @@ namespace Spire
 									argList << L", ";
 							}
 							Error(33072, L"'" + varExpr->Variable + L"' is an import operator defined in pipeline '" + currentShader->Pipeline->SyntaxNode->Name.Content
-								+ L"', but none of the import operator overloads matches argument list '(" +
-								argList.ProduceString() + L"').",
+								+ L"', but none of the import operator overloads converting to world '" + currentCompNode->Rate->Worlds.First().World.Content + L"' matches argument list (" +
+								argList.ProduceString() + L").",
 								varExpr);
 							invoke->Type = ExpressionType::Error;
 						}
@@ -25192,7 +25204,7 @@ namespace Spire
 							codeGen->ProcessFunction(func.Ptr());
 						for (auto & shader : shaderClosures)
 						{
-							InsertImplicitImportOperators(shader.Value->IR.Ptr());
+							InsertImplicitImportOperators(result.GetErrorWriter(), shader.Value->IR.Ptr());
 						}
 						if (result.ErrorList.Count() > 0)
 							return;
@@ -31808,7 +31820,8 @@ namespace Spire
 			return (basicType->BaseType == BaseType &&
 				basicType->Func == Func &&
 				basicType->Shader == Shader &&
-				basicType->Struct == Struct);
+				basicType->Struct == Struct &&
+				basicType->RecordTypeName == RecordTypeName);
 		}
 
 		bool BasicExpressionType::IsVectorType() const

@@ -321,7 +321,7 @@ namespace Spire
 							codeGen->ProcessFunction(func.Ptr());
 						for (auto & shader : shaderClosures)
 						{
-							InsertImplicitImportOperators(shader.Value->IR.Ptr());
+							InsertImplicitImportOperators(result.GetErrorWriter(), shader.Value->IR.Ptr());
 						}
 						if (result.ErrorList.Count() > 0)
 							return;
