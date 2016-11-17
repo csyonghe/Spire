@@ -158,18 +158,31 @@ namespace Spire
 					else if (currentPipeline || currentShader)
 					{
 						PipelineSymbol * pipe = currentPipeline ? currentPipeline : currentShader->Pipeline;
+						bool matched = false;
 						if (pipe)
 						{
 							if (pipe->Worlds.ContainsKey(typeNode->TypeName))
 							{
 								expType->BaseType = BaseType::Record;
 								expType->RecordTypeName = typeNode->TypeName;
+								matched = true;
 							}
-							else
-								Error(31040, L"undefined type name: '" + typeNode->TypeName + L"'.", typeNode);
 						}
-						else
+						if (currentImportOperator)
+						{
+							if (typeNode->TypeName == currentImportOperator->TypeName.Content)
+							{
+								expType->BaseType = BaseType::Generic;
+								expType->GenericTypeVar = typeNode->TypeName;
+								matched = true;
+							}
+							
+						}
+						if (!matched)
+						{
+							Error(31040, L"undefined type name: '" + typeNode->TypeName + L"'.", typeNode);
 							typeResult = ExpressionType::Error;
+						}
 					}
 					else
 					{
@@ -603,14 +616,10 @@ namespace Spire
 				this->currentShader = nullptr;
 			}
 
-			bool MatchType_RecordType(String recTypeName, ExpressionType * valueType)
+			bool MatchType_GenericType(String typeName, ExpressionType * valueType)
 			{
-				if (valueType->IsGenericType(L"Uniform") || valueType->IsGenericType(L"Patch"))
-				{
-					valueType = valueType->AsGenericType()->BaseType.Ptr();
-				}
 				if (auto basicType = valueType->AsBasicType())
-					return basicType->RecordTypeName == recTypeName;
+					return basicType->GenericTypeVar == typeName;
 				return false;
 			}
 
@@ -1010,9 +1019,9 @@ namespace Spire
 								+ L"' does not match component's type '"
 								+ currentComp->Type->DataType->ToString() + L"'", stmt);
 						}
-						if (currentImportOperator && !MatchType_RecordType(currentImportOperator->SourceWorld.Content, stmt->Expression->Type.Ptr()))
-							Error(30007, L"expression type '" + stmt->Expression->Type->ToString() + L"' does not match import operator's type '" + currentImportOperator->SourceWorld.Content
-								+ L"'.", stmt);
+						if (currentImportOperator && !MatchType_GenericType(currentImportOperator->TypeName.Content, stmt->Expression->Type.Ptr()))
+							Error(30020, L"import operator should return '" + currentImportOperator->TypeName.Content
+								+ L"', but the expression has type '" + stmt->Expression->Type->ToString() + L"'. do you forget 'project'?", stmt);
 					}
 				}
 				return stmt;
@@ -1020,13 +1029,13 @@ namespace Spire
 			virtual RefPtr<StatementSyntaxNode> VisitVarDeclrStatement(VarDeclrStatementSyntaxNode *stmt) override
 			{
 				stmt->Type = TranslateTypeNode(stmt->TypeNode);
-				if (stmt->Type->IsTexture())
-				{
-					Error(30033, L"cannot declare a local variable of 'texture' type.", stmt);
-				}
-				if (stmt->Type->AsGenericType())
+				if (stmt->Type->IsTextureOrSampler() || stmt->Type->AsGenericType())
 				{
 					Error(30033, L"cannot declare a local variable of this type.", stmt);
+				}
+				else if (stmt->Type->AsBasicType() && stmt->Type->AsBasicType()->RecordTypeName.Length())
+				{
+					Error(33034, L"cannot declare a record-typed variable in an import operator.", stmt);
 				}
 				for (auto & para : stmt->Variables)
 				{
@@ -1469,6 +1478,23 @@ namespace Spire
 						Error(30015, L"undefined identifier '" + varExpr->Variable + L"'.", varExpr);
 				}
 				return invoke;
+			}
+
+			RefPtr<ExpressionSyntaxNode> VisitProject(ProjectExpressionSyntaxNode * project) override
+			{
+				if (currentImportOperator == nullptr)
+				{
+					Error(30030, L"'project': invalid use outside import operator.", project);
+					return project;
+				}
+				project->BaseExpression->Accept(this);
+				auto baseType = project->BaseExpression->Type->AsBasicType();
+				if (!baseType || baseType->RecordTypeName != currentImportOperator->SourceWorld.Content)
+					Error(30031, L"'project': expression must evaluate to record type '" + currentImportOperator->SourceWorld.Content + L"'.", project);
+				auto rsType = new BasicExpressionType(BaseType::Generic);
+				project->Type = rsType;
+				rsType->GenericTypeVar = currentImportOperator->TypeName.Content;
+				return project;
 			}
 
 			RefPtr<ExpressionSyntaxNode> ResolveInvoke(InvokeExpressionSyntaxNode * expr)

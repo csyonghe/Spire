@@ -512,6 +512,17 @@ namespace Spire
 			ReadToken(TokenType::RParent);
 			FillPosition(op.Ptr());
 			op->Name = ReadToken(TokenType::Identifier);
+			if (LookAheadToken(TokenType::OpLess))
+			{
+				ReadToken(TokenType::OpLess);
+				op->TypeName = ReadToken(TokenType::Identifier);
+				ReadToken(TokenType::OpGreater);
+			}
+			else
+			{
+				op->TypeName.Position = op->Name.Position;
+				op->TypeName.Content = L"TComponentType";
+			}
 			ReadToken(TokenType::LParent);
 			while (!LookAheadToken(TokenType::RParent))
 			{
@@ -527,7 +538,9 @@ namespace Spire
 				ReadToken(L"require");
 				op->Requirements.Add(ParseFunction(false));
 			}
+			isInImportOperator = true;
 			op->Body = ParseBlockStatement();
+			isInImportOperator = false;
 			PopScope();
 			return op;
 		}
@@ -1225,7 +1238,16 @@ namespace Spire
 		RefPtr<ExpressionSyntaxNode> Parser::ParseLeafExpression()
 		{
 			RefPtr<ExpressionSyntaxNode> rs;
-
+			if (LookAheadToken(L"project"))
+			{
+				RefPtr<ProjectExpressionSyntaxNode> project = new ProjectExpressionSyntaxNode();
+				FillPosition(project.Ptr());
+				ReadToken(L"project");
+				ReadToken(TokenType::LParent);
+				project->BaseExpression = ParseExpression();
+				ReadToken(TokenType::RParent);
+				return project;
+			}
 			if (LookAheadToken(TokenType::OpInc) ||
 				LookAheadToken(TokenType::OpDec) ||
 				LookAheadToken(TokenType::OpNot) ||

@@ -5,7 +5,7 @@ namespace Spire
 {
 	namespace Compiler
 	{
-		RefPtr<ILType> TranslateExpressionType(ExpressionType * type, Dictionary<String, RefPtr<ILRecordType>> * recordTypes)
+		RefPtr<ILType> TranslateExpressionType(ExpressionType * type, Dictionary<String, RefPtr<ILType>> * genericTypeMappings)
 		{
 			RefPtr<ILType> resultType = 0;
 			if (auto basicType = type->AsBasicType())
@@ -16,10 +16,17 @@ namespace Spire
 				}
 				else if (basicType->BaseType == BaseType::Record)
 				{
-					if (recordTypes)
-						return (*recordTypes)[basicType->RecordTypeName]();
+					if (genericTypeMappings)
+						return (*genericTypeMappings)[basicType->RecordTypeName]();
 					else
 						throw InvalidProgramException(L"unexpected record type.");
+				}
+				else if (basicType->BaseType == BaseType::Generic)
+				{
+					if (genericTypeMappings)
+						return (*genericTypeMappings)[basicType->GenericTypeVar]();
+					else
+						throw InvalidProgramException(L"unexpected generic type.");
 				}
 				else
 				{
@@ -31,7 +38,7 @@ namespace Spire
 			else if (auto arrType = type->AsArrayType())
 			{
 				auto nArrType = new ILArrayType();
-				nArrType->BaseType = TranslateExpressionType(arrType->BaseType.Ptr(), recordTypes);
+				nArrType->BaseType = TranslateExpressionType(arrType->BaseType.Ptr(), genericTypeMappings);
 				nArrType->ArrayLength = arrType->ArrayLength;
 				resultType = nArrType;
 			}
@@ -39,15 +46,15 @@ namespace Spire
 			{
 				auto gType = new ILGenericType();
 				gType->GenericTypeName = genType->GenericTypeName;
-				gType->BaseType = TranslateExpressionType(genType->BaseType.Ptr(), recordTypes);
+				gType->BaseType = TranslateExpressionType(genType->BaseType.Ptr(), genericTypeMappings);
 				resultType = gType;
 			}
 			return resultType;
 		}
 
-		RefPtr<ILType> TranslateExpressionType(const RefPtr<ExpressionType> & type, Dictionary<String, RefPtr<ILRecordType>> * recordTypes)
+		RefPtr<ILType> TranslateExpressionType(const RefPtr<ExpressionType> & type, Dictionary<String, RefPtr<ILType>> * genericTypeMappings)
 		{
-			return TranslateExpressionType(type.Ptr(), recordTypes);
+			return TranslateExpressionType(type.Ptr(), genericTypeMappings);
 		}
 	}
 }

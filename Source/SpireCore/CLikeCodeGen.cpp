@@ -37,10 +37,7 @@ namespace Spire
 
 		void CLikeCodeGen::PrintType(StringBuilder & sbCode, ILType* type)
 		{
-			if (dynamic_cast<ILRecordType*>(type))
-				PrintType(sbCode, currentImportInstr->Type.Ptr());
-			else
-				PrintTypeName(sbCode, type);
+			PrintTypeName(sbCode, type);
 		}
 
 		void CLikeCodeGen::PrintDef(StringBuilder & sbCode, ILType* type, const String & name)
@@ -203,158 +200,49 @@ namespace Spire
 			}
 			if (instr->Is<MemberLoadInstruction>())
 			{
-				auto genType = dynamic_cast<ILGenericType*>(op0->Type.Ptr());
-				if (genType && genType->GenericTypeName == L"PackedBuffer")
+				
+				PrintOp(ctx, op0);
+				bool printDefault = true;
+				if (op0->Type->IsVector())
 				{
-					// load record type from packed buffer
-					String conversionFunction;
-					int size = 0;
-					if (instr->Type->ToString() == L"int")
+					if (auto c = dynamic_cast<ILConstOperand*>(op1))
 					{
-						conversionFunction = L"floatBitsToInt";
-						size = 1;
-					}
-					else if (instr->Type->ToString() == L"ivec2")
-					{
-						conversionFunction = L"floatBitsToInt";
-						size = 2;
-					}
-					else if (instr->Type->ToString() == L"ivec3")
-					{
-						conversionFunction = L"floatBitsToInt";
-						size = 3;
-					}
-					else if (instr->Type->ToString() == L"ivec4")
-					{
-						conversionFunction = L"floatBitsToInt";
-						size = 4;
-					}
-					else if (instr->Type->ToString() == L"uint")
-					{
-						conversionFunction = L"floatBitsToUint";
-						size = 1;
-					}
-					else if (instr->Type->ToString() == L"uvec2")
-					{
-						conversionFunction = L"floatBitsToUint";
-						size = 2;
-					}
-					else if (instr->Type->ToString() == L"uvec3")
-					{
-						conversionFunction = L"floatBitsToUint";
-						size = 3;
-					}
-					else if (instr->Type->ToString() == L"uvec4")
-					{
-						conversionFunction = L"floatBitsToUint";
-						size = 4;
-					}
-					else if (instr->Type->ToString() == L"float")
-					{
-						conversionFunction = L"";
-						size = 1;
-					}
-					else if (instr->Type->ToString() == L"vec2")
-					{
-						conversionFunction = L"";
-						size = 2;
-					}
-					else if (instr->Type->ToString() == L"vec3")
-					{
-						conversionFunction = L"";
-						size = 3;
-					}
-					else if (instr->Type->ToString() == L"vec4")
-					{
-						conversionFunction = L"";
-						size = 4;
-					}
-					else if (instr->Type->ToString() == L"mat3")
-					{
-						conversionFunction = L"";
-						size = 9;
-					}
-					else if (instr->Type->ToString() == L"mat4")
-					{
-						conversionFunction = L"";
-						size = 16;
-					}
-					else
-					{
-						errWriter->Error(50082, L"importing type '" + instr->Type->ToString() + L"' from PackedBuffer is not supported by the GLSL backend.",
-							CodePosition());
-					}
-					ctx.Body << instr->Type->ToString() << L"(";
-					auto recType = dynamic_cast<ILRecordType*>(genType->BaseType.Ptr());
-					int recTypeSize = 0;
-					EnumerableDictionary<String, int> memberOffsets;
-					for (auto & member : recType->Members)
-					{
-						memberOffsets[member.Key] = recTypeSize;
-						recTypeSize += member.Value.Type->GetVectorSize();
-					}
-					for (int i = 0; i < size; i++)
-					{
-						ctx.Body << conversionFunction << L"(";
-						PrintOp(ctx, op0);
-						ctx.Body << L"[(";
-						PrintOp(ctx, op1);
-						ctx.Body << L") * " << recTypeSize << L" + " << memberOffsets[currentImportInstr->ComponentName]() << L"])";
-						if (i != size - 1)
-							ctx.Body << L", ";
-					}
-					ctx.Body << L")";
-				}
-				else
-				{
-					PrintOp(ctx, op0);
-					bool printDefault = true;
-					if (op0->Type->IsVector())
-					{
-						if (auto c = dynamic_cast<ILConstOperand*>(op1))
+						switch (c->IntValues[0])
 						{
-							switch (c->IntValues[0])
-							{
-							case 0:
-								ctx.Body << L".x";
-								break;
-							case 1:
-								ctx.Body << L".y";
-								break;
-							case 2:
-								ctx.Body << L".z";
-								break;
-							case 3:
-								ctx.Body << L".w";
-								break;
-							default:
-								throw InvalidOperationException(L"Invalid member access.");
-							}
-							printDefault = false;
-						}
-					}
-					else if (auto structType = dynamic_cast<ILStructType*>(op0->Type.Ptr()))
-					{
-						if (auto c = dynamic_cast<ILConstOperand*>(op1))
-						{
-							ctx.Body << L"." << structType->Members[c->IntValues[0]].FieldName;
+						case 0:
+							ctx.Body << L".x";
+							break;
+						case 1:
+							ctx.Body << L".y";
+							break;
+						case 2:
+							ctx.Body << L".z";
+							break;
+						case 3:
+							ctx.Body << L".w";
+							break;
+						default:
+							throw InvalidOperationException(L"Invalid member access.");
 						}
 						printDefault = false;
 					}
-					if (printDefault)
-					{
-						ctx.Body << L"[";
-						PrintOp(ctx, op1);
-						ctx.Body << L"]";
-					}
-					if (genType)
-					{
-						if ((genType->GenericTypeName == L"Buffer" ||
-							genType->GenericTypeName == L"ArrayBuffer") 
-							&& dynamic_cast<ILRecordType*>(genType->BaseType.Ptr()))
-							ctx.Body << L"." << currentImportInstr->ComponentName;
-					}
 				}
+				else if (auto structType = dynamic_cast<ILStructType*>(op0->Type.Ptr()))
+				{
+					if (auto c = dynamic_cast<ILConstOperand*>(op1))
+					{
+						ctx.Body << L"." << structType->Members[c->IntValues[0]].FieldName;
+					}
+					printDefault = false;
+				}
+				if (printDefault)
+				{
+					ctx.Body << L"[";
+					PrintOp(ctx, op1);
+					ctx.Body << L"]";
+				}
+				
+				
 				return;
 			}
 			const wchar_t * op = L"";
@@ -639,7 +527,7 @@ namespace Spire
 
 		bool CLikeCodeGen::AppearAsExpression(ILInstruction & instr, bool force)
 		{
-			if (instr.Is<LoadInputInstruction>())
+			if (instr.Is<LoadInputInstruction>() || instr.Is<ProjectInstruction>())
 				return true;
 			if (auto arg = instr.As<FetchArgInstruction>())
 			{
@@ -737,7 +625,9 @@ namespace Spire
 
 		void CLikeCodeGen::PrintInstrExpr(CodeGenContext & ctx, ILInstruction & instr)
 		{
-			if (auto binInstr = instr.As<BinaryInstruction>())
+			if (auto projInstr = instr.As<ProjectInstruction>())
+				PrintProjectInstrExpr(ctx, projInstr);
+			else if (auto binInstr = instr.As<BinaryInstruction>())
 				PrintBinaryInstrExpr(ctx, binInstr);
 			else if (auto unaryInstr = instr.As<UnaryInstruction>())
 				PrintUnaryInstrExpr(ctx, unaryInstr);
@@ -873,7 +763,6 @@ namespace Spire
 				{
 					context.Body << L"discard;\n";
 				}
-					
 				else
 					PrintInstr(context, instr);
 			}
@@ -1271,7 +1160,7 @@ namespace Spire
 				codeGen->PrintDef(Header, op->Type.Ptr(), name);
 				if (op->Type->IsInt() || op->Type->IsUInt())
 				{
-					Header << L" = 0;";
+					Header << L" = 0";
 				}
 				Header << L";\n";
 				VarName.Add(op, name);

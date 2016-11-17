@@ -23,6 +23,7 @@ namespace Spire
 			String fileName;
 			HashSet<String> typeNames;
 			HashSet<String> classNames;
+			bool isInImportOperator = false;
 			void FillPosition(SyntaxNode * node)
 			{
 				int id = Math::Min(pos, tokens.Count() - 1);

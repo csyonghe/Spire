@@ -414,57 +414,6 @@ namespace Spire
 		{
 			return visitor->VisitBasicType(this);
 		}
-		RefPtr<TypeSyntaxNode> TypeSyntaxNode::FromExpressionType(ExpressionType * type)
-		{
-			if (auto basicType = dynamic_cast<BasicExpressionType*>(type))
-			{
-				RefPtr<BasicTypeSyntaxNode> rs = new BasicTypeSyntaxNode();
-				auto & t = *basicType;
-				if (basicType->BaseType == BaseType::Int)
-					rs->TypeName = L"int";
-				else if (t.BaseType == BaseType::Float)
-					rs->TypeName = L"float";
-				else if (t.BaseType == BaseType::Bool)
-					rs->TypeName = L"bool";
-				else if (t.BaseType == BaseType::Int2)
-					rs->TypeName = L"ivec2";
-				else if (t.BaseType == BaseType::Int3)
-					rs->TypeName = L"ivec3";
-				else if (t.BaseType == BaseType::Int4)
-					rs->TypeName = L"ivec4";
-				else if (t.BaseType == BaseType::UInt)
-					rs->TypeName = L"uint";
-				else if (t.BaseType == BaseType::UInt2)
-					rs->TypeName = L"uint2";
-				else if (t.BaseType == BaseType::UInt3)
-					rs->TypeName = L"uint3";
-				else if (t.BaseType == BaseType::UInt4)
-					rs->TypeName = L"uint4";
-				else if (t.BaseType == BaseType::Float2)
-					rs->TypeName = L"vec2";
-				else if (t.BaseType == BaseType::Float3)
-					rs->TypeName = L"vec3";
-				else if (t.BaseType == BaseType::Float4)
-					rs->TypeName = L"vec4";
-				else if (t.BaseType == BaseType::Float3x3)
-					rs->TypeName = L"mat3";
-				else if (t.BaseType == BaseType::Float4x4)
-					rs->TypeName = L"mat4";
-				else if (t.BaseType == BaseType::Texture2D)
-					rs->TypeName = L"sampler2D";
-				else if (t.BaseType == BaseType::TextureCube)
-					rs->TypeName = L"samplerCube";
-				return rs;
-			}
-			else if (auto arrayType = dynamic_cast<ArrayExpressionType*>(type))
-			{
-				RefPtr<ArrayTypeSyntaxNode> rs = new ArrayTypeSyntaxNode();
-				rs->ArrayLength = arrayType->ArrayLength;
-				rs->BaseType = FromExpressionType(arrayType->BaseType.Ptr());
-				return rs;
-			}
-			throw NotImplementedException();
-		}
 		RefPtr<SyntaxNode> ComponentSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
 			return visitor->VisitComponent(this);
@@ -580,7 +529,7 @@ namespace Spire
 		{
 			return (BaseType == Compiler::BaseType::Int || BaseType == Compiler::BaseType::UInt || BaseType == Compiler::BaseType::Bool);
 		}
-		bool ExpressionType::IsTexture() const
+		bool ExpressionType::IsTextureOrSampler() const
 		{
 			auto basicType = AsBasicType();
 			if (basicType)
@@ -818,5 +767,15 @@ namespace Spire
 				return L"";
 			}
 		}
-	}
+		RefPtr<SyntaxNode> ProjectExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
+		{
+			return visitor->VisitProject(this);
+		}
+		ProjectExpressionSyntaxNode * ProjectExpressionSyntaxNode::Clone(CloneContext & ctx)
+		{
+			auto * result = new ProjectExpressionSyntaxNode(*this);
+			result->BaseExpression = BaseExpression->Clone(ctx);
+			return result;
+		}
+}
 }

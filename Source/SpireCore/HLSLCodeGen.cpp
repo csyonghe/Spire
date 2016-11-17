@@ -164,6 +164,13 @@ namespace Spire
 				ctx.Body << L")";
 			}
 
+			void PrintProjectInstrExpr(CodeGenContext & ctx, ProjectInstruction * proj) override
+			{
+				// project component out of record type. 
+				PrintOp(ctx, proj->Operand.Ptr());
+				ctx.Body << L"." << proj->ComponentName;
+			}
+
 			void PrintTypeName(StringBuilder& sb, ILType* type) override
 			{
 				// Currently, all types are internally named based on their GLSL equivalent, so

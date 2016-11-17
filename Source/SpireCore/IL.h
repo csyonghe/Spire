@@ -1113,8 +1113,7 @@ namespace Spire
 			AllInstructionsIterator begin();
 			AllInstructionsIterator end();
 		};
-
-
+		
 		class CFGNode : public Object
 		{
 		private:
@@ -1306,6 +1305,7 @@ namespace Spire
 			}
 		};
 
+
 		class PhiInstruction : public ILInstruction
 		{
 		public:
@@ -1389,6 +1389,25 @@ namespace Spire
 		public:
 			RefPtr<ILRecordType> RecordType;
 			List<UseReference> Arguments;
+		};
+
+		class ProjectInstruction : public UnaryInstruction
+		{
+		public:
+			String ComponentName;
+			virtual String ToString() override
+			{
+				StringBuilder sb;
+				sb << Name << L" = project ";
+				sb << Operand.ToString();
+				sb << L", " << ComponentName;
+				return sb.ProduceString();
+			}
+			virtual ProjectInstruction * Clone() override
+			{
+				return new ProjectInstruction(*this);
+			}
+			virtual void Accept(InstructionVisitor * visitor) override;
 		};
 
 		class ExportInstruction : public UnaryInstruction
@@ -2373,6 +2392,7 @@ namespace Spire
 			virtual void VisitLoadInputInstruction(LoadInputInstruction *) {}
 			virtual void VisitPhiInstruction(PhiInstruction *){}
 			virtual void VisitSwizzleInstruction(SwizzleInstruction*) {}
+			virtual void VisitProjectInstruction(ProjectInstruction*) {}
 		};
 
 		class ForInstruction : public ILInstruction

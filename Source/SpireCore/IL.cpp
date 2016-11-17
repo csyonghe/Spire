@@ -654,5 +654,9 @@ namespace Spire
 		{
 			visitor->VisitSwizzleInstruction(this);
 		}
+		void ProjectInstruction::Accept(InstructionVisitor * visitor)
+		{
+			visitor->VisitProjectInstruction(this);
+		}
 }
 }

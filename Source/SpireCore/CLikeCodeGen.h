@@ -152,7 +152,7 @@ namespace Spire
 			virtual void PrintMatrixMulInstrExpr(CodeGenContext & ctx, ILOperand* op0, ILOperand* op1);
 			virtual void PrintRasterPositionOutputWrite(CodeGenContext & ctx, ILOperand * operand) = 0;
 			virtual void PrintTextureCall(CodeGenContext & ctx, CallInstruction * instr) = 0;
-
+			virtual void PrintProjectInstrExpr(CodeGenContext & ctx, ProjectInstruction * instr) = 0;
 		public:
 			void Error(int errId, String msg, CodePosition pos);
 			void PrintType(StringBuilder & sbCode, ILType* type);
@@ -199,6 +199,7 @@ namespace Spire
 			ExternComponentCodeGenInfo ExtractExternComponentInfo(const ILObjectDefinition & input);
 			void PrintInputReference(StringBuilder & sb, String input);
 			void DeclareInput(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader);
+
 			void GenerateVertexShaderEpilog(CodeGenContext & ctx, ILWorld * world, ILStage * stage);
 			void GenerateDomainShaderProlog(CodeGenContext & ctx, ILStage * stage);
 

@@ -107,6 +107,128 @@ namespace Spire
 				}
 			}
 
+			void PrintProjectInstrExpr(CodeGenContext & ctx, ProjectInstruction * proj)
+			{
+				if (auto memberLoadInstr = dynamic_cast<MemberLoadInstruction*>(proj->Operand.Ptr()))
+				{
+					bool overrideBaseMemberLoad = false;
+					auto genType = dynamic_cast<ILGenericType*>(memberLoadInstr->Operands[0]->Type.Ptr());
+					if (genType && genType->GenericTypeName == L"PackedBuffer")
+					{
+						// load record type from packed buffer
+						String conversionFunction;
+						int size = 0;
+						if (memberLoadInstr->Type->ToString() == L"int")
+						{
+							conversionFunction = L"floatBitsToInt";
+							size = 1;
+						}
+						else if (memberLoadInstr->Type->ToString() == L"ivec2")
+						{
+							conversionFunction = L"floatBitsToInt";
+							size = 2;
+						}
+						else if (memberLoadInstr->Type->ToString() == L"ivec3")
+						{
+							conversionFunction = L"floatBitsToInt";
+							size = 3;
+						}
+						else if (memberLoadInstr->Type->ToString() == L"ivec4")
+						{
+							conversionFunction = L"floatBitsToInt";
+							size = 4;
+						}
+						else if (memberLoadInstr->Type->ToString() == L"uint")
+						{
+							conversionFunction = L"floatBitsToUint";
+							size = 1;
+						}
+						else if (memberLoadInstr->Type->ToString() == L"uvec2")
+						{
+							conversionFunction = L"floatBitsToUint";
+							size = 2;
+						}
+						else if (memberLoadInstr->Type->ToString() == L"uvec3")
+						{
+							conversionFunction = L"floatBitsToUint";
+							size = 3;
+						}
+						else if (memberLoadInstr->Type->ToString() == L"uvec4")
+						{
+							conversionFunction = L"floatBitsToUint";
+							size = 4;
+						}
+						else if (memberLoadInstr->Type->ToString() == L"float")
+						{
+							conversionFunction = L"";
+							size = 1;
+						}
+						else if (memberLoadInstr->Type->ToString() == L"vec2")
+						{
+							conversionFunction = L"";
+							size = 2;
+						}
+						else if (memberLoadInstr->Type->ToString() == L"vec3")
+						{
+							conversionFunction = L"";
+							size = 3;
+						}
+						else if (memberLoadInstr->Type->ToString() == L"vec4")
+						{
+							conversionFunction = L"";
+							size = 4;
+						}
+						else if (memberLoadInstr->Type->ToString() == L"mat3")
+						{
+							conversionFunction = L"";
+							size = 9;
+						}
+						else if (memberLoadInstr->Type->ToString() == L"mat4")
+						{
+							conversionFunction = L"";
+							size = 16;
+						}
+						else
+						{
+							errWriter->Error(50082, L"importing type '" + memberLoadInstr->Type->ToString() + L"' from PackedBuffer is not supported by the GLSL backend.",
+								CodePosition());
+						}
+						ctx.Body << memberLoadInstr->Type->ToString() << L"(";
+						auto recType = dynamic_cast<ILRecordType*>(genType->BaseType.Ptr());
+						int recTypeSize = 0;
+						EnumerableDictionary<String, int> memberOffsets;
+						for (auto & member : recType->Members)
+						{
+							memberOffsets[member.Key] = recTypeSize;
+							recTypeSize += member.Value.Type->GetVectorSize();
+						}
+						for (int i = 0; i < size; i++)
+						{
+							ctx.Body << conversionFunction << L"(";
+							PrintOp(ctx, memberLoadInstr->Operands[0].Ptr());
+							ctx.Body << L"[(";
+							PrintOp(ctx, memberLoadInstr->Operands[1].Ptr());
+							ctx.Body << L") * " << recTypeSize << L" + " << memberOffsets[proj->ComponentName]() << L"])";
+							if (i != size - 1)
+								ctx.Body << L", ";
+						}
+						ctx.Body << L")";
+						overrideBaseMemberLoad = true;
+					}
+					if (!overrideBaseMemberLoad)
+						PrintOp(ctx, memberLoadInstr, true);
+					if (genType)
+					{
+						if ((genType->GenericTypeName == L"Buffer" ||
+							genType->GenericTypeName == L"ArrayBuffer")
+							&& dynamic_cast<ILRecordType*>(genType->BaseType.Ptr()))
+							ctx.Body << L"." << proj->ComponentName;
+					}
+				}
+				else
+					PrintOp(ctx, proj->Operand.Ptr(), true);
+			}
+
 			void PrintTypeName(StringBuilder& sb, ILType* type) override
 			{
 				// Currently, all types are internally named based on their GLSL equivalent, so

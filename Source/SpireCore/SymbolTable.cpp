@@ -392,7 +392,7 @@ namespace Spire
 		{
 			if (auto basic = type->AsBasicType())
 			{
-				if (basic->BaseType == BaseType::Record)
+				if (basic->BaseType == BaseType::Generic)
 					return recordReplaceStr;
 				else
 					return basic->ToString();

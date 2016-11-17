@@ -7042,8 +7042,7 @@ namespace Spire
 			AllInstructionsIterator begin();
 			AllInstructionsIterator end();
 		};
-
-
+		
 		class CFGNode : public Object
 		{
 		private:
@@ -7235,6 +7234,7 @@ namespace Spire
 			}
 		};
 
+
 		class PhiInstruction : public ILInstruction
 		{
 		public:
@@ -7318,6 +7318,25 @@ namespace Spire
 		public:
 			RefPtr<ILRecordType> RecordType;
 			List<UseReference> Arguments;
+		};
+
+		class ProjectInstruction : public UnaryInstruction
+		{
+		public:
+			String ComponentName;
+			virtual String ToString() override
+			{
+				StringBuilder sb;
+				sb << Name << L" = project ";
+				sb << Operand.ToString();
+				sb << L", " << ComponentName;
+				return sb.ProduceString();
+			}
+			virtual ProjectInstruction * Clone() override
+			{
+				return new ProjectInstruction(*this);
+			}
+			virtual void Accept(InstructionVisitor * visitor) override;
 		};
 
 		class ExportInstruction : public UnaryInstruction
@@ -8302,6 +8321,7 @@ namespace Spire
 			virtual void VisitLoadInputInstruction(LoadInputInstruction *) {}
 			virtual void VisitPhiInstruction(PhiInstruction *){}
 			virtual void VisitSwizzleInstruction(SwizzleInstruction*) {}
+			virtual void VisitProjectInstruction(ProjectInstruction*) {}
 		};
 
 		class ForInstruction : public ILInstruction
@@ -8585,7 +8605,8 @@ namespace Spire
 			Shader = 256,
 			Struct = 1024,
 			Record = 2048,
-			Error = 8192,
+			Generic = 8192,
+			Error = 16384,
 		};
 
 		inline const wchar_t * BaseTypeToString(BaseType t)
@@ -8679,7 +8700,7 @@ namespace Spire
 			virtual ArrayExpressionType * AsArrayType() const = 0;
 			virtual GenericExpressionType * AsGenericType() const = 0;
 			virtual ExpressionType * Clone() = 0;
-			bool IsTexture() const;
+			bool IsTextureOrSampler() const;
 			bool IsStruct() const;
 			bool IsShader() const;
 			static void Init();
@@ -8698,7 +8719,7 @@ namespace Spire
 			FunctionSymbol * Func = nullptr;
 			ShaderComponentSymbol * Component = nullptr;
 			StructSymbol * Struct = nullptr;
-			String RecordTypeName;
+			String RecordTypeName, GenericTypeVar;
 
 			BasicExpressionType()
 			{
@@ -8876,7 +8897,6 @@ namespace Spire
 		class TypeSyntaxNode : public SyntaxNode
 		{
 		public:
-			static RefPtr<TypeSyntaxNode> FromExpressionType(ExpressionType * t);
 			virtual TypeSyntaxNode * Clone(CloneContext & ctx) = 0;
 		};
 
@@ -9106,6 +9126,14 @@ namespace Spire
 			List<RefPtr<ExpressionSyntaxNode>> Arguments;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ImportExpressionSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
+		class ProjectExpressionSyntaxNode : public ExpressionSyntaxNode
+		{
+		public:
+			RefPtr<ExpressionSyntaxNode> BaseExpression;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual ProjectExpressionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class UnaryExpressionSyntaxNode : public ExpressionSyntaxNode
@@ -9693,7 +9721,12 @@ namespace Spire
 					arg->Expression = arg->Expression->Accept(this).As<ExpressionSyntaxNode>();
 				return arg;
 			}
-
+			virtual RefPtr<ExpressionSyntaxNode> VisitProject(ProjectExpressionSyntaxNode * project)
+			{
+				if (project->BaseExpression)
+					project->BaseExpression = project->BaseExpression->Accept(this).As<ExpressionSyntaxNode>();
+				return project;
+			}
 		};
 	}
 }
@@ -11223,7 +11256,7 @@ namespace Spire
 			virtual void PrintMatrixMulInstrExpr(CodeGenContext & ctx, ILOperand* op0, ILOperand* op1);
 			virtual void PrintRasterPositionOutputWrite(CodeGenContext & ctx, ILOperand * operand) = 0;
 			virtual void PrintTextureCall(CodeGenContext & ctx, CallInstruction * instr) = 0;
-
+			virtual void PrintProjectInstrExpr(CodeGenContext & ctx, ProjectInstruction * instr) = 0;
 		public:
 			void Error(int errId, String msg, CodePosition pos);
 			void PrintType(StringBuilder & sbCode, ILType* type);
@@ -11270,6 +11303,7 @@ namespace Spire
 			ExternComponentCodeGenInfo ExtractExternComponentInfo(const ILObjectDefinition & input);
 			void PrintInputReference(StringBuilder & sb, String input);
 			void DeclareInput(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader);
+
 			void GenerateVertexShaderEpilog(CodeGenContext & ctx, ILWorld * world, ILStage * stage);
 			void GenerateDomainShaderProlog(CodeGenContext & ctx, ILStage * stage);
 
@@ -11599,8 +11633,8 @@ namespace Spire
 {
 	namespace Compiler
 	{
-		RefPtr<ILType> TranslateExpressionType(ExpressionType * type, Dictionary<String, RefPtr<ILRecordType>> * recordTypes = nullptr);
-		RefPtr<ILType> TranslateExpressionType(const RefPtr<ExpressionType> & type, Dictionary<String, RefPtr<ILRecordType>> * recordTypes = nullptr);
+		RefPtr<ILType> TranslateExpressionType(ExpressionType * type, Dictionary<String, RefPtr<ILType>> * genericTypeMappings = nullptr);
+		RefPtr<ILType> TranslateExpressionType(const RefPtr<ExpressionType> & type, Dictionary<String, RefPtr<ILType>> * genericTypeMappings = nullptr);
 	}
 }
 
@@ -11746,6 +11780,7 @@ namespace Spire
 			String fileName;
 			HashSet<String> typeNames;
 			HashSet<String> classNames;
+			bool isInImportOperator = false;
 			void FillPosition(SyntaxNode * node)
 			{
 				int id = Math::Min(pos, tokens.Count() - 1);
@@ -14406,10 +14441,7 @@ namespace Spire
 
 		void CLikeCodeGen::PrintType(StringBuilder & sbCode, ILType* type)
 		{
-			if (dynamic_cast<ILRecordType*>(type))
-				PrintType(sbCode, currentImportInstr->Type.Ptr());
-			else
-				PrintTypeName(sbCode, type);
+			PrintTypeName(sbCode, type);
 		}
 
 		void CLikeCodeGen::PrintDef(StringBuilder & sbCode, ILType* type, const String & name)
@@ -14572,158 +14604,49 @@ namespace Spire
 			}
 			if (instr->Is<MemberLoadInstruction>())
 			{
-				auto genType = dynamic_cast<ILGenericType*>(op0->Type.Ptr());
-				if (genType && genType->GenericTypeName == L"PackedBuffer")
+				
+				PrintOp(ctx, op0);
+				bool printDefault = true;
+				if (op0->Type->IsVector())
 				{
-					// load record type from packed buffer
-					String conversionFunction;
-					int size = 0;
-					if (instr->Type->ToString() == L"int")
+					if (auto c = dynamic_cast<ILConstOperand*>(op1))
 					{
-						conversionFunction = L"floatBitsToInt";
-						size = 1;
-					}
-					else if (instr->Type->ToString() == L"ivec2")
-					{
-						conversionFunction = L"floatBitsToInt";
-						size = 2;
-					}
-					else if (instr->Type->ToString() == L"ivec3")
-					{
-						conversionFunction = L"floatBitsToInt";
-						size = 3;
-					}
-					else if (instr->Type->ToString() == L"ivec4")
-					{
-						conversionFunction = L"floatBitsToInt";
-						size = 4;
-					}
-					else if (instr->Type->ToString() == L"uint")
-					{
-						conversionFunction = L"floatBitsToUint";
-						size = 1;
-					}
-					else if (instr->Type->ToString() == L"uvec2")
-					{
-						conversionFunction = L"floatBitsToUint";
-						size = 2;
-					}
-					else if (instr->Type->ToString() == L"uvec3")
-					{
-						conversionFunction = L"floatBitsToUint";
-						size = 3;
-					}
-					else if (instr->Type->ToString() == L"uvec4")
-					{
-						conversionFunction = L"floatBitsToUint";
-						size = 4;
-					}
-					else if (instr->Type->ToString() == L"float")
-					{
-						conversionFunction = L"";
-						size = 1;
-					}
-					else if (instr->Type->ToString() == L"vec2")
-					{
-						conversionFunction = L"";
-						size = 2;
-					}
-					else if (instr->Type->ToString() == L"vec3")
-					{
-						conversionFunction = L"";
-						size = 3;
-					}
-					else if (instr->Type->ToString() == L"vec4")
-					{
-						conversionFunction = L"";
-						size = 4;
-					}
-					else if (instr->Type->ToString() == L"mat3")
-					{
-						conversionFunction = L"";
-						size = 9;
-					}
-					else if (instr->Type->ToString() == L"mat4")
-					{
-						conversionFunction = L"";
-						size = 16;
-					}
-					else
-					{
-						errWriter->Error(50082, L"importing type '" + instr->Type->ToString() + L"' from PackedBuffer is not supported by the GLSL backend.",
-							CodePosition());
-					}
-					ctx.Body << instr->Type->ToString() << L"(";
-					auto recType = dynamic_cast<ILRecordType*>(genType->BaseType.Ptr());
-					int recTypeSize = 0;
-					EnumerableDictionary<String, int> memberOffsets;
-					for (auto & member : recType->Members)
-					{
-						memberOffsets[member.Key] = recTypeSize;
-						recTypeSize += member.Value.Type->GetVectorSize();
-					}
-					for (int i = 0; i < size; i++)
-					{
-						ctx.Body << conversionFunction << L"(";
-						PrintOp(ctx, op0);
-						ctx.Body << L"[(";
-						PrintOp(ctx, op1);
-						ctx.Body << L") * " << recTypeSize << L" + " << memberOffsets[currentImportInstr->ComponentName]() << L"])";
-						if (i != size - 1)
-							ctx.Body << L", ";
-					}
-					ctx.Body << L")";
-				}
-				else
-				{
-					PrintOp(ctx, op0);
-					bool printDefault = true;
-					if (op0->Type->IsVector())
-					{
-						if (auto c = dynamic_cast<ILConstOperand*>(op1))
+						switch (c->IntValues[0])
 						{
-							switch (c->IntValues[0])
-							{
-							case 0:
-								ctx.Body << L".x";
-								break;
-							case 1:
-								ctx.Body << L".y";
-								break;
-							case 2:
-								ctx.Body << L".z";
-								break;
-							case 3:
-								ctx.Body << L".w";
-								break;
-							default:
-								throw InvalidOperationException(L"Invalid member access.");
-							}
-							printDefault = false;
-						}
-					}
-					else if (auto structType = dynamic_cast<ILStructType*>(op0->Type.Ptr()))
-					{
-						if (auto c = dynamic_cast<ILConstOperand*>(op1))
-						{
-							ctx.Body << L"." << structType->Members[c->IntValues[0]].FieldName;
+						case 0:
+							ctx.Body << L".x";
+							break;
+						case 1:
+							ctx.Body << L".y";
+							break;
+						case 2:
+							ctx.Body << L".z";
+							break;
+						case 3:
+							ctx.Body << L".w";
+							break;
+						default:
+							throw InvalidOperationException(L"Invalid member access.");
 						}
 						printDefault = false;
 					}
-					if (printDefault)
-					{
-						ctx.Body << L"[";
-						PrintOp(ctx, op1);
-						ctx.Body << L"]";
-					}
-					if (genType)
-					{
-						if ((genType->GenericTypeName == L"Buffer" ||
-							genType->GenericTypeName == L"ArrayBuffer") 
-							&& dynamic_cast<ILRecordType*>(genType->BaseType.Ptr()))
-							ctx.Body << L"." << currentImportInstr->ComponentName;
-					}
 				}
+				else if (auto structType = dynamic_cast<ILStructType*>(op0->Type.Ptr()))
+				{
+					if (auto c = dynamic_cast<ILConstOperand*>(op1))
+					{
+						ctx.Body << L"." << structType->Members[c->IntValues[0]].FieldName;
+					}
+					printDefault = false;
+				}
+				if (printDefault)
+				{
+					ctx.Body << L"[";
+					PrintOp(ctx, op1);
+					ctx.Body << L"]";
+				}
+				
+				
 				return;
 			}
 			const wchar_t * op = L"";
@@ -15008,7 +14931,7 @@ namespace Spire
 
 		bool CLikeCodeGen::AppearAsExpression(ILInstruction & instr, bool force)
 		{
-			if (instr.Is<LoadInputInstruction>())
+			if (instr.Is<LoadInputInstruction>() || instr.Is<ProjectInstruction>())
 				return true;
 			if (auto arg = instr.As<FetchArgInstruction>())
 			{
@@ -15106,7 +15029,9 @@ namespace Spire
 
 		void CLikeCodeGen::PrintInstrExpr(CodeGenContext & ctx, ILInstruction & instr)
 		{
-			if (auto binInstr = instr.As<BinaryInstruction>())
+			if (auto projInstr = instr.As<ProjectInstruction>())
+				PrintProjectInstrExpr(ctx, projInstr);
+			else if (auto binInstr = instr.As<BinaryInstruction>())
 				PrintBinaryInstrExpr(ctx, binInstr);
 			else if (auto unaryInstr = instr.As<UnaryInstruction>())
 				PrintUnaryInstrExpr(ctx, unaryInstr);
@@ -15242,7 +15167,6 @@ namespace Spire
 				{
 					context.Body << L"discard;\n";
 				}
-					
 				else
 					PrintInstr(context, instr);
 			}
@@ -15640,7 +15564,7 @@ namespace Spire
 				codeGen->PrintDef(Header, op->Type.Ptr(), name);
 				if (op->Type->IsInt() || op->Type->IsUInt())
 				{
-					Header << L" = 0;";
+					Header << L" = 0";
 				}
 				Header << L";\n";
 				VarName.Add(op, name);
@@ -15739,7 +15663,7 @@ namespace Spire
 						compSyntax->Name.Content = compName;
 						CloneContext cloneCtx;
 						compSyntax->Expression = arg->Expression->Clone(cloneCtx);
-						compSyntax->TypeNode = TypeSyntaxNode::FromExpressionType(arg->Expression->Type.Ptr());
+						compSyntax->TypeNode = new BasicTypeSyntaxNode();
 						compSyntax->TypeNode->Position = compSyntax->Position;
 						impl->SyntaxNode = compSyntax;
 						ccomp->Name = compName;
@@ -16638,13 +16562,13 @@ namespace Spire
 			ILWorld * currentWorld = nullptr;
 			ComponentDefinitionIR * currentComponent = nullptr;
 			ILOperand * returnRegister = nullptr;
-			ImportOperatorDefSyntaxNode * currentImportDef = nullptr;
+			ImportExpressionSyntaxNode * currentImport = nullptr;
 			ShaderIR * currentShader = nullptr;
 			CompileResult & result;
 			List<ILOperand*> exprStack;
 			CodeWriter codeWriter;
 			ScopeDictionary<String, ILOperand*> variables;
-			Dictionary<String, RefPtr<ILRecordType>> recordTypes;
+			Dictionary<String, RefPtr<ILType>> genericTypeMappings;
 
 			void PushStack(ILOperand * op)
 			{
@@ -16659,7 +16583,7 @@ namespace Spire
 			AllocVarInstruction * AllocVar(ExpressionType * etype)
 			{
 				AllocVarInstruction * varOp = 0;
-				RefPtr<ILType> type = TranslateExpressionType(etype, &recordTypes);
+				RefPtr<ILType> type = TranslateExpressionType(etype, &genericTypeMappings);
 				auto arrType = dynamic_cast<ILArrayType*>(type.Ptr());
 
 				if (arrType)
@@ -16675,7 +16599,7 @@ namespace Spire
 			}
 			FetchArgInstruction * FetchArg(ExpressionType * etype, int argId)
 			{
-				auto type = TranslateExpressionType(etype, &recordTypes);
+				auto type = TranslateExpressionType(etype, &genericTypeMappings);
 				auto arrType = dynamic_cast<ILArrayType*>(type.Ptr());
 				FetchArgInstruction * varOp = 0;
 				if (arrType)
@@ -16747,7 +16671,7 @@ namespace Spire
 				TranslateStages(compiledShader.Ptr(), pipeline->SyntaxNode);
 				result.Program->Shaders.Add(compiledShader);
 
-				recordTypes.Clear();
+				genericTypeMappings.Clear();
 
 				// pass 1: iterating all worlds
 				// create ILWorld and ILRecordType objects for all worlds
@@ -16757,7 +16681,7 @@ namespace Spire
 					auto w = new ILWorld();
 					auto recordType = new ILRecordType();
 					recordType->TypeName = world.Key;
-					recordTypes[world.Key] = recordType;
+					genericTypeMappings[world.Key] = recordType;
 					w->Name = world.Key;
 					w->OutputType = recordType;
 					w->Attributes = world.Value.SyntaxNode->LayoutAttributes;
@@ -16791,7 +16715,7 @@ namespace Spire
 							ILObjectDefinition compDef;
 							compDef.Attributes = comp->SyntaxNode->LayoutAttributes;
 							compDef.Name = comp->UniqueName;
-							compDef.Type = TranslateExpressionType(comp->Type.Ptr(), &recordTypes);
+							compDef.Type = TranslateExpressionType(comp->Type.Ptr(), &genericTypeMappings);
 							compDef.Position = comp->SyntaxNode->Position;
 							compiledWorld->OutputType->Members.AddIfNotExists(compDef.Name, compDef);
 						}
@@ -16817,7 +16741,7 @@ namespace Spire
 						{
 							ILObjectDefinition def;
 							def.Name = comp->UniqueName;
-							def.Type = TranslateExpressionType(comp->Type.Ptr(), &recordTypes);
+							def.Type = TranslateExpressionType(comp->Type.Ptr(), &genericTypeMappings);
 							def.Position = comp->SyntaxNode->Position;
 							def.Attributes = comp->SyntaxNode->LayoutAttributes;
 							world.Value->Inputs.Add(def);
@@ -16833,22 +16757,22 @@ namespace Spire
 						// for each import operator call "import[w0->w1](x)", add x to w0's record type
 						EnumerateImportExpressions(comp->SyntaxNode.Ptr(), [&](ImportExpressionSyntaxNode * importExpr)
 						{
-							auto & recType = recordTypes[importExpr->ImportOperatorDef->SourceWorld.Content]();
+							auto recType = genericTypeMappings[importExpr->ImportOperatorDef->SourceWorld.Content]().As<ILRecordType>();
 							ILObjectDefinition entryDef;
 							entryDef.Attributes = comp->SyntaxNode->LayoutAttributes;
 							entryDef.Name = importExpr->ComponentUniqueName;
-							entryDef.Type = TranslateExpressionType(importExpr->Type.Ptr(), &recordTypes);
+							entryDef.Type = TranslateExpressionType(importExpr->Type.Ptr(), &genericTypeMappings);
 							entryDef.Position = importExpr->Position;
 							recType->Members.AddIfNotExists(importExpr->ComponentUniqueName, entryDef);
 						});
 						// if comp is output, add comp to its world's record type
 						if (comp->SyntaxNode->IsOutput)
 						{
-							auto & recType = recordTypes[comp->World]();
+							auto recType = genericTypeMappings[comp->World]().As<ILRecordType>();
 							ILObjectDefinition entryDef;
 							entryDef.Attributes = comp->SyntaxNode->LayoutAttributes;
 							entryDef.Name = comp->UniqueName;
-							entryDef.Type = TranslateExpressionType(comp->Type.Ptr(), &recordTypes);
+							entryDef.Type = TranslateExpressionType(comp->Type.Ptr(), &genericTypeMappings);
 							entryDef.Position = comp->SyntaxNode->Position;
 							recType->Members.AddIfNotExists(comp->UniqueName, entryDef);
 						}
@@ -16867,7 +16791,7 @@ namespace Spire
 						RefPtr<ILFunction> func = new ILFunction();
 						RefPtr<FunctionSymbol> funcSym = new FunctionSymbol();
 						func->Name = funcName;
-						func->ReturnType = TranslateExpressionType(comp->Type, &recordTypes);
+						func->ReturnType = TranslateExpressionType(comp->Type, &genericTypeMappings);
 						symTable->Functions[funcName] = funcSym;
 						result.Program->Functions[funcName] = func;
 						for (auto dep : comp->GetComponentFunctionDependencyClosure())
@@ -16885,7 +16809,7 @@ namespace Spire
 						{
 							if (dep->SyntaxNode->Parameters.Count() == 0)
 							{
-								auto paramType = TranslateExpressionType(dep->Type, &recordTypes);
+								auto paramType = TranslateExpressionType(dep->Type, &genericTypeMappings);
 								String paramName = EscapeDoubleUnderscore(L"p" + String(id) + L"_" + dep->OriginalName); 
 								func->Parameters.Add(paramName, ILParameter(paramType));
 								auto argInstr = codeWriter.FetchArg(paramType, id + 1);
@@ -16896,7 +16820,7 @@ namespace Spire
 						}
 						for (auto & param : comp->SyntaxNode->Parameters)
 						{
-							auto paramType = TranslateExpressionType(param->Type, &recordTypes);
+							auto paramType = TranslateExpressionType(param->Type, &genericTypeMappings);
 							String paramName = EscapeDoubleUnderscore(L"p" + String(id) + L"_" + param->Name);
 							func->Parameters.Add(paramName, ILParameter(paramType, param->Qualifier));
 							auto argInstr = codeWriter.FetchArg(paramType, id + 1);
@@ -16980,7 +16904,7 @@ namespace Spire
 			{
 				currentComponent = comp;
 				String varName = EscapeDoubleUnderscore(currentComponent->OriginalName);
-				RefPtr<ILType> type = TranslateExpressionType(currentComponent->Type, &recordTypes);
+				RefPtr<ILType> type = TranslateExpressionType(currentComponent->Type, &genericTypeMappings);
 
 				if (comp->SyntaxNode->IsInput)
 				{
@@ -17151,7 +17075,7 @@ namespace Spire
 			virtual RefPtr<StatementSyntaxNode> VisitReturnStatement(ReturnStatementSyntaxNode* stmt) override
 			{
 				returnRegister = nullptr;
-				if (currentWorld != nullptr && currentComponent != nullptr && !currentImportDef)
+				if (currentWorld != nullptr && currentComponent != nullptr && !currentImport)
 				{
 					if (stmt->Expression)
 					{
@@ -17374,7 +17298,7 @@ namespace Spire
 					rs->Operands.SetSize(2);
 					rs->Operands[0] = left;
 					rs->Operands[1] = right;
-					rs->Type = TranslateExpressionType(expr->Type, &recordTypes);
+					rs->Type = TranslateExpressionType(expr->Type, &genericTypeMappings);
 					codeWriter.Insert(rs);
 					switch (expr->Operator)
 					{
@@ -17401,6 +17325,17 @@ namespace Spire
 					PushStack(rs);
 				}
 				return expr;
+			}
+			virtual RefPtr<ExpressionSyntaxNode> VisitProject(ProjectExpressionSyntaxNode * project) override
+			{
+				project->BaseExpression->Accept(this);
+				auto rs = PopStack();
+				auto proj = new ProjectInstruction();
+				proj->ComponentName = currentImport->ComponentUniqueName;
+				proj->Operand = rs;
+				codeWriter.Insert(proj);
+				PushStack(proj);
+				return project;
 			}
 			virtual RefPtr<ExpressionSyntaxNode> VisitConstantExpression(ConstantExpressionSyntaxNode* expr) override
 			{
@@ -17444,17 +17379,24 @@ namespace Spire
 					arguments.Add(argOp);
 					variables.Add(expr->ImportOperatorDef->Parameters[i]->Name, argOp);
 				}
-				currentImportDef = expr->ImportOperatorDef.Ptr();
+				currentImport = expr;
+				auto oldTypeMapping = genericTypeMappings.TryGetValue(expr->ImportOperatorDef->TypeName.Content);
+				auto componentType = TranslateExpressionType(expr->Type, &genericTypeMappings);
+				genericTypeMappings[expr->ImportOperatorDef->TypeName.Content] = componentType;
 				codeWriter.PushNode();
 				expr->ImportOperatorDef->Body->Accept(this);
-				currentImportDef = nullptr;
+				currentImport = nullptr;
 				auto impInstr = new ImportInstruction(expr->Arguments.Count());
 				for (int i = 0; i < expr->Arguments.Count(); i++)
 					impInstr->Arguments[i] = arguments[i];
 				impInstr->ImportOperator = codeWriter.PopNode();
 				variables.PopScope();
+				if (oldTypeMapping)
+					genericTypeMappings[expr->ImportOperatorDef->TypeName.Content] = *oldTypeMapping;
+				else
+					genericTypeMappings.Remove(expr->ImportOperatorDef->TypeName.Content);
 				impInstr->ComponentName = expr->ComponentUniqueName;
-				impInstr->Type = TranslateExpressionType(expr->Type, &recordTypes);
+				impInstr->Type = TranslateExpressionType(expr->Type, &genericTypeMappings);
 				codeWriter.Insert(impInstr);
 				PushStack(impInstr);
 				return expr;
@@ -17512,7 +17454,7 @@ namespace Spire
 						else
 						{
 							auto rs = new SwizzleInstruction();
-							rs->Type = TranslateExpressionType(expr->Type.Ptr(), &recordTypes);
+							rs->Type = TranslateExpressionType(expr->Type.Ptr(), &genericTypeMappings);
 							rs->SwizzleString = expr->MemberName;
 							rs->Operand = base;
 							codeWriter.Insert(rs);
@@ -17590,7 +17532,7 @@ namespace Spire
 				instr->Function = funcName;
 				for (int i = 0; i < args.Count(); i++)
 					instr->Arguments[i] = args[i];
-				instr->Type = TranslateExpressionType(expr->Type, &recordTypes);
+				instr->Type = TranslateExpressionType(expr->Type, &genericTypeMappings);
 				codeWriter.Insert(instr);
 				PushStack(instr);
 				return expr;
@@ -17643,7 +17585,7 @@ namespace Spire
 						instr->Operands[1] = result.Program->ConstantPool->CreateConstant(1.0f);
 					else
 						instr->Operands[1] = result.Program->ConstantPool->CreateConstant(1);
-					instr->Type = TranslateExpressionType(expr->Type, &recordTypes);
+					instr->Type = TranslateExpressionType(expr->Type, &genericTypeMappings);
 					codeWriter.Insert(instr);
 
 					expr->Expression->Access = ExpressionAccess::Write;
@@ -17669,7 +17611,7 @@ namespace Spire
 						instr->Operands[1] = result.Program->ConstantPool->CreateConstant(1.0f);
 					else
 						instr->Operands[1] = result.Program->ConstantPool->CreateConstant(1);
-					instr->Type = TranslateExpressionType(expr->Type, &recordTypes);
+					instr->Type = TranslateExpressionType(expr->Type, &genericTypeMappings);
 					codeWriter.Insert(instr);
 
 					expr->Expression->Access = ExpressionAccess::Write;
@@ -18370,6 +18312,128 @@ namespace Spire
 					sb << inputName;
 					break;
 				}
+			}
+
+			void PrintProjectInstrExpr(CodeGenContext & ctx, ProjectInstruction * proj)
+			{
+				if (auto memberLoadInstr = dynamic_cast<MemberLoadInstruction*>(proj->Operand.Ptr()))
+				{
+					bool overrideBaseMemberLoad = false;
+					auto genType = dynamic_cast<ILGenericType*>(memberLoadInstr->Operands[0]->Type.Ptr());
+					if (genType && genType->GenericTypeName == L"PackedBuffer")
+					{
+						// load record type from packed buffer
+						String conversionFunction;
+						int size = 0;
+						if (memberLoadInstr->Type->ToString() == L"int")
+						{
+							conversionFunction = L"floatBitsToInt";
+							size = 1;
+						}
+						else if (memberLoadInstr->Type->ToString() == L"ivec2")
+						{
+							conversionFunction = L"floatBitsToInt";
+							size = 2;
+						}
+						else if (memberLoadInstr->Type->ToString() == L"ivec3")
+						{
+							conversionFunction = L"floatBitsToInt";
+							size = 3;
+						}
+						else if (memberLoadInstr->Type->ToString() == L"ivec4")
+						{
+							conversionFunction = L"floatBitsToInt";
+							size = 4;
+						}
+						else if (memberLoadInstr->Type->ToString() == L"uint")
+						{
+							conversionFunction = L"floatBitsToUint";
+							size = 1;
+						}
+						else if (memberLoadInstr->Type->ToString() == L"uvec2")
+						{
+							conversionFunction = L"floatBitsToUint";
+							size = 2;
+						}
+						else if (memberLoadInstr->Type->ToString() == L"uvec3")
+						{
+							conversionFunction = L"floatBitsToUint";
+							size = 3;
+						}
+						else if (memberLoadInstr->Type->ToString() == L"uvec4")
+						{
+							conversionFunction = L"floatBitsToUint";
+							size = 4;
+						}
+						else if (memberLoadInstr->Type->ToString() == L"float")
+						{
+							conversionFunction = L"";
+							size = 1;
+						}
+						else if (memberLoadInstr->Type->ToString() == L"vec2")
+						{
+							conversionFunction = L"";
+							size = 2;
+						}
+						else if (memberLoadInstr->Type->ToString() == L"vec3")
+						{
+							conversionFunction = L"";
+							size = 3;
+						}
+						else if (memberLoadInstr->Type->ToString() == L"vec4")
+						{
+							conversionFunction = L"";
+							size = 4;
+						}
+						else if (memberLoadInstr->Type->ToString() == L"mat3")
+						{
+							conversionFunction = L"";
+							size = 9;
+						}
+						else if (memberLoadInstr->Type->ToString() == L"mat4")
+						{
+							conversionFunction = L"";
+							size = 16;
+						}
+						else
+						{
+							errWriter->Error(50082, L"importing type '" + memberLoadInstr->Type->ToString() + L"' from PackedBuffer is not supported by the GLSL backend.",
+								CodePosition());
+						}
+						ctx.Body << memberLoadInstr->Type->ToString() << L"(";
+						auto recType = dynamic_cast<ILRecordType*>(genType->BaseType.Ptr());
+						int recTypeSize = 0;
+						EnumerableDictionary<String, int> memberOffsets;
+						for (auto & member : recType->Members)
+						{
+							memberOffsets[member.Key] = recTypeSize;
+							recTypeSize += member.Value.Type->GetVectorSize();
+						}
+						for (int i = 0; i < size; i++)
+						{
+							ctx.Body << conversionFunction << L"(";
+							PrintOp(ctx, memberLoadInstr->Operands[0].Ptr());
+							ctx.Body << L"[(";
+							PrintOp(ctx, memberLoadInstr->Operands[1].Ptr());
+							ctx.Body << L") * " << recTypeSize << L" + " << memberOffsets[proj->ComponentName]() << L"])";
+							if (i != size - 1)
+								ctx.Body << L", ";
+						}
+						ctx.Body << L")";
+						overrideBaseMemberLoad = true;
+					}
+					if (!overrideBaseMemberLoad)
+						PrintOp(ctx, memberLoadInstr, true);
+					if (genType)
+					{
+						if ((genType->GenericTypeName == L"Buffer" ||
+							genType->GenericTypeName == L"ArrayBuffer")
+							&& dynamic_cast<ILRecordType*>(genType->BaseType.Ptr()))
+							ctx.Body << L"." << proj->ComponentName;
+					}
+				}
+				else
+					PrintOp(ctx, proj->Operand.Ptr(), true);
 			}
 
 			void PrintTypeName(StringBuilder& sb, ILType* type) override
@@ -19294,6 +19358,13 @@ namespace Spire
 						ctx.Body << L", ";
 				}
 				ctx.Body << L")";
+			}
+
+			void PrintProjectInstrExpr(CodeGenContext & ctx, ProjectInstruction * proj) override
+			{
+				// project component out of record type. 
+				PrintOp(ctx, proj->Operand.Ptr());
+				ctx.Body << L"." << proj->ComponentName;
 			}
 
 			void PrintTypeName(StringBuilder& sb, ILType* type) override
@@ -20602,6 +20673,10 @@ namespace Spire
 		void SwizzleInstruction::Accept(InstructionVisitor * visitor)
 		{
 			visitor->VisitSwizzleInstruction(this);
+		}
+		void ProjectInstruction::Accept(InstructionVisitor * visitor)
+		{
+			visitor->VisitProjectInstruction(this);
 		}
 }
 }
@@ -22260,6 +22335,17 @@ namespace Spire
 			ReadToken(TokenType::RParent);
 			FillPosition(op.Ptr());
 			op->Name = ReadToken(TokenType::Identifier);
+			if (LookAheadToken(TokenType::OpLess))
+			{
+				ReadToken(TokenType::OpLess);
+				op->TypeName = ReadToken(TokenType::Identifier);
+				ReadToken(TokenType::OpGreater);
+			}
+			else
+			{
+				op->TypeName.Position = op->Name.Position;
+				op->TypeName.Content = L"TComponentType";
+			}
 			ReadToken(TokenType::LParent);
 			while (!LookAheadToken(TokenType::RParent))
 			{
@@ -22275,7 +22361,9 @@ namespace Spire
 				ReadToken(L"require");
 				op->Requirements.Add(ParseFunction(false));
 			}
+			isInImportOperator = true;
 			op->Body = ParseBlockStatement();
+			isInImportOperator = false;
 			PopScope();
 			return op;
 		}
@@ -22973,7 +23061,16 @@ namespace Spire
 		RefPtr<ExpressionSyntaxNode> Parser::ParseLeafExpression()
 		{
 			RefPtr<ExpressionSyntaxNode> rs;
-
+			if (LookAheadToken(L"project"))
+			{
+				RefPtr<ProjectExpressionSyntaxNode> project = new ProjectExpressionSyntaxNode();
+				FillPosition(project.Ptr());
+				ReadToken(L"project");
+				ReadToken(TokenType::LParent);
+				project->BaseExpression = ParseExpression();
+				ReadToken(TokenType::RParent);
+				return project;
+			}
 			if (LookAheadToken(TokenType::OpInc) ||
 				LookAheadToken(TokenType::OpDec) ||
 				LookAheadToken(TokenType::OpNot) ||
@@ -23450,18 +23547,31 @@ namespace Spire
 					else if (currentPipeline || currentShader)
 					{
 						PipelineSymbol * pipe = currentPipeline ? currentPipeline : currentShader->Pipeline;
+						bool matched = false;
 						if (pipe)
 						{
 							if (pipe->Worlds.ContainsKey(typeNode->TypeName))
 							{
 								expType->BaseType = BaseType::Record;
 								expType->RecordTypeName = typeNode->TypeName;
+								matched = true;
 							}
-							else
-								Error(31040, L"undefined type name: '" + typeNode->TypeName + L"'.", typeNode);
 						}
-						else
+						if (currentImportOperator)
+						{
+							if (typeNode->TypeName == currentImportOperator->TypeName.Content)
+							{
+								expType->BaseType = BaseType::Generic;
+								expType->GenericTypeVar = typeNode->TypeName;
+								matched = true;
+							}
+							
+						}
+						if (!matched)
+						{
+							Error(31040, L"undefined type name: '" + typeNode->TypeName + L"'.", typeNode);
 							typeResult = ExpressionType::Error;
+						}
 					}
 					else
 					{
@@ -23895,14 +24005,10 @@ namespace Spire
 				this->currentShader = nullptr;
 			}
 
-			bool MatchType_RecordType(String recTypeName, ExpressionType * valueType)
+			bool MatchType_GenericType(String typeName, ExpressionType * valueType)
 			{
-				if (valueType->IsGenericType(L"Uniform") || valueType->IsGenericType(L"Patch"))
-				{
-					valueType = valueType->AsGenericType()->BaseType.Ptr();
-				}
 				if (auto basicType = valueType->AsBasicType())
-					return basicType->RecordTypeName == recTypeName;
+					return basicType->GenericTypeVar == typeName;
 				return false;
 			}
 
@@ -24302,9 +24408,9 @@ namespace Spire
 								+ L"' does not match component's type '"
 								+ currentComp->Type->DataType->ToString() + L"'", stmt);
 						}
-						if (currentImportOperator && !MatchType_RecordType(currentImportOperator->SourceWorld.Content, stmt->Expression->Type.Ptr()))
-							Error(30007, L"expression type '" + stmt->Expression->Type->ToString() + L"' does not match import operator's type '" + currentImportOperator->SourceWorld.Content
-								+ L"'.", stmt);
+						if (currentImportOperator && !MatchType_GenericType(currentImportOperator->TypeName.Content, stmt->Expression->Type.Ptr()))
+							Error(30020, L"import operator should return '" + currentImportOperator->TypeName.Content
+								+ L"', but the expression has type '" + stmt->Expression->Type->ToString() + L"'. do you forget 'project'?", stmt);
 					}
 				}
 				return stmt;
@@ -24312,13 +24418,13 @@ namespace Spire
 			virtual RefPtr<StatementSyntaxNode> VisitVarDeclrStatement(VarDeclrStatementSyntaxNode *stmt) override
 			{
 				stmt->Type = TranslateTypeNode(stmt->TypeNode);
-				if (stmt->Type->IsTexture())
-				{
-					Error(30033, L"cannot declare a local variable of 'texture' type.", stmt);
-				}
-				if (stmt->Type->AsGenericType())
+				if (stmt->Type->IsTextureOrSampler() || stmt->Type->AsGenericType())
 				{
 					Error(30033, L"cannot declare a local variable of this type.", stmt);
+				}
+				else if (stmt->Type->AsBasicType() && stmt->Type->AsBasicType()->RecordTypeName.Length())
+				{
+					Error(33034, L"cannot declare a record-typed variable in an import operator.", stmt);
 				}
 				for (auto & para : stmt->Variables)
 				{
@@ -24761,6 +24867,23 @@ namespace Spire
 						Error(30015, L"undefined identifier '" + varExpr->Variable + L"'.", varExpr);
 				}
 				return invoke;
+			}
+
+			RefPtr<ExpressionSyntaxNode> VisitProject(ProjectExpressionSyntaxNode * project) override
+			{
+				if (currentImportOperator == nullptr)
+				{
+					Error(30030, L"'project': invalid use outside import operator.", project);
+					return project;
+				}
+				project->BaseExpression->Accept(this);
+				auto baseType = project->BaseExpression->Type->AsBasicType();
+				if (!baseType || baseType->RecordTypeName != currentImportOperator->SourceWorld.Content)
+					Error(30031, L"'project': expression must evaluate to record type '" + currentImportOperator->SourceWorld.Content + L"'.", project);
+				auto rsType = new BasicExpressionType(BaseType::Generic);
+				project->Type = rsType;
+				rsType->GenericTypeVar = currentImportOperator->TypeName.Content;
+				return project;
 			}
 
 			RefPtr<ExpressionSyntaxNode> ResolveInvoke(InvokeExpressionSyntaxNode * expr)
@@ -31853,7 +31976,7 @@ namespace Spire
 		{
 			if (auto basic = type->AsBasicType())
 			{
-				if (basic->BaseType == BaseType::Record)
+				if (basic->BaseType == BaseType::Generic)
 					return recordReplaceStr;
 				else
 					return basic->ToString();
@@ -32470,57 +32593,6 @@ namespace Spire
 		{
 			return visitor->VisitBasicType(this);
 		}
-		RefPtr<TypeSyntaxNode> TypeSyntaxNode::FromExpressionType(ExpressionType * type)
-		{
-			if (auto basicType = dynamic_cast<BasicExpressionType*>(type))
-			{
-				RefPtr<BasicTypeSyntaxNode> rs = new BasicTypeSyntaxNode();
-				auto & t = *basicType;
-				if (basicType->BaseType == BaseType::Int)
-					rs->TypeName = L"int";
-				else if (t.BaseType == BaseType::Float)
-					rs->TypeName = L"float";
-				else if (t.BaseType == BaseType::Bool)
-					rs->TypeName = L"bool";
-				else if (t.BaseType == BaseType::Int2)
-					rs->TypeName = L"ivec2";
-				else if (t.BaseType == BaseType::Int3)
-					rs->TypeName = L"ivec3";
-				else if (t.BaseType == BaseType::Int4)
-					rs->TypeName = L"ivec4";
-				else if (t.BaseType == BaseType::UInt)
-					rs->TypeName = L"uint";
-				else if (t.BaseType == BaseType::UInt2)
-					rs->TypeName = L"uint2";
-				else if (t.BaseType == BaseType::UInt3)
-					rs->TypeName = L"uint3";
-				else if (t.BaseType == BaseType::UInt4)
-					rs->TypeName = L"uint4";
-				else if (t.BaseType == BaseType::Float2)
-					rs->TypeName = L"vec2";
-				else if (t.BaseType == BaseType::Float3)
-					rs->TypeName = L"vec3";
-				else if (t.BaseType == BaseType::Float4)
-					rs->TypeName = L"vec4";
-				else if (t.BaseType == BaseType::Float3x3)
-					rs->TypeName = L"mat3";
-				else if (t.BaseType == BaseType::Float4x4)
-					rs->TypeName = L"mat4";
-				else if (t.BaseType == BaseType::Texture2D)
-					rs->TypeName = L"sampler2D";
-				else if (t.BaseType == BaseType::TextureCube)
-					rs->TypeName = L"samplerCube";
-				return rs;
-			}
-			else if (auto arrayType = dynamic_cast<ArrayExpressionType*>(type))
-			{
-				RefPtr<ArrayTypeSyntaxNode> rs = new ArrayTypeSyntaxNode();
-				rs->ArrayLength = arrayType->ArrayLength;
-				rs->BaseType = FromExpressionType(arrayType->BaseType.Ptr());
-				return rs;
-			}
-			throw NotImplementedException();
-		}
 		RefPtr<SyntaxNode> ComponentSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
 			return visitor->VisitComponent(this);
@@ -32636,7 +32708,7 @@ namespace Spire
 		{
 			return (BaseType == Compiler::BaseType::Int || BaseType == Compiler::BaseType::UInt || BaseType == Compiler::BaseType::Bool);
 		}
-		bool ExpressionType::IsTexture() const
+		bool ExpressionType::IsTextureOrSampler() const
 		{
 			auto basicType = AsBasicType();
 			if (basicType)
@@ -32874,7 +32946,17 @@ namespace Spire
 				return L"";
 			}
 		}
-	}
+		RefPtr<SyntaxNode> ProjectExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
+		{
+			return visitor->VisitProject(this);
+		}
+		ProjectExpressionSyntaxNode * ProjectExpressionSyntaxNode::Clone(CloneContext & ctx)
+		{
+			auto * result = new ProjectExpressionSyntaxNode(*this);
+			result->BaseExpression = BaseExpression->Clone(ctx);
+			return result;
+		}
+}
 }
 
 /***********************************************************************
@@ -32885,7 +32967,7 @@ namespace Spire
 {
 	namespace Compiler
 	{
-		RefPtr<ILType> TranslateExpressionType(ExpressionType * type, Dictionary<String, RefPtr<ILRecordType>> * recordTypes)
+		RefPtr<ILType> TranslateExpressionType(ExpressionType * type, Dictionary<String, RefPtr<ILType>> * genericTypeMappings)
 		{
 			RefPtr<ILType> resultType = 0;
 			if (auto basicType = type->AsBasicType())
@@ -32896,10 +32978,17 @@ namespace Spire
 				}
 				else if (basicType->BaseType == BaseType::Record)
 				{
-					if (recordTypes)
-						return (*recordTypes)[basicType->RecordTypeName]();
+					if (genericTypeMappings)
+						return (*genericTypeMappings)[basicType->RecordTypeName]();
 					else
 						throw InvalidProgramException(L"unexpected record type.");
+				}
+				else if (basicType->BaseType == BaseType::Generic)
+				{
+					if (genericTypeMappings)
+						return (*genericTypeMappings)[basicType->GenericTypeVar]();
+					else
+						throw InvalidProgramException(L"unexpected generic type.");
 				}
 				else
 				{
@@ -32911,7 +33000,7 @@ namespace Spire
 			else if (auto arrType = type->AsArrayType())
 			{
 				auto nArrType = new ILArrayType();
-				nArrType->BaseType = TranslateExpressionType(arrType->BaseType.Ptr(), recordTypes);
+				nArrType->BaseType = TranslateExpressionType(arrType->BaseType.Ptr(), genericTypeMappings);
 				nArrType->ArrayLength = arrType->ArrayLength;
 				resultType = nArrType;
 			}
@@ -32919,15 +33008,15 @@ namespace Spire
 			{
 				auto gType = new ILGenericType();
 				gType->GenericTypeName = genType->GenericTypeName;
-				gType->BaseType = TranslateExpressionType(genType->BaseType.Ptr(), recordTypes);
+				gType->BaseType = TranslateExpressionType(genType->BaseType.Ptr(), genericTypeMappings);
 				resultType = gType;
 			}
 			return resultType;
 		}
 
-		RefPtr<ILType> TranslateExpressionType(const RefPtr<ExpressionType> & type, Dictionary<String, RefPtr<ILRecordType>> * recordTypes)
+		RefPtr<ILType> TranslateExpressionType(const RefPtr<ExpressionType> & type, Dictionary<String, RefPtr<ILType>> * genericTypeMappings)
 		{
-			return TranslateExpressionType(type.Ptr(), recordTypes);
+			return TranslateExpressionType(type.Ptr(), genericTypeMappings);
 		}
 	}
 }

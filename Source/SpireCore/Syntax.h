@@ -40,7 +40,8 @@ namespace Spire
 			Shader = 256,
 			Struct = 1024,
 			Record = 2048,
-			Error = 8192,
+			Generic = 8192,
+			Error = 16384,
 		};
 
 		inline const wchar_t * BaseTypeToString(BaseType t)
@@ -134,7 +135,7 @@ namespace Spire
 			virtual ArrayExpressionType * AsArrayType() const = 0;
 			virtual GenericExpressionType * AsGenericType() const = 0;
 			virtual ExpressionType * Clone() = 0;
-			bool IsTexture() const;
+			bool IsTextureOrSampler() const;
 			bool IsStruct() const;
 			bool IsShader() const;
 			static void Init();
@@ -153,7 +154,7 @@ namespace Spire
 			FunctionSymbol * Func = nullptr;
 			ShaderComponentSymbol * Component = nullptr;
 			StructSymbol * Struct = nullptr;
-			String RecordTypeName;
+			String RecordTypeName, GenericTypeVar;
 
 			BasicExpressionType()
 			{
@@ -331,7 +332,6 @@ namespace Spire
 		class TypeSyntaxNode : public SyntaxNode
 		{
 		public:
-			static RefPtr<TypeSyntaxNode> FromExpressionType(ExpressionType * t);
 			virtual TypeSyntaxNode * Clone(CloneContext & ctx) = 0;
 		};
 
@@ -561,6 +561,14 @@ namespace Spire
 			List<RefPtr<ExpressionSyntaxNode>> Arguments;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ImportExpressionSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
+		class ProjectExpressionSyntaxNode : public ExpressionSyntaxNode
+		{
+		public:
+			RefPtr<ExpressionSyntaxNode> BaseExpression;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual ProjectExpressionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
 		class UnaryExpressionSyntaxNode : public ExpressionSyntaxNode
@@ -1148,7 +1156,12 @@ namespace Spire
 					arg->Expression = arg->Expression->Accept(this).As<ExpressionSyntaxNode>();
 				return arg;
 			}
-
+			virtual RefPtr<ExpressionSyntaxNode> VisitProject(ProjectExpressionSyntaxNode * project)
+			{
+				if (project->BaseExpression)
+					project->BaseExpression = project->BaseExpression->Accept(this).As<ExpressionSyntaxNode>();
+				return project;
+			}
 		};
 	}
 }

@@ -40,13 +40,13 @@ namespace Spire
 			ILWorld * currentWorld = nullptr;
 			ComponentDefinitionIR * currentComponent = nullptr;
 			ILOperand * returnRegister = nullptr;
-			ImportOperatorDefSyntaxNode * currentImportDef = nullptr;
+			ImportExpressionSyntaxNode * currentImport = nullptr;
 			ShaderIR * currentShader = nullptr;
 			CompileResult & result;
 			List<ILOperand*> exprStack;
 			CodeWriter codeWriter;
 			ScopeDictionary<String, ILOperand*> variables;
-			Dictionary<String, RefPtr<ILRecordType>> recordTypes;
+			Dictionary<String, RefPtr<ILType>> genericTypeMappings;
 
 			void PushStack(ILOperand * op)
 			{
@@ -61,7 +61,7 @@ namespace Spire
 			AllocVarInstruction * AllocVar(ExpressionType * etype)
 			{
 				AllocVarInstruction * varOp = 0;
-				RefPtr<ILType> type = TranslateExpressionType(etype, &recordTypes);
+				RefPtr<ILType> type = TranslateExpressionType(etype, &genericTypeMappings);
 				auto arrType = dynamic_cast<ILArrayType*>(type.Ptr());
 
 				if (arrType)
@@ -77,7 +77,7 @@ namespace Spire
 			}
 			FetchArgInstruction * FetchArg(ExpressionType * etype, int argId)
 			{
-				auto type = TranslateExpressionType(etype, &recordTypes);
+				auto type = TranslateExpressionType(etype, &genericTypeMappings);
 				auto arrType = dynamic_cast<ILArrayType*>(type.Ptr());
 				FetchArgInstruction * varOp = 0;
 				if (arrType)
@@ -149,7 +149,7 @@ namespace Spire
 				TranslateStages(compiledShader.Ptr(), pipeline->SyntaxNode);
 				result.Program->Shaders.Add(compiledShader);
 
-				recordTypes.Clear();
+				genericTypeMappings.Clear();
 
 				// pass 1: iterating all worlds
 				// create ILWorld and ILRecordType objects for all worlds
@@ -159,7 +159,7 @@ namespace Spire
 					auto w = new ILWorld();
 					auto recordType = new ILRecordType();
 					recordType->TypeName = world.Key;
-					recordTypes[world.Key] = recordType;
+					genericTypeMappings[world.Key] = recordType;
 					w->Name = world.Key;
 					w->OutputType = recordType;
 					w->Attributes = world.Value.SyntaxNode->LayoutAttributes;
@@ -193,7 +193,7 @@ namespace Spire
 							ILObjectDefinition compDef;
 							compDef.Attributes = comp->SyntaxNode->LayoutAttributes;
 							compDef.Name = comp->UniqueName;
-							compDef.Type = TranslateExpressionType(comp->Type.Ptr(), &recordTypes);
+							compDef.Type = TranslateExpressionType(comp->Type.Ptr(), &genericTypeMappings);
 							compDef.Position = comp->SyntaxNode->Position;
 							compiledWorld->OutputType->Members.AddIfNotExists(compDef.Name, compDef);
 						}
@@ -219,7 +219,7 @@ namespace Spire
 						{
 							ILObjectDefinition def;
 							def.Name = comp->UniqueName;
-							def.Type = TranslateExpressionType(comp->Type.Ptr(), &recordTypes);
+							def.Type = TranslateExpressionType(comp->Type.Ptr(), &genericTypeMappings);
 							def.Position = comp->SyntaxNode->Position;
 							def.Attributes = comp->SyntaxNode->LayoutAttributes;
 							world.Value->Inputs.Add(def);
@@ -235,22 +235,22 @@ namespace Spire
 						// for each import operator call "import[w0->w1](x)", add x to w0's record type
 						EnumerateImportExpressions(comp->SyntaxNode.Ptr(), [&](ImportExpressionSyntaxNode * importExpr)
 						{
-							auto & recType = recordTypes[importExpr->ImportOperatorDef->SourceWorld.Content]();
+							auto recType = genericTypeMappings[importExpr->ImportOperatorDef->SourceWorld.Content]().As<ILRecordType>();
 							ILObjectDefinition entryDef;
 							entryDef.Attributes = comp->SyntaxNode->LayoutAttributes;
 							entryDef.Name = importExpr->ComponentUniqueName;
-							entryDef.Type = TranslateExpressionType(importExpr->Type.Ptr(), &recordTypes);
+							entryDef.Type = TranslateExpressionType(importExpr->Type.Ptr(), &genericTypeMappings);
 							entryDef.Position = importExpr->Position;
 							recType->Members.AddIfNotExists(importExpr->ComponentUniqueName, entryDef);
 						});
 						// if comp is output, add comp to its world's record type
 						if (comp->SyntaxNode->IsOutput)
 						{
-							auto & recType = recordTypes[comp->World]();
+							auto recType = genericTypeMappings[comp->World]().As<ILRecordType>();
 							ILObjectDefinition entryDef;
 							entryDef.Attributes = comp->SyntaxNode->LayoutAttributes;
 							entryDef.Name = comp->UniqueName;
-							entryDef.Type = TranslateExpressionType(comp->Type.Ptr(), &recordTypes);
+							entryDef.Type = TranslateExpressionType(comp->Type.Ptr(), &genericTypeMappings);
 							entryDef.Position = comp->SyntaxNode->Position;
 							recType->Members.AddIfNotExists(comp->UniqueName, entryDef);
 						}
@@ -269,7 +269,7 @@ namespace Spire
 						RefPtr<ILFunction> func = new ILFunction();
 						RefPtr<FunctionSymbol> funcSym = new FunctionSymbol();
 						func->Name = funcName;
-						func->ReturnType = TranslateExpressionType(comp->Type, &recordTypes);
+						func->ReturnType = TranslateExpressionType(comp->Type, &genericTypeMappings);
 						symTable->Functions[funcName] = funcSym;
 						result.Program->Functions[funcName] = func;
 						for (auto dep : comp->GetComponentFunctionDependencyClosure())
@@ -287,7 +287,7 @@ namespace Spire
 						{
 							if (dep->SyntaxNode->Parameters.Count() == 0)
 							{
-								auto paramType = TranslateExpressionType(dep->Type, &recordTypes);
+								auto paramType = TranslateExpressionType(dep->Type, &genericTypeMappings);
 								String paramName = EscapeDoubleUnderscore(L"p" + String(id) + L"_" + dep->OriginalName); 
 								func->Parameters.Add(paramName, ILParameter(paramType));
 								auto argInstr = codeWriter.FetchArg(paramType, id + 1);
@@ -298,7 +298,7 @@ namespace Spire
 						}
 						for (auto & param : comp->SyntaxNode->Parameters)
 						{
-							auto paramType = TranslateExpressionType(param->Type, &recordTypes);
+							auto paramType = TranslateExpressionType(param->Type, &genericTypeMappings);
 							String paramName = EscapeDoubleUnderscore(L"p" + String(id) + L"_" + param->Name);
 							func->Parameters.Add(paramName, ILParameter(paramType, param->Qualifier));
 							auto argInstr = codeWriter.FetchArg(paramType, id + 1);
@@ -382,7 +382,7 @@ namespace Spire
 			{
 				currentComponent = comp;
 				String varName = EscapeDoubleUnderscore(currentComponent->OriginalName);
-				RefPtr<ILType> type = TranslateExpressionType(currentComponent->Type, &recordTypes);
+				RefPtr<ILType> type = TranslateExpressionType(currentComponent->Type, &genericTypeMappings);
 
 				if (comp->SyntaxNode->IsInput)
 				{
@@ -553,7 +553,7 @@ namespace Spire
 			virtual RefPtr<StatementSyntaxNode> VisitReturnStatement(ReturnStatementSyntaxNode* stmt) override
 			{
 				returnRegister = nullptr;
-				if (currentWorld != nullptr && currentComponent != nullptr && !currentImportDef)
+				if (currentWorld != nullptr && currentComponent != nullptr && !currentImport)
 				{
 					if (stmt->Expression)
 					{
@@ -776,7 +776,7 @@ namespace Spire
 					rs->Operands.SetSize(2);
 					rs->Operands[0] = left;
 					rs->Operands[1] = right;
-					rs->Type = TranslateExpressionType(expr->Type, &recordTypes);
+					rs->Type = TranslateExpressionType(expr->Type, &genericTypeMappings);
 					codeWriter.Insert(rs);
 					switch (expr->Operator)
 					{
@@ -803,6 +803,17 @@ namespace Spire
 					PushStack(rs);
 				}
 				return expr;
+			}
+			virtual RefPtr<ExpressionSyntaxNode> VisitProject(ProjectExpressionSyntaxNode * project) override
+			{
+				project->BaseExpression->Accept(this);
+				auto rs = PopStack();
+				auto proj = new ProjectInstruction();
+				proj->ComponentName = currentImport->ComponentUniqueName;
+				proj->Operand = rs;
+				codeWriter.Insert(proj);
+				PushStack(proj);
+				return project;
 			}
 			virtual RefPtr<ExpressionSyntaxNode> VisitConstantExpression(ConstantExpressionSyntaxNode* expr) override
 			{
@@ -846,17 +857,24 @@ namespace Spire
 					arguments.Add(argOp);
 					variables.Add(expr->ImportOperatorDef->Parameters[i]->Name, argOp);
 				}
-				currentImportDef = expr->ImportOperatorDef.Ptr();
+				currentImport = expr;
+				auto oldTypeMapping = genericTypeMappings.TryGetValue(expr->ImportOperatorDef->TypeName.Content);
+				auto componentType = TranslateExpressionType(expr->Type, &genericTypeMappings);
+				genericTypeMappings[expr->ImportOperatorDef->TypeName.Content] = componentType;
 				codeWriter.PushNode();
 				expr->ImportOperatorDef->Body->Accept(this);
-				currentImportDef = nullptr;
+				currentImport = nullptr;
 				auto impInstr = new ImportInstruction(expr->Arguments.Count());
 				for (int i = 0; i < expr->Arguments.Count(); i++)
 					impInstr->Arguments[i] = arguments[i];
 				impInstr->ImportOperator = codeWriter.PopNode();
 				variables.PopScope();
+				if (oldTypeMapping)
+					genericTypeMappings[expr->ImportOperatorDef->TypeName.Content] = *oldTypeMapping;
+				else
+					genericTypeMappings.Remove(expr->ImportOperatorDef->TypeName.Content);
 				impInstr->ComponentName = expr->ComponentUniqueName;
-				impInstr->Type = TranslateExpressionType(expr->Type, &recordTypes);
+				impInstr->Type = TranslateExpressionType(expr->Type, &genericTypeMappings);
 				codeWriter.Insert(impInstr);
 				PushStack(impInstr);
 				return expr;
@@ -914,7 +932,7 @@ namespace Spire
 						else
 						{
 							auto rs = new SwizzleInstruction();
-							rs->Type = TranslateExpressionType(expr->Type.Ptr(), &recordTypes);
+							rs->Type = TranslateExpressionType(expr->Type.Ptr(), &genericTypeMappings);
 							rs->SwizzleString = expr->MemberName;
 							rs->Operand = base;
 							codeWriter.Insert(rs);
@@ -992,7 +1010,7 @@ namespace Spire
 				instr->Function = funcName;
 				for (int i = 0; i < args.Count(); i++)
 					instr->Arguments[i] = args[i];
-				instr->Type = TranslateExpressionType(expr->Type, &recordTypes);
+				instr->Type = TranslateExpressionType(expr->Type, &genericTypeMappings);
 				codeWriter.Insert(instr);
 				PushStack(instr);
 				return expr;
@@ -1045,7 +1063,7 @@ namespace Spire
 						instr->Operands[1] = result.Program->ConstantPool->CreateConstant(1.0f);
 					else
 						instr->Operands[1] = result.Program->ConstantPool->CreateConstant(1);
-					instr->Type = TranslateExpressionType(expr->Type, &recordTypes);
+					instr->Type = TranslateExpressionType(expr->Type, &genericTypeMappings);
 					codeWriter.Insert(instr);
 
 					expr->Expression->Access = ExpressionAccess::Write;
@@ -1071,7 +1089,7 @@ namespace Spire
 						instr->Operands[1] = result.Program->ConstantPool->CreateConstant(1.0f);
 					else
 						instr->Operands[1] = result.Program->ConstantPool->CreateConstant(1);
-					instr->Type = TranslateExpressionType(expr->Type, &recordTypes);
+					instr->Type = TranslateExpressionType(expr->Type, &genericTypeMappings);
 					codeWriter.Insert(instr);
 
 					expr->Expression->Access = ExpressionAccess::Write;
