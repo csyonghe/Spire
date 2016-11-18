@@ -536,7 +536,10 @@ namespace Spire
 			}
 			if (auto import = instr.As<ImportInstruction>())
 			{
-				if ((!useBindlessTexture && import->Type->IsTexture()) || import->Type.As<ILArrayType>() || import->Type->IsSamplerState())
+				if ((!useBindlessTexture && import->Type->IsTexture()) 
+					|| import->Type.As<ILArrayType>() 
+					|| import->Type->IsSamplerState()
+					|| import->Type.As<ILGenericType>())
 					return true;
 			}
 			for (auto &&usr : instr.Users)
@@ -861,10 +864,8 @@ namespace Spire
 						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::Texture;
 					else if (genType->GenericTypeName == L"PackedBuffer")
 						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::PackedBuffer;
-					else if (genType->GenericTypeName == L"ArrayBuffer")
+					else if (genType->GenericTypeName == L"StructuredBuffer" || genType->GenericTypeName == L"RWStructuredBuffer")
 						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::ArrayBuffer;
-					else if (genType->GenericTypeName == L"StorageBuffer")
-						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::StorageBuffer;
 				}
 				if (auto arrType = dynamic_cast<ILArrayType*>(type))
 				{
@@ -935,10 +936,6 @@ namespace Spire
 			{
 				PrintUniformBufferInputReference(sb, input, currentImportInstr->ComponentName);
 			}
-			else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StorageBuffer)
-			{
-				PrintStorageBufferInputReference(sb, input, currentImportInstr->ComponentName);
-			}
 			else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::ArrayBuffer)
 			{
 				PrintArrayBufferInputReference(sb, input, currentImportInstr->ComponentName);
@@ -983,16 +980,12 @@ namespace Spire
 					DeclareUniformBuffer(sb, input, isVertexShader);
 					return;
 
-				case ExternComponentCodeGenInfo::DataStructureType::StorageBuffer:
-					DeclareStorageBuffer(sb, input, isVertexShader);
-					return;
-
 				case ExternComponentCodeGenInfo::DataStructureType::ArrayBuffer:
 					DeclareArrayBuffer(sb, input, isVertexShader);
 					return;
 
 				case ExternComponentCodeGenInfo::DataStructureType::PackedBuffer:
-					DeclareArrayBuffer(sb, input, isVertexShader);
+					DeclarePackedBuffer(sb, input, isVertexShader);
 					return;
 
 				case ExternComponentCodeGenInfo::DataStructureType::Texture:

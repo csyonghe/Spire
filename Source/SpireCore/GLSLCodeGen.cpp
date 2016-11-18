@@ -38,7 +38,7 @@ namespace Spire
 
 			void PrintUniformBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
 			{
-				if (!currentImportInstr->Type->IsTexture() || useBindlessTexture)
+				if ((!currentImportInstr->Type->IsTexture() || useBindlessTexture) && !currentImportInstr->Type.As<ILGenericType>())
 					sb << L"blk" << inputName << L"." << componentName;
 				else
 					sb << componentName;
@@ -219,8 +219,7 @@ namespace Spire
 						PrintOp(ctx, memberLoadInstr, true);
 					if (genType)
 					{
-						if ((genType->GenericTypeName == L"Buffer" ||
-							genType->GenericTypeName == L"ArrayBuffer")
+						if ((genType->GenericTypeName == L"StructuredBuffer" || genType->GenericTypeName == L"RWStructuredBuffer")
 							&& dynamic_cast<ILRecordType*>(genType->BaseType.Ptr()))
 							ctx.Body << L"." << proj->ComponentName;
 					}
@@ -327,6 +326,8 @@ namespace Spire
 						continue;
 					if (field.Value.Type->IsSamplerState())
 						continue;
+					if (field.Value.Type.As<ILGenericType>()) // ArrayBuffer etc. goes to separate declaration outside the block
+						continue;
 					String declName = field.Key;
 					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
 					itemsDeclaredInBlock++;
@@ -370,71 +371,21 @@ namespace Spire
 						}
 					}
 				}
-			}
-
-			void DeclareStorageBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) override
-			{
-				auto info = ExtractExternComponentInfo(input);
-				extCompInfo[input.Name] = info;
-				auto recType = ExtractRecordType(input.Type.Ptr());
-				assert(recType);
-				assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StorageBuffer);
-
-				int declarationStart = sb.GlobalHeader.Length();
-				int itemsDeclaredInBlock = 0;
-
-				sb.GlobalHeader << L"layout(std430";
-				if (info.Binding != -1)
-					sb.GlobalHeader << L", binding = " << info.Binding;
-				sb.GlobalHeader << L") buffer " << input.Name << L"\n{\n";
-
-				int index = 0;
 				for (auto & field : recType->Members)
 				{
-					if (!useBindlessTexture && info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer &&
-						field.Value.Type->IsTexture())
-						continue;
-					if (field.Value.Type->IsSamplerState())
-						continue;
-					if (input.Attributes.ContainsKey(L"VertexInput"))
-						sb.GlobalHeader << L"layout(location = " << index << L") ";
-					if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat") ||
-						(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput &&
-							field.Value.Type->IsIntegral())))
-						sb.GlobalHeader << L"flat ";
-					if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput)
+					auto genType = field.Value.Type.As<ILGenericType>();
+					if (genType->GenericTypeName == L"StructuredBuffer" || genType->GenericTypeName == L"RWStructuredBuffer")
 					{
-						sb.GlobalHeader << L"in ";
+						if (field.Value.Attributes.ContainsKey(L"Binding"))
+							sb.GlobalHeader << L"layout(binding = " << field.Value.Attributes[L"Binding"]() << L") ";
+						sb.GlobalHeader << L"buffer buf" << field.Key << L"\n{\n";
+						PrintType(sb.GlobalHeader, genType->BaseType.Ptr());
+						sb.GlobalHeader << L" " << field.Key << L"[];\n}\n";
 					}
-					else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
-						sb.GlobalHeader << L"patch in ";
-					String declName = field.Key;
-					if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput ||
-						info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
-						declName = AddWorldNameSuffix(declName, recType->ToString());
-					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
-					itemsDeclaredInBlock++;
-					if (info.IsArray)
-					{
-						sb.GlobalHeader << L"[";
-						if (info.ArrayLength)
-							sb.GlobalHeader << String(info.ArrayLength);
-						sb.GlobalHeader << L"]";
-					}
-					sb.GlobalHeader << L";\n";
-
-					index++;
 				}
-				if (itemsDeclaredInBlock == 0)
-				{
-					sb.GlobalHeader.Remove(declarationStart, sb.GlobalHeader.Length() - declarationStart);
-					return;
-				}
-
-				sb.GlobalHeader << L"} blk" << input.Name << L";\n";
 			}
 
-			void DeclareArrayBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) override
+			void DeclareArrayBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool /*isVertexShader*/) override
 			{
 				auto info = ExtractExternComponentInfo(input);
 				extCompInfo[input.Name] = info;
@@ -450,10 +401,6 @@ namespace Spire
 				{
 					if (field.Value.Type->IsSamplerState())
 						continue;
-					if (input.Attributes.ContainsKey(L"VertexInput"))
-						sb.GlobalHeader << L"layout(location = " << index << L") ";
-					if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat")))
-						sb.GlobalHeader << L"flat ";
 					String declName = field.Key;
 					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
 					itemsDeclaredInBlock++;

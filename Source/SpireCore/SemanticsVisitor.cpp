@@ -209,6 +209,13 @@ namespace Spire
 				typeNode->BaseType->Accept(this);
 				rs->BaseType = typeResult;
 				rs->GenericTypeName = typeNode->GenericTypeName;
+				if (rs->GenericTypeName != L"PackedBuffer" &&
+					rs->GenericTypeName != L"StructuredBuffer" &&
+					rs->GenericTypeName != L"RWStructuredBuffer" &&
+					rs->GenericTypeName != L"Uniform" &&
+					rs->GenericTypeName != L"Patch" &&
+					rs->GenericTypeName != L"PackedBuffer")
+					Error(30015, L"'" + rs->GenericTypeName + L"': undefined identifier.", typeNode);
 				typeResult = rs;
 				return typeNode;
 			}
@@ -1172,7 +1179,8 @@ namespace Spire
 				{
 					auto & baseExprType = expr->BaseExpression->Type;
 					bool isValid = baseExprType->AsGenericType() &&
-							(baseExprType->AsGenericType()->GenericTypeName == L"ArrayBuffer" ||
+							(baseExprType->AsGenericType()->GenericTypeName == L"StructuredBuffer" ||
+								baseExprType->AsGenericType()->GenericTypeName == L"RWStructuredBuffer" ||
 							 baseExprType->AsGenericType()->GenericTypeName == L"PackedBuffer");
 					isValid = isValid || (baseExprType->AsBasicType() && GetVectorSize(baseExprType->AsBasicType()->BaseType) != 0);
 					isValid = isValid || baseExprType->AsArrayType();

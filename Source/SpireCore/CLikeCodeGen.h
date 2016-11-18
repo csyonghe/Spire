@@ -33,6 +33,7 @@ namespace Spire
 			CompileResult * Result = nullptr;
 			HashSet<String> UsedVarNames;
 			int TextureBindingsAllocator = 0;
+			int BufferAllocator = 0;
 			StringBuilder Body, Header, GlobalHeader;
 			List<ILType*> Arguments;
 			String ReturnVarName;
@@ -76,7 +77,7 @@ namespace Spire
 		public:
 			enum class DataStructureType
 			{
-				StandardInput, UniformBuffer, ArrayBuffer, PackedBuffer, StorageBuffer, Texture, Patch
+				StandardInput, UniformBuffer, ArrayBuffer, PackedBuffer, Texture, Patch
 			};
 			enum class SystemVarType
 			{
@@ -125,7 +126,6 @@ namespace Spire
 
 			// Hooks for declaring an input record based on the storage mode used (uniform, SSBO, etc.)
 			virtual void DeclareUniformBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) = 0;
-			virtual void DeclareStorageBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) = 0;
 			virtual void DeclareArrayBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) = 0;
 			virtual void DeclarePackedBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) = 0;
 			virtual void DeclareTextureInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) = 0;

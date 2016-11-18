@@ -94,7 +94,8 @@ namespace Spire
 				typeNames.Add(L"SamplerState");
 				typeNames.Add(L"sampler_state");
 				typeNames.Add(L"Uniform");
-				typeNames.Add(L"ArrayBuffer");
+				typeNames.Add(L"StructuredBuffer");
+				typeNames.Add(L"RWStructuredBuffer");
 				typeNames.Add(L"PackedBuffer");
 				typeNames.Add(L"StorageBuffer");
 				typeNames.Add(L"Patch");

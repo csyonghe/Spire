@@ -286,10 +286,6 @@ namespace Spire
 				}
 			}
 
-			void DeclareStorageBuffer(CodeGenContext & /*sb*/, const ILObjectDefinition & /*input*/, bool /*isVertexShader*/) override
-			{
-				// TODO: HLSL does not make it easy to declare a UAV with an interesting type...
-			}
 			void DeclareArrayBuffer(CodeGenContext & /*sb*/, const ILObjectDefinition & /*input*/, bool /*isVertexShader*/) override
 			{
 

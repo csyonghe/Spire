@@ -11137,6 +11137,7 @@ namespace Spire
 			CompileResult * Result = nullptr;
 			HashSet<String> UsedVarNames;
 			int TextureBindingsAllocator = 0;
+			int BufferAllocator = 0;
 			StringBuilder Body, Header, GlobalHeader;
 			List<ILType*> Arguments;
 			String ReturnVarName;
@@ -11180,7 +11181,7 @@ namespace Spire
 		public:
 			enum class DataStructureType
 			{
-				StandardInput, UniformBuffer, ArrayBuffer, PackedBuffer, StorageBuffer, Texture, Patch
+				StandardInput, UniformBuffer, ArrayBuffer, PackedBuffer, Texture, Patch
 			};
 			enum class SystemVarType
 			{
@@ -11229,7 +11230,6 @@ namespace Spire
 
 			// Hooks for declaring an input record based on the storage mode used (uniform, SSBO, etc.)
 			virtual void DeclareUniformBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) = 0;
-			virtual void DeclareStorageBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) = 0;
 			virtual void DeclareArrayBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) = 0;
 			virtual void DeclarePackedBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) = 0;
 			virtual void DeclareTextureInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) = 0;
@@ -11851,7 +11851,8 @@ namespace Spire
 				typeNames.Add(L"SamplerState");
 				typeNames.Add(L"sampler_state");
 				typeNames.Add(L"Uniform");
-				typeNames.Add(L"ArrayBuffer");
+				typeNames.Add(L"StructuredBuffer");
+				typeNames.Add(L"RWStructuredBuffer");
 				typeNames.Add(L"PackedBuffer");
 				typeNames.Add(L"StorageBuffer");
 				typeNames.Add(L"Patch");
@@ -14940,7 +14941,10 @@ namespace Spire
 			}
 			if (auto import = instr.As<ImportInstruction>())
 			{
-				if ((!useBindlessTexture && import->Type->IsTexture()) || import->Type.As<ILArrayType>() || import->Type->IsSamplerState())
+				if ((!useBindlessTexture && import->Type->IsTexture()) 
+					|| import->Type.As<ILArrayType>() 
+					|| import->Type->IsSamplerState()
+					|| import->Type.As<ILGenericType>())
 					return true;
 			}
 			for (auto &&usr : instr.Users)
@@ -15265,10 +15269,8 @@ namespace Spire
 						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::Texture;
 					else if (genType->GenericTypeName == L"PackedBuffer")
 						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::PackedBuffer;
-					else if (genType->GenericTypeName == L"ArrayBuffer")
+					else if (genType->GenericTypeName == L"StructuredBuffer" || genType->GenericTypeName == L"RWStructuredBuffer")
 						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::ArrayBuffer;
-					else if (genType->GenericTypeName == L"StorageBuffer")
-						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::StorageBuffer;
 				}
 				if (auto arrType = dynamic_cast<ILArrayType*>(type))
 				{
@@ -15339,10 +15341,6 @@ namespace Spire
 			{
 				PrintUniformBufferInputReference(sb, input, currentImportInstr->ComponentName);
 			}
-			else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StorageBuffer)
-			{
-				PrintStorageBufferInputReference(sb, input, currentImportInstr->ComponentName);
-			}
 			else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::ArrayBuffer)
 			{
 				PrintArrayBufferInputReference(sb, input, currentImportInstr->ComponentName);
@@ -15387,16 +15385,12 @@ namespace Spire
 					DeclareUniformBuffer(sb, input, isVertexShader);
 					return;
 
-				case ExternComponentCodeGenInfo::DataStructureType::StorageBuffer:
-					DeclareStorageBuffer(sb, input, isVertexShader);
-					return;
-
 				case ExternComponentCodeGenInfo::DataStructureType::ArrayBuffer:
 					DeclareArrayBuffer(sb, input, isVertexShader);
 					return;
 
 				case ExternComponentCodeGenInfo::DataStructureType::PackedBuffer:
-					DeclareArrayBuffer(sb, input, isVertexShader);
+					DeclarePackedBuffer(sb, input, isVertexShader);
 					return;
 
 				case ExternComponentCodeGenInfo::DataStructureType::Texture:
@@ -18245,7 +18239,7 @@ namespace Spire
 
 			void PrintUniformBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
 			{
-				if (!currentImportInstr->Type->IsTexture() || useBindlessTexture)
+				if ((!currentImportInstr->Type->IsTexture() || useBindlessTexture) && !currentImportInstr->Type.As<ILGenericType>())
 					sb << L"blk" << inputName << L"." << componentName;
 				else
 					sb << componentName;
@@ -18426,8 +18420,7 @@ namespace Spire
 						PrintOp(ctx, memberLoadInstr, true);
 					if (genType)
 					{
-						if ((genType->GenericTypeName == L"Buffer" ||
-							genType->GenericTypeName == L"ArrayBuffer")
+						if ((genType->GenericTypeName == L"StructuredBuffer" || genType->GenericTypeName == L"RWStructuredBuffer")
 							&& dynamic_cast<ILRecordType*>(genType->BaseType.Ptr()))
 							ctx.Body << L"." << proj->ComponentName;
 					}
@@ -18534,6 +18527,8 @@ namespace Spire
 						continue;
 					if (field.Value.Type->IsSamplerState())
 						continue;
+					if (field.Value.Type.As<ILGenericType>()) // ArrayBuffer etc. goes to separate declaration outside the block
+						continue;
 					String declName = field.Key;
 					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
 					itemsDeclaredInBlock++;
@@ -18577,71 +18572,21 @@ namespace Spire
 						}
 					}
 				}
-			}
-
-			void DeclareStorageBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) override
-			{
-				auto info = ExtractExternComponentInfo(input);
-				extCompInfo[input.Name] = info;
-				auto recType = ExtractRecordType(input.Type.Ptr());
-				assert(recType);
-				assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StorageBuffer);
-
-				int declarationStart = sb.GlobalHeader.Length();
-				int itemsDeclaredInBlock = 0;
-
-				sb.GlobalHeader << L"layout(std430";
-				if (info.Binding != -1)
-					sb.GlobalHeader << L", binding = " << info.Binding;
-				sb.GlobalHeader << L") buffer " << input.Name << L"\n{\n";
-
-				int index = 0;
 				for (auto & field : recType->Members)
 				{
-					if (!useBindlessTexture && info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer &&
-						field.Value.Type->IsTexture())
-						continue;
-					if (field.Value.Type->IsSamplerState())
-						continue;
-					if (input.Attributes.ContainsKey(L"VertexInput"))
-						sb.GlobalHeader << L"layout(location = " << index << L") ";
-					if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat") ||
-						(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput &&
-							field.Value.Type->IsIntegral())))
-						sb.GlobalHeader << L"flat ";
-					if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput)
+					auto genType = field.Value.Type.As<ILGenericType>();
+					if (genType->GenericTypeName == L"StructuredBuffer" || genType->GenericTypeName == L"RWStructuredBuffer")
 					{
-						sb.GlobalHeader << L"in ";
+						if (field.Value.Attributes.ContainsKey(L"Binding"))
+							sb.GlobalHeader << L"layout(binding = " << field.Value.Attributes[L"Binding"]() << L") ";
+						sb.GlobalHeader << L"buffer buf" << field.Key << L"\n{\n";
+						PrintType(sb.GlobalHeader, genType->BaseType.Ptr());
+						sb.GlobalHeader << L" " << field.Key << L"[];\n}\n";
 					}
-					else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
-						sb.GlobalHeader << L"patch in ";
-					String declName = field.Key;
-					if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput ||
-						info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
-						declName = AddWorldNameSuffix(declName, recType->ToString());
-					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
-					itemsDeclaredInBlock++;
-					if (info.IsArray)
-					{
-						sb.GlobalHeader << L"[";
-						if (info.ArrayLength)
-							sb.GlobalHeader << String(info.ArrayLength);
-						sb.GlobalHeader << L"]";
-					}
-					sb.GlobalHeader << L";\n";
-
-					index++;
 				}
-				if (itemsDeclaredInBlock == 0)
-				{
-					sb.GlobalHeader.Remove(declarationStart, sb.GlobalHeader.Length() - declarationStart);
-					return;
-				}
-
-				sb.GlobalHeader << L"} blk" << input.Name << L";\n";
 			}
 
-			void DeclareArrayBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) override
+			void DeclareArrayBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool /*isVertexShader*/) override
 			{
 				auto info = ExtractExternComponentInfo(input);
 				extCompInfo[input.Name] = info;
@@ -18657,10 +18602,6 @@ namespace Spire
 				{
 					if (field.Value.Type->IsSamplerState())
 						continue;
-					if (input.Attributes.ContainsKey(L"VertexInput"))
-						sb.GlobalHeader << L"layout(location = " << index << L") ";
-					if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat")))
-						sb.GlobalHeader << L"flat ";
 					String declName = field.Key;
 					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
 					itemsDeclaredInBlock++;
@@ -19482,10 +19423,6 @@ namespace Spire
 				}
 			}
 
-			void DeclareStorageBuffer(CodeGenContext & /*sb*/, const ILObjectDefinition & /*input*/, bool /*isVertexShader*/) override
-			{
-				// TODO: HLSL does not make it easy to declare a UAV with an interesting type...
-			}
 			void DeclareArrayBuffer(CodeGenContext & /*sb*/, const ILObjectDefinition & /*input*/, bool /*isVertexShader*/) override
 			{
 
@@ -23598,6 +23535,13 @@ namespace Spire
 				typeNode->BaseType->Accept(this);
 				rs->BaseType = typeResult;
 				rs->GenericTypeName = typeNode->GenericTypeName;
+				if (rs->GenericTypeName != L"PackedBuffer" &&
+					rs->GenericTypeName != L"StructuredBuffer" &&
+					rs->GenericTypeName != L"RWStructuredBuffer" &&
+					rs->GenericTypeName != L"Uniform" &&
+					rs->GenericTypeName != L"Patch" &&
+					rs->GenericTypeName != L"PackedBuffer")
+					Error(30015, L"'" + rs->GenericTypeName + L"': undefined identifier.", typeNode);
 				typeResult = rs;
 				return typeNode;
 			}
@@ -24561,7 +24505,8 @@ namespace Spire
 				{
 					auto & baseExprType = expr->BaseExpression->Type;
 					bool isValid = baseExprType->AsGenericType() &&
-							(baseExprType->AsGenericType()->GenericTypeName == L"ArrayBuffer" ||
+							(baseExprType->AsGenericType()->GenericTypeName == L"StructuredBuffer" ||
+								baseExprType->AsGenericType()->GenericTypeName == L"RWStructuredBuffer" ||
 							 baseExprType->AsGenericType()->GenericTypeName == L"PackedBuffer");
 					isValid = isValid || (baseExprType->AsBasicType() && GetVectorSize(baseExprType->AsBasicType()->BaseType) != 0);
 					isValid = isValid || baseExprType->AsArrayType();
