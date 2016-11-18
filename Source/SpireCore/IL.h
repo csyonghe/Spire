@@ -1720,6 +1720,10 @@ namespace Spire
 				{
 					Type = arrType->BaseType->Clone();
 				}
+				else if (auto genType = dynamic_cast<ILGenericType*>(v0->Type.Ptr()))
+				{
+					Type = genType->BaseType->Clone();
+				}
 				else if (auto baseType = dynamic_cast<ILBasicType *>(v0->Type.Ptr()))
 				{
 					switch (baseType->Type)

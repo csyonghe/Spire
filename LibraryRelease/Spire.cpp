@@ -7649,6 +7649,10 @@ namespace Spire
 				{
 					Type = arrType->BaseType->Clone();
 				}
+				else if (auto genType = dynamic_cast<ILGenericType*>(v0->Type.Ptr()))
+				{
+					Type = genType->BaseType->Clone();
+				}
 				else if (auto baseType = dynamic_cast<ILBasicType *>(v0->Type.Ptr()))
 				{
 					switch (baseType->Type)
@@ -18575,13 +18579,18 @@ namespace Spire
 				for (auto & field : recType->Members)
 				{
 					auto genType = field.Value.Type.As<ILGenericType>();
+					if (!genType)
+						continue;
 					if (genType->GenericTypeName == L"StructuredBuffer" || genType->GenericTypeName == L"RWStructuredBuffer")
 					{
 						if (field.Value.Attributes.ContainsKey(L"Binding"))
-							sb.GlobalHeader << L"layout(binding = " << field.Value.Attributes[L"Binding"]() << L") ";
+							sb.GlobalHeader << L"layout(std430, binding = " << field.Value.Attributes[L"Binding"]() << L") ";
+						else
+							sb.GlobalHeader << L"layout(std430) ";
+
 						sb.GlobalHeader << L"buffer buf" << field.Key << L"\n{\n";
 						PrintType(sb.GlobalHeader, genType->BaseType.Ptr());
-						sb.GlobalHeader << L" " << field.Key << L"[];\n}\n";
+						sb.GlobalHeader << L" " << field.Key << L"[];\n};\n";
 					}
 				}
 			}
