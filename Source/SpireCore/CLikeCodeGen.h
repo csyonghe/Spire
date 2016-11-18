@@ -23,6 +23,25 @@ namespace Spire
 
 		class CLikeCodeGen;
 
+		class ExternComponentCodeGenInfo
+		{
+		public:
+			enum class DataStructureType
+			{
+				StandardInput, UniformBuffer, ArrayBuffer, PackedBuffer, Texture, Patch
+			};
+			enum class SystemVarType
+			{
+				None, TessCoord, InvocationId, ThreadId, FragCoord, PatchVertexCount, PrimitiveId
+			};
+			DataStructureType DataStructure = DataStructureType::StandardInput;
+			RefPtr<ILType> Type;
+			SystemVarType SystemVar = SystemVarType::None;
+			bool IsArray = false;
+			int ArrayLength = 0;
+			int Binding = -1;
+		};
+
 		class CodeGenContext
 		{
 		public:
@@ -37,6 +56,8 @@ namespace Spire
 			StringBuilder Body, Header, GlobalHeader;
 			List<ILType*> Arguments;
 			String ReturnVarName;
+			HashSet<ExternComponentCodeGenInfo::SystemVarType> UsedSystemInputs;
+
 			String GenerateCodeName(String name, String prefix)
 			{
 				StringBuilder nameBuilder;
@@ -70,25 +91,6 @@ namespace Spire
 
 
 			String DefineVariable(ILOperand * op);
-		};
-
-		class ExternComponentCodeGenInfo
-		{
-		public:
-			enum class DataStructureType
-			{
-				StandardInput, UniformBuffer, ArrayBuffer, PackedBuffer, Texture, Patch
-			};
-			enum class SystemVarType
-			{
-				None, TessCoord, InvocationId, ThreadId, FragCoord, PatchVertexCount, PrimitiveId
-			};
-			DataStructureType DataStructure = DataStructureType::StandardInput;
-			RefPtr<ILType> Type;
-			SystemVarType SystemVar = SystemVarType::None;
-			bool IsArray = false;
-			int ArrayLength = 0;
-			int Binding = -1;
 		};
 
 		class OutputStrategy : public Object
@@ -142,17 +144,23 @@ namespace Spire
 			virtual void PrintArrayBufferInputReference(StringBuilder& sb, String inputName, String componentName) = 0;
 			virtual void PrintPackedBufferInputReference(StringBuilder& sb, String inputName, String componentName) = 0;
 			virtual void PrintStandardInputReference(StringBuilder& sb, ILRecordType* recType, String inputName, String componentName) = 0;
+			virtual void PrintStandardArrayInputReference(StringBuilder& sb, ILRecordType* recType, String inputName, String componentName) = 0;
 			virtual void PrintPatchInputReference(StringBuilder& sb, ILRecordType* recType, String inputName, String componentName) = 0;
 			virtual void PrintDefaultInputReference(StringBuilder& sb, ILRecordType* recType, String inputName, String componentName) = 0;
-			virtual void PrintSystemVarReference(StringBuilder& sb, String inputName, ExternComponentCodeGenInfo::SystemVarType systemVar) = 0;
+			virtual void PrintSystemVarReference(CodeGenContext & ctx, StringBuilder& sb, String inputName, ExternComponentCodeGenInfo::SystemVarType systemVar) = 0;
 
 			//
 			virtual void PrintTypeName(StringBuilder& sb, ILType* type) = 0;
-			virtual String RemapFuncNameForTarget(String name);
+			virtual void PrintCallInstrExprForTarget(CodeGenContext & ctx, CallInstruction * instr, String const& name);
 			virtual void PrintMatrixMulInstrExpr(CodeGenContext & ctx, ILOperand* op0, ILOperand* op1);
 			virtual void PrintRasterPositionOutputWrite(CodeGenContext & ctx, ILOperand * operand) = 0;
 			virtual void PrintTextureCall(CodeGenContext & ctx, CallInstruction * instr) = 0;
 			virtual void PrintProjectInstrExpr(CodeGenContext & ctx, ProjectInstruction * instr) = 0;
+
+			// Helpers for printing call instructions
+			void PrintDefaultCallInstrArgs(CodeGenContext & ctx, CallInstruction * instr);
+			void PrintDefaultCallInstrExpr(CodeGenContext & ctx, CallInstruction * instr, String const& name);
+
 		public:
 			void Error(int errId, String msg, CodePosition pos);
 			void PrintType(StringBuilder & sbCode, ILType* type);
@@ -197,11 +205,10 @@ namespace Spire
 			void GenerateStructs(StringBuilder & sb, ILProgram * program);
 			void GenerateReferencedFunctions(StringBuilder & sb, ILProgram * program, ArrayView<ILWorld*> worlds);
 			ExternComponentCodeGenInfo ExtractExternComponentInfo(const ILObjectDefinition & input);
-			void PrintInputReference(StringBuilder & sb, String input);
+			void PrintInputReference(CodeGenContext & ctx, StringBuilder & sb, String input);
 			void DeclareInput(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader);
 
 			void GenerateVertexShaderEpilog(CodeGenContext & ctx, ILWorld * world, ILStage * stage);
-			void GenerateDomainShaderProlog(CodeGenContext & ctx, ILStage * stage);
 
 			StageSource GenerateVertexFragmentDomainShader(ILProgram * program, ILShader * shader, ILStage * stage);
 			StageSource GenerateComputeShader(ILProgram * program, ILShader * shader, ILStage * stage);

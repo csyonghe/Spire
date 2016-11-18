@@ -200,7 +200,6 @@ namespace Spire
 			}
 			if (instr->Is<MemberLoadInstruction>())
 			{
-				
 				PrintOp(ctx, op0);
 				bool printDefault = true;
 				if (op0->Type->IsVector())
@@ -456,9 +455,30 @@ namespace Spire
 			ctx.Body << L";\n";
 		}
 
-		String CLikeCodeGen::RemapFuncNameForTarget(String name)
+		void CLikeCodeGen::PrintCallInstrExprForTarget(CodeGenContext & ctx, CallInstruction * instr, String const& name)
 		{
-			return name;
+			PrintDefaultCallInstrExpr(ctx, instr, name);
+		}
+
+		void CLikeCodeGen::PrintDefaultCallInstrArgs(CodeGenContext & ctx, CallInstruction * instr)
+		{
+			ctx.Body << L"(";
+			int id = 0;
+			for (auto & arg : instr->Arguments)
+			{
+				PrintOp(ctx, arg.Ptr());
+				if (id != instr->Arguments.Count() - 1)
+					ctx.Body << L", ";
+				id++;
+			}
+			ctx.Body << L")";
+		}
+
+
+		void CLikeCodeGen::PrintDefaultCallInstrExpr(CodeGenContext & ctx, CallInstruction * instr, String const& callName)
+		{
+			ctx.Body << callName;
+			PrintDefaultCallInstrArgs(ctx, instr);
 		}
 
 		void CLikeCodeGen::PrintCallInstrExpr(CodeGenContext & ctx, CallInstruction * instr)
@@ -470,18 +490,7 @@ namespace Spire
 			}
 			String callName;
 			callName = GetFuncOriginalName(instr->Function);
-			callName = RemapFuncNameForTarget(callName);
-			ctx.Body << callName;
-			ctx.Body << L"(";
-			int id = 0;
-			for (auto & arg : instr->Arguments)
-			{
-				PrintOp(ctx, arg.Ptr());
-				if (id != instr->Arguments.Count() - 1)
-					ctx.Body << L", ";
-				id++;
-			}
-			ctx.Body << L")";
+			PrintCallInstrExprForTarget(ctx, instr, callName);
 		}
 
 		void CLikeCodeGen::PrintCallInstr(CodeGenContext & ctx, CallInstruction * instr)
@@ -687,7 +696,7 @@ namespace Spire
 
 		void CLikeCodeGen::PrintLoadInputInstrExpr(CodeGenContext & ctx, LoadInputInstruction * instr)
 		{
-			PrintInputReference(ctx.Body, instr->InputName);
+			PrintInputReference(ctx, ctx.Body, instr->InputName);
 		}
 
 		void CLikeCodeGen::GenerateCode(CodeGenContext & context, CFGNode * code)
@@ -927,7 +936,7 @@ namespace Spire
 			return info;
 		}
 
-		void CLikeCodeGen::PrintInputReference(StringBuilder & sb, String input)
+		void CLikeCodeGen::PrintInputReference(CodeGenContext & ctx, StringBuilder & sb, String input)
 		{
 			auto info = extCompInfo[input]();
 
@@ -949,7 +958,14 @@ namespace Spire
 				// TODO(tfoley): hoist this logic up to the top-level if chain?
 				if(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput)
 				{
-					PrintStandardInputReference(sb, recType, input, currentImportInstr->ComponentName);
+					if(info.IsArray)
+					{
+						PrintStandardArrayInputReference(sb, recType, input, currentImportInstr->ComponentName);
+					}
+					else
+					{
+						PrintStandardInputReference(sb, recType, input, currentImportInstr->ComponentName);
+					}
 				}
 				else if(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
 				{
@@ -963,7 +979,7 @@ namespace Spire
 			}
 			else
 			{
-				PrintSystemVarReference(sb, input, info.SystemVar);
+				PrintSystemVarReference(ctx, sb, input, info.SystemVar);
 			}
 		}
 
@@ -1028,31 +1044,6 @@ namespace Spire
 					errWriter->Error(50041, L"'" + positionVar.Value + L"': component not defined.",
 						positionVar.Position);
 			}
-		}
-
-		void CLikeCodeGen::GenerateDomainShaderProlog(CodeGenContext & ctx, ILStage * stage)
-		{
-			ctx.GlobalHeader << L"layout(";
-			StageAttribute val;
-			if (stage->Attributes.TryGetValue(L"Domain", val))
-				ctx.GlobalHeader << ((val.Value == L"quads") ? L"quads" : L"triangles");
-			else
-				ctx.GlobalHeader << L"triangles";
-			if (val.Value != L"triangles" && val.Value != L"quads")
-				Error(50093, L"'Domain' should be either 'triangles' or 'quads'.", val.Position);
-			if (stage->Attributes.TryGetValue(L"Winding", val))
-			{
-				if (val.Value == L"cw")
-					ctx.GlobalHeader << L", cw";
-				else
-					ctx.GlobalHeader << L", ccw";
-			}
-			if (stage->Attributes.TryGetValue(L"EqualSpacing", val))
-			{
-				if (val.Value == L"1" || val.Value == L"true")
-					ctx.GlobalHeader << L", equal_spacing";
-			}
-			ctx.GlobalHeader << L") in;\n";
 		}
 
 		StageSource CLikeCodeGen::GenerateVertexFragmentDomainShader(ILProgram * program, ILShader * shader, ILStage * stage)
