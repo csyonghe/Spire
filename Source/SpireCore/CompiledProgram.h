@@ -226,13 +226,13 @@ namespace Spire
 			{
 				for (int i = 0; i < ErrorList.Count(); i++)
 				{
-					printf("%s(%d): error %d: %s\n", ErrorList[i].Position.FileName.ToMultiByteString(), ErrorList[i].Position.Line,
+					fprintf(stderr, "%s(%d): error %d: %s\n", ErrorList[i].Position.FileName.ToMultiByteString(), ErrorList[i].Position.Line,
 						ErrorList[i].ErrorID, ErrorList[i].Message.ToMultiByteString());
 				}
 				if (printWarning)
 					for (int i = 0; i < WarningList.Count(); i++)
 					{
-						printf("%s(%d): warning %d: %s\n", WarningList[i].Position.FileName.ToMultiByteString(),
+						fprintf(stderr, "%s(%d): warning %d: %s\n", WarningList[i].Position.FileName.ToMultiByteString(),
 							WarningList[i].Position.Line, WarningList[i].ErrorID, WarningList[i].Message.ToMultiByteString());
 					}
 			}
