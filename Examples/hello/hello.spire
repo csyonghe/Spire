@@ -11,9 +11,6 @@ pipeline StandardPipeline
     input world ModelInstance;
     
     [Pinned]
-    input world SkeletonData;
-    
-    [Pinned]
     
     input world ViewUniform;
     
@@ -29,54 +26,48 @@ pipeline StandardPipeline
     extern @(CoarseVertex*, Fragment*) Uniform<MaterialUniform> MaterialUniformBlock; 
     import(MaterialUniform->CoarseVertex) uniformImport()
     {
-        return MaterialUniformBlock;
+        return project(MaterialUniformBlock);
     }
     import(MaterialUniform->Fragment) uniformImport()
     {
-        return MaterialUniformBlock;
+        return project(MaterialUniformBlock);
     }
 
     [Binding: "1"]
     extern @(CoarseVertex*, Fragment*) Uniform<ViewUniform> ViewUniformBlock;
     import(ViewUniform->CoarseVertex) uniformImport()
     {
-        return ViewUniformBlock;
+        return project(ViewUniformBlock);
     }
     import(ViewUniform->Fragment) uniformImport()
     {
-        return ViewUniformBlock;
+        return project(ViewUniformBlock);
     }
     
     [Binding: "0"]
     extern @(CoarseVertex*, Fragment*) Uniform<ModelInstance> ModelInstanceBlock;
     import(ModelInstance->CoarseVertex) uniformImport()
     {
-        return ModelInstanceBlock;
+        return project(ModelInstanceBlock);
     }
     import(ModelInstance->Fragment) uniformImport()
     {
-        return ModelInstanceBlock;
-    }
-    
-    [Binding: "3"]
-    extern @(CoarseVertex*) StorageBuffer<SkeletonData> SkeletonDataBlock;
-    import(SkeletonData->CoarseVertex) uniformImport()
-    {
-        return SkeletonDataBlock;
+        return project(ModelInstanceBlock);
     }
     
     [VertexInput]
     extern @CoarseVertex MeshVertex vertAttribIn;
     import(MeshVertex->CoarseVertex) vertexImport()
     {
-        return vertAttribIn;
+        return project(vertAttribIn);
     }
     
     extern @Fragment CoarseVertex CoarseVertexIn;
     import(CoarseVertex->Fragment) standardImport()
-        require trait IsTriviallyPassable(CoarseVertex)
+// TODO(tfoley): this trait doesn't seem to be implemented on `vec3`
+//        require trait IsTriviallyPassable(CoarseVertex)
     {
-        return CoarseVertexIn;
+        return project(CoarseVertexIn);
     }
     
     stage vs : VertexShader

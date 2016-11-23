@@ -96,7 +96,7 @@ HRESULT initialize( ID3D11Device* dxDevice )
 
     // Add a module of code to the shader.
     // Note: we could call this multiple times to construct a complex effect
-    spShaderAddModule(spireShader, "HelloModule");
+    spShaderAddModuleByName(spireShader, "HelloModule");
 
     // Compile the constructed shader
     SpireCompilationResult* spireResult = spCompileShader(spireContext, spireShader);
