@@ -1,5 +1,4 @@
 #include "LibString.h"
-#include "MD5.h"
 
 namespace CoreLib
 {
@@ -69,25 +68,6 @@ namespace CoreLib
 				len = rs.length;
 			}
 			return rs;
-		}
-
-		String String::MD5() const
-		{
-			unsigned char result[16];
-			MD5_CTX ctx;
-			MD5_Init(&ctx);
-			MD5_Update(&ctx, buffer.Ptr(), length * sizeof(wchar_t));
-			MD5_Final(result, &ctx);
-			StringBuilder strResult;
-			for (int i = 0; i < 16; i++)
-			{
-				auto ch = String((int)result[i], 16);
-				if (ch.length == 1)
-					strResult << L'0';
-				else
-					strResult << ch;
-			}
-			return strResult.ProduceString();
 		}
 
 		String String::PadLeft(wchar_t ch, int pLen)

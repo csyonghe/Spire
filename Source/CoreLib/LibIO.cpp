@@ -13,13 +13,6 @@ namespace CoreLib
 	{
 		using namespace CoreLib::Basic;
 
-		CommandLineWriter * currentCommandWriter = nullptr;
-
-		void SetCommandLineWriter(CommandLineWriter * writer)
-		{
-			currentCommandWriter = writer;
-		}
-
 		bool File::Exists(const String & fileName)
 		{
 			struct _stat32 statVar;
