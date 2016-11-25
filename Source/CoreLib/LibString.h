@@ -494,7 +494,6 @@ namespace CoreLib
 			}
 			String PadLeft(wchar_t ch, int length);
 			String PadRight(wchar_t ch, int length);
-			String MD5() const;
 			String ReplaceAll(String src, String dst) const;
 		};
 

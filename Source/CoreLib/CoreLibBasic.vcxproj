@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="DebugClang|ARM">
@@ -747,9 +747,7 @@
     <ClInclude Include="Basic.h" />
     <ClInclude Include="Common.h" />
     <ClInclude Include="Dictionary.h" />
-    <ClInclude Include="Events.h" />
     <ClInclude Include="Exception.h" />
-    <ClInclude Include="Func.h" />
     <ClInclude Include="IntSet.h" />
     <ClInclude Include="LibIO.h" />
     <ClInclude Include="LibString.h" />
@@ -757,10 +755,7 @@
     <ClInclude Include="Linq.h" />
     <ClInclude Include="List.h" />
     <ClInclude Include="LibMath.h" />
-    <ClInclude Include="MD5.h" />
-    <ClInclude Include="MemoryPool.h" />
     <ClInclude Include="Parser.h" />
-    <ClInclude Include="PerformanceCounter.h" />
     <ClInclude Include="Regex\MetaLexer.h" />
     <ClInclude Include="Regex\Regex.h" />
     <ClInclude Include="Regex\RegexDFA.h" />
@@ -770,7 +765,6 @@
     <ClInclude Include="SmartPointer.h" />
     <ClInclude Include="Stream.h" />
     <ClInclude Include="TextIO.h" />
-    <ClInclude Include="Threading.h" />
     <ClInclude Include="TypeTraits.h" />
     <ClInclude Include="WideChar.h" />
   </ItemGroup>
@@ -778,10 +772,7 @@
     <ClCompile Include="LibIO.cpp" />
     <ClCompile Include="LibMath.cpp" />
     <ClCompile Include="LibString.cpp" />
-    <ClCompile Include="MD5.cpp" />
-    <ClCompile Include="MemoryPool.cpp" />
     <ClCompile Include="Parser.cpp" />
-    <ClCompile Include="PerformanceCounter.cpp" />
     <ClCompile Include="Regex\MetaLexer.cpp" />
     <ClCompile Include="Regex\Regex.cpp" />
     <ClCompile Include="Regex\RegexDFA.cpp" />
@@ -790,7 +781,6 @@
     <ClCompile Include="Regex\RegexTree.cpp" />
     <ClCompile Include="Stream.cpp" />
     <ClCompile Include="TextIO.cpp" />
-    <ClCompile Include="Threading.cpp" />
     <ClCompile Include="WideChar.cpp" />
   </ItemGroup>
   <ItemGroup>
