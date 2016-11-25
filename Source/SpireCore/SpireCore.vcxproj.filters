@@ -54,9 +54,6 @@
     <ClInclude Include="Closure.h">
       <Filter>Front End</Filter>
     </ClInclude>
-    <ClInclude Include="CodePosition.h">
-      <Filter>Front End</Filter>
-    </ClInclude>
     <ClInclude Include="VariantIR.h">
       <Filter>Front End</Filter>
     </ClInclude>

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="DebugClang|ARM">
@@ -748,6 +748,7 @@
     <ClInclude Include="Common.h" />
     <ClInclude Include="Dictionary.h" />
     <ClInclude Include="Exception.h" />
+    <ClInclude Include="Func.h" />
     <ClInclude Include="IntSet.h" />
     <ClInclude Include="LibIO.h" />
     <ClInclude Include="LibString.h" />
@@ -755,12 +756,7 @@
     <ClInclude Include="Linq.h" />
     <ClInclude Include="List.h" />
     <ClInclude Include="LibMath.h" />
-    <ClInclude Include="Parser.h" />
-    <ClInclude Include="Regex\MetaLexer.h" />
-    <ClInclude Include="Regex\Regex.h" />
-    <ClInclude Include="Regex\RegexDFA.h" />
-    <ClInclude Include="Regex\RegexNFA.h" />
-    <ClInclude Include="Regex\RegexTree.h" />
+    <ClInclude Include="Tokenizer.h" />
     <ClInclude Include="SecureCRT.h" />
     <ClInclude Include="SmartPointer.h" />
     <ClInclude Include="Stream.h" />
@@ -772,13 +768,7 @@
     <ClCompile Include="LibIO.cpp" />
     <ClCompile Include="LibMath.cpp" />
     <ClCompile Include="LibString.cpp" />
-    <ClCompile Include="Parser.cpp" />
-    <ClCompile Include="Regex\MetaLexer.cpp" />
-    <ClCompile Include="Regex\Regex.cpp" />
-    <ClCompile Include="Regex\RegexDFA.cpp" />
-    <ClCompile Include="Regex\RegexNFA.cpp" />
-    <ClCompile Include="Regex\RegexParser.cpp" />
-    <ClCompile Include="Regex\RegexTree.cpp" />
+    <ClCompile Include="Tokenizer.cpp" />
     <ClCompile Include="Stream.cpp" />
     <ClCompile Include="TextIO.cpp" />
     <ClCompile Include="WideChar.cpp" />

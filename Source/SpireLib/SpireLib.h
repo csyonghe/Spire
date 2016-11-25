@@ -2,7 +2,7 @@
 #define LIB_BAKER_SL_H
 
 #include "../CoreLib/Basic.h"
-#include "../CoreLib/Parser.h"
+#include "../CoreLib/Tokenizer.h"
 #include "../SpireCore/ShaderCompiler.h"
 
 namespace SpireLib
@@ -12,7 +12,7 @@ namespace SpireLib
 	public:
 		CoreLib::Basic::EnumerableDictionary<CoreLib::Basic::String, Spire::Compiler::StageSource> Sources; // indexed by world
 		Spire::Compiler::ShaderMetaData MetaData;
-		void AddSource(CoreLib::Basic::String source, CoreLib::Text::Parser & parser);
+		void AddSource(CoreLib::Basic::String source, CoreLib::Text::TokenReader & parser);
 		void FromString(const CoreLib::String & str);
 		CoreLib::String ToString();
 		void SaveToFile(CoreLib::Basic::String fileName);

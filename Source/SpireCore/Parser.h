@@ -33,7 +33,7 @@ namespace Spire
 				}
 				else
 				{
-					node->Position = CodePosition(0, 0, fileName);
+					node->Position = CodePosition(0, 0, 0, fileName);
 				}
 				node->Scope = scopeStack.Last();
 			}

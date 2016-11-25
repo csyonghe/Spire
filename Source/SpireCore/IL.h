@@ -2,13 +2,14 @@
 #define RASTER_RENDERER_IL_H
 
 #include "../CoreLib/Basic.h"
-#include "../CoreLib/Parser.h"
-#include "CodePosition.h"
+#include "../CoreLib/Tokenizer.h"
 
 namespace Spire
 {
 	namespace Compiler
 	{
+		using CoreLib::Text::CodePosition;
+
 		using namespace CoreLib::Basic;
 		enum class LayoutRule
 		{
@@ -64,7 +65,7 @@ namespace Spire
 			virtual int GetAlignment(LayoutRule rule = LayoutRule::Std430) = 0;
 		};
 
-		RefPtr<ILType> TypeFromString(CoreLib::Text::Parser & parser);
+		RefPtr<ILType> TypeFromString(CoreLib::Text::TokenReader & parser);
 
 		class ILObjectDefinition
 		{

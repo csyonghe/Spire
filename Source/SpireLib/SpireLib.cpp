@@ -1,6 +1,6 @@
 #include "SpireLib.h"
 #include "../CoreLib/LibIO.h"
-#include "../CoreLib/Parser.h"
+#include "../CoreLib/Tokenizer.h"
 #include "../SpireCore/StdInclude.h"
 #include "include/Spire.h"
 #include "../SpireCore/TypeTranslation.h"
@@ -12,12 +12,12 @@ using namespace Spire::Compiler;
 
 namespace SpireLib
 {
-	void ReadSource(EnumerableDictionary<String, StageSource> & sources, CoreLib::Text::Parser & parser, String src)
+	void ReadSource(EnumerableDictionary<String, StageSource> & sources, CoreLib::Text::TokenReader & parser, String src)
 	{
 		auto getShaderSource = [&]()
 		{
 			auto token = parser.ReadToken();
-			int endPos = token.Position + 1;
+			int endPos = token.Position.Pos + 1;
 			int brace = 0;
 			while (endPos < src.Length() && !(src[endPos] == L'}' && brace == 0))
 			{
@@ -27,10 +27,10 @@ namespace SpireLib
 					brace--;
 				endPos++;
 			}
-			while (!parser.IsEnd() && parser.NextToken().Position != endPos)
+			while (!parser.IsEnd() && parser.NextToken().Position.Pos != endPos)
 				parser.ReadToken();
 			parser.ReadToken();
-			return src.SubString(token.Position + 1, endPos - token.Position - 1);
+			return src.SubString(token.Position.Pos + 1, endPos - token.Position.Pos - 1);
 		};
 		while (!parser.IsEnd() && !parser.LookAhead(L"}"))
 		{
@@ -168,7 +168,7 @@ namespace SpireLib
 			}
 			catch (IOException)
 			{
-				compileResult.GetErrorWriter()->Error(1, L"cannot open file '" + inputFileName + L"'.", CodePosition(0, 0, L""));
+				compileResult.GetErrorWriter()->Error(1, L"cannot open file '" + inputFileName + L"'.", CodePosition(0, 0, 0, L""));
 			}
 		}
 		units.Add(predefUnit);
@@ -188,11 +188,11 @@ namespace SpireLib
 		}
 		catch (IOException)
 		{
-			compileResult.GetErrorWriter()->Error(1, L"cannot open file '" + Path::GetFileName(sourceFileName) + L"'.", CodePosition(0, 0, L""));
+			compileResult.GetErrorWriter()->Error(1, L"cannot open file '" + Path::GetFileName(sourceFileName) + L"'.", CodePosition(0, 0, 0, L""));
 		}
 		return List<ShaderLibFile>();
 	}
-	void ShaderLibFile::AddSource(CoreLib::Basic::String source, CoreLib::Text::Parser & parser)
+	void ShaderLibFile::AddSource(CoreLib::Basic::String source, CoreLib::Text::TokenReader & parser)
 	{
 		ReadSource(Sources, parser, source);
 	}
@@ -225,7 +225,7 @@ namespace SpireLib
 					writer << L"\n{\n";
 					for (auto & attrib : entry.Attributes)
 					{
-						writer << attrib.Key << L" : " << CoreLib::Text::Parser::EscapeStringLiteral(attrib.Value) << L";\n";
+						writer << attrib.Key << L" : " << CoreLib::Text::EscapeStringLiteral(attrib.Value) << L";\n";
 					}
 					writer << L"}";
 				}
@@ -276,7 +276,7 @@ namespace SpireLib
 	void ShaderLibFile::FromString(const String & src)
 	{
 		Clear();
-		CoreLib::Text::Parser parser(src);
+		CoreLib::Text::TokenReader parser(src);
 		while (!parser.IsEnd())
 		{
 			auto fieldName = parser.ReadWord();
@@ -576,7 +576,7 @@ namespace SpireLib
 				}
 				catch (IOException)
 				{
-					result.GetErrorWriter()->Error(1, L"cannot open file '" + inputFileName + L"'.", CodePosition(0, 0, L""));
+					result.GetErrorWriter()->Error(1, L"cannot open file '" + inputFileName + L"'.", CodePosition(0, 0, 0, L""));
 				}
 			}
 			cresult.Errors.AddRange(result.ErrorList);

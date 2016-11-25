@@ -8,7 +8,7 @@ namespace Spire
 		{
 			if (pos >= tokens.Count())
 			{
-				errors.Add(CompileError(String(L"\"") + string + String(L"\" expected but end of file encountered."), 20001, CodePosition(0, 0, fileName)));
+				errors.Add(CompileError(String(L"\"") + string + String(L"\" expected but end of file encountered."), 20001, CodePosition(0, 0, 0, fileName)));
 				throw 0;
 			}
 			else if (tokens[pos].Content != string)
@@ -23,7 +23,7 @@ namespace Spire
 		{
 			if (pos >= tokens.Count())
 			{
-				errors.Add(CompileError(String(L" Unexpected end of file."), 20001, CodePosition(0, 0, fileName)));
+				errors.Add(CompileError(String(L" Unexpected end of file."), 20001, CodePosition(0, 0, 0, fileName)));
 				throw 0;
 			}
 			return tokens[pos++];
@@ -33,7 +33,7 @@ namespace Spire
 		{
 			if (pos >= tokens.Count())
 			{
-				errors.Add(CompileError(TokenTypeToString(type) + String(L" expected but end of file encountered."), 20001, CodePosition(0, 0, fileName)));
+				errors.Add(CompileError(TokenTypeToString(type) + String(L" expected but end of file encountered."), 20001, CodePosition(0, 0, 0, fileName)));
 				throw 0;
 			}
 			else if(tokens[pos].Type != type)
@@ -48,7 +48,7 @@ namespace Spire
 		{
 			if (pos + offset >= tokens.Count())
 			{
-				errors.Add(CompileError(String(L"\'") + string + String(L"\' expected but end of file encountered."), 20001, CodePosition(0, 0, fileName)));
+				errors.Add(CompileError(String(L"\'") + string + String(L"\' expected but end of file encountered."), 20001, CodePosition(0, 0, 0, fileName)));
 				return false;
 			}
 			else
@@ -64,7 +64,7 @@ namespace Spire
 		{
 			if (pos + offset >= tokens.Count())
 			{
-				errors.Add(CompileError(TokenTypeToString(type) + String(L" expected but end of file encountered."), 20001, CodePosition(0, 0, fileName)));
+				errors.Add(CompileError(TokenTypeToString(type) + String(L" expected but end of file encountered."), 20001, CodePosition(0, 0, 0, fileName)));
 				return false;
 			}
 			else
@@ -80,7 +80,7 @@ namespace Spire
 		{
 			if (pos >= tokens.Count())
 			{
-				errors.Add(CompileError(String(L"type name expected but end of file encountered."), 20001, CodePosition(0, 0, fileName)));
+				errors.Add(CompileError(String(L"type name expected but end of file encountered."), 20001, CodePosition(0, 0, 0, fileName)));
 				throw 0;
 			}
 			if(!IsTypeKeyword())
@@ -130,7 +130,7 @@ namespace Spire
 		{
 			scopeStack.Add(new Scope());
 			RefPtr<ProgramSyntaxNode> program = new ProgramSyntaxNode();
-			program->Position = CodePosition(0, 0, fileName);
+			program->Position = CodePosition(0, 0, 0, fileName);
 			program->Scope = scopeStack.Last();
 			try
 			{
@@ -473,7 +473,7 @@ namespace Spire
 							arg->ArgumentName.Position = varExpr->Position;
 						}
 						else
-							errors.Add(CompileError(L"unexpected ':'.", 20011, pos < tokens.Count() ? tokens[pos].Position : CodePosition(0, 0, fileName)));
+							errors.Add(CompileError(L"unexpected ':'.", 20011, pos < tokens.Count() ? tokens[pos].Position : CodePosition(0, 0, 0, fileName)));
 						ReadToken(L":");
 						arg->Expression = ParseExpression();
 					}
@@ -667,19 +667,19 @@ namespace Spire
 				statement = ParseBlockStatement();
 			else if (IsTypeKeyword() || LookAheadToken(L"const"))
 				statement = ParseVarDeclrStatement();
-			else if (LookAheadToken(TokenType::KeywordIf))
+			else if (LookAheadToken(L"if"))
 				statement = ParseIfStatement();
-			else if (LookAheadToken(TokenType::KeywordFor))
+			else if (LookAheadToken(L"for"))
 				statement = ParseForStatement();
-			else if (LookAheadToken(TokenType::KeywordWhile))
+			else if (LookAheadToken(L"while"))
 				statement = ParseWhileStatement();
-			else if (LookAheadToken(TokenType::KeywordDo))
+			else if (LookAheadToken(L"do"))
 				statement = ParseDoWhileStatement();
-			else if (LookAheadToken(TokenType::KeywordBreak))
+			else if (LookAheadToken(L"break"))
 				statement = ParseBreakStatement();
-			else if (LookAheadToken(TokenType::KeywordContinue))
+			else if (LookAheadToken(L"continue"))
 				statement = ParseContinueStatement();
-			else if (LookAheadToken(TokenType::KeywordReturn))
+			else if (LookAheadToken(L"return"))
 				statement = ParseReturnStatement();
 			else if (LookAheadToken(L"using") || (LookAheadToken(L"public") && LookAheadToken(L"using", 1)))
 				statement = ParseImportStatement();
@@ -838,14 +838,14 @@ namespace Spire
 		{
 			RefPtr<IfStatementSyntaxNode> ifStatement = new IfStatementSyntaxNode();
 			FillPosition(ifStatement.Ptr());
-			ReadToken(TokenType::KeywordIf);
+			ReadToken(L"if");
 			ReadToken(TokenType::LParent);
 			ifStatement->Predicate = ParseExpression();
 			ReadToken(TokenType::RParent);
 			ifStatement->PositiveStatement = ParseStatement();
-			if (LookAheadToken(TokenType::KeywordElse))
+			if (LookAheadToken(L"else"))
 			{
-				ReadToken(TokenType::KeywordElse);
+				ReadToken(L"else");
 				ifStatement->NegativeStatement = ParseStatement();
 			}
 			return ifStatement;
@@ -856,7 +856,7 @@ namespace Spire
 			RefPtr<ForStatementSyntaxNode> stmt = new ForStatementSyntaxNode();
 			PushScope();
 			FillPosition(stmt.Ptr());
-			ReadToken(TokenType::KeywordFor);
+			ReadToken(L"for");
 			ReadToken(TokenType::LParent);
 			if (IsTypeKeyword())
 			{
@@ -898,7 +898,7 @@ namespace Spire
 			RefPtr<WhileStatementSyntaxNode> whileStatement = new WhileStatementSyntaxNode();
 			PushScope();
 			FillPosition(whileStatement.Ptr());
-			ReadToken(TokenType::KeywordWhile);
+			ReadToken(L"while");
 			ReadToken(TokenType::LParent);
 			whileStatement->Predicate = ParseExpression();
 			ReadToken(TokenType::RParent);
@@ -912,9 +912,9 @@ namespace Spire
 			RefPtr<DoWhileStatementSyntaxNode> doWhileStatement = new DoWhileStatementSyntaxNode();
 			PushScope();
 			FillPosition(doWhileStatement.Ptr());
-			ReadToken(TokenType::KeywordDo);
+			ReadToken(L"do");
 			doWhileStatement->Statement = ParseStatement();
-			ReadToken(TokenType::KeywordWhile);
+			ReadToken(L"while");
 			ReadToken(TokenType::LParent);
 			doWhileStatement->Predicate = ParseExpression();
 			ReadToken(TokenType::RParent);
@@ -927,7 +927,7 @@ namespace Spire
 		{
 			RefPtr<BreakStatementSyntaxNode> breakStatement = new BreakStatementSyntaxNode();
 			FillPosition(breakStatement.Ptr());
-			ReadToken(TokenType::KeywordBreak);
+			ReadToken(L"break");
 			ReadToken(TokenType::Semicolon);
 			return breakStatement;
 		}
@@ -936,7 +936,7 @@ namespace Spire
 		{
 			RefPtr<ContinueStatementSyntaxNode> continueStatement = new ContinueStatementSyntaxNode();
 			FillPosition(continueStatement.Ptr());
-			ReadToken(TokenType::KeywordContinue);
+			ReadToken(L"continue");
 			ReadToken(TokenType::Semicolon);
 			return continueStatement;
 		}
@@ -945,7 +945,7 @@ namespace Spire
 		{
 			RefPtr<ReturnStatementSyntaxNode> returnStatement = new ReturnStatementSyntaxNode();
 			FillPosition(returnStatement.Ptr());
-			ReadToken(TokenType::KeywordReturn);
+			ReadToken(L"return");
 			if (!LookAheadToken(TokenType::Semicolon))
 				returnStatement->Expression = ParseExpression();
 			ReadToken(TokenType::Semicolon);

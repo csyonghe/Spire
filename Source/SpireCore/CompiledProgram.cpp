@@ -1,5 +1,5 @@
 #include "CompiledProgram.h"
-#include "../CoreLib/Parser.h"
+
 namespace Spire
 {
 	namespace Compiler

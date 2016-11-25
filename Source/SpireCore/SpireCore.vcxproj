@@ -371,7 +371,6 @@
     <ClInclude Include="CLikeCodeGen.h" />
     <ClInclude Include="Closure.h" />
     <ClInclude Include="CodeGenBackend.h" />
-    <ClInclude Include="CodePosition.h" />
     <ClInclude Include="CodeWriter.h" />
     <ClInclude Include="CompiledProgram.h" />
     <ClInclude Include="CompileError.h" />

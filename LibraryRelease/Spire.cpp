@@ -1431,7 +1431,6 @@ namespace CoreLib
 			}
 			String PadLeft(wchar_t ch, int length);
 			String PadRight(wchar_t ch, int length);
-			String MD5() const;
 			String ReplaceAll(String src, String dst) const;
 		};
 
@@ -5033,22 +5032,28 @@ namespace CoreLib
 #endif
 
 /***********************************************************************
-SPIRECORE\CODEPOSITION.H
+CORELIB\TOKENIZER.H
 ***********************************************************************/
-#ifndef SPIRE_CODE_POSITION_H
-#define SPIRE_CODE_POSITION_H
+#ifndef CORELIB_TEXT_PARSER_H
+#define CORELIB_TEXT_PARSER_H
 
 
-namespace Spire
+namespace CoreLib
 {
-	namespace Compiler
+	namespace Text
 	{
-		using namespace CoreLib::Basic;
+		class TextFormatException : public Exception
+		{
+		public:
+			TextFormatException(String message)
+				: Exception(message)
+			{}
+		};
 
 		class CodePosition
 		{
 		public:
-			int Line = -1, Col = -1;
+			int Line = -1, Col = -1, Pos = -1;
 			String FileName;
 			String ToString()
 			{
@@ -5059,10 +5064,11 @@ namespace Spire
 				return sb.ProduceString();
 			}
 			CodePosition() = default;
-			CodePosition(int line, int col, String fileName)
+			CodePosition(int line, int col, int pos, String fileName)
 			{
 				Line = line;
 				Col = col;
+				Pos = pos;
 				this->FileName = fileName;
 			}
 			bool operator < (const CodePosition & pos) const
@@ -5075,6 +5081,194 @@ namespace Spire
 				return FileName == pos.FileName && Line == pos.Line && Col == pos.Col;
 			}
 		};
+
+		enum class TokenType
+		{
+			// illegal
+			Unknown,
+			// identifier
+			Identifier,
+			// constant
+			IntLiterial, DoubleLiterial, StringLiterial, CharLiterial,
+			// operators
+			Semicolon, Comma, Dot, LBrace, RBrace, LBracket, RBracket, LParent, RParent,
+			OpAssign, OpAdd, OpSub, OpMul, OpDiv, OpMod, OpNot, OpBitNot, OpLsh, OpRsh,
+			OpEql, OpNeq, OpGreater, OpLess, OpGeq, OpLeq,
+			OpAnd, OpOr, OpBitXor, OpBitAnd, OpBitOr,
+			OpInc, OpDec, OpAddAssign, OpSubAssign, OpMulAssign, OpDivAssign, OpModAssign,
+			OpShlAssign, OpShrAssign, OpOrAssign, OpAndAssign, OpXorAssign,
+
+			QuestionMark, Colon, RightArrow, At,
+		};
+
+		String TokenTypeToString(TokenType type);
+
+		class Token
+		{
+		public:
+			TokenType Type = TokenType::Unknown;
+			String Content;
+			CodePosition Position;
+			Token() = default;
+			Token(TokenType type, const String & content, int line, int col, int pos, String fileName)
+			{
+				Type = type;
+				Content = content;
+				Position = CodePosition(line, col, pos, fileName);
+			}
+		};
+
+		enum class TokenizeErrorType
+		{
+			InvalidCharacter, InvalidEscapeSequence
+		};
+
+		List<Token> TokenizeText(const String & fileName, const String & text, Procedure<TokenizeErrorType, CodePosition> errorHandler);
+		List<Token> TokenizeText(const String & fileName, const String & text);
+		List<Token> TokenizeText(const String & text);
+		
+		String EscapeStringLiteral(String str);
+		String UnescapeStringLiteral(String str);
+
+		class TokenReader
+		{
+		private:
+			bool legal;
+			List<Token> tokens;
+			int tokenPtr;
+		public:
+			TokenReader(Basic::String text);
+			int ReadInt()
+			{
+				auto token = ReadToken();
+				bool neg = false;
+				if (token.Content == L'-')
+				{
+					neg = true;
+					token = ReadToken();
+				}
+				if (token.Type == TokenType::IntLiterial)
+				{
+					if (neg)
+						return -StringToInt(token.Content);
+					else
+						return StringToInt(token.Content);
+				}
+				throw TextFormatException(L"Text parsing error: int expected.");
+			}
+			unsigned int ReadUInt()
+			{
+				auto token = ReadToken();
+				if (token.Type == TokenType::IntLiterial)
+				{
+					return StringToUInt(token.Content);
+				}
+				throw TextFormatException(L"Text parsing error: int expected.");
+			}
+			double ReadDouble()
+			{
+				auto token = ReadToken();
+				bool neg = false;
+				if (token.Content == L'-')
+				{
+					neg = true;
+					token = ReadToken();
+				}
+				if (token.Type == TokenType::DoubleLiterial || token.Type == TokenType::IntLiterial)
+				{
+					if (neg)
+						return -StringToDouble(token.Content);
+					else
+						return StringToDouble(token.Content);
+				}
+				throw TextFormatException(L"Text parsing error: floating point value expected.");
+			}
+			String ReadWord()
+			{
+				auto token = ReadToken();
+				if (token.Type == TokenType::Identifier)
+				{
+					return token.Content;
+				}
+				throw TextFormatException(L"Text parsing error: identifier expected.");
+			}
+			String Read(const wchar_t * expectedStr)
+			{
+				auto token = ReadToken();
+				if (token.Content == expectedStr)
+				{
+					return token.Content;
+				}
+				throw TextFormatException(L"Text parsing error: \'" + String(expectedStr) + L"\' expected.");
+			}
+			String Read(String expectedStr)
+			{
+				auto token = ReadToken();
+				if (token.Content == expectedStr)
+				{
+					return token.Content;
+				}
+				throw TextFormatException(L"Text parsing error: \'" + expectedStr + L"\' expected.");
+			}
+			
+			String ReadStringLiteral()
+			{
+				auto token = ReadToken();
+				if (token.Type == TokenType::StringLiterial)
+				{
+					return UnescapeStringLiteral(token.Content.SubString(1, token.Content.Length()-2));
+				}
+				throw TextFormatException(L"Text parsing error: string literal expected.");
+			}
+			void Back(int count)
+			{
+				tokenPtr -= count;
+			}
+			Token ReadToken()
+			{
+				if (tokenPtr < tokens.Count())
+				{
+					auto &rs = tokens[tokenPtr];
+					tokenPtr++;
+					return rs;
+				}
+				throw TextFormatException(L"Unexpected ending.");
+			}
+			Token NextToken()
+			{
+				if (tokenPtr < tokens.Count())
+					return tokens[tokenPtr];
+				else
+				{
+					Token rs;
+					rs.Type = TokenType::Unknown;
+					return rs;
+				}
+			}
+			bool LookAhead(String token)
+			{
+				if (tokenPtr < tokens.Count())
+				{
+					auto next = NextToken();
+					return next.Content == token;
+				}
+				else
+				{
+					return false;
+				}
+			}
+			bool IsEnd()
+			{
+				return tokenPtr == tokens.Count();
+			}
+		public:
+			bool IsLegalText()
+			{
+				return legal;
+			}
+		};
+
+		List<String> Split(String str, wchar_t c);
 	}
 }
 
@@ -5092,6 +5286,7 @@ namespace Spire
 	namespace Compiler
 	{
 		using namespace CoreLib::Basic;
+		using namespace CoreLib::Text;
 
 		class CompileError
 		{
@@ -5161,774 +5356,6 @@ namespace Spire
 #endif
 
 /***********************************************************************
-CORELIB\REGEX\REGEXTREE.H
-***********************************************************************/
-#ifndef GX_REGEX_PARSER_H
-#define GX_REGEX_PARSER_H
-
-
-namespace CoreLib
-{
-	namespace Text
-	{
-		using namespace CoreLib::Basic;
-
-		class RegexCharSetNode;
-		class RegexRepeatNode;
-		class RegexConnectionNode;
-		class RegexSelectionNode;
-
-		class RegexNodeVisitor : public Object
-		{
-		public:
-			virtual void VisitCharSetNode(RegexCharSetNode * node);
-			virtual void VisitRepeatNode(RegexRepeatNode * node);
-			virtual void VisitConnectionNode(RegexConnectionNode * node);
-			virtual void VisitSelectionNode(RegexSelectionNode * node);
-		};
-
-		class RegexNode : public Object
-		{
-		public:
-			virtual String Reinterpret() = 0;
-			virtual void Accept(RegexNodeVisitor * visitor) = 0;
-		};
-
-		class RegexCharSet : public Object
-		{
-		private:
-			List<RegexCharSet *> OriSet;
-			void CopyCtor(const RegexCharSet & set);
-		public:
-			bool Neg;
-			struct RegexCharRange
-			{
-				wchar_t Begin,End;
-				bool operator == (const RegexCharRange & r);
-			};
-			List<RegexCharRange> Ranges;
-			List<unsigned short> Elements; 
-		
-		public:
-			RegexCharSet()
-			{
-				Neg = false;
-			}
-			RegexCharSet(const RegexCharSet & set);
-			String Reinterpret();
-			void Normalize();
-			void Sort();
-			void AddRange(RegexCharRange r);
-			void SubtractRange(RegexCharRange r);
-			bool Contains(RegexCharRange r);
-			bool operator ==(const RegexCharSet & set);
-			RegexCharSet & operator = (const RegexCharSet & set);
-			static void InsertElement(List<RefPtr<RegexCharSet>> &L, RefPtr<RegexCharSet> & elem);
-			static void RangeMinus(RegexCharRange r1, RegexCharRange r2, RegexCharSet & rs);
-			static void CharSetMinus(RegexCharSet & s1, RegexCharSet & s2);
-			static void RangeIntersection(RegexCharRange r1, RegexCharRange r2, RegexCharSet &rs);
-			static void CalcCharElementFromPair(RegexCharSet * c1, RegexCharSet * c2, RegexCharSet & AmB, RegexCharSet & BmA, RegexCharSet & AnB);
-			static void CalcCharElements(List<RegexCharSet *> & sets, List<RegexCharRange> & elements);
-		};
-
-		class RegexCharSetNode : public RegexNode
-		{
-		public:
-			RefPtr<RegexCharSet> CharSet;
-		public:
-			String Reinterpret();
-			virtual void Accept(RegexNodeVisitor * visitor);
-			RegexCharSetNode();
-		};
-
-		class RegexRepeatNode : public RegexNode
-		{
-		public:
-			enum _RepeatType
-			{
-				rtOptional, rtArbitary, rtMoreThanOnce, rtSpecified
-			};
-			_RepeatType RepeatType = rtOptional;
-			int MinRepeat = -1, MaxRepeat = -1;
-			RefPtr<RegexNode> Child;
-		public:
-			String Reinterpret();
-			virtual void Accept(RegexNodeVisitor * visitor);
-		};
-
-		class RegexConnectionNode : public RegexNode
-		{
-		public:
-			RefPtr<RegexNode> LeftChild, RightChild;
-		public:
-			String Reinterpret();
-			virtual void Accept(RegexNodeVisitor * visitor);
-		};
-
-		class RegexSelectionNode : public RegexNode
-		{
-		public:
-			RefPtr<RegexNode> LeftChild, RightChild;
-		public:
-			String Reinterpret();
-			virtual void Accept(RegexNodeVisitor * visitor);
-		};
-
-		class RegexParser : public Object
-		{
-		private:
-			String src;
-			int ptr;
-			RegexNode * ParseSelectionNode();
-			RegexNode * ParseConnectionNode();
-			RegexNode * ParseRepeatNode();
-			RegexCharSet * ParseCharSet();
-			wchar_t ReadNextCharInCharSet();
-			int ParseInteger();
-			bool IsOperator();
-		public:
-			struct SyntaxError
-			{
-				int Position;
-				String Text;
-			};
-			List<SyntaxError> Errors;
-			RefPtr<RegexNode> Parse(const String & regex); 
-		};
-	}
-}
-
-#endif
-
-/***********************************************************************
-CORELIB\REGEX\REGEXNFA.H
-***********************************************************************/
-#ifndef REGEX_NFA_H
-#define REGEX_NFA_H
-
-
-namespace CoreLib
-{
-	namespace Text
-	{
-		using namespace CoreLib::Basic;
-
-		class NFA_Node;
-
-		class NFA_Translation : public Object
-		{
-		public:
-			RefPtr<RegexCharSet> CharSet;
-			NFA_Node * NodeSrc, * NodeDest;
-			NFA_Translation();
-			NFA_Translation(NFA_Node * src, NFA_Node * dest, RefPtr<RegexCharSet> charSet);
-			NFA_Translation(NFA_Node * src, NFA_Node * dest);
-		};
-
-		class NFA_Node : public Object
-		{
-		private:
-			static int HandleCount;
-		public:
-			int ID = -1;
-			bool Flag = 0;
-			bool IsFinal = false;
-			int TerminalIdentifier;
-			List<NFA_Translation *> Translations;
-			List<NFA_Translation *> PrevTranslations;
-			void RemoveTranslation(NFA_Translation * trans);
-			void RemovePrevTranslation(NFA_Translation * trans);
-			NFA_Node();
-		};
-
-		class NFA_Graph : public RegexNodeVisitor
-		{
-			friend class DFA_Graph;
-		private:
-			NFA_Node * start = nullptr, * end = nullptr;
-			struct NFA_StatePair
-			{
-				NFA_Node * start = nullptr, * end = nullptr;
-			};
-			List<NFA_StatePair> stateStack;
-			NFA_StatePair PopState();
-			void PushState(NFA_StatePair s);
-		private:
-			List<RefPtr<NFA_Node>> nodes;
-			List<RefPtr<NFA_Translation>> translations;
-			void ClearNodes();
-			void ClearNodeFlags();
-			void GetValidStates(List<NFA_Node *> & states);
-			void GetEpsilonClosure(NFA_Node * node, List<NFA_Node *> & states);
-			void EliminateEpsilon();
-		public:
-			NFA_Node * CreateNode();
-			NFA_Translation * CreateTranslation();
-			String Interpret();
-			void GenerateFromRegexTree(RegexNode * tree, bool elimEpsilon = true);
-			void PostGenerationProcess();
-			void CombineNFA(NFA_Graph * graph);
-			NFA_Node * GetStartNode();
-			void SetStartNode(NFA_Node * node);
-			void SetTerminalIdentifier(int id);
-			virtual void VisitCharSetNode(RegexCharSetNode * node);
-			virtual void VisitRepeatNode(RegexRepeatNode * node);
-			virtual void VisitConnectionNode(RegexConnectionNode * node);
-			virtual void VisitSelectionNode(RegexSelectionNode * node);
-		};
-	}
-}
-
-
-#endif
-
-/***********************************************************************
-CORELIB\REGEX\REGEXDFA.H
-***********************************************************************/
-#ifndef REGEX_DFA_H
-#define REGEX_DFA_H
-
-
-namespace CoreLib
-{
-	namespace Text
-	{
-		using namespace CoreLib::Basic;
-
-		typedef List<Word> RegexCharTable;
-	
-		class CharTableGenerator : public Object
-		{
-		private:
-			List<String> sets;
-			RegexCharTable * table;
-			int AddSet(String set);
-		public:
-			List<RegexCharSet::RegexCharRange> elements;
-			CharTableGenerator(RegexCharTable * _table);
-			int Generate(List<RegexCharSet *> & charSets);
-		};
-
-		class DFA_Table_Tag
-		{
-		public:
-			bool IsFinal = false;
-			List<int> TerminalIdentifiers; // sorted
-			DFA_Table_Tag();
-		};
-
-		class DFA_Table : public Object
-		{
-		public:
-			int StateCount;
-			int AlphabetSize;
-			int ** DFA;
-			List<RefPtr<DFA_Table_Tag>> Tags;
-			int StartState;
-			RefPtr<RegexCharTable> CharTable;
-			DFA_Table();
-			~DFA_Table();
-		};
-
-		class DFA_Node : public Object
-		{
-		public:
-			int ID = -1;
-			bool IsFinal = false;
-			List<int> TerminalIdentifiers; // sorted
-			List<NFA_Node*> Nodes;  // sorted
-			List<DFA_Node *> Translations;
-			DFA_Node(int elements);
-			bool operator == (const DFA_Node & node);
-		};
-
-		class DFA_Graph : public Object
-		{
-		private:
-			List<RegexCharSet::RegexCharRange> CharElements;
-			RefPtr<RegexCharTable> table;
-			DFA_Node * startNode;
-			List<RefPtr<DFA_Node>> nodes;
-			void CombineCharElements(NFA_Node * node, List<Word> & elem);
-		public:
-			void Generate(NFA_Graph * nfa);
-			String Interpret();
-			void ToDfaTable(DFA_Table * dfa);
-		};
-	}
-}
-#endif
-
-/***********************************************************************
-CORELIB\REGEX\REGEX.H
-***********************************************************************/
-#ifndef GX_REGEX_H
-#define GX_REGEX_H
-
-
-namespace CoreLib
-{
-	namespace Text
-	{
-		class IllegalRegexException : public Exception
-		{
-		};
-
-		class RegexMatcher : public Object
-		{
-		private:
-			DFA_Table * dfa;
-		public:
-			RegexMatcher(DFA_Table * table);
-			int Match(const String & str, int startPos = 0);
-		};
-
-		class PureRegex : public Object
-		{
-		private:
-			RefPtr<DFA_Table> dfaTable;
-		public:
-			struct RegexMatchResult
-			{
-				int Start;
-				int Length;
-			};
-			PureRegex(const String & regex);
-			bool IsMatch(const String & str); // Match Whole Word
-			RegexMatchResult Search(const String & str, int startPos = 0);
-			DFA_Table * GetDFA();
-		};
-	}
-}
-
-#endif
-
-/***********************************************************************
-CORELIB\REGEX\METALEXER.H
-***********************************************************************/
-#ifndef GX_META_LEXER_H
-#define GX_META_LEXER_H
-
-
-namespace CoreLib
-{
-	namespace Text
-	{
-		class LexToken
-		{
-		public:
-			String Str;
-			int TypeID;
-			int Position;
-		};
-
-		class LazyLexToken
-		{
-		public:
-			int TypeID;
-			int Position;
-			int Length;
-		};
-
-		typedef LinkedList<LexToken> LexStream;
-	
-		class LexerError
-		{
-		public:
-			String Text;
-			int Position;
-		};
-
-		struct LexProfileToken
-		{
-			String str;
-			enum LexProfileTokenType
-			{
-				Identifier,
-				Equal,
-				Regex
-			} type;
-		};
-
-		typedef LinkedList<LexProfileToken> LexProfileTokenStream;
-		typedef LinkedNode<LexProfileToken> LexProfileTokenNode;
-
-		class LexicalParseException : public Exception
-		{
-		public:
-			int Position;
-			LexicalParseException(String str, int pos) : Exception(str), Position(pos)
-			{}
-		};
-
-		class LazyLexStream
-		{
-		private:
-			RefPtr<DFA_Table> dfa; 
-			List<bool> *ignoreSet;
-		public:
-			String InputText;
-			LazyLexStream() = default;
-			LazyLexStream(String text, const RefPtr<DFA_Table> & dfa, List<bool> *ignoreSet)
-				: dfa(dfa), ignoreSet(ignoreSet), InputText(text)
-			{}
-			inline DFA_Table * GetDFA()
-			{
-				return dfa.Ptr();
-			}
-			inline List<bool> & GetIgnoreSet()
-			{
-				return *ignoreSet;
-			}
-			class Iterator
-			{
-			public:
-				int ptr, state, lastTokenPtr;
-				LazyLexStream * stream;
-				LazyLexToken currentToken;
-				bool operator != (const Iterator & iter) const
-				{
-					return lastTokenPtr != iter.lastTokenPtr;
-				}
-				bool operator == (const Iterator & iter) const
-				{
-					return lastTokenPtr == iter.lastTokenPtr;
-				}
-				LazyLexToken * operator ->()
-				{
-					return &currentToken;
-				}
-				LazyLexToken operator *()
-				{
-					return currentToken;
-				}
-				Iterator & operator ++();
-				Iterator operator ++(int)
-				{
-					Iterator rs = *this;
-					this->operator++();
-					return rs;
-				}
-			};
-			Iterator begin()
-			{
-				Iterator iter;
-				iter.ptr = 0;
-				iter.lastTokenPtr = 0;
-				iter.state = dfa->StartState;
-				iter.stream = this;
-				++iter;
-				return iter;
-			}
-			Iterator end()
-			{
-				Iterator iter;
-				iter.ptr = InputText.Length();
-				iter.lastTokenPtr = -1;
-				iter.state = dfa->StartState;
-				iter.stream = this;
-				return iter;
-			}
-		};
-
-		class MetaLexer : public Object
-		{
-		private:
-			RefPtr<DFA_Table> dfa;
-			List<String> Regex;
-			List<String> TokenNames;
-			List<bool> Ignore;
-			String ReadProfileToken(LexProfileTokenNode*n, LexProfileToken::LexProfileTokenType type);
-			bool ParseLexProfile(const String &lex);
-			void ConstructDFA();
-		public:
-			int TokensParsed;
-			List<LexerError> Errors;
-			MetaLexer(String LexProfile);
-			MetaLexer();
-			DFA_Table * GetDFA();
-			String GetTokenName(int id);
-			int GetRuleCount();
-			void SetLexProfile(String lex);
-			bool Parse(String str, LexStream & stream);
-			LazyLexStream Parse(String str)
-			{
-				return LazyLexStream(str, dfa, &Ignore);
-			}
-		};
-	}
-}
-
-#endif
-
-/***********************************************************************
-CORELIB\PARSER.H
-***********************************************************************/
-#ifndef CORELIB_TEXT_PARSER_H
-#define CORELIB_TEXT_PARSER_H
-
-
-namespace CoreLib
-{
-	namespace Text
-	{
-		class TextFormatException : public Exception
-		{
-		public:
-			TextFormatException(String message)
-				: Exception(message)
-			{}
-		};
-
-		const int TokenType_Identifier = 3;
-		const int TokenType_Int = 4;
-		const int TokenType_Float = 5;
-		const int TokenType_StringLiteral = 6;
-		const int TokenType_CharLiteral = 7;
-
-		class Parser
-		{
-		private:
-			static RefPtr<MetaLexer> metaLexer;
-			LazyLexStream stream;
-			bool legal;
-			String text;
-			List<LazyLexToken> tokens;
-			int tokenPtr;
-			LexToken MakeToken(LazyLexToken ltk)
-			{
-				LexToken tk;
-				tk.Position = ltk.Position;
-				tk.TypeID = ltk.TypeID;
-				tk.Str = text.SubString(ltk.Position, ltk.Length);
-				return tk;
-			}
-		public:
-			static MetaLexer * GetTextLexer();
-			static void DisposeTextLexer();
-			static Basic::List<Basic::String> SplitString(Basic::String str, wchar_t ch);
-			Parser(Basic::String text);
-			int ReadInt()
-			{
-				auto token = ReadToken();
-				bool neg = false;
-				if (token.Str == L'-')
-				{
-					neg = true;
-					token = ReadToken();
-				}
-				if (token.TypeID == TokenType_Int)
-				{
-					if (neg)
-						return -StringToInt(token.Str);
-					else
-						return StringToInt(token.Str);
-				}
-				throw TextFormatException(L"Text parsing error: int expected.");
-			}
-			unsigned int ReadUInt()
-			{
-				auto token = ReadToken();
-				if (token.TypeID == TokenType_Int)
-				{
-					return StringToUInt(token.Str);
-				}
-				throw TextFormatException(L"Text parsing error: int expected.");
-			}
-			double ReadDouble()
-			{
-				auto token = ReadToken();
-				bool neg = false;
-				if (token.Str == L'-')
-				{
-					neg = true;
-					token = ReadToken();
-				}
-				if (token.TypeID == TokenType_Float || token.TypeID == TokenType_Int)
-				{
-					if (neg)
-						return -StringToDouble(token.Str);
-					else
-						return StringToDouble(token.Str);
-				}
-				throw TextFormatException(L"Text parsing error: floating point value expected.");
-			}
-			String ReadWord()
-			{
-				auto token = ReadToken();
-				if (token.TypeID == TokenType_Identifier)
-				{
-					return token.Str;
-				}
-				throw TextFormatException(L"Text parsing error: identifier expected.");
-			}
-			String Read(const wchar_t * expectedStr)
-			{
-				auto token = ReadToken();
-				if (token.Str == expectedStr)
-				{
-					return token.Str;
-				}
-				throw TextFormatException(L"Text parsing error: \'" + String(expectedStr) + L"\' expected.");
-			}
-			String Read(String expectedStr)
-			{
-				auto token = ReadToken();
-				if (token.Str == expectedStr)
-				{
-					return token.Str;
-				}
-				throw TextFormatException(L"Text parsing error: \'" + expectedStr + L"\' expected.");
-			}
-			static String EscapeStringLiteral(String str)
-			{
-				StringBuilder sb;
-				sb << L"\"";
-				for (int i = 0; i < str.Length(); i++)
-				{
-					switch (str[i])
-					{
-					case L' ':
-						sb << L"\\s";
-						break;
-					case L'\n':
-						sb << L"\\n";
-						break;
-					case L'\r':
-						sb << L"\\r";
-						break;
-					case L'\t':
-						sb << L"\\t";
-						break;
-					case L'\v':
-						sb << L"\\v";
-						break;
-					case L'\'':
-						sb << L"\\\'";
-						break;
-					case L'\"':
-						sb << L"\\\"";
-						break;
-					case L'\\':
-						sb << L"\\\\";
-						break;
-					default:
-						sb << str[i];
-						break;
-					}
-				}
-				sb << L"\"";
-				return sb.ProduceString();
-			}
-			String UnescapeStringLiteral(String str)
-			{
-				StringBuilder sb;
-				for (int i = 0; i < str.Length(); i++)
-				{
-					if (str[i] == L'\\' && i < str.Length() - 1)
-					{
-						switch (str[i + 1])
-						{
-						case L's':
-							sb << L" ";
-							break;
-						case L't':
-							sb << L'\t';
-							break;
-						case L'n':
-							sb << L'\n';
-							break;
-						case L'r':
-							sb << L'\r';
-							break;
-						case L'v':
-							sb << L'\v';
-							break;
-						case L'\'':
-							sb << L'\'';
-							break;
-						case L'\"':
-							sb << L"\"";
-							break;
-						case L'\\':
-							sb << L"\\";
-							break;
-						default:
-							i = i - 1;
-							sb << str[i];
-						}
-						i++;
-					}
-					else
-						sb << str[i];
-				}
-				return sb.ProduceString();
-			}
-			String ReadStringLiteral()
-			{
-				auto token = ReadToken();
-				if (token.TypeID == TokenType_StringLiteral)
-				{
-					return UnescapeStringLiteral(token.Str.SubString(1, token.Str.Length()-2));
-				}
-				throw TextFormatException(L"Text parsing error: string literal expected.");
-			}
-			void Back(int count)
-			{
-				tokenPtr -= count;
-			}
-			LexToken ReadToken()
-			{
-				if (tokenPtr < tokens.Count())
-				{
-					LexToken rs = MakeToken(tokens[tokenPtr]);
-					tokenPtr++;
-					return rs;
-				}
-				throw TextFormatException(L"Unexpected ending.");
-			}
-			LexToken NextToken()
-			{
-				if (tokenPtr < tokens.Count())
-					return MakeToken(tokens[tokenPtr]);
-				else
-				{
-					LexToken rs;
-					rs.TypeID = -1;
-					rs.Position = -1;
-					return rs;
-				}
-			}
-			bool LookAhead(String token)
-			{
-				if (tokenPtr < tokens.Count())
-				{
-					auto next = NextToken();
-					return next.Str == token;
-				}
-				else
-				{
-					return false;
-				}
-			}
-			bool IsEnd()
-			{
-				return tokenPtr == tokens.Count();
-			}
-		public:
-			bool IsLegalText()
-			{
-				return legal;
-			}
-		};
-
-		List<String> Split(String str, wchar_t c);
-	}
-}
-
-#endif
-
-/***********************************************************************
 SPIRECORE\IL.H
 ***********************************************************************/
 #ifndef RASTER_RENDERER_IL_H
@@ -5939,6 +5366,8 @@ namespace Spire
 {
 	namespace Compiler
 	{
+		using CoreLib::Text::CodePosition;
+
 		using namespace CoreLib::Basic;
 		enum class LayoutRule
 		{
@@ -5994,7 +5423,7 @@ namespace Spire
 			virtual int GetAlignment(LayoutRule rule = LayoutRule::Std430) = 0;
 		};
 
-		RefPtr<ILType> TypeFromString(CoreLib::Text::Parser & parser);
+		RefPtr<ILType> TypeFromString(CoreLib::Text::TokenReader & parser);
 
 		class ILObjectDefinition
 		{
@@ -8518,45 +7947,7 @@ namespace Spire
 	namespace Compiler
 	{
 		using namespace CoreLib::Basic;
-
-		enum class TokenType
-		{
-			// illegal
-			Unkown,
-			// identifier
-			Identifier,
-			KeywordReturn, KeywordBreak, KeywordContinue,
-			KeywordIf, KeywordElse, KeywordFor, KeywordWhile, KeywordDo,
-			// constant
-			IntLiterial, DoubleLiterial, StringLiterial, CharLiterial,
-			// operators
-			Semicolon, Comma, Dot, LBrace, RBrace, LBracket, RBracket, LParent, RParent,
-			OpAssign, OpAdd, OpSub, OpMul, OpDiv, OpMod, OpNot, OpBitNot, OpLsh, OpRsh, 
-			OpEql, OpNeq, OpGreater, OpLess, OpGeq, OpLeq,
-			OpAnd, OpOr, OpBitXor, OpBitAnd, OpBitOr,
-			OpInc, OpDec, OpAddAssign, OpSubAssign, OpMulAssign, OpDivAssign, OpModAssign,
-			OpShlAssign, OpShrAssign, OpOrAssign, OpAndAssign, OpXorAssign,
-			
-			QuestionMark, Colon, RightArrow, At,
-		};
-
-		String TokenTypeToString(TokenType type);
-
-		class Token
-		{
-		public:
-			TokenType Type = TokenType::Unkown;
-			String Content;
-			CodePosition Position;
-			Token() = default;
-			Token(TokenType type, const String & content, int line, int col, String fileName)
-			{
-				Type = type;
-				Content = content;
-				Position = CodePosition(line, col, fileName);
-			}
-		};
-
+		
 		class Lexer
 		{
 		public:
@@ -9965,13 +9356,13 @@ namespace Spire
 			{
 				for (int i = 0; i < ErrorList.Count(); i++)
 				{
-					printf("%s(%d): error %d: %s\n", ErrorList[i].Position.FileName.ToMultiByteString(), ErrorList[i].Position.Line,
+					fprintf(stderr, "%s(%d): error %d: %s\n", ErrorList[i].Position.FileName.ToMultiByteString(), ErrorList[i].Position.Line,
 						ErrorList[i].ErrorID, ErrorList[i].Message.ToMultiByteString());
 				}
 				if (printWarning)
 					for (int i = 0; i < WarningList.Count(); i++)
 					{
-						printf("%s(%d): warning %d: %s\n", WarningList[i].Position.FileName.ToMultiByteString(),
+						fprintf(stderr, "%s(%d): warning %d: %s\n", WarningList[i].Position.FileName.ToMultiByteString(),
 							WarningList[i].Position.Line, WarningList[i].ErrorID, WarningList[i].Message.ToMultiByteString());
 					}
 			}
@@ -10931,184 +10322,6 @@ namespace CoreLib
 #endif
 
 /***********************************************************************
-CORELIB\EVENTS.H
-***********************************************************************/
-#ifndef GX_EVENTS_H
-#define GX_EVENTS_H
-
-namespace CoreLib
-{
-	namespace Basic
-	{
-	/***************************************************************************
-
-	Events.h
-
-	Usage:
-
-		class A
-		{
-		public:
-			void EventHandler(int a)
-			{
-				cout<<endl<<"function of object handler invoked. a*a = ";
-				cout<<a*a<<endl;
-			}
-		};
-
-		class B
-		{
-		public:
-			typedef gxEvent1<int> gxOnEvent;
-		public:
-			gxOnEvent OnEvent;
-			void DoSomething()
-			{
-				OnEvent.Invoke(4);
-			}
-		};
-
-		void FuncHandler()
-		{
-			cout<<"Function invoked."<<endl;
-		}
-
-		void main()
-		{
-			A a;
-			B b;
-			b.OnEvent.Bind(&a,&A::EventHandler);	
-			b.OnEvent.Bind(FuncHandler);			
-			b.DoSomething();
-			b.OnEvent.Unbind(FuncHandler);			
-			b.OnEvent.Unbind(&a,&A::EventHandler);
-			b.DoSomething();                       
-		}
-
-	***************************************************************************/
-		template <typename... Arguments>
-		class Event
-		{
-		private:
-			List<RefPtr<FuncPtr<void, Arguments... >>> Handlers;
-			void Bind(FuncPtr<void, Arguments...> * fobj)
-			{
-				Handlers.Add(fobj);
-			}
-			void Unbind(FuncPtr<void, Arguments...> * fobj)
-			{
-				int id = -1;
-				for (int i = 0; i < Handlers.Count(); i++)
-				{
-					if ((*Handlers[i]) == fobj)
-					{
-						id = i;
-						break;
-					}
-				}
-				if (id != -1)
-				{
-					Handlers[id] = 0;
-					Handlers.Delete(id);				
-				}
-			}
-		public:
-			Event()
-			{
-			}
-			Event(const Event & e)
-			{
-				operator=(e);
-			}
-			Event & operator = (const Event & e)
-			{
-				for (int i = 0; i < e.Handlers.Count(); i++)
-					Handlers.Add(e.Handlers[i]->Clone());
-				return *this;
-			}
-			template <typename Class>
-			Event(Class * Owner, typename MemberFuncPtr<Class, void, Arguments...>::FuncType handler)
-			{
-				Bind(Owner, handler);
-			}
-			Event(typename CdeclFuncPtr<void, Arguments...>::FuncType f)
-			{
-				Bind(f);
-			}
-			template <typename TFunctor>
-			Event(const TFunctor & func)
-			{
-				Bind(func);
-			}
-			template <typename Class>
-			void Bind(Class * Owner, typename MemberFuncPtr<Class, void, Arguments...>::FuncType handler)
-			{
-				Handlers.Add(new MemberFuncPtr<Class, void, Arguments...>(Owner, handler));
-			}
-			template <typename Class>
-			void Unbind(Class * Owner, typename MemberFuncPtr<Class, void, Arguments...>::FuncType handler)
-			{
-				MemberFuncPtr<Class, void, Arguments...> h(Owner, handler);
-				Unbind(&h);
-			}
-			void Bind(typename CdeclFuncPtr<void, Arguments...>::FuncType f)
-			{
-				Bind(new CdeclFuncPtr<void, Arguments...>(f));
-			}
-			void Unbind(typename CdeclFuncPtr<void, Arguments...>::FuncType f)
-			{
-				CdeclFuncPtr<void, Arguments...> h(f);
-				Unbind(&h);
-			}
-			template <typename TFunctor>
-			void Bind(const TFunctor & func)
-			{
-				Handlers.Add(new LambdaFuncPtr<TFunctor, void, Arguments...>(func));
-			}
-			template <typename TFunctor>
-			void Unbind(const TFunctor & func)
-			{
-				LambdaFuncPtr<TFunctor, void, Arguments...> h(func);
-				Unbind(&h);
-			}
-			Event & operator += (typename CdeclFuncPtr<void, Arguments...>::FuncType f)
-			{
-				Bind(f);
-				return *this;
-			}
-			Event & operator -= (typename CdeclFuncPtr<void, Arguments...>::FuncType f)
-			{
-				Unbind(f);
-				return *this;
-			}
-			template <typename TFunctor>
-			Event & operator += (const TFunctor & f)
-			{
-				Bind(f);
-				return *this;
-			}
-			template <typename TFunctor>
-			Event & operator -= (const TFunctor & f)
-			{
-				Unbind(f);
-				return *this;
-			}
-			void Invoke(Arguments... params) const
-			{
-				for (int i = 0; i < Handlers.Count(); i++)
-					Handlers[i]->operator()(params...);
-			}
-			void operator ()(Arguments... params) const
-			{
-				Invoke(params...);
-			}
-		};
-	}
-}
-
-#endif
-
-/***********************************************************************
 SPIRECORE\CLIKECODEGEN.H
 ***********************************************************************/
 // CLikeCodeGen.h
@@ -11741,26 +10954,6 @@ namespace CoreLib
 #endif
 			static bool CreateDirectory(const String & path);
 		};
-
-		class CommandLineWriter : public Object
-		{
-		public:
-			virtual void Write(const String & text) = 0;
-		};
-
-		void SetCommandLineWriter(CommandLineWriter * writer);
-
-		extern CommandLineWriter * currentCommandWriter;
-		template<typename ...Args>
-		void uiprintf(const wchar_t * format, Args... args)
-		{
-			if (currentCommandWriter)
-			{
-				wchar_t buffer[1024];
-				swprintf_s(buffer, format, args...);
-				currentCommandWriter->Write(buffer);
-			}
-		}
 	}
 }
 
@@ -11802,7 +10995,7 @@ namespace Spire
 				}
 				else
 				{
-					node->Position = CodePosition(0, 0, fileName);
+					node->Position = CodePosition(0, 0, 0, fileName);
 				}
 				node->Scope = scopeStack.Last();
 			}
@@ -11977,7 +11170,7 @@ namespace SpireLib
 	public:
 		CoreLib::Basic::EnumerableDictionary<CoreLib::Basic::String, Spire::Compiler::StageSource> Sources; // indexed by world
 		Spire::Compiler::ShaderMetaData MetaData;
-		void AddSource(CoreLib::Basic::String source, CoreLib::Text::Parser & parser);
+		void AddSource(CoreLib::Basic::String source, CoreLib::Text::TokenReader & parser);
 		void FromString(const CoreLib::String & str);
 		CoreLib::String ToString();
 		void SaveToFile(CoreLib::Basic::String fileName);
@@ -12433,287 +11626,13 @@ extern "C" {  // only need to export C interface if
 #endif
 
 /***********************************************************************
-CORELIB\MD5.H
-***********************************************************************/
-/*
-* This is an OpenSSL-compatible implementation of the RSA Data Security, Inc.
-* MD5 Message-Digest Algorithm (RFC 1321).
-*
-* Homepage:
-* http://openwall.info/wiki/people/solar/software/public-domain-source-code/md5
-*
-* Author:
-* Alexander Peslyak, better known as Solar Designer <solar at openwall.com>
-*
-* This software was written by Alexander Peslyak in 2001.  No copyright is
-* claimed, and the software is hereby placed in the public domain.
-* In case this attempt to disclaim copyright and place the software in the
-* public domain is deemed null and void, then the software is
-* Copyright (c) 2001 Alexander Peslyak and it is hereby released to the
-* general public under the following terms:
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted.
-*
-* There's ABSOLUTELY NO WARRANTY, express or implied.
-*
-* See md5.c for more information.
-*/
-
-#ifdef HAVE_OPENSSL
-#include <openssl/md5.h>
-#elif !defined(_MD5_H)
-#define _MD5_H
-
-/* Any 32-bit or wider unsigned integer data type will do */
-typedef unsigned int MD5_u32plus;
-
-typedef struct {
-	MD5_u32plus lo, hi;
-	MD5_u32plus a, b, c, d;
-	unsigned char buffer[64];
-	MD5_u32plus block[16];
-} MD5_CTX;
-
-extern void MD5_Init(MD5_CTX *ctx);
-extern void MD5_Update(MD5_CTX *ctx, const void *data, unsigned long size);
-extern void MD5_Final(unsigned char *result, MD5_CTX *ctx);
-
-#endif
-
-/***********************************************************************
-CORELIB\MEMORYPOOL.H
-***********************************************************************/
-#ifndef CORE_LIB_MEMORY_POOL_H
-#define CORE_LIB_MEMORY_POOL_H
-
-
-namespace CoreLib
-{
-	namespace Basic
-	{
-		struct MemoryBlockFields
-		{
-			unsigned int Occupied : 1;
-			unsigned int Order : 31;
-		};
-		struct FreeListNode
-		{
-			FreeListNode * PrevPtr = nullptr, *NextPtr = nullptr;
-		};
-		class MemoryPool
-		{
-		private:
-			static const int MaxLevels = 32;
-			int blockSize = 0, log2BlockSize = 0;
-			int numLevels = 0;
-			int bytesAllocated = 0;
-			int bytesWasted = 0;
-			unsigned char * buffer = nullptr;
-			FreeListNode * freeList[MaxLevels];
-			IntSet used;
-			int AllocBlock(int level);
-			void FreeBlock(unsigned char * ptr, int level);
-		public:
-			MemoryPool(unsigned char * buffer, int log2BlockSize, int numBlocks);
-			MemoryPool() = default;
-			void Init(unsigned char * buffer, int log2BlockSize, int numBlocks);
-			unsigned char * Alloc(int size);
-			void Free(unsigned char * ptr, int size);
-		};
-	}
-}
-
-#endif
-
-/***********************************************************************
-CORELIB\PERFORMANCECOUNTER.H
-***********************************************************************/
-#ifndef CORELIB_PERFORMANCE_COUNTER_H
-#define CORELIB_PERFORMANCE_COUNTER_H
-
-#include <chrono>
-
-namespace CoreLib
-{
-	namespace Diagnostics
-	{
-		typedef std::chrono::high_resolution_clock::time_point TimePoint;
-		typedef std::chrono::high_resolution_clock::duration Duration;
-		class PerformanceCounter
-		{
-		public:
-			static TimePoint Start();
-			static Duration End(TimePoint counter);
-			static float EndSeconds(TimePoint counter);
-			static double ToSeconds(Duration duration);
-		};
-	}
-}
-
-#endif
-
-/***********************************************************************
-CORELIB\THREADING.H
-***********************************************************************/
-#ifndef CORE_LIB_THREADING_H
-#define CORE_LIB_THREADING_H
-#include <atomic>
-#include <thread>
-#include <mutex>
-#include <xmmintrin.h>
-
-#ifndef _WIN32
-#define __stdcall
-#endif
-
-namespace CoreLib
-{
-	namespace Threading
-	{
-		class SpinLock
-		{
-		private:
-			std::atomic_flag lck;
-		public:
-			SpinLock()
-			{
-				lck.clear();
-			}
-			inline bool TryLock()
-			{
-				return !lck.test_and_set(std::memory_order_acquire);
-			}
-			inline void Lock()
-			{
-				while (lck.test_and_set(std::memory_order_acquire))
-				{
-				}
-			}
-			inline void Unlock()
-			{
-				lck.clear(std::memory_order_release);
-			}
-			SpinLock & operator = (const SpinLock & /*other*/)
-			{
-				lck.clear();
-				return *this;
-			}
-		};
-
-		class ParallelSystemInfo
-		{
-		public:
-			static int GetProcessorCount();
-		};
-
-		typedef CoreLib::Basic::Event<> ThreadProc;
-		typedef CoreLib::Basic::Event<CoreLib::Basic::Object *> ThreadParameterizedProc;
-		class Thread;
-
-		class ThreadParam
-		{
-		public:
-			Thread * thread;
-			CoreLib::Basic::Object * threadParam;
-		};
-
-		enum class ThreadPriority
-		{
-			Normal,
-			AboveNormal,
-			Highest,
-			Critical,
-			BelowNormal,
-			Lowest,
-			Idle
-		};
-		unsigned int __stdcall ThreadProcedure(const ThreadParam& param);
-		class Thread : public CoreLib::Basic::Object
-		{
-			friend unsigned int __stdcall ThreadProcedure(const ThreadParam& param);
-		private:
-			 ThreadParam internalParam;
-		public:
-			
-		private:
-			std::thread threadHandle;
-			CoreLib::Basic::RefPtr<ThreadProc> threadProc;
-			CoreLib::Basic::RefPtr<ThreadParameterizedProc> paramedThreadProc;
-		public:
-			Thread()
-			{
-				internalParam.threadParam = nullptr;
-				internalParam.thread = this;
-			}
-			Thread(ThreadProc * p)
-				: Thread()
-			{
-				Start(p);
-			}
-			Thread(ThreadParameterizedProc * p, CoreLib::Basic::Object * param)
-				: Thread()
-			{
-				Start(p, param);
-			}
-			void Start(ThreadProc * p)
-			{
-				threadProc = p;
-				threadHandle = std::thread(ThreadProcedure, internalParam);
-			}
-			void Start(ThreadParameterizedProc * p, CoreLib::Basic::Object * param)
-			{
-				paramedThreadProc = p;
-				internalParam.thread = this;
-				internalParam.threadParam = param;
-				threadHandle = std::thread(ThreadProcedure, internalParam);
-			}
-			void Join()
-			{
-				if (threadHandle.joinable())
-					threadHandle.join();
-			}
-			void Detach()
-			{
-				if (threadHandle.joinable())
-					threadHandle.detach();
-			}
-			std::thread::id GetHandle()
-			{
-				return threadHandle.get_id();
-			}
-		};
-
-		class Mutex : public CoreLib::Basic::Object
-		{
-		private:
-			std::mutex handle;
-		public:
-			void Lock()
-			{
-				handle.lock();
-			}
-			bool TryLock()
-			{
-				return handle.try_lock();
-			}
-			void Unlock()
-			{
-				return handle.unlock();
-			}
-		};
-	}
-}
-
-#endif
-
-/***********************************************************************
 CORELIB\VECTORMATH.H
 ***********************************************************************/
 #ifndef VECTOR_MATH_H
 #define VECTOR_MATH_H
 #include <random>
 #include <cmath>
+#include <xmmintrin.h>
 #ifdef _M_X64
 #define NO_SIMD_ASM
 #endif
@@ -17708,6 +16627,7 @@ namespace Spire
 /***********************************************************************
 SPIRECORE\COMPILEDPROGRAM.CPP
 ***********************************************************************/
+
 namespace Spire
 {
 	namespace Compiler
@@ -20548,7 +19468,7 @@ namespace Spire
 	{
 		using namespace CoreLib::IO;
 
-		RefPtr<ILType> BaseTypeFromString(CoreLib::Text::Parser & parser)
+		RefPtr<ILType> BaseTypeFromString(CoreLib::Text::TokenReader & parser)
 		{
 			if (parser.LookAhead(L"int"))
 				return new ILBasicType(ILBaseType::Int);
@@ -20591,7 +19511,7 @@ namespace Spire
 			return nullptr;
 		}
 
-		RefPtr<ILType> TypeFromString(CoreLib::Text::Parser & parser)
+		RefPtr<ILType> TypeFromString(CoreLib::Text::TokenReader & parser)
 		{
 			auto result = BaseTypeFromString(parser);
 			parser.ReadToken();
@@ -21397,7 +20317,7 @@ namespace Spire
 {
 	namespace Compiler
 	{
-		RefPtr<KeyHoleNode> ParseInternal(CoreLib::Text::Parser & parser)
+		RefPtr<KeyHoleNode> ParseInternal(CoreLib::Text::TokenReader & parser)
 		{
 			RefPtr<KeyHoleNode> result = new KeyHoleNode();
 			result->NodeType = parser.ReadWord();
@@ -21426,7 +20346,7 @@ namespace Spire
 
 		RefPtr<KeyHoleNode> KeyHoleNode::Parse(String format)
 		{
-			CoreLib::Text::Parser parser(format);
+			CoreLib::Text::TokenReader parser(format);
 			return ParseInternal(parser);
 		}
 
@@ -21492,738 +20412,24 @@ namespace Spire
 {
 	namespace Compiler
 	{
-		enum class State
-		{
-			Start, Identifier, Operator, Int, Fixed, Double, Char, String, MultiComment, SingleComment
-		};
-
-		bool IsLetter(wchar_t ch)
-		{
-			return ((ch >= L'a' && ch <= L'z') ||
-				(ch >= L'A' && ch <= L'Z') || ch == L'_' || ch == L'#');
-		}
-
-		bool IsDigit(wchar_t ch)
-		{
-			return ch >= L'0' && ch <= L'9';
-		}
-
-		bool IsPunctuation(wchar_t ch)
-		{
-			return  ch == L'+' || ch == L'-' || ch == L'*' || ch == L'/' || ch == L'%' ||
-					ch == L'!' || ch == L'^' || ch == L'&' || ch == L'(' || ch == L')' ||
-					ch == L'=' || ch == L'{' || ch == L'}' || ch == L'[' || ch == L']' ||
-					ch == L'|' || ch == L';' || ch == L',' || ch == L'.' || ch == L'<' ||
-					ch == L'>' || ch == L'~' || ch == L'@' || ch == L':' || ch == L'?';
-		}
-
-		TokenType GetKeywordTokenType(const String & str)
-		{
-			if (str == L"return")
-				return TokenType::KeywordReturn;
-			else if (str == L"break")
-				return TokenType::KeywordBreak;
-			else if (str == L"continue")
-				return TokenType::KeywordContinue;
-			else if (str == L"if")
-				return TokenType::KeywordIf;
-			else if (str == L"else")
-				return TokenType::KeywordElse;
-			else if (str == L"for")
-				return TokenType::KeywordFor;
-			else if (str == L"while")
-				return TokenType::KeywordWhile;
-			else if (str == L"do")
-				return TokenType::KeywordDo;
-			else
-				return TokenType::Identifier;
-		}
-
-		void ParseOperators(const String & str, List<Token> & tokens, int line, int col, String fileName)
-		{
-			int pos = 0;
-			while (pos < str.Length())
-			{
-				wchar_t curChar = str[pos];
-				wchar_t nextChar = (pos < str.Length()-1)? str[pos + 1] : L'\0';
-				wchar_t nextNextChar = (pos < str.Length() - 2) ? str[pos + 2] : L'\0';
-				auto InsertToken = [&](TokenType type, const String & ct)
-				{
-					tokens.Add(Token(type, ct, line, col + pos, fileName));
-				};
-				switch(curChar)
-				{
-				case L'+':
-					if (nextChar == L'+')
-					{
-						InsertToken(TokenType::OpInc, L"++");
-						pos += 2;
-					}
-					else if (nextChar == L'=')
-					{
-						InsertToken(TokenType::OpAddAssign, L"+=");
-						pos += 2;
-					}
-					else
-					{
-						InsertToken(TokenType::OpAdd, L"+");
-						pos++;
-					}
-					break;
-				case L'-':
-					if (nextChar == L'-')
-					{
-						InsertToken(TokenType::OpDec, L"--");
-						pos += 2;
-					}
-					else if (nextChar == L'=')
-					{
-						InsertToken(TokenType::OpSubAssign, L"-=");
-						pos += 2;
-					}
-					else if (nextChar == L'>')
-					{
-						InsertToken(TokenType::RightArrow, L"->");
-						pos += 2;
-					}
-					else
-					{
-						InsertToken(TokenType::OpSub, L"-");
-						pos++;
-					}
-					break;
-				case L'*':
-					if (nextChar == L'=')
-					{
-						InsertToken(TokenType::OpMulAssign, L"*=");
-						pos += 2;
-					}
-					else
-					{
-						InsertToken(TokenType::OpMul, L"*");
-						pos++;
-					}
-					break;
-				case L'/':
-					if (nextChar == L'=')
-					{
-						InsertToken(TokenType::OpDivAssign, L"/=");
-						pos += 2;
-					}
-					else
-					{
-						InsertToken(TokenType::OpDiv, L"/");
-						pos++;
-					}
-					break;
-				case L'%':
-					if (nextChar == L'=')
-					{
-						InsertToken(TokenType::OpModAssign, L"%=");
-						pos += 2;
-					}
-					else
-					{
-						InsertToken(TokenType::OpMod, L"%");
-						pos++;
-					}
-					break;
-				case L'|':
-					if (nextChar == L'|')
-					{
-						InsertToken(TokenType::OpOr, L"||");
-						pos += 2;
-					}
-					else if (nextChar == L'=')
-					{
-						InsertToken(TokenType::OpOrAssign, L"|=");
-						pos += 2;
-					}
-					else
-					{
-						InsertToken(TokenType::OpBitOr, L"|");
-						pos++;
-					}
-					break;
-				case L'&':
-					if (nextChar == L'&')
-					{
-						InsertToken(TokenType::OpAnd, L"&&");
-						pos += 2;
-					}
-					else if (nextChar == L'=')
-					{
-						InsertToken(TokenType::OpAndAssign, L"&=");
-						pos += 2;
-					}
-					else
-					{
-						InsertToken(TokenType::OpBitAnd, L"&");
-						pos++;
-					}
-					break;
-				case L'^':
-					if (nextChar == L'=')
-					{
-						InsertToken(TokenType::OpXorAssign, L"^=");
-						pos += 2;
-					}
-					else
-					{
-						InsertToken(TokenType::OpBitXor, L"^");
-						pos++;
-					}
-					break;
-				case L'>':
-					if (nextChar == L'>')
-					{
-						if (nextNextChar == L'=')
-						{
-							InsertToken(TokenType::OpShrAssign, L">>=");
-							pos += 3;
-						}
-						else
-						{
-							InsertToken(TokenType::OpRsh, L">>");
-							pos += 2;
-						}
-					}
-					else if (nextChar == L'=')
-					{
-						InsertToken(TokenType::OpGeq, L">=");
-						pos += 2;
-					}
-					else
-					{
-						InsertToken(TokenType::OpGreater, L">");
-						pos++;
-					}
-					break;
-				case L'<':
-					if (nextChar == L'<')
-					{
-						if (nextNextChar == L'=')
-						{
-							InsertToken(TokenType::OpShlAssign, L"<<=");
-							pos += 3;
-						}
-						else
-						{
-							InsertToken(TokenType::OpLsh, L"<<");
-							pos += 2;
-						}
-					}
-					else if (nextChar == L'=')
-					{
-						InsertToken(TokenType::OpLeq, L"<=");
-						pos += 2;
-					}
-					else
-					{
-						InsertToken(TokenType::OpLess, L"<");
-						pos++;
-					}
-					break;
-				case L'=':
-					if (nextChar == L'=')
-					{
-						InsertToken(TokenType::OpEql, L"==");
-						pos += 2;
-					}
-					else
-					{
-						InsertToken(TokenType::OpAssign, L"=");
-						pos++;
-					}
-					break;
-				case L'!':
-					if (nextChar == L'=')
-					{
-						InsertToken(TokenType::OpNeq, L"!=");
-						pos += 2;
-					}
-					else
-					{
-						InsertToken(TokenType::OpNot, L"!");
-						pos++;
-					}
-					break;
-				case L'?':
-					InsertToken(TokenType::QuestionMark, L"?");
-					pos++;
-					break;
-				case L'@':
-					InsertToken(TokenType::At, L"@");
-					pos++;
-					break;
-				case L':':
-					InsertToken(TokenType::Colon, L":");
-					pos++;
-					break;
-				case L'~':
-					InsertToken(TokenType::OpBitNot, L"~");
-					pos++;
-					break;
-				case L';':
-					InsertToken(TokenType::Semicolon, L";");
-					pos++;
-					break;
-				case L',':
-					InsertToken(TokenType::Comma, L","); 
-					pos++;
-					break;
-				case L'.':
-					InsertToken(TokenType::Dot, L".");
-					pos++;
-					break;
-				case L'{':
-					InsertToken(TokenType::LBrace, L"{"); 
-					pos++;
-					break;
-				case L'}':
-					InsertToken(TokenType::RBrace, L"}"); 
-					pos++;
-					break;
-				case L'[':
-					InsertToken(TokenType::LBracket, L"["); 
-					pos++;
-					break;
-				case L']':
-					InsertToken(TokenType::RBracket, L"]"); 
-					pos++;
-					break;
-				case L'(':
-					InsertToken(TokenType::LParent, L"("); 
-					pos++;
-					break;
-				case L')':
-					InsertToken(TokenType::RParent, L")"); 
-					pos++;
-					break;
-				}
-			}
-		}
-
-		enum class LexDerivative
-		{
-			None, Line, File
-		};
-
 		List<Token> Lexer::Parse(const String & fileName, const String & str, List<CompileError> & errorList)
 		{
-			int lastPos = 0, pos = 0;
-			int line = 1, col = 0;
-			String file = fileName;
-			State state = State::Start;
-			StringBuilder tokenBuilder;
-			int tokenLine, tokenCol;
-			List<Token> tokenList;
-			LexDerivative derivative = LexDerivative::None;
-			auto InsertToken = [&](TokenType type)
+			return CoreLib::Text::TokenizeText(fileName, str, [&](CoreLib::Text::TokenizeErrorType errType, CoreLib::Text::CodePosition pos)
 			{
-				derivative = LexDerivative::None;
-				tokenList.Add(Token(type, tokenBuilder.ToString(), tokenLine, tokenCol, file));
-				tokenBuilder.Clear();
-			};
-			auto ProcessTransferChar = [&](wchar_t nextChar)
-			{
-				switch(nextChar)
+				auto curChar = str[pos.Pos];
+				switch (errType)
 				{
-				case L'\\':
-				case L'\"':
-				case L'\'':
-					tokenBuilder.Append(nextChar);
+				case CoreLib::Text::TokenizeErrorType::InvalidCharacter:
+					errorList.Add(CompileError(L"Illegal character '\\x" + String((int)curChar, 16) + L"'", 10000, pos));
 					break;
-				case L't':
-					tokenBuilder.Append('\t');
+				case CoreLib::Text::TokenizeErrorType::InvalidEscapeSequence:
+					errorList.Add(CompileError(L"Illegal character literial.", 10001, pos));
 					break;
-				case L's':
-					tokenBuilder.Append(' ');
-					break;
-				case L'n':
-					tokenBuilder.Append('\n');
-					break;
-				case L'r':
-					tokenBuilder.Append('\r');
-					break;
-				case L'b':
-					tokenBuilder.Append('\b');
+				default:
 					break;
 				}
-			};
-			while (pos <= str.Length())
-			{
-				wchar_t curChar = (pos < str.Length()?str[pos]:L' ');
-				wchar_t nextChar = (pos < str.Length()-1)? str[pos + 1] : L'\0';
-				if (lastPos != pos)
-				{
-					if (curChar == L'\n')
-					{
-						line++;
-						col = 0;
-					}
-					else
-						col++;
-					lastPos = pos;
-				}
-
-				switch (state)
-				{
-				case State::Start:
-					if (IsLetter(curChar))
-					{
-						state = State::Identifier;
-						tokenLine = line;
-						tokenCol = col;
-					}
-					else if (IsDigit(curChar))
-					{
-						state = State::Int;
-						tokenLine = line;
-						tokenCol = col;
-					}
-					else if (curChar == L'\'')
-					{
-						state = State::Char;
-						pos++;
-						tokenLine = line;
-						tokenCol = col;
-					}
-					else if (curChar == L'"')
-					{
-						state = State::String;
-						pos++;
-						tokenLine = line;
-						tokenCol = col;
-					}
-					else if (curChar == L' ' || curChar == L'\t' || curChar == L'\r' || curChar == L'\n' || curChar == 160) // 160:non-break space
-						pos++;
-					else if (curChar == L'/' && nextChar == L'/')
-					{
-						state = State::SingleComment;
-						pos += 2;
-					}
-					else if (curChar == L'/' && nextChar == L'*')
-					{
-						pos += 2;
-						state = State::MultiComment;
-					}
-					else if (IsPunctuation(curChar))
-					{
-						state = State::Operator;
-						tokenLine = line;
-						tokenCol = col;
-					}
-					else
-					{
-						errorList.Add(CompileError(L"Illegal character '" + String(curChar) + L"'", 10000, CodePosition(line, col, file)));
-						pos++;
-					}
-					break;
-				case State::Identifier:
-					if (IsLetter(curChar) || IsDigit(curChar))
-					{
-						tokenBuilder.Append(curChar);
-						pos++;
-					}
-					else
-					{
-						auto tokenStr = tokenBuilder.ToString();
-						if (tokenStr == L"#line_reset#")
-						{
-							line = 0;
-							col = 0;
-							tokenBuilder.Clear();
-						}
-						else if (tokenStr == L"#line")
-						{
-							derivative = LexDerivative::Line;
-							tokenBuilder.Clear();
-						}
-						else if (tokenStr == L"#file")
-						{
-							derivative = LexDerivative::File;
-							tokenBuilder.Clear();
-							line = 0;
-							col = 0;
-						}
-						else
-							InsertToken(GetKeywordTokenType(tokenStr));
-						state = State::Start;
-					}
-					break;
-				case State::Operator:
-					if (IsPunctuation(curChar) && !((curChar == L'/' && nextChar == L'/') || (curChar == L'/' && nextChar == L'*')))
-					{
-						tokenBuilder.Append(curChar);
-						pos++;
-					}
-					else
-					{
-						//do token analyze
-						ParseOperators(tokenBuilder.ToString(), tokenList, tokenLine, tokenCol, file);
-						tokenBuilder.Clear();
-						state = State::Start;
-					}
-					break;
-				case State::Int:
-					if (IsDigit(curChar))
-					{
-						tokenBuilder.Append(curChar);
-						pos++;
-					}
-					else if (curChar == L'.')
-					{
-						state = State::Fixed;
-						tokenBuilder.Append(curChar);
-						pos++;
-					}
-					else if (curChar == L'e' || curChar == L'E')
-					{
-						state = State::Double;
-						tokenBuilder.Append(curChar);
-						if (nextChar == L'-' || nextChar == L'+')
-						{
-							tokenBuilder.Append(nextChar);
-							pos++;
-						}
-						pos++;
-					}
-					else
-					{
-						if (derivative == LexDerivative::Line)
-						{
-							derivative = LexDerivative::None;
-							line = StringToInt(tokenBuilder.ToString()) - 1;
-							col = 0;
-							tokenBuilder.Clear();
-						}
-						else
-						{
-							InsertToken(TokenType::IntLiterial);
-						}
-						state = State::Start;
-					}
-					break;
-				case State::Fixed:
-					if (IsDigit(curChar))
-					{
-						tokenBuilder.Append(curChar);
-						pos++;
-					}
-					else if (curChar == L'e' || curChar == L'E')
-					{
-						state = State::Double;
-						tokenBuilder.Append(curChar);
-						if (nextChar == L'-' || nextChar == L'+')
-						{
-							tokenBuilder.Append(nextChar);
-							pos++;
-						}
-						pos++;
-					}
-					else
-					{
-						if (curChar == L'f')
-							pos++;
-						InsertToken(TokenType::DoubleLiterial);
-						state = State::Start;
-					}
-					break;
-				case State::Double:
-					if (IsDigit(curChar))
-					{
-						tokenBuilder.Append(curChar);
-						pos++;
-					}
-					else
-					{
-						if (curChar == L'f')
-							pos++;
-						InsertToken(TokenType::DoubleLiterial);
-						state = State::Start;
-					}
-					break;
-				case State::String:
-					if (curChar != L'"')
-					{
-						if (curChar == L'\\')
-						{
-							ProcessTransferChar(nextChar);
-							pos++;
-						}
-						else
-							tokenBuilder.Append(curChar);
-					}
-					else
-					{
-						if (derivative == LexDerivative::File)
-						{
-							derivative = LexDerivative::None;
-							file = tokenBuilder.ToString();
-							tokenBuilder.Clear();
-						}
-						else
-						{
-							InsertToken(TokenType::StringLiterial);
-						}
-						state = State::Start;
-					}
-					pos++;
-					break;
-				case State::Char:
-					if (curChar != L'\'')
-					{
-						if (curChar == L'\\')
-						{
-							ProcessTransferChar(nextChar);
-							pos++;
-						}
-						else
-							tokenBuilder.Append(curChar);
-					}
-					else
-					{
-						if (tokenBuilder.Length() > 1)
-							errorList.Add(CompileError(L"Illegal character literial.", 10001, CodePosition(line, col-tokenBuilder.Length(), file)));
-						InsertToken(TokenType::CharLiterial);
-						state = State::Start;
-					}
-					pos++;
-					break;
-				case State::SingleComment:
-					if (curChar == L'\n')
-						state = State::Start;
-					pos++;
-					break;
-				case State::MultiComment:
-					if (curChar == L'*' && nextChar == '/')
-					{
-						state = State::Start;
-						pos += 2;
-					}
-					else
-						pos++;
-					break;
-				}
-			}
-			return tokenList;
+			});
 		}
-
-		String TokenTypeToString(TokenType type)
-		{
-			switch (type)
-			{
-			case TokenType::Unkown:
-				return L"UnknownToken";
-			case TokenType::Identifier:
-				return L"Identifier";
-
-			case TokenType::KeywordReturn:
-				return L"\"return\"";
-			case TokenType::KeywordBreak:
-				return L"\"break\"";
-			case TokenType::KeywordContinue:
-				return L"\"continue\"";
-			case TokenType::KeywordIf:
-				return L"\"if\"";
-			case TokenType::KeywordElse:
-				return L"\"else\"";
-			case TokenType::KeywordFor:
-				return L"\"for\"";
-			case TokenType::KeywordWhile:
-				return L"\"while\"";
-			case TokenType::KeywordDo:
-				return L"\"do\"";
-			case TokenType::IntLiterial:
-				return L"Int Literial";
-			case TokenType::DoubleLiterial:
-				return L"Double Literial";
-			case TokenType::StringLiterial:
-				return L"String Literial";
-			case TokenType::CharLiterial:
-				return L"CharLiterial";
-			case TokenType::QuestionMark:
-				return L"'?'";
-			case TokenType::Colon:
-				return L"':'";
-			case TokenType::Semicolon:
-				return L"';'";
-			case TokenType::Comma:
-				return L"','";
-			case TokenType::LBrace:
-				return L"'{'";
-			case TokenType::RBrace:
-				return L"'}'";
-			case TokenType::LBracket:
-				return L"'['";
-			case TokenType::RBracket:
-				return L"']'";
-			case TokenType::LParent:
-				return L"'('";
-			case TokenType::RParent:
-				return L"')'";
-			case TokenType::At:
-				return L"'@'";
-			case TokenType::OpAssign:
-				return L"'='";
-			case TokenType::OpAdd:
-				return L"'+'";
-			case TokenType::OpSub:
-				return L"'-'";
-			case TokenType::OpMul:
-				return L"'*'";
-			case TokenType::OpDiv:
-				return L"'/'";
-			case TokenType::OpMod:
-				return L"'%'";
-			case TokenType::OpNot:
-				return L"'!'";
-			case TokenType::OpLsh:
-				return L"'<<'";
-			case TokenType::OpRsh:
-				return L"'>>'";
-			case TokenType::OpAddAssign:
-				return L"'+='";
-			case TokenType::OpSubAssign:
-				return L"'-='";
-			case TokenType::OpMulAssign:
-				return L"'*='";
-			case TokenType::OpDivAssign:
-				return L"'/='";
-			case TokenType::OpModAssign:
-				return L"'%='";
-			case TokenType::OpEql:
-				return L"'=='";
-			case TokenType::OpNeq:
-				return L"'!='";
-			case TokenType::OpGreater:
-				return L"'>'";
-			case TokenType::OpLess:
-				return L"'<'";
-			case TokenType::OpGeq:
-				return L"'>='";
-			case TokenType::OpLeq:
-				return L"'<='";
-			case TokenType::OpAnd:
-				return L"'&&'";
-			case TokenType::OpOr:
-				return L"'||'";
-			case TokenType::OpBitXor:
-				return L"'^'";
-			case TokenType::OpBitAnd:
-				return L"'&'";
-			case TokenType::OpBitOr:
-				return L"'|'";
-			case TokenType::OpInc:
-				return L"'++'";
-			case TokenType::OpDec:
-				return L"'--'";
-			default:
-				return L"";
-			}
-		}
-		
 	}
 }
 
@@ -22349,7 +20555,7 @@ namespace Spire
 		{
 			if (pos >= tokens.Count())
 			{
-				errors.Add(CompileError(String(L"\"") + string + String(L"\" expected but end of file encountered."), 20001, CodePosition(0, 0, fileName)));
+				errors.Add(CompileError(String(L"\"") + string + String(L"\" expected but end of file encountered."), 20001, CodePosition(0, 0, 0, fileName)));
 				throw 0;
 			}
 			else if (tokens[pos].Content != string)
@@ -22364,7 +20570,7 @@ namespace Spire
 		{
 			if (pos >= tokens.Count())
 			{
-				errors.Add(CompileError(String(L" Unexpected end of file."), 20001, CodePosition(0, 0, fileName)));
+				errors.Add(CompileError(String(L" Unexpected end of file."), 20001, CodePosition(0, 0, 0, fileName)));
 				throw 0;
 			}
 			return tokens[pos++];
@@ -22374,7 +20580,7 @@ namespace Spire
 		{
 			if (pos >= tokens.Count())
 			{
-				errors.Add(CompileError(TokenTypeToString(type) + String(L" expected but end of file encountered."), 20001, CodePosition(0, 0, fileName)));
+				errors.Add(CompileError(TokenTypeToString(type) + String(L" expected but end of file encountered."), 20001, CodePosition(0, 0, 0, fileName)));
 				throw 0;
 			}
 			else if(tokens[pos].Type != type)
@@ -22389,7 +20595,7 @@ namespace Spire
 		{
 			if (pos + offset >= tokens.Count())
 			{
-				errors.Add(CompileError(String(L"\'") + string + String(L"\' expected but end of file encountered."), 20001, CodePosition(0, 0, fileName)));
+				errors.Add(CompileError(String(L"\'") + string + String(L"\' expected but end of file encountered."), 20001, CodePosition(0, 0, 0, fileName)));
 				return false;
 			}
 			else
@@ -22405,7 +20611,7 @@ namespace Spire
 		{
 			if (pos + offset >= tokens.Count())
 			{
-				errors.Add(CompileError(TokenTypeToString(type) + String(L" expected but end of file encountered."), 20001, CodePosition(0, 0, fileName)));
+				errors.Add(CompileError(TokenTypeToString(type) + String(L" expected but end of file encountered."), 20001, CodePosition(0, 0, 0, fileName)));
 				return false;
 			}
 			else
@@ -22421,7 +20627,7 @@ namespace Spire
 		{
 			if (pos >= tokens.Count())
 			{
-				errors.Add(CompileError(String(L"type name expected but end of file encountered."), 20001, CodePosition(0, 0, fileName)));
+				errors.Add(CompileError(String(L"type name expected but end of file encountered."), 20001, CodePosition(0, 0, 0, fileName)));
 				throw 0;
 			}
 			if(!IsTypeKeyword())
@@ -22471,7 +20677,7 @@ namespace Spire
 		{
 			scopeStack.Add(new Scope());
 			RefPtr<ProgramSyntaxNode> program = new ProgramSyntaxNode();
-			program->Position = CodePosition(0, 0, fileName);
+			program->Position = CodePosition(0, 0, 0, fileName);
 			program->Scope = scopeStack.Last();
 			try
 			{
@@ -22814,7 +21020,7 @@ namespace Spire
 							arg->ArgumentName.Position = varExpr->Position;
 						}
 						else
-							errors.Add(CompileError(L"unexpected ':'.", 20011, pos < tokens.Count() ? tokens[pos].Position : CodePosition(0, 0, fileName)));
+							errors.Add(CompileError(L"unexpected ':'.", 20011, pos < tokens.Count() ? tokens[pos].Position : CodePosition(0, 0, 0, fileName)));
 						ReadToken(L":");
 						arg->Expression = ParseExpression();
 					}
@@ -23008,19 +21214,19 @@ namespace Spire
 				statement = ParseBlockStatement();
 			else if (IsTypeKeyword() || LookAheadToken(L"const"))
 				statement = ParseVarDeclrStatement();
-			else if (LookAheadToken(TokenType::KeywordIf))
+			else if (LookAheadToken(L"if"))
 				statement = ParseIfStatement();
-			else if (LookAheadToken(TokenType::KeywordFor))
+			else if (LookAheadToken(L"for"))
 				statement = ParseForStatement();
-			else if (LookAheadToken(TokenType::KeywordWhile))
+			else if (LookAheadToken(L"while"))
 				statement = ParseWhileStatement();
-			else if (LookAheadToken(TokenType::KeywordDo))
+			else if (LookAheadToken(L"do"))
 				statement = ParseDoWhileStatement();
-			else if (LookAheadToken(TokenType::KeywordBreak))
+			else if (LookAheadToken(L"break"))
 				statement = ParseBreakStatement();
-			else if (LookAheadToken(TokenType::KeywordContinue))
+			else if (LookAheadToken(L"continue"))
 				statement = ParseContinueStatement();
-			else if (LookAheadToken(TokenType::KeywordReturn))
+			else if (LookAheadToken(L"return"))
 				statement = ParseReturnStatement();
 			else if (LookAheadToken(L"using") || (LookAheadToken(L"public") && LookAheadToken(L"using", 1)))
 				statement = ParseImportStatement();
@@ -23179,14 +21385,14 @@ namespace Spire
 		{
 			RefPtr<IfStatementSyntaxNode> ifStatement = new IfStatementSyntaxNode();
 			FillPosition(ifStatement.Ptr());
-			ReadToken(TokenType::KeywordIf);
+			ReadToken(L"if");
 			ReadToken(TokenType::LParent);
 			ifStatement->Predicate = ParseExpression();
 			ReadToken(TokenType::RParent);
 			ifStatement->PositiveStatement = ParseStatement();
-			if (LookAheadToken(TokenType::KeywordElse))
+			if (LookAheadToken(L"else"))
 			{
-				ReadToken(TokenType::KeywordElse);
+				ReadToken(L"else");
 				ifStatement->NegativeStatement = ParseStatement();
 			}
 			return ifStatement;
@@ -23197,7 +21403,7 @@ namespace Spire
 			RefPtr<ForStatementSyntaxNode> stmt = new ForStatementSyntaxNode();
 			PushScope();
 			FillPosition(stmt.Ptr());
-			ReadToken(TokenType::KeywordFor);
+			ReadToken(L"for");
 			ReadToken(TokenType::LParent);
 			if (IsTypeKeyword())
 			{
@@ -23239,7 +21445,7 @@ namespace Spire
 			RefPtr<WhileStatementSyntaxNode> whileStatement = new WhileStatementSyntaxNode();
 			PushScope();
 			FillPosition(whileStatement.Ptr());
-			ReadToken(TokenType::KeywordWhile);
+			ReadToken(L"while");
 			ReadToken(TokenType::LParent);
 			whileStatement->Predicate = ParseExpression();
 			ReadToken(TokenType::RParent);
@@ -23253,9 +21459,9 @@ namespace Spire
 			RefPtr<DoWhileStatementSyntaxNode> doWhileStatement = new DoWhileStatementSyntaxNode();
 			PushScope();
 			FillPosition(doWhileStatement.Ptr());
-			ReadToken(TokenType::KeywordDo);
+			ReadToken(L"do");
 			doWhileStatement->Statement = ParseStatement();
-			ReadToken(TokenType::KeywordWhile);
+			ReadToken(L"while");
 			ReadToken(TokenType::LParent);
 			doWhileStatement->Predicate = ParseExpression();
 			ReadToken(TokenType::RParent);
@@ -23268,7 +21474,7 @@ namespace Spire
 		{
 			RefPtr<BreakStatementSyntaxNode> breakStatement = new BreakStatementSyntaxNode();
 			FillPosition(breakStatement.Ptr());
-			ReadToken(TokenType::KeywordBreak);
+			ReadToken(L"break");
 			ReadToken(TokenType::Semicolon);
 			return breakStatement;
 		}
@@ -23277,7 +21483,7 @@ namespace Spire
 		{
 			RefPtr<ContinueStatementSyntaxNode> continueStatement = new ContinueStatementSyntaxNode();
 			FillPosition(continueStatement.Ptr());
-			ReadToken(TokenType::KeywordContinue);
+			ReadToken(L"continue");
 			ReadToken(TokenType::Semicolon);
 			return continueStatement;
 		}
@@ -23286,7 +21492,7 @@ namespace Spire
 		{
 			RefPtr<ReturnStatementSyntaxNode> returnStatement = new ReturnStatementSyntaxNode();
 			FillPosition(returnStatement.Ptr());
-			ReadToken(TokenType::KeywordReturn);
+			ReadToken(L"return");
 			if (!LookAheadToken(TokenType::Semicolon))
 				returnStatement->Expression = ParseExpression();
 			ReadToken(TokenType::Semicolon);
@@ -23768,7 +21974,7 @@ namespace Spire
 			{
 				if (pos >= tokens.Count())
 				{
-					errors.Add(CompileError(String(L"\"") + string + String(L"\" expected but end of file encountered."), 0, CodePosition(0, 0, fileName)));
+					errors.Add(CompileError(String(L"\"") + string + String(L"\" expected but end of file encountered."), 0, CodePosition(0, 0, 0, fileName)));
 					throw 0;
 				}
 				else if (tokens[pos].Content != string)
@@ -23783,7 +21989,7 @@ namespace Spire
 			{
 				if (pos >= tokens.Count())
 				{
-					errors.Add(CompileError(TokenTypeToString(type) + String(L" expected but end of file encountered."), 0, CodePosition(0, 0, fileName)));
+					errors.Add(CompileError(TokenTypeToString(type) + String(L" expected but end of file encountered."), 0, CodePosition(0, 0, 0, fileName)));
 					throw 0;
 				}
 				else if (tokens[pos].Type != type)
@@ -23798,7 +22004,7 @@ namespace Spire
 			{
 				if (pos >= tokens.Count())
 				{
-					errors.Add(CompileError(String(L"\'") + string + String(L"\' expected but end of file encountered."), 0, CodePosition(0, 0, fileName)));
+					errors.Add(CompileError(String(L"\'") + string + String(L"\' expected but end of file encountered."), 0, CodePosition(0, 0, 0, fileName)));
 					return false;
 				}
 				else
@@ -25840,7 +24046,7 @@ namespace Spire
 								{
 									if (attrib.Value.StartsWith(L"%"))
 									{
-										CoreLib::Text::Parser parser(attrib.Value.SubString(1, attrib.Value.Length() - 1));
+										CoreLib::Text::TokenReader parser(attrib.Value.SubString(1, attrib.Value.Length() - 1));
 										auto compName = parser.ReadWord();
 										parser.Read(L".");
 										auto compAttrib = parser.ReadWord();
@@ -33817,12 +32023,12 @@ using namespace Spire::Compiler;
 
 namespace SpireLib
 {
-	void ReadSource(EnumerableDictionary<String, StageSource> & sources, CoreLib::Text::Parser & parser, String src)
+	void ReadSource(EnumerableDictionary<String, StageSource> & sources, CoreLib::Text::TokenReader & parser, String src)
 	{
 		auto getShaderSource = [&]()
 		{
 			auto token = parser.ReadToken();
-			int endPos = token.Position + 1;
+			int endPos = token.Position.Pos + 1;
 			int brace = 0;
 			while (endPos < src.Length() && !(src[endPos] == L'}' && brace == 0))
 			{
@@ -33832,10 +32038,10 @@ namespace SpireLib
 					brace--;
 				endPos++;
 			}
-			while (!parser.IsEnd() && parser.NextToken().Position != endPos)
+			while (!parser.IsEnd() && parser.NextToken().Position.Pos != endPos)
 				parser.ReadToken();
 			parser.ReadToken();
-			return src.SubString(token.Position + 1, endPos - token.Position - 1);
+			return src.SubString(token.Position.Pos + 1, endPos - token.Position.Pos - 1);
 		};
 		while (!parser.IsEnd() && !parser.LookAhead(L"}"))
 		{
@@ -33973,7 +32179,7 @@ namespace SpireLib
 			}
 			catch (IOException)
 			{
-				compileResult.GetErrorWriter()->Error(1, L"cannot open file '" + inputFileName + L"'.", CodePosition(0, 0, L""));
+				compileResult.GetErrorWriter()->Error(1, L"cannot open file '" + inputFileName + L"'.", CodePosition(0, 0, 0, L""));
 			}
 		}
 		units.Add(predefUnit);
@@ -33993,11 +32199,11 @@ namespace SpireLib
 		}
 		catch (IOException)
 		{
-			compileResult.GetErrorWriter()->Error(1, L"cannot open file '" + Path::GetFileName(sourceFileName) + L"'.", CodePosition(0, 0, L""));
+			compileResult.GetErrorWriter()->Error(1, L"cannot open file '" + Path::GetFileName(sourceFileName) + L"'.", CodePosition(0, 0, 0, L""));
 		}
 		return List<ShaderLibFile>();
 	}
-	void ShaderLibFile::AddSource(CoreLib::Basic::String source, CoreLib::Text::Parser & parser)
+	void ShaderLibFile::AddSource(CoreLib::Basic::String source, CoreLib::Text::TokenReader & parser)
 	{
 		ReadSource(Sources, parser, source);
 	}
@@ -34030,7 +32236,7 @@ namespace SpireLib
 					writer << L"\n{\n";
 					for (auto & attrib : entry.Attributes)
 					{
-						writer << attrib.Key << L" : " << CoreLib::Text::Parser::EscapeStringLiteral(attrib.Value) << L";\n";
+						writer << attrib.Key << L" : " << CoreLib::Text::EscapeStringLiteral(attrib.Value) << L";\n";
 					}
 					writer << L"}";
 				}
@@ -34081,7 +32287,7 @@ namespace SpireLib
 	void ShaderLibFile::FromString(const String & src)
 	{
 		Clear();
-		CoreLib::Text::Parser parser(src);
+		CoreLib::Text::TokenReader parser(src);
 		while (!parser.IsEnd())
 		{
 			auto fieldName = parser.ReadWord();
@@ -34381,7 +32587,7 @@ namespace SpireLib
 				}
 				catch (IOException)
 				{
-					result.GetErrorWriter()->Error(1, L"cannot open file '" + inputFileName + L"'.", CodePosition(0, 0, L""));
+					result.GetErrorWriter()->Error(1, L"cannot open file '" + inputFileName + L"'.", CodePosition(0, 0, 0, L""));
 				}
 			}
 			cresult.Errors.AddRange(result.ErrorList);
@@ -34756,13 +32962,6 @@ namespace CoreLib
 	{
 		using namespace CoreLib::Basic;
 
-		CommandLineWriter * currentCommandWriter = nullptr;
-
-		void SetCommandLineWriter(CommandLineWriter * writer)
-		{
-			currentCommandWriter = writer;
-		}
-
 		bool File::Exists(const String & fileName)
 		{
 			struct _stat32 statVar;
@@ -34958,25 +33157,6 @@ namespace CoreLib
 			return rs;
 		}
 
-		String String::MD5() const
-		{
-			unsigned char result[16];
-			MD5_CTX ctx;
-			MD5_Init(&ctx);
-			MD5_Update(&ctx, buffer.Ptr(), length * sizeof(wchar_t));
-			MD5_Final(result, &ctx);
-			StringBuilder strResult;
-			for (int i = 0; i < 16; i++)
-			{
-				auto ch = String((int)result[i], 16);
-				if (ch.length == 1)
-					strResult << L'0';
-				else
-					strResult << ch;
-			}
-			return strResult.ProduceString();
-		}
-
 		String String::PadLeft(wchar_t ch, int pLen)
 		{
 			StringBuilder sb;
@@ -34995,598 +33175,6 @@ namespace CoreLib
 			for (int i = 0; i < pLen - this->length; i++)
 				sb << ch;
 			return sb.ProduceString();
-		}
-	}
-}
-#endif
-
-/***********************************************************************
-CORELIB\MD5.CPP
-***********************************************************************/
-#ifndef SPIRE_NO_CORE_LIB
-/*
-* This is an OpenSSL-compatible implementation of the RSA Data Security, Inc.
-* MD5 Message-Digest Algorithm (RFC 1321).
-*
-* Homepage:
-* http://openwall.info/wiki/people/solar/software/public-domain-source-code/md5
-*
-* Author:
-* Alexander Peslyak, better known as Solar Designer <solar at openwall.com>
-*
-* This software was written by Alexander Peslyak in 2001.  No copyright is
-* claimed, and the software is hereby placed in the public domain.
-* In case this attempt to disclaim copyright and place the software in the
-* public domain is deemed null and void, then the software is
-* Copyright (c) 2001 Alexander Peslyak and it is hereby released to the
-* general public under the following terms:
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted.
-*
-* There's ABSOLUTELY NO WARRANTY, express or implied.
-*
-* (This is a heavily cut-down "BSD license".)
-*
-* This differs from Colin Plumb's older public domain implementation in that
-* no exactly 32-bit integer data type is required (any 32-bit or wider
-* unsigned integer data type will do), there's no compile-time endianness
-* configuration, and the function prototypes match OpenSSL's.  No code from
-* Colin Plumb's implementation has been reused; this comment merely compares
-* the properties of the two independent implementations.
-*
-* The primary goals of this implementation are portability and ease of use.
-* It is meant to be fast, but not as fast as possible.  Some known
-* optimizations are not included to reduce source code size and avoid
-* compile-time configuration.
-*/
-
-#ifndef HAVE_OPENSSL
-
-
-
-/*
-* The basic MD5 functions.
-*
-* F and G are optimized compared to their RFC 1321 definitions for
-* architectures that lack an AND-NOT instruction, just like in Colin Plumb's
-* implementation.
-*/
-#define F(x, y, z)			((z) ^ ((x) & ((y) ^ (z))))
-#define G(x, y, z)			((y) ^ ((z) & ((x) ^ (y))))
-#define H(x, y, z)			(((x) ^ (y)) ^ (z))
-#define H2(x, y, z)			((x) ^ ((y) ^ (z)))
-#define I(x, y, z)			((y) ^ ((x) | ~(z)))
-
-/*
-* The MD5 transformation for all four rounds.
-*/
-#define STEP(f, a, b, c, d, x, t, s) \
-	(a) += f((b), (c), (d)) + (x)+(t); \
-	(a) = (((a) << (s)) | (((a)& 0xffffffff) >> (32 - (s)))); \
-	(a) += (b);
-
-/*
-* SET reads 4 input bytes in little-endian byte order and stores them
-* in a properly aligned word in host byte order.
-*
-* The check for little-endian architectures that tolerate unaligned
-* memory accesses is just an optimization.  Nothing will break if it
-* doesn't work.
-*/
-#if defined(__i386__) || defined(__x86_64__) || defined(__vax__)
-#define SET(n) \
-	(*(MD5_u32plus *)&ptr[(n)* 4])
-#define GET(n) \
-	SET(n)
-#else
-#define SET(n) \
-	(ctx->block[(n)] = \
-	(MD5_u32plus)ptr[(n)* 4] | \
-	((MD5_u32plus)ptr[(n)* 4 + 1] << 8) | \
-	((MD5_u32plus)ptr[(n)* 4 + 2] << 16) | \
-	((MD5_u32plus)ptr[(n)* 4 + 3] << 24))
-#define GET(n) \
-	(ctx->block[(n)])
-#endif
-
-/*
-* This processes one or more 64-byte data blocks, but does NOT update
-* the bit counters.  There are no alignment requirements.
-*/
-static const void *body(MD5_CTX *ctx, const void *data, unsigned long size)
-{
-	const unsigned char *ptr;
-	MD5_u32plus a, b, c, d;
-	MD5_u32plus saved_a, saved_b, saved_c, saved_d;
-
-	ptr = (const unsigned char *)data;
-
-	a = ctx->a;
-	b = ctx->b;
-	c = ctx->c;
-	d = ctx->d;
-
-	do {
-		saved_a = a;
-		saved_b = b;
-		saved_c = c;
-		saved_d = d;
-
-		/* Round 1 */
-		STEP(F, a, b, c, d, SET(0), 0xd76aa478, 7)
-			STEP(F, d, a, b, c, SET(1), 0xe8c7b756, 12)
-			STEP(F, c, d, a, b, SET(2), 0x242070db, 17)
-			STEP(F, b, c, d, a, SET(3), 0xc1bdceee, 22)
-			STEP(F, a, b, c, d, SET(4), 0xf57c0faf, 7)
-			STEP(F, d, a, b, c, SET(5), 0x4787c62a, 12)
-			STEP(F, c, d, a, b, SET(6), 0xa8304613, 17)
-			STEP(F, b, c, d, a, SET(7), 0xfd469501, 22)
-			STEP(F, a, b, c, d, SET(8), 0x698098d8, 7)
-			STEP(F, d, a, b, c, SET(9), 0x8b44f7af, 12)
-			STEP(F, c, d, a, b, SET(10), 0xffff5bb1, 17)
-			STEP(F, b, c, d, a, SET(11), 0x895cd7be, 22)
-			STEP(F, a, b, c, d, SET(12), 0x6b901122, 7)
-			STEP(F, d, a, b, c, SET(13), 0xfd987193, 12)
-			STEP(F, c, d, a, b, SET(14), 0xa679438e, 17)
-			STEP(F, b, c, d, a, SET(15), 0x49b40821, 22)
-
-			/* Round 2 */
-			STEP(G, a, b, c, d, GET(1), 0xf61e2562, 5)
-			STEP(G, d, a, b, c, GET(6), 0xc040b340, 9)
-			STEP(G, c, d, a, b, GET(11), 0x265e5a51, 14)
-			STEP(G, b, c, d, a, GET(0), 0xe9b6c7aa, 20)
-			STEP(G, a, b, c, d, GET(5), 0xd62f105d, 5)
-			STEP(G, d, a, b, c, GET(10), 0x02441453, 9)
-			STEP(G, c, d, a, b, GET(15), 0xd8a1e681, 14)
-			STEP(G, b, c, d, a, GET(4), 0xe7d3fbc8, 20)
-			STEP(G, a, b, c, d, GET(9), 0x21e1cde6, 5)
-			STEP(G, d, a, b, c, GET(14), 0xc33707d6, 9)
-			STEP(G, c, d, a, b, GET(3), 0xf4d50d87, 14)
-			STEP(G, b, c, d, a, GET(8), 0x455a14ed, 20)
-			STEP(G, a, b, c, d, GET(13), 0xa9e3e905, 5)
-			STEP(G, d, a, b, c, GET(2), 0xfcefa3f8, 9)
-			STEP(G, c, d, a, b, GET(7), 0x676f02d9, 14)
-			STEP(G, b, c, d, a, GET(12), 0x8d2a4c8a, 20)
-
-			/* Round 3 */
-			STEP(H, a, b, c, d, GET(5), 0xfffa3942, 4)
-			STEP(H2, d, a, b, c, GET(8), 0x8771f681, 11)
-			STEP(H, c, d, a, b, GET(11), 0x6d9d6122, 16)
-			STEP(H2, b, c, d, a, GET(14), 0xfde5380c, 23)
-			STEP(H, a, b, c, d, GET(1), 0xa4beea44, 4)
-			STEP(H2, d, a, b, c, GET(4), 0x4bdecfa9, 11)
-			STEP(H, c, d, a, b, GET(7), 0xf6bb4b60, 16)
-			STEP(H2, b, c, d, a, GET(10), 0xbebfbc70, 23)
-			STEP(H, a, b, c, d, GET(13), 0x289b7ec6, 4)
-			STEP(H2, d, a, b, c, GET(0), 0xeaa127fa, 11)
-			STEP(H, c, d, a, b, GET(3), 0xd4ef3085, 16)
-			STEP(H2, b, c, d, a, GET(6), 0x04881d05, 23)
-			STEP(H, a, b, c, d, GET(9), 0xd9d4d039, 4)
-			STEP(H2, d, a, b, c, GET(12), 0xe6db99e5, 11)
-			STEP(H, c, d, a, b, GET(15), 0x1fa27cf8, 16)
-			STEP(H2, b, c, d, a, GET(2), 0xc4ac5665, 23)
-
-			/* Round 4 */
-			STEP(I, a, b, c, d, GET(0), 0xf4292244, 6)
-			STEP(I, d, a, b, c, GET(7), 0x432aff97, 10)
-			STEP(I, c, d, a, b, GET(14), 0xab9423a7, 15)
-			STEP(I, b, c, d, a, GET(5), 0xfc93a039, 21)
-			STEP(I, a, b, c, d, GET(12), 0x655b59c3, 6)
-			STEP(I, d, a, b, c, GET(3), 0x8f0ccc92, 10)
-			STEP(I, c, d, a, b, GET(10), 0xffeff47d, 15)
-			STEP(I, b, c, d, a, GET(1), 0x85845dd1, 21)
-			STEP(I, a, b, c, d, GET(8), 0x6fa87e4f, 6)
-			STEP(I, d, a, b, c, GET(15), 0xfe2ce6e0, 10)
-			STEP(I, c, d, a, b, GET(6), 0xa3014314, 15)
-			STEP(I, b, c, d, a, GET(13), 0x4e0811a1, 21)
-			STEP(I, a, b, c, d, GET(4), 0xf7537e82, 6)
-			STEP(I, d, a, b, c, GET(11), 0xbd3af235, 10)
-			STEP(I, c, d, a, b, GET(2), 0x2ad7d2bb, 15)
-			STEP(I, b, c, d, a, GET(9), 0xeb86d391, 21)
-
-			a += saved_a;
-		b += saved_b;
-		c += saved_c;
-		d += saved_d;
-
-		ptr += 64;
-	} while (size -= 64);
-
-	ctx->a = a;
-	ctx->b = b;
-	ctx->c = c;
-	ctx->d = d;
-
-	return ptr;
-}
-
-void MD5_Init(MD5_CTX *ctx)
-{
-	ctx->a = 0x67452301;
-	ctx->b = 0xefcdab89;
-	ctx->c = 0x98badcfe;
-	ctx->d = 0x10325476;
-
-	ctx->lo = 0;
-	ctx->hi = 0;
-}
-
-void MD5_Update(MD5_CTX *ctx, const void *data, unsigned long size)
-{
-	MD5_u32plus saved_lo;
-	unsigned long used, available;
-
-	saved_lo = ctx->lo;
-	if ((ctx->lo = (saved_lo + size) & 0x1fffffff) < saved_lo)
-		ctx->hi++;
-	ctx->hi += size >> 29;
-
-	used = saved_lo & 0x3f;
-
-	if (used) {
-		available = 64 - used;
-
-		if (size < available) {
-			memcpy(&ctx->buffer[used], data, size);
-			return;
-		}
-
-		memcpy(&ctx->buffer[used], data, available);
-		data = (const unsigned char *)data + available;
-		size -= available;
-		body(ctx, ctx->buffer, 64);
-	}
-
-	if (size >= 64) {
-		data = body(ctx, data, size & ~(unsigned long)0x3f);
-		size &= 0x3f;
-	}
-
-	memcpy(ctx->buffer, data, size);
-}
-
-void MD5_Final(unsigned char *result, MD5_CTX *ctx)
-{
-	unsigned long used, available;
-
-	used = ctx->lo & 0x3f;
-
-	ctx->buffer[used++] = 0x80;
-
-	available = 64 - used;
-
-	if (available < 8) {
-		memset(&ctx->buffer[used], 0, available);
-		body(ctx, ctx->buffer, 64);
-		used = 0;
-		available = 64;
-	}
-
-	memset(&ctx->buffer[used], 0, available - 8);
-
-	ctx->lo <<= 3;
-	ctx->buffer[56] = (unsigned char)(ctx->lo);
-	ctx->buffer[57] = (unsigned char)(ctx->lo >> 8);
-	ctx->buffer[58] = (unsigned char)(ctx->lo >> 16);
-	ctx->buffer[59] = (unsigned char)(ctx->lo >> 24);
-	ctx->buffer[60] = (unsigned char)(ctx->hi);
-	ctx->buffer[61] = (unsigned char)(ctx->hi >> 8);
-	ctx->buffer[62] = (unsigned char)(ctx->hi >> 16);
-	ctx->buffer[63] = (unsigned char)(ctx->hi >> 24);
-
-	body(ctx, ctx->buffer, 64);
-
-	result[0] = (unsigned char)(ctx->a);
-	result[1] = (unsigned char)(ctx->a >> 8);
-	result[2] = (unsigned char)(ctx->a >> 16);
-	result[3] = (unsigned char)(ctx->a >> 24);
-	result[4] = (unsigned char)(ctx->b);
-	result[5] = (unsigned char)(ctx->b >> 8);
-	result[6] = (unsigned char)(ctx->b >> 16);
-	result[7] = (unsigned char)(ctx->b >> 24);
-	result[8] = (unsigned char)(ctx->c);
-	result[9] = (unsigned char)(ctx->c >> 8);
-	result[10] = (unsigned char)(ctx->c >> 16);
-	result[11] = (unsigned char)(ctx->c >> 24);
-	result[12] = (unsigned char)(ctx->d);
-	result[13] = (unsigned char)(ctx->d >> 8);
-	result[14] = (unsigned char)(ctx->d >> 16);
-	result[15] = (unsigned char)(ctx->d >> 24);
-
-	memset(ctx, 0, sizeof(*ctx));
-}
-
-#endif
-#endif
-
-/***********************************************************************
-CORELIB\MEMORYPOOL.CPP
-***********************************************************************/
-#ifndef SPIRE_NO_CORE_LIB
-
-namespace CoreLib
-{
-	namespace Basic
-	{
-		MemoryPool::MemoryPool(unsigned char * pBuffer, int pLog2BlockSize, int numBlocks)
-		{
-			Init(pBuffer, pLog2BlockSize, numBlocks);
-		}
-		void MemoryPool::Init(unsigned char * pBuffer, int pLog2BlockSize, int numBlocks)
-		{
-			assert(pLog2BlockSize >= 1 && pLog2BlockSize <= 30);
-			assert(numBlocks >= 4);
-			buffer = pBuffer;
-			blockSize = 1 << pLog2BlockSize;
-			log2BlockSize = pLog2BlockSize;
-			numLevels = Math::Log2Floor(numBlocks);
-			freeList[0] = (FreeListNode*)buffer;
-			freeList[0]->NextPtr = nullptr;
-			freeList[0]->PrevPtr = nullptr;
-			used.SetMax(1 << (numLevels));
-			for (int i = 1; i < MaxLevels; i++)
-			{
-				freeList[i] = nullptr;
-			}
-		}
-		int MemoryPool::AllocBlock(int level)
-		{
-			if (level < 0)
-				return -1;
-			if (freeList[level] == nullptr)
-			{
-				auto largeBlockAddr = AllocBlock(level - 1);
-				if (largeBlockAddr != -1)
-				{
-					auto block1 = (FreeListNode*)(buffer + ((largeBlockAddr ^ (1 << (numLevels - level))) << log2BlockSize));
-					block1->NextPtr = nullptr;
-					block1->PrevPtr = nullptr;
-					freeList[level] = block1;
-
-					int blockIndex = (1 << level) + (largeBlockAddr >> (numLevels-level)) - 1;
-					used.Add(blockIndex);
-					return largeBlockAddr;
-				}
-				else
-					return -1;
-			}
-			else
-			{
-				auto node = freeList[level];
-				if (node->NextPtr)
-				{
-					node->NextPtr->PrevPtr = node->PrevPtr;
-				}
-				freeList[level] = freeList[level]->NextPtr;
-				int rs = (int)((unsigned char *)node - buffer) >> log2BlockSize;
-				int blockIndex = (1 << level) + (rs >> (numLevels - level)) - 1;
-				used.Add(blockIndex);
-				return rs;
-			}
-		}
-		unsigned char * MemoryPool::Alloc(int size)
-		{
-			if (size == 0)
-				return nullptr;
-			int originalSize = size;
-			if (size < blockSize)
-				size = blockSize;
-			int order = numLevels - (Math::Log2Ceil(size) - log2BlockSize);
-			assert(order >= 0 && order < MaxLevels);
-
-			bytesAllocated += (1 << ((numLevels-order) + log2BlockSize));
-			bytesWasted += (1 << ((numLevels - order) + log2BlockSize)) - originalSize;
-
-			int blockId = AllocBlock(order);
-			if (blockId != -1)
-				return buffer + (blockId << log2BlockSize);
-			else
-				return nullptr;
-		}
-		void MemoryPool::FreeBlock(unsigned char * ptr, int level)
-		{
-			int indexInLevel = (int)(ptr - buffer) >> (numLevels - level + log2BlockSize);
-			int blockIndex = (1 << level) + indexInLevel - 1;
-			assert(used.Contains(blockIndex));
-			int buddyIndex = (blockIndex & 1) ? blockIndex + 1 : blockIndex - 1;
-			used.Remove(blockIndex);
-			if (level > 0 && !used.Contains(buddyIndex))
-			{
-				auto buddyPtr = (FreeListNode *)(buffer + ((((int)(ptr - buffer) >> log2BlockSize) ^ (1 << (numLevels - level))) << log2BlockSize));
-				if (buddyPtr->PrevPtr)
-				{
-					buddyPtr->PrevPtr->NextPtr = buddyPtr->NextPtr;
-				}
-				if (buddyPtr->NextPtr)
-				{
-					buddyPtr->NextPtr->PrevPtr = buddyPtr->PrevPtr;
-				}
-				if (freeList[level] == buddyPtr)
-				{
-					freeList[level] = buddyPtr->NextPtr;
-				}
-				// recursively free parent blocks
-				auto parentPtr = Math::Min(buddyPtr, (FreeListNode*)ptr);
-				if (level > 0)
-					FreeBlock((unsigned char*)parentPtr, level - 1);
-			}
-			else
-			{
-				// insert to freelist
-				auto freeNode = (FreeListNode *)ptr;
-				freeNode->NextPtr = freeList[level];
-				freeNode->PrevPtr = nullptr;
-				if (freeList[level])
-					freeList[level]->PrevPtr = freeNode;
-				freeList[level] = freeNode;
-			}
-		}
-		void MemoryPool::Free(unsigned char * ptr, int size)
-		{
-			if (size == 0)
-				return;
-			int originalSize = size;
-			if (size < blockSize)
-				size = blockSize;
-			int level = numLevels - (Math::Log2Ceil(size) - log2BlockSize);
-			bytesAllocated -= (1 << ((numLevels-level) + log2BlockSize));
-			bytesWasted -= (1 << ((numLevels - level) + log2BlockSize)) - originalSize;
-			FreeBlock(ptr, level);
-		}
-	}
-}
-
-#endif
-
-/***********************************************************************
-CORELIB\PARSER.CPP
-***********************************************************************/
-#ifndef SPIRE_NO_CORE_LIB
-
-using namespace CoreLib::Basic;
-
-namespace CoreLib
-{
-	namespace Text
-	{
-		RefPtr<MetaLexer> Parser::metaLexer;
-		MetaLexer * Parser::GetTextLexer()
-		{
-			if (!metaLexer)
-			{
-				metaLexer = new MetaLexer();
-				metaLexer->SetLexProfile(
-					L"#WhiteSpace = {\\s+}\n"\
-					L"#SingleLineComment = {//[^\\n]*\\n}\n"\
-					L"#MultiLineComment = {/\\*([^*]|\\*[^/])*\\*/}\n"\
-					L"Identifier = {[a-zA-Z_]\\w*}\n"\
-					L"IntConstant = {\\d+}\n"\
-					L"FloatConstant = {\\d*.\\d+|\\d+(.\\d+)?(e(-)?\\d+)?}\n"\
-					L"StringConstant = {\"([^\\\\\"]|\\\\\\.)*\"}\n"\
-					L"CharConstant = {'[^\\n\\r]*'}\n"\
-					L"LParent = {\\(}\n"\
-					L"RParent = {\\)}\n"\
-					L"LBrace = {{}\n"\
-					L"RBrace = {}}\n"\
-					L"LBracket = {\\[}\n"\
-					L"RBracket = {\\]}\n"\
-					L"Dot = {.}\n"\
-					L"Semicolon = {;}\n"\
-					L"Comma = {,}\n"\
-					L"Colon = {:}\n"\
-					L"OpAdd = {\\+}\n"\
-					L"OpSub = {-}\n"\
-					L"OpDiv = {/}\n"\
-					L"OpMul = {\\*}\n"\
-					L"OpMod = {%}\n"\
-					L"OpExp = {^}\n"\
-					L"OpGreater = {>}\n"\
-					L"OpLess = {<}\n"\
-					L"OpEqual = {==}\n"\
-					L"OpGEqual = {>=}\n"\
-					L"OpLEqual = {<=}\n"\
-					L"OpNEqual = {!=}\n"\
-					L"OpAnd = {&}\n"\
-					L"OpOr = {\\|}\n"\
-					L"OpNot = {!}\n"\
-					L"OpAssign = {=}\n"\
-					L"OpDollar = {$}\n"
-					);
-			}
-			return metaLexer.Ptr();
-		}
-		void Parser::DisposeTextLexer()
-		{
-			metaLexer = nullptr;
-		}
-		Basic::List<Basic::String> Parser::SplitString(Basic::String str, wchar_t ch)
-		{
-			List<String> result;
-			StringBuilder currentBuilder;
-			for (int i = 0; i < str.Length(); i++)
-			{
-				if (str[i] == ch)
-				{
-					result.Add(currentBuilder.ToString());
-					currentBuilder.Clear();
-				}
-				else
-					currentBuilder.Append(str[i]);
-			}
-			result.Add(currentBuilder.ToString());
-			return result;
-		}
-		Parser::Parser(String text)
-		{
-			this->text = text;
-			
-			stream = GetTextLexer()->Parse(text);
-			for (auto token : stream)
-			{
-				if (token.TypeID != -1)
-					tokens.Add(token);
-			}
-			tokenPtr = 0;
-		}
-
-
-		List<String> Split(String text, wchar_t c)
-		{
-			List<String> result;
-			StringBuilder sb;
-			for (int i = 0; i < text.Length(); i++)
-			{
-				if (text[i] == c)
-				{
-					auto str = sb.ToString();
-					if (str.Length() != 0)
-						result.Add(str);
-					sb.Clear();
-				}
-				else
-					sb << text[i];
-			}
-			auto lastStr = sb.ToString();
-			if (lastStr.Length())
-				result.Add(lastStr);
-			return result;
-		}
-
-	}
-}
-#endif
-
-/***********************************************************************
-CORELIB\PERFORMANCECOUNTER.CPP
-***********************************************************************/
-#ifndef SPIRE_NO_CORE_LIB
-
-using namespace std::chrono;
-
-namespace CoreLib
-{
-	namespace Diagnostics
-	{
-		TimePoint PerformanceCounter::Start()
-		{
-			return high_resolution_clock::now();
-		}
-
-		Duration PerformanceCounter::End(TimePoint counter)
-		{
-			return high_resolution_clock::now()-counter;
-		}
-
-		float PerformanceCounter::EndSeconds(TimePoint counter)
-		{
-			return (float)ToSeconds(high_resolution_clock::now() - counter);
-		}
-
-		double PerformanceCounter::ToSeconds(Duration counter)
-		{
-			auto rs = duration_cast<duration<double>>(counter);
-			return *(double*)&rs;
 		}
 	}
 }
@@ -36188,55 +33776,833 @@ namespace CoreLib
 #endif
 
 /***********************************************************************
-CORELIB\THREADING.CPP
+CORELIB\TOKENIZER.CPP
 ***********************************************************************/
 #ifndef SPIRE_NO_CORE_LIB
 
-#ifdef _WIN32
-#elif MACOS
-#include <sys/param.h>
-#include <sys/sysctl.h>
-#else
-#include <unistd.h>
-#endif
+using namespace CoreLib::Basic;
 
 namespace CoreLib
 {
-	namespace Threading
+	namespace Text
 	{
-		unsigned int __stdcall ThreadProcedure(const ThreadParam& param)
+		TokenReader::TokenReader(String text)
 		{
-			if (param.thread->paramedThreadProc)
-				param.thread->paramedThreadProc->Invoke(param.threadParam);
-			else
-				param.thread->threadProc->Invoke();
-			return 0;
+			this->tokens = TokenizeText(L"", text, [&](TokenizeErrorType, CodePosition) {legal = false; });
+			tokenPtr = 0;
 		}
 
-		int ParallelSystemInfo::GetProcessorCount()
+		enum class State
 		{
-		#ifdef _WIN32
-			SYSTEM_INFO sysinfo;
-			GetSystemInfo(&sysinfo);
-			return sysinfo.dwNumberOfProcessors;
-		#elif MACOS
-			int nm[2];
-			size_t len = 4;
-			uint32_t count;
+			Start, Identifier, Operator, Int, Fixed, Double, Char, String, MultiComment, SingleComment
+		};
 
-			nm[0] = CTL_HW; nm[1] = HW_AVAILCPU;
-			sysctl(nm, 2, &count, &len, NULL, 0);
+		enum class LexDerivative
+		{
+			None, Line, File
+		};
 
-			if(count < 1) {
-				nm[1] = HW_NCPU;
-				sysctl(nm, 2, &count, &len, NULL, 0);
-				if(count < 1) { count = 1; }
+		bool IsLetter(wchar_t ch)
+		{
+			return ((ch >= L'a' && ch <= L'z') ||
+				(ch >= L'A' && ch <= L'Z') || ch == L'_' || ch == L'#');
+		}
+
+		bool IsDigit(wchar_t ch)
+		{
+			return ch >= L'0' && ch <= L'9';
+		}
+
+		bool IsPunctuation(wchar_t ch)
+		{
+			return  ch == L'+' || ch == L'-' || ch == L'*' || ch == L'/' || ch == L'%' ||
+				ch == L'!' || ch == L'^' || ch == L'&' || ch == L'(' || ch == L')' ||
+				ch == L'=' || ch == L'{' || ch == L'}' || ch == L'[' || ch == L']' ||
+				ch == L'|' || ch == L';' || ch == L',' || ch == L'.' || ch == L'<' ||
+				ch == L'>' || ch == L'~' || ch == L'@' || ch == L':' || ch == L'?';
+		}
+
+		void ParseOperators(const String & str, List<Token> & tokens, int line, int col, String fileName)
+		{
+			int pos = 0;
+			while (pos < str.Length())
+			{
+				wchar_t curChar = str[pos];
+				wchar_t nextChar = (pos < str.Length() - 1) ? str[pos + 1] : L'\0';
+				wchar_t nextNextChar = (pos < str.Length() - 2) ? str[pos + 2] : L'\0';
+				auto InsertToken = [&](TokenType type, const String & ct)
+				{
+					tokens.Add(Token(type, ct, line, col + pos, pos, fileName));
+				};
+				switch (curChar)
+				{
+				case L'+':
+					if (nextChar == L'+')
+					{
+						InsertToken(TokenType::OpInc, L"++");
+						pos += 2;
+					}
+					else if (nextChar == L'=')
+					{
+						InsertToken(TokenType::OpAddAssign, L"+=");
+						pos += 2;
+					}
+					else
+					{
+						InsertToken(TokenType::OpAdd, L"+");
+						pos++;
+					}
+					break;
+				case L'-':
+					if (nextChar == L'-')
+					{
+						InsertToken(TokenType::OpDec, L"--");
+						pos += 2;
+					}
+					else if (nextChar == L'=')
+					{
+						InsertToken(TokenType::OpSubAssign, L"-=");
+						pos += 2;
+					}
+					else if (nextChar == L'>')
+					{
+						InsertToken(TokenType::RightArrow, L"->");
+						pos += 2;
+					}
+					else
+					{
+						InsertToken(TokenType::OpSub, L"-");
+						pos++;
+					}
+					break;
+				case L'*':
+					if (nextChar == L'=')
+					{
+						InsertToken(TokenType::OpMulAssign, L"*=");
+						pos += 2;
+					}
+					else
+					{
+						InsertToken(TokenType::OpMul, L"*");
+						pos++;
+					}
+					break;
+				case L'/':
+					if (nextChar == L'=')
+					{
+						InsertToken(TokenType::OpDivAssign, L"/=");
+						pos += 2;
+					}
+					else
+					{
+						InsertToken(TokenType::OpDiv, L"/");
+						pos++;
+					}
+					break;
+				case L'%':
+					if (nextChar == L'=')
+					{
+						InsertToken(TokenType::OpModAssign, L"%=");
+						pos += 2;
+					}
+					else
+					{
+						InsertToken(TokenType::OpMod, L"%");
+						pos++;
+					}
+					break;
+				case L'|':
+					if (nextChar == L'|')
+					{
+						InsertToken(TokenType::OpOr, L"||");
+						pos += 2;
+					}
+					else if (nextChar == L'=')
+					{
+						InsertToken(TokenType::OpOrAssign, L"|=");
+						pos += 2;
+					}
+					else
+					{
+						InsertToken(TokenType::OpBitOr, L"|");
+						pos++;
+					}
+					break;
+				case L'&':
+					if (nextChar == L'&')
+					{
+						InsertToken(TokenType::OpAnd, L"&&");
+						pos += 2;
+					}
+					else if (nextChar == L'=')
+					{
+						InsertToken(TokenType::OpAndAssign, L"&=");
+						pos += 2;
+					}
+					else
+					{
+						InsertToken(TokenType::OpBitAnd, L"&");
+						pos++;
+					}
+					break;
+				case L'^':
+					if (nextChar == L'=')
+					{
+						InsertToken(TokenType::OpXorAssign, L"^=");
+						pos += 2;
+					}
+					else
+					{
+						InsertToken(TokenType::OpBitXor, L"^");
+						pos++;
+					}
+					break;
+				case L'>':
+					if (nextChar == L'>')
+					{
+						if (nextNextChar == L'=')
+						{
+							InsertToken(TokenType::OpShrAssign, L">>=");
+							pos += 3;
+						}
+						else
+						{
+							InsertToken(TokenType::OpRsh, L">>");
+							pos += 2;
+						}
+					}
+					else if (nextChar == L'=')
+					{
+						InsertToken(TokenType::OpGeq, L">=");
+						pos += 2;
+					}
+					else
+					{
+						InsertToken(TokenType::OpGreater, L">");
+						pos++;
+					}
+					break;
+				case L'<':
+					if (nextChar == L'<')
+					{
+						if (nextNextChar == L'=')
+						{
+							InsertToken(TokenType::OpShlAssign, L"<<=");
+							pos += 3;
+						}
+						else
+						{
+							InsertToken(TokenType::OpLsh, L"<<");
+							pos += 2;
+						}
+					}
+					else if (nextChar == L'=')
+					{
+						InsertToken(TokenType::OpLeq, L"<=");
+						pos += 2;
+					}
+					else
+					{
+						InsertToken(TokenType::OpLess, L"<");
+						pos++;
+					}
+					break;
+				case L'=':
+					if (nextChar == L'=')
+					{
+						InsertToken(TokenType::OpEql, L"==");
+						pos += 2;
+					}
+					else
+					{
+						InsertToken(TokenType::OpAssign, L"=");
+						pos++;
+					}
+					break;
+				case L'!':
+					if (nextChar == L'=')
+					{
+						InsertToken(TokenType::OpNeq, L"!=");
+						pos += 2;
+					}
+					else
+					{
+						InsertToken(TokenType::OpNot, L"!");
+						pos++;
+					}
+					break;
+				case L'?':
+					InsertToken(TokenType::QuestionMark, L"?");
+					pos++;
+					break;
+				case L'@':
+					InsertToken(TokenType::At, L"@");
+					pos++;
+					break;
+				case L':':
+					InsertToken(TokenType::Colon, L":");
+					pos++;
+					break;
+				case L'~':
+					InsertToken(TokenType::OpBitNot, L"~");
+					pos++;
+					break;
+				case L';':
+					InsertToken(TokenType::Semicolon, L";");
+					pos++;
+					break;
+				case L',':
+					InsertToken(TokenType::Comma, L",");
+					pos++;
+					break;
+				case L'.':
+					InsertToken(TokenType::Dot, L".");
+					pos++;
+					break;
+				case L'{':
+					InsertToken(TokenType::LBrace, L"{");
+					pos++;
+					break;
+				case L'}':
+					InsertToken(TokenType::RBrace, L"}");
+					pos++;
+					break;
+				case L'[':
+					InsertToken(TokenType::LBracket, L"[");
+					pos++;
+					break;
+				case L']':
+					InsertToken(TokenType::RBracket, L"]");
+					pos++;
+					break;
+				case L'(':
+					InsertToken(TokenType::LParent, L"(");
+					pos++;
+					break;
+				case L')':
+					InsertToken(TokenType::RParent, L")");
+					pos++;
+					break;
+				}
 			}
-			return count;
-		#else
-			return sysconf(_SC_NPROCESSORS_ONLN);
-		#endif
 		}
+
+		List<Token> TokenizeText(const String & fileName, const String & text, Procedure<TokenizeErrorType, CodePosition> errorHandler)
+		{
+			int lastPos = 0, pos = 0;
+			int line = 1, col = 0;
+			String file = fileName;
+			State state = State::Start;
+			StringBuilder tokenBuilder;
+			int tokenLine, tokenCol;
+			List<Token> tokenList;
+			LexDerivative derivative = LexDerivative::None;
+			auto InsertToken = [&](TokenType type)
+			{
+				derivative = LexDerivative::None;
+				tokenList.Add(Token(type, tokenBuilder.ToString(), tokenLine, tokenCol, pos, file));
+				tokenBuilder.Clear();
+			};
+			auto ProcessTransferChar = [&](wchar_t nextChar)
+			{
+				switch (nextChar)
+				{
+				case L'\\':
+				case L'\"':
+				case L'\'':
+					tokenBuilder.Append(nextChar);
+					break;
+				case L't':
+					tokenBuilder.Append('\t');
+					break;
+				case L's':
+					tokenBuilder.Append(' ');
+					break;
+				case L'n':
+					tokenBuilder.Append('\n');
+					break;
+				case L'r':
+					tokenBuilder.Append('\r');
+					break;
+				case L'b':
+					tokenBuilder.Append('\b');
+					break;
+				}
+			};
+			while (pos <= text.Length())
+			{
+				wchar_t curChar = (pos < text.Length() ? text[pos] : L' ');
+				wchar_t nextChar = (pos < text.Length() - 1) ? text[pos + 1] : L'\0';
+				if (lastPos != pos)
+				{
+					if (curChar == L'\n')
+					{
+						line++;
+						col = 0;
+					}
+					else
+						col++;
+					lastPos = pos;
+				}
+
+				switch (state)
+				{
+				case State::Start:
+					if (IsLetter(curChar))
+					{
+						state = State::Identifier;
+						tokenLine = line;
+						tokenCol = col;
+					}
+					else if (IsDigit(curChar))
+					{
+						state = State::Int;
+						tokenLine = line;
+						tokenCol = col;
+					}
+					else if (curChar == L'\'')
+					{
+						state = State::Char;
+						pos++;
+						tokenLine = line;
+						tokenCol = col;
+					}
+					else if (curChar == L'"')
+					{
+						state = State::String;
+						pos++;
+						tokenLine = line;
+						tokenCol = col;
+					}
+					else if (curChar == L' ' || curChar == L'\t' || curChar == L'\r' || curChar == L'\n' || curChar == 160) // 160:non-break space
+						pos++;
+					else if (curChar == L'/' && nextChar == L'/')
+					{
+						state = State::SingleComment;
+						pos += 2;
+					}
+					else if (curChar == L'/' && nextChar == L'*')
+					{
+						pos += 2;
+						state = State::MultiComment;
+					}
+					else if (IsPunctuation(curChar))
+					{
+						state = State::Operator;
+						tokenLine = line;
+						tokenCol = col;
+					}
+					else
+					{
+						errorHandler(TokenizeErrorType::InvalidCharacter, CodePosition(line, col, pos, file));
+						pos++;
+					}
+					break;
+				case State::Identifier:
+					if (IsLetter(curChar) || IsDigit(curChar))
+					{
+						tokenBuilder.Append(curChar);
+						pos++;
+					}
+					else
+					{
+						auto tokenStr = tokenBuilder.ToString();
+						if (tokenStr == L"#line_reset#")
+						{
+							line = 0;
+							col = 0;
+							tokenBuilder.Clear();
+						}
+						else if (tokenStr == L"#line")
+						{
+							derivative = LexDerivative::Line;
+							tokenBuilder.Clear();
+						}
+						else if (tokenStr == L"#file")
+						{
+							derivative = LexDerivative::File;
+							tokenBuilder.Clear();
+							line = 0;
+							col = 0;
+						}
+						else
+							InsertToken(TokenType::Identifier);
+						state = State::Start;
+					}
+					break;
+				case State::Operator:
+					if (IsPunctuation(curChar) && !((curChar == L'/' && nextChar == L'/') || (curChar == L'/' && nextChar == L'*')))
+					{
+						tokenBuilder.Append(curChar);
+						pos++;
+					}
+					else
+					{
+						//do token analyze
+						ParseOperators(tokenBuilder.ToString(), tokenList, tokenLine, tokenCol, file);
+						tokenBuilder.Clear();
+						state = State::Start;
+					}
+					break;
+				case State::Int:
+					if (IsDigit(curChar))
+					{
+						tokenBuilder.Append(curChar);
+						pos++;
+					}
+					else if (curChar == L'.')
+					{
+						state = State::Fixed;
+						tokenBuilder.Append(curChar);
+						pos++;
+					}
+					else if (curChar == L'e' || curChar == L'E')
+					{
+						state = State::Double;
+						tokenBuilder.Append(curChar);
+						if (nextChar == L'-' || nextChar == L'+')
+						{
+							tokenBuilder.Append(nextChar);
+							pos++;
+						}
+						pos++;
+					}
+					else
+					{
+						if (derivative == LexDerivative::Line)
+						{
+							derivative = LexDerivative::None;
+							line = StringToInt(tokenBuilder.ToString()) - 1;
+							col = 0;
+							tokenBuilder.Clear();
+						}
+						else
+						{
+							InsertToken(TokenType::IntLiterial);
+						}
+						state = State::Start;
+					}
+					break;
+				case State::Fixed:
+					if (IsDigit(curChar))
+					{
+						tokenBuilder.Append(curChar);
+						pos++;
+					}
+					else if (curChar == L'e' || curChar == L'E')
+					{
+						state = State::Double;
+						tokenBuilder.Append(curChar);
+						if (nextChar == L'-' || nextChar == L'+')
+						{
+							tokenBuilder.Append(nextChar);
+							pos++;
+						}
+						pos++;
+					}
+					else
+					{
+						if (curChar == L'f')
+							pos++;
+						InsertToken(TokenType::DoubleLiterial);
+						state = State::Start;
+					}
+					break;
+				case State::Double:
+					if (IsDigit(curChar))
+					{
+						tokenBuilder.Append(curChar);
+						pos++;
+					}
+					else
+					{
+						if (curChar == L'f')
+							pos++;
+						InsertToken(TokenType::DoubleLiterial);
+						state = State::Start;
+					}
+					break;
+				case State::String:
+					if (curChar != L'"')
+					{
+						if (curChar == L'\\')
+						{
+							ProcessTransferChar(nextChar);
+							pos++;
+						}
+						else
+							tokenBuilder.Append(curChar);
+					}
+					else
+					{
+						if (derivative == LexDerivative::File)
+						{
+							derivative = LexDerivative::None;
+							file = tokenBuilder.ToString();
+							tokenBuilder.Clear();
+						}
+						else
+						{
+							InsertToken(TokenType::StringLiterial);
+						}
+						state = State::Start;
+					}
+					pos++;
+					break;
+				case State::Char:
+					if (curChar != L'\'')
+					{
+						if (curChar == L'\\')
+						{
+							ProcessTransferChar(nextChar);
+							pos++;
+						}
+						else
+							tokenBuilder.Append(curChar);
+					}
+					else
+					{
+						if (tokenBuilder.Length() > 1)
+							errorHandler(TokenizeErrorType::InvalidEscapeSequence, CodePosition(line, col - tokenBuilder.Length(), pos, file));
+
+						InsertToken(TokenType::CharLiterial);
+						state = State::Start;
+					}
+					pos++;
+					break;
+				case State::SingleComment:
+					if (curChar == L'\n')
+						state = State::Start;
+					pos++;
+					break;
+				case State::MultiComment:
+					if (curChar == L'*' && nextChar == '/')
+					{
+						state = State::Start;
+						pos += 2;
+					}
+					else
+						pos++;
+					break;
+				}
+			}
+			return tokenList;
+		}
+		List<Token> TokenizeText(const String & fileName, const String & text)
+		{
+			return TokenizeText(fileName, text, [](TokenizeErrorType, CodePosition) {});
+		}
+		List<Token> TokenizeText(const String & text)
+		{
+			return TokenizeText(L"", text, [](TokenizeErrorType, CodePosition) {});
+		}
+
+		String EscapeStringLiteral(String str)
+		{
+			StringBuilder sb;
+			sb << L"\"";
+			for (int i = 0; i < str.Length(); i++)
+			{
+				switch (str[i])
+				{
+				case L' ':
+					sb << L"\\s";
+					break;
+				case L'\n':
+					sb << L"\\n";
+					break;
+				case L'\r':
+					sb << L"\\r";
+					break;
+				case L'\t':
+					sb << L"\\t";
+					break;
+				case L'\v':
+					sb << L"\\v";
+					break;
+				case L'\'':
+					sb << L"\\\'";
+					break;
+				case L'\"':
+					sb << L"\\\"";
+					break;
+				case L'\\':
+					sb << L"\\\\";
+					break;
+				default:
+					sb << str[i];
+					break;
+				}
+			}
+			sb << L"\"";
+			return sb.ProduceString();
+		}
+
+		String UnescapeStringLiteral(String str)
+		{
+			StringBuilder sb;
+			for (int i = 0; i < str.Length(); i++)
+			{
+				if (str[i] == L'\\' && i < str.Length() - 1)
+				{
+					switch (str[i + 1])
+					{
+					case L's':
+						sb << L" ";
+						break;
+					case L't':
+						sb << L'\t';
+						break;
+					case L'n':
+						sb << L'\n';
+						break;
+					case L'r':
+						sb << L'\r';
+						break;
+					case L'v':
+						sb << L'\v';
+						break;
+					case L'\'':
+						sb << L'\'';
+						break;
+					case L'\"':
+						sb << L"\"";
+						break;
+					case L'\\':
+						sb << L"\\";
+						break;
+					default:
+						i = i - 1;
+						sb << str[i];
+					}
+					i++;
+				}
+				else
+					sb << str[i];
+			}
+			return sb.ProduceString();
+		}
+
+
+		String TokenTypeToString(TokenType type)
+		{
+			switch (type)
+			{
+			case TokenType::Unknown:
+				return L"UnknownToken";
+			case TokenType::Identifier:
+				return L"Identifier";
+			case TokenType::IntLiterial:
+				return L"Int Literial";
+			case TokenType::DoubleLiterial:
+				return L"Double Literial";
+			case TokenType::StringLiterial:
+				return L"String Literial";
+			case TokenType::CharLiterial:
+				return L"CharLiterial";
+			case TokenType::QuestionMark:
+				return L"'?'";
+			case TokenType::Colon:
+				return L"':'";
+			case TokenType::Semicolon:
+				return L"';'";
+			case TokenType::Comma:
+				return L"','";
+			case TokenType::LBrace:
+				return L"'{'";
+			case TokenType::RBrace:
+				return L"'}'";
+			case TokenType::LBracket:
+				return L"'['";
+			case TokenType::RBracket:
+				return L"']'";
+			case TokenType::LParent:
+				return L"'('";
+			case TokenType::RParent:
+				return L"')'";
+			case TokenType::At:
+				return L"'@'";
+			case TokenType::OpAssign:
+				return L"'='";
+			case TokenType::OpAdd:
+				return L"'+'";
+			case TokenType::OpSub:
+				return L"'-'";
+			case TokenType::OpMul:
+				return L"'*'";
+			case TokenType::OpDiv:
+				return L"'/'";
+			case TokenType::OpMod:
+				return L"'%'";
+			case TokenType::OpNot:
+				return L"'!'";
+			case TokenType::OpLsh:
+				return L"'<<'";
+			case TokenType::OpRsh:
+				return L"'>>'";
+			case TokenType::OpAddAssign:
+				return L"'+='";
+			case TokenType::OpSubAssign:
+				return L"'-='";
+			case TokenType::OpMulAssign:
+				return L"'*='";
+			case TokenType::OpDivAssign:
+				return L"'/='";
+			case TokenType::OpModAssign:
+				return L"'%='";
+			case TokenType::OpEql:
+				return L"'=='";
+			case TokenType::OpNeq:
+				return L"'!='";
+			case TokenType::OpGreater:
+				return L"'>'";
+			case TokenType::OpLess:
+				return L"'<'";
+			case TokenType::OpGeq:
+				return L"'>='";
+			case TokenType::OpLeq:
+				return L"'<='";
+			case TokenType::OpAnd:
+				return L"'&&'";
+			case TokenType::OpOr:
+				return L"'||'";
+			case TokenType::OpBitXor:
+				return L"'^'";
+			case TokenType::OpBitAnd:
+				return L"'&'";
+			case TokenType::OpBitOr:
+				return L"'|'";
+			case TokenType::OpInc:
+				return L"'++'";
+			case TokenType::OpDec:
+				return L"'--'";
+			default:
+				return L"";
+			}
+		}
+
+		List<String> Split(String text, wchar_t c)
+		{
+			List<String> result;
+			StringBuilder sb;
+			for (int i = 0; i < text.Length(); i++)
+			{
+				if (text[i] == c)
+				{
+					auto str = sb.ToString();
+					if (str.Length() != 0)
+						result.Add(str);
+					sb.Clear();
+				}
+				else
+					sb << text[i];
+			}
+			auto lastStr = sb.ToString();
+			if (lastStr.Length())
+				result.Add(lastStr);
+			return result;
+		}
+
 	}
 }
 #endif
@@ -36707,2485 +35073,5 @@ void MByteToWideChar(wchar_t * buffer, int bufferSize, const char * str, int len
 #else
 	std::mbstowcs(buffer, str, bufferSize);
 #endif
-}
-#endif
-
-/***********************************************************************
-CORELIB\REGEX\METALEXER.CPP
-***********************************************************************/
-#ifndef SPIRE_NO_CORE_LIB
-
-
-namespace CoreLib
-{
-namespace Text
-{
-	MetaLexer::MetaLexer()
-	{
-	}
-
-	MetaLexer::MetaLexer(String profile)
-	{
-		SetLexProfile(profile);
-	}
-
-	String MetaLexer::GetTokenName(int id)
-	{
-		return TokenNames[id];
-	}
-
-	int MetaLexer::GetRuleCount()
-	{
-		return TokenNames.Count();
-	}
-
-	void MetaLexer::SetLexProfile(String lex)
-	{
-		Errors.Clear();
-		ParseLexProfile(lex);
-		if (!Errors.Count())
-			ConstructDFA();
-		else
-			dfa = 0;
-	}
-
-	bool IsWhiteSpace(wchar_t ch)
-	{
-		return (ch == L' ' || ch == L'\t' || ch == L'\n' || ch == L'\r' || ch == L'\v');
-	}
-
-	bool IsIdent(wchar_t ch)
-	{
-		return ((ch >=L'A' && ch <= L'Z') || (ch >= L'a' && ch<=L'z') || (ch>=L'0' && ch<=L'9')
-			|| ch == L'_' || ch==L'#');
-	}
-
-	bool IsLetter(wchar_t ch)
-	{
-		return ((ch >=L'A' && ch <= L'Z') || (ch >= L'a' && ch<=L'z') || ch == L'_' || ch==L'#');
-	}
-
-	bool MetaLexer::ParseLexProfile(const CoreLib::String & lex)
-	{
-		LinkedList<LexProfileToken> tokens;
-		int ptr = 0;
-		int state = 0;
-		StringBuilder curToken;
-		while (ptr < lex.Length())
-		{
-			wchar_t curChar = lex[ptr];
-			wchar_t nextChar = 0;
-			if (ptr+1<lex.Length())
-				nextChar = lex[ptr+1];
-			switch (state)
-			{
-			case 0:
-				{
-					if (IsLetter(curChar))
-						state = 1;
-					else if (IsWhiteSpace(curChar))
-						ptr ++;
-					else if (curChar == L'{')
-					{
-						state = 2;
-						ptr ++;
-					}
-					else if (curChar == L'=')
-						state = 3;
-					else if (curChar == L'/' && nextChar == L'/')
-						state = 4;
-					else
-					{
-						LexerError err;
-						err.Position = ptr;
-						err.Text = String(L"[Profile Error] Illegal character \'") + curChar + L"\'";
-						Errors.Add(err);
-						ptr ++;
-					}
-					curToken.Clear();
-				}
-				break;
-			case 1:
-				{
-					if (IsIdent(curChar))
-					{
-						curToken.Append(curChar);
-						ptr ++;
-					}
-					else
-					{
-						LexProfileToken tk;
-						tk.str = curToken.ToString();
-						tk.type = LexProfileToken::Identifier;
-						tokens.AddLast(tk);
-						state = 0;
-					}
-				}
-				break;
-			case 2:
-				{
-					if (curChar == L'}' && (nextChar == L'\r' || nextChar == L'\n' || nextChar == 0) )
-					{
-						LexProfileToken tk;
-						tk.str = curToken.ToString();
-						tk.type = LexProfileToken::Regex;
-						tokens.AddLast(tk);
-						ptr ++;
-						state = 0;
-					}
-					else
-					{
-						curToken.Append(curChar);
-						ptr ++;
-					}
-				}
-				break;
-			case 3:
-				{
-					LexProfileToken tk;
-					tk.str = curChar;
-					tk.type = LexProfileToken::Equal;
-					tokens.AddLast(tk);
-					ptr ++;
-					state = 0;
-				}
-				break;
-			case 4:
-				{
-					if (curChar == L'\n')
-						state = 0;
-					else
-						ptr ++;
-				}
-			}
-		}
-
-		// Parse tokens
-		LinkedNode<LexProfileToken> * l = tokens.FirstNode();
-		state = 0;
-		String curName, curRegex;
-		try
-		{
-			TokenNames.Clear();
-			Regex.Clear();
-			while (l)
-			{
-				curName = ReadProfileToken(l, LexProfileToken::Identifier);
-				l = l->GetNext();
-				ReadProfileToken(l, LexProfileToken::Equal);
-				l = l->GetNext();
-				curRegex = ReadProfileToken(l, LexProfileToken::Regex);
-				l = l->GetNext();
-				TokenNames.Add(curName);
-				Regex.Add(curRegex);
-				if (curName[0] == L'#')
-					Ignore.Add(true);
-				else
-					Ignore.Add(false);
-			}
-		}
-		catch(int)
-		{
-			return false;
-		}
-		return true;
-	}
-
-	String MetaLexer::ReadProfileToken(LexProfileTokenNode*n, LexProfileToken::LexProfileTokenType type)
-	{
-		if (n && n->Value.type == type)
-		{
-			return n->Value.str;
-		}
-		else
-		{
-			String name = L"[Profile Error] ";
-			switch (type)
-			{
-			case LexProfileToken::Equal:
-				name = L"\'=\'";
-				break;
-			case LexProfileToken::Identifier:
-				name = L"Token identifier";
-				break;
-			case LexProfileToken::Regex:
-				name = L"Regular expression";
-				break;
-			}
-			name = name + L" expected.";
-			LexerError err;
-			err.Text = name;
-			err.Position = 0;
-			Errors.Add(err);
-			throw 0;
-		}
-	}
-
-	DFA_Table * MetaLexer::GetDFA()
-	{
-		return dfa.operator->();
-	}
-
-	void MetaLexer::ConstructDFA()
-	{
-		RegexParser parser;
-		NFA_Graph nfa;
-		NFA_Node * node = nfa.CreateNode();
-		nfa.SetStartNode(node);
-		for (int i=0; i<Regex.Count(); i++)
-		{
-			RefPtr<RegexNode> tree = parser.Parse(Regex[i]);
-			if (tree)
-			{
-				NFA_Graph cNfa;
-				cNfa.GenerateFromRegexTree(tree.operator->(), true);
-				cNfa.SetTerminalIdentifier(i);
-				nfa.CombineNFA(&cNfa);
-				NFA_Translation * trans = nfa.CreateTranslation();
-				trans->NodeDest = cNfa.GetStartNode();
-				trans->NodeSrc = node;
-				trans->NodeDest->PrevTranslations.Add(trans);
-				trans->NodeSrc->Translations.Add(trans);
-			}
-			else
-			{
-				LexerError err;
-				err.Position = 0;
-				err.Text = L"Illegal regex for \"" + String(TokenNames[i]) + L"\"";
-				Errors.Add(err);
-				return;
-			}
-		}
-		nfa.PostGenerationProcess();
-		DFA_Graph dfaGraph;
-		dfaGraph.Generate(&nfa);
-		dfa = new DFA_Table();
-		dfaGraph.ToDfaTable(dfa.operator ->());
-	}
-
-	LazyLexStream::Iterator & LazyLexStream::Iterator::operator ++()
-	{
-		auto &str = stream->InputText;
-		auto sDfa = stream->GetDFA();
-		auto & ignore = stream->GetIgnoreSet();
-		if (lastTokenPtr == str.Length())
-		{
-			lastTokenPtr = -1;
-			return *this;
-		}
-
-		int lastAcceptState = -1;
-		int lastAcceptPtr = -1;
-		while (ptr < str.Length())
-		{
-			if (sDfa->Tags[state]->IsFinal)
-			{
-				lastAcceptState = state;
-				lastAcceptPtr = ptr;
-			}
-			Word charClass = (*sDfa->CharTable)[str[ptr]];
-			if (charClass == 0xFFFF)
-			{
-				ptr++;
-				continue;
-			}
-			int nextState = sDfa->DFA[state][charClass];
-			if (nextState >= 0)
-			{
-				state = nextState;
-				ptr++;
-			}
-			else
-			{
-				if (lastAcceptState != -1)
-				{
-					state = lastAcceptState;
-					ptr = lastAcceptPtr;
-					
-					
-					if (!ignore[sDfa->Tags[state]->TerminalIdentifiers[0]])
-					{
-						currentToken.Length = ptr - lastTokenPtr;
-						currentToken.TypeID = sDfa->Tags[state]->TerminalIdentifiers[0];
-						currentToken.Position = lastTokenPtr;
-						state = sDfa->StartState;
-						lastTokenPtr = ptr;
-						lastAcceptState = -1;
-						lastAcceptPtr = -1;
-						break;
-					}
-					state = sDfa->StartState;
-					lastTokenPtr = ptr;
-					lastAcceptState = -1;
-					lastAcceptPtr = -1;
-				}
-				else
-				{
-					ptr++;
-					lastAcceptState = lastAcceptPtr = -1;
-					lastTokenPtr = ptr;
-					state = sDfa->StartState;
-					continue;
-				}
-			}
-		}
-		if (ptr == str.Length())
-		{
-			if (sDfa->Tags[state]->IsFinal &&
-				!ignore[sDfa->Tags[state]->TerminalIdentifiers[0]])
-			{
-				currentToken.Length = ptr - lastTokenPtr;
-				currentToken.TypeID = sDfa->Tags[state]->TerminalIdentifiers[0];
-				currentToken.Position = lastTokenPtr;
-			}
-			else
-			{
-				currentToken.Length = 0;
-				currentToken.TypeID = -1;
-				currentToken.Position = lastTokenPtr;
-			}
-			lastTokenPtr = ptr;
-		}
-		
-		return *this;
-	}
-
-	bool MetaLexer::Parse(String str, LexStream & stream)
-	{
-		TokensParsed = 0;
-		if (!dfa)
-			return false;
-		int ptr = 0;
-		int lastAcceptState = -1;
-		int lastAcceptPtr = -1;
-		int lastTokenPtr = 0;
-		int state = dfa->StartState;
-		while (ptr<str.Length())
-		{
-			if (dfa->Tags[state]->IsFinal)
-			{
-				lastAcceptState = state;
-				lastAcceptPtr = ptr;
-			}
-			Word charClass = (*dfa->CharTable)[str[ptr]];
-			if (charClass == 0xFFFF)
-			{
-				LexerError err;
-				err.Text = String(L"Illegal character \'") + str[ptr] + L"\'";
-				err.Position = ptr;
-				Errors.Add(err);
-				ptr++;
-				continue;
-			}
-			int nextState = dfa->DFA[state][charClass];
-			if (nextState >= 0)
-			{
-				state = nextState;
-				ptr++;
-			}
-			else
-			{
-				if (lastAcceptState != -1)
-				{
-					state = lastAcceptState;
-					ptr = lastAcceptPtr;
-					if (!Ignore[dfa->Tags[state]->TerminalIdentifiers[0]])
-					{
-						LexToken tk;
-						tk.Str = str.SubString(lastTokenPtr, ptr-lastTokenPtr);
-						tk.TypeID = dfa->Tags[state]->TerminalIdentifiers[0];
-						tk.Position = lastTokenPtr;
-						stream.AddLast(tk);
-					}
-					TokensParsed ++;
-					lastTokenPtr = ptr;
-					state = dfa->StartState;
-					lastAcceptState = -1;
-					lastAcceptPtr = -1;
-				}
-				else
-				{
-					LexerError err;
-					err.Text = L"Illegal token \'" +
-						str.SubString(lastTokenPtr, ptr-lastTokenPtr) + L"\'";
-					err.Position = ptr;
-					Errors.Add(err);
-					ptr++;
-					lastAcceptState = lastAcceptPtr = -1;
-					lastTokenPtr = ptr;
-					state = dfa->StartState;
-					continue;
-				}
-			}
-		}
-
-		if (dfa->Tags[state]->IsFinal &&
-			!Ignore[dfa->Tags[state]->TerminalIdentifiers[0]])
-		{
-			LexToken tk;
-			tk.Str = str.SubString(lastTokenPtr, ptr-lastTokenPtr);
-			tk.TypeID = dfa->Tags[state]->TerminalIdentifiers[0];
-			stream.AddLast(tk);
-			TokensParsed ++;
-		}
-		return (Errors.Count() == 0);
-	}
-}
-}
-#endif
-
-/***********************************************************************
-CORELIB\REGEX\REGEX.CPP
-***********************************************************************/
-#ifndef SPIRE_NO_CORE_LIB
-
-namespace CoreLib
-{
-namespace Text
-{
-	RegexMatcher::RegexMatcher(DFA_Table * table)
-		:dfa(table)
-	{
-	}
-
-	int RegexMatcher::Match(const String & str, int startPos)
-	{
-		int state = dfa->StartState;
-		if (state == -1)
-			return -1;
-		for (int i=startPos; i<str.Length(); i++)
-		{
-			Word charClass = (*dfa->CharTable)[str[i]];
-			if (charClass == 0xFFFF)
-				return -1;
-			int nextState = dfa->DFA[state][charClass];
-			if (nextState == -1)
-			{
-				if (dfa->Tags[state]->IsFinal)
-					return i-startPos;
-				else
-					return -1;
-			}
-			else
-				state = nextState;
-		}
-		if (dfa->Tags[state]->IsFinal)
-			return str.Length()-startPos;
-		else
-			return -1;
-	}
-
-	DFA_Table * PureRegex::GetDFA()
-	{
-		return dfaTable.operator->();
-	}
-
-	PureRegex::PureRegex(const String & regex)
-	{
-		RegexParser p;
-		RefPtr<RegexNode> tree = p.Parse(regex);
-		if (tree)
-		{
-			NFA_Graph nfa;
-			nfa.GenerateFromRegexTree(tree.operator ->());
-			DFA_Graph dfa;
-			dfa.Generate(&nfa);
-			dfaTable = new DFA_Table();
-			dfa.ToDfaTable(dfaTable.operator->());
-		}
-		else
-		{
-			IllegalRegexException ex;
-			if (p.Errors.Count())
-				ex.Message = p.Errors[0].Text;
-			throw ex;
-		}
-	}
-
-	bool PureRegex::IsMatch(const String & str)
-	{
-		RegexMatcher matcher(dfaTable.operator->());
-		return (matcher.Match(str, 0)==str.Length());
-	}
-
-	PureRegex::RegexMatchResult PureRegex::Search(const String & str, int startPos)
-	{
-		RegexMatcher matcher(dfaTable.operator ->());
-		for (int i=startPos; i<str.Length(); i++)
-		{
-			int len = matcher.Match(str, i);
-			if (len >= 0)
-			{
-				RegexMatchResult rs;
-				rs.Start = i;
-				rs.Length = len;
-				return rs;
-			}
-		}
-		RegexMatchResult rs;
-		rs.Start = 0;
-		rs.Length = -1;
-		return rs;
-	}
-}
-}
-#endif
-
-/***********************************************************************
-CORELIB\REGEX\REGEXDFA.CPP
-***********************************************************************/
-#ifndef SPIRE_NO_CORE_LIB
-
-namespace CoreLib
-{
-namespace Text
-{
-	CharTableGenerator::CharTableGenerator(RegexCharTable * _table)
-		: table(_table)
-	{
-		table->SetSize(65536);
-		memset(table->Buffer(),0,sizeof(Word)*table->Count());
-	}
-
-	DFA_Table_Tag::DFA_Table_Tag()
-	{
-		IsFinal = false;
-	}
-
-	int CharTableGenerator::AddSet(String set)
-	{
-		int fid = sets.IndexOf(set);
-		if (fid != -1)
-			return fid;
-		else
-		{
-			sets.Add(set);
-			return sets.Count()-1;
-		}
-	}
-
-	int CharTableGenerator::Generate(List<RegexCharSet *> & charSets)
-	{
-		/*List<RegexCharSet *> cs;
-		cs.SetCapacity(charSets.Count());
-		String str;
-		str.Alloc(1024);
-		for (int i=1; i<65536; i++)
-		{
-			str = L"";
-			cs.Clear();
-			for (int j=0; j<charSets.Count(); j++)
-			{
-				if (charSets[j]->Contains(i))
-				{
-					str += (wchar_t)(j+1);
-					cs.Add(charSets[j]);
-				}
-			}
-			int lastCount = sets.Count();
-			if (str.Length())
-			{
-				int id = AddSet(str);
-				if (id == lastCount)
-				{
-					for (int j=0; j<cs.Count(); j++)
-						cs[j]->Elements.Add(id);
-				}
-				(*table)[i] = id;
-			}
-			else
-				(*table)[i] = 0xFFFF;
-		}
-		return sets.Count();*/
-		
-		RegexCharSet::CalcCharElements(charSets, elements);
-		for (int i=0; i<table->Count(); i++)
-			(*table)[i] = 0xFFFF;
-		Word* buf = table->Buffer();
-		for (int i=0; i<elements.Count(); i++)
-		{
-			for (int k=elements[i].Begin; k<=elements[i].End; k++)	
-			{
-#ifdef _DEBUG
-				if ((*table)[k] != 0xFFFF)
-				{
-					throw L"Illegal subset generation."; // This indicates a bug.
-				}
-#endif
-				buf[k] = (Word)i;
-			}
-		}
-		return elements.Count();
-	}
-
-	DFA_Node::DFA_Node(int elements)
-	{
-		Translations.SetSize(elements);
-		for (int i=0; i<elements; i++)
-			Translations[i] = 0;
-	}
-
-	void DFA_Graph::CombineCharElements(NFA_Node * node, List<Word> & elem)
-	{
-		for (int i=0; i<node->Translations.Count(); i++)
-		{
-			for (int j=0; j<node->Translations[i]->CharSet->Elements.Count(); j++)
-			{
-				if (elem.IndexOf(node->Translations[i]->CharSet->Elements[j]) == -1)
-					elem.Add(node->Translations[i]->CharSet->Elements[j]);
-			}
-		}
-	}
-
-	void DFA_Graph::Generate(NFA_Graph * nfa)
-	{
-		table = new RegexCharTable();
-		List<RegexCharSet * > charSets;
-		for (int i=0; i<nfa->translations.Count(); i++)
-		{
-			if (nfa->translations[i]->CharSet && nfa->translations[i]->CharSet->Ranges.Count())
-				charSets.Add(nfa->translations[i]->CharSet.operator->());
-		}
-		CharTableGenerator gen(table.operator ->());
-		int elements = gen.Generate(charSets);
-		CharElements = gen.elements;
-		List<DFA_Node *> L,D;
-		startNode = new DFA_Node(elements);
-		startNode->ID = 0;
-		startNode->Nodes.Add(nfa->start);
-		L.Add(startNode);
-		nodes.Add(startNode);
-		List<Word> charElem;
-		do
-		{
-			DFA_Node * node = L.Last();
-			L.RemoveAt(L.Count()-1);
-			charElem.Clear();
-			node->IsFinal = false;
-			for (int i=0; i<node->Nodes.Count(); i++)
-			{
-				CombineCharElements(node->Nodes[i], charElem);
-				if (node->Nodes[i]->IsFinal)
-					node->IsFinal = true;
-			}
-			for (int i=0; i<charElem.Count(); i++)
-			{
-				DFA_Node * n = new DFA_Node(0);
-				for (int j=0; j<node->Nodes.Count(); j++)
-				{
-					for (int k=0; k<node->Nodes[j]->Translations.Count(); k++)
-					{
-						NFA_Translation * trans = node->Nodes[j]->Translations[k];
-						if (trans->CharSet->Elements.Contains(charElem[i]))
-						{
-							if (!n->Nodes.Contains(node->Nodes[j]->Translations[k]->NodeDest))
-								n->Nodes.Add(node->Nodes[j]->Translations[k]->NodeDest);
-						}
-					}
-				}
-				int fid = -1;
-				for (int j=0; j<nodes.Count(); j++)
-				{
-					if ((*nodes[j]) == *n)
-					{
-						fid = j;
-						break;
-					}
-				}
-				if (fid == -1)
-				{
-					n->Translations.SetSize(elements);
-					for (int m=0; m<elements; m++)
-						n->Translations[m] = 0;
-					n->ID = nodes.Count();
-					L.Add(n);
-					nodes.Add(n);
-					fid = nodes.Count()-1;
-				}
-				else
-					delete n;
-				n = nodes[fid].operator ->();
-				node->Translations[charElem[i]] = n;
-			}
-		}
-		while (L.Count());
-
-		// Set Terminal Identifiers
-		HashSet<int> terminalIdentifiers;
-		for (int i=0; i<nodes.Count(); i++)
-		{
-			terminalIdentifiers.Clear();
-			for (int j=0; j<nodes[i]->Nodes.Count(); j++)
-			{
-				if (nodes[i]->Nodes[j]->IsFinal && 
-					!terminalIdentifiers.Contains(nodes[i]->Nodes[j]->TerminalIdentifier))
-				{
-					nodes[i]->IsFinal = true;
-					terminalIdentifiers.Add(nodes[i]->Nodes[j]->TerminalIdentifier);
-					nodes[i]->TerminalIdentifiers.Add(nodes[i]->Nodes[j]->TerminalIdentifier);
-				}
-			}
-			nodes[i]->TerminalIdentifiers.Sort();
-		}
-	}
-
-	bool DFA_Node::operator == (const DFA_Node & node)
-	{
-		if (Nodes.Count() != node.Nodes.Count())
-			return false;
-		for (int i=0; i<node.Nodes.Count(); i++)
-		{
-			if (node.Nodes[i] != Nodes[i])
-				return false;
-		}
-		return true;
-	}
-
-	String DFA_Graph::Interpret()
-	{
-		StringBuilder sb(4096000);
-		for (int i=0; i<nodes.Count(); i++)
-		{
-			if (nodes[i]->IsFinal)
-				sb.Append(L'#');
-			else if (nodes[i] == startNode)
-				sb.Append(L'*');
-			sb.Append(String(nodes[i]->ID));
-			sb.Append(L'(');
-			for (int j=0; j<nodes[i]->Nodes.Count(); j++)
-			{
-				sb.Append(String(nodes[i]->Nodes[j]->ID));
-				sb.Append(L" ");
-			}
-			sb.Append(L")\n");
-			for (int j=0; j<nodes[i]->Translations.Count(); j++)
-			{
-				if (nodes[i]->Translations[j])
-				{
-					sb.Append(L"\tOn ");
-					sb.Append(String(j));
-					sb.Append(L": ");
-					sb.Append(String(nodes[i]->Translations[j]->ID));
-					sb.Append(L'\n');
-				}
-			}
-		}
-
-		sb.Append(L"\n\n==================\n");
-		sb.Append(L"Char Set Table:\n");
-		for (int i=0; i<CharElements.Count(); i++)
-		{
-			sb.Append(L"Class ");
-			sb.Append(String(i));
-			sb.Append(L": ");
-			RegexCharSet s;
-			s.Ranges.Add(CharElements[i]);
-			sb.Append(s.Reinterpret());
-			sb.Append(L"\n");
-		}
-		return sb.ProduceString();
-	}
-
-	void DFA_Graph::ToDfaTable(DFA_Table * dfa)
-	{
-		dfa->CharTable = table;
-		dfa->DFA = new int*[nodes.Count()];
-		dfa->Tags.SetSize(nodes.Count());
-		for (int i=0; i<nodes.Count(); i++)
-			dfa->Tags[i] = new DFA_Table_Tag();
-		dfa->StateCount = nodes.Count();
-		dfa->AlphabetSize = CharElements.Count();
-		for (int i=0; i<nodes.Count(); i++)
-		{
-			dfa->DFA[i] = new int[table->Count()];
-			for (int j=0; j<nodes[i]->Translations.Count(); j++)
-			{
-				if (nodes[i]->Translations[j])
-					dfa->DFA[i][j] = nodes[i]->Translations[j]->ID;
-				else
-					dfa->DFA[i][j] = -1;
-			}
-			if (nodes[i] == startNode)
-				dfa->StartState = i;
-			if (nodes[i]->IsFinal)
-			{
-				dfa->Tags[i]->IsFinal = true;
-				dfa->Tags[i]->TerminalIdentifiers = nodes[i]->TerminalIdentifiers;
-			}
-		}
-	}
-
-	DFA_Table::DFA_Table()
-	{
-		DFA = 0;
-		StateCount = 0;
-		AlphabetSize = 0;
-		StartState = -1;
-	}
-	
-	DFA_Table::~DFA_Table()
-	{
-		if (DFA)
-		{
-			for (int i=0; i<StateCount; i++)
-				delete [] DFA[i];
-			delete [] DFA;
-		}
-	}
-}
-}
-#endif
-
-/***********************************************************************
-CORELIB\REGEX\REGEXNFA.CPP
-***********************************************************************/
-#ifndef SPIRE_NO_CORE_LIB
-
-namespace CoreLib
-{
-namespace Text
-{
-	int NFA_Node::HandleCount = 0;
-
-	NFA_Translation::NFA_Translation(NFA_Node * src, NFA_Node * dest, RefPtr<RegexCharSet> charSet)
-		: CharSet(charSet), NodeSrc(src), NodeDest(dest)
-	{}
-
-	NFA_Translation::NFA_Translation()
-	{
-		NodeSrc = NodeDest = 0;
-	}
-
-	NFA_Translation::NFA_Translation(NFA_Node * src, NFA_Node * dest)
-		: NodeSrc(src), NodeDest(dest)
-	{
-	}
-
-	NFA_Node::NFA_Node()
-		: Flag(false), IsFinal(false), TerminalIdentifier(0)
-	{
-		HandleCount ++;
-		ID = HandleCount;
-	}
-
-	void NFA_Node::RemoveTranslation(NFA_Translation * trans)
-	{
-		int fid = Translations.IndexOf(trans);
-		if (fid != -1)
-			Translations.RemoveAt(fid);
-	}
-
-	void NFA_Node::RemovePrevTranslation(NFA_Translation * trans)
-	{
-		int fid = PrevTranslations.IndexOf(trans);
-		if (fid != -1)
-			PrevTranslations.RemoveAt(fid);
-	}
-
-	NFA_Node * NFA_Graph::CreateNode()
-	{
-		NFA_Node * nNode = new NFA_Node();
-		nodes.Add(nNode);
-		return nNode;
-	}
-
-	NFA_Translation * NFA_Graph::CreateTranslation()
-	{
-		NFA_Translation * trans = new NFA_Translation();
-		translations.Add(trans);
-		return trans;
-	}
-
-	void NFA_Graph::ClearNodes()
-	{
-		for (int i=0; i<nodes.Count(); i++)
-			nodes[i] = 0;
-		for (int i=0; i<translations.Count(); i++)
-			translations[i] = 0;
-		nodes.Clear();
-		translations.Clear();
-	}
-
-	void NFA_Graph::GenerateFromRegexTree(RegexNode * tree, bool elimEpsilon)
-	{
-		NFA_StatePair s;
-		tree->Accept(this);
-		s = PopState();
-		start = s.start;
-		end = s.end;
-		end->IsFinal = true;
-
-		if (elimEpsilon)
-		{
-			PostGenerationProcess();
-		}
-
-	}
-
-	void NFA_Graph::PostGenerationProcess()
-	{
-		EliminateEpsilon();
-		for (int i=0; i<translations.Count(); i++)
-		{
-			if (translations[i]->CharSet)
-				translations[i]->CharSet->Normalize();
-			else
-			{
-				translations[i] = 0;
-				translations.RemoveAt(i);
-				i--;
-			}
-		}
-	}
-
-	NFA_Node * NFA_Graph::GetStartNode()
-	{
-		return start;
-	}
-
-	void NFA_Graph::PushState(NFA_StatePair s)
-	{
-		stateStack.Add(s);
-	}
-
-	NFA_Graph::NFA_StatePair NFA_Graph::PopState()
-	{
-		NFA_StatePair s = stateStack.Last();
-		stateStack.RemoveAt(stateStack.Count()-1);
-		return s;
-	}
-
-	void NFA_Graph::VisitCharSetNode(RegexCharSetNode * node)
-	{
-		NFA_StatePair s;
-		s.start = CreateNode();
-		s.end = CreateNode();
-		NFA_Translation * trans = CreateTranslation();
-		trans->CharSet = node->CharSet;
-		trans->NodeSrc = s.start;
-		trans->NodeDest = s.end;
-		s.start->Translations.Add(trans);
-		s.end->PrevTranslations.Add(trans);
-		PushState(s);
-	}
-
-	void NFA_Graph::VisitRepeatNode(RegexRepeatNode * node)
-	{
-		NFA_StatePair sr;
-		sr.start = sr.end = nullptr;
-		node->Child->Accept(this);
-		NFA_StatePair s = PopState();
-		if (node->RepeatType == RegexRepeatNode::rtArbitary)
-		{
-			sr.start = CreateNode();
-			sr.end = CreateNode();
-
-			NFA_Translation * trans = CreateTranslation();
-			trans->NodeSrc = sr.start;
-			trans->NodeDest = sr.end;
-			sr.start->Translations.Add(trans);
-			sr.end->PrevTranslations.Add(trans);
-			
-			NFA_Translation * trans1 = CreateTranslation();
-			trans1->NodeSrc = sr.end;
-			trans1->NodeDest = s.start;
-			sr.end->Translations.Add(trans1);
-			s.start->PrevTranslations.Add(trans1);
-
-			NFA_Translation * trans2 = CreateTranslation();
-			trans2->NodeSrc = s.end;
-			trans2->NodeDest = sr.end;
-			s.end->Translations.Add(trans2);
-			sr.end->PrevTranslations.Add(trans2);
-		}
-		else if (node->RepeatType == RegexRepeatNode::rtOptional)
-		{
-			sr = s;
-
-			NFA_Translation * trans = CreateTranslation();
-			trans->NodeSrc = sr.start;
-			trans->NodeDest = sr.end;
-			sr.start->Translations.Add(trans);
-			sr.end->PrevTranslations.Add(trans);
-		}
-		else if (node->RepeatType == RegexRepeatNode::rtMoreThanOnce)
-		{
-			sr = s;
-
-			NFA_Translation * trans = CreateTranslation();
-			trans->NodeSrc = sr.end;
-			trans->NodeDest = sr.start;
-			sr.start->PrevTranslations.Add(trans);
-			sr.end->Translations.Add(trans);
-		}
-		else if (node->RepeatType == RegexRepeatNode::rtSpecified)
-		{
-			if (node->MinRepeat == 0)
-			{
-				if (node->MaxRepeat > 0)
-				{
-					for (int i=1; i<node->MaxRepeat; i++)
-					{
-						node->Child->Accept(this);
-						NFA_StatePair s1 = PopState();
-						NFA_Translation * trans = CreateTranslation();
-						trans->NodeDest = s1.start;
-						trans->NodeSrc = s.end;
-						trans->NodeDest->PrevTranslations.Add(trans);
-						trans->NodeSrc->Translations.Add(trans);
-
-						trans = CreateTranslation();
-						trans->NodeDest = s1.start;
-						trans->NodeSrc = s.start;
-						trans->NodeDest->PrevTranslations.Add(trans);
-						trans->NodeSrc->Translations.Add(trans);
-
-						s.end = s1.end;
-					}
-					NFA_Translation * trans = CreateTranslation();
-					trans->NodeDest = s.end;
-					trans->NodeSrc = s.start;
-					trans->NodeDest->PrevTranslations.Add(trans);
-					trans->NodeSrc->Translations.Add(trans);
-					sr = s;
-				}
-				else if (node->MaxRepeat == 0)
-				{
-					sr.start = CreateNode();
-					sr.end = CreateNode();
-					NFA_Translation * trans = CreateTranslation();
-					trans->NodeDest = sr.end;
-					trans->NodeSrc = sr.start;
-					trans->NodeDest->PrevTranslations.Add(trans);
-					trans->NodeSrc->Translations.Add(trans);
-				}
-				else
-				{
-					// Arbitary repeat
-					sr.start = CreateNode();
-					sr.end = CreateNode();
-
-					NFA_Translation * trans = CreateTranslation();
-					trans->NodeSrc = sr.start;
-					trans->NodeDest = sr.end;
-					sr.start->Translations.Add(trans);
-					sr.end->PrevTranslations.Add(trans);
-					
-					NFA_Translation * trans1 = CreateTranslation();
-					trans1->NodeSrc = sr.end;
-					trans1->NodeDest = s.start;
-					sr.end->Translations.Add(trans1);
-					s.start->PrevTranslations.Add(trans1);
-
-					NFA_Translation * trans2 = CreateTranslation();
-					trans2->NodeSrc = s.end;
-					trans2->NodeDest = sr.end;
-					s.end->Translations.Add(trans2);
-					sr.end->PrevTranslations.Add(trans2);
-				}
-			}
-			else
-			{
-				NFA_Node * lastBegin = s.start;
-				for (int i=1; i<node->MinRepeat; i++)
-				{
-					node->Child->Accept(this);
-					NFA_StatePair s1 = PopState();
-					NFA_Translation * trans = CreateTranslation();
-					trans->NodeDest = s1.start;
-					trans->NodeSrc = s.end;
-					trans->NodeDest->PrevTranslations.Add(trans);
-					trans->NodeSrc->Translations.Add(trans);
-					s.end = s1.end;
-					lastBegin = s1.start;
-				}
-				if (node->MaxRepeat == -1)
-				{
-					NFA_Translation * trans = CreateTranslation();
-					trans->NodeDest = lastBegin;
-					trans->NodeSrc = s.end;
-					trans->NodeDest->PrevTranslations.Add(trans);
-					trans->NodeSrc->Translations.Add(trans);
-				}
-				else if (node->MaxRepeat > node->MinRepeat)
-				{
-					lastBegin = s.end;
-					for (int i=node->MinRepeat; i<node->MaxRepeat; i++)
-					{
-						node->Child->Accept(this);
-						NFA_StatePair s1 = PopState();
-						NFA_Translation * trans = CreateTranslation();
-						trans->NodeDest = s1.start;
-						trans->NodeSrc = s.end;
-						trans->NodeDest->PrevTranslations.Add(trans);
-						trans->NodeSrc->Translations.Add(trans);
-
-						trans = CreateTranslation();
-						trans->NodeDest = s1.start;
-						trans->NodeSrc = lastBegin;
-						trans->NodeDest->PrevTranslations.Add(trans);
-						trans->NodeSrc->Translations.Add(trans);
-
-						s.end = s1.end;
-					}
-
-					NFA_Translation * trans = CreateTranslation();
-					trans->NodeDest = s.end;
-					trans->NodeSrc = lastBegin;
-					trans->NodeDest->PrevTranslations.Add(trans);
-					trans->NodeSrc->Translations.Add(trans);
-				}
-
-				sr = s;
-			}
-			
-		}
-		PushState(sr);
-	}
-
-	void NFA_Graph::VisitSelectionNode(RegexSelectionNode * node)
-	{
-		NFA_StatePair s, s1, sr;
-		sr.start = CreateNode();
-		sr.end = CreateNode();
-		s.start = sr.start;
-		s.end = sr.end;
-		s1.start = sr.start;
-		s1.end = sr.end;
-		if (node->LeftChild)
-		{
-			node->LeftChild->Accept(this);
-			s = PopState();
-		}
-		if (node->RightChild)
-		{
-			node->RightChild->Accept(this);
-			s1 = PopState();
-		}
-		
-		NFA_Translation * trans;
-		trans = CreateTranslation();
-		trans->NodeSrc = sr.start;
-		trans->NodeDest = s.start;
-		sr.start->Translations.Add(trans);
-		s.start->PrevTranslations.Add(trans);
-
-		trans = CreateTranslation();
-		trans->NodeSrc = sr.start;
-		trans->NodeDest = s1.start;
-		sr.start->Translations.Add(trans);
-		s1.start->PrevTranslations.Add(trans);
-
-		trans = CreateTranslation();
-		trans->NodeSrc = s.end;
-		trans->NodeDest = sr.end;
-		s.end->Translations.Add(trans);
-		sr.end->PrevTranslations.Add(trans);
-
-		trans = CreateTranslation();
-		trans->NodeSrc = s1.end;
-		trans->NodeDest = sr.end;
-		s1.end->Translations.Add(trans);
-		sr.end->PrevTranslations.Add(trans);
-
-		PushState(sr);
-	}
-
-	void NFA_Graph::VisitConnectionNode(RegexConnectionNode * node)
-	{
-		NFA_StatePair s, s1;
-		node->LeftChild->Accept(this);
-		s = PopState();
-		node->RightChild->Accept(this);
-		s1 = PopState();
-		NFA_Translation * trans = CreateTranslation();
-		trans->NodeDest = s1.start;
-		trans->NodeSrc = s.end;
-		s.end->Translations.Add(trans);
-		s1.start->PrevTranslations.Add(trans);
-		s.end = s1.end;
-		PushState(s);
-		
-	}
-
-	void NFA_Graph::ClearNodeFlags()
-	{
-		for (int i=0; i<nodes.Count(); i++)
-			nodes[i]->Flag = false;
-	}
-
-	void NFA_Graph::GetValidStates(List<NFA_Node *> & states)
-	{
-		RefPtr<List<NFA_Node *>> list1 = new List<NFA_Node *>();
-		RefPtr<List<NFA_Node *>> list2 = new List<NFA_Node *>();
-		list1->Add(start);
-		states.Add(start);
-		ClearNodeFlags();
-		while (list1->Count())
-		{
-			list2->Clear();
-			for (int i=0; i<list1->Count(); i++)
-			{
-				bool isValid = false;
-				NFA_Node * curNode = (*list1)[i];
-				curNode->Flag = true;
-				for (int j=0; j<curNode->PrevTranslations.Count(); j++)
-				{
-					if (curNode->PrevTranslations[j]->CharSet)
-					{
-						isValid = true;
-						break;
-					}
-					
-				}
-				if (isValid)
-					states.Add(curNode);
-				for (int j=0; j<curNode->Translations.Count(); j++)
-				{
-					if (!curNode->Translations[j]->NodeDest->Flag)
-					{
-						list2->Add(curNode->Translations[j]->NodeDest);
-					}
-				}
-			}
-			RefPtr<List<NFA_Node *>> tmp = list1;
-			list1 = list2;
-			list2 = tmp;
-		}
-	}
-
-	void NFA_Graph::GetEpsilonClosure(NFA_Node * node, List<NFA_Node *> & states)
-	{
-		RefPtr<List<NFA_Node *>> list1 = new List<NFA_Node *>();
-		RefPtr<List<NFA_Node *>> list2 = new List<NFA_Node *>();
-		list1->Add(node);
-		ClearNodeFlags();
-		while (list1->Count())
-		{
-			list2->Clear();
-			for (int m=0; m<list1->Count(); m++)
-			{
-				NFA_Node * curNode = (*list1)[m];
-				for (int i=0; i<curNode->Translations.Count(); i++)
-				{
-					
-					if (!curNode->Translations[i]->CharSet)
-					{
-						if (!curNode->Translations[i]->NodeDest->Flag)
-						{
-							states.Add(curNode->Translations[i]->NodeDest);
-							list2->Add(curNode->Translations[i]->NodeDest);
-							curNode->Translations[i]->NodeDest->Flag = true;
-						}
-					}
-				}
-			}
-			RefPtr<List<NFA_Node *>> tmp = list1;
-			list1 = list2;
-			list2 = tmp;
-		}
-	}
-
-	void NFA_Graph::EliminateEpsilon()
-	{
-		List<NFA_Node *> validStates;
-		GetValidStates(validStates);
-		for (int i=0; i<validStates.Count(); i++)
-		{
-			NFA_Node * curState = validStates[i];
-			List<NFA_Node *> closure;
-			GetEpsilonClosure(curState, closure);
-			// Add translations from epsilon closures
-			for (int j=0; j<closure.Count(); j++)
-			{
-				NFA_Node * curNode = closure[j];
-				for (int k=0; k<curNode->Translations.Count(); k++)
-				{
-					if (curNode->Translations[k]->CharSet)
-					{
-						// Generate a translation from curState to curNode->Dest[k]
-						NFA_Translation * trans = CreateTranslation();
-						trans->CharSet = curNode->Translations[k]->CharSet;
-						trans->NodeSrc = curState;
-						trans->NodeDest = curNode->Translations[k]->NodeDest;
-						curState->Translations.Add(trans);
-						trans->NodeDest->PrevTranslations.Add(trans);
-					}
-				}
-				if (curNode == end)
-				{
-					curState->IsFinal = true;
-					curState->TerminalIdentifier = end->TerminalIdentifier;
-				}
-			}
-		}
-		// Remove epsilon-translations and invalid states
-		ClearNodeFlags();
-		for (int i=0; i<validStates.Count(); i++)
-		{
-			validStates[i]->Flag = true;
-		}
-		for (int i=0; i<nodes.Count(); i++)
-		{
-			if (!nodes[i]->Flag)
-			{
-				// Remove invalid state
-				for (int j=0; j<nodes[i]->PrevTranslations.Count(); j++)
-				{
-					NFA_Translation * trans = nodes[i]->PrevTranslations[j];
-					trans->NodeSrc->RemoveTranslation(trans);
-					int fid = translations.IndexOf(trans);
-					if (fid != -1)
-					{
-						translations[fid] = 0;
-						translations.RemoveAt(fid);
-					}
-				}
-				for (int j=0; j<nodes[i]->Translations.Count(); j++)
-				{
-					NFA_Translation * trans = nodes[i]->Translations[j];
-					trans->NodeDest->RemovePrevTranslation(trans);
-					int fid = translations.IndexOf(trans);
-					if (fid != -1)
-					{
-						translations[fid] = 0;
-						translations.RemoveAt(fid);
-					}
-				}
-			}
-		}
-
-		for (int i=0; i<validStates.Count(); i++)
-		{
-			for (int j=0; j<validStates[i]->Translations.Count(); j++)
-			{
-				NFA_Translation * trans = validStates[i]->Translations[j];
-				if (!trans->CharSet)
-				{
-					validStates[i]->RemoveTranslation(trans);
-					trans->NodeDest->RemovePrevTranslation(trans);
-					int fid = translations.IndexOf(trans);
-					if (fid != -1)
-					{
-						translations[fid] = 0;
-						translations.RemoveAt(fid);
-					}
-				}
-			}
-		}
-
-		int ptr = 0;
-		while (ptr < nodes.Count())
-		{
-			if (!nodes[ptr]->Flag)
-			{
-				nodes[ptr] = 0;
-				nodes.RemoveAt(ptr);
-			}
-			else
-				ptr ++;
-		}
-	}
-
-	String NFA_Graph::Interpret()
-	{
-		StringBuilder sb(4096);
-		for (int i=0; i<nodes.Count(); i++)
-		{
-			sb.Append(L"State: ");
-			if (nodes[i]->IsFinal)
-				sb.Append(L"[");
-			if (nodes[i] == start)
-				sb.Append(L"*");
-			sb.Append(String(nodes[i]->ID));
-			if (nodes[i]->IsFinal)
-				sb.Append(L"]");
-			sb.Append(L'\n');
-			for (int j=0; j<nodes[i]->Translations.Count(); j++)
-			{
-				sb.Append(L"\t");
-				if (nodes[i]->Translations[j]->CharSet)
-					sb.Append(nodes[i]->Translations[j]->CharSet->Reinterpret());
-				else
-					sb.Append(L"<epsilon>");
-				sb.Append(L":");
-				sb.Append(String(nodes[i]->Translations[j]->NodeDest->ID));
-				sb.Append(L"\n");
-			}
-		}
-		return sb.ProduceString();
-		
-	}
-
-	void NFA_Graph::SetStartNode(NFA_Node *node)
-	{
-		start = node;
-	}
-
-	void NFA_Graph::CombineNFA(NFA_Graph * graph)
-	{
-		for (int i=0; i<graph->nodes.Count(); i++)
-		{
-			nodes.Add(graph->nodes[i]);
-		}
-		for (int i=0; i<graph->translations.Count(); i++)
-		{
-			translations.Add(graph->translations[i]);
-		}
-
-	}
-
-	void NFA_Graph::SetTerminalIdentifier(int id)
-	{
-		for (int i=0; i<nodes.Count(); i++)
-		{
-			if (nodes[i]->IsFinal)
-			{
-				nodes[i]->TerminalIdentifier = id;
-			}
-		}
-	}
-}
-}
-#endif
-
-/***********************************************************************
-CORELIB\REGEX\REGEXPARSER.CPP
-***********************************************************************/
-#ifndef SPIRE_NO_CORE_LIB
-
-namespace CoreLib
-{
-namespace Text
-{
-	RegexCharSetNode::RegexCharSetNode()
-	{
-		CharSet = new RegexCharSet();
-	}
-
-	RefPtr<RegexNode> RegexParser::Parse(const String &regex)
-	{
-		src = regex;
-		ptr = 0;
-		try
-		{
-			return ParseSelectionNode();
-		}
-		catch (...)
-		{
-			return 0;
-		}
-	}
-
-	RegexNode * RegexParser::ParseSelectionNode()
-	{
-		if (ptr >= src.Length())
-			return 0;
-		RefPtr<RegexNode> left = ParseConnectionNode();
-		while (ptr < src.Length() && src[ptr] == L'|')
-		{
-			ptr ++;
-			RefPtr<RegexNode> right = ParseConnectionNode();
-			RegexSelectionNode * rs = new RegexSelectionNode();
-			rs->LeftChild = left;
-			rs->RightChild = right;
-			left = rs;
-		}
-		return left.Release();
-	}
-
-	RegexNode * RegexParser::ParseConnectionNode()
-	{
-		if (ptr >= src.Length())
-		{
-			return 0;
-		}
-		RefPtr<RegexNode> left = ParseRepeatNode();
-		while (ptr < src.Length() && src[ptr] != L'|' && src[ptr] != L')')
-		{
-			RefPtr<RegexNode> right = ParseRepeatNode();
-			if (right)
-			{
-				RegexConnectionNode * reg = new RegexConnectionNode();
-				reg->LeftChild = left;
-				reg->RightChild = right;
-				left = reg;
-			}
-			else
-				break;
-		}
-		return left.Release();
-	}
-
-	RegexNode * RegexParser::ParseRepeatNode()
-	{
-		if (ptr >= src.Length() || src[ptr] == L')' || src[ptr] == L'|')
-			return 0;
-		
-		RefPtr<RegexNode> content;
-		if (src[ptr] == L'(')
-		{
-			RefPtr<RegexNode> reg;
-			ptr ++;
-			reg = ParseSelectionNode();
-			if (src[ptr] != L')')
-			{
-				SyntaxError err;
-				err.Position = ptr;
-				err.Text = L"\')\' expected.";
-				Errors.Add(err);
-				throw 0;
-			}
-			ptr ++;
-			content = reg.Release();
-		}
-		else
-		{
-			RefPtr<RegexCharSetNode> reg;
-			if (src[ptr] == L'[')
-			{
-				reg = new RegexCharSetNode();
-				ptr ++;
-				reg->CharSet = ParseCharSet();
-				
-				if (src[ptr] != L']')
-				{
-					SyntaxError err;
-					err.Position = ptr;
-					err.Text = L"\']\' expected.";
-					Errors.Add(err);
-					throw 0;
-				}
-				ptr ++;
-			}
-			else if (src[ptr] == L'\\')
-			{
-				ptr ++;
-				reg = new RegexCharSetNode();
-				reg->CharSet = new RegexCharSet();
-				switch (src[ptr])
-				{
-				case L'.':
-					{
-						reg->CharSet->Neg = true;
-						break;
-					}
-				case L'w':
-				case L'W':
-					{
-						RegexCharSet::RegexCharRange range;
-						reg->CharSet->Neg = false;
-						range.Begin = L'a';
-						range.End = L'z';
-						reg->CharSet->Ranges.Add(range);
-						range.Begin = L'A';
-						range.End = L'Z';
-						reg->CharSet->Ranges.Add(range);
-						range.Begin = L'_';
-						range.End = L'_';
-						reg->CharSet->Ranges.Add(range);
-						range.Begin = L'0';
-						range.End = L'9';
-						reg->CharSet->Ranges.Add(range);
-						if (src[ptr] == L'W')
-							reg->CharSet->Neg = true;
-						break;
-					}
-				case L's':
-				case 'S':
-					{
-						RegexCharSet::RegexCharRange range;
-						reg->CharSet->Neg = false;
-						range.Begin = L' ';
-						range.End = L' ';
-						reg->CharSet->Ranges.Add(range);
-						range.Begin = L'\t';
-						range.End = L'\t';
-						reg->CharSet->Ranges.Add(range);
-						range.Begin = L'\r';
-						range.End = L'\r';
-						reg->CharSet->Ranges.Add(range);
-						range.Begin = L'\n';
-						range.End = L'\n';
-						reg->CharSet->Ranges.Add(range);
-						if (src[ptr] == L'S')
-							reg->CharSet->Neg = true;
-						break;
-					}
-				case L'd':
-				case L'D':
-					{
-						RegexCharSet::RegexCharRange range;
-						reg->CharSet->Neg = false;
-						range.Begin = L'0';
-						range.End = L'9';
-						reg->CharSet->Ranges.Add(range);
-						if (src[ptr] == L'D')
-							reg->CharSet->Neg = true;
-						break;
-					}
-				case L'n':
-					{
-						RegexCharSet::RegexCharRange range;
-						reg->CharSet->Neg = false;
-						range.Begin = L'\n';
-						range.End = L'\n';
-						reg->CharSet->Ranges.Add(range);
-						break;
-					}
-				case L't':
-					{
-						RegexCharSet::RegexCharRange range;
-						reg->CharSet->Neg = false;
-						range.Begin = L'\t';
-						range.End = L'\t';
-						reg->CharSet->Ranges.Add(range);
-						break;
-					}
-				case L'r':
-					{
-						RegexCharSet::RegexCharRange range;
-						reg->CharSet->Neg = false;
-						range.Begin = L'\r';
-						range.End = L'\r';
-						reg->CharSet->Ranges.Add(range);
-						break;
-					}
-				case L'v':
-					{
-						RegexCharSet::RegexCharRange range;
-						reg->CharSet->Neg = false;
-						range.Begin = L'\v';
-						range.End = L'\v';
-						reg->CharSet->Ranges.Add(range);
-						break;
-					}
-				case L'f':
-					{
-						RegexCharSet::RegexCharRange range;
-						reg->CharSet->Neg = false;
-						range.Begin = L'\f';
-						range.End = L'\f';
-						reg->CharSet->Ranges.Add(range);
-						break;
-					}
-				case L'*':
-				case L'|':
-				case L'(':
-				case L')':
-				case L'?':
-				case L'+':
-				case L'[':
-				case L']':
-				case L'\\':
-					{
-						RegexCharSet::RegexCharRange range;
-						reg->CharSet->Neg = false;
-						range.Begin = src[ptr];
-						range.End = range.Begin;
-						reg->CharSet->Ranges.Add(range);
-						break;
-					}
-				default:
-					{
-						SyntaxError err;
-						err.Position = ptr;
-						err.Text = String(L"Illegal escape sequence \'\\") + src[ptr] + L"\'";
-						Errors.Add(err);
-						throw 0;
-					}
-				}
-				ptr ++;
-			}
-			else if (!IsOperator())
-			{
-				RegexCharSet::RegexCharRange range;
-				reg = new RegexCharSetNode();
-				reg->CharSet->Neg = false;
-				range.Begin = src[ptr];
-				range.End = range.Begin;
-				ptr ++;
-				reg->CharSet->Ranges.Add(range);
-			}
-			else
-			{
-				SyntaxError err;
-				err.Position = ptr;
-				err.Text = String(L"Unexpected \'") + src[ptr] + L'\'';
-				Errors.Add(err);
-				throw 0;
-			}
-			content = reg.Release();
-		}
-		if (ptr < src.Length())
-		{
-			if (src[ptr] == L'*')
-			{
-				RefPtr<RegexRepeatNode> node = new RegexRepeatNode();
-				node->Child = content;
-				node->RepeatType = RegexRepeatNode::rtArbitary;
-				ptr ++;
-				return node.Release();
-			}
-			else if (src[ptr] == L'?')
-			{
-				RefPtr<RegexRepeatNode> node = new RegexRepeatNode();
-				node->Child = content;
-				node->RepeatType = RegexRepeatNode::rtOptional;
-				ptr ++;
-				return node.Release();
-			}
-			else if (src[ptr] == L'+')
-			{
-				RefPtr<RegexRepeatNode> node = new RegexRepeatNode();
-				node->Child = content;
-				node->RepeatType = RegexRepeatNode::rtMoreThanOnce;
-				ptr ++;
-				return node.Release();
-			}
-			else if (src[ptr] == L'{')
-			{
-				ptr++;
-				RefPtr<RegexRepeatNode> node = new RegexRepeatNode();
-				node->Child = content;
-				node->RepeatType = RegexRepeatNode::rtSpecified;
-				node->MinRepeat = ParseInteger();
-				if (src[ptr] == L',')
-				{
-					ptr ++;
-					node->MaxRepeat = ParseInteger();
-				}
-				else
-					node->MaxRepeat = node->MinRepeat;
-				if (src[ptr] == L'}')
-					ptr++;
-				else
-				{
-					SyntaxError err;
-					err.Position = ptr;
-					err.Text = L"\'}\' expected.";
-					Errors.Add(err);
-					throw 0;
-				}
-				if (node->MinRepeat < 0)
-				{
-					SyntaxError err;
-					err.Position = ptr;
-					err.Text = L"Minimun repeat cannot be less than 0.";
-					Errors.Add(err);
-					throw 0;
-				}
-				if (node->MaxRepeat != -1 && node->MaxRepeat < node->MinRepeat)
-				{
-					SyntaxError err;
-					err.Position = ptr;
-					err.Text = L"Max repeat cannot be less than min repeat.";
-					Errors.Add(err);
-					throw 0;
-				}
-				return node.Release();
-			}
-		}
-		return content.Release();
-	}
-
-	bool IsDigit(wchar_t ch)
-	{
-		return ch>=L'0'&& ch <=L'9';
-	}
-
-	int RegexParser::ParseInteger()
-	{
-		StringBuilder number;
-		while (IsDigit(src[ptr]))
-		{
-			number.Append(src[ptr]);
-			ptr ++;
-		}
-		if (number.Length() == 0)
-			return -1;
-		else
-			return StringToInt(number.ProduceString());
-	}
-
-	bool RegexParser::IsOperator()
-	{
-		return (src[ptr] == L'|' || src[ptr] == L'*' || src[ptr] == L'(' || src[ptr] == L')'
-				|| src[ptr] == L'?' || src[ptr] == L'+');
-	}
-
-	wchar_t RegexParser::ReadNextCharInCharSet()
-	{
-		if (ptr < src.Length() && src[ptr] != L']')
-		{
-			if (src[ptr] == L'\\')
-			{
-				ptr ++;
-				if (ptr >= src.Length())
-				{
-					SyntaxError err;
-					err.Position = ptr;
-					err.Text = String(L"Unexpected end of char-set when looking for escape sequence.");
-					Errors.Add(err);
-					throw 0;
-				}
-				wchar_t rs = 0;
-				if (src[ptr] == L'\\')
-					rs = L'\\';
-				else if (src[ptr] == L'^')
-					rs = L'^';
-				else if (src[ptr] == L'-')
-					rs = L'-';
-				else if (src[ptr] == L']')
-					rs = L']';
-				else if (src[ptr] == L'n')
-					rs = L'\n';
-				else if (src[ptr] == L't')
-					rs = L'\t';
-				else if (src[ptr] == L'r')
-					rs = L'\r';
-				else if (src[ptr] == L'v')
-					rs = L'\v';
-				else if (src[ptr] == L'f')
-					rs = L'\f';
-				else
-				{
-					SyntaxError err;
-					err.Position = ptr;
-					err.Text = String(L"Illegal escape sequence inside charset definition \'\\") + src[ptr] + L"\'";
-					Errors.Add(err);
-					throw 0;
-				}
-				ptr ++;
-				return rs;
-			}
-			else
-				return src[ptr++];
-		}
-		else
-		{
-			SyntaxError err;
-			err.Position = ptr;
-			err.Text = String(L"Unexpected end of char-set.");
-			Errors.Add(err);
-			throw 0;
-		}
-	}
-
-	RegexCharSet * RegexParser::ParseCharSet()
-	{
-		RefPtr<RegexCharSet> rs = new RegexCharSet();
-		if (src[ptr] == L'^')
-		{
-			rs->Neg = true;
-			ptr ++;
-		}
-		else
-			rs->Neg = false;
-		RegexCharSet::RegexCharRange range;
-		while (ptr < src.Length() && src[ptr] != L']')
-		{
-			range.Begin = ReadNextCharInCharSet();
-			//ptr ++;
-			
-			if (ptr >= src.Length())
-			{
-				break;
-			}
-			if (src[ptr] == L'-')
-			{
-				ptr ++;
-				range.End = ReadNextCharInCharSet();	
-			}
-			else
-			{
-				range.End = range.Begin;
-			}
-			rs->Ranges.Add(range);
-		
-		}
-		if (ptr >=src.Length() || src[ptr] != L']')
-		{
-			SyntaxError err;
-			err.Position = ptr;
-			err.Text = String(L"Unexpected end of char-set.");
-			Errors.Add(err);
-			throw 0;
-		}
-		return rs.Release();
-	}
-}
-}
-#endif
-
-/***********************************************************************
-CORELIB\REGEX\REGEXTREE.CPP
-***********************************************************************/
-#ifndef SPIRE_NO_CORE_LIB
-
-namespace CoreLib
-{
-namespace Text
-{
-	void RegexNodeVisitor::VisitCharSetNode(RegexCharSetNode * )
-	{
-	}
-
-	void RegexNodeVisitor::VisitRepeatNode(RegexRepeatNode * )
-	{
-
-	}
-
-	void RegexNodeVisitor::VisitSelectionNode(RegexSelectionNode * )
-	{
-	}
-
-	void RegexNodeVisitor::VisitConnectionNode(RegexConnectionNode * )
-	{
-
-	}
-
-	void RegexCharSetNode::Accept(RegexNodeVisitor * visitor)
-	{
-		visitor->VisitCharSetNode(this);
-	}
-
-	void RegexSelectionNode::Accept(RegexNodeVisitor * visitor)
-	{
-		visitor->VisitSelectionNode(this);
-	}
-
-	void RegexConnectionNode::Accept(RegexNodeVisitor * visitor)
-	{
-		visitor->VisitConnectionNode(this);
-	}
-
-	void RegexRepeatNode::Accept(RegexNodeVisitor *visitor)
-	{
-		visitor->VisitRepeatNode(this);
-	}
-
-	String RegexConnectionNode::Reinterpret()
-	{
-		return LeftChild->Reinterpret() + RightChild->Reinterpret();
-	}
-
-	String RegexSelectionNode::Reinterpret()
-	{
-		return LeftChild->Reinterpret() + L"|" + RightChild->Reinterpret();
-	}
-
-	String RegexRepeatNode::Reinterpret()
-	{
-		wchar_t t;
-		if (RepeatType == RegexRepeatNode::rtArbitary)
-			t = L'*';
-		else if (RepeatType == rtOptional)
-			t = L'?';
-		else
-			t = L'+';
-		return String(L"(") + Child->Reinterpret() + L")" + t;
-	}
-
-	String RegexCharSet::Reinterpret()
-	{
-		if (Ranges.Count()== 1 && Ranges[0].Begin == Ranges[0].End &&
-			!Neg)
-		{
-			return (Ranges[0].Begin>=28 && Ranges[0].Begin <127)? String((wchar_t)Ranges[0].Begin):
-				String(L"<") + String((int)Ranges[0].Begin) + String(L">");
-		}
-		else
-		{
-			StringBuilder rs;
-			rs.Append(L"[");
-			if (Neg)
-				rs.Append(L'^');
-			for (int i=0; i<Ranges.Count(); i++)
-			{
-				if (Ranges[i].Begin == Ranges[i].End)
-					rs.Append(Ranges[i].Begin);
-				else
-				{
-					rs.Append(Ranges[i].Begin>=28 && Ranges[i].Begin<128?Ranges[i].Begin:
-						String(L"<") + String((int)Ranges[i].Begin) + L">");
-					rs.Append(L'-');
-					rs.Append(Ranges[i].End>=28 && Ranges[i].End<128?Ranges[i].End:
-						String(L"<") + String((int)Ranges[i].End)+ L">");
-				}
-			}
-			rs.Append(L']');
-			return rs.ProduceString();
-		}
-	}
-
-	String RegexCharSetNode::Reinterpret()
-	{
-		return CharSet->Reinterpret();
-	}
-
-	void RegexCharSet::Sort()
-	{
-		for (int i=0; i<Ranges.Count()-1; i++)
-		{
-			for (int j=i+1; j<Ranges.Count(); j++)
-			{
-				RegexCharRange ri,rj;
-				ri = Ranges[i];
-				rj = Ranges[j];
-				if (Ranges[i].Begin > Ranges[j].Begin)
-				{
-					RegexCharRange range = Ranges[i];
-					Ranges[i] = Ranges[j];
-					Ranges[j] = range;
-				}
-			}
-		}
-	}
-
-	void RegexCharSet::Normalize()
-	{
-		for (int i=0; i<Ranges.Count()-1; i++)
-		{
-			for (int j=i+1; j<Ranges.Count(); j++)
-			{
-				if ((Ranges[i].Begin >= Ranges[j].Begin && Ranges[i].Begin <= Ranges[j].End) ||
-					(Ranges[j].Begin >= Ranges[i].Begin && Ranges[j].Begin <= Ranges[i].End) )
-				{
-					Ranges[i].Begin = Math::Min(Ranges[i].Begin, Ranges[j].Begin);
-					Ranges[i].End = Math::Max(Ranges[i].End, Ranges[j].End);
-					Ranges.RemoveAt(j);
-					j--;
-				}
-			}
-		}
-		Sort();
-		if (Neg)
-		{
-			List<RegexCharRange> nranges;
-			nranges.AddRange(Ranges);
-			Ranges.Clear();
-			RegexCharRange range;
-			range.Begin = 1;
-			for (int i=0; i<nranges.Count(); i++)
-			{
-				range.End = nranges[i].Begin-1;
-				Ranges.Add(range);
-				range.Begin = nranges[i].End+1;
-			}
-			range.End = 65530;
-			Ranges.Add(range);
-			Neg = false;
-		}
-	}
-
-	bool RegexCharSet::Contains(RegexCharRange r)
-	{
-		for (int i=0; i<Ranges.Count(); i++)
-		{
-			if (r.Begin >= Ranges[i].Begin && r.End <= Ranges[i].End)
-				return true;
-		}
-		return false;
-	}
-
-	void RegexCharSet::RangeIntersection(RegexCharRange r1, RegexCharRange r2, RegexCharSet & rs)
-	{
-		RegexCharRange r;
-		r.Begin = Math::Max(r1.Begin,r2.Begin);
-		r.End = Math::Min(r1.End, r2.End);
-		if (r.Begin <= r.End)
-			rs.Ranges.Add(r);
-	}
-	
-	void RegexCharSet::RangeMinus(RegexCharRange r1, RegexCharRange r2, RegexCharSet & rs)
-	{
-		if (r2.Begin <= r1.Begin && r2.End>= r1.Begin && r2.End <= r1.End)
-		{
-			RegexCharRange r;
-			r.Begin = ((int)r2.End + 1)>0xFFFF?0xFFFF:r2.End+1;
-			r.End = r1.End;
-			if (r.Begin <= r.End && !(r.Begin == r.End && r.Begin == 65530))
-				rs.Ranges.Add(r);
-		}
-		else if (r2.Begin >= r1.Begin && r2.Begin <= r1.End && r2.End >= r1.End)
-		{
-			RegexCharRange r;
-			r.Begin = r1.Begin;
-			r.End = r2.Begin == 1? 1: r2.Begin - 1;
-			if (r.Begin <= r.End && !(r.Begin == r.End == 1))
-				rs.Ranges.Add(r);
-		}
-		else if (r2.Begin >= r1.Begin && r2.End <= r1.End)
-		{
-			RegexCharRange r;
-			r.Begin = r1.Begin;
-			r.End = r2.Begin == 1? 1: r2.Begin - 1;
-			if (r.Begin <= r.End && !(r.Begin == r.End && r.Begin  == 1))
-				rs.Ranges.Add(r);
-			r.Begin = r2.End == 0xFFFF? r2.End : r2.End + 1;
-			r.End = r1.End;
-			if (r.Begin <= r.End && !(r.Begin == r.End && r.Begin  == 65530))
-				rs.Ranges.Add(r);
-		}
-		else if (r2.End<r1.Begin || r1.End < r2.Begin)
-		{
-			rs.Ranges.Add(r1);
-		}
-	}
-
-	void RegexCharSet::CharSetMinus(RegexCharSet & s1, RegexCharSet & s2)
-	{
-		RegexCharSet s;
-		for (int i=0; i<s1.Ranges.Count(); i++)
-		{
-			for (int j=0; j<s2.Ranges.Count(); j++)
-			{
-				if (i>=s1.Ranges.Count() || i<0)
-					return;
-				s.Ranges.Clear();
-				RangeMinus(s1.Ranges[i], s2.Ranges[j], s);
-				if (s.Ranges.Count() == 1)
-					s1.Ranges[i] = s.Ranges[0];
-				else if (s.Ranges.Count() == 2)
-				{
-					s1.Ranges[i] = s.Ranges[0];
-					s1.Ranges.Add(s.Ranges[1]);
-				}
-				else
-				{
-					s1.Ranges.RemoveAt(i);
-					i--;
-				}
-			}
-		}
-	}
-
-	RegexCharSet & RegexCharSet::operator = (const RegexCharSet & set)
-	{
-		CopyCtor(set);
-		return *this;
-	}
-
-	bool RegexCharSet::RegexCharRange::operator == (const RegexCharRange & r)
-	{
-		return r.Begin == Begin && r.End == End;
-	}
-
-	void RegexCharSet::AddRange(RegexCharRange newR)
-	{
-		//RegexCharSet set;
-		//set.Ranges.Add(r);
-		//for (int i=0; i<Ranges.Count(); i++)
-		//{
-		//	if (Ranges[i].Begin < r.Begin && Ranges[i].End > r.Begin)
-		//	{
-		//		RegexCharRange nrange;
-		//		nrange.Begin = r.Begin;
-		//		nrange.End = Ranges[i].End;
-		//		Ranges[i].End = r.Begin == 1? 1:r.Begin-1;
-		//		if (!Ranges.Contains(nrange))
-		//			Ranges.Add(nrange);
-		//	}
-		//	if (r.End > Ranges[i].Begin && r.End < Ranges[i].End)
-		//	{
-		//		RegexCharRange nrange;
-		//		nrange.Begin = r.End == 0xFFFF ? 0xFFFF : r.End+1;
-		//		nrange.End = Ranges[i].End;
-		//		Ranges[i].End = r.End;
-		//		if (!Ranges.Contains(nrange))
-		//			Ranges.Add(nrange);
-		//	}
-		//	if (r.Begin == Ranges[i].Begin && r.End == Ranges[i].End)
-		//		return;
-		//}
-		//for (int i=0; i<Ranges.Count(); i++)
-		//	set.SubtractRange(Ranges[i]);
-		//for (int i=0; i<set.Ranges.Count(); i++)
-		//{
-		//	for (int j=0; j<Ranges.Count(); j++)
-		//		if (Ranges[j].Begin == set.Ranges[i].Begin ||
-		//			Ranges[j].Begin == set.Ranges[i].End ||
-		//			Ranges[j].End == set.Ranges[i].End||
-		//			Ranges[j].End == set.Ranges[i].Begin)
-		//		{
-		//			RegexCharRange sr = set.Ranges[i];
-		//			RegexCharRange r = Ranges[j];
-		//			throw 0;
-		//		}
-		//	if (!Ranges.Contains(set.Ranges[i]))
-		//		Ranges.Add(set.Ranges[i]);
-		//}
-		//Normalize();
-		if (newR.Begin > newR.End)
-			return;
-		Sort();
-		int rangeCount = Ranges.Count();
-		for (int i=0; i<rangeCount; i++)
-		{
-			RegexCharRange & oriR = Ranges[i];
-			if (newR.Begin > oriR.Begin)
-			{
-				if (newR.Begin > oriR.End)
-				{
-
-				}
-				else if (newR.End > oriR.End)
-				{
-					RegexCharRange nRange;
-					nRange.Begin = newR.Begin;
-					nRange.End = oriR.End;
-					wchar_t newR_begin = newR.Begin;
-					newR.Begin = oriR.End + 1;
-					oriR.End = newR_begin-1;
-					Ranges.Add(nRange);
-				}
-				else if (newR.End == oriR.End)
-				{
-					oriR.End = newR.Begin - 1;
-					Ranges.Add(newR);
-					return;
-				}
-				else if (newR.End < oriR.End)
-				{
-					RegexCharRange nRange;
-					nRange.Begin = newR.End + 1;
-					nRange.End = oriR.End;
-					oriR.End = newR.Begin - 1;
-					Ranges.Add(newR);
-					Ranges.Add(nRange);
-					return;
-				}
-			}
-			else if (newR.Begin == oriR.Begin)
-			{
-				if (newR.End > oriR.End)
-				{
-					newR.Begin = oriR.End + 1;
-				}
-				else if (newR.End == oriR.End)
-				{
-					return;
-				}
-				else
-				{
-					wchar_t oriR_end = oriR.End;
-					oriR.End = newR.End;
-					newR.End = oriR_end;
-					newR.Begin = oriR.End + 1;
-					Ranges.Add(newR);
-					return;
-				}
-			}
-			else if (newR.Begin < oriR.Begin)
-			{
-				if (newR.End > oriR.End)
-				{
-					RegexCharRange nRange;
-					nRange.Begin = newR.Begin;
-					nRange.End = oriR.Begin-1;
-					Ranges.Add(nRange);
-					newR.Begin = oriR.Begin;
-					i--;
-				}
-				else if (newR.End == oriR.End)
-				{
-					RegexCharRange nRange;
-					nRange.Begin = newR.Begin;
-					nRange.End = oriR.Begin-1;
-					Ranges.Add(nRange);
-					return;
-				}
-				else if (newR.End < oriR.End && newR.End >= oriR.Begin)
-				{
-					RegexCharRange nRange;
-					nRange.Begin = newR.Begin;
-					nRange.End = oriR.Begin-1;
-					Ranges.Add(nRange);
-					nRange.Begin = newR.End+1;
-					nRange.End = oriR.End;
-					Ranges.Add(nRange);
-					oriR.End = newR.End;
-					return;
-				}
-				else
-					break;
-			}
-		}
-		Ranges.Add(newR);
-		
-	}
-
-	void RegexCharSet::SubtractRange(RegexCharRange r)
-	{
-		
-		int rc = Ranges.Count();
-		for (int i=0; i<rc; i++)
-		{
-			RegexCharSet rs;
-			RangeMinus(Ranges[i], r, rs);
-			if (rs.Ranges.Count() == 1)
-				Ranges[i] = rs.Ranges[0];
-			else if (rs.Ranges.Count() == 0)
-			{
-				Ranges.RemoveAt(i);
-				i--;
-				rc--;
-			}
-			else
-			{
-				Ranges[i] = rs.Ranges[0];
-				Ranges.Add(rs.Ranges[1]);
-			}
-		}
-		Normalize();
-	}
-
-	void RegexCharSet::CalcCharElementFromPair(RegexCharSet * c1, RegexCharSet * c2, RegexCharSet & AmB, RegexCharSet & BmA, RegexCharSet & AnB)
-	{
-		AmB = *c1;
-		BmA = *c2;
-		CharSetMinus(AmB, *c2);
-		CharSetMinus(BmA, *c1);
-		for (int i=0; i<c1->Ranges.Count(); i++)
-		{
-			if (c2->Ranges.Count())
-			{
-				for (int j=0; j<c2->Ranges.Count(); j++)
-				{
-					RangeIntersection(c1->Ranges[i], c2->Ranges[j], AnB);
-				}
-			}
-		}
-		AmB.Normalize();
-		BmA.Normalize();
-		AnB.Normalize();
-	}
-
-	bool RegexCharSet::operator ==(const RegexCharSet & set)
-	{
-		if (Ranges.Count() != set.Ranges.Count())
-			return false;
-		for (int i=0; i<Ranges.Count(); i++)
-		{
-			if (Ranges[i].Begin != set.Ranges[i].Begin ||
-				Ranges[i].End != set.Ranges[i].End)
-				return false;
-		}
-		return true;
-	}
-
-	void RegexCharSet::InsertElement(List<RefPtr<RegexCharSet>> &L, RefPtr<RegexCharSet> & elem)
-	{
-		bool find = false;
-		for (int i=0; i<L.Count(); i++)
-		{
-			if ((*L[i]) == *elem)
-			{
-				for (int k=0; k<elem->OriSet.Count(); k++)
-				{
-					if (!L[i]->OriSet.Contains(elem->OriSet[k]))
-						L[i]->OriSet.Add(elem->OriSet[k]);
-				}
-				find = true;
-				break;
-			}
-		}
-		if (!find)
-			L.Add(elem);
-	}
-
-	void RegexCharSet::CalcCharElements(List<RegexCharSet *> &sets, List<RegexCharRange> & elements)
-	{
-		RegexCharSet set;
-		for (int i=0; i<sets.Count(); i++)
-			for (int j=0; j<sets[i]->Ranges.Count(); j++)
-				set.AddRange(sets[i]->Ranges[j]);
-		for (int j=0; j<set.Ranges.Count(); j++)
-		{
-			for (int i=0; i<sets.Count(); i++)
-			{
-				if (sets[i]->Contains(set.Ranges[j]))
-					sets[i]->Elements.Add((unsigned short)j);
-			}
-			elements.Add(set.Ranges[j]);
-		}
-		/*
-		List<RefPtr<RegexCharSet>> L;
-		if (!sets.Count())
-			return;
-		int lastSetCount = sets.Count();
-		for (int i=0; i<sets.Count(); i++)
-			sets[i]->OriSet.Add(sets[i]);
-		L.Add(new RegexCharSet(*(sets[0])));
-		for (int i=1; i<sets.Count(); i++)
-		{
-			RefPtr<RegexCharSet> bma = new RegexCharSet(*sets[i]);
-			bma->OriSet = sets[i]->OriSet;
-			for (int j=L.Count()-1; j>=0; j--)
-			{
-				RefPtr<RegexCharSet> bma2 = new RegexCharSet();
-				RefPtr<RegexCharSet> amb = new RegexCharSet();
-				RefPtr<RegexCharSet> anb = new RegexCharSet();
-				CalcCharElementFromPair(L[j].operator ->(), sets[i], *amb, *bma2, *anb);
-				CharSetMinus(*bma, *L[j]);
-				L[j]->Normalize();
-				amb->OriSet = L[j]->OriSet;
-				anb->OriSet = amb->OriSet;
-				for (int k=0; k<bma->OriSet.Count(); k++)
-				{
-					if (!anb->OriSet.Contains(bma->OriSet[k]))
-						anb->OriSet.Add(bma->OriSet[k]);
-				}
-				if (amb->Ranges.Count())
-				{
-					L[j] = amb;
-				}
-				else
-				{
-					L[j] = 0;
-					L.RemoveAt(j);
-				}
-				if (anb->Ranges.Count())
-				{
-					InsertElement(L,anb);
-				}
-			}
-			if (bma->Ranges.Count())
-			{
-				InsertElement(L,bma);
-			}
-
-		}
-		for (int i=0; i<L.Count(); i++)
-		{
-			for (int j=0; j<L[i]->OriSet.Count(); j++)
-			{
-				L[i]->OriSet[j]->Elements.Add(i);
-			}
-			elements.Add(L[i].Release());
-		}
-		for (int i=lastSetCount; i<sets.Count(); i++)
-			RemoveAt sets[i];
-		sets.SetSize(lastSetCount);
-
-		*/
-	}
-
-	void RegexCharSet::CopyCtor(const RegexCharSet & set)
-	{
-		Ranges = set.Ranges;
-		Elements = set.Elements;
-		Neg = set.Neg;
-		OriSet = set.OriSet;
-	}
-
-	RegexCharSet::RegexCharSet(const RegexCharSet & set)
-	{
-		CopyCtor(set);
-	}
-
-
-}
 }
 #endif

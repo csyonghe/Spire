@@ -8,7 +8,7 @@
 //
 
 #include "CodeGenBackend.h"
-#include "../CoreLib/Parser.h"
+#include "../CoreLib/Tokenizer.h"
 #include "Syntax.h"
 #include "Naming.h"
 

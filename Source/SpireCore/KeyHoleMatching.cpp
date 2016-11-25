@@ -1,11 +1,11 @@
 #include "IL.h"
-#include "../CoreLib/Parser.h"
+#include "../CoreLib/Tokenizer.h"
 
 namespace Spire
 {
 	namespace Compiler
 	{
-		RefPtr<KeyHoleNode> ParseInternal(CoreLib::Text::Parser & parser)
+		RefPtr<KeyHoleNode> ParseInternal(CoreLib::Text::TokenReader & parser)
 		{
 			RefPtr<KeyHoleNode> result = new KeyHoleNode();
 			result->NodeType = parser.ReadWord();
@@ -34,7 +34,7 @@ namespace Spire
 
 		RefPtr<KeyHoleNode> KeyHoleNode::Parse(String format)
 		{
-			CoreLib::Text::Parser parser(format);
+			CoreLib::Text::TokenReader parser(format);
 			return ParseInternal(parser);
 		}
 

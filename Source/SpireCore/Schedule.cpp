@@ -17,7 +17,7 @@ namespace Spire
 			{
 				if (pos >= tokens.Count())
 				{
-					errors.Add(CompileError(String(L"\"") + string + String(L"\" expected but end of file encountered."), 0, CodePosition(0, 0, fileName)));
+					errors.Add(CompileError(String(L"\"") + string + String(L"\" expected but end of file encountered."), 0, CodePosition(0, 0, 0, fileName)));
 					throw 0;
 				}
 				else if (tokens[pos].Content != string)
@@ -32,7 +32,7 @@ namespace Spire
 			{
 				if (pos >= tokens.Count())
 				{
-					errors.Add(CompileError(TokenTypeToString(type) + String(L" expected but end of file encountered."), 0, CodePosition(0, 0, fileName)));
+					errors.Add(CompileError(TokenTypeToString(type) + String(L" expected but end of file encountered."), 0, CodePosition(0, 0, 0, fileName)));
 					throw 0;
 				}
 				else if (tokens[pos].Type != type)
@@ -47,7 +47,7 @@ namespace Spire
 			{
 				if (pos >= tokens.Count())
 				{
-					errors.Add(CompileError(String(L"\'") + string + String(L"\' expected but end of file encountered."), 0, CodePosition(0, 0, fileName)));
+					errors.Add(CompileError(String(L"\'") + string + String(L"\' expected but end of file encountered."), 0, CodePosition(0, 0, 0, fileName)));
 					return false;
 				}
 				else

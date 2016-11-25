@@ -4,7 +4,7 @@
 #include "StringObject.h"
 #include "Naming.h"
 #include "TypeTranslation.h"
-#include "../CoreLib/Parser.h"
+#include "../CoreLib/Tokenizer.h"
 #include <assert.h>
 
 namespace Spire

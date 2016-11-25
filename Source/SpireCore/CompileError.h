@@ -2,13 +2,14 @@
 #define RASTER_RENDERER_COMPILE_ERROR_H
 
 #include "../CoreLib/Basic.h"
-#include "CodePosition.h"
+#include "../CoreLib/Tokenizer.h"
 
 namespace Spire
 {
 	namespace Compiler
 	{
 		using namespace CoreLib::Basic;
+		using namespace CoreLib::Text;
 
 		class CompileError
 		{

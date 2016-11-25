@@ -142,7 +142,7 @@ int wmain(int argc, wchar_t* argv[])
 				catch (Exception &)
 				{
 					result.GetErrorWriter()->Error(4, L"cannot write output file \'" + Path::Combine(outputDir, f.MetaData.ShaderName + L".cse") + L"\'.",
-						CodePosition(0, 0, L""));
+						CodePosition(0, 0, 0, L""));
 				}
 			}
 		}

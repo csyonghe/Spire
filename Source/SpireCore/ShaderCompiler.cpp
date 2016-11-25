@@ -9,7 +9,7 @@
 #include "StdInclude.h"
 #include "Schedule.h"
 #include "CodeGenBackend.h"
-#include "../CoreLib/Parser.h"
+#include "../CoreLib/Tokenizer.h"
 #include "Closure.h"
 #include "VariantIR.h"
 
@@ -46,7 +46,7 @@ namespace Spire
 								{
 									if (attrib.Value.StartsWith(L"%"))
 									{
-										CoreLib::Text::Parser parser(attrib.Value.SubString(1, attrib.Value.Length() - 1));
+										CoreLib::Text::TokenReader parser(attrib.Value.SubString(1, attrib.Value.Length() - 1));
 										auto compName = parser.ReadWord();
 										parser.Read(L".");
 										auto compAttrib = parser.ReadWord();

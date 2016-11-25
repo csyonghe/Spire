@@ -2,7 +2,7 @@
 #include "../CoreLib/LibIO.h"
 #include "Syntax.h"
 #include "CompiledProgram.h"
-#include "../CoreLib/Parser.h"
+#include "../CoreLib/Tokenizer.h"
 
 namespace Spire
 {
@@ -10,7 +10,7 @@ namespace Spire
 	{
 		using namespace CoreLib::IO;
 
-		RefPtr<ILType> BaseTypeFromString(CoreLib::Text::Parser & parser)
+		RefPtr<ILType> BaseTypeFromString(CoreLib::Text::TokenReader & parser)
 		{
 			if (parser.LookAhead(L"int"))
 				return new ILBasicType(ILBaseType::Int);
@@ -53,7 +53,7 @@ namespace Spire
 			return nullptr;
 		}
 
-		RefPtr<ILType> TypeFromString(CoreLib::Text::Parser & parser)
+		RefPtr<ILType> TypeFromString(CoreLib::Text::TokenReader & parser)
 		{
 			auto result = BaseTypeFromString(parser);
 			parser.ReadToken();
