@@ -5050,6 +5050,31 @@ namespace CoreLib
 			{}
 		};
 
+		inline bool IsLetter(wchar_t ch)
+		{
+			return ((ch >= L'a' && ch <= L'z') ||
+				(ch >= L'A' && ch <= L'Z') || ch == L'_' || ch == L'#');
+		}
+
+		inline bool IsDigit(wchar_t ch)
+		{
+			return ch >= L'0' && ch <= L'9';
+		}
+
+		inline bool IsPunctuation(wchar_t ch)
+		{
+			return  ch == L'+' || ch == L'-' || ch == L'*' || ch == L'/' || ch == L'%' ||
+				ch == L'!' || ch == L'^' || ch == L'&' || ch == L'(' || ch == L')' ||
+				ch == L'=' || ch == L'{' || ch == L'}' || ch == L'[' || ch == L']' ||
+				ch == L'|' || ch == L';' || ch == L',' || ch == L'.' || ch == L'<' ||
+				ch == L'>' || ch == L'~' || ch == L'@' || ch == L':' || ch == L'?';
+		}
+
+		inline bool IsWhiteSpace(wchar_t ch)
+		{
+			return (ch == L' ' || ch == L'\t' || ch == L'\n' || ch == L'\r' || ch == L'\v');
+		}
+
 		class CodePosition
 		{
 		public:
@@ -17192,7 +17217,7 @@ namespace Spire
 
 			void PrintStandardArrayInputReference(StringBuilder& sb, ILRecordType* recType, String inputName, String componentName) override
 			{
-				PrintStandardArrayInputReference(sb, recType, inputName, componentName);
+				PrintStandardInputReference(sb, recType, inputName, componentName);
 			}
 
 			void PrintPatchInputReference(StringBuilder& sb, ILRecordType* recType, String inputName, String componentName) override
@@ -17208,7 +17233,7 @@ namespace Spire
 				sb << declName;
 			}
 
-			void PrintSystemVarReference(CodeGenContext & ctx, StringBuilder& sb, String inputName, ExternComponentCodeGenInfo::SystemVarType systemVar) override
+			void PrintSystemVarReference(CodeGenContext & /*ctx*/, StringBuilder& sb, String inputName, ExternComponentCodeGenInfo::SystemVarType systemVar) override
 			{
 				switch(systemVar)
 				{
@@ -33801,26 +33826,6 @@ namespace CoreLib
 		{
 			None, Line, File
 		};
-
-		bool IsLetter(wchar_t ch)
-		{
-			return ((ch >= L'a' && ch <= L'z') ||
-				(ch >= L'A' && ch <= L'Z') || ch == L'_' || ch == L'#');
-		}
-
-		bool IsDigit(wchar_t ch)
-		{
-			return ch >= L'0' && ch <= L'9';
-		}
-
-		bool IsPunctuation(wchar_t ch)
-		{
-			return  ch == L'+' || ch == L'-' || ch == L'*' || ch == L'/' || ch == L'%' ||
-				ch == L'!' || ch == L'^' || ch == L'&' || ch == L'(' || ch == L')' ||
-				ch == L'=' || ch == L'{' || ch == L'}' || ch == L'[' || ch == L']' ||
-				ch == L'|' || ch == L';' || ch == L',' || ch == L'.' || ch == L'<' ||
-				ch == L'>' || ch == L'~' || ch == L'@' || ch == L':' || ch == L'?';
-		}
 
 		void ParseOperators(const String & str, List<Token> & tokens, int line, int col, String fileName)
 		{

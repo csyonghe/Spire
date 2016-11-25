@@ -68,7 +68,7 @@ namespace Spire
 
 			void PrintStandardArrayInputReference(StringBuilder& sb, ILRecordType* recType, String inputName, String componentName) override
 			{
-				PrintStandardArrayInputReference(sb, recType, inputName, componentName);
+				PrintStandardInputReference(sb, recType, inputName, componentName);
 			}
 
 			void PrintPatchInputReference(StringBuilder& sb, ILRecordType* recType, String inputName, String componentName) override
@@ -84,7 +84,7 @@ namespace Spire
 				sb << declName;
 			}
 
-			void PrintSystemVarReference(CodeGenContext & ctx, StringBuilder& sb, String inputName, ExternComponentCodeGenInfo::SystemVarType systemVar) override
+			void PrintSystemVarReference(CodeGenContext & /*ctx*/, StringBuilder& sb, String inputName, ExternComponentCodeGenInfo::SystemVarType systemVar) override
 			{
 				switch(systemVar)
 				{
