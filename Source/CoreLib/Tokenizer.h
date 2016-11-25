@@ -15,6 +15,31 @@ namespace CoreLib
 			{}
 		};
 
+		inline bool IsLetter(wchar_t ch)
+		{
+			return ((ch >= L'a' && ch <= L'z') ||
+				(ch >= L'A' && ch <= L'Z') || ch == L'_' || ch == L'#');
+		}
+
+		inline bool IsDigit(wchar_t ch)
+		{
+			return ch >= L'0' && ch <= L'9';
+		}
+
+		inline bool IsPunctuation(wchar_t ch)
+		{
+			return  ch == L'+' || ch == L'-' || ch == L'*' || ch == L'/' || ch == L'%' ||
+				ch == L'!' || ch == L'^' || ch == L'&' || ch == L'(' || ch == L')' ||
+				ch == L'=' || ch == L'{' || ch == L'}' || ch == L'[' || ch == L']' ||
+				ch == L'|' || ch == L';' || ch == L',' || ch == L'.' || ch == L'<' ||
+				ch == L'>' || ch == L'~' || ch == L'@' || ch == L':' || ch == L'?';
+		}
+
+		inline bool IsWhiteSpace(wchar_t ch)
+		{
+			return (ch == L' ' || ch == L'\t' || ch == L'\n' || ch == L'\r' || ch == L'\v');
+		}
+
 		class CodePosition
 		{
 		public:
