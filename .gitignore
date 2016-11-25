@@ -2,3 +2,11 @@ DebugClang/
 *.user
 autotuneLog.txt
 LibraryRelease/CodePack.exe
+*.exe
+*.exe.config
+*.exe.manifest
+*.pdb
+.vs
+*.VC.opendb
+*.VC.db
+*.spire.actual
