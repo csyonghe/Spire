@@ -3,8 +3,8 @@
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
 
 <Type Name="CoreLib::Basic::String">
-    <DisplayString>{buffer.pointer,su}</DisplayString>
-	<StringView>buffer.pointer,su</StringView>
+    <DisplayString>{buffer.pointer,s}</DisplayString>
+	<StringView>buffer.pointer,s</StringView>
 </Type>
 
 <Type Name="CoreLib::Basic::ArrayView&lt;*&gt;">

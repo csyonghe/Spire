@@ -44,55 +44,55 @@ namespace Spire
 			switch (BaseType)
 			{
 			case Compiler::BaseType::Int:
-				res.Append(L"int");
+				res.Append("int");
 				break;
 			case Compiler::BaseType::UInt:
-				res.Append(L"uint");
+				res.Append("uint");
 				break;
 			case Compiler::BaseType::Bool:
-				res.Append(L"bool");
+				res.Append("bool");
 				break;
 			case Compiler::BaseType::Float:
-				res.Append(L"float");
+				res.Append("float");
 				break;
 			case Compiler::BaseType::Int2:
-				res.Append(L"ivec2");
+				res.Append("ivec2");
 				break;
 			case Compiler::BaseType::UInt2:
-				res.Append(L"uvec2");
+				res.Append("uvec2");
 				break;
 			case Compiler::BaseType::Float2:
-				res.Append(L"vec2");
+				res.Append("vec2");
 				break;
 			case Compiler::BaseType::Int3:
-				res.Append(L"ivec3");
+				res.Append("ivec3");
 				break;
 			case Compiler::BaseType::UInt3:
-				res.Append(L"uvec3");
+				res.Append("uvec3");
 				break;
 			case Compiler::BaseType::Float3:
-				res.Append(L"vec3");
+				res.Append("vec3");
 				break;
 			case Compiler::BaseType::Int4:
-				res.Append(L"ivec4");
+				res.Append("ivec4");
 				break;
 			case Compiler::BaseType::UInt4:
-				res.Append(L"uvec4");
+				res.Append("uvec4");
 				break;
 			case Compiler::BaseType::Float4:
-				res.Append(L"vec4");
+				res.Append("vec4");
 				break;
 			case Compiler::BaseType::Float3x3:
-				res.Append(L"mat3");
+				res.Append("mat3");
 				break;
 			case Compiler::BaseType::Float4x4:
-				res.Append(L"mat4");
+				res.Append("mat4");
 				break;
 			case Compiler::BaseType::Texture2D:
-				res.Append(L"sampler2D");
+				res.Append("sampler2D");
 				break;
 			case Compiler::BaseType::TextureCube:
-				res.Append(L"samplerCube");
+				res.Append("samplerCube");
 				break;
 			case Compiler::BaseType::Function:
 				res.Append(Func->SyntaxNode->InternalName);
@@ -107,7 +107,7 @@ namespace Spire
 				res.Append(RecordTypeName);
 				break;
 			case Compiler::BaseType::Error:
-				res.Append(L"<errtype>");
+				res.Append("<errtype>");
 				break;
 			default:
 				break;
@@ -626,9 +626,9 @@ namespace Spire
 		CoreLib::Basic::String ArrayExpressionType::ToString() const
 		{
 			if (ArrayLength > 0)
-				return BaseType->ToString() + L"[" + String(ArrayLength) + L"]";
+				return BaseType->ToString() + "[" + String(ArrayLength) + "]";
 			else
-				return BaseType->ToString() + L"[]";
+				return BaseType->ToString() + "[]";
 		}
 		ExpressionType * ArrayExpressionType::Clone()
 		{
@@ -665,7 +665,7 @@ namespace Spire
 		}
 		CoreLib::Basic::String GenericExpressionType::ToString() const
 		{
-			return GenericTypeName + L"<" + BaseType->ToString() + L">";
+			return GenericTypeName + "<" + BaseType->ToString() + ">";
 		}
 		ExpressionType * GenericExpressionType::Clone()
 		{
@@ -707,64 +707,64 @@ namespace Spire
 			{
 			case Operator::Add:
 			case Operator::AddAssign:
-				return L"+";
+				return "+";
 			case Operator::Sub:
 			case Operator::SubAssign:
-				return L"-";
+				return "-";
 			case Operator::Neg:
-				return L"-";
+				return "-";
 			case Operator::Not:
-				return L"!";
+				return "!";
 			case Operator::BitNot:
-				return L"~";
+				return "~";
 			case Operator::PreInc:
 			case Operator::PostInc:
-				return L"++";
+				return "++";
 			case Operator::PreDec:
 			case Operator::PostDec:
-				return L"--";
+				return "--";
 			case Operator::Mul:
 			case Operator::MulAssign:
-				return L"*";
+				return "*";
 			case Operator::Div:
 			case Operator::DivAssign:
-				return L"/";
+				return "/";
 			case Operator::Mod:
 			case Operator::ModAssign:
-				return L"%";
+				return "%";
 			case Operator::Lsh:
 			case Operator::LshAssign:
-				return L"<<";
+				return "<<";
 			case Operator::Rsh:
 			case Operator::RshAssign:
-				return L">>";
+				return ">>";
 			case Operator::Eql:
-				return L"==";
+				return "==";
 			case Operator::Neq:
-				return L"!=";
+				return "!=";
 			case Operator::Greater:
-				return L">";
+				return ">";
 			case Operator::Less:
-				return L"<";
+				return "<";
 			case Operator::Geq:
-				return L">=";
+				return ">=";
 			case Operator::Leq:
-				return L"<=";
+				return "<=";
 			case Operator::BitAnd:
 			case Operator::AndAssign:
-				return L"&";
+				return "&";
 			case Operator::BitXor:
 			case Operator::XorAssign:
-				return L"^";
+				return "^";
 			case Operator::BitOr:
 			case Operator::OrAssign:
-				return L"|";
+				return "|";
 			case Operator::And:
-				return L"&&";
+				return "&&";
 			case Operator::Or:
-				return L"||";
+				return "||";
 			default:
-				return L"";
+				return "";
 			}
 		}
 		RefPtr<SyntaxNode> ProjectExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)

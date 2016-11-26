@@ -6,17 +6,17 @@ using namespace CoreLib::IO;
 using namespace Spire::Compiler;
 
 // Try to read an argument for a command-line option.
-wchar_t const* tryReadCommandLineArgument(wchar_t const* option, wchar_t***ioCursor, wchar_t**end)
+String tryReadCommandLineArgument(wchar_t const* option, wchar_t***ioCursor, wchar_t**end)
 {
 	wchar_t**& cursor = *ioCursor;
 	if (cursor == end)
 	{
-		fprintf(stderr, "expected an argument for command-line option '%s'", String(option).ToMultiByteString());
+		fprintf(stderr, "expected an argument for command-line option '%S'", option);
 		exit(1);
 	}
 	else
 	{
-		return *cursor++;
+		return String::FromWString(*cursor++);
 	}
 }
 
@@ -38,25 +38,25 @@ int wmain(int argc, wchar_t* argv[])
 		while (argCursor != argEnd)
 		{
 			wchar_t const* arg = *argCursor++;
-			if (arg[0] == L'-')
+			if (arg[0] == '-')
 			{
-				String argStr(arg);
+				String argStr = String::FromWString(arg);
 
 				// The argument looks like an option, so try to parse it.
-				if (argStr == L"-out")
+				if (argStr == "-out")
 					outputDir = tryReadCommandLineArgument(arg, &argCursor, argEnd);
-				else if (argStr == L"-symbol")
+				else if (argStr == "-symbo")
 					options.SymbolToCompile = tryReadCommandLineArgument(arg, &argCursor, argEnd);
-				else if (argStr == L"-schedule")
+				else if (argStr == "-schedule")
 					options.ScheduleFileName = tryReadCommandLineArgument(arg, &argCursor, argEnd);
-				else if (argStr == L"-backend")
+				else if (argStr == "-backend")
 				{
 					String name = tryReadCommandLineArgument(arg, &argCursor, argEnd);
-					if (name == "glsl")
+					if (name == "gls")
 					{
 						options.Target = CodeGenTarget::GLSL;
 					}
-					else if (name == "hlsl")
+					else if (name == "hls")
 					{
 						options.Target = CodeGenTarget::HLSL;
 					}
@@ -66,12 +66,12 @@ int wmain(int argc, wchar_t* argv[])
 					}
 					else
 					{
-						fprintf(stderr, "unknown code generation target '%s'\n", name.ToMultiByteString());
+						fprintf(stderr, "unknown code generation target '%S'\n", name.ToWString());
 					}
 				}
-				else if (argStr == L"-genchoice")
+				else if (argStr == "-genchoice")
 					options.Mode = CompilerMode::GenerateChoice;
-				else if (argStr == L"--")
+				else if (argStr == "--")
 				{
 					// The `--` option causes us to stop trying to parse options,
 					// and treat the rest of the command line as input file names:
@@ -83,7 +83,7 @@ int wmain(int argc, wchar_t* argv[])
 				}
 				else
 				{
-					fprintf(stderr, "unknown command-line option '%s'\n", argStr.ToMultiByteString());
+					fprintf(stderr, "unknown command-line option '%S'\n", argStr.ToWString());
 					// TODO: print a usage message
 					exit(1);
 				}
@@ -106,7 +106,7 @@ int wmain(int argc, wchar_t* argv[])
 			exit(1);
 		}
 
-		String fileName = inputPaths[0];
+		String fileName = String::FromWString(inputPaths[0]);
 
 		// Output directory defaults to the path of the input file
 		if (outputDir.Length() == 0)
@@ -125,7 +125,7 @@ int wmain(int argc, wchar_t* argv[])
 			}
 			catch (IOException)
 			{
-				printf("Cannot open schedule file '%s'.\n", options.ScheduleFileName.ToMultiByteString());
+				printf("Cannot open schedule file '%S'.\n", options.ScheduleFileName.ToWString());
 				goto end;
 			}
 		}
@@ -137,18 +137,18 @@ int wmain(int argc, wchar_t* argv[])
 			{
 				try
 				{
-					f.SaveToFile(Path::Combine(outputDir, f.MetaData.ShaderName + L".cse"));
+					f.SaveToFile(Path::Combine(outputDir, f.MetaData.ShaderName + ".cse"));
 				}
 				catch (Exception &)
 				{
-					result.GetErrorWriter()->Error(4, L"cannot write output file \'" + Path::Combine(outputDir, f.MetaData.ShaderName + L".cse") + L"\'.",
-						CodePosition(0, 0, 0, L""));
+					result.GetErrorWriter()->Error(4, "cannot write output file \'" + Path::Combine(outputDir, f.MetaData.ShaderName + ".cse") + "\'.",
+						CodePosition(0, 0, 0, ""));
 				}
 			}
 		}
 		catch (Exception & e)
 		{
-			wprintf(L"internal compiler error: %s\n", e.Message.Buffer());
+			printf("internal compiler error: %S\n", e.Message.ToWString());
 		}
 		result.PrintError(true);
 		if (result.Success)

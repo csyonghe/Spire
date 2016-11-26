@@ -16,10 +16,10 @@ namespace Spire
 					comp.Value->Implementations.First()->SyntaxNode->IsOutput))
 				{
 					if (parent->Components.TryGetValue(comp.Key, ccomp))
-						err->Error(33022, L"\'" + comp.Key + L"\' is already defined in current scope.\nsee previous definition at " + ccomp->Implementations.First()->SyntaxNode->Position.ToString(),
+						err->Error(33022, "\'" + comp.Key + "\' is already defined in current scope.\nsee previous definition at " + ccomp->Implementations.First()->SyntaxNode->Position.ToString(),
 							comp.Value->Implementations.First()->SyntaxNode->Position);
 					else if (parent->SubClosures.TryGetValue(comp.Key, su))
-						err->Error(33022, L"\'" + comp.Key + L"\' is already defined in current scope.\nsee previous definition at " + su->UsingPosition.ToString(),
+						err->Error(33022, "\'" + comp.Key + "\' is already defined in current scope.\nsee previous definition at " + su->UsingPosition.ToString(),
 							comp.Value->Implementations.First()->SyntaxNode->Position);
 				}
 			}
@@ -30,10 +30,10 @@ namespace Spire
 					RefPtr<ShaderComponentSymbol> ccomp;
 					RefPtr<ShaderClosure> su;
 					if (parent->Components.TryGetValue(c.Key, ccomp))
-						err->Error(33022, L"\'" + c.Key + L"\' is already defined in current scope.\nsee previous definition at " + ccomp->Implementations.First()->SyntaxNode->Position.ToString(),
+						err->Error(33022, "\'" + c.Key + "\' is already defined in current scope.\nsee previous definition at " + ccomp->Implementations.First()->SyntaxNode->Position.ToString(),
 							c.Value->UsingPosition);
 					else if (parent->SubClosures.TryGetValue(c.Key, su))
-						err->Error(33022, L"\'" + c.Key + L"\' is already defined in current scope.\nsee previous definition at " + su->UsingPosition.ToString(),
+						err->Error(33022, "\'" + c.Key + "\' is already defined in current scope.\nsee previous definition at " + su->UsingPosition.ToString(),
 							c.Value->UsingPosition);
 					for (auto & sc : c.Value->SubClosures)
 						if (sc.Value->IsInPlace)
@@ -60,8 +60,8 @@ namespace Spire
 				else if (!rootShader->Pipeline->IsChildOf(shader->Pipeline))
 				{
 					StringBuilder sb;
-					sb << L"pipeline '" << shader->Pipeline->SyntaxNode->Name.Content << L"' targeted by module '" <<
-						shader->SyntaxNode->Name.Content << L"' is incompatible with pipeline '" << rootShader->Pipeline->SyntaxNode->Name.Content << L"' targeted by shader '" << rootShader->Name << L"'.\nsee definition of shader '" << shader->SyntaxNode->Name.Content << L"' at " << shader->SyntaxNode->Position.ToString();
+					sb << "pipeline '" << shader->Pipeline->SyntaxNode->Name.Content << "' targeted by module '" <<
+						shader->SyntaxNode->Name.Content << "' is incompatible with pipeline '" << rootShader->Pipeline->SyntaxNode->Name.Content << "' targeted by shader '" << rootShader->Name << "'.\nsee definition of shader '" << shader->SyntaxNode->Name.Content << "' at " << shader->SyntaxNode->Position.ToString();
 					err->Error(33041, sb.ProduceString(), shader->SyntaxNode->Position);
 				}
 			}
@@ -78,7 +78,7 @@ namespace Spire
 					for (auto & arg : import->Arguments)
 					{
 						RefPtr<ShaderComponentSymbol> ccomp = new ShaderComponentSymbol();
-						auto compName = L"arg" + String(rs->Components.Count()) + L"_" + 
+						auto compName = "arg" + String(rs->Components.Count()) + "_" + 
 							(import->ObjectName.Content.Length()==0?import->ShaderName.Content:import->ObjectName.Content) + arg->ArgumentName.Content;
 						auto impl = new ShaderComponentImplSymbol();
 						auto compSyntax = new ComponentSyntaxNode();
@@ -118,7 +118,7 @@ namespace Spire
 						{
 							refClosure->IsInPlace = true;
 							CheckComponentRedefinition(err, rs.Ptr(), refClosure.Ptr());
-							rs->SubClosures[L"annonymousObj" + String(UniqueIdGenerator::Next())] = refClosure;
+							rs->SubClosures["annonymousObj" + String(UniqueIdGenerator::Next())] = refClosure;
 						}
 						else
 						{
@@ -144,25 +144,25 @@ namespace Spire
 					!pRefMap.ContainsKey(comp.Key))
 				{
 					StringBuilder errMsg;
-					errMsg << L"parameter '" << comp.Key << L"' of module '" << shader->SyntaxNode->Name.Content << L"' is unassigned.";
+					errMsg << "parameter '" << comp.Key << "' of module '" << shader->SyntaxNode->Name.Content << "' is unassigned.";
 					// try to provide more info on why it is unassigned
 					auto arg = rootShader->FindComponent(comp.Key, true, false);
 					if (!arg)
-						errMsg << L" implicit parameter matching failed because shader '" << rootShader->Name << L"' does not define component '" + comp.Key + L"'.";
+						errMsg << " implicit parameter matching failed because shader '" << rootShader->Name << "' does not define component '" + comp.Key + "'.";
 					else
 					{
 						if (comp.Value->Type->DataType->Equals(arg->Type->DataType.Ptr()))
 						{
-							errMsg << L" implicit parameter matching failed because the component of the same name is not accessible from '" << shader->SyntaxNode->Name.Content << L"'.\ncheck if you have declared necessary requirements and properly used the 'public' qualifier.";
+							errMsg << " implicit parameter matching failed because the component of the same name is not accessible from '" << shader->SyntaxNode->Name.Content << "'.\ncheck if you have declared necessary requirements and properly used the 'public' qualifier.";
 						}
 						else
 						{
-							errMsg << L"implicit parameter matching failed because the component of the same name does not match parameter type '"
-								<< comp.Value->Type->DataType->ToString() << L"'.";
+							errMsg << "implicit parameter matching failed because the component of the same name does not match parameter type '"
+								<< comp.Value->Type->DataType->ToString() << "'.";
 						}
-						errMsg << L"\nsee requirement declaration at " << comp.Value->Implementations.First()->SyntaxNode->Position.ToString() << L".";
-						errMsg << L"\nsee potential definition of component '" << comp.Key << L"' at " << arg->Implementations.First()->SyntaxNode->Position.ToString()
-							<< L".\n";
+						errMsg << "\nsee requirement declaration at " << comp.Value->Implementations.First()->SyntaxNode->Position.ToString() << ".";
+						errMsg << "\nsee potential definition of component '" << comp.Key << "' at " << arg->Implementations.First()->SyntaxNode->Position.ToString()
+							<< ".\n";
 					}
 					err->Error(33023,errMsg.ProduceString(), rs->UsingPosition);
 				}
@@ -222,9 +222,9 @@ namespace Spire
 			{
 				currentImport = import;
 				import->Component->Accept(this);
-				if (import->Component->Tags.ContainsKey(L"ComponentReference"))
+				if (import->Component->Tags.ContainsKey("ComponentReference"))
 				{
-					import->ComponentUniqueName = import->Component->Tags[L"ComponentReference"]().As<StringObject>()->Content;
+					import->ComponentUniqueName = import->Component->Tags["ComponentReference"]().As<StringObject>()->Content;
 				}
 				currentImport = nullptr;
 				for (auto & arg : import->Arguments)
@@ -235,7 +235,7 @@ namespace Spire
 			RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode * var) override
 			{
 				RefPtr<Object> compRef;
-				if (var->Tags.TryGetValue(L"ComponentReference", compRef))
+				if (var->Tags.TryGetValue("ComponentReference", compRef))
 				{
 					ReplaceReference(compRef.As<StringObject>());
 				}
@@ -246,7 +246,7 @@ namespace Spire
 			{
 				member->BaseExpression->Accept(this);
 				RefPtr<Object> compRef;
-				if (member->Tags.TryGetValue(L"ComponentReference", compRef))
+				if (member->Tags.TryGetValue("ComponentReference", compRef))
 				{
 					ReplaceReference(compRef.As<StringObject>());
 				}
@@ -294,13 +294,13 @@ namespace Spire
 			{
 				currentImport = import;
 				import->Component->Accept(this);
-				if (!import->Component->Tags.ContainsKey(L"ComponentReference"))
+				if (!import->Component->Tags.ContainsKey("ComponentReference"))
 				{
-					Error(32047, L"first argument of an import operator call does not resolve to a component.", import->Component.Ptr());
+					Error(32047, "first argument of an import operator call does not resolve to a component.", import->Component.Ptr());
 				}
 				else
 				{
-					import->ComponentUniqueName = import->Component->Tags[L"ComponentReference"]().As<StringObject>()->Content;
+					import->ComponentUniqueName = import->Component->Tags["ComponentReference"]().As<StringObject>()->Content;
 				}
 				currentImport = nullptr;
 				for (auto & arg : import->Arguments)
@@ -320,17 +320,17 @@ namespace Spire
 						{
 							if (comp->Implementations.First()->SyntaxNode->IsParam)
 								shaderClosure->RefMap.TryGetValue(comp->Name, comp);
-							var->Tags[L"ComponentReference"] = new StringObject(comp->UniqueName);
+							var->Tags["ComponentReference"] = new StringObject(comp->UniqueName);
 							AddReference(comp.Ptr(), currentImport, var->Position);
 						}
 						else
-							throw InvalidProgramException(L"cannot resolve reference.");
+							throw InvalidProgramException("cannot resolve reference.");
 					}
 					if (auto comp = shaderClosure->FindComponent(var->Variable))
 					{
 						if (comp->Implementations.First()->SyntaxNode->IsParam)
 							shaderClosure->RefMap.TryGetValue(var->Variable, comp);
-						var->Tags[L"ComponentReference"] = new StringObject(comp->UniqueName);
+						var->Tags["ComponentReference"] = new StringObject(comp->UniqueName);
 
 						AddReference(comp.Ptr(), currentImport, var->Position);
 					}
@@ -342,7 +342,7 @@ namespace Spire
 						var->Type = new BasicExpressionType(originalShader, closure.Ptr());
 					}
 					else if (!(var->Type->AsBasicType() && var->Type->AsBasicType()->BaseType == BaseType::Function))
-						throw InvalidProgramException(L"cannot resolve reference.");
+						throw InvalidProgramException("cannot resolve reference.");
 				}
 				return var;
 			}
@@ -354,7 +354,7 @@ namespace Spire
 				{
 					if (auto comp = member->BaseExpression->Type->AsBasicType()->ShaderClosure->FindComponent(member->MemberName))
 					{
-						member->Tags[L"ComponentReference"] = new StringObject(comp->UniqueName);
+						member->Tags["ComponentReference"] = new StringObject(comp->UniqueName);
 						AddReference(comp.Ptr(), currentImport, member->Position);
 					}
 					else if (auto shader = member->BaseExpression->Type->AsBasicType()->ShaderClosure->FindClosure(member->MemberName))
@@ -369,11 +369,11 @@ namespace Spire
 				{
 					if (auto comp = shaderClosure->FindComponent(member->Type->AsBasicType()->Component->Name))
 					{
-						member->Tags[L"ComponentReference"] = new StringObject(comp->UniqueName);
+						member->Tags["ComponentReference"] = new StringObject(comp->UniqueName);
 						AddReference(comp.Ptr(), currentImport, member->Position);
 					}
 					else
-						throw InvalidProgramException(L"cannot resolve reference.");
+						throw InvalidProgramException("cannot resolve reference.");
 				}
 				return member;
 			}
@@ -433,8 +433,8 @@ namespace Spire
 			StringBuilder sb;
 			for (auto ch : name)
 			{
-				if (ch == L'.')
-					sb << L"_";
+				if (ch == '.')
+					sb << "_";
 				else
 					sb << ch;
 			}
@@ -470,9 +470,9 @@ namespace Spire
 			for (auto & subClosure : shader->SubClosures)
 			{
 				if (subClosure.Value->IsInPlace)
-					AssignUniqueNames(subClosure.Value.Ptr(), namePrefix + subClosure.Value->Name + L".", publicNamePrefix);
+					AssignUniqueNames(subClosure.Value.Ptr(), namePrefix + subClosure.Value->Name + ".", publicNamePrefix);
 				else
-					AssignUniqueNames(subClosure.Value.Ptr(), namePrefix + subClosure.Key + L".", publicNamePrefix + subClosure.Key + L".");
+					AssignUniqueNames(subClosure.Value.Ptr(), namePrefix + subClosure.Key + ".", publicNamePrefix + subClosure.Key + ".");
 			}
 		}
 
@@ -503,23 +503,23 @@ namespace Spire
 						// silently ignore consistently defined global components (components in abstract worlds)
 						if (!IsConsistentGlobalComponentDefinition(comp.Value.Ptr(), existingComp))
 						{
-							err->Error(34025, L"'" + existingComp->Name + L"': global component conflicts with previous declaration.\nsee previous declaration at " + existingComp->Implementations.First()->SyntaxNode->Position.ToString(),
+							err->Error(34025, "'" + existingComp->Name + "': global component conflicts with previous declaration.\nsee previous declaration at " + existingComp->Implementations.First()->SyntaxNode->Position.ToString(),
 								comp.Value->Implementations.First()->SyntaxNode->Position);
 						}
 						else
 						{
-							err->Warning(34026, L"'" + existingComp->Name + L"': component is already defined when compiling shader '" + closure->Name + L"'. use 'require' to declare it as a parameter. \nsee previous declaration at " + existingComp->Implementations.First()->SyntaxNode->Position.ToString(),
+							err->Warning(34026, "'" + existingComp->Name + "': component is already defined when compiling shader '" + closure->Name + "'. use 'require' to declare it as a parameter. \nsee previous declaration at " + existingComp->Implementations.First()->SyntaxNode->Position.ToString(),
 								comp.Value->Implementations.First()->SyntaxNode->Position);
 						}
 					}
 					else if (comp.Value->Implementations.First()->SyntaxNode->Parameters.Count() == 0)
 					{
 						StringBuilder errBuilder;
-						errBuilder << L"component named '" << comp.Value->UniqueKey << L"\' is already defined when compiling '" << closure->Name << L"'.";
+						errBuilder << "component named '" << comp.Value->UniqueKey << "\' is already defined when compiling '" << closure->Name << "'.";
 						auto currentClosure = subClosure;
 						while (currentClosure != nullptr && currentClosure != closure)
 						{
-							errBuilder << L"\nsee inclusion of '" << currentClosure->Name << L"' at " << currentClosure->UsingPosition.ToString() << L".";
+							errBuilder << "\nsee inclusion of '" << currentClosure->Name << "' at " << currentClosure->UsingPosition.ToString() << ".";
 							currentClosure = currentClosure->Parent;
 						}
 						err->Error(34024, errBuilder.ProduceString(), comp.Value->Implementations.First()->SyntaxNode->Position);
@@ -579,8 +579,8 @@ namespace Spire
 						ShaderComponentSymbol* unaccessibleComp = nullptr;
 						if (!IsWorldFeasible(symTable, shader->Pipeline, impl.Ptr(), w, unaccessibleComp))
 						{
-							err->Error(33100, L"'" + comp->Name + L"' cannot be computed at '" + w + L"' because the dependent component '" + unaccessibleComp->Name + L"' is not accessible.\nsee definition of '"
-								+ unaccessibleComp->Name + L"' at " + unaccessibleComp->Implementations.First()->SyntaxNode->Position.ToString(),
+							err->Error(33100, "'" + comp->Name + "' cannot be computed at '" + w + "' because the dependent component '" + unaccessibleComp->Name + "' is not accessible.\nsee definition of '"
+								+ unaccessibleComp->Name + "' at " + unaccessibleComp->Implementations.First()->SyntaxNode->Position.ToString(),
 								impl->ComponentReferencePositions[unaccessibleComp]());
 						}
 						autoWorld.Remove(w);
@@ -656,7 +656,7 @@ namespace Spire
 								}
 								if (rcomp.Key == comp.Value)
 								{
-									err->Error(32013, L"'" + rcomp.Key->Name + L"': circular reference is not allowed.", impl->SyntaxNode->Position);
+									err->Error(32013, "'" + rcomp.Key->Name + "': circular reference is not allowed.", impl->SyntaxNode->Position);
 									rs = true;
 								}
 							}
@@ -701,8 +701,8 @@ namespace Spire
 						{
 							if (!symTable->IsWorldImplicitlyReachable(shader->Pipeline, arg->Type->FeasibleWorlds, w, requirement->Type->DataType))
 							{
-								err->Error(32015, L"argument '" + arg->Name + L"' is not available in world '" + w + L"' as required by '" + shader->Name
-									+ L"'.\nsee requirement declaration at " +
+								err->Error(32015, "argument '" + arg->Name + "' is not available in world '" + w + "' as required by '" + shader->Name
+									+ "'.\nsee requirement declaration at " +
 									requirement->Implementations.First()->SyntaxNode->Position.ToString(), arg->Implementations.First()->SyntaxNode->Position);
 							}
 						}
@@ -751,7 +751,7 @@ namespace Spire
 					!comp.Value->Implementations.First()->SyntaxNode->IsOutput)
 				{
 					RefPtr<Object> compRef;
-					if (comp.Value->Implementations.First()->SyntaxNode->Expression->Tags.TryGetValue(L"ComponentReference", compRef))
+					if (comp.Value->Implementations.First()->SyntaxNode->Expression->Tags.TryGetValue("ComponentReference", compRef))
 					{
 						compSub[comp.Key] = compRef.As<StringObject>()->Content;
 					}
@@ -790,16 +790,16 @@ namespace Spire
 					{
 						if (!comp->Type->DataType->Equals(req.Value->Type->DataType.Ptr()))
 						{
-							errMsg << L"component '" << req.Key << L"' has type '" << comp->Type->DataType->ToString() << L"', but pipeline '"
-								<< shader->Pipeline->SyntaxNode->Name.Content << L"' requires it to be '" << req.Value->Type->DataType->ToString() 
-								<< L"'.\nsee pipeline requirement definition at " << req.Value->Implementations.First()->SyntaxNode->Position.ToString();
+							errMsg << "component '" << req.Key << "' has type '" << comp->Type->DataType->ToString() << "', but pipeline '"
+								<< shader->Pipeline->SyntaxNode->Name.Content << "' requires it to be '" << req.Value->Type->DataType->ToString() 
+								<< "'.\nsee pipeline requirement definition at " << req.Value->Implementations.First()->SyntaxNode->Position.ToString();
 							err->Error(32051, errMsg.ProduceString(), comp->Implementations.First()->SyntaxNode->Position);
 						}
 					}
 					else
 					{
-						errMsg << L"shader '" << shader->Name << L"' does not define '" << req.Key << L"' as required by pipeline '"
-							<< shader->Pipeline->SyntaxNode->Name.Content << L"''.\nsee pipeline requirement definition at "
+						errMsg << "shader '" << shader->Name << "' does not define '" << req.Key << "' as required by pipeline '"
+							<< shader->Pipeline->SyntaxNode->Name.Content << "''.\nsee pipeline requirement definition at "
 							<< req.Value->Implementations.First()->SyntaxNode->Position.ToString();
 						err->Error(32052, errMsg.ProduceString(), shader->Position);
 					}
@@ -811,12 +811,12 @@ namespace Spire
 		{
 			if (shader->Parent)
 			{
-				sb << L"see module '" + shader->Name << L"' being used in '" + shader->Parent->Name << L"' at " << shader->Position.ToString() << L"\n";
+				sb << "see module '" + shader->Name << "' being used in '" + shader->Parent->Name << "' at " << shader->Position.ToString() << "\n";
 				PrintModuleUsingStack(sb, shader->Parent);
 			}
 			else
 			{
-				sb << L"shader '" << shader->Name << L"' is targeting pipeline '" << shader->Pipeline->SyntaxNode->Name.Content << L"' at " << shader->Position.ToString() << L"\nalso see pipeline definition at " << shader->Pipeline->SyntaxNode->Position.ToString();
+				sb << "shader '" << shader->Name << "' is targeting pipeline '" << shader->Pipeline->SyntaxNode->Name.Content << "' at " << shader->Position.ToString() << "\nalso see pipeline definition at " << shader->Pipeline->SyntaxNode->Position.ToString();
 			}
 		}
 	
@@ -834,8 +834,8 @@ namespace Spire
 						{
 							{
 								StringBuilder sb;
-								sb << L"\'" << world.World.Content << L"' is not a defined world in '" <<
-									shader->Pipeline->SyntaxNode->Name.Content << L"'.\n";
+								sb << "\'" << world.World.Content << "' is not a defined world in '" <<
+									shader->Pipeline->SyntaxNode->Name.Content << "'.\n";
 								PrintModuleUsingStack(sb, shader);
 								if (!shader->Pipeline->WorldDependency.ContainsKey(world.World.Content))
 									err->Error(33012, sb.ProduceString(), world.World.Position);
@@ -849,7 +849,7 @@ namespace Spire
 									if (userSpecifiedWorlds.Count() > 1)
 									{
 										StringBuilder sb;
-										sb << L"abstract world cannot appear with other worlds.\n";
+										sb << "abstract world cannot appear with other worlds.\n";
 										PrintModuleUsingStack(sb, shader);
 										err->Error(33013, sb.ProduceString(),
 											world.World.Position);
@@ -862,7 +862,7 @@ namespace Spire
 					if (!inAbstractWorld && !impl->SyntaxNode->IsParam && !impl->SyntaxNode->IsInput
 						&& !impl->SyntaxNode->Expression && !impl->SyntaxNode->BlockStatement)
 					{
-						err->Error(33014, L"non-abstract component must have an implementation.",
+						err->Error(33014, "non-abstract component must have an implementation.",
 							impl->SyntaxNode->Position);
 					}
 
@@ -886,7 +886,7 @@ namespace Spire
 					if (impl->SyntaxNode->Expression || impl->SyntaxNode->BlockStatement)
 					{
 						if (isDefinedInAbstractWorld)
-							err->Error(33039, L"'" + impl->SyntaxNode->Name.Content + L"': no code allowed for component defined in input world.", impl->SyntaxNode->Position);
+							err->Error(33039, "'" + impl->SyntaxNode->Name.Content + "': no code allowed for component defined in input world.", impl->SyntaxNode->Position);
 					}
 				}
 			}
@@ -900,7 +900,7 @@ namespace Spire
 			AddPipelineComponents(shader);
 			CheckPipelineShaderConsistency(err, shader);
 			// assign choice names
-			AssignUniqueNames(shader, L"", L"");
+			AssignUniqueNames(shader, "", "");
 			// traverse closures to get component list
 			GatherComponents(err, shader, shader);
 			PropagatePipelineRequirements(err, shader);
@@ -920,8 +920,8 @@ namespace Spire
 				auto comp = shader->FindComponent(requirement.Key);
 				if (!comp)
 				{
-					err->Error(32014, L"shader '" + shader->Name + L"' does not provide '" + requirement.Key + L"' as required by '" + shader->Pipeline->SyntaxNode->Name.Content
-						+ L"'.\nsee requirement declaration at " +
+					err->Error(32014, "shader '" + shader->Name + "' does not provide '" + requirement.Key + "' as required by '" + shader->Pipeline->SyntaxNode->Name.Content
+						+ "'.\nsee requirement declaration at " +
 						requirement.Value->Implementations.First()->SyntaxNode->Position.ToString(), shader->Position);
 				}
 				else
@@ -932,8 +932,8 @@ namespace Spire
 						{
 							if (!symTable->IsWorldImplicitlyReachable(shader->Pipeline, comp->Type->FeasibleWorlds, w, requirement.Value->Type->DataType))
 							{
-								err->Error(32015, L"component '" + comp->Name + L"' is not available in world '" + w + L"' as required by '" + shader->Pipeline->SyntaxNode->Name.Content
-									+ L"'.\nsee requirement declaration at " +
+								err->Error(32015, "component '" + comp->Name + "' is not available in world '" + w + "' as required by '" + shader->Pipeline->SyntaxNode->Name.Content
+									+ "'.\nsee requirement declaration at " +
 									requirement.Value->Implementations.First()->SyntaxNode->Position.ToString(), comp->Implementations.First()->SyntaxNode->Position);
 							}
 						}

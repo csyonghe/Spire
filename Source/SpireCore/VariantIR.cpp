@@ -166,7 +166,7 @@ namespace Spire
 									{
 										ShaderComponentSymbol* refComp;
 										if (!Shader->AllComponents.TryGetValue(importUsing, refComp))
-											throw InvalidProgramException(L"import operator dependency not exists.");
+											throw InvalidProgramException("import operator dependency not exists.");
 										ReferenceWorkItem workItem;
 										workItem.Dependency = ComponentDependency(refComp->UniqueName, nullptr);
 										workItem.SourceWorld = importOp->SourceWorld.Content;

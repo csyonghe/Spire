@@ -17,37 +17,37 @@ namespace Spire
 			sb << comp->Name.Content;
 			for (auto & param : comp->Parameters)
 			{
-				sb << L"@" << param->Type->ToString();
+				sb << "@" << param->Type->ToString();
 			}
 			return sb.ProduceString();
 		}
 
 		String TranslateHLSLTypeNames(String name)
 		{
-			if (name == L"float2" || name == L"half2")
-				return L"vec2";
-			else if (name == L"float3" || name == L"half3")
-				return L"vec3";
-			else if (name == L"float4" || name == L"half4")
-				return L"vec4";
-			else if (name == L"half")
-				return L"float";
-			else if (name == L"int2")
-				return L"ivec2";
-			else if (name == L"int3")
-				return L"ivec3";
-			else if (name == L"int4")
-				return L"ivec4";
-			else if (name == L"uint2")
-				return L"uvec2";
-			else if (name == L"uint3")
-				return L"uvec3";
-			else if (name == L"uint4")
-				return L"uvec4";
-			else if (name == L"float3x3" || name == L"half3x3")
-				return L"mat3";
-			else if (name == L"float4x4" || name == L"half4x4")
-				return L"mat4";
+			if (name == "float2" || name == "half2")
+				return "vec2";
+			else if (name == "float3" || name == "half3")
+				return "vec3";
+			else if (name == "float4" || name == "half4")
+				return "vec4";
+			else if (name == "half")
+				return "float";
+			else if (name == "int2")
+				return "ivec2";
+			else if (name == "int3")
+				return "ivec3";
+			else if (name == "int4")
+				return "ivec4";
+			else if (name == "uint2")
+				return "uvec2";
+			else if (name == "uint3")
+				return "uvec3";
+			else if (name == "uint4")
+				return "uvec4";
+			else if (name == "float3x3" || name == "half3x3")
+				return "mat3";
+			else if (name == "float4x4" || name == "half4x4")
+				return "mat4";
 			else
 				return name;
 		}
@@ -109,43 +109,43 @@ namespace Spire
 			RefPtr<TypeSyntaxNode> VisitBasicType(BasicTypeSyntaxNode * typeNode) override
 			{
 				RefPtr<BasicExpressionType> expType = new BasicExpressionType();
-				if (typeNode->TypeName == L"int")
+				if (typeNode->TypeName == "int")
 					expType->BaseType = BaseType::Int;
-				else if (typeNode->TypeName == L"uint")
+				else if (typeNode->TypeName == "uint")
 					expType->BaseType = BaseType::UInt;
-				else if (typeNode->TypeName == L"float" || typeNode->TypeName == L"half")
+				else if (typeNode->TypeName == "float" || typeNode->TypeName == "half")
 					expType->BaseType = BaseType::Float;
-				else if (typeNode->TypeName == L"ivec2" || typeNode->TypeName == L"int2")
+				else if (typeNode->TypeName == "ivec2" || typeNode->TypeName == "int2")
 					expType->BaseType = BaseType::Int2;
-				else if (typeNode->TypeName == L"ivec3" || typeNode->TypeName == L"int3")
+				else if (typeNode->TypeName == "ivec3" || typeNode->TypeName == "int3")
 					expType->BaseType = BaseType::Int3;
-				else if (typeNode->TypeName == L"ivec4" || typeNode->TypeName == L"int4")
+				else if (typeNode->TypeName == "ivec4" || typeNode->TypeName == "int4")
 					expType->BaseType = BaseType::Int4;
-				else if (typeNode->TypeName == L"uvec2" || typeNode->TypeName == L"uint2")
+				else if (typeNode->TypeName == "uvec2" || typeNode->TypeName == "uint2")
 					expType->BaseType = BaseType::UInt2;
-				else if (typeNode->TypeName == L"uvec3" || typeNode->TypeName == L"uint3")
+				else if (typeNode->TypeName == "uvec3" || typeNode->TypeName == "uint3")
 					expType->BaseType = BaseType::UInt3;
-				else if (typeNode->TypeName == L"uvec4" || typeNode->TypeName == L"uint4")
+				else if (typeNode->TypeName == "uvec4" || typeNode->TypeName == "uint4")
 					expType->BaseType = BaseType::UInt4;
-				else if (typeNode->TypeName == L"vec2" || typeNode->TypeName == L"float2" || typeNode->TypeName == L"half2")
+				else if (typeNode->TypeName == "vec2" || typeNode->TypeName == "float2" || typeNode->TypeName == "half2")
 					expType->BaseType = BaseType::Float2;
-				else if (typeNode->TypeName == L"vec3" || typeNode->TypeName == L"float3" || typeNode->TypeName == L"half3")
+				else if (typeNode->TypeName == "vec3" || typeNode->TypeName == "float3" || typeNode->TypeName == "half3")
 					expType->BaseType = BaseType::Float3;
-				else if (typeNode->TypeName == L"vec4" || typeNode->TypeName == L"float4" || typeNode->TypeName == L"half4")
+				else if (typeNode->TypeName == "vec4" || typeNode->TypeName == "float4" || typeNode->TypeName == "half4")
 					expType->BaseType = BaseType::Float4;
-				else if (typeNode->TypeName == L"mat3" || typeNode->TypeName == L"mat3x3" || typeNode->TypeName == L"float3x3" || typeNode->TypeName == L"half3x3")
+				else if (typeNode->TypeName == "mat3" || typeNode->TypeName == "mat3x3" || typeNode->TypeName == "float3x3" || typeNode->TypeName == "half3x3")
 					expType->BaseType = BaseType::Float3x3;
-				else if (typeNode->TypeName == L"mat4" || typeNode->TypeName == L"mat4x4" || typeNode->TypeName == L"float4x4" || typeNode->TypeName == L"half4x4")
+				else if (typeNode->TypeName == "mat4" || typeNode->TypeName == "mat4x4" || typeNode->TypeName == "float4x4" || typeNode->TypeName == "half4x4")
 					expType->BaseType = BaseType::Float4x4;
-				else if (typeNode->TypeName == L"texture" || typeNode->TypeName == L"Texture" || typeNode->TypeName == L"Texture2D")
+				else if (typeNode->TypeName == "texture" || typeNode->TypeName == "Texture" || typeNode->TypeName == "Texture2D")
 					expType->BaseType = BaseType::Texture2D;
-				else if (typeNode->TypeName == L"TextureCUBE" || typeNode->TypeName == L"TextureCube")
+				else if (typeNode->TypeName == "TextureCUBE" || typeNode->TypeName == "TextureCube")
 					expType->BaseType = BaseType::TextureCube;
-				else if (typeNode->TypeName == L"SamplerState" || typeNode->TypeName == L"sampler" || typeNode->TypeName == L"sampler_state")
+				else if (typeNode->TypeName == "SamplerState" || typeNode->TypeName == "sampler" || typeNode->TypeName == "sampler_state")
 					expType->BaseType = BaseType::SamplerState;
-				else if (typeNode->TypeName == L"void")
+				else if (typeNode->TypeName == "void")
 					expType->BaseType = BaseType::Void;
-				else if (typeNode->TypeName == L"bool")
+				else if (typeNode->TypeName == "bool")
 					expType->BaseType = BaseType::Bool;
 				else
 				{
@@ -180,13 +180,13 @@ namespace Spire
 						}
 						if (!matched)
 						{
-							Error(31040, L"undefined type name: '" + typeNode->TypeName + L"'.", typeNode);
+							Error(31040, "undefined type name: '" + typeNode->TypeName + "'.", typeNode);
 							typeResult = ExpressionType::Error;
 						}
 					}
 					else
 					{
-						Error(31040, L"undefined type name: '" + typeNode->TypeName + L"'.", typeNode);
+						Error(31040, "undefined type name: '" + typeNode->TypeName + "'.", typeNode);
 						typeResult = ExpressionType::Error;
 						return typeNode;
 					}
@@ -209,13 +209,13 @@ namespace Spire
 				typeNode->BaseType->Accept(this);
 				rs->BaseType = typeResult;
 				rs->GenericTypeName = typeNode->GenericTypeName;
-				if (rs->GenericTypeName != L"PackedBuffer" &&
-					rs->GenericTypeName != L"StructuredBuffer" &&
-					rs->GenericTypeName != L"RWStructuredBuffer" &&
-					rs->GenericTypeName != L"Uniform" &&
-					rs->GenericTypeName != L"Patch" &&
-					rs->GenericTypeName != L"PackedBuffer")
-					Error(30015, L"'" + rs->GenericTypeName + L"': undefined identifier.", typeNode);
+				if (rs->GenericTypeName != "PackedBuffer" &&
+					rs->GenericTypeName != "StructuredBuffer" &&
+					rs->GenericTypeName != "RWStructuredBuffer" &&
+					rs->GenericTypeName != "Uniform" &&
+					rs->GenericTypeName != "Patch" &&
+					rs->GenericTypeName != "PackedBuffer")
+					Error(30015, "'" + rs->GenericTypeName + "': undefined identifier.", typeNode);
 				typeResult = rs;
 				return typeNode;
 			}
@@ -233,7 +233,7 @@ namespace Spire
 					}
 					else
 					{
-						Error(33010, L"pipeline '" + pipeline->ParentPipeline.Content + L"' is undefined.", pipeline->ParentPipeline);
+						Error(33010, "pipeline '" + pipeline->ParentPipeline.Content + "' is undefined.", pipeline->ParentPipeline);
 					}
 				}
 				currentPipeline = psymbol.Ptr();
@@ -250,7 +250,7 @@ namespace Spire
 					}
 					else
 					{
-						Error(33001, L"world \'" + world->Name.Content + L"\' is already defined.", world.Ptr());
+						Error(33001, "world \'" + world->Name.Content + "\' is already defined.", world.Ptr());
 					}
 				}
 				for (auto comp : pipeline->AbstractComponents)
@@ -260,7 +260,7 @@ namespace Spire
 						&& psymbol->IsAbstractWorld(comp->Rate->Worlds.First().World.Content)))
 						AddNewComponentSymbol(psymbol->Components, psymbol->FunctionComponents, comp);
 					else
-						Error(33003, L"cannot define components in a pipeline.",
+						Error(33003, "cannot define components in a pipeline.",
 							comp.Ptr());
 				}
 				for (auto & op : pipeline->ImportOperators)
@@ -271,18 +271,18 @@ namespace Spire
 				for (auto op : pipeline->ImportOperators)
 				{
 					if (!psymbol->WorldDependency.ContainsKey(op->DestWorld.Content))
-						Error(33004, L"undefined world name '" + op->DestWorld.Content + L"'.", op->DestWorld);
+						Error(33004, "undefined world name '" + op->DestWorld.Content + "'.", op->DestWorld);
 					else
 					{
 						if (psymbol->Worlds[op->DestWorld.Content].GetValue().IsAbstract)
-							Error(33005, L"abstract world cannot appear as target as an import operator.", op->DestWorld);
+							Error(33005, "abstract world cannot appear as target as an import operator.", op->DestWorld);
 						else if (!psymbol->WorldDependency.ContainsKey(op->SourceWorld.Content))
-							Error(33006, L"undefined world name '" + op->SourceWorld.Content + L"'.", op->SourceWorld);
+							Error(33006, "undefined world name '" + op->SourceWorld.Content + "'.", op->SourceWorld);
 						else
 						{
 							if (IsWorldDependent(psymbol.Ptr(), op->SourceWorld.Content, op->DestWorld.Content))
 							{
-								Error(33007, L"import operator '" + op->Name.Content + L"' creates a circular dependency between world '" + op->SourceWorld.Content + L"' and '" + op->DestWorld.Content + L"'",
+								Error(33007, "import operator '" + op->Name.Content + "' creates a circular dependency between world '" + op->SourceWorld.Content + "' and '" + op->DestWorld.Content + "'",
 									op->Name);
 							}
 							else
@@ -326,7 +326,7 @@ namespace Spire
 					for (auto & para : op->Parameters)
 					{
 						if (paraNames.Contains(para->Name))
-							Error(30002, L"parameter \'" + para->Name + L"\' already defined.", para.Ptr());
+							Error(30002, "parameter \'" + para->Name + "\' already defined.", para.Ptr());
 						else
 							paraNames.Add(para->Name);
 						VariableEntry varEntry;
@@ -335,7 +335,7 @@ namespace Spire
 						varEntry.Type.DataType = para->Type;
 						op->Scope->Variables.AddIfNotExists(varEntry.Name, varEntry);
 						if (varEntry.Type.DataType->Equals(ExpressionType::Void.Ptr()))
-							Error(30016, L"'void' can not be parameter type.", para.Ptr());
+							Error(30016, "'void' can not be parameter type.", para.Ptr());
 					}
 					auto oldSymFuncs = symbolTable->Functions;
 					auto oldSymFuncOverloads = symbolTable->FunctionOverloads;
@@ -373,12 +373,12 @@ namespace Spire
 						{
 							if (namedArgumentAppeared)
 							{
-								Error(33030, L"positional argument cannot appear after a named argument.", arg->Expression.Ptr());
+								Error(33030, "positional argument cannot appear after a named argument.", arg->Expression.Ptr());
 								break;
 							}
 							if (position >= paramList.Count())
 							{
-								Error(33031, L"too many arguments.", arg->Expression.Ptr());
+								Error(33031, "too many arguments.", arg->Expression.Ptr());
 								break;
 							}
 							arg->ArgumentName.Content = paramList[position]->Name;
@@ -414,24 +414,24 @@ namespace Spire
 											varExpr->Variable = funcType->Component->Name;
 									}
 									else
-										Error(30052, L"ordinary functions not allowed as argument to function-typed module parameter.", arg.Ptr());
+										Error(30052, "ordinary functions not allowed as argument to function-typed module parameter.", arg.Ptr());
 								}
 								else
-									Error(30051, L"invalid value for argument '" + arg->ArgumentName.Content, arg.Ptr());
+									Error(30051, "invalid value for argument '" + arg->ArgumentName.Content, arg.Ptr());
 							}
 							else
 							{
 								arg->Accept(this);
 								if (!refComp->Type->DataType->Equals(arg->Expression->Type.Ptr()))
 								{
-									Error(33027, L"argument type (" + arg->Expression->Type->ToString() + L") does not match parameter type (" + refComp->Type->DataType->ToString() + L")", arg->Expression.Ptr());
+									Error(33027, "argument type (" + arg->Expression->Type->ToString() + ") does not match parameter type (" + refComp->Type->DataType->ToString() + ")", arg->Expression.Ptr());
 								}
 								if (!refComp->IsParam())
-									Error(33028, L"'" + arg->ArgumentName.Content + L"' is not a parameter of '" + import->ShaderName.Content + L"'.", arg->ArgumentName);
+									Error(33028, "'" + arg->ArgumentName.Content + "' is not a parameter of '" + import->ShaderName.Content + "'.", arg->ArgumentName);
 							}
 						}
 						else
-							Error(33028, L"'" + arg->ArgumentName.Content + L"' is not a parameter of '" + import->ShaderName.Content + L"'.", arg->ArgumentName);
+							Error(33028, "'" + arg->ArgumentName.Content + "' is not a parameter of '" + import->ShaderName.Content + "'.", arg->ArgumentName);
 					}
 				}
 				return import;
@@ -468,7 +468,7 @@ namespace Spire
 					if (comp->Expression || comp->BlockStatement)
 					{
 						if (compSym->IsParam())
-							Error(33040, L"'require': cannot define computation on component requirements.", comp);
+							Error(33040, "'require': cannot define computation on component requirements.", comp);
 					}
 					currentComp = nullptr;
 					return comp;
@@ -478,7 +478,7 @@ namespace Spire
 					RefPtr<ShaderSymbol> refShader;
 					symbolTable->Shaders.TryGetValue(import->ShaderName.Content, refShader);
 					if (!refShader)
-						Error(33015, L"undefined identifier \'" + import->ShaderName.Content + L"\'.", import->ShaderName);
+						Error(33015, "undefined identifier \'" + import->ShaderName.Content + "\'.", import->ShaderName);
 					currentShader->DependentShaders.Add(refShader.Ptr());
 					if (!currentComp)
 					{
@@ -494,13 +494,13 @@ namespace Spire
 							if (currentShader->ShaderObjects.ContainsKey(import->ObjectName.Content) ||
 								currentShader->Components.ContainsKey(import->ObjectName.Content))
 							{
-								Error(33018, L"\'" + import->ShaderName.Content + L"\' is already defined.", import->ShaderName);
+								Error(33018, "\'" + import->ShaderName.Content + "\' is already defined.", import->ShaderName);
 							}
 							currentShader->ShaderObjects[import->ObjectName.Content] = su;
 						}
 					}
 					if (currentComp)
-						Error(33016, L"'using': importing not allowed in component definition.", import->ShaderName);
+						Error(33016, "'using': importing not allowed in component definition.", import->ShaderName);
 					return import;
 				}
 			};
@@ -525,8 +525,8 @@ namespace Spire
 					{
 						// current compilation context has more than one pipeline defined,
 						// in which case we do not allow implicit pipeline specification
-						Error(33002, L"explicit pipeline specification required for shader '" +
-							shader->Name.Content + L"' because multiple pipelines are defined in current context.", curShader->Name);
+						Error(33002, "explicit pipeline specification required for shader '" +
+							shader->Name.Content + "' because multiple pipelines are defined in current context.", curShader->Name);
 					}
 				}
 
@@ -538,7 +538,7 @@ namespace Spire
 						shaderSymbol->Pipeline = pipeline->Ptr();
 					else
 					{
-						Error(33010, L"pipeline \'" + pipelineName + L"' is not defined.", shader->Pipeline);
+						Error(33010, "pipeline \'" + pipelineName + "' is not defined.", shader->Pipeline);
 						throw 0;
 					}
 				}
@@ -556,7 +556,7 @@ namespace Spire
 							shaderSymbol->IsAbstract = true;
 							if (!shaderSymbol->SyntaxNode->IsModule)
 							{
-								Error(33009, L"parameters can only be defined in modules.", shaderSymbol->SyntaxNode);
+								Error(33009, "parameters can only be defined in modules.", shaderSymbol->SyntaxNode);
 							}
 						}
 						for (auto & param : comp->Parameters)
@@ -580,8 +580,8 @@ namespace Spire
 							for (auto & world : userSpecifiedWorlds)
 							{
 								if (!shaderSymbol->Pipeline->WorldDependency.ContainsKey(world.World.Content))
-									Error(33012, L"\'" + world.World.Content + L"' is not a defined world in '" +
-										pipelineName + L"'.", world.World);
+									Error(33012, "\'" + world.World.Content + "' is not a defined world in '" +
+										pipelineName + "'.", world.World);
 								WorldSymbol worldSym;
 
 								if (shaderSymbol->Pipeline->Worlds.TryGetValue(world.World.Content, worldSym))
@@ -591,7 +591,7 @@ namespace Spire
 										inAbstractWorld = true;
 										if (userSpecifiedWorlds.Count() > 1)
 										{
-											Error(33013, L"abstract world cannot appear with other worlds.",
+											Error(33013, "abstract world cannot appear with other worlds.",
 												world.World);
 										}
 									}
@@ -601,7 +601,7 @@ namespace Spire
 						if (!inAbstractWorld && !impl->SyntaxNode->IsParam
 							&& !impl->SyntaxNode->Expression && !impl->SyntaxNode->BlockStatement)
 						{
-							Error(33014, L"non-abstract component must have an implementation.",
+							Error(33014, "non-abstract component must have an implementation.",
 								impl->SyntaxNode.Ptr());
 						}
 					}
@@ -672,8 +672,8 @@ namespace Spire
 					comp->Expression = comp->Expression->Accept(this).As<ExpressionSyntaxNode>();
 					if (!MatchType_ValueReceiver(compSym->Type->DataType.Ptr(), comp->Expression->Type.Ptr()) && 
 						!comp->Expression->Type->Equals(ExpressionType::Error.Ptr()))
-						Error(30019, L"type mismatch \'" + comp->Expression->Type->ToString() + L"\' and \'" +
-							currentComp->Type->DataType->ToString() + L"\'", comp->Name);
+						Error(30019, "type mismatch \'" + comp->Expression->Type->ToString() + "\' and \'" +
+							currentComp->Type->DataType->ToString() + "\'", comp->Name);
 				}
 				if (comp->BlockStatement)
 					comp->BlockStatement->Accept(this);
@@ -715,11 +715,11 @@ namespace Spire
 					}
 					else
 					{
-						Error(33019, L"component \'" + compImpl->SyntaxNode->Name.Content + L"\': definition marked as 'export' must have an explicitly specified world.",
+						Error(33019, "component \'" + compImpl->SyntaxNode->Name.Content + "\': definition marked as 'export' must have an explicitly specified world.",
 							compImpl->SyntaxNode.Ptr());
 					}
 					if (compImpl->SyntaxNode->Parameters.Count() > 0)
-						Error(33037, L"component '" + compImpl->SyntaxNode->Name.Content + L"\': definition marked as 'export' cannot have parameters.",
+						Error(33037, "component '" + compImpl->SyntaxNode->Name.Content + "\': definition marked as 'export' cannot have parameters.",
 							compImpl->SyntaxNode->Name);
 				}
 				auto compName = GetFullComponentName(comp.Ptr());
@@ -734,16 +734,16 @@ namespace Spire
 				else
 				{
 					if (comp->IsParam)
-						Error(33029, L"\'" + compImpl->SyntaxNode->Name.Content + L"\': requirement clash with previous definition.",
+						Error(33029, "\'" + compImpl->SyntaxNode->Name.Content + "\': requirement clash with previous definition.",
 							compImpl->SyntaxNode.Ptr());
 					else
 					{
 						if (!compSym->Type->DataType->Equals(comp->Type.Ptr()))
-							Error(30035, L"'" + comp->Name.Content + L"': type of overloaded component mismatches previous definition.\nsee previous definition at " +
+							Error(30035, "'" + comp->Name.Content + "': type of overloaded component mismatches previous definition.\nsee previous definition at " +
 								compSym->Implementations.First()->SyntaxNode->Position.ToString(), comp->Name);
 					}
 					if (compImpl->SyntaxNode->Parameters.Count())
-						Error(33032, L"\'" + compImpl->SyntaxNode->Name.Content + L"\': function redefinition.\nsee previous definition at " +
+						Error(33032, "\'" + compImpl->SyntaxNode->Name.Content + "\': function redefinition.\nsee previous definition at " +
 							compSym->Implementations.Last()->SyntaxNode->Position.ToString(), compImpl->SyntaxNode.Ptr());
 					symbolTable->CheckComponentImplementationConsistency(err, compSym.Ptr(), compImpl.Ptr());
 				}
@@ -781,15 +781,15 @@ namespace Spire
 					if (funcNames.Contains(func->InternalName))
 					{
 						StringBuilder argList;
-						argList << L"(";
+						argList << "(";
 						for (auto & param : func->Parameters)
 						{
 							argList << param->Type->ToString();
 							if (param != func->Parameters.Last())
-								argList << L", ";
+								argList << ", ";
 						}
-						argList << L")";
-						Error(30001, L"\'" + func->Name + argList.ProduceString() + L"\': function redefinition.", func.Ptr());
+						argList << ")";
+						Error(30001, "\'" + func->Name + argList.ProduceString() + "\': function redefinition.", func.Ptr());
 					}
 					else
 						funcNames.Add(func->InternalName);
@@ -809,7 +809,7 @@ namespace Spire
 					shaderSym->SyntaxNode = shader.Ptr();
 					if (symbolTable->Shaders.ContainsKey(shader->Name.Content))
 					{
-						Error(33018, L"shader '" + shader->Name.Content + "' has already been defined.", shader->Name);
+						Error(33018, "shader '" + shader->Name.Content + "' has already been defined.", shader->Name);
 					}
 					symbolTable->Shaders[shader->Name.Content] = shaderSym;
 				}
@@ -828,7 +828,7 @@ namespace Spire
 					for (auto & shader : symbolTable->Shaders)
 						if (!sortedShaders.Contains(shader.Value.Ptr()))
 						{
-							Error(33011, L"shader '" + shader.Key + L"' involves circular reference.", shader.Value->SyntaxNode->Name);
+							Error(33011, "shader '" + shader.Key + "' involves circular reference.", shader.Value->SyntaxNode->Name);
 						}
 				}
 
@@ -886,7 +886,7 @@ namespace Spire
 				for (auto & para : functionNode->Parameters)
 				{
 					if (paraNames.Contains(para->Name))
-						Error(30002, L"parameter \'" + para->Name + L"\' already defined.", para.Ptr());
+						Error(30002, "parameter \'" + para->Name + "\' already defined.", para.Ptr());
 					else
 						paraNames.Add(para->Name);
 					VariableEntry varEntry;
@@ -895,8 +895,8 @@ namespace Spire
 					varEntry.Type.DataType = para->Type;
 					functionNode->Scope->Variables.AddIfNotExists(varEntry.Name, varEntry);
 					if (varEntry.Type.DataType->Equals(ExpressionType::Void.Ptr()))
-						Error(30016, L"'void' can not be parameter type.", para.Ptr());
-					internalName << L"@" << varEntry.Type.DataType->ToString();
+						Error(30016, "'void' can not be parameter type.", para.Ptr());
+					internalName << "@" << varEntry.Type.DataType->ToString();
 				}
 				functionNode->InternalName = internalName.ProduceString();	
 				RefPtr<FunctionSymbol> symbol = new FunctionSymbol();
@@ -923,13 +923,13 @@ namespace Spire
 			virtual RefPtr<StatementSyntaxNode> VisitBreakStatement(BreakStatementSyntaxNode *stmt) override
 			{
 				if (!loops.Count())
-					Error(30003, L"'break' must appear inside loop constructs.", stmt);
+					Error(30003, "'break' must appear inside loop constructs.", stmt);
 				return stmt;
 			}
 			virtual RefPtr<StatementSyntaxNode> VisitContinueStatement(ContinueStatementSyntaxNode *stmt) override
 			{
 				if (!loops.Count())
-					Error(30004, L"'continue' must appear inside loop constructs.", stmt);
+					Error(30004, "'continue' must appear inside loop constructs.", stmt);
 				return stmt;
 			}
 			virtual RefPtr<StatementSyntaxNode> VisitDoWhileStatement(DoWhileStatementSyntaxNode *stmt) override
@@ -940,7 +940,7 @@ namespace Spire
 				if (!stmt->Predicate->Type->Equals(ExpressionType::Error.Ptr()) && 
 					!stmt->Predicate->Type->Equals(ExpressionType::Int.Ptr()) &&
 					!stmt->Predicate->Type->Equals(ExpressionType::Bool.Ptr()))
-					Error(30005, L"'while': expression must evaluate to int.", stmt);
+					Error(30005, "'while': expression must evaluate to int.", stmt);
 				stmt->Statement->Accept(this);
 
 				loops.RemoveAt(loops.Count() - 1);
@@ -971,7 +971,7 @@ namespace Spire
 						!stmt->PredicateExpression->Type->Equals(ExpressionType::Int.Ptr()) &&
 						!stmt->PredicateExpression->Type->Equals(ExpressionType::UInt.Ptr()))
 					{
-						Error(30028, L"'for': predicate expression must evaluate to bool.", stmt->PredicateExpression.Ptr());
+						Error(30028, "'for': predicate expression must evaluate to bool.", stmt->PredicateExpression.Ptr());
 					}
 				}
 				if (stmt->SideEffectExpression)
@@ -990,7 +990,7 @@ namespace Spire
 				if (!stmt->Predicate->Type->Equals(ExpressionType::Error.Ptr()) 
 					&& (!stmt->Predicate->Type->Equals(ExpressionType::Int.Ptr()) && 
 						!stmt->Predicate->Type->Equals(ExpressionType::Bool.Ptr())))
-					Error(30006, L"'if': expression must evaluate to int.", stmt);
+					Error(30006, "'if': expression must evaluate to int.", stmt);
 
 				if (stmt->PositiveStatement != NULL)
 					stmt->PositiveStatement->Accept(this);
@@ -1004,12 +1004,12 @@ namespace Spire
 				if (currentCompNode && currentCompNode->BlockStatement->Statements.Count() &&
 					stmt != currentCompNode->BlockStatement->Statements.Last().Ptr())
 				{
-					Error(30026, L"'return' can only appear as the last statement in component definition.", stmt);
+					Error(30026, "'return' can only appear as the last statement in component definition.", stmt);
 				}
 				if (!stmt->Expression)
 				{
 					if (function && !function->ReturnType->Equals(ExpressionType::Void.Ptr()))
-						Error(30006, L"'return' should have an expression.", stmt);
+						Error(30006, "'return' should have an expression.", stmt);
 				}
 				else
 				{
@@ -1017,18 +1017,18 @@ namespace Spire
 					if (!stmt->Expression->Type->Equals(ExpressionType::Error.Ptr()))
 					{
 						if (function && !MatchType_ValueReceiver(function->ReturnType.Ptr(), stmt->Expression->Type.Ptr()))
-							Error(30007, L"expression type '" + stmt->Expression->Type->ToString()
-								+ L"' does not match function's return type '"
-								+ function->ReturnType->ToString() + L"'", stmt);
+							Error(30007, "expression type '" + stmt->Expression->Type->ToString()
+								+ "' does not match function's return type '"
+								+ function->ReturnType->ToString() + "'", stmt);
 						if (currentComp && !MatchType_ValueReceiver(currentComp->Type->DataType.Ptr(), stmt->Expression->Type.Ptr()))
 						{
-							Error(30007, L"expression type '" + stmt->Expression->Type->ToString()
-								+ L"' does not match component's type '"
-								+ currentComp->Type->DataType->ToString() + L"'", stmt);
+							Error(30007, "expression type '" + stmt->Expression->Type->ToString()
+								+ "' does not match component's type '"
+								+ currentComp->Type->DataType->ToString() + "'", stmt);
 						}
 						if (currentImportOperator && !MatchType_GenericType(currentImportOperator->TypeName.Content, stmt->Expression->Type.Ptr()))
-							Error(30020, L"import operator should return '" + currentImportOperator->TypeName.Content
-								+ L"', but the expression has type '" + stmt->Expression->Type->ToString() + L"'. do you forget 'project'?", stmt);
+							Error(30020, "import operator should return '" + currentImportOperator->TypeName.Content
+								+ "', but the expression has type '" + stmt->Expression->Type->ToString() + "'. do you forget 'project'?", stmt);
 					}
 				}
 				return stmt;
@@ -1038,24 +1038,24 @@ namespace Spire
 				stmt->Type = TranslateTypeNode(stmt->TypeNode);
 				if (stmt->Type->IsTextureOrSampler() || stmt->Type->AsGenericType())
 				{
-					Error(30033, L"cannot declare a local variable of this type.", stmt);
+					Error(30033, "cannot declare a local variable of this type.", stmt);
 				}
 				else if (stmt->Type->AsBasicType() && stmt->Type->AsBasicType()->RecordTypeName.Length())
 				{
-					Error(33034, L"cannot declare a record-typed variable in an import operator.", stmt);
+					Error(33034, "cannot declare a record-typed variable in an import operator.", stmt);
 				}
 				for (auto & para : stmt->Variables)
 				{
 					VariableEntry varDeclr;
 					varDeclr.Name = para->Name;
 					if (stmt->Scope->Variables.ContainsKey(para->Name))
-						Error(30008, L"variable " + para->Name + L" already defined.", para.Ptr());
+						Error(30008, "variable " + para->Name + " already defined.", para.Ptr());
 
 					varDeclr.Type.DataType = stmt->Type;
 					if (varDeclr.Type.DataType->Equals(ExpressionType::Void.Ptr()))
-						Error(30009, L"invalid type 'void'.", stmt);
+						Error(30009, "invalid type 'void'.", stmt);
 					if (varDeclr.Type.DataType->IsArray() && varDeclr.Type.DataType->AsArrayType()->ArrayLength <= 0)
-						Error(30025, L"array size must be larger than zero.", stmt);
+						Error(30025, "array size must be larger than zero.", stmt);
 
 					stmt->Scope->Variables.AddIfNotExists(para->Name, varDeclr);
 					if (para->Expression != NULL)
@@ -1064,8 +1064,8 @@ namespace Spire
 						if (!MatchType_ValueReceiver(varDeclr.Type.DataType.Ptr(), para->Expression->Type.Ptr())
 							&& !para->Expression->Type->Equals(ExpressionType::Error.Ptr()))
 						{
-							Error(30019, L"type mismatch \'" + para->Expression->Type->ToString() + L"\' and \'" +
-								varDeclr.Type.DataType->ToString() + L"\'", para.Ptr());
+							Error(30019, "type mismatch \'" + para->Expression->Type->ToString() + "\' and \'" +
+								varDeclr.Type.DataType->ToString() + "\'", para.Ptr());
 						}
 					}
 				}
@@ -1078,7 +1078,7 @@ namespace Spire
 				if (!stmt->Predicate->Type->Equals(ExpressionType::Error.Ptr()) && 
 					!stmt->Predicate->Type->Equals(ExpressionType::Int.Ptr()) &&
 					!stmt->Predicate->Type->Equals(ExpressionType::Bool.Ptr()))
-					Error(30010, L"'while': expression must evaluate to int.", stmt);
+					Error(30010, "'while': expression must evaluate to int.", stmt);
 
 				stmt->Statement->Accept(this);
 				loops.RemoveAt(loops.Count() - 1);
@@ -1100,7 +1100,7 @@ namespace Spire
 				{
 					if (!(leftType->AsBasicType() && leftType->AsBasicType()->IsLeftValue) &&
 						!leftType->Equals(ExpressionType::Error.Ptr()))
-						Error(30011, L"left of '=' is not an l-value.", expr->LeftExpression.Ptr());
+						Error(30011, "left of '=' is not an l-value.", expr->LeftExpression.Ptr());
 					if (expr->Operator == Operator::AndAssign ||
 						expr->Operator == Operator::OrAssign ||
 						expr->Operator == Operator::XorAssign ||
@@ -1109,7 +1109,7 @@ namespace Spire
 					{
 						if (!(leftType->IsIntegral() && rightType->IsIntegral()))
 						{
-							Error(30041, L"bit operation: operand must be integral type.", expr);
+							Error(30041, "bit operation: operand must be integral type.", expr);
 						}
 					}
 					expr->LeftExpression->Access = ExpressionAccess::Write;
@@ -1137,8 +1137,8 @@ namespace Spire
 					{
 						expr->Type = ExpressionType::Error;
 						if (!leftType->Equals(ExpressionType::Error.Ptr()) && !rightType->Equals(ExpressionType::Error.Ptr()))
-							Error(30012, L"no overload found for operator " + OperatorToString(expr->Operator) + L" (" + leftType->ToString() + L", "
-								+ rightType->ToString() + L").", expr);
+							Error(30012, "no overload found for operator " + OperatorToString(expr->Operator) + " (" + leftType->ToString() + ", "
+								+ rightType->ToString() + ").", expr);
 					}
 					else
 					{
@@ -1179,20 +1179,20 @@ namespace Spire
 				{
 					auto & baseExprType = expr->BaseExpression->Type;
 					bool isValid = baseExprType->AsGenericType() &&
-							(baseExprType->AsGenericType()->GenericTypeName == L"StructuredBuffer" ||
-								baseExprType->AsGenericType()->GenericTypeName == L"RWStructuredBuffer" ||
-							 baseExprType->AsGenericType()->GenericTypeName == L"PackedBuffer");
+							(baseExprType->AsGenericType()->GenericTypeName == "StructuredBuffer" ||
+								baseExprType->AsGenericType()->GenericTypeName == "RWStructuredBuffer" ||
+							 baseExprType->AsGenericType()->GenericTypeName == "PackedBuffer");
 					isValid = isValid || (baseExprType->AsBasicType() && GetVectorSize(baseExprType->AsBasicType()->BaseType) != 0);
 					isValid = isValid || baseExprType->AsArrayType();
 					if (!isValid)
 					{
-						Error(30013, L"'[]' can only index on arrays.", expr);
+						Error(30013, "'[]' can only index on arrays.", expr);
 						expr->Type = ExpressionType::Error;
 					}
 					if (!expr->IndexExpression->Type->Equals(ExpressionType::Int.Ptr()) && 
 						!expr->IndexExpression->Type->Equals(ExpressionType::UInt.Ptr()))
 					{
-						Error(30014, L"index expression must evaluate to int.", expr);
+						Error(30014, "index expression must evaluate to int.", expr);
 						expr->Type = ExpressionType::Error;
 					}
 				}
@@ -1359,14 +1359,14 @@ namespace Spire
 						// component with explicit import operator call must be qualified with explicit rate
 						if (!currentCompNode->Rate)
 						{
-							Error(33071, L"cannot call an import operator from an auto-placed component '" + currentCompNode->Name.Content + L"'. try qualify the component with explicit worlds.",
+							Error(33071, "cannot call an import operator from an auto-placed component '" + currentCompNode->Name.Content + "'. try qualify the component with explicit worlds.",
 								varExpr);
 							invoke->Type = ExpressionType::Error;
 							return invoke;
 						}
 						// for now we do not support calling import operator from a multi-world component definition
 						if (currentCompNode->Rate->Worlds.Count() > 1)
-							Error(33073, L"cannot call an import operator from a multi-world component definition. consider qualify the component with only one explicit world.",
+							Error(33073, "cannot call an import operator from a multi-world component definition. consider qualify the component with only one explicit world.",
 								varExpr);
 						auto validOverloads = From(*impOpList).Where([&](RefPtr<ImportOperatorDefSyntaxNode> imp) { return imp->DestWorld.Content == currentCompNode->Rate->Worlds.First().World.Content; }).ToList();
 						auto func = FindFunctionOverload(validOverloads, [](RefPtr<ImportOperatorDefSyntaxNode> imp)
@@ -1395,11 +1395,11 @@ namespace Spire
 							{
 								argList << arguments[i]->Type->ToString();
 								if (i != arguments.Count() - 1)
-									argList << L", ";
+									argList << ", ";
 							}
-							Error(33072, L"'" + varExpr->Variable + L"' is an import operator defined in pipeline '" + currentShader->Pipeline->SyntaxNode->Name.Content
-								+ L"', but none of the import operator overloads converting to world '" + currentCompNode->Rate->Worlds.First().World.Content + L"' matches argument list (" +
-								argList.ProduceString() + L").",
+							Error(33072, "'" + varExpr->Variable + "' is an import operator defined in pipeline '" + currentShader->Pipeline->SyntaxNode->Name.Content
+								+ "', but none of the import operator overloads converting to world '" + currentCompNode->Rate->Worlds.First().World.Content + "' matches argument list (" +
+								argList.ProduceString() + ").",
 								varExpr);
 							invoke->Type = ExpressionType::Error;
 						}
@@ -1412,8 +1412,8 @@ namespace Spire
 				RefPtr<FunctionSymbol> func;
 				varExpr->Variable = TranslateHLSLTypeNames(varExpr->Variable);
 
-				if (varExpr->Variable == L"texture" && arguments.Count() > 0 &&
-					arguments[0]->Type->IsGenericType(L"Texture"))
+				if (varExpr->Variable == "texture" && arguments.Count() > 0 &&
+					arguments[0]->Type->IsGenericType("Texture"))
 				{
 					if (arguments.Count() != 2)
 					{
@@ -1438,13 +1438,13 @@ namespace Spire
 						}
 					}
 					auto funcType = new BasicExpressionType(BaseType::Function);
-					funcType->Func = symbolTable->FunctionOverloads[L"texture"]().First().Ptr();
+					funcType->Func = symbolTable->FunctionOverloads["texture"]().First().Ptr();
 					varExpr->Type = funcType;
 				}
 				else
 				{
 					// find function overload with implicit argument type conversions
-					auto namePrefix = varExpr->Variable + L"@";
+					auto namePrefix = varExpr->Variable + "@";
 					List<RefPtr<FunctionSymbol>> * functionOverloads = symbolTable->FunctionOverloads.TryGetValue(varExpr->Variable);
 					if (functionOverloads)
 					{
@@ -1478,12 +1478,12 @@ namespace Spire
 					{
 						argList << arguments[i]->Type->ToString();
 						if (i != arguments.Count() - 1)
-							argList << L", ";
+							argList << ", ";
 					}
 					if (functionNameFound)
-						Error(30021, varExpr->Variable + L": no overload takes arguments (" + argList.ProduceString() + L")", varExpr);
+						Error(30021, varExpr->Variable + ": no overload takes arguments (" + argList.ProduceString() + ")", varExpr);
 					else
-						Error(30015, L"undefined identifier '" + varExpr->Variable + L"'.", varExpr);
+						Error(30015, "undefined identifier '" + varExpr->Variable + "'.", varExpr);
 				}
 				return invoke;
 			}
@@ -1492,13 +1492,13 @@ namespace Spire
 			{
 				if (currentImportOperator == nullptr)
 				{
-					Error(30030, L"'project': invalid use outside import operator.", project);
+					Error(30030, "'project': invalid use outside import operator.", project);
 					return project;
 				}
 				project->BaseExpression->Accept(this);
 				auto baseType = project->BaseExpression->Type->AsBasicType();
 				if (!baseType || baseType->RecordTypeName != currentImportOperator->SourceWorld.Content)
-					Error(30031, L"'project': expression must evaluate to record type '" + currentImportOperator->SourceWorld.Content + L"'.", project);
+					Error(30031, "'project': expression must evaluate to record type '" + currentImportOperator->SourceWorld.Content + "'.", project);
 				auto rsType = new BasicExpressionType(BaseType::Generic);
 				project->Type = rsType;
 				rsType->GenericTypeVar = currentImportOperator->TypeName.Content;
@@ -1517,7 +1517,7 @@ namespace Spire
 				}
 				else
 				{
-					Error(33070, L"expression preceding parenthesis of apparent call must have function type.", expr->FunctionExpr.Ptr());
+					Error(33070, "expression preceding parenthesis of apparent call must have function type.", expr->FunctionExpr.Ptr());
 					expr->Type = ExpressionType::Error;
 				}
 				return expr;
@@ -1553,7 +1553,7 @@ namespace Spire
 									if (i < expr->Arguments.Count() && expr->Arguments[i]->Type->AsBasicType() &&
 										!expr->Arguments[i]->Type->AsBasicType()->IsLeftValue)
 									{
-										Error(30047, L"argument passed to parameter '" + (*params)[i]->Name + L"' must be l-value.",
+										Error(30047, "argument passed to parameter '" + (*params)[i]->Name + "' must be l-value.",
 											expr->Arguments[i].Ptr());
 									}
 								}
@@ -1569,67 +1569,67 @@ namespace Spire
 				switch (op)
 				{
 				case Spire::Compiler::Operator::Neg:
-					return L"-";
+					return "-";
 				case Spire::Compiler::Operator::Not:
-					return L"!";
+					return "!";
 				case Spire::Compiler::Operator::PreInc:
-					return L"++";
+					return "++";
 				case Spire::Compiler::Operator::PreDec:
-					return L"--";
+					return "--";
 				case Spire::Compiler::Operator::PostInc:
-					return L"++";
+					return "++";
 				case Spire::Compiler::Operator::PostDec:
-					return L"--";
+					return "--";
 				case Spire::Compiler::Operator::Mul:
 				case Spire::Compiler::Operator::MulAssign:
-					return L"*";
+					return "*";
 				case Spire::Compiler::Operator::Div:
 				case Spire::Compiler::Operator::DivAssign:
-					return L"/";
+					return "/";
 				case Spire::Compiler::Operator::Mod:
 				case Spire::Compiler::Operator::ModAssign:
-					return L"%";
+					return "%";
 				case Spire::Compiler::Operator::Add:
 				case Spire::Compiler::Operator::AddAssign:
-					return L"+";
+					return "+";
 				case Spire::Compiler::Operator::Sub:
 				case Spire::Compiler::Operator::SubAssign:
-					return L"-";
+					return "-";
 				case Spire::Compiler::Operator::Lsh:
 				case Spire::Compiler::Operator::LshAssign:
-					return L"<<";
+					return "<<";
 				case Spire::Compiler::Operator::Rsh:
 				case Spire::Compiler::Operator::RshAssign:
-					return L">>";
+					return ">>";
 				case Spire::Compiler::Operator::Eql:
-					return L"==";
+					return "==";
 				case Spire::Compiler::Operator::Neq:
-					return L"!=";
+					return "!=";
 				case Spire::Compiler::Operator::Greater:
-					return L">";
+					return ">";
 				case Spire::Compiler::Operator::Less:
-					return L"<";
+					return "<";
 				case Spire::Compiler::Operator::Geq:
-					return L">=";
+					return ">=";
 				case Spire::Compiler::Operator::Leq:
-					return L"<=";
+					return "<=";
 				case Spire::Compiler::Operator::BitAnd:
 				case Spire::Compiler::Operator::AndAssign:
-					return L"&";
+					return "&";
 				case Spire::Compiler::Operator::BitXor:
 				case Spire::Compiler::Operator::XorAssign:
-					return L"^";
+					return "^";
 				case Spire::Compiler::Operator::BitOr:
 				case Spire::Compiler::Operator::OrAssign:
-					return L"|";
+					return "|";
 				case Spire::Compiler::Operator::And:
-					return L"&&";
+					return "&&";
 				case Spire::Compiler::Operator::Or:
-					return L"||";
+					return "||";
 				case Spire::Compiler::Operator::Assign:
-					return L"=";
+					return "=";
 				default:
-					return L"ERROR";
+					return "ERROR";
 				}
 			}
 			virtual RefPtr<ExpressionSyntaxNode> VisitUnaryExpression(UnaryExpressionSyntaxNode *expr) override
@@ -1646,7 +1646,7 @@ namespace Spire
 				{
 					expr->Type = ExpressionType::Error;
 					if (!expr->Expression->Type->Equals(ExpressionType::Error.Ptr()))
-						Error(30012, L"no overload found for operator " + OperatorToString(expr->Operator) + L" (" + expr->Expression->Type->ToString() + L").", expr);
+						Error(30012, "no overload found for operator " + OperatorToString(expr->Operator) + " (" + expr->Expression->Type->ToString() + ").", expr);
 				}
 				else
 				{
@@ -1681,7 +1681,7 @@ namespace Spire
 						expr->Type = comp->Type->DataType;
 					}
 					else
-						Error(30015, L"undefined identifier \'" + expr->Variable + L"\'", expr);
+						Error(30015, "undefined identifier \'" + expr->Variable + "\'", expr);
 				}
 				else if (currentShader)
 				{
@@ -1694,16 +1694,16 @@ namespace Spire
 					}
 					else if (compRef.Component)
 					{
-						Error(30017, L"component \'" + expr->Variable + L"\' is not accessible from shader '" + currentShader->SyntaxNode->Name.Content + L"'.", expr);
+						Error(30017, "component \'" + expr->Variable + "\' is not accessible from shader '" + currentShader->SyntaxNode->Name.Content + "'.", expr);
 					}
 					else
-						Error(30015, L"undefined identifier \'" + expr->Variable + L"\'", expr);
-					expr->Tags[L"ComponentReference"] = new ComponentReferenceObject(compRef.Component);
+						Error(30015, "undefined identifier \'" + expr->Variable + "\'", expr);
+					expr->Tags["ComponentReference"] = new ComponentReferenceObject(compRef.Component);
 				}
 				else
-					Error(30015, L"undefined identifier \'" + expr->Variable + L"\'", expr);
+					Error(30015, "undefined identifier \'" + expr->Variable + "\'", expr);
 
-				if (expr->Type->IsGenericType(L"Uniform") || expr->Type->IsGenericType(L"Patch") || expr->Type->IsGenericType(L"StorageBuffer"))
+				if (expr->Type->IsGenericType("Uniform") || expr->Type->IsGenericType("Patch") || expr->Type->IsGenericType("StorageBuffer"))
 					expr->Type = expr->Type->AsGenericType()->BaseType;
 
 				return expr;
@@ -1729,8 +1729,8 @@ namespace Spire
 					expr->Type = ExpressionType::Error;
 				if (expr->Type->Equals(ExpressionType::Error.Ptr()) && !expr->Expression->Type->Equals(ExpressionType::Error.Ptr()))
 				{
-					Error(30022, L"invalid type cast between \"" + expr->Expression->Type->ToString() + L"\" and \"" +
-						targetType->ToString() + L"\".", expr);
+					Error(30022, "invalid type cast between \"" + expr->Expression->Type->ToString() + "\" and \"" +
+						targetType->ToString() + "\".", expr);
 				}
 				return expr;
 			}
@@ -1741,13 +1741,13 @@ namespace Spire
 					&& !expr->SelectorExpr->Type->Equals(ExpressionType::Error.Ptr()))
 				{
 					expr->Type = ExpressionType::Error;
-					Error(30079, L"selector must evaluate to bool.", expr);
+					Error(30079, "selector must evaluate to bool.", expr);
 				}
 				expr->Expr0 = expr->Expr0->Accept(this).As<ExpressionSyntaxNode>();
 				expr->Expr1 = expr->Expr1->Accept(this).As<ExpressionSyntaxNode>();
 				if (!expr->Expr0->Type->Equals(expr->Expr1->Type.Ptr()))
 				{
-					Error(30080, L"the two value expressions in a select clause must have same type.", expr);
+					Error(30080, "the two value expressions in a select clause must have same type.", expr);
 				}
 				expr->Type = expr->Expr0->Type;
 				return expr;
@@ -1772,20 +1772,20 @@ namespace Spire
 							auto ch = expr->MemberName[i];
 							switch (ch)
 							{
-							case L'x':
-							case L'r':
+							case 'x':
+							case 'r':
 								children.Add(0);
 								break;
-							case L'y':
-							case L'g':
+							case 'y':
+							case 'g':
 								children.Add(1);
 								break;
-							case L'z':
-							case L'b':
+							case 'z':
+							case 'b':
 								children.Add(2);
 								break;
-							case L'w':
-							case L'a':
+							case 'w':
+							case 'a':
 								children.Add(3);
 								break;
 							default:
@@ -1855,7 +1855,7 @@ namespace Spire
 					}
 					else
 						expr->Type = ExpressionType::Error;
-					expr->Tags[L"ComponentReference"] = new ComponentReferenceObject(refComp.Component);
+					expr->Tags["ComponentReference"] = new ComponentReferenceObject(refComp.Component);
 				}
 				else if (baseType->IsStruct())
 				{
@@ -1863,8 +1863,8 @@ namespace Spire
 					if (id == -1)
 					{
 						expr->Type = ExpressionType::Error;
-						Error(30027, L"\'" + expr->MemberName + L"\' is not a member of \'" +
-							baseType->AsBasicType()->Struct->Name + L"\'.", expr);
+						Error(30027, "\'" + expr->MemberName + "\' is not a member of \'" +
+							baseType->AsBasicType()->Struct->Name + "\'.", expr);
 					}
 					else
 						expr->Type = baseType->AsBasicType()->Struct->SyntaxNode->Fields[id]->Type;
@@ -1878,8 +1878,8 @@ namespace Spire
 				if (!baseType->Equals(ExpressionType::Error.Ptr()) &&
 					expr->Type->Equals(ExpressionType::Error.Ptr()))
 				{
-					Error(30023, L"\"" + baseType->ToString() + L"\" does not have public member \"" +
-						expr->MemberName + L"\".", expr);
+					Error(30023, "\"" + baseType->ToString() + "\" does not have public member \"" +
+						expr->MemberName + "\".", expr);
 				}
 				return expr;
 			}

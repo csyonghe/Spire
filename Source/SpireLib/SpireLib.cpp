@@ -19,11 +19,11 @@ namespace SpireLib
 			auto token = parser.ReadToken();
 			int endPos = token.Position.Pos + 1;
 			int brace = 0;
-			while (endPos < src.Length() && !(src[endPos] == L'}' && brace == 0))
+			while (endPos < src.Length() && !(src[endPos] == '}' && brace == 0))
 			{
-				if (src[endPos] == L'{')
+				if (src[endPos] == '{')
 					brace++;
-				else if (src[endPos] == L'}')
+				else if (src[endPos] == '}')
 					brace--;
 				endPos++;
 			}
@@ -32,24 +32,24 @@ namespace SpireLib
 			parser.ReadToken();
 			return src.SubString(token.Position.Pos + 1, endPos - token.Position.Pos - 1);
 		};
-		while (!parser.IsEnd() && !parser.LookAhead(L"}"))
+		while (!parser.IsEnd() && !parser.LookAhead("}"))
 		{
 			auto worldName = parser.ReadWord();
 			StageSource compiledSrc;
-			if (parser.LookAhead(L"binary"))
+			if (parser.LookAhead("binary"))
 			{
 				parser.ReadToken();
-				parser.Read(L"{");
-				while (!parser.LookAhead(L"}") && !parser.IsEnd())
+				parser.Read("{");
+				while (!parser.LookAhead("}") && !parser.IsEnd())
 				{
 					auto val = parser.ReadUInt();
 					compiledSrc.BinaryCode.AddRange((unsigned char*)&val, sizeof(unsigned int));
-					if (parser.LookAhead(L","))
+					if (parser.LookAhead(","))
 						parser.ReadToken();
 				}
-				parser.Read(L"}");
+				parser.Read("}");
 			}
-			if (parser.LookAhead(L"text"))
+			if (parser.LookAhead("text"))
 			{
 				parser.ReadToken();
 				compiledSrc.MainCode = getShaderSource();
@@ -130,7 +130,7 @@ namespace SpireLib
 		auto searchDirs = options.SearchDirectories;
 		searchDirs.Add(Path::GetDirectoryName(fileName));
 		searchDirs.Reverse();
-		auto predefUnit = compiler->Parse(compileResult, SpireStdLib::GetCode(), L"stdlib");
+		auto predefUnit = compiler->Parse(compileResult, SpireStdLib::GetCode(), "stdlib");
 		for (int i = 0; i < unitsToInclude.Count(); i++)
 		{
 			auto inputFileName = unitsToInclude[i];
@@ -161,14 +161,14 @@ namespace SpireLib
 						}
 						if (!found)
 						{
-							compileResult.GetErrorWriter()->Error(2, L"cannot find file '" + inputFileName + L"'.", inc.Position);
+							compileResult.GetErrorWriter()->Error(2, "cannot find file '" + inputFileName + "'.", inc.Position);
 						}
 					}
 				}
 			}
 			catch (IOException)
 			{
-				compileResult.GetErrorWriter()->Error(1, L"cannot open file '" + inputFileName + L"'.", CodePosition(0, 0, 0, L""));
+				compileResult.GetErrorWriter()->Error(1, "cannot open file '" + inputFileName + "'.", CodePosition(0, 0, 0, ""));
 			}
 		}
 		units.Add(predefUnit);
@@ -188,7 +188,7 @@ namespace SpireLib
 		}
 		catch (IOException)
 		{
-			compileResult.GetErrorWriter()->Error(1, L"cannot open file '" + Path::GetFileName(sourceFileName) + L"'.", CodePosition(0, 0, 0, L""));
+			compileResult.GetErrorWriter()->Error(1, "cannot open file '" + Path::GetFileName(sourceFileName) + "'.", CodePosition(0, 0, 0, ""));
 		}
 		return List<ShaderLibFile>();
 	}
@@ -200,61 +200,61 @@ namespace SpireLib
 	CoreLib::String ShaderLibFile::ToString()
 	{
 		StringBuilder writer;
-		writer << L"name " << MetaData.ShaderName << EndLine;
+		writer << "name " << MetaData.ShaderName << EndLine;
 		for (auto & stage : MetaData.Stages)
 		{
-			writer << L"stage " << stage.Key << EndLine << L"{" << EndLine;
-			writer << L"target " << stage.Value.TargetName << EndLine;
+			writer << "stage " << stage.Key << EndLine << "{" << EndLine;
+			writer << "target " << stage.Value.TargetName << EndLine;
 			for (auto & blk : stage.Value.InputBlocks)
 			{
-				writer << L"in " << blk << L";\n";
+				writer << "in " << blk << ";\n";
 			}
-			writer << L"out " << stage.Value.OutputBlock << L";\n";
+			writer << "out " << stage.Value.OutputBlock << ";\n";
 			for (auto & comp : stage.Value.Components)
-				writer << L"comp " << comp << L";\n";
-			writer << L"}" << EndLine;
+				writer << "comp " << comp << ";\n";
+			writer << "}" << EndLine;
 		}
 		for (auto & ublock : MetaData.InterfaceBlocks)
 		{
-			writer << L"interface " << ublock.Key << L" size " << ublock.Value.Size << L"\n{\n";
+			writer << "interface " << ublock.Key << " size " << ublock.Value.Size << "\n{\n";
 			for (auto & entry : ublock.Value.Entries)
 			{
-				writer << entry.Type->ToString() << L" " << entry.Name << L" : " << entry.Offset << L"," << entry.Size;
+				writer << entry.Type->ToString() << " " << entry.Name << " : " << entry.Offset << "," << entry.Size;
 				if (entry.Attributes.Count())
 				{
-					writer << L"\n{\n";
+					writer << "\n{\n";
 					for (auto & attrib : entry.Attributes)
 					{
-						writer << attrib.Key << L" : " << CoreLib::Text::EscapeStringLiteral(attrib.Value) << L";\n";
+						writer << attrib.Key << " : " << CoreLib::Text::EscapeStringLiteral(attrib.Value) << ";\n";
 					}
-					writer << L"}";
+					writer << "}";
 				}
-				writer << L";\n";
+				writer << ";\n";
 			}
-			writer << L"}\n";
+			writer << "}\n";
 		}
-		writer << L"source" << EndLine << L"{" << EndLine;
+		writer << "source" << EndLine << "{" << EndLine;
 		for (auto & src : Sources)
 		{
 			writer << src.Key << EndLine;
 			if (src.Value.BinaryCode.Count())
 			{
-				writer << L"binary" << EndLine << L"{" << EndLine;
+				writer << "binary" << EndLine << "{" << EndLine;
 				auto binaryBuffer = (unsigned int*)src.Value.BinaryCode.Buffer();
 				for (int i = 0; i < src.Value.BinaryCode.Count() / 4; i++)
 				{
-					writer << String((long long)binaryBuffer[i]) << L",";
+					writer << String((long long)binaryBuffer[i]) << ",";
 					if ((i + 1) % 10)
 						writer << EndLine;
 				}
-				writer << EndLine << L"}" << EndLine;
+				writer << EndLine << "}" << EndLine;
 			}
-			writer << L"text" << EndLine << L"{" << EndLine;
+			writer << "text" << EndLine << "{" << EndLine;
 			writer << src.Value.MainCode << EndLine;
 
-			writer << L"}" << EndLine;
+			writer << "}" << EndLine;
 		}
-		writer << L"}" << EndLine;
+		writer << "}" << EndLine;
 		StringBuilder formatSB;
 		IndentString(formatSB, writer.ProduceString());
 		return formatSB.ProduceString();
@@ -280,84 +280,84 @@ namespace SpireLib
 		while (!parser.IsEnd())
 		{
 			auto fieldName = parser.ReadWord();
-			if (fieldName == L"name")
+			if (fieldName == "name")
 			{
 				MetaData.ShaderName = parser.ReadWord();
 			}
-			else if (fieldName == L"source")
+			else if (fieldName == "source")
 			{
-				parser.Read(L"{");
+				parser.Read("{");
 				ReadSource(Sources, parser, src);
-				parser.Read(L"}");
+				parser.Read("}");
 			}
 
-			else if (fieldName == L"stage")
+			else if (fieldName == "stage")
 			{
 				StageMetaData stage;
 				stage.Name = parser.ReadWord();
-				parser.Read(L"{");
-				while (!parser.LookAhead(L"}"))
+				parser.Read("{");
+				while (!parser.LookAhead("}"))
 				{
 					auto subFieldName = parser.ReadWord();
-					if (subFieldName == L"target")
+					if (subFieldName == "target")
 						stage.TargetName = parser.ReadWord();
-					else if (subFieldName == L"in")
+					else if (subFieldName == "in")
 					{
 						stage.InputBlocks.Add(parser.ReadWord());
-						parser.Read(L";");
+						parser.Read(";");
 					}
-					else if (subFieldName == L"out")
+					else if (subFieldName == "out")
 					{
 						stage.OutputBlock = parser.ReadWord();
-						parser.Read(L";");
+						parser.Read(";");
 					}
-					else if (subFieldName == L"comp")
+					else if (subFieldName == "comp")
 					{
 						auto compName = parser.ReadWord();
-						parser.Read(L";");
+						parser.Read(";");
 						stage.Components.Add(compName);
 					}
 				}
-				parser.Read(L"}");
+				parser.Read("}");
 				MetaData.Stages[stage.Name] = stage;
 			}
-			else if (fieldName == L"interface")
+			else if (fieldName == "interface")
 			{
 				InterfaceBlockMetaData block;
-				if (!parser.LookAhead(L"{") && !parser.LookAhead(L"size"))
+				if (!parser.LookAhead("{") && !parser.LookAhead("size"))
 					block.Name = parser.ReadWord();
-				if (parser.LookAhead(L"size"))
+				if (parser.LookAhead("size"))
 				{
 					parser.ReadWord();
 					block.Size = parser.ReadInt();
 				}
-				parser.Read(L"{");
-				while (!parser.LookAhead(L"}") && !parser.IsEnd())
+				parser.Read("{");
+				while (!parser.LookAhead("}") && !parser.IsEnd())
 				{
 					InterfaceBlockEntry entry;
 					entry.Type = TypeFromString(parser);
 					entry.Name = parser.ReadWord();
-					parser.Read(L":");
+					parser.Read(":");
 					entry.Offset = parser.ReadInt();
-					parser.Read(L",");
+					parser.Read(",");
 					entry.Size = parser.ReadInt();
-					if (parser.LookAhead(L"{"))
+					if (parser.LookAhead("{"))
 					{
-						parser.Read(L"{");
-						while (!parser.LookAhead(L"}") && !parser.IsEnd())
+						parser.Read("{");
+						while (!parser.LookAhead("}") && !parser.IsEnd())
 						{
 							auto attribName = parser.ReadWord();
-							parser.Read(L":");
+							parser.Read(":");
 							auto attribValue = parser.ReadStringLiteral();
-							parser.Read(L";");
+							parser.Read(";");
 							entry.Attributes[attribName] = attribValue;
 						}
-						parser.Read(L"}");
+						parser.Read("}");
 					}
-					parser.Read(L";");
+					parser.Read(";");
 					block.Entries.Add(entry);
 				}
-				parser.Read(L"}");
+				parser.Read("}");
 				MetaData.InterfaceBlocks[block.Name] = block;
 			}
 		}
@@ -398,13 +398,13 @@ namespace SpireLib
 		String GetSource() const
 		{
 			StringBuilder codeBuilder;
-			codeBuilder << L"shader " << shaderName;
+			codeBuilder << "shader " << shaderName;
 			if (targetPipeline.Length())
-				codeBuilder << L":" << targetPipeline;
-			codeBuilder << L"\n{\n";
+				codeBuilder << ":" << targetPipeline;
+			codeBuilder << "\n{\n";
 			for (auto & m : usings)
-				codeBuilder << L"using " << m << L";\n";
-			codeBuilder << L"\n}\n";
+				codeBuilder << "using " << m << ";\n";
+			codeBuilder << "\n}\n";
 			return codeBuilder.ToString();
 		}
 	};
@@ -463,7 +463,7 @@ namespace SpireLib
 		{
 			compiler = CreateShaderCompiler();
 			compileContext = new Spire::Compiler::CompilationContext();
-			LoadModuleSource(SpireStdLib::GetCode(), L"stdlib");
+			LoadModuleSource(SpireStdLib::GetCode(), "stdlib");
 		}
 
 		~CompilationContext()
@@ -497,7 +497,7 @@ namespace SpireLib
 						compMeta.TypeName = compMeta.Type->ToString();
 						for (auto & impl : comp.Value->Implementations)
 						{
-							impl->SyntaxNode->LayoutAttributes.TryGetValue(L"Binding", compMeta.Register);
+							impl->SyntaxNode->LayoutAttributes.TryGetValue("Binding", compMeta.Register);
 							if (impl->SyntaxNode->IsParam)
 							{
 								meta.Requirements.Add(compMeta);
@@ -569,14 +569,14 @@ namespace SpireLib
 							}
 							if (!found)
 							{
-								result.GetErrorWriter()->Error(2, L"cannot find file '" + inputFileName + L"'.", inc.Position);
+								result.GetErrorWriter()->Error(2, "cannot find file '" + inputFileName + "'.", inc.Position);
 							}
 						}
 					}
 				}
 				catch (IOException)
 				{
-					result.GetErrorWriter()->Error(1, L"cannot open file '" + inputFileName + L"'.", CodePosition(0, 0, 0, L""));
+					result.GetErrorWriter()->Error(1, "cannot open file '" + inputFileName + "'.", CodePosition(0, 0, 0, ""));
 				}
 			}
 			cresult.Errors.AddRange(result.ErrorList);
@@ -694,7 +694,7 @@ const char * spGetModuleName(SpireModule * module)
 {
 	if (!module) return nullptr;
 	auto moduleNode = MODULE(module);
-	return moduleNode->Name.ToMultiByteString();
+	return moduleNode->Name.Buffer();
 }
 
 int spComponentInfoCollectionGetComponent(SpireComponentInfoCollection * collection, int index, SpireComponentInfo * result)
@@ -704,12 +704,12 @@ int spComponentInfoCollectionGetComponent(SpireComponentInfoCollection * collect
 		return SPIRE_ERROR_INVALID_PARAMETER;
 	if (index < 0 || index >= list->Count())
 		return SPIRE_ERROR_INVALID_PARAMETER;
-	result->Name = (*list)[index].Name.ToMultiByteString();
+	result->Name = (*list)[index].Name.Buffer();
 	result->Alignment = (*list)[index].Alignment;
 	result->Offset = (*list)[index].Offset;
 	result->Size = (*list)[index].Type->GetSize();
-	result->Register = (*list)[index].Register.ToMultiByteString();
-	result->TypeName = (*list)[index].TypeName.ToMultiByteString();
+	result->Register = (*list)[index].Register.Buffer();
+	result->TypeName = (*list)[index].TypeName.Buffer();
 	return 0;
 }
 
@@ -767,8 +767,8 @@ int spModuleGetRequiredComponents(SpireModule * module, SpireComponentInfo * buf
 	int ptr = 0;
 	for (auto & comp : components)
 	{
-		buffer[ptr].Name = comp.Name.ToMultiByteString();
-		buffer[ptr].TypeName = comp.TypeName.ToMultiByteString();
+		buffer[ptr].Name = comp.Name.Buffer();
+		buffer[ptr].TypeName = comp.TypeName.Buffer();
 		buffer[ptr].Alignment = comp.Type->GetAlignment();
 		buffer[ptr].Size = comp.Type->GetSize();
 		buffer[ptr].Offset = comp.Offset;
@@ -814,9 +814,9 @@ int spGetMessageContent(SpireCompilationResult * result, int messageType, int in
 		if (index >= 0 && index < list->Count())
 		{
 			auto & msg = (*list)[index];
-			pMsg->Message = msg.Message.ToMultiByteString();
+			pMsg->Message = msg.Message.Buffer();
 			pMsg->ErrorId = msg.ErrorID;
-			pMsg->FileName = msg.Position.FileName.ToMultiByteString();
+			pMsg->FileName = msg.Position.FileName.Buffer();
 			pMsg->Line = msg.Position.Line;
 			pMsg->Col = msg.Position.Col;
 			return 1;
@@ -847,11 +847,11 @@ int spGetCompilerOutput(SpireCompilationResult * result, char * buffer, int buff
 	StringBuilder sb;
 	auto rs = RS(result);
 	for (auto & x : rs->Errors)
-		sb << L"error " << x.Message << L":" << x.Position.ToString() << L": " << x.Message << L"\n";
+		sb << "error " << x.Message << ":" << x.Position.ToString() << ": " << x.Message << "\n";
 	for (auto & x : rs->Warnings)
-		sb << L"error " << x.Message << L":" << x.Position.ToString() << L": " << x.Message << L"\n";
+		sb << "error " << x.Message << ":" << x.Position.ToString() << ": " << x.Message << "\n";
 	auto str = sb.ProduceString();
-	return ReturnStr(str.ToMultiByteString(), buffer, bufferSize);
+	return ReturnStr(str.Buffer(), buffer, bufferSize);
 }
 
 int spGetCompiledShaderNames(SpireCompilationResult * result, char * buffer, int bufferSize)
@@ -862,12 +862,12 @@ int spGetCompiledShaderNames(SpireCompilationResult * result, char * buffer, int
 	for (auto x : rs->Sources)
 	{
 		if (!first)
-			sb << L"\n";
+			sb << "\n";
 		sb << x.Key;
 		first = false;
 	}
 	auto str = sb.ProduceString();
-	return ReturnStr(str.ToMultiByteString(), buffer, bufferSize);
+	return ReturnStr(str.Buffer(), buffer, bufferSize);
 }
 
 int spGetCompiledShaderStageNames(SpireCompilationResult * result, const char * shaderName, char * buffer, int bufferSize)
@@ -880,12 +880,12 @@ int spGetCompiledShaderStageNames(SpireCompilationResult * result, const char * 
 		for (auto x : src->Stages)
 		{
 			if (!first)
-				sb << L"\n";
+				sb << "\n";
 			sb << x.Key;
 			first = false;
 		}
 		auto str = sb.ProduceString();
-		return ReturnStr(str.ToMultiByteString(), buffer, bufferSize);
+		return ReturnStr(str.Buffer(), buffer, bufferSize);
 	}
 	else
 	{
@@ -913,8 +913,8 @@ char * spGetShaderStageSource(SpireCompilationResult * result, const char * shad
 			if (state->MainCode.Length())
 			{
 				if (length)
-					*length = (int)strlen(state->MainCode.ToMultiByteString()) + 1;
-				return state->MainCode.ToMultiByteString();
+					*length = state->MainCode.Length() + 1;
+				return state->MainCode.Buffer();
 			}
 			else
 			{

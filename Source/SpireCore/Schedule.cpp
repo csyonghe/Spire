@@ -13,16 +13,16 @@ namespace Spire
 			List<Token> tokens;
 			int pos;
 			String fileName;
-			Token & ReadToken(const wchar_t * string)
+			Token & ReadToken(const char * string)
 			{
 				if (pos >= tokens.Count())
 				{
-					errors.Add(CompileError(String(L"\"") + string + String(L"\" expected but end of file encountered."), 0, CodePosition(0, 0, 0, fileName)));
+					errors.Add(CompileError(String("\"") + string + String("\" expected but end of file encountered."), 0, CodePosition(0, 0, 0, fileName)));
 					throw 0;
 				}
 				else if (tokens[pos].Content != string)
 				{
-					errors.Add(CompileError(String(L"\"") + string + String(L"\" expected"), 0, tokens[pos].Position));
+					errors.Add(CompileError(String("\"") + string + String("\" expected"), 0, tokens[pos].Position));
 					throw 20001;
 				}
 				return tokens[pos++];
@@ -32,22 +32,22 @@ namespace Spire
 			{
 				if (pos >= tokens.Count())
 				{
-					errors.Add(CompileError(TokenTypeToString(type) + String(L" expected but end of file encountered."), 0, CodePosition(0, 0, 0, fileName)));
+					errors.Add(CompileError(TokenTypeToString(type) + String(" expected but end of file encountered."), 0, CodePosition(0, 0, 0, fileName)));
 					throw 0;
 				}
 				else if (tokens[pos].Type != type)
 				{
-					errors.Add(CompileError(TokenTypeToString(type) + String(L" expected"), 20001, tokens[pos].Position));
+					errors.Add(CompileError(TokenTypeToString(type) + String(" expected"), 20001, tokens[pos].Position));
 					throw 20001;
 				}
 				return tokens[pos++];
 			}
 
-			bool LookAheadToken(const wchar_t * string)
+			bool LookAheadToken(const char * string)
 			{
 				if (pos >= tokens.Count())
 				{
-					errors.Add(CompileError(String(L"\'") + string + String(L"\' expected but end of file encountered."), 0, CodePosition(0, 0, 0, fileName)));
+					errors.Add(CompileError(String("\'") + string + String("\' expected but end of file encountered."), 0, CodePosition(0, 0, 0, fileName)));
 					return false;
 				}
 				else
@@ -73,14 +73,14 @@ namespace Spire
 				{
 					while (pos < tokens.Count())
 					{
-						if (LookAheadToken(L"attrib"))
+						if (LookAheadToken("attrib"))
 						{
 							EnumerableDictionary<String, String> additionalAttributes;
-							ReadToken(L"attrib");
+							ReadToken("attrib");
 							String choiceName = ReadToken(TokenType::Identifier).Content;
-							while (LookAheadToken(L"."))
+							while (LookAheadToken("."))
 							{
-								choiceName = choiceName + L".";
+								choiceName = choiceName + ".";
 								ReadToken(TokenType::Dot);
 								choiceName = choiceName + ReadToken(TokenType::Identifier).Content;
 							}
@@ -90,13 +90,13 @@ namespace Spire
 							{
 								auto name = ReadToken(TokenType::Identifier).Content;
 								String value;
-								if (LookAheadToken(L":"))
+								if (LookAheadToken(":"))
 								{
-									ReadToken(L":");
+									ReadToken(":");
 									value = ReadToken(TokenType::StringLiterial).Content;
 								}
 								additionalAttributes[name] = value;
-								if (LookAheadToken(L","))
+								if (LookAheadToken(","))
 									ReadToken(TokenType::Comma);
 								else
 									break;
@@ -106,9 +106,9 @@ namespace Spire
 						else
 						{
 							String choiceName = ReadToken(TokenType::Identifier).Content;
-							while (LookAheadToken(L"."))
+							while (LookAheadToken("."))
 							{
-								choiceName = choiceName + L".";
+								choiceName = choiceName + ".";
 								ReadToken(TokenType::Dot);
 								choiceName = choiceName + ReadToken(TokenType::Identifier).Content;
 							}
@@ -119,7 +119,7 @@ namespace Spire
 								auto & token = ReadToken(TokenType::StringLiterial);
 								RefPtr<ChoiceValueSyntaxNode> choiceValue = new ChoiceValueSyntaxNode();
 								choiceValue->Position = token.Position;
-								int splitterPos = token.Content.IndexOf(L':');
+								int splitterPos = token.Content.IndexOf(':');
 								if (splitterPos != -1)
 								{
 									choiceValue->WorldName = token.Content.SubString(0, splitterPos);
@@ -130,7 +130,7 @@ namespace Spire
 									choiceValue->WorldName = token.Content;
 								}
 								worlds.Add(choiceValue);
-								if (LookAheadToken(L","))
+								if (LookAheadToken(","))
 									ReadToken(TokenType::Comma);
 								else
 									break;

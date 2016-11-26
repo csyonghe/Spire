@@ -22,12 +22,12 @@ namespace CoreLib
 		{
 		public:
 #ifdef _WIN32
-			static const wchar_t PathDelimiter = L'\\';
+			static const char PathDelimiter = '\\';
 #else
-			static const wchar_t PathDelimiter = L'/';
+			static const char PathDelimiter = '/';
 #endif
 			static String TruncateExt(const String & path);
-			static String ReplaceExt(const String & path, const wchar_t * newExt);
+			static String ReplaceExt(const String & path, const char * newExt);
 			static String GetFileName(const String & path);
 			static String GetFileNameWithoutEXT(const String & path);
 			static String GetFileExt(const String & path);

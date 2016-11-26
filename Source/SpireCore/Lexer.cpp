@@ -13,10 +13,10 @@ namespace Spire
 				switch (errType)
 				{
 				case CoreLib::Text::TokenizeErrorType::InvalidCharacter:
-					errorList.Add(CompileError(L"Illegal character '\\x" + String((int)curChar, 16) + L"'", 10000, pos));
+					errorList.Add(CompileError("Illegal character '\\x" + String((unsigned char)curChar, 16) + "'", 10000, pos));
 					break;
 				case CoreLib::Text::TokenizeErrorType::InvalidEscapeSequence:
-					errorList.Add(CompileError(L"Illegal character literial.", 10001, pos));
+					errorList.Add(CompileError("Illegal character literial.", 10001, pos));
 					break;
 				default:
 					break;

@@ -121,7 +121,7 @@ namespace Spire
 				if (AlternateName.Length() == 0)
 					return WorldName;
 				else
-					return WorldName + L":" + AlternateName;
+					return WorldName + ":" + AlternateName;
 			}
 			bool operator == (const ShaderChoiceValue & val)
 			{
@@ -226,14 +226,14 @@ namespace Spire
 			{
 				for (int i = 0; i < ErrorList.Count(); i++)
 				{
-					fprintf(stderr, "%s(%d): error %d: %s\n", ErrorList[i].Position.FileName.ToMultiByteString(), ErrorList[i].Position.Line,
-						ErrorList[i].ErrorID, ErrorList[i].Message.ToMultiByteString());
+					fprintf(stderr, "%S(%d): error %d: %S\n", ErrorList[i].Position.FileName.ToWString(), ErrorList[i].Position.Line,
+						ErrorList[i].ErrorID, ErrorList[i].Message.ToWString());
 				}
 				if (printWarning)
 					for (int i = 0; i < WarningList.Count(); i++)
 					{
-						fprintf(stderr, "%s(%d): warning %d: %s\n", WarningList[i].Position.FileName.ToMultiByteString(),
-							WarningList[i].Position.Line, WarningList[i].ErrorID, WarningList[i].Message.ToMultiByteString());
+						fprintf(stderr, "%S(%d): warning %d: %S\n", WarningList[i].Position.FileName.ToWString(),
+							WarningList[i].Position.Line, WarningList[i].ErrorID, WarningList[i].Message.ToWString());
 					}
 			}
 			CompileResult()

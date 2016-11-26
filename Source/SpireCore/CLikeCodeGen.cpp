@@ -26,7 +26,7 @@ namespace Spire
 			if (name.EndsWith(suffix))
 				return name;
 			else
-				return EscapeDoubleUnderscore(name + L"_" + suffix);
+				return EscapeDoubleUnderscore(name + "_" + suffix);
 		}
 
 
@@ -43,10 +43,10 @@ namespace Spire
 		void CLikeCodeGen::PrintDef(StringBuilder & sbCode, ILType* type, const String & name)
 		{
 			PrintType(sbCode, type);
-			sbCode << L" ";
+			sbCode << " ";
 			sbCode << name;
 			if (name.Length() == 0)
-				throw InvalidProgramException(L"unnamed instruction.");
+				throw InvalidProgramException("unnamed instruction.");
 		}
 
 		String CLikeCodeGen::GetFunctionCallName(String name)
@@ -54,13 +54,13 @@ namespace Spire
 			StringBuilder rs;
 			for (int i = 0; i < name.Length(); i++)
 			{
-				if ((name[i] >= L'a' && name[i] <= L'z') || (name[i] >= L'A' && name[i] <= L'Z') || 
-					name[i] == L'_' || (name[i] >= L'0' && name[i] <= L'9'))
+				if ((name[i] >= 'a' && name[i] <= 'z') || (name[i] >= 'A' && name[i] <= 'Z') || 
+					name[i] == '_' || (name[i] >= '0' && name[i] <= '9'))
 				{
 					rs << name[i];
 				}
 				else if (i != name.Length() - 1)
-					rs << L'_';
+					rs << '_';
 			}
 			return rs.ProduceString();
 		}
@@ -68,7 +68,7 @@ namespace Spire
 		String CLikeCodeGen::GetFuncOriginalName(const String & name)
 		{
 			String originalName;
-			int splitPos = name.IndexOf(L'@');
+			int splitPos = name.IndexOf('@');
 			if (splitPos == 0)
 				return name;
 			if (splitPos != -1)
@@ -82,11 +82,11 @@ namespace Spire
 		{
 			auto makeFloat = [](float v)
 			{
-				String rs(v, L"%.12e");
-				if (!rs.Contains(L'.') && !rs.Contains(L'e') && !rs.Contains(L'E'))
-					rs = rs + L".0";
-				if (rs.StartsWith(L"-"))
-					rs = L"(" + rs + L")";
+				String rs(v, "%.12e");
+				if (!rs.Contains('.') && !rs.Contains('e') && !rs.Contains('E'))
+					rs = rs + ".0";
+				if (rs.StartsWith("-"))
+					rs = "(" + rs + ")";
 				return rs;
 			};
 			
@@ -98,26 +98,26 @@ namespace Spire
 				else if (type->IsInt())
 					ctx.Body << (c->IntValues[0]);
 				else if (type->IsBool())
-					ctx.Body << ((c->IntValues[0] != 0) ? L"true" : L"false");
+					ctx.Body << ((c->IntValues[0] != 0) ? "true" : "false");
 				else if (auto baseType = dynamic_cast<ILBasicType*>(type))
 				{
 					PrintType(ctx.Body, baseType);
 					ctx.Body << "(";
 
 					if (baseType->Type == ILBaseType::Float2)
-						ctx.Body << makeFloat(c->FloatValues[0]) << L", " << makeFloat(c->FloatValues[1]);
+						ctx.Body << makeFloat(c->FloatValues[0]) << ", " << makeFloat(c->FloatValues[1]);
 					else if (baseType->Type == ILBaseType::Float3)
-						ctx.Body << makeFloat(c->FloatValues[0]) << L", " << makeFloat(c->FloatValues[1]) << L", " << makeFloat(c->FloatValues[2]);
+						ctx.Body << makeFloat(c->FloatValues[0]) << ", " << makeFloat(c->FloatValues[1]) << ", " << makeFloat(c->FloatValues[2]);
 					else if (baseType->Type == ILBaseType::Float4)
-						ctx.Body << makeFloat(c->FloatValues[0]) << L", " << makeFloat(c->FloatValues[1]) << L", " << makeFloat(c->FloatValues[2]) << L", " << makeFloat(c->FloatValues[3]);
+						ctx.Body << makeFloat(c->FloatValues[0]) << ", " << makeFloat(c->FloatValues[1]) << ", " << makeFloat(c->FloatValues[2]) << ", " << makeFloat(c->FloatValues[3]);
 					else if (baseType->Type == ILBaseType::Float3x3)
 					{
-						ctx.Body << L"mat3(";
+						ctx.Body << "mat3(";
 						for (int i = 0; i < 9; i++)
 						{
 							ctx.Body << makeFloat(c->FloatValues[i]);
 							if (i != 8)
-								ctx.Body << L", ";
+								ctx.Body << ", ";
 						}
 						ctx.Body;
 					}
@@ -127,20 +127,20 @@ namespace Spire
 						{
 							ctx.Body << makeFloat(c->FloatValues[i]);
 							if (i != 15)
-								ctx.Body << L", ";
+								ctx.Body << ", ";
 						}
 					}
 					else if (baseType->Type == ILBaseType::Int2)
-						ctx.Body << c->IntValues[0] << L", " << c->IntValues[1];
+						ctx.Body << c->IntValues[0] << ", " << c->IntValues[1];
 					else if (baseType->Type == ILBaseType::Int3)
-						ctx.Body << c->IntValues[0] << L", " << c->IntValues[1] << L", " << c->IntValues[2];
+						ctx.Body << c->IntValues[0] << ", " << c->IntValues[1] << ", " << c->IntValues[2];
 					else if (baseType->Type == ILBaseType::Int4)
-						ctx.Body << c->IntValues[0] << L", " << c->IntValues[1] << L", " << c->IntValues[2] << L", " << c->IntValues[3];
+						ctx.Body << c->IntValues[0] << ", " << c->IntValues[1] << ", " << c->IntValues[2] << ", " << c->IntValues[3];
 
 					ctx.Body << ")";
 				}
 				else
-					throw InvalidOperationException(L"Illegal constant.");
+					throw InvalidOperationException("Illegal constant.");
 			}
 			else if (auto instr = dynamic_cast<ILInstruction*>(op))
 			{
@@ -151,7 +151,7 @@ namespace Spire
 				else
 				{
 					if (forceExpression)
-						throw InvalidProgramException(L"cannot generate code block as an expression.");
+						throw InvalidProgramException("cannot generate code block as an expression.");
 					String substituteName;
 					if (ctx.SubstituteNames.TryGetValue(instr->Name, substituteName))
 						ctx.Body << substituteName;
@@ -160,7 +160,7 @@ namespace Spire
 				}
 			}
 			else
-				throw InvalidOperationException(L"Unsupported operand type.");
+				throw InvalidOperationException("Unsupported operand type.");
 		}
 
 		static bool IsMatrix(ILOperand* operand)
@@ -172,11 +172,11 @@ namespace Spire
 
 		void CLikeCodeGen::PrintMatrixMulInstrExpr(CodeGenContext & ctx, ILOperand* op0, ILOperand* op1)
 		{
-			ctx.Body << L"(";
+			ctx.Body << "(";
 			PrintOp(ctx, op0);
-			ctx.Body << L" * ";
+			ctx.Body << " * ";
 			PrintOp(ctx, op1);
-			ctx.Body << L")";
+			ctx.Body << ")";
 		}
 
 		void CLikeCodeGen::PrintBinaryInstrExpr(CodeGenContext & ctx, BinaryInstruction * instr)
@@ -185,18 +185,18 @@ namespace Spire
 			{
 				auto op0 = instr->Operands[0].Ptr();
 				auto op1 = instr->Operands[1].Ptr();
-				ctx.Body << L"(";
+				ctx.Body << "(";
 				PrintOp(ctx, op0);
-				ctx.Body << L" = ";
+				ctx.Body << " = ";
 				PrintOp(ctx, op1);
-				ctx.Body << L")";
+				ctx.Body << ")";
 				return;
 			}
 			auto op0 = instr->Operands[0].Ptr();
 			auto op1 = instr->Operands[1].Ptr();
 			if (instr->Is<StoreInstruction>())
 			{
-				throw InvalidOperationException(L"store instruction cannot appear as expression.");
+				throw InvalidOperationException("store instruction cannot appear as expression.");
 			}
 			if (instr->Is<MemberLoadInstruction>())
 			{
@@ -209,19 +209,19 @@ namespace Spire
 						switch (c->IntValues[0])
 						{
 						case 0:
-							ctx.Body << L".x";
+							ctx.Body << ".x";
 							break;
 						case 1:
-							ctx.Body << L".y";
+							ctx.Body << ".y";
 							break;
 						case 2:
-							ctx.Body << L".z";
+							ctx.Body << ".z";
 							break;
 						case 3:
-							ctx.Body << L".w";
+							ctx.Body << ".w";
 							break;
 						default:
-							throw InvalidOperationException(L"Invalid member access.");
+							throw InvalidOperationException("Invalid member access.");
 						}
 						printDefault = false;
 					}
@@ -230,28 +230,28 @@ namespace Spire
 				{
 					if (auto c = dynamic_cast<ILConstOperand*>(op1))
 					{
-						ctx.Body << L"." << structType->Members[c->IntValues[0]].FieldName;
+						ctx.Body << "." << structType->Members[c->IntValues[0]].FieldName;
 					}
 					printDefault = false;
 				}
 				if (printDefault)
 				{
-					ctx.Body << L"[";
+					ctx.Body << "[";
 					PrintOp(ctx, op1);
-					ctx.Body << L"]";
+					ctx.Body << "]";
 				}
 				
 				
 				return;
 			}
-			const wchar_t * op = L"";
+			const char * op = "";
 			if (instr->Is<AddInstruction>())
 			{
-				op = L"+";
+				op = "+";
 			}
 			else if (instr->Is<SubInstruction>())
 			{
-				op = L"-";
+				op = "-";
 			}
 			else if (instr->Is<MulInstruction>())
 			{
@@ -265,81 +265,81 @@ namespace Spire
 					return;
 				}
 
-				op = L"*";
+				op = "*";
 			}
 			else if (instr->Is<DivInstruction>())
 			{
-				op = L"/";
+				op = "/";
 			}
 			else if (instr->Is<ModInstruction>())
 			{
-				op = L"%";
+				op = "%";
 			}
 			else if (instr->Is<ShlInstruction>())
 			{
-				op = L"<<";
+				op = "<<";
 			}
 			else if (instr->Is<ShrInstruction>())
 			{
-				op = L">>";
+				op = ">>";
 			}
 			else if (instr->Is<CmpeqlInstruction>())
 			{
-				op = L"==";
-				//ctx.Body << L"int";
+				op = "==";
+				//ctx.Body << "int";
 			}
 			else if (instr->Is<CmpgeInstruction>())
 			{
-				op = L">=";
-				//ctx.Body << L"int";
+				op = ">=";
+				//ctx.Body << "int";
 			}
 			else if (instr->Is<CmpgtInstruction>())
 			{
-				op = L">";
-				//ctx.Body << L"int";
+				op = ">";
+				//ctx.Body << "int";
 			}
 			else if (instr->Is<CmpleInstruction>())
 			{
-				op = L"<=";
-				//ctx.Body << L"int";
+				op = "<=";
+				//ctx.Body << "int";
 			}
 			else if (instr->Is<CmpltInstruction>())
 			{
-				op = L"<";
-				//ctx.Body << L"int";
+				op = "<";
+				//ctx.Body << "int";
 			}
 			else if (instr->Is<CmpneqInstruction>())
 			{
-				op = L"!=";
-				//ctx.Body << L"int";
+				op = "!=";
+				//ctx.Body << "int";
 			}
 			else if (instr->Is<AndInstruction>())
 			{
-				op = L"&&";
+				op = "&&";
 			}
 			else if (instr->Is<OrInstruction>())
 			{
-				op = L"||";
+				op = "||";
 			}
 			else if (instr->Is<BitXorInstruction>())
 			{
-				op = L"^";
+				op = "^";
 			}
 			else if (instr->Is<BitAndInstruction>())
 			{
-				op = L"&";
+				op = "&";
 			}
 			else if (instr->Is<BitOrInstruction>())
 			{
-				op = L"|";
+				op = "|";
 			}
 			else
-				throw InvalidProgramException(L"unsupported binary instruction.");
-			ctx.Body << L"(";
+				throw InvalidProgramException("unsupported binary instruction.");
+			ctx.Body << "(";
 			PrintOp(ctx, op0);
-			ctx.Body << L" " << op << L" ";
+			ctx.Body << " " << op << " ";
 			PrintOp(ctx, op1);
-			ctx.Body << L")";
+			ctx.Body << ")";
 		}
 
 		void CLikeCodeGen::PrintBinaryInstr(CodeGenContext & ctx, BinaryInstruction * instr)
@@ -349,22 +349,22 @@ namespace Spire
 			if (instr->Is<StoreInstruction>())
 			{
 				PrintOp(ctx, op0);
-				ctx.Body << L" = ";
+				ctx.Body << " = ";
 				PrintOp(ctx, op1);
-				ctx.Body << L";\n";
+				ctx.Body << ";\n";
 				return;
 			}
 			auto varName = ctx.DefineVariable(instr);
 			if (instr->Is<MemberLoadInstruction>())
 			{
-				ctx.Body << varName << L" = ";
+				ctx.Body << varName << " = ";
 				PrintBinaryInstrExpr(ctx, instr);
-				ctx.Body << L";\n";
+				ctx.Body << ";\n";
 				return;
 			}
-			ctx.Body << varName << L" = ";
+			ctx.Body << varName << " = ";
 			PrintBinaryInstrExpr(ctx, instr);
-			ctx.Body << L";\n";
+			ctx.Body << ";\n";
 		}
 
 		void CLikeCodeGen::PrintUnaryInstrExpr(CodeGenContext & ctx, UnaryInstruction * instr)
@@ -380,32 +380,32 @@ namespace Spire
 				PrintSwizzleInstrExpr(ctx, instr->As<SwizzleInstruction>());
 				return;
 			}
-			const wchar_t * op = L"";
+			const char * op = "";
 			if (instr->Is<BitNotInstruction>())
-				op = L"~";
+				op = "~";
 			else if (instr->Is<Float2IntInstruction>())
-				op = L"(int)";
+				op = "(int)";
 			else if (instr->Is<Int2FloatInstruction>())
-				op = L"(float)";
+				op = "(float)";
 			else if (instr->Is<CopyInstruction>())
-				op = L"";
+				op = "";
 			else if (instr->Is<NegInstruction>())
-				op = L"-";
+				op = "-";
 			else if (instr->Is<NotInstruction>())
-				op = L"!";
+				op = "!";
 			else
-				throw InvalidProgramException(L"unsupported unary instruction.");
-			ctx.Body << L"(" << op;
+				throw InvalidProgramException("unsupported unary instruction.");
+			ctx.Body << "(" << op;
 			PrintOp(ctx, op0);
-			ctx.Body << L")";
+			ctx.Body << ")";
 		}
 
 		void CLikeCodeGen::PrintUnaryInstr(CodeGenContext & ctx, UnaryInstruction * instr)
 		{
 			auto varName = ctx.DefineVariable(instr);
-			ctx.Body << varName << L" = ";
+			ctx.Body << varName << " = ";
 			PrintUnaryInstrExpr(ctx, instr);
-			ctx.Body << L";\n";
+			ctx.Body << ";\n";
 		}
 
 		void CLikeCodeGen::PrintAllocVarInstrExpr(CodeGenContext & ctx, AllocVarInstruction * instr)
@@ -420,7 +420,7 @@ namespace Spire
 				ctx.DefineVariable(instr);
 			}
 			else
-				throw InvalidProgramException(L"size operand of allocVar instr is not an intermediate.");
+				throw InvalidProgramException("size operand of allocVar instr is not an intermediate.");
 		}
 
 		void CLikeCodeGen::PrintFetchArgInstrExpr(CodeGenContext & ctx, FetchArgInstruction * instr)
@@ -438,21 +438,21 @@ namespace Spire
 
 		void CLikeCodeGen::PrintSelectInstrExpr(CodeGenContext & ctx, SelectInstruction * instr)
 		{
-			ctx.Body << L"(";
+			ctx.Body << "(";
 			PrintOp(ctx, instr->Operands[0].Ptr());
-			ctx.Body << L"?";
+			ctx.Body << "?";
 			PrintOp(ctx, instr->Operands[1].Ptr());
-			ctx.Body << L":";
+			ctx.Body << ":";
 			PrintOp(ctx, instr->Operands[2].Ptr());
-			ctx.Body << L")";
+			ctx.Body << ")";
 		}
 
 		void CLikeCodeGen::PrintSelectInstr(CodeGenContext & ctx, SelectInstruction * instr)
 		{
 			auto varName = ctx.DefineVariable(instr);
-			ctx.Body << varName << L" = ";
+			ctx.Body << varName << " = ";
 			PrintSelectInstrExpr(ctx, instr);
-			ctx.Body << L";\n";
+			ctx.Body << ";\n";
 		}
 
 		void CLikeCodeGen::PrintCallInstrExprForTarget(CodeGenContext & ctx, CallInstruction * instr, String const& name)
@@ -462,16 +462,16 @@ namespace Spire
 
 		void CLikeCodeGen::PrintDefaultCallInstrArgs(CodeGenContext & ctx, CallInstruction * instr)
 		{
-			ctx.Body << L"(";
+			ctx.Body << "(";
 			int id = 0;
 			for (auto & arg : instr->Arguments)
 			{
 				PrintOp(ctx, arg.Ptr());
 				if (id != instr->Arguments.Count() - 1)
-					ctx.Body << L", ";
+					ctx.Body << ", ";
 				id++;
 			}
-			ctx.Body << L")";
+			ctx.Body << ")";
 		}
 
 
@@ -499,39 +499,39 @@ namespace Spire
 			{
 				auto varName = ctx.DefineVariable(instr);
 				ctx.Body << varName;
-				ctx.Body << L" = ";
+				ctx.Body << " = ";
 			}
 			PrintCallInstrExpr(ctx, instr);
-			ctx.Body << L";\n";
+			ctx.Body << ";\n";
 		}
 
 		void CLikeCodeGen::PrintCastF2IInstrExpr(CodeGenContext & ctx, Float2IntInstruction * instr)
 		{
-			ctx.Body << L"((int)(";
+			ctx.Body << "((int)(";
 			PrintOp(ctx, instr->Operand.Ptr());
-			ctx.Body << L"))";
+			ctx.Body << "))";
 		}
 		void CLikeCodeGen::PrintCastF2IInstr(CodeGenContext & ctx, Float2IntInstruction * instr)
 		{
 			auto varName = ctx.DefineVariable(instr);
 			ctx.Body << varName;
-			ctx.Body << L" = ";
+			ctx.Body << " = ";
 			PrintCastF2IInstrExpr(ctx, instr);
-			ctx.Body << L";\n";
+			ctx.Body << ";\n";
 		}
 		void CLikeCodeGen::PrintCastI2FInstrExpr(CodeGenContext & ctx, Int2FloatInstruction * instr)
 		{
-			ctx.Body << L"((float)(";
+			ctx.Body << "((float)(";
 			PrintOp(ctx, instr->Operand.Ptr());
-			ctx.Body << L"))";
+			ctx.Body << "))";
 		}
 		void CLikeCodeGen::PrintCastI2FInstr(CodeGenContext & ctx, Int2FloatInstruction * instr)
 		{
 			auto varName = ctx.DefineVariable(instr);
 			ctx.Body << varName;
-			ctx.Body << L" = ";
+			ctx.Body << " = ";
 			PrintCastI2FInstrExpr(ctx, instr);
-			ctx.Body << L";\n";
+			ctx.Body << ";\n";
 		}
 
 		bool CLikeCodeGen::AppearAsExpression(ILInstruction & instr, bool force)
@@ -585,18 +585,18 @@ namespace Spire
 				ctx.Body << varName;
 				if (auto structType = dynamic_cast<ILStructType*>(srcType))
 				{
-					ctx.Body << L".";
+					ctx.Body << ".";
 					ctx.Body << structType->Members[dynamic_cast<ILConstOperand*>(op1)->IntValues[0]].FieldName;
 				}
 				else
 				{
-					ctx.Body << L"[";
+					ctx.Body << "[";
 					PrintOp(ctx, op1);
-					ctx.Body << L"]";
+					ctx.Body << "]";
 				}
-				ctx.Body << L" = ";
+				ctx.Body << " = ";
 				PrintOp(ctx, op2);
-				ctx.Body << L";\n";
+				ctx.Body << ";\n";
 			};
 			if (auto srcInstr = dynamic_cast<ILInstruction*>(instr->Operands[0].Ptr()))
 			{
@@ -615,7 +615,7 @@ namespace Spire
 		void CLikeCodeGen::PrintSwizzleInstrExpr(CodeGenContext & ctx, SwizzleInstruction * swizzle)
 		{
 			PrintOp(ctx, swizzle->Operand.Ptr());
-			ctx.Body << L"." << swizzle->SwizzleString;
+			ctx.Body << "." << swizzle->SwizzleString;
 		}
 
 		void CLikeCodeGen::PrintImportInstr(CodeGenContext & ctx, ImportInstruction * importInstr)
@@ -660,12 +660,12 @@ namespace Spire
 			else if (auto import = instr.As<ImportInstruction>())
 				PrintImportInstrExpr(ctx, import);
 			else if (instr.As<MemberUpdateInstruction>())
-				throw InvalidOperationException(L"member update instruction cannot appear as expression.");
+				throw InvalidOperationException("member update instruction cannot appear as expression.");
 		}
 
 		void CLikeCodeGen::PrintInstr(CodeGenContext & ctx, ILInstruction & instr)
 		{
-			// ctx.Body << L"// " << instr.ToString() << L";\n";
+			// ctx.Body << "// " << instr.ToString() << ";\n";
 			if (!AppearAsExpression(instr, false))
 			{
 				if (auto binInstr = instr.As<BinaryInstruction>())
@@ -705,75 +705,75 @@ namespace Spire
 			{
 				if (auto ifInstr = instr.As<IfInstruction>())
 				{
-					context.Body << L"if (bool(";
+					context.Body << "if (bool(";
 					PrintOp(context, ifInstr->Operand.Ptr(), true);
-					context.Body << L"))\n{\n";
+					context.Body << "))\n{\n";
 					GenerateCode(context, ifInstr->TrueCode.Ptr());
-					context.Body << L"}\n";
+					context.Body << "}\n";
 					if (ifInstr->FalseCode)
 					{
-						context.Body << L"else\n{\n";
+						context.Body << "else\n{\n";
 						GenerateCode(context, ifInstr->FalseCode.Ptr());
-						context.Body << L"}\n";
+						context.Body << "}\n";
 					}
 				}
 				else if (auto forInstr = instr.As<ForInstruction>())
 				{
-					context.Body << L"for (";
+					context.Body << "for (";
 					if (forInstr->InitialCode)
 						PrintOp(context, forInstr->InitialCode->GetLastInstruction(), true);
-					context.Body << L"; ";
+					context.Body << "; ";
 					if (forInstr->ConditionCode)
 						PrintOp(context, forInstr->ConditionCode->GetLastInstruction(), true);
-					context.Body << L"; ";
+					context.Body << "; ";
 					if (forInstr->SideEffectCode)
 						PrintOp(context, forInstr->SideEffectCode->GetLastInstruction(), true);
-					context.Body << L")\n{\n";
+					context.Body << ")\n{\n";
 					GenerateCode(context, forInstr->BodyCode.Ptr());
-					context.Body << L"}\n";
+					context.Body << "}\n";
 				}
 				else if (auto doInstr = instr.As<DoInstruction>())
 				{
-					context.Body << L"do\n{\n";
+					context.Body << "do\n{\n";
 					GenerateCode(context, doInstr->BodyCode.Ptr());
-					context.Body << L"} while (bool(";
+					context.Body << "} while (bool(";
 					PrintOp(context, doInstr->ConditionCode->GetLastInstruction()->As<ReturnInstruction>()->Operand.Ptr(), true);
-					context.Body << L"));\n";
+					context.Body << "));\n";
 				}
 				else if (auto whileInstr = instr.As<WhileInstruction>())
 				{
-					context.Body << L"while (bool(";
+					context.Body << "while (bool(";
 					PrintOp(context, whileInstr->ConditionCode->GetLastInstruction()->As<ReturnInstruction>()->Operand.Ptr(), true);
-					context.Body << L"))\n{\n";
+					context.Body << "))\n{\n";
 					GenerateCode(context, whileInstr->BodyCode.Ptr());
-					context.Body << L"}\n";
+					context.Body << "}\n";
 				}
 				else if (auto ret = instr.As<ReturnInstruction>())
 				{
 					if (currentImportInstr) 
 					{
-						context.Body << currentImportInstr->Name << L" = ";
+						context.Body << currentImportInstr->Name << " = ";
 						PrintOp(context, ret->Operand.Ptr());
-						context.Body << L";\n";
+						context.Body << ";\n";
 					}
 					else
 					{
-						context.Body << L"return ";
+						context.Body << "return ";
 						PrintOp(context, ret->Operand.Ptr());
-						context.Body << L";\n";
+						context.Body << ";\n";
 					}
 				}
 				else if (instr.Is<BreakInstruction>())
 				{
-					context.Body << L"break;\n";
+					context.Body << "break;\n";
 				}
 				else if (instr.Is<ContinueInstruction>())
 				{
-					context.Body << L"continue;\n";
+					context.Body << "continue;\n";
 				}
 				else if (instr.Is<DiscardInstruction>())
 				{
-					context.Body << L"discard;\n";
+					context.Body << "discard;\n";
 				}
 				else
 					PrintInstr(context, instr);
@@ -782,9 +782,9 @@ namespace Spire
 
 		CLikeCodeGen::CLikeCodeGen()
 		{
-			intrinsicTextureFunctions.Add(L"Sample");
-			intrinsicTextureFunctions.Add(L"SampleBias");
-			intrinsicTextureFunctions.Add(L"SampleGrad");
+			intrinsicTextureFunctions.Add("Sample");
+			intrinsicTextureFunctions.Add("SampleBias");
+			intrinsicTextureFunctions.Add("SampleGrad");
 		}
 
 		CompiledShaderSource CLikeCodeGen::GenerateShader(CompileResult & result, SymbolTable *, ILShader * shader, ErrorWriter * err)
@@ -796,14 +796,14 @@ namespace Spire
 			for (auto & stage : shader->Stages)
 			{
 				StageSource src;
-				if (stage.Value->StageType == L"VertexShader" || stage.Value->StageType == L"FragmentShader" || stage.Value->StageType == L"DomainShader")
+				if (stage.Value->StageType == "VertexShader" || stage.Value->StageType == "FragmentShader" || stage.Value->StageType == "DomainShader")
 					src = GenerateVertexFragmentDomainShader(result.Program.Ptr(), shader, stage.Value.Ptr());
-				else if (stage.Value->StageType == L"ComputeShader")
+				else if (stage.Value->StageType == "ComputeShader")
 					src = GenerateComputeShader(result.Program.Ptr(), shader, stage.Value.Ptr());
-				else if (stage.Value->StageType == L"HullShader")
+				else if (stage.Value->StageType == "HullShader")
 					src = GenerateHullShader(result.Program.Ptr(), shader, stage.Value.Ptr());
 				else
-					errWriter->Error(50020, L"Unknown stage type '" + stage.Value->StageType + L"'.", stage.Value->Position);
+					errWriter->Error(50020, "Unknown stage type '" + stage.Value->StageType + "'.", stage.Value->Position);
 				rs.Stages[stage.Key] = src;
 			}
 				
@@ -819,13 +819,13 @@ namespace Spire
 			{
 				if (!st->IsIntrinsic)
 				{
-					sb << L"struct " << st->TypeName << L"\n{\n";
+					sb << "struct " << st->TypeName << "\n{\n";
 					for (auto & f : st->Members)
 					{
 						sb << f.Type->ToString();
-						sb << " " << f.FieldName << L";\n";
+						sb << " " << f.FieldName << ";\n";
 					}
-					sb << L"};\n";
+					sb << "};\n";
 				}
 			}
 		}
@@ -841,7 +841,7 @@ namespace Spire
 				if (refFuncs.Contains(func.Value->Name))
 				{
 					GenerateFunctionDeclaration(sb, func.Value.Ptr());
-					sb << L";\n";
+					sb << ";\n";
 				}
 			}
 			for (auto & func : program->Functions)
@@ -858,22 +858,22 @@ namespace Spire
 			ExternComponentCodeGenInfo info;
 			info.Type = type;
 			String bindingVal;
-			if (input.Attributes.TryGetValue(L"Binding", bindingVal))
+			if (input.Attributes.TryGetValue("Binding", bindingVal))
 				info.Binding = StringToInt(bindingVal);
 			if (recType)
 			{
 				if (auto genType = dynamic_cast<ILGenericType*>(type))
 				{
 					type = genType->BaseType.Ptr();
-					if (genType->GenericTypeName == L"Uniform")
+					if (genType->GenericTypeName == "Uniform")
 						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::UniformBuffer;
-					else if (genType->GenericTypeName == L"Patch")
+					else if (genType->GenericTypeName == "Patch")
 						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::Patch;
-					else if (genType->GenericTypeName == L"Texture")
+					else if (genType->GenericTypeName == "Texture")
 						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::Texture;
-					else if (genType->GenericTypeName == L"PackedBuffer")
+					else if (genType->GenericTypeName == "PackedBuffer")
 						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::PackedBuffer;
-					else if (genType->GenericTypeName == L"StructuredBuffer" || genType->GenericTypeName == L"RWStructuredBuffer")
+					else if (genType->GenericTypeName == "StructuredBuffer" || genType->GenericTypeName == "RWStructuredBuffer")
 						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::ArrayBuffer;
 				}
 				if (auto arrType = dynamic_cast<ILArrayType*>(type))
@@ -881,7 +881,7 @@ namespace Spire
 					if (info.DataStructure != ExternComponentCodeGenInfo::DataStructureType::StandardInput &&
 						info.DataStructure != ExternComponentCodeGenInfo::DataStructureType::UniformBuffer &&
 						info.DataStructure != ExternComponentCodeGenInfo::DataStructureType::Patch)
-						errWriter->Error(51090, L"cannot generate code for extern component type '" + type->ToString() + L"'.",
+						errWriter->Error(51090, "cannot generate code for extern component type '" + type->ToString() + "'.",
 							input.Position);
 					type = arrType->BaseType.Ptr();
 					info.IsArray = true;
@@ -889,48 +889,48 @@ namespace Spire
 				}
 				if (type != recType)
 				{
-					errWriter->Error(51090, L"cannot generate code for extern component type '" + type->ToString() + L"'.",
+					errWriter->Error(51090, "cannot generate code for extern component type '" + type->ToString() + "'.",
 						input.Position);
 				}
 			}
 			else
 			{
 				// check for attributes 
-				if (input.Attributes.ContainsKey(L"TessCoord"))
+				if (input.Attributes.ContainsKey("TessCoord"))
 				{
 					info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::TessCoord;
 					if (!(input.Type->IsFloatVector() && input.Type->GetVectorSize() <= 3))
-						Error(50020, L"TessCoord must have vec2 or vec3 type.", input.Position);
+						Error(50020, "TessCoord must have vec2 or vec3 type.", input.Position);
 				}
-				else if (input.Attributes.ContainsKey(L"FragCoord"))
+				else if (input.Attributes.ContainsKey("FragCoord"))
 				{
 					info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::FragCoord;
 					if (!(input.Type->IsFloatVector() && input.Type->GetVectorSize() == 4))
-						Error(50020, L"FragCoord must be a vec4.", input.Position);
+						Error(50020, "FragCoord must be a vec4.", input.Position);
 				}
-				else if (input.Attributes.ContainsKey(L"InvocationId"))
+				else if (input.Attributes.ContainsKey("InvocationId"))
 				{
 					info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::InvocationId;
 					if (!input.Type->IsInt())
-						Error(50020, L"InvocationId must have int type.", input.Position);
+						Error(50020, "InvocationId must have int type.", input.Position);
 				}
-				else if (input.Attributes.ContainsKey(L"ThreadId"))
+				else if (input.Attributes.ContainsKey("ThreadId"))
 				{
 					info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::InvocationId;
 					if (!input.Type->IsInt())
-						Error(50020, L"ThreadId must have int type.", input.Position);
+						Error(50020, "ThreadId must have int type.", input.Position);
 				}
-				else if (input.Attributes.ContainsKey(L"PrimitiveId"))
+				else if (input.Attributes.ContainsKey("PrimitiveId"))
 				{
 					info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::PrimitiveId;
 					if (!input.Type->IsInt())
-						Error(50020, L"PrimitiveId must have int type.", input.Position);
+						Error(50020, "PrimitiveId must have int type.", input.Position);
 				}
-				else if (input.Attributes.ContainsKey(L"PatchVertexCount"))
+				else if (input.Attributes.ContainsKey("PatchVertexCount"))
 				{
 					info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::PatchVertexCount;
 					if (!input.Type->IsInt())
-						Error(50020, L"PatchVertexCount must have int type.", input.Position);
+						Error(50020, "PatchVertexCount must have int type.", input.Position);
 				}
 			}
 			return info;
@@ -1017,7 +1017,7 @@ namespace Spire
 					return;
 
 				default:
-					errWriter->Error(99999, L"internal error: unexpected data structure for record type",
+					errWriter->Error(99999, "internal error: unexpected data structure for record type",
 							input.Position);
 					break;
 				}
@@ -1027,7 +1027,7 @@ namespace Spire
 		void CLikeCodeGen::GenerateVertexShaderEpilog(CodeGenContext & ctx, ILWorld * world, ILStage * stage)
 		{
 			StageAttribute positionVar;
-			if (stage->Attributes.TryGetValue(L"Position", positionVar))
+			if (stage->Attributes.TryGetValue("Position", positionVar))
 			{
 				ILOperand * operand;
 				if (world->Components.TryGetValue(positionVar.Value, operand))
@@ -1037,11 +1037,11 @@ namespace Spire
 						PrintRasterPositionOutputWrite(ctx, operand);
 					}
 					else
-						errWriter->Error(50040, L"'" + positionVar.Value + L"': component used as 'Position' output must be of vec4 type.",
+						errWriter->Error(50040, "'" + positionVar.Value + "': component used as 'Position' output must be of vec4 type.",
 							positionVar.Position);
 				}
 				else
-					errWriter->Error(50041, L"'" + positionVar.Value + L"': component not defined.",
+					errWriter->Error(50041, "'" + positionVar.Value + "': component not defined.",
 						positionVar.Position);
 			}
 		}
@@ -1050,12 +1050,12 @@ namespace Spire
 		{
 			RefPtr<ILWorld> world = nullptr;
 			StageAttribute worldName;
-			if (stage->Attributes.TryGetValue(L"World", worldName))
+			if (stage->Attributes.TryGetValue("World", worldName))
 			{
 				if (!shader->Worlds.TryGetValue(worldName.Value, world))
-					errWriter->Error(50022, L"world '" + worldName.Value + L"' is not defined.", worldName.Position);
+					errWriter->Error(50022, "world '" + worldName.Value + "' is not defined.", worldName.Position);
 			}
-			outputStrategy = CreateStandardOutputStrategy(world.Ptr(), L"");
+			outputStrategy = CreateStandardOutputStrategy(world.Ptr(), "");
 			return GenerateSingleWorldShader(program, shader, stage);
 		}
 
@@ -1063,10 +1063,10 @@ namespace Spire
 		{
 			RefPtr<ILWorld> world = nullptr;
 			StageAttribute worldName;
-			if (stage->Attributes.TryGetValue(L"World", worldName))
+			if (stage->Attributes.TryGetValue("World", worldName))
 			{
 				if (!shader->Worlds.TryGetValue(worldName.Value, world))
-					errWriter->Error(50022, L"world '" + worldName.Value + L"' is not defined.", worldName.Position);
+					errWriter->Error(50022, "world '" + worldName.Value + "' is not defined.", worldName.Position);
 			}
 			outputStrategy = CreatePackedBufferOutputStrategy(world.Ptr());
 			return GenerateSingleWorldShader(program, shader, stage);
@@ -1079,8 +1079,8 @@ namespace Spire
 			if (retType)
 				PrintType(sbCode, retType);
 			else
-				sbCode << L"void";
-			sbCode << L" " << GetFuncOriginalName(function->Name) << L"(";
+				sbCode << "void";
+			sbCode << " " << GetFuncOriginalName(function->Name) << "(";
 			int id = 0;
 			auto paramIter = function->Parameters.begin();
 			for (auto & instr : *function->Code)
@@ -1091,22 +1091,22 @@ namespace Spire
 					{
 						if (id > 0)
 						{
-							sbCode << L", ";
+							sbCode << ", ";
 						}
 						auto qualifier = (*paramIter).Value.Qualifier;
 						if (qualifier == ParameterQualifier::InOut)
-							sbCode << L"inout ";
+							sbCode << "inout ";
 						else if (qualifier == ParameterQualifier::Out)
-							sbCode << L"out ";
+							sbCode << "out ";
 						else if (qualifier == ParameterQualifier::Uniform)
-							sbCode << L"uniform ";
+							sbCode << "uniform ";
 						PrintDef(sbCode, arg->Type.Ptr(), arg->Name);
 						id++;
 					}
 					++paramIter;
 				}
 			}
-			sbCode << L")";
+			sbCode << ")";
 		}
 		String CLikeCodeGen::GenerateFunction(ILFunction * function)
 		{
@@ -1117,17 +1117,17 @@ namespace Spire
 			ctx.Body.Clear();
 			ctx.Header.Clear();
 			ctx.Arguments.Clear();
-			ctx.ReturnVarName = L"";
+			ctx.ReturnVarName = "";
 			ctx.VarName.Clear();
 				
 			function->Code->NameAllInstructions();
 			GenerateFunctionDeclaration(sbCode, function);
-			sbCode << L"\n{\n";
+			sbCode << "\n{\n";
 			GenerateCode(ctx, function->Code.Ptr());
 			sbCode << ctx.Header.ToString() << ctx.Body.ToString();
 			if (ctx.ReturnVarName.Length())
-				sbCode << L"return " << ctx.ReturnVarName << L";\n";
-			sbCode << L"}\n";
+				sbCode << "return " << ctx.ReturnVarName << ";\n";
+			sbCode << "}\n";
 			return sbCode.ProduceString();
 		}
 
@@ -1140,13 +1140,13 @@ namespace Spire
 			}
 			else
 			{
-				auto name = GenerateCodeName(op->Name, L"");
+				auto name = GenerateCodeName(op->Name, "");
 				codeGen->PrintDef(Header, op->Type.Ptr(), name);
 				if (op->Type->IsInt() || op->Type->IsUInt())
 				{
-					Header << L" = 0";
+					Header << " = 0";
 				}
-				Header << L";\n";
+				Header << ";\n";
 				VarName.Add(op, name);
 				op->Name = name;
 				return op->Name;

@@ -117,55 +117,55 @@ namespace Spire
 			virtual String ToString() override
 			{
 				if (Type == ILBaseType::Int)
-					return L"int";
+					return "int";
 				else if (Type == ILBaseType::UInt)
-					return L"uint";
+					return "uint";
 				else if (Type == ILBaseType::UInt2)
-					return L"uvec2";
+					return "uvec2";
 				else if (Type == ILBaseType::UInt3)
-					return L"uvec3";
+					return "uvec3";
 				else if (Type == ILBaseType::UInt4)
-					return L"uvec4";
+					return "uvec4";
 				else if (Type == ILBaseType::Int2)
-					return L"ivec2";
+					return "ivec2";
 				else if (Type == ILBaseType::Int3)
-					return L"ivec3";
+					return "ivec3";
 				else if (Type == ILBaseType::Int4)
-					return L"ivec4";
+					return "ivec4";
 				else if (Type == ILBaseType::Float)
-					return L"float";
+					return "float";
 				else if (Type == ILBaseType::Float2)
-					return L"vec2";
+					return "vec2";
 				else if (Type == ILBaseType::Float3)
-					return L"vec3";
+					return "vec3";
 				else if (Type == ILBaseType::Float4)
-					return L"vec4";
+					return "vec4";
 				else if (Type == ILBaseType::Float3x3)
-					return L"mat3";
+					return "mat3";
 				else if (Type == ILBaseType::Float4x4)
-					return L"mat4";
+					return "mat4";
 				else if (Type == ILBaseType::Texture2D)
-					return L"sampler2D";
+					return "sampler2D";
 				else if (Type == ILBaseType::TextureCube)
-					return L"samplerCube";
+					return "samplerCube";
 				else if (Type == ILBaseType::TextureCubeShadow)
-					return L"samplerCubeShadow";
+					return "samplerCubeShadow";
 				else if (Type == ILBaseType::TextureShadow)
-					return L"sampler2DShadow";
+					return "sampler2DShadow";
 				else if (Type == ILBaseType::Bool)
-					return L"bool";
+					return "bool";
 				else if (Type == ILBaseType::Bool2)
-					return L"bvec2";
+					return "bvec2";
 				else if (Type == ILBaseType::Bool3)
-					return L"bvec3";
+					return "bvec3";
 				else if (Type == ILBaseType::Bool4)
-					return L"bvec4";
+					return "bvec4";
 				else if (Type == ILBaseType::SamplerState)
-					return L"SamplerState";
+					return "SamplerState";
 				else if (Type == ILBaseType::Void)
-					return L"void";
+					return "void";
 				else
-					return L"?unknown";
+					return "?unknown";
 			}
 			virtual int GetAlignment(LayoutRule rule) override
 			{
@@ -267,9 +267,9 @@ namespace Spire
 			virtual String ToString() override
 			{
 				if (ArrayLength > 0)
-					return BaseType->ToString() + L"[" + String(ArrayLength) + L"]";
+					return BaseType->ToString() + "[" + String(ArrayLength) + "]";
 				else
-					return BaseType->ToString() + L"[]";
+					return BaseType->ToString() + "[]";
 			}
 			virtual int GetSize(LayoutRule layoutRule) override
 			{
@@ -308,7 +308,7 @@ namespace Spire
 			}
 			virtual String ToString() override
 			{
-				return GenericTypeName + L"<" + BaseType->ToString() + L">";
+				return GenericTypeName + "<" + BaseType->ToString() + ">";
 			}
 			virtual int GetSize(LayoutRule rule) override
 			{
@@ -483,7 +483,7 @@ namespace Spire
 			}
 			virtual String ToString()
 			{
-				return L"<operand>";
+				return "<operand>";
 			}
 			virtual bool IsUndefined()
 			{
@@ -496,11 +496,11 @@ namespace Spire
 		public:
 			ILUndefinedOperand()
 			{
-				Name = L"<undef>";
+				Name = "<undef>";
 			}
 			virtual String ToString() override
 			{
-				return L"<undef>";
+				return "<undef>";
 			}
 			virtual bool IsUndefined() override
 			{
@@ -547,7 +547,7 @@ namespace Spire
 				if (ref.Ptr())
 				{
 					if (!user)
-						throw InvalidOperationException(L"user not initialized.");
+						throw InvalidOperationException("user not initialized.");
 					ref.Ptr()->Users.Add(user);
 				}
 			}
@@ -559,7 +559,7 @@ namespace Spire
 				if (newRef)
 				{
 					if (!user)
-						throw InvalidOperationException(L"user not initialized.");
+						throw InvalidOperationException("user not initialized.");
 					newRef->Users.Add(user);
 				}
 			}
@@ -592,7 +592,7 @@ namespace Spire
 				if (reference)
 					return reference->Name;
 				else
-					return L"<null>";
+					return "<null>";
 			}
 		};
 
@@ -665,38 +665,38 @@ namespace Spire
 			virtual String ToString() override
 			{
 				if (Type->IsFloat())
-					return String(FloatValues[0]) + L"f";
+					return String(FloatValues[0]) + "f";
 				else if (Type->IsInt())
 					return String(IntValues[0]);
 				else if (auto baseType = dynamic_cast<ILBasicType*>(Type.Ptr()))
 				{
 					StringBuilder sb(256);
 					if (baseType->Type == ILBaseType::Float2)
-						sb << L"vec2(" << FloatValues[0] << L"f, " << FloatValues[1] << L"f)";
+						sb << "vec2(" << FloatValues[0] << "f, " << FloatValues[1] << "f)";
 					else if (baseType->Type == ILBaseType::Float3)
-						sb << L"vec3(" << FloatValues[0] << L"f, " << FloatValues[1] << L"f, " << FloatValues[2] << L"f)";
+						sb << "vec3(" << FloatValues[0] << "f, " << FloatValues[1] << "f, " << FloatValues[2] << "f)";
 					else if (baseType->Type == ILBaseType::Float4)
-						sb << L"vec4(" << FloatValues[0] << L"f, " << FloatValues[1] << L"f, " << FloatValues[2] << L"f, " << FloatValues[3] << L"f)";
+						sb << "vec4(" << FloatValues[0] << "f, " << FloatValues[1] << "f, " << FloatValues[2] << "f, " << FloatValues[3] << "f)";
 					else if (baseType->Type == ILBaseType::Float3x3)
-						sb << L"mat3(...)";
+						sb << "mat3(...)";
 					else if (baseType->Type == ILBaseType::Float4x4)
-						sb << L"mat4(...)";
+						sb << "mat4(...)";
 					else if (baseType->Type == ILBaseType::Int2)
-						sb << L"ivec2(" << IntValues[0] << L", " << IntValues[1] << L")";
+						sb << "ivec2(" << IntValues[0] << ", " << IntValues[1] << ")";
 					else if (baseType->Type == ILBaseType::Int3)
-						sb << L"ivec3(" << IntValues[0] << L", " << IntValues[1] << L", " << IntValues[2] << L")";
+						sb << "ivec3(" << IntValues[0] << ", " << IntValues[1] << ", " << IntValues[2] << ")";
 					else if (baseType->Type == ILBaseType::Int4)
-						sb << L"ivec4(" << IntValues[0] << L", " << IntValues[1] << L", " << IntValues[2] << L", " << IntValues[3] << L")";
+						sb << "ivec4(" << IntValues[0] << ", " << IntValues[1] << ", " << IntValues[2] << ", " << IntValues[3] << ")";
 					else if (baseType->Type == ILBaseType::UInt2)
-						sb << L"uvec2(" << IntValues[0] << L", " << IntValues[1] << L")";
+						sb << "uvec2(" << IntValues[0] << ", " << IntValues[1] << ")";
 					else if (baseType->Type == ILBaseType::UInt3)
-						sb << L"uvec3(" << IntValues[0] << L", " << IntValues[1] << L", " << IntValues[2] << L")";
+						sb << "uvec3(" << IntValues[0] << ", " << IntValues[1] << ", " << IntValues[2] << ")";
 					else if (baseType->Type == ILBaseType::UInt4)
-						sb << L"uvec4(" << IntValues[0] << L", " << IntValues[1] << L", " << IntValues[2] << L", " << IntValues[3] << L")";
+						sb << "uvec4(" << IntValues[0] << ", " << IntValues[1] << ", " << IntValues[2] << ", " << IntValues[3] << ")";
 					return sb.ToString();
 				}
 				else
-					throw InvalidOperationException(L"Illegal constant.");
+					throw InvalidOperationException("Illegal constant.");
 			}
 		};
 
@@ -734,7 +734,7 @@ namespace Spire
 
 			virtual String GetOperatorString()
 			{
-				return L"<instruction>";
+				return "<instruction>";
 			}
 			virtual bool HasSideEffect()
 			{
@@ -787,7 +787,7 @@ namespace Spire
 				Remove();
 				if (Users.Count())
 				{
-					throw InvalidOperationException(L"All uses must be removed before removing this instruction");
+					throw InvalidOperationException("All uses must be removed before removing this instruction");
 				}
 				delete this;
 			}
@@ -845,18 +845,18 @@ namespace Spire
 			{
 				StringBuilder sb(256);
 				sb << Name;
-				sb << L" = switch ";
+				sb << " = switch ";
 				for (auto & op : Candidates)
 				{
 					sb << op.ToString();
 					if (op != Candidates.Last())
-						sb << L", ";
+						sb << ", ";
 				}
 				return sb.ProduceString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"switch";
+				return "switch";
 			}
 			virtual bool HasSideEffect() override
 			{
@@ -967,11 +967,11 @@ namespace Spire
 			}
 			virtual String ToString() override
 			{
-				return Name + L" = INPUT " + InputName;
+				return Name + " = INPUT " + InputName;
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"input";
+				return "input";
 			}
 			virtual LoadInputInstruction * Clone() override
 			{
@@ -995,7 +995,7 @@ namespace Spire
 			{
 				auto ptrType = type->Clone();
 				if (!type)
-					throw ArgumentException(L"type cannot be null.");
+					throw ArgumentException("type cannot be null.");
 				this->Type = ptrType;
 				this->Size = count;
 			}
@@ -1010,7 +1010,7 @@ namespace Spire
 			}
 			virtual String ToString() override
 			{
-				return Name + L" = VAR " + Type->ToString() + L", " + Size.ToString();
+				return Name + " = VAR " + Type->ToString() + ", " + Size.ToString();
 			}
 			virtual OperandIterator begin() override
 			{
@@ -1022,7 +1022,7 @@ namespace Spire
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"avar";
+				return "avar";
 			}
 			virtual AllocVarInstruction * Clone() override
 			{
@@ -1042,11 +1042,11 @@ namespace Spire
 			}
 			virtual String ToString() override
 			{
-				return Name + L" = ARG " + Type->ToString();
+				return Name + " = ARG " + Type->ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"arg " + String(ArgId);
+				return "arg " + String(ArgId);
 			}
 			virtual bool IsDeterministic() override
 			{
@@ -1330,7 +1330,7 @@ namespace Spire
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"phi";
+				return "phi";
 			}
 			virtual OperandIterator begin() override
 			{
@@ -1343,7 +1343,7 @@ namespace Spire
 			virtual String ToString() override
 			{
 				StringBuilder sb;
-				sb << Name << L" = phi ";
+				sb << Name << " = phi ";
 				for (auto & op : Operands)
 				{
 					if (op)
@@ -1351,8 +1351,8 @@ namespace Spire
 						sb << op.ToString();
 					}
 					else
-						sb << L"<?>";
-					sb << L", ";
+						sb << "<?>";
+					sb << ", ";
 				}
 				return sb.ProduceString();
 			}
@@ -1399,9 +1399,9 @@ namespace Spire
 			virtual String ToString() override
 			{
 				StringBuilder sb;
-				sb << Name << L" = project ";
+				sb << Name << " = project ";
 				sb << Operand.ToString();
-				sb << L", " << ComponentName;
+				sb << ", " << ComponentName;
 				return sb.ProduceString();
 			}
 			virtual ProjectInstruction * Clone() override
@@ -1430,11 +1430,11 @@ namespace Spire
 			}
 			virtual String ToString() override
 			{
-				return L"export [" + ComponentName + L"], " + Operand.ToString();
+				return "export [" + ComponentName + "], " + Operand.ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"export [" + ComponentName + L"]";
+				return "export [" + ComponentName + "]";
 			}
 			virtual ExportInstruction * Clone() override
 			{
@@ -1517,11 +1517,11 @@ namespace Spire
 
 			virtual String ToString() override
 			{
-				return Name + L" = select " + Operands[0].ToString() + L": " + Operands[1].ToString() + L", " + Operands[2].ToString();
+				return Name + " = select " + Operands[0].ToString() + ": " + Operands[1].ToString() + ", " + Operands[2].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"select";
+				return "select";
 			}
 			virtual SelectInstruction * Clone() override
 			{
@@ -1548,19 +1548,19 @@ namespace Spire
 			{
 				StringBuilder sb(256);
 				sb << Name;
-				sb << L" = call " << Function << L"(";
+				sb << " = call " << Function << "(";
 				for (auto & op : Arguments)
 				{
 					sb << op.ToString();
 					if (op != Arguments.Last())
-						sb << L", ";
+						sb << ", ";
 				}
-				sb << L")";
+				sb << ")";
 				return sb.ProduceString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"call " + Function;
+				return "call " + Function;
 			}
 			virtual bool HasSideEffect() override
 			{
@@ -1597,11 +1597,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return  Name + L" = not " + Operand.ToString();
+				return  Name + " = not " + Operand.ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"not";
+				return "not";
 			}
 			virtual NotInstruction * Clone() override
 			{
@@ -1623,11 +1623,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return  Name + L" = neg " + Operand.ToString();
+				return  Name + " = neg " + Operand.ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"neg";
+				return "neg";
 			}
 			virtual NegInstruction * Clone() override
 			{
@@ -1643,11 +1643,11 @@ namespace Spire
 			String SwizzleString;
 			virtual String ToString() override
 			{
-				return  Name + L" = " + Operand.ToString() + L"." + SwizzleString;
+				return  Name + " = " + Operand.ToString() + "." + SwizzleString;
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"swizzle";
+				return "swizzle";
 			}
 			virtual SwizzleInstruction * Clone() override
 			{
@@ -1661,11 +1661,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return  Name + L" = bnot " + Operand.ToString();
+				return  Name + " = bnot " + Operand.ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"bnot";
+				return "bnot";
 			}
 			virtual BitNotInstruction * Clone() override
 			{
@@ -1695,11 +1695,11 @@ namespace Spire
 			}
 			virtual String ToString() override
 			{
-				return Name + L" = add " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = add " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"add";
+				return "add";
 			}
 			virtual AddInstruction * Clone() override
 			{
@@ -1751,26 +1751,26 @@ namespace Spire
 						Type = new ILBasicType(ILBaseType::UInt);
 						break;
 					default:
-						throw InvalidOperationException(L"Unsupported aggregate type.");
+						throw InvalidOperationException("Unsupported aggregate type.");
 					}
 				}
 				else if (auto structType = dynamic_cast<ILStructType*>(v0->Type.Ptr()))
 				{
 					auto cv1 = dynamic_cast<ILConstOperand*>(v1);
 					if (!cv1)
-						throw InvalidProgramException(L"member field access offset is not constant.");
+						throw InvalidProgramException("member field access offset is not constant.");
 					if (cv1->IntValues[0] < 0 || cv1->IntValues[0] >= structType->Members.Count())
-						throw InvalidProgramException(L"member field access offset out of bounds.");
+						throw InvalidProgramException("member field access offset out of bounds.");
 					Type = structType->Members[cv1->IntValues[0]].Type;
 				}
 			}
 			virtual String ToString() override
 			{
-				return Name + L" = retrieve " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = retrieve " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"retrieve";
+				return "retrieve";
 			}
 			virtual MemberLoadInstruction * Clone() override
 			{
@@ -1784,11 +1784,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = sub " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = sub " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"sub";
+				return "sub";
 			}
 			virtual SubInstruction * Clone() override
 			{
@@ -1811,11 +1811,11 @@ namespace Spire
 
 			virtual String ToString() override
 			{
-				return Name + L" = mul " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = mul " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"mul";
+				return "mu";
 			}
 			virtual MulInstruction * Clone() override
 			{
@@ -1829,11 +1829,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = div " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = div " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"div";
+				return "div";
 			}
 			virtual DivInstruction * Clone() override
 			{
@@ -1846,11 +1846,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = mod " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = mod " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"mod";
+				return "mod";
 			}
 			virtual ModInstruction * Clone() override
 			{
@@ -1863,11 +1863,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = and " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = and " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"and";
+				return "and";
 			}
 			virtual AndInstruction * Clone() override
 			{
@@ -1881,11 +1881,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = or " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = or " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"or";
+				return "or";
 			}
 			virtual OrInstruction * Clone() override
 			{
@@ -1907,11 +1907,11 @@ namespace Spire
 			BitAndInstruction(const BitAndInstruction &) = default;
 			virtual String ToString() override
 			{
-				return Name + L" = band " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = band " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"band";
+				return "band";
 			}
 			virtual BitAndInstruction * Clone() override
 			{
@@ -1925,11 +1925,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = bor " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = bor " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"bor";
+				return "bor";
 			}
 			virtual BitOrInstruction * Clone() override
 			{
@@ -1951,11 +1951,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = bxor " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = bxor " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"bxor";
+				return "bxor";
 			}
 			virtual BitXorInstruction * Clone() override
 			{
@@ -1969,11 +1969,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = shl " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = shl " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"shl";
+				return "sh";
 			}
 			virtual ShlInstruction * Clone() override
 			{
@@ -1986,11 +1986,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = shr " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = shr " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"shr";
+				return "shr";
 			}
 			virtual ShrInstruction * Clone() override
 			{
@@ -2005,11 +2005,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = gt " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = gt " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"gt";
+				return "gt";
 			}
 			virtual CmpgtInstruction * Clone() override
 			{
@@ -2022,11 +2022,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = ge " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = ge " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"ge";
+				return "ge";
 			}
 			virtual CmpgeInstruction * Clone() override
 			{
@@ -2039,11 +2039,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = lt " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = lt " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"lt";
+				return "lt";
 			}
 			virtual CmpltInstruction * Clone() override
 			{
@@ -2065,11 +2065,11 @@ namespace Spire
 
 			virtual String ToString() override
 			{
-				return Name + L" = le " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = le " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"le";
+				return "le";
 			}
 			virtual CmpleInstruction * Clone() override
 			{
@@ -2082,12 +2082,12 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = eql " + Operands[0].ToString()
-					+ L", " + Operands[1].ToString();
+				return Name + " = eql " + Operands[0].ToString()
+					+ ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"eql";
+				return "eq";
 			}
 			virtual CmpeqlInstruction * Clone() override
 			{
@@ -2100,11 +2100,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = neq " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = neq " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"neq";
+				return "neq";
 			}
 			virtual CmpneqInstruction * Clone() override
 			{
@@ -2130,11 +2130,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = f2i " + Operand.ToString();
+				return Name + " = f2i " + Operand.ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"f2i";
+				return "f2i";
 			}
 			virtual Float2IntInstruction * Clone() override
 			{
@@ -2157,11 +2157,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = i2f " + Operand.ToString();
+				return Name + " = i2f " + Operand.ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"i2f";
+				return "i2f";
 			}
 			virtual Int2FloatInstruction * Clone() override
 			{
@@ -2184,11 +2184,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = " + Operand.ToString();
+				return Name + " = " + Operand.ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"copy";
+				return "copy";
 			}
 			virtual CopyInstruction * Clone() override
 			{
@@ -2214,7 +2214,7 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = load " + Operand.ToString();
+				return Name + " = load " + Operand.ToString();
 			}
 			virtual bool IsDeterministic() override
 			{
@@ -2222,7 +2222,7 @@ namespace Spire
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"ld";
+				return "ld";
 			}
 			virtual LoadInstruction * Clone() override
 			{
@@ -2247,11 +2247,11 @@ namespace Spire
 			}
 			virtual String ToString() override
 			{
-				return  L"discard";
+				return  "discard";
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"discard";
+				return "discard";
 			}
 			virtual DiscardInstruction * Clone() override
 			{
@@ -2276,12 +2276,12 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return L"store " + Operands[0].ToString() + L", " +
+				return "store " + Operands[0].ToString() + ", " +
 					Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"st";
+				return "st";
 			}
 			virtual bool HasSideEffect() override
 			{
@@ -2334,11 +2334,11 @@ namespace Spire
 			}
 			virtual String ToString() override
 			{
-				return Name + L" = update " + Operands[0].ToString() + L", " + Operands[1].ToString() + L"," + Operands[2].ToString();
+				return Name + " = update " + Operands[0].ToString() + ", " + Operands[1].ToString() + "," + Operands[2].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"update";
+				return "update";
 			}
 			virtual MemberUpdateInstruction * Clone() override
 			{
@@ -2445,11 +2445,11 @@ namespace Spire
 			virtual String ToString() override
 			{
 				StringBuilder sb;
-				sb << L"for (" << InitialCode->ToString() << L"; " << ConditionCode->ToString() << L"; ";
-				sb << SideEffectCode->ToString() << L")" << EndLine;
-				sb << L"{" << EndLine;
+				sb << "for (" << InitialCode->ToString() << "; " << ConditionCode->ToString() << "; ";
+				sb << SideEffectCode->ToString() << ")" << EndLine;
+				sb << "{" << EndLine;
 				sb << BodyCode->ToString() << EndLine;
-				sb << L"}" << EndLine;
+				sb << "}" << EndLine;
 				return sb.ProduceString();
 			}
 		};
@@ -2476,16 +2476,16 @@ namespace Spire
 			virtual String ToString() override
 			{
 				StringBuilder sb;
-				sb << L"if (" << Operand->ToString() << L")" << EndLine;
-				sb << L"{" << EndLine;
+				sb << "if (" << Operand->ToString() << ")" << EndLine;
+				sb << "{" << EndLine;
 				sb << TrueCode->ToString() << EndLine;
-				sb << L"}" << EndLine;
+				sb << "}" << EndLine;
 				if (FalseCode)
 				{
-					sb << L"else" << EndLine;
-					sb << L"{" << EndLine;
+					sb << "else" << EndLine;
+					sb << "{" << EndLine;
 					sb << FalseCode->ToString() << EndLine;
-					sb << L"}" << EndLine;
+					sb << "}" << EndLine;
 				}
 				return sb.ProduceString();
 			}
@@ -2510,10 +2510,10 @@ namespace Spire
 			virtual String ToString() override
 			{
 				StringBuilder sb;
-				sb << L"while (" << ConditionCode->ToString() << L")" << EndLine;
-				sb << L"{" << EndLine;
+				sb << "while (" << ConditionCode->ToString() << ")" << EndLine;
+				sb << "{" << EndLine;
 				sb << BodyCode->ToString();
-				sb << L"}" << EndLine;
+				sb << "}" << EndLine;
 				return sb.ProduceString();
 			}
 		};
@@ -2537,10 +2537,10 @@ namespace Spire
 			virtual String ToString() override
 			{
 				StringBuilder sb;
-				sb << L"{" << EndLine;
+				sb << "{" << EndLine;
 				sb << BodyCode->ToString();
-				sb << L"}" << EndLine;
-				sb << L"while (" << ConditionCode->ToString() << L")" << EndLine;
+				sb << "}" << EndLine;
+				sb << "while (" << ConditionCode->ToString() << ")" << EndLine;
 				return sb.ProduceString();
 			}
 		};
@@ -2555,7 +2555,7 @@ namespace Spire
 
 			virtual String ToString() override
 			{
-				return L"return " + Operand->ToString() + L";";
+				return "return " + Operand->ToString() + ";";
 			}
 		};
 		class BreakInstruction : public ILInstruction

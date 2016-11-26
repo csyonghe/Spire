@@ -20,9 +20,9 @@ namespace Spire
 
 			void PrintRasterPositionOutputWrite(CodeGenContext & ctx, ILOperand * operand) override
 			{
-				ctx.Body << L"stage_output.sv_position = ";
+				ctx.Body << "stage_output.sv_position = ";
 				PrintOp(ctx, operand);
-				ctx.Body << L";\n";
+				ctx.Body << ";\n";
 			}
 
 			void PrintMatrixMulInstrExpr(CodeGenContext & ctx, ILOperand* op0, ILOperand* op1) override
@@ -34,17 +34,17 @@ namespace Spire
 				// This function is called by the code generator for that op
 				// and allows us to print it appropriately.
 
-				ctx.Body << L"mul(";
+				ctx.Body << "mul(";
 				PrintOp(ctx, op1);
-				ctx.Body << L", ";
+				ctx.Body << ", ";
 				PrintOp(ctx, op0);
-				ctx.Body << L")";
+				ctx.Body << ")";
 			}
 
 			void PrintUniformBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
 			{
 				if (!currentImportInstr->Type->IsTexture() || useBindlessTexture)
-					sb << L"blk" << inputName;
+					sb << "blk" << inputName;
 				else
 					sb << componentName;
 			}
@@ -56,27 +56,27 @@ namespace Spire
 
 			void PrintArrayBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
 			{
-				sb << L"blk" << inputName << L".content";
+				sb << "blk" << inputName << ".content";
 			}
 
 			void PrintPackedBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
 			{
-				sb << L"blk" << inputName << L".content";
+				sb << "blk" << inputName << ".content";
 			}
 
 			void PrintStandardInputReference(StringBuilder& sb, ILRecordType* /*recType*/, String inputName, String componentName) override
 			{
-				sb << L"stage_input/*standard*/";
+				sb << "stage_input/*standard*/";
 			}
 
 			void PrintStandardArrayInputReference(StringBuilder& sb, ILRecordType* /*recType*/, String inputName, String componentName) override
 			{
-				sb << L"stage_input/*array*/";
+				sb << "stage_input/*array*/";
 			}
 
 			void PrintPatchInputReference(StringBuilder& sb, ILRecordType* /*recType*/, String inputName, String componentName) override
 			{
-				sb << L"stage_input_patch/*patch*/." << inputName;
+				sb << "stage_input_patch/*patch*/." << inputName;
 			}
 
 			void PrintDefaultInputReference(StringBuilder& sb, ILRecordType* /*recType*/, String inputName, String componentName) override
@@ -91,23 +91,23 @@ namespace Spire
 				switch(systemVar)
 				{
 				case ExternComponentCodeGenInfo::SystemVarType::FragCoord:
-					sb << L"sv_FragPosition";
+					sb << "sv_FragPosition";
 					break;
 				case ExternComponentCodeGenInfo::SystemVarType::TessCoord:
-					sb << L"sv_DomainLocation";
+					sb << "sv_DomainLocation";
 					break;
 				case ExternComponentCodeGenInfo::SystemVarType::InvocationId:
-					sb << L"sv_ThreadID";
+					sb << "sv_ThreadID";
 					break;
 				case ExternComponentCodeGenInfo::SystemVarType::ThreadId:
-					sb << L"sv_GlobalThreadID.x";
+					sb << "sv_GlobalThreadID.x";
 					break;
 				case ExternComponentCodeGenInfo::SystemVarType::PatchVertexCount:
 					// TODO(tfoley): there is no equivalent of this in HLSL
-					sb << L"sv_InputControlPointCount";
+					sb << "sv_InputControlPointCount";
 					break;
 				case ExternComponentCodeGenInfo::SystemVarType::PrimitiveId:
-					sb << L"sv_PrimitiveID";
+					sb << "sv_PrimitiveID";
 					break;
 				default:
 					sb << inputName;
@@ -127,32 +127,32 @@ namespace Spire
 				// Note 2: Well, actually, the Right Answer is for the type representation to
 				// be better than just a string, so that we don't have to do this string->string map.
 				static const struct {
-					wchar_t const* glslName;
-					wchar_t const* hlslName;
+					char const* glslName;
+					char const* hlslName;
 				} kNameRemaps[] =
 				{
-					{ L"vec2", L"*float2" },
-					{ L"vec3", L"*float3" },
-					{ L"vec4", L"*float4" },
+					{ "vec2", "*float2" },
+					{ "vec3", "*float3" },
+					{ "vec4", "*float4" },
 
-					{ L"ivec2", L"*int2" },
-					{ L"ivec3", L"*int3" },
-					{ L"ivec4", L"*int4" },
+					{ "ivec2", "*int2" },
+					{ "ivec3", "*int3" },
+					{ "ivec4", "*int4" },
 
-					{ L"uvec2", L"*uint2" },
-					{ L"uvec3", L"*uint3" },
-					{ L"uvec4", L"*uint4" },
+					{ "uvec2", "*uint2" },
+					{ "uvec3", "*uint3" },
+					{ "uvec4", "*uint4" },
 
-					{ L"mat3", L"float3x3" },
-					{ L"mat4", L"float4x4" },
+					{ "mat3", "float3x3" },
+					{ "mat4", "float4x4" },
 				};
 
 				for(auto remap : kNameRemaps)
 				{
-					if(wcscmp(name.Buffer(), remap.glslName) == 0)
+					if(strcmp(name.Buffer(), remap.glslName) == 0)
 					{
-						wchar_t const* hlslName = remap.hlslName;
-						if(*hlslName == L'*')
+						char const* hlslName = remap.hlslName;
+						if(*hlslName == '*')
 						{
 							hlslName++;
 
@@ -165,9 +165,9 @@ namespace Spire
 							// it differently
 							if(instr->Arguments.Count() == 1)
 							{
-								ctx.Body << L"((" << hlslName << L") ";
+								ctx.Body << "((" << hlslName << ") ";
 								PrintOp(ctx, instr->Arguments[0].Ptr());
-								ctx.Body << L")";
+								ctx.Body << ")";
 								return;
 							}
 						}
@@ -186,22 +186,22 @@ namespace Spire
 				// internally, texObj.Sample(sampler_obj, uv, ..) is represented as Sample(texObj, sampler_obj, uv, ...)
 				// so we need to lift first argument to the front
 				PrintOp(ctx, instr->Arguments[0].Ptr(), true);
-				ctx.Body << L"." << instr->Function;
-				ctx.Body << L"(";
+				ctx.Body << "." << instr->Function;
+				ctx.Body << "(";
 				for (int i = 1; i < instr->Arguments.Count(); i++)
 				{
 					PrintOp(ctx, instr->Arguments[i].Ptr());
 					if (i < instr->Arguments.Count() - 1)
-						ctx.Body << L", ";
+						ctx.Body << ", ";
 				}
-				ctx.Body << L")";
+				ctx.Body << ")";
 			}
 
 			void PrintProjectInstrExpr(CodeGenContext & ctx, ProjectInstruction * proj) override
 			{
 				// project component out of record type. 
 				PrintOp(ctx, proj->Operand.Ptr());
-				ctx.Body << L"." << proj->ComponentName;
+				ctx.Body << "." << proj->ComponentName;
 			}
 
 			void PrintTypeName(StringBuilder& sb, ILType* type) override
@@ -216,30 +216,30 @@ namespace Spire
 				// Note 2: Well, actually, the Right Answer is for the type representation to
 				// be better than just a string, so that we don't have to do this string->string map.
 				static const struct {
-					wchar_t const* glslName;
-					wchar_t const* hlslName;
+					char const* glslName;
+					char const* hlslName;
 				} kNameRemaps[] =
 				{
-					{ L"vec2", L"float2" },
-					{ L"vec3", L"float3" },
-					{ L"vec4", L"float4" },
+					{ "vec2", "float2" },
+					{ "vec3", "float3" },
+					{ "vec4", "float4" },
 
-					{ L"ivec2", L"int2" },
-					{ L"ivec3", L"int3" },
-					{ L"ivec4", L"int4" },
+					{ "ivec2", "int2" },
+					{ "ivec3", "int3" },
+					{ "ivec4", "int4" },
 
-					{ L"uvec2", L"uint2" },
-					{ L"uvec3", L"uint3" },
-					{ L"uvec4", L"uint4" },
+					{ "uvec2", "uint2" },
+					{ "uvec3", "uint3" },
+					{ "uvec4", "uint4" },
 
-					{ L"mat3", L"float3x3" },
-					{ L"mat4", L"float4x4" },
+					{ "mat3", "float3x3" },
+					{ "mat4", "float4x4" },
 				};
 
 				String typeName = type->ToString();
 				for(auto remap : kNameRemaps)
 				{
-					if(wcscmp(typeName.Buffer(), remap.glslName) == 0)
+					if(strcmp(typeName.Buffer(), remap.glslName) == 0)
 					{
 						sb << remap.hlslName;
 						return;
@@ -263,14 +263,14 @@ namespace Spire
 				int declarationStart = sb.GlobalHeader.Length();
 				int itemsDeclaredInBlock = 0;
 
-				sb.GlobalHeader << L"cbuffer " << input.Name;
+				sb.GlobalHeader << "cbuffer " << input.Name;
 				if (info.Binding != -1)
-					sb.GlobalHeader << L" : register(b" << info.Binding << L")";
-				sb.GlobalHeader << L"\n{\n";
+					sb.GlobalHeader << " : register(b" << info.Binding << ")";
+				sb.GlobalHeader << "\n{\n";
 
 				// We declare an inline struct inside the `cbuffer` to ensure that
 				// the members have an appropriate prefix on their name.
-				sb.GlobalHeader << L"struct {\n";
+				sb.GlobalHeader << "struct {\n";
 
 				int index = 0;
 				for (auto & field : recType->Members)
@@ -282,12 +282,12 @@ namespace Spire
 					itemsDeclaredInBlock++;
 					if (info.IsArray)
 					{
-						sb.GlobalHeader << L"[";
+						sb.GlobalHeader << "[";
 						if (info.ArrayLength)
 							sb.GlobalHeader << String(info.ArrayLength);
-						sb.GlobalHeader << L"]";
+						sb.GlobalHeader << "]";
 					}
-					sb.GlobalHeader << L";\n";
+					sb.GlobalHeader << ";\n";
 
 					index++;
 				}
@@ -298,23 +298,23 @@ namespace Spire
 					return;
 				}
 
-				sb.GlobalHeader << L"} blk" << input.Name << L";\n";
-				sb.GlobalHeader << L"};\n";
+				sb.GlobalHeader << "} blk" << input.Name << ";\n";
+				sb.GlobalHeader << "};\n";
 
 				for (auto & field : recType->Members)
 				{
 					if (field.Value.Type->IsTexture())
 					{
-						if (field.Value.Attributes.ContainsKey(L"Binding"))
-							sb.GlobalHeader << L"layout(binding = " << field.Value.Attributes[L"Binding"]() << L") ";
+						if (field.Value.Attributes.ContainsKey("Binding"))
+							sb.GlobalHeader << "layout(binding = " << field.Value.Attributes["Binding"]() << ") ";
 						else
 						{
-							sb.GlobalHeader << L"layout(binding = " << sb.TextureBindingsAllocator << L") ";
+							sb.GlobalHeader << "layout(binding = " << sb.TextureBindingsAllocator << ") ";
 							sb.TextureBindingsAllocator++;
 						}
-						sb.GlobalHeader << L"uniform ";
+						sb.GlobalHeader << "uniform ";
 						PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), field.Key);
-						sb.GlobalHeader << L";\n";
+						sb.GlobalHeader << ";\n";
 					}
 				}
 			}
@@ -342,23 +342,23 @@ namespace Spire
 						// TODO(tfoley): texture binding allocation needs to be per-stage in D3D11, but should be global for D3D12
 						int slotIndex = sb.TextureBindingsAllocator++;
 
-						sb.GlobalHeader << L"Texture2D " << field.Key;
-						sb.GlobalHeader << L" : register(t" << slotIndex << L")";
-						sb.GlobalHeader << L";\n";
+						sb.GlobalHeader << "Texture2D " << field.Key;
+						sb.GlobalHeader << " : register(t" << slotIndex << ")";
+						sb.GlobalHeader << ";\n";
 
-						sb.GlobalHeader << L"SamplerState " << field.Key << "_sampler";
-						sb.GlobalHeader << L" : register(s" << slotIndex << L")";
-						sb.GlobalHeader << L";\n";
+						sb.GlobalHeader << "SamplerState " << field.Key << "_sampler";
+						sb.GlobalHeader << " : register(s" << slotIndex << ")";
+						sb.GlobalHeader << ";\n";
 					}
 					else
 					{
-						errWriter->Error(51091, L"type '" + field.Value.Type->ToString() + L"' cannot be placed in a texture.",
+						errWriter->Error(51091, "type '" + field.Value.Type->ToString() + "' cannot be placed in a texture.",
 							field.Value.Position);
 					}
 				}
 			}
 
-			void DeclareStandardInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) override
+			void DeclareStandardInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool /*isVertexShader*/) override
 			{
 				auto info = ExtractExternComponentInfo(input);
 				extCompInfo[input.Name] = info;
@@ -377,12 +377,12 @@ namespace Spire
 			void GenerateDomainShaderAttributes(StringBuilder & sb, ILStage * stage)
 			{
 				StageAttribute val;
-				if (stage->Attributes.TryGetValue(L"Domain", val))
-					sb << L"[domain(\"" << ((val.Value == L"quads") ? L"quad" : L"tri") << L"\")]\n";
+				if (stage->Attributes.TryGetValue("Domain", val))
+					sb << "[domain(\"" << ((val.Value == "quads") ? "quad" : "tri") << "\")]\n";
 				else
-					sb << L"[domain(\"tri\")]\n";
-				if (val.Value != L"triangles" && val.Value != L"quads")
-					Error(50093, L"'Domain' should be either 'triangles' or 'quads'.", val.Position);
+					sb << "[domain(\"tri\")]\n";
+				if (val.Value != "triangles" && val.Value != "quads")
+					Error(50093, "'Domain' should be either 'triangles' or 'quads'.", val.Position);
 			}
 
 			void PrintHeaderBoilerplate(CodeGenContext& ctx)
@@ -426,7 +426,7 @@ namespace Spire
 
 				// TODO(tfoley): Ther are no bindles textures in HLSL, so I'm
 				// not sure what to do with this flag.
-				useBindlessTexture = stage->Attributes.ContainsKey(L"BindlessTexture");
+				useBindlessTexture = stage->Attributes.ContainsKey("BindlessTexture");
 
 				StageSource rs;
 				CodeGenContext ctx;
@@ -436,13 +436,13 @@ namespace Spire
 				GenerateStructs(ctx.GlobalHeader, program);
 				StageAttribute worldName;
 				RefPtr<ILWorld> world = nullptr;
-				if (stage->Attributes.TryGetValue(L"World", worldName))
+				if (stage->Attributes.TryGetValue("World", worldName))
 				{
 					if (!shader->Worlds.TryGetValue(worldName.Value, world))
-						errWriter->Error(50022, L"world '" + worldName.Value + L"' is not defined.", worldName.Position);
+						errWriter->Error(50022, "world '" + worldName.Value + "' is not defined.", worldName.Position);
 				}
 				else
-					errWriter->Error(50023, L"'" + stage->StageType + L"' should provide 'World' attribute.", stage->Position);
+					errWriter->Error(50023, "'" + stage->StageType + "' should provide 'World' attribute.", stage->Position);
 				if (!world)
 					return rs;
 				GenerateReferencedFunctions(ctx.GlobalHeader, program, MakeArrayView(world.Ptr()));
@@ -465,7 +465,7 @@ namespace Spire
 				// shader is passed to us more explicitly.
 				for (auto & input : world->Inputs)
 				{
-					DeclareInput(ctx, input, stage->StageType == L"VertexShader");
+					DeclareInput(ctx, input, stage->StageType == "VertexShader");
 
 					// We need to detect the world that represents the ordinary stage input...
 					// TODO(tfoley): It seems like this is logically part of the stage definition.
@@ -499,7 +499,7 @@ namespace Spire
 				}
 				if(!stageInputType)
 				{
-					errWriter->Error(99999, L"'" + stage->StageType + L"' doesn't appear to have any input world", stage->Position);
+					errWriter->Error(99999, "'" + stage->StageType + "' doesn't appear to have any input world", stage->Position);
 				}
 		
 				// For a domain shader, we need to know how many corners the
@@ -509,15 +509,15 @@ namespace Spire
 				int cornerCount = 3;
 				if(stage->StageType == "DomainShader")
 				{
-					if (!stage->Attributes.TryGetValue(L"ControlPointCount", controlPointCount))
+					if (!stage->Attributes.TryGetValue("ControlPointCount", controlPointCount))
 					{
-						errWriter->Error(50052, L"'DomainShader' requires attribute 'ControlPointCount'.", stage->Position);
+						errWriter->Error(50052, "'DomainShader' requires attribute 'ControlPointCount'.", stage->Position);
 					}
 					StageAttribute val;
-					if(stage->Attributes.TryGetValue(L"Domain", val))
+					if(stage->Attributes.TryGetValue("Domain", val))
 					{
-						if(val.Value == L"quads")			cornerCount = 4;
-						else if(val.Value == L"triangles")	cornerCount = 3;
+						if(val.Value == "quads")			cornerCount = 4;
+						else if(val.Value == "triangles")	cornerCount = 3;
 					}
 				}
 
@@ -529,7 +529,7 @@ namespace Spire
 				// For shader types that might output the special `SV_Position`
 				// output, we check if the stage in the pipeline actually
 				// declares this output, and emit the logic as needed.
-				if (stage->StageType == L"VertexShader" || stage->StageType == L"DomainShader")
+				if (stage->StageType == "VertexShader" || stage->StageType == "DomainShader")
 					GenerateVertexShaderEpilog(ctx, world.Ptr(), stage);
 
 				StringBuilder sb;
@@ -540,8 +540,8 @@ namespace Spire
 				// work, we generate a combined `struct` that comprises
 				// the user-declared outputs (in a nested `struct`) along
 				// with any system-interpreted outputs we need.
-				sb << L"struct T" << world->OutputType->TypeName << "Ext\n{\n";
-				sb << L"T" << world->OutputType->TypeName << " user";
+				sb << "struct T" << world->OutputType->TypeName << "Ext\n{\n";
+				sb << "T" << world->OutputType->TypeName << " user";
 
 				// The fragment shader needs to use the specific output
 				// semantic `SV_Target` as expected by the HLSL compiler.
@@ -552,19 +552,19 @@ namespace Spire
 				// already applied to the fields of the output `struct`.
 				if(stage->StageType == "FragmentShader")
 				{
-					sb << L" : SV_Target";
+					sb << " : SV_Target";
 				}
-				sb << L";\n";
+				sb << ";\n";
 
 				// We emit any required system-output semantics here.
 				// For now we are just handling `SV_Position`, but
 				// values like fragment shader depth output, etc.
 				// would also go here.
-				if(stage->Attributes.TryGetValue(L"Position"))
+				if(stage->Attributes.TryGetValue("Position"))
 				{
-					sb << L"float4 sv_position : SV_Position;\n";
+					sb << "float4 sv_position : SV_Position;\n";
 				}
-				sb << L"};\n";
+				sb << "};\n";
 
 				if(dsPatchType || dsCornerPointType)
 				{
@@ -578,15 +578,15 @@ namespace Spire
 					// above, we are going to output a single `struct`
 					// that combines user-defined and system inputs.
 
-					sb << L"struct TStageInputPatch\n{\n";
+					sb << "struct TStageInputPatch\n{\n";
 					if(dsPatchType)
 					{
 						// In order to ensure consistent semantics, we apply
 						// a blanket `P` semantic here to the per-patch input.
 						// This semantic will override any per-field semantics
 						// that got emitted for the record type itself.
-						sb << L"T" << dsPatchType->TypeName << L" "
-							<< dsPatchInput->Name << L" : P;\n";
+						sb << "T" << dsPatchType->TypeName << " "
+							<< dsPatchInput->Name << " : P;\n";
 					}
 					if(dsCornerPointType)
 					{
@@ -595,9 +595,9 @@ namespace Spire
 						// apply a single blanket semantic that will go and
 						// recursively enumerate unique semantics for all
 						// the array elements and fields.
-						sb << L"T" << dsCornerPointType->TypeName << L" "
+						sb << "T" << dsCornerPointType->TypeName << " "
 							<< dsCornerPointInput->Name
-							<< L"[" << cornerCount << L"] : C;\n";
+							<< "[" << cornerCount << "] : C;\n";
 					}
 
 					// Note: HLSL requires tessellation level to be declared
@@ -607,18 +607,18 @@ namespace Spire
 					// attribute by string comparison is dangerous, and needs
 					// to be handled more centrally and robustly.
 					StageAttribute val;
-					if(stage->Attributes.TryGetValue(L"Domain", val) && (val.Value == L"quads"))
+					if(stage->Attributes.TryGetValue("Domain", val) && (val.Value == "quads"))
 					{
-						sb << L"    float sv_TessFactors[4] : SV_TessFactor;\n";
-						sb << L"    float sv_InsideTessFactors[2] : SV_InsideTessFactor;\n";
+						sb << "    float sv_TessFactors[4] : SV_TessFactor;\n";
+						sb << "    float sv_InsideTessFactors[2] : SV_InsideTessFactor;\n";
 					}
 					else
 					{
-						sb << L"    float sv_TessFactors[3] : SV_TessFactor;\n";
-						sb << L"    float sv_InsideTessFactors[1] : SV_InsideTessFactor;\n";
+						sb << "    float sv_TessFactors[3] : SV_TessFactor;\n";
+						sb << "    float sv_InsideTessFactors[1] : SV_InsideTessFactor;\n";
 					}
 
-					sb << L"};\n";
+					sb << "};\n";
 				}
 
 				// The domain shader has a few required attributes that need
@@ -628,7 +628,7 @@ namespace Spire
 					GenerateDomainShaderAttributes(sb, stage);
 				}
 
-				sb << L"T" << world->OutputType->TypeName << L"Ext main(";
+				sb << "T" << world->OutputType->TypeName << "Ext main(";
 
 				if(stageInputType)
 				{
@@ -641,7 +641,7 @@ namespace Spire
 						// A domain shader needs to declare an array of input
 						// control points, using the special-purpose generic type
 						// provided by HLSL.
-						sb << L"OutputPatch<T" << stageInputType->TypeName << ", " << controlPointCount.Value << L"> stage_input";
+						sb << "OutputPatch<T" << stageInputType->TypeName << ", " << controlPointCount.Value << "> stage_input";
 					}
 					else if (stage->StageType == "VertexShader")
 					{
@@ -651,14 +651,14 @@ namespace Spire
 						// so that the individual vertex elements in the input
 						// layout will all get the semantic "A" with sequential
 						// indices starting at zero.
-						sb << L"\n    T" << stageInputType->TypeName << " stage_input : A";
+						sb << "\n    T" << stageInputType->TypeName << " stage_input : A";
 					}
 					else
 					{
 						// Finally, the default case just uses the semantics
 						// that were automatically assigned to the fields
 						// of the input record type.
-						sb << L"\n    T" << stageInputType->TypeName << " stage_input";
+						sb << "\n    T" << stageInputType->TypeName << " stage_input";
 					}
 				}
 
@@ -666,33 +666,33 @@ namespace Spire
 				{
 					// For a domain shader, we also need to declare
 					// the per-patch (and per-corner point) input.
-					sb << L",\n    TStageInputPatch stage_input_patch";
+					sb << ",\n    TStageInputPatch stage_input_patch";
 				}
 
 				// Next we declare any addition system inputs that ended up
 				// being used during code generation.
 				if(ctx.UsedSystemInputs.Contains(ExternComponentCodeGenInfo::SystemVarType::TessCoord))
 				{
-					sb << L",\n    ";
+					sb << ",\n    ";
 
 					StageAttribute val;
-					if(stage->Attributes.TryGetValue(L"Domain", val))
-						sb << ((val.Value == L"quads") ? L"float2" : L"float3");
+					if(stage->Attributes.TryGetValue("Domain", val))
+						sb << ((val.Value == "quads") ? "float2" : "float3");
 					else
-						sb << L"float3";
+						sb << "float3";
 
-					sb << L" sv_DomainLocation : SV_DomainLocation";
+					sb << " sv_DomainLocation : SV_DomainLocation";
 				}
 				if(ctx.UsedSystemInputs.Contains(ExternComponentCodeGenInfo::SystemVarType::FragCoord))
 				{
-					sb << L",\n    float4 sv_FragPosition : SV_Position";
+					sb << ",\n    float4 sv_FragPosition : SV_Position";
 				}
 
 				sb << ")\n{ \n";
 				sb << "T" << world->OutputType->TypeName << "Ext stage_output;\n";
 				sb << ctx.Header.ProduceString() << ctx.Body.ProduceString();
 				sb << "return stage_output;\n";
-				sb << L"}";
+				sb << "}";
 				rs.MainCode = sb.ProduceString();
 				return rs;
 			}
@@ -701,7 +701,7 @@ namespace Spire
 			{
 				// By convention, the name of the generated `struct` is
 				// "T" prefixed onto the name of the record type.
-				ctx.GlobalHeader << L"struct T" << recType->TypeName << L"\n{\n";
+				ctx.GlobalHeader << "struct T" << recType->TypeName << "\n{\n";
 
 				int index = 0;
 				for (auto & field : recType->Members)
@@ -711,7 +711,7 @@ namespace Spire
 					// this relaly only affects records that flow
 					// through rasterization/setup/interpolation.
 					if (field.Value.Type->IsIntegral())
-						ctx.GlobalHeader << L"noperspective ";
+						ctx.GlobalHeader << "noperspective ";
 
 					// Declare the field as a `struct` member
 					String declName = field.Key;
@@ -747,7 +747,7 @@ namespace Spire
 					index++;
 				}
 
-				ctx.GlobalHeader << L"};\n";
+				ctx.GlobalHeader << "};\n";
 			}
 
 			// Most of our generated HLSL code can use a single simple output
@@ -773,9 +773,9 @@ namespace Spire
 
 				virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) override
 				{
-					ctx.Body << prefix << L"." << instr->ComponentName << L" = ";
+					ctx.Body << prefix << "." << instr->ComponentName << " = ";
 					codeGen->PrintOp(ctx, instr->Operand.Ptr());
-					ctx.Body << L";\n";
+					ctx.Body << ";\n";
 				}
 			};
 
@@ -793,55 +793,55 @@ namespace Spire
 				StageAttribute patchWorldName, controlPointWorldName, cornerPointWorldName, domain, innerLevel, outerLevel, numControlPoints;
 				StageAttribute inputControlPointCount;
 				RefPtr<ILWorld> patchWorld, controlPointWorld, cornerPointWorld;
-				if (!stage->Attributes.TryGetValue(L"PatchWorld", patchWorldName))
+				if (!stage->Attributes.TryGetValue("PatchWorld", patchWorldName))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'PatchWorld'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'PatchWorld'.", stage->Position);
 					return rs;
 				}
 				if (!shader->Worlds.TryGetValue(patchWorldName.Value, patchWorld))
-					errWriter->Error(50022, L"world '" + patchWorldName.Value + L"' is not defined.", patchWorldName.Position);
-				if (!stage->Attributes.TryGetValue(L"ControlPointWorld", controlPointWorldName))
+					errWriter->Error(50022, "world '" + patchWorldName.Value + "' is not defined.", patchWorldName.Position);
+				if (!stage->Attributes.TryGetValue("ControlPointWorld", controlPointWorldName))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'ControlPointWorld'.", stage->Position); 
+					errWriter->Error(50052, "'HullShader' requires attribute 'ControlPointWorld'.", stage->Position); 
 					return rs;
 				}
 				if (!shader->Worlds.TryGetValue(controlPointWorldName.Value, controlPointWorld))
-					errWriter->Error(50022, L"world '" + controlPointWorldName.Value + L"' is not defined.", controlPointWorldName.Position);
-				if (!stage->Attributes.TryGetValue(L"CornerPointWorld", cornerPointWorldName))
+					errWriter->Error(50022, "world '" + controlPointWorldName.Value + "' is not defined.", controlPointWorldName.Position);
+				if (!stage->Attributes.TryGetValue("CornerPointWorld", cornerPointWorldName))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'CornerPointWorld'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'CornerPointWorld'.", stage->Position);
 					return rs;
 				}
 				if (!shader->Worlds.TryGetValue(cornerPointWorldName.Value, cornerPointWorld))
-					errWriter->Error(50022, L"world '" + cornerPointWorldName.Value + L"' is not defined.", cornerPointWorldName.Position);
-				if (!stage->Attributes.TryGetValue(L"Domain", domain))
+					errWriter->Error(50022, "world '" + cornerPointWorldName.Value + "' is not defined.", cornerPointWorldName.Position);
+				if (!stage->Attributes.TryGetValue("Domain", domain))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'Domain'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'Domain'.", stage->Position);
 					return rs;
 				}
-				if (domain.Value != L"triangles" && domain.Value != L"quads")
+				if (domain.Value != "triangles" && domain.Value != "quads")
 				{
-					errWriter->Error(50053, L"'Domain' should be either 'triangles' or 'quads'.", domain.Position);
+					errWriter->Error(50053, "'Domain' should be either 'triangles' or 'quads'.", domain.Position);
 					return rs;
 				}
-				if (!stage->Attributes.TryGetValue(L"TessLevelOuter", outerLevel))
+				if (!stage->Attributes.TryGetValue("TessLevelOuter", outerLevel))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'TessLevelOuter'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'TessLevelOuter'.", stage->Position);
 					return rs;
 				}
-				if (!stage->Attributes.TryGetValue(L"TessLevelInner", innerLevel))
+				if (!stage->Attributes.TryGetValue("TessLevelInner", innerLevel))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'TessLevelInner'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'TessLevelInner'.", stage->Position);
 					return rs;
 				}
-				if (!stage->Attributes.TryGetValue(L"InputControlPointCount", inputControlPointCount))
+				if (!stage->Attributes.TryGetValue("InputControlPointCount", inputControlPointCount))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'InputControlPointCount'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'InputControlPointCount'.", stage->Position);
 					return rs;
 				}
-				if (!stage->Attributes.TryGetValue(L"ControlPointCount", numControlPoints))
+				if (!stage->Attributes.TryGetValue("ControlPointCount", numControlPoints))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'ControlPointCount'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'ControlPointCount'.", stage->Position);
 					return rs;
 				}
 
@@ -851,15 +851,15 @@ namespace Spire
 				// or only require them when generating HLSL.
 				//
 				StageAttribute partitioning;
-				if(!stage->Attributes.TryGetValue(L"Partitioning", partitioning))
+				if(!stage->Attributes.TryGetValue("Partitioning", partitioning))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'Partitioning'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'Partitioning'.", stage->Position);
 					return rs;
 				}
 				StageAttribute outputTopology;
-				if(!stage->Attributes.TryGetValue(L"OutputTopology", outputTopology))
+				if(!stage->Attributes.TryGetValue("OutputTopology", outputTopology))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'OutputTopology'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'OutputTopology'.", stage->Position);
 					return rs;
 				}
 				// TODO(tfoley): Any reason to include an optional
@@ -875,9 +875,9 @@ namespace Spire
 				PrintHeaderBoilerplate(ctx);
 
 				int cornerCount = 3;
-				if(domain.Value == L"triangles")
+				if(domain.Value == "triangles")
 					cornerCount = 3;
-				else if(domain.Value == L"quads")
+				else if(domain.Value == "quads")
 					cornerCount = 4;
 
 
@@ -895,9 +895,8 @@ namespace Spire
 				// Similar to the single-world case, we try to capture
 				// some information about inputs so that we can use it
 				// to inform code generation later.
-				String perCornerIteratorInputName = L"perCornerIterator";
-				ILRecordType* coarseVertexType;
-
+				String perCornerIteratorInputName = "perCornerIterator";
+				ILRecordType* coarseVertexType = nullptr;
 				//
 				for (auto & input : controlPointWorld->Inputs)
 				{
@@ -946,7 +945,7 @@ namespace Spire
 				cornerPointWorld->Code->NameAllInstructions();
 
 				StringBuilder cornerPointOutputPrefix;
-				cornerPointOutputPrefix << L"stage_output.corners[" << perCornerIteratorInputName << L"]";
+				cornerPointOutputPrefix << "stage_output.corners[" << perCornerIteratorInputName << "]";
 
 				outputStrategy = new SimpleOutputStrategy(this, cornerPointWorld.Ptr(), cornerPointOutputPrefix.ProduceString());
 				outputStrategy->DeclareOutput(ctx, stage);
@@ -954,17 +953,17 @@ namespace Spire
 				// Note(tfoley): We use the `[unroll]` attribute here, because
 				// the HLSL compiler will end up unrolling this loop anyway,
 				// and we'd rather not get their warning about it.
-				ctx.Body << L"[unroll] for (uint " << perCornerIteratorInputName << " = 0; "
-					<< perCornerIteratorInputName << " < " << cornerCount << L"; "
+				ctx.Body << "[unroll] for (uint " << perCornerIteratorInputName << " = 0; "
+					<< perCornerIteratorInputName << " < " << cornerCount << "; "
 					<< perCornerIteratorInputName << "++)\n{\n";
 				GenerateCode(ctx, cornerPointWorld->Code.Ptr());
 				auto debugStr = cornerPointWorld->Code->ToString();
-				ctx.Body << L"}\n";
+				ctx.Body << "}\n";
 				outputStrategy = NULL;
 
 				// Perform per-patch computation
 				patchWorld->Code->NameAllInstructions();
-				outputStrategy = CreateStandardOutputStrategy(patchWorld.Ptr(), L"patch");
+				outputStrategy = CreateStandardOutputStrategy(patchWorld.Ptr(), "patch");
 				outputStrategy->DeclareOutput(ctx, stage);
 				GenerateCode(ctx, patchWorld->Code.Ptr());
 
@@ -972,7 +971,7 @@ namespace Spire
 				StageAttribute val;
 				int tessFactorCount = 3;
 				int insideFactorCount = 1;
-				if(stage->Attributes.TryGetValue(L"Domain", val) && (val.Value == L"quads"))
+				if(stage->Attributes.TryGetValue("Domain", val) && (val.Value == "quads"))
 				{
 					tessFactorCount = 4;
 					insideFactorCount = 2;
@@ -1007,9 +1006,9 @@ namespace Spire
 						{
 							// TODO(tfoley): is this needlessly re-computing the operand multiple times?
 
-							ctx.Body << L"stage_output.sv_TessFactors[" << i << L"] = ";
+							ctx.Body << "stage_output.sv_TessFactors[" << i << "] = ";
 							PrintOp(ctx, operand);
-							ctx.Body << L"[" << i << L"];\n";
+							ctx.Body << "[" << i << "];\n";
 						}
 						found = true;
 						break;
@@ -1017,7 +1016,7 @@ namespace Spire
 
 				}
 				if (!found)
-					errWriter->Error(50041, L"'" + outerLevel.Value + L"': component not defined.",
+					errWriter->Error(50041, "'" + outerLevel.Value + "': component not defined.",
 						outerLevel.Position);
 
 
@@ -1029,16 +1028,16 @@ namespace Spire
 					{
 						for (int i = 0; i < insideFactorCount; i++)
 						{
-							ctx.Body << L"stage_output.sv_InsideTessFactors[" << i << L"] = ";
+							ctx.Body << "stage_output.sv_InsideTessFactors[" << i << "] = ";
 							PrintOp(ctx, operand);
-							ctx.Body << L"[" << i << L"];\n";
+							ctx.Body << "[" << i << "];\n";
 						}
 						found = true;
 						break;
 					}
 				}
 				if (!found)
-					errWriter->Error(50041, L"'" + innerLevel.Value + L"': component not defined.",
+					errWriter->Error(50041, "'" + innerLevel.Value + "': component not defined.",
 						innerLevel.Position);
 
 				// Now surround the code with the boilerplate needed to
@@ -1046,17 +1045,17 @@ namespace Spire
 
 				StringBuilder patchMain;
 
-				patchMain << L"struct SPIRE_PatchOutput\n{\n";
-				patchMain << L"T" << patchWorld->OutputType->TypeName << " user : P;\n";
-				patchMain << L"T" << cornerPointWorld->OutputType->TypeName << L" corners[" << cornerCount << L"] : C;\n";
+				patchMain << "struct SPIRE_PatchOutput\n{\n";
+				patchMain << "T" << patchWorld->OutputType->TypeName << " user : P;\n";
+				patchMain << "T" << cornerPointWorld->OutputType->TypeName << " corners[" << cornerCount << "] : C;\n";
 
-				patchMain << L"    float sv_TessFactors[" << tessFactorCount << L"] : SV_TessFactor;\n";
-				patchMain << L"    float sv_InsideTessFactors[" << insideFactorCount << "] : SV_InsideTessFactor;\n";
+				patchMain << "    float sv_TessFactors[" << tessFactorCount << "] : SV_TessFactor;\n";
+				patchMain << "    float sv_InsideTessFactors[" << insideFactorCount << "] : SV_InsideTessFactor;\n";
 
-				patchMain << L"};\n";
+				patchMain << "};\n";
 
 
-				patchMain << L"SPIRE_PatchOutput SPIRE_patchOutput(";
+				patchMain << "SPIRE_PatchOutput SPIRE_patchOutput(";
 
 				if (coarseVertexType)
 				{
@@ -1065,7 +1064,7 @@ namespace Spire
 				// TODO(tfoley): provide other input shere like SV_PrimitiveID
 
 
-				patchMain << L")\n{\n";
+				patchMain << ")\n{\n";
 				patchMain << "SPIRE_PatchOutput stage_output;\n";
 				patchMain << ctx.Header.ProduceString() << ctx.Body.ProduceString();
 				patchMain << "return stage_output;\n";
@@ -1092,90 +1091,90 @@ namespace Spire
 				// state for it).
 
 				// Name of the entry point to use for the patch-constant phase
-				controlPointMain << L"[patchconstantfunc(\"SPIRE_patchOutput\")]\n";
+				controlPointMain << "[patchconstantfunc(\"SPIRE_patchOutput\")]\n";
 
 				// Domain for tessellation.
-				controlPointMain << L"[domain(\"";
-				if(domain.Value == L"quads")
+				controlPointMain << "[domain(\"";
+				if(domain.Value == "quads")
 				{
-					controlPointMain << L"quad";
+					controlPointMain << "quad";
 				}
-				else if(domain.Value == L"triangles")
+				else if(domain.Value == "triangles")
 				{
-					controlPointMain << L"tri";
+					controlPointMain << "tri";
 				}
 				else
 				{
-					errWriter->Error(50053, L"'Domain' should be either 'triangles' or 'quads'.", domain.Position);
+					errWriter->Error(50053, "'Domain' should be either 'triangles' or 'quads'.", domain.Position);
 					return rs;
 				}
-				controlPointMain << L"\")]\n";
+				controlPointMain << "\")]\n";
 
 				// Parititoning mode (integer, fractional, etc.)
-				controlPointMain << L"[partitioning(\"";
-				if(partitioning.Value == L"integer")
+				controlPointMain << "[partitioning(\"";
+				if(partitioning.Value == "integer")
 				{
 					controlPointMain << "integer";
 				}
-				else if(partitioning.Value == L"pow2")
+				else if(partitioning.Value == "pow2")
 				{
 					controlPointMain << "pow2";
 				}
-				else if(partitioning.Value == L"fractional_even")
+				else if(partitioning.Value == "fractional_even")
 				{
 					controlPointMain << "fractional_even";
 				}
-				else if(partitioning.Value == L"fractional_odd")
+				else if(partitioning.Value == "fractional_odd")
 				{
 					controlPointMain << "fractional_odd";
 				}
 				else
 				{
-					errWriter->Error(50053, L"'Partitioning' must be one of: 'integer', 'pow2', 'fractional_even', or 'fractional_odd'.", partitioning.Position);
+					errWriter->Error(50053, "'Partitioning' must be one of: 'integer', 'pow2', 'fractional_even', or 'fractional_odd'.", partitioning.Position);
 					return rs;
 				}
-				controlPointMain << L"\")]\n";
+				controlPointMain << "\")]\n";
 
 				// Desired output topology, including winding order
 				// for triangles.
-				controlPointMain << L"[outputtopology(\"";
-				if(outputTopology.Value == L"point")
+				controlPointMain << "[outputtopology(\"";
+				if(outputTopology.Value == "point")
 				{
 					controlPointMain << "point";
 				}
-				else if(outputTopology.Value == L"line")
+				else if(outputTopology.Value == "line")
 				{
 					controlPointMain << "line";
 				}
-				else if(outputTopology.Value == L"triangle_cw")
+				else if(outputTopology.Value == "triangle_cw")
 				{
 					controlPointMain << "triangle_cw";
 				}
-				else if(outputTopology.Value == L"triangle_ccw")
+				else if(outputTopology.Value == "triangle_ccw")
 				{
 					controlPointMain << "triangle_ccw";
 				}
 				else
 				{
-					errWriter->Error(50053, L"'OutputTopology' must be one of: 'point', 'line', 'triangle_cw', or 'triangle_ccw'.", partitioning.Position);
+					errWriter->Error(50053, "'OutputTopology' must be one of: 'point', 'line', 'triangle_cw', or 'triangle_ccw'.", partitioning.Position);
 					return rs;
 				}
-				controlPointMain << L"\")]\n";
+				controlPointMain << "\")]\n";
 
 				// Number of output control points
-				controlPointMain << L"[outputcontrolpoints(" << numControlPoints.Value << ")]\n";
+				controlPointMain << "[outputcontrolpoints(" << numControlPoints.Value << ")]\n";
 
 				// With all the attributes dealt with, we can emit the actual `main()` routine
 
-				controlPointMain << L"T" << controlPointWorld->OutputType->TypeName << " main(";
+				controlPointMain << "T" << controlPointWorld->OutputType->TypeName << " main(";
 
-				controlPointMain << L"    InputPatch<T" << coarseVertexType->TypeName << L", " << inputControlPointCount.Value << L"> stage_input";
-				controlPointMain << L",\n    uint sv_ControlPointID : SV_OutputControlPointID";
+				controlPointMain << "    InputPatch<T" << coarseVertexType->TypeName << ", " << inputControlPointCount.Value << "> stage_input";
+				controlPointMain << ",\n    uint sv_ControlPointID : SV_OutputControlPointID";
 
-				controlPointMain << L")\n{\n";
-				controlPointMain << L"T" << controlPointWorld->OutputType->TypeName << " stage_output;\n";
+				controlPointMain << ")\n{\n";
+				controlPointMain << "T" << controlPointWorld->OutputType->TypeName << " stage_output;\n";
 				controlPointMain << ctx.Header.ProduceString() << ctx.Body.ProduceString();
-				controlPointMain << L"return stage_output;\n";
+				controlPointMain << "return stage_output;\n";
 				controlPointMain << "}\n";
 
 				StringBuilder sb;
@@ -1204,21 +1203,21 @@ namespace Spire
 			}
 			virtual void DeclareOutput(CodeGenContext & ctx, ILStage *) override
 			{
-				ctx.GlobalHeader << L"struct T" << world->OutputType->TypeName << L"\n{\n";
+				ctx.GlobalHeader << "struct T" << world->OutputType->TypeName << "\n{\n";
 
 				for (auto & field : world->OutputType->Members)
 				{
 					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), field.Key);
-					ctx.GlobalHeader << L";\n";
+					ctx.GlobalHeader << ";\n";
 				}
 
-				ctx.GlobalHeader << L"};\n";
+				ctx.GlobalHeader << "};\n";
 			}
 			virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) override
 			{
-				ctx.Body << AddWorldNameSuffix(instr->ComponentName, world->Name) << L"[" << outputIndex << L"] = ";
+				ctx.Body << AddWorldNameSuffix(instr->ComponentName, world->Name) << "[" << outputIndex << "] = ";
 				codeGen->PrintOp(ctx, instr->Operand.Ptr());
-				ctx.Body << L";\n";
+				ctx.Body << ";\n";
 			}
 		};
 
@@ -1233,9 +1232,9 @@ namespace Spire
 			{
 				for (auto & field : world->OutputType->Members)
 				{
-					ctx.GlobalHeader << L"out ";
+					ctx.GlobalHeader << "out ";
 					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), field.Key);
-					ctx.GlobalHeader << L";\n";
+					ctx.GlobalHeader << ";\n";
 				}
 			}
 			virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * exportInstr) override
@@ -1243,79 +1242,79 @@ namespace Spire
 				String conversionFunction;
 				int size = 0;
 				String typeName = exportInstr->Type->ToString();
-				if (typeName == L"int")
+				if (typeName == "int")
 				{
-					conversionFunction = L"intBitsToFloat";
+					conversionFunction = "intBitsToFloat";
 					size = 1;
 				}
-				else if (typeName == L"ivec2")
+				else if (typeName == "ivec2")
 				{
-					conversionFunction = L"intBitsToFloat";
+					conversionFunction = "intBitsToFloat";
 					size = 2;
 				}
-				else if (typeName == L"ivec3")
+				else if (typeName == "ivec3")
 				{
-					conversionFunction = L"intBitsToFloat";
+					conversionFunction = "intBitsToFloat";
 					size = 3;
 				}
-				else if (typeName == L"ivec4")
+				else if (typeName == "ivec4")
 				{
-					conversionFunction = L"intBitsToFloat";
+					conversionFunction = "intBitsToFloat";
 					size = 4;
 				}
-				else if (typeName == L"uint")
+				else if (typeName == "uint")
 				{
-					conversionFunction = L"uintBitsToFloat";
+					conversionFunction = "uintBitsToFloat";
 					size = 1;
 				}
-				else if (typeName == L"uvec2")
+				else if (typeName == "uvec2")
 				{
-					conversionFunction = L"uintBitsToFloat";
+					conversionFunction = "uintBitsToFloat";
 					size = 2;
 				}
-				else if (typeName == L"uvec3")
+				else if (typeName == "uvec3")
 				{
-					conversionFunction = L"uintBitsToFloat";
+					conversionFunction = "uintBitsToFloat";
 					size = 3;
 				}
-				else if (typeName == L"uvec4")
+				else if (typeName == "uvec4")
 				{
-					conversionFunction = L"uintBitsToFloat";
+					conversionFunction = "uintBitsToFloat";
 					size = 4;
 				}
-				else if (typeName == L"float")
+				else if (typeName == "float")
 				{
-					conversionFunction = L"";
+					conversionFunction = "";
 					size = 1;
 				}
-				else if (typeName == L"vec2")
+				else if (typeName == "vec2")
 				{
-					conversionFunction = L"";
+					conversionFunction = "";
 					size = 2;
 				}
-				else if (typeName == L"vec3")
+				else if (typeName == "vec3")
 				{
-					conversionFunction = L"";
+					conversionFunction = "";
 					size = 3;
 				}
-				else if (typeName == L"vec4")
+				else if (typeName == "vec4")
 				{
-					conversionFunction = L"";
+					conversionFunction = "";
 					size = 4;
 				}
-				else if (typeName == L"mat3")
+				else if (typeName == "mat3")
 				{
-					conversionFunction = L"";
+					conversionFunction = "";
 					size = 9;
 				}
-				else if (typeName == L"mat4")
+				else if (typeName == "mat4")
 				{
-					conversionFunction = L"";
+					conversionFunction = "";
 					size = 16;
 				}
 				else
 				{
-					codeGen->Error(50082, L"importing type '" + typeName + L"' from PackedBuffer is not supported by the GLSL backend.",
+					codeGen->Error(50082, "importing type '" + typeName + "' from PackedBuffer is not supported by the GLSL backend.",
 						CodePosition());
 				}
 				auto recType = world->OutputType.Ptr();
@@ -1328,17 +1327,17 @@ namespace Spire
 				}
 				for (int i = 0; i < size; i++)
 				{
-					ctx.Body << L"sysOutputBuffer.content[gl_InvocationId.x * " << recTypeSize << L" + " + memberOffsets[exportInstr->ComponentName]()
-						<< L"] = " << conversionFunction << L"(";
+					ctx.Body << "sysOutputBuffer.content[gl_InvocationId.x * " << recTypeSize << " + " + memberOffsets[exportInstr->ComponentName]()
+						<< "] = " << conversionFunction << "(";
 					codeGen->PrintOp(ctx, exportInstr->Operand.Ptr());
 					if (size <= 4)
-						ctx.Body << L"[" << i << L"]";
+						ctx.Body << "[" << i << "]";
 					else
 					{
 						int width = size == 9 ? 3 : 4;
-						ctx.Body << L"[" << i / width << L"][" << i % width << L"]";
+						ctx.Body << "[" << i / width << "][" << i % width << "]";
 					}
-					ctx.Body << L");\n";
+					ctx.Body << ");\n";
 				}
 			}
 		};

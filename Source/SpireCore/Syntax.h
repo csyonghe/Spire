@@ -44,39 +44,39 @@ namespace Spire
 			Error = 16384,
 		};
 
-		inline const wchar_t * BaseTypeToString(BaseType t)
+		inline const char * BaseTypeToString(BaseType t)
 		{
 			switch (t)
 			{
 			case BaseType::Void:
-				return L"void";
+				return "void";
 			case BaseType::Bool:
 			case BaseType::Int:
-				return L"int";
+				return "int";
 			case BaseType::Int2:
-				return L"int2";
+				return "int2";
 			case BaseType::Int3:
-				return L"int3";
+				return "int3";
 			case BaseType::Int4:
-				return L"int4";
+				return "int4";
 			case BaseType::Float:
-				return L"float";
+				return "float";
 			case BaseType::Float2:
-				return L"float2";
+				return "float2";
 			case BaseType::Float3:
-				return L"float3";
+				return "float3";
 			case BaseType::Float4:
-				return L"float4";
+				return "float4";
 			case BaseType::Float3x3:
-				return L"float3x3";
+				return "float3x3";
 			case BaseType::Float4x4:
-				return L"float4x4";
+				return "float4x4";
 			case BaseType::Texture2D:
-				return L"sampler2D";
+				return "sampler2D";
 			case BaseType::TextureCube:
-				return L"samplerCube";
+				return "samplerCube";
 			default:
-				return L"<err-type>";
+				return "<err-type>";
 			}
 		}
 

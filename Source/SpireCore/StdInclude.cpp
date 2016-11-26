@@ -252,28 +252,28 @@ namespace Spire
 				Operator::BitAnd, Operator::BitXor, Operator::BitOr,
 				Operator::And,
 				Operator::Or };
-			String floatTypes[] = { L"float", L"vec2", L"vec3", L"vec4" };
-			String intTypes[] = { L"int", L"ivec2", L"ivec3", L"ivec4" };
-			String uintTypes[] = { L"uint", L"uvec2", L"uvec3", L"uvec4" };
+			String floatTypes[] = { "float", "vec2", "vec3", "vec4" };
+			String intTypes[] = { "int", "ivec2", "ivec3", "ivec4" };
+			String uintTypes[] = { "uint", "uvec2", "uvec3", "uvec4" };
 
-			sb << L"__intrinsic vec3 operator * (vec3, mat3);\n";
-			sb << L"__intrinsic vec3 operator * (mat3, vec3);\n";
+			sb << "__intrinsic vec3 operator * (vec3, mat3);\n";
+			sb << "__intrinsic vec3 operator * (mat3, vec3);\n";
 
-			sb << L"__intrinsic vec4 operator * (vec4, mat4);\n";
-			sb << L"__intrinsic vec4 operator * (mat4, vec4);\n";
+			sb << "__intrinsic vec4 operator * (vec4, mat4);\n";
+			sb << "__intrinsic vec4 operator * (mat4, vec4);\n";
 
-			sb << L"__intrinsic mat3 operator * (mat3, mat3);\n";
-			sb << L"__intrinsic mat4 operator * (mat4, mat4);\n";
+			sb << "__intrinsic mat3 operator * (mat3, mat3);\n";
+			sb << "__intrinsic mat4 operator * (mat4, mat4);\n";
 
-			sb << L"__intrinsic bool operator && (bool, bool);\n";
-			sb << L"__intrinsic bool operator || (bool, bool);\n";
+			sb << "__intrinsic bool operator && (bool, bool);\n";
+			sb << "__intrinsic bool operator || (bool, bool);\n";
 
 			for (auto type : intTypes)
 			{
-				sb << L"__intrinsic bool operator && (bool, " << type << L");\n";
-				sb << L"__intrinsic bool operator || (bool, " << type << L");\n";
-				sb << L"__intrinsic bool operator && (" << type << ", bool);\n";
-				sb << L"__intrinsic bool operator || (" << type << ", bool);\n";
+				sb << "__intrinsic bool operator && (bool, " << type << ");\n";
+				sb << "__intrinsic bool operator || (bool, " << type << ");\n";
+				sb << "__intrinsic bool operator && (" << type << ", bool);\n";
+				sb << "__intrinsic bool operator || (" << type << ", bool);\n";
 			}
 
 			for (auto op : intUnaryOps)
@@ -285,8 +285,8 @@ namespace Spire
 					auto utype = uintTypes[i];
 					for (int j = 0; j < 2; j++)
 					{
-						auto retType = (op == Operator::Not) ? L"bool" : j == 0 ? itype : utype;
-						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << (j == 0 ? itype : utype) << L");\n";
+						auto retType = (op == Operator::Not) ? "bool" : j == 0 ? itype : utype;
+						sb << "__intrinsic " << retType << " operator " << opName << "(" << (j == 0 ? itype : utype) << ");\n";
 					}
 				}
 			}
@@ -297,8 +297,8 @@ namespace Spire
 				for (int i = 0; i < 4; i++)
 				{
 					auto type = floatTypes[i];
-					auto retType = (op == Operator::Not) ? L"bool" : type;
-					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L");\n";
+					auto retType = (op == Operator::Not) ? "bool" : type;
+					sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ");\n";
 				}
 			}
 
@@ -310,22 +310,22 @@ namespace Spire
 					auto type = floatTypes[i];
 					auto itype = intTypes[i];
 					auto utype = uintTypes[i];
-					auto retType = ((op >= Operator::Eql && op <= Operator::Leq) || op == Operator::And || op == Operator::Or) ? L"bool" : type;
-					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << type << L");\n";
-					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << itype << L", " << type << L");\n";
-					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << utype << L", " << type << L");\n";
-					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << itype << L");\n";
-					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << utype << L");\n";
+					auto retType = ((op >= Operator::Eql && op <= Operator::Leq) || op == Operator::And || op == Operator::Or) ? "bool" : type;
+					sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << type << ");\n";
+					sb << "__intrinsic " << retType << " operator " << opName << "(" << itype << ", " << type << ");\n";
+					sb << "__intrinsic " << retType << " operator " << opName << "(" << utype << ", " << type << ");\n";
+					sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << itype << ");\n";
+					sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << utype << ");\n";
 					if (i > 0)
 					{
-						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << floatTypes[0] << L");\n";
-						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << floatTypes[0] << L", " << type << L");\n";
+						sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << floatTypes[0] << ");\n";
+						sb << "__intrinsic " << retType << " operator " << opName << "(" << floatTypes[0] << ", " << type << ");\n";
 
-						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << intTypes[0] << L");\n";
-						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << intTypes[0] << L", " << type << L");\n";
+						sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << intTypes[0] << ");\n";
+						sb << "__intrinsic " << retType << " operator " << opName << "(" << intTypes[0] << ", " << type << ");\n";
 
-						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << uintTypes[0] << L");\n";
-						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << uintTypes[0] << L", " << type << L");\n";
+						sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << uintTypes[0] << ");\n";
+						sb << "__intrinsic " << retType << " operator " << opName << "(" << uintTypes[0] << ", " << type << ");\n";
 					}
 				}
 			}
@@ -337,18 +337,18 @@ namespace Spire
 				{
 					auto type = intTypes[i];
 					auto utype = uintTypes[i];
-					auto retType = ((op >= Operator::Eql && op <= Operator::Leq) || op == Operator::And || op == Operator::Or) ? L"bool" : type;
-					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << type << L");\n";
-					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << utype << L", " << type << L");\n";
-					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << utype << L");\n";
-					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << utype << L", " << utype << L");\n";
+					auto retType = ((op >= Operator::Eql && op <= Operator::Leq) || op == Operator::And || op == Operator::Or) ? "bool" : type;
+					sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << type << ");\n";
+					sb << "__intrinsic " << retType << " operator " << opName << "(" << utype << ", " << type << ");\n";
+					sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << utype << ");\n";
+					sb << "__intrinsic " << retType << " operator " << opName << "(" << utype << ", " << utype << ");\n";
 					if (i > 0)
 					{
-						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << intTypes[0] << L");\n";
-						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << intTypes[0] << L", " << type << L");\n";
+						sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << intTypes[0] << ");\n";
+						sb << "__intrinsic " << retType << " operator " << opName << "(" << intTypes[0] << ", " << type << ");\n";
 
-						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << uintTypes[0] << L");\n";
-						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << uintTypes[0] << L", " << type << L");\n";
+						sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << uintTypes[0] << ");\n";
+						sb << "__intrinsic " << retType << " operator " << opName << "(" << uintTypes[0] << ", " << type << ");\n";
 					}
 				}
 			}

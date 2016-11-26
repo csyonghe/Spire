@@ -23,7 +23,7 @@ namespace Spire
 				// GLSL does not have sampler type, print 0 as placeholder
 				if (op->Type->IsSamplerState())
 				{
-					ctx.Body << L"0";
+					ctx.Body << "0";
 					return;
 				}
 				CLikeCodeGen::PrintOp(ctx, op, forceExpression);
@@ -31,32 +31,32 @@ namespace Spire
 
 			void PrintRasterPositionOutputWrite(CodeGenContext & ctx, ILOperand * operand) override
 			{
-				ctx.Body << L"gl_Position = ";
+				ctx.Body << "gl_Position = ";
 				PrintOp(ctx, operand);
-				ctx.Body << L";\n";
+				ctx.Body << ";\n";
 			}
 
 			void PrintUniformBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
 			{
 				if ((!currentImportInstr->Type->IsTexture() || useBindlessTexture) && !currentImportInstr->Type.As<ILGenericType>())
-					sb << L"blk" << inputName << L"." << componentName;
+					sb << "blk" << inputName << "." << componentName;
 				else
 					sb << componentName;
 			}
 
 			void PrintStorageBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
 			{
-				sb << L"blk" << inputName << L"." << componentName;
+				sb << "blk" << inputName << "." << componentName;
 			}
 
 			void PrintArrayBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
 			{
-				sb << L"blk" << inputName << L".content";
+				sb << "blk" << inputName << ".content";
 			}
 
 			void PrintPackedBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
 			{
-				sb << L"blk" << inputName << L".content";
+				sb << "blk" << inputName << ".content";
 			}
 
 			void PrintStandardInputReference(StringBuilder& sb, ILRecordType* recType, String inputName, String componentName) override
@@ -89,22 +89,22 @@ namespace Spire
 				switch(systemVar)
 				{
 				case ExternComponentCodeGenInfo::SystemVarType::FragCoord:
-					sb << L"gl_FragCoord";
+					sb << "gl_FragCoord";
 					break;
 				case ExternComponentCodeGenInfo::SystemVarType::TessCoord:
-					sb << L"gl_TessCoord";
+					sb << "gl_TessCoord";
 					break;
 				case ExternComponentCodeGenInfo::SystemVarType::InvocationId:
-					sb << L"gl_InvocationID";
+					sb << "gl_InvocationID";
 					break;
 				case ExternComponentCodeGenInfo::SystemVarType::ThreadId:
-					sb << L"gl_GlobalInvocationID.x";
+					sb << "gl_GlobalInvocationID.x";
 					break;
 				case ExternComponentCodeGenInfo::SystemVarType::PatchVertexCount:
-					sb << L"gl_PatchVerticesIn";
+					sb << "gl_PatchVerticesIn";
 					break;
 				case ExternComponentCodeGenInfo::SystemVarType::PrimitiveId:
-					sb << L"gl_PrimitiveID";
+					sb << "gl_PrimitiveID";
 					break;
 				default:
 					sb << inputName;
@@ -118,87 +118,87 @@ namespace Spire
 				{
 					bool overrideBaseMemberLoad = false;
 					auto genType = dynamic_cast<ILGenericType*>(memberLoadInstr->Operands[0]->Type.Ptr());
-					if (genType && genType->GenericTypeName == L"PackedBuffer")
+					if (genType && genType->GenericTypeName == "PackedBuffer")
 					{
 						// load record type from packed buffer
 						String conversionFunction;
 						int size = 0;
-						if (memberLoadInstr->Type->ToString() == L"int")
+						if (memberLoadInstr->Type->ToString() == "int")
 						{
-							conversionFunction = L"floatBitsToInt";
+							conversionFunction = "floatBitsToInt";
 							size = 1;
 						}
-						else if (memberLoadInstr->Type->ToString() == L"ivec2")
+						else if (memberLoadInstr->Type->ToString() == "ivec2")
 						{
-							conversionFunction = L"floatBitsToInt";
+							conversionFunction = "floatBitsToInt";
 							size = 2;
 						}
-						else if (memberLoadInstr->Type->ToString() == L"ivec3")
+						else if (memberLoadInstr->Type->ToString() == "ivec3")
 						{
-							conversionFunction = L"floatBitsToInt";
+							conversionFunction = "floatBitsToInt";
 							size = 3;
 						}
-						else if (memberLoadInstr->Type->ToString() == L"ivec4")
+						else if (memberLoadInstr->Type->ToString() == "ivec4")
 						{
-							conversionFunction = L"floatBitsToInt";
+							conversionFunction = "floatBitsToInt";
 							size = 4;
 						}
-						else if (memberLoadInstr->Type->ToString() == L"uint")
+						else if (memberLoadInstr->Type->ToString() == "uint")
 						{
-							conversionFunction = L"floatBitsToUint";
+							conversionFunction = "floatBitsToUint";
 							size = 1;
 						}
-						else if (memberLoadInstr->Type->ToString() == L"uvec2")
+						else if (memberLoadInstr->Type->ToString() == "uvec2")
 						{
-							conversionFunction = L"floatBitsToUint";
+							conversionFunction = "floatBitsToUint";
 							size = 2;
 						}
-						else if (memberLoadInstr->Type->ToString() == L"uvec3")
+						else if (memberLoadInstr->Type->ToString() == "uvec3")
 						{
-							conversionFunction = L"floatBitsToUint";
+							conversionFunction = "floatBitsToUint";
 							size = 3;
 						}
-						else if (memberLoadInstr->Type->ToString() == L"uvec4")
+						else if (memberLoadInstr->Type->ToString() == "uvec4")
 						{
-							conversionFunction = L"floatBitsToUint";
+							conversionFunction = "floatBitsToUint";
 							size = 4;
 						}
-						else if (memberLoadInstr->Type->ToString() == L"float")
+						else if (memberLoadInstr->Type->ToString() == "float")
 						{
-							conversionFunction = L"";
+							conversionFunction = "";
 							size = 1;
 						}
-						else if (memberLoadInstr->Type->ToString() == L"vec2")
+						else if (memberLoadInstr->Type->ToString() == "vec2")
 						{
-							conversionFunction = L"";
+							conversionFunction = "";
 							size = 2;
 						}
-						else if (memberLoadInstr->Type->ToString() == L"vec3")
+						else if (memberLoadInstr->Type->ToString() == "vec3")
 						{
-							conversionFunction = L"";
+							conversionFunction = "";
 							size = 3;
 						}
-						else if (memberLoadInstr->Type->ToString() == L"vec4")
+						else if (memberLoadInstr->Type->ToString() == "vec4")
 						{
-							conversionFunction = L"";
+							conversionFunction = "";
 							size = 4;
 						}
-						else if (memberLoadInstr->Type->ToString() == L"mat3")
+						else if (memberLoadInstr->Type->ToString() == "mat3")
 						{
-							conversionFunction = L"";
+							conversionFunction = "";
 							size = 9;
 						}
-						else if (memberLoadInstr->Type->ToString() == L"mat4")
+						else if (memberLoadInstr->Type->ToString() == "mat4")
 						{
-							conversionFunction = L"";
+							conversionFunction = "";
 							size = 16;
 						}
 						else
 						{
-							errWriter->Error(50082, L"importing type '" + memberLoadInstr->Type->ToString() + L"' from PackedBuffer is not supported by the GLSL backend.",
+							errWriter->Error(50082, "importing type '" + memberLoadInstr->Type->ToString() + "' from PackedBuffer is not supported by the GLSL backend.",
 								CodePosition());
 						}
-						ctx.Body << memberLoadInstr->Type->ToString() << L"(";
+						ctx.Body << memberLoadInstr->Type->ToString() << "(";
 						auto recType = dynamic_cast<ILRecordType*>(genType->BaseType.Ptr());
 						int recTypeSize = 0;
 						EnumerableDictionary<String, int> memberOffsets;
@@ -209,24 +209,24 @@ namespace Spire
 						}
 						for (int i = 0; i < size; i++)
 						{
-							ctx.Body << conversionFunction << L"(";
+							ctx.Body << conversionFunction << "(";
 							PrintOp(ctx, memberLoadInstr->Operands[0].Ptr());
-							ctx.Body << L"[(";
+							ctx.Body << "[(";
 							PrintOp(ctx, memberLoadInstr->Operands[1].Ptr());
-							ctx.Body << L") * " << recTypeSize << L" + " << memberOffsets[proj->ComponentName]() << L"])";
+							ctx.Body << ") * " << recTypeSize << " + " << memberOffsets[proj->ComponentName]() << "])";
 							if (i != size - 1)
-								ctx.Body << L", ";
+								ctx.Body << ", ";
 						}
-						ctx.Body << L")";
+						ctx.Body << ")";
 						overrideBaseMemberLoad = true;
 					}
 					if (!overrideBaseMemberLoad)
 						PrintOp(ctx, memberLoadInstr, true);
 					if (genType)
 					{
-						if ((genType->GenericTypeName == L"StructuredBuffer" || genType->GenericTypeName == L"RWStructuredBuffer")
+						if ((genType->GenericTypeName == "StructuredBuffer" || genType->GenericTypeName == "RWStructuredBuffer")
 							&& dynamic_cast<ILRecordType*>(genType->BaseType.Ptr()))
-							ctx.Body << L"." << proj->ComponentName;
+							ctx.Body << "." << proj->ComponentName;
 					}
 				}
 				else
@@ -240,72 +240,72 @@ namespace Spire
 
 				// GLSL does not have sampler type, use int as placeholder
 				if (type->IsSamplerState())
-					sb << L"int";
+					sb << "int";
 				else
 					sb << type->ToString();
 			}
 
 			void PrintTextureCall(CodeGenContext & ctx, CallInstruction * instr)
 			{
-				if (instr->Function == L"Sample")
+				if (instr->Function == "Sample")
 				{
 					if (instr->Arguments.Count() == 4)
-						ctx.Body << L"textureOffset";
+						ctx.Body << "textureOffset";
 					else
-						ctx.Body << L"texture";
-					ctx.Body << L"(";
+						ctx.Body << "texture";
+					ctx.Body << "(";
 					for (int i = 0; i < instr->Arguments.Count(); i++)
 					{
 						if (i == 1) continue; // skip sampler_state parameter
 						PrintOp(ctx, instr->Arguments[i].Ptr());
 						if (i < instr->Arguments.Count() - 1)
-							ctx.Body << L", ";
+							ctx.Body << ", ";
 					}
-					ctx.Body << L")";
+					ctx.Body << ")";
 				}
-				else if (instr->Function == L"SampleGrad")
+				else if (instr->Function == "SampleGrad")
 				{
 					if (instr->Arguments.Count() == 6)
-						ctx.Body << L"textureGradOffset";
+						ctx.Body << "textureGradOffset";
 					else
-						ctx.Body << L"textureGrad";
-					ctx.Body << L"(";
+						ctx.Body << "textureGrad";
+					ctx.Body << "(";
 					for (int i = 0; i < instr->Arguments.Count(); i++)
 					{
 						if (i == 1) continue; // skip sampler_state parameter
 						PrintOp(ctx, instr->Arguments[i].Ptr());
 						if (i < instr->Arguments.Count() - 1)
-							ctx.Body << L", ";
+							ctx.Body << ", ";
 					}
-					ctx.Body << L")";
+					ctx.Body << ")";
 				}
-				else if (instr->Function == L"SampleBias")
+				else if (instr->Function == "SampleBias")
 				{
 					if (instr->Arguments.Count() == 5) // loc, bias, offset
 					{
-						ctx.Body << L"textureOffset(";
+						ctx.Body << "textureOffset(";
 						PrintOp(ctx, instr->Arguments[0].Ptr());
-						ctx.Body << L", ";
+						ctx.Body << ", ";
 						PrintOp(ctx, instr->Arguments[2].Ptr());
-						ctx.Body << L", ";
+						ctx.Body << ", ";
 						PrintOp(ctx, instr->Arguments[4].Ptr());
-						ctx.Body << L", ";
+						ctx.Body << ", ";
 						PrintOp(ctx, instr->Arguments[3].Ptr());
-						ctx.Body << L")";
+						ctx.Body << ")";
 					}
 					else
 					{
-						ctx.Body << L"texture(";
+						ctx.Body << "texture(";
 						PrintOp(ctx, instr->Arguments[0].Ptr());
-						ctx.Body << L", ";
+						ctx.Body << ", ";
 						PrintOp(ctx, instr->Arguments[2].Ptr());
-						ctx.Body << L", ";
+						ctx.Body << ", ";
 						PrintOp(ctx, instr->Arguments[3].Ptr());
-						ctx.Body << L")";
+						ctx.Body << ")";
 					}
 				}
 				else
-					throw NotImplementedException(L"CodeGen for texture function '" + instr->Function + L"' is not implemented.");
+					throw NotImplementedException("CodeGen for texture function '" + instr->Function + "' is not implemented.");
 			}
 
 			void DeclareUniformBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool /*isVertexShader*/) override
@@ -319,10 +319,10 @@ namespace Spire
 				int declarationStart = sb.GlobalHeader.Length();
 				int itemsDeclaredInBlock = 0;
 
-				sb.GlobalHeader << L"layout(std140";
+				sb.GlobalHeader << "layout(std140";
 				if (info.Binding != -1)
-					sb.GlobalHeader << L", binding = " << info.Binding;
-				sb.GlobalHeader << L") uniform " << input.Name << L"\n{\n";
+					sb.GlobalHeader << ", binding = " << info.Binding;
+				sb.GlobalHeader << ") uniform " << input.Name << "\n{\n";
 
 				int index = 0;
 				for (auto & field : recType->Members)
@@ -338,12 +338,12 @@ namespace Spire
 					itemsDeclaredInBlock++;
 					if (info.IsArray)
 					{
-						sb.GlobalHeader << L"[";
+						sb.GlobalHeader << "[";
 						if (info.ArrayLength)
 							sb.GlobalHeader << String(info.ArrayLength);
-						sb.GlobalHeader << L"]";
+						sb.GlobalHeader << "]";
 					}
-					sb.GlobalHeader << L";\n";
+					sb.GlobalHeader << ";\n";
 
 					index++;
 				}
@@ -353,7 +353,7 @@ namespace Spire
 				}
 				else
 				{
-					sb.GlobalHeader << L"} blk" << input.Name << L";\n";
+					sb.GlobalHeader << "} blk" << input.Name << ";\n";
 				}
 				if (!useBindlessTexture)
 				{
@@ -363,16 +363,16 @@ namespace Spire
 							//continue;
 						if (field.Value.Type->IsTexture())
 						{
-							if (field.Value.Attributes.ContainsKey(L"Binding"))
-								sb.GlobalHeader << L"layout(binding = " << field.Value.Attributes[L"Binding"]() << L") ";
+							if (field.Value.Attributes.ContainsKey("Binding"))
+								sb.GlobalHeader << "layout(binding = " << field.Value.Attributes["Binding"]() << ") ";
 							else
 							{
-								sb.GlobalHeader << L"layout(binding = " << sb.TextureBindingsAllocator << L") ";
+								sb.GlobalHeader << "layout(binding = " << sb.TextureBindingsAllocator << ") ";
 								sb.TextureBindingsAllocator++;
 							}
-							sb.GlobalHeader << L"uniform ";
+							sb.GlobalHeader << "uniform ";
 							PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), field.Key);
-							sb.GlobalHeader << L";\n";
+							sb.GlobalHeader << ";\n";
 						}
 					}
 				}
@@ -381,16 +381,16 @@ namespace Spire
 					auto genType = field.Value.Type.As<ILGenericType>();
 					if (!genType)
 						continue;
-					if (genType->GenericTypeName == L"StructuredBuffer" || genType->GenericTypeName == L"RWStructuredBuffer")
+					if (genType->GenericTypeName == "StructuredBuffer" || genType->GenericTypeName == "RWStructuredBuffer")
 					{
-						if (field.Value.Attributes.ContainsKey(L"Binding"))
-							sb.GlobalHeader << L"layout(std430, binding = " << field.Value.Attributes[L"Binding"]() << L") ";
+						if (field.Value.Attributes.ContainsKey("Binding"))
+							sb.GlobalHeader << "layout(std430, binding = " << field.Value.Attributes["Binding"]() << ") ";
 						else
-							sb.GlobalHeader << L"layout(std430) ";
+							sb.GlobalHeader << "layout(std430) ";
 
-						sb.GlobalHeader << L"buffer buf" << field.Key << L"\n{\n";
+						sb.GlobalHeader << "buffer buf" << field.Key << "\n{\n";
 						PrintType(sb.GlobalHeader, genType->BaseType.Ptr());
-						sb.GlobalHeader << L" " << field.Key << L"[];\n};\n";
+						sb.GlobalHeader << " " << field.Key << "[];\n};\n";
 					}
 				}
 			}
@@ -404,7 +404,7 @@ namespace Spire
 				assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::ArrayBuffer);
 
 				int itemsDeclaredInBlock = 0;
-				sb.GlobalHeader << L"struct T" << input.Name << L"\n{\n";
+				sb.GlobalHeader << "struct T" << input.Name << "\n{\n";
 					
 				int index = 0;
 				for (auto & field : recType->Members)
@@ -414,14 +414,14 @@ namespace Spire
 					String declName = field.Key;
 					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
 					itemsDeclaredInBlock++;
-					sb.GlobalHeader << L";\n";
+					sb.GlobalHeader << ";\n";
 					index++;
 				}
 
-				sb.GlobalHeader << L"};\nlayout(std430";
+				sb.GlobalHeader << "};\nlayout(std430";
 				if (info.Binding != -1)
-					sb.GlobalHeader << L", binding = " << info.Binding;
-				sb.GlobalHeader  << ") buffer " << input.Name << L"\n{\nT" << input.Name << L" content[];\n} blk" << input.Name << L";\n";
+					sb.GlobalHeader << ", binding = " << info.Binding;
+				sb.GlobalHeader  << ") buffer " << input.Name << "\n{\nT" << input.Name << " content[];\n} blk" << input.Name << ";\n";
 			}
 
 			void DeclarePackedBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool /*isVertexShader*/) override
@@ -432,10 +432,10 @@ namespace Spire
 				assert(recType);
 				assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::PackedBuffer);
 
-				sb.GlobalHeader << L"layout(std430";
+				sb.GlobalHeader << "layout(std430";
 				if (info.Binding != -1)
-					sb.GlobalHeader << L", binding = " << info.Binding;
-				sb.GlobalHeader << L") uniform " << input.Name << L"\n{\nfloat content[];\n} blk" << input.Name << L";\n";
+					sb.GlobalHeader << ", binding = " << info.Binding;
+				sb.GlobalHeader << ") uniform " << input.Name << "\n{\nfloat content[];\n} blk" << input.Name << ";\n";
 			}
 
 			void DeclareTextureInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool /*isVertexShader*/) override
@@ -449,12 +449,12 @@ namespace Spire
 				{
 					if(field.Value.Type->IsFloat() || field.Value.Type->IsFloatVector() && !field.Value.Type->IsFloatMatrix())
 					{
-						sb.GlobalHeader << L"layout(binding = " << sb.TextureBindingsAllocator << L") uniform sampler2D " << field.Key << L";\n";
+						sb.GlobalHeader << "layout(binding = " << sb.TextureBindingsAllocator << ") uniform sampler2D " << field.Key << ";\n";
 						sb.TextureBindingsAllocator++;
 					}
 					else
 					{
-						errWriter->Error(51091, L"type '" + field.Value.Type->ToString() + L"' cannot be placed in a texture.",
+						errWriter->Error(51091, "type '" + field.Value.Type->ToString() + "' cannot be placed in a texture.",
 							field.Value.Position);
 					}
 				}
@@ -474,11 +474,11 @@ namespace Spire
 				{
 					if (field.Value.Type->IsSamplerState())
 						continue;
-					if (input.Attributes.ContainsKey(L"VertexInput"))
-						sb.GlobalHeader << L"layout(location = " << index << L") ";
-					if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat") || field.Value.Type->IsIntegral()))
-						sb.GlobalHeader << L"flat ";
-					sb.GlobalHeader << L"in ";
+					if (input.Attributes.ContainsKey("VertexInput"))
+						sb.GlobalHeader << "layout(location = " << index << ") ";
+					if (!isVertexShader && (input.Attributes.ContainsKey("Flat") || field.Value.Type->IsIntegral()))
+						sb.GlobalHeader << "flat ";
+					sb.GlobalHeader << "in ";
 
 					String declName = field.Key;
 					declName = AddWorldNameSuffix(declName, recType->ToString());
@@ -487,12 +487,12 @@ namespace Spire
 					itemsDeclaredInBlock++;
 					if (info.IsArray)
 					{
-						sb.GlobalHeader << L"[";
+						sb.GlobalHeader << "[";
 						if (info.ArrayLength)
 							sb.GlobalHeader << String(info.ArrayLength);
-						sb.GlobalHeader << L"]";
+						sb.GlobalHeader << "]";
 					}
-					sb.GlobalHeader << L";\n";
+					sb.GlobalHeader << ";\n";
 
 					index++;
 				}
@@ -513,9 +513,9 @@ namespace Spire
 				{
 					if (field.Value.Type->IsSamplerState())
 						continue;
-					if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat")))
-						sb.GlobalHeader << L"flat ";
-					sb.GlobalHeader << L"patch in ";
+					if (!isVertexShader && (input.Attributes.ContainsKey("Flat")))
+						sb.GlobalHeader << "flat ";
+					sb.GlobalHeader << "patch in ";
 
 					String declName = field.Key;
 					declName = AddWorldNameSuffix(declName, recType->ToString());
@@ -524,12 +524,12 @@ namespace Spire
 					itemsDeclaredInBlock++;
 					if (info.IsArray)
 					{
-						sb.GlobalHeader << L"[";
+						sb.GlobalHeader << "[";
 						if (info.ArrayLength)
 							sb.GlobalHeader << String(info.ArrayLength);
-						sb.GlobalHeader << L"]";
+						sb.GlobalHeader << "]";
 					}
-					sb.GlobalHeader << L";\n";
+					sb.GlobalHeader << ";\n";
 
 					index++;
 				}
@@ -537,132 +537,132 @@ namespace Spire
 
 			void GenerateHeader(StringBuilder & sb, ILStage * stage)
 			{
-				sb << L"#version 440\n";
-				if (stage->Attributes.ContainsKey(L"BindlessTexture"))
-					sb << L"#extension GL_ARB_bindless_texture: require\n#extension GL_NV_gpu_shader5 : require\n";
-				if (stage->Attributes.ContainsKey(L"NV_CommandList"))
-					sb << L"#extension GL_NV_command_list: require\n";
+				sb << "#version 440\n";
+				if (stage->Attributes.ContainsKey("BindlessTexture"))
+					sb << "#extension GL_ARB_bindless_texture: require\n#extension GL_NV_gpu_shader5 : require\n";
+				if (stage->Attributes.ContainsKey("NV_CommandList"))
+					sb << "#extension GL_NV_command_list: require\n";
 			}
 
 			void GenerateDomainShaderProlog(CodeGenContext & ctx, ILStage * stage)
 			{
-				ctx.GlobalHeader << L"layout(";
+				ctx.GlobalHeader << "layout(";
 				StageAttribute val;
-				if (stage->Attributes.TryGetValue(L"Domain", val))
-					ctx.GlobalHeader << ((val.Value == L"quads") ? L"quads" : L"triangles");
+				if (stage->Attributes.TryGetValue("Domain", val))
+					ctx.GlobalHeader << ((val.Value == "quads") ? "quads" : "triangles");
 				else
-					ctx.GlobalHeader << L"triangles";
-				if (val.Value != L"triangles" && val.Value != L"quads")
-					Error(50093, L"'Domain' should be either 'triangles' or 'quads'.", val.Position);
-				if (stage->Attributes.TryGetValue(L"Winding", val))
+					ctx.GlobalHeader << "triangles";
+				if (val.Value != "triangles" && val.Value != "quads")
+					Error(50093, "'Domain' should be either 'triangles' or 'quads'.", val.Position);
+				if (stage->Attributes.TryGetValue("Winding", val))
 				{
-					if (val.Value == L"cw")
-						ctx.GlobalHeader << L", cw";
+					if (val.Value == "cw")
+						ctx.GlobalHeader << ", cw";
 					else
-						ctx.GlobalHeader << L", ccw";
+						ctx.GlobalHeader << ", ccw";
 				}
-				if (stage->Attributes.TryGetValue(L"EqualSpacing", val))
+				if (stage->Attributes.TryGetValue("EqualSpacing", val))
 				{
-					if (val.Value == L"1" || val.Value == L"true")
-						ctx.GlobalHeader << L", equal_spacing";
+					if (val.Value == "1" || val.Value == "true")
+						ctx.GlobalHeader << ", equal_spacing";
 				}
-				ctx.GlobalHeader << L") in;\n";
+				ctx.GlobalHeader << ") in;\n";
 			}
 			StageSource GenerateSingleWorldShader(ILProgram * program, ILShader * shader, ILStage * stage) override
 			{
-				useBindlessTexture = stage->Attributes.ContainsKey(L"BindlessTexture");
+				useBindlessTexture = stage->Attributes.ContainsKey("BindlessTexture");
 				StageSource rs;
 				CodeGenContext ctx;
 				GenerateHeader(ctx.GlobalHeader, stage);
-				if (stage->StageType == L"DomainShader")
+				if (stage->StageType == "DomainShader")
 					GenerateDomainShaderProlog(ctx, stage);
 
 				GenerateStructs(ctx.GlobalHeader, program);
 				StageAttribute worldName;
 				RefPtr<ILWorld> world = nullptr;
-				if (stage->Attributes.TryGetValue(L"World", worldName))
+				if (stage->Attributes.TryGetValue("World", worldName))
 				{
 					if (!shader->Worlds.TryGetValue(worldName.Value, world))
-						errWriter->Error(50022, L"world '" + worldName.Value + L"' is not defined.", worldName.Position);
+						errWriter->Error(50022, "world '" + worldName.Value + "' is not defined.", worldName.Position);
 				}
 				else
-					errWriter->Error(50023, L"'" + stage->StageType + L"' should provide 'World' attribute.", stage->Position);
+					errWriter->Error(50023, "'" + stage->StageType + "' should provide 'World' attribute.", stage->Position);
 				if (!world)
 					return rs;
 				GenerateReferencedFunctions(ctx.GlobalHeader, program, MakeArrayView(world.Ptr()));
 				extCompInfo.Clear();
 				for (auto & input : world->Inputs)
 				{
-					DeclareInput(ctx, input, stage->StageType == L"VertexShader");
+					DeclareInput(ctx, input, stage->StageType == "VertexShader");
 				}
 		
 				outputStrategy->DeclareOutput(ctx, stage);
 				ctx.codeGen = this;
 				world->Code->NameAllInstructions();
 				GenerateCode(ctx, world->Code.Ptr());
-				if (stage->StageType == L"VertexShader" || stage->StageType == L"DomainShader")
+				if (stage->StageType == "VertexShader" || stage->StageType == "DomainShader")
 					GenerateVertexShaderEpilog(ctx, world.Ptr(), stage);
 
 				StringBuilder sb;
 				sb << ctx.GlobalHeader.ProduceString();
-				sb << L"void main()\n{\n";
+				sb << "void main()\n{\n";
 				sb << ctx.Header.ProduceString() << ctx.Body.ProduceString();
-				sb << L"}";
+				sb << "}";
 				rs.MainCode = sb.ProduceString();
 				return rs;
 			}
 
 			StageSource GenerateHullShader(ILProgram * program, ILShader * shader, ILStage * stage) override
 			{
-				useBindlessTexture = stage->Attributes.ContainsKey(L"BindlessTexture");
+				useBindlessTexture = stage->Attributes.ContainsKey("BindlessTexture");
 
 				StageSource rs;
 				StageAttribute patchWorldName, controlPointWorldName, cornerPointWorldName, domain, innerLevel, outerLevel, numControlPoints;
 				RefPtr<ILWorld> patchWorld, controlPointWorld, cornerPointWorld;
-				if (!stage->Attributes.TryGetValue(L"PatchWorld", patchWorldName))
+				if (!stage->Attributes.TryGetValue("PatchWorld", patchWorldName))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'PatchWorld'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'PatchWorld'.", stage->Position);
 					return rs;
 				}
 				if (!shader->Worlds.TryGetValue(patchWorldName.Value, patchWorld))
-					errWriter->Error(50022, L"world '" + patchWorldName.Value + L"' is not defined.", patchWorldName.Position);
-				if (!stage->Attributes.TryGetValue(L"ControlPointWorld", controlPointWorldName))
+					errWriter->Error(50022, "world '" + patchWorldName.Value + "' is not defined.", patchWorldName.Position);
+				if (!stage->Attributes.TryGetValue("ControlPointWorld", controlPointWorldName))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'ControlPointWorld'.", stage->Position); 
+					errWriter->Error(50052, "'HullShader' requires attribute 'ControlPointWorld'.", stage->Position); 
 					return rs;
 				}
 				if (!shader->Worlds.TryGetValue(controlPointWorldName.Value, controlPointWorld))
-					errWriter->Error(50022, L"world '" + controlPointWorldName.Value + L"' is not defined.", controlPointWorldName.Position);
-				if (!stage->Attributes.TryGetValue(L"CornerPointWorld", cornerPointWorldName))
+					errWriter->Error(50022, "world '" + controlPointWorldName.Value + "' is not defined.", controlPointWorldName.Position);
+				if (!stage->Attributes.TryGetValue("CornerPointWorld", cornerPointWorldName))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'CornerPointWorld'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'CornerPointWorld'.", stage->Position);
 					return rs;
 				}
 				if (!shader->Worlds.TryGetValue(cornerPointWorldName.Value, cornerPointWorld))
-					errWriter->Error(50022, L"world '" + cornerPointWorldName.Value + L"' is not defined.", cornerPointWorldName.Position);
-				if (!stage->Attributes.TryGetValue(L"Domain", domain))
+					errWriter->Error(50022, "world '" + cornerPointWorldName.Value + "' is not defined.", cornerPointWorldName.Position);
+				if (!stage->Attributes.TryGetValue("Domain", domain))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'Domain'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'Domain'.", stage->Position);
 					return rs;
 				}
-				if (domain.Value != L"triangles" && domain.Value != L"quads")
+				if (domain.Value != "triangles" && domain.Value != "quads")
 				{
-					errWriter->Error(50053, L"'Domain' should be either 'triangles' or 'quads'.", domain.Position);
+					errWriter->Error(50053, "'Domain' should be either 'triangles' or 'quads'.", domain.Position);
 					return rs;
 				}
-				if (!stage->Attributes.TryGetValue(L"TessLevelOuter", outerLevel))
+				if (!stage->Attributes.TryGetValue("TessLevelOuter", outerLevel))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'TessLevelOuter'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'TessLevelOuter'.", stage->Position);
 					return rs;
 				}
-				if (!stage->Attributes.TryGetValue(L"TessLevelInner", innerLevel))
+				if (!stage->Attributes.TryGetValue("TessLevelInner", innerLevel))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'TessLevelInner'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'TessLevelInner'.", stage->Position);
 					return rs;
 				}
-				if (!stage->Attributes.TryGetValue(L"ControlPointCount", numControlPoints))
+				if (!stage->Attributes.TryGetValue("ControlPointCount", numControlPoints))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'ControlPointCount'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'ControlPointCount'.", stage->Position);
 					return rs;
 				}
 				CodeGenContext ctx;
@@ -672,7 +672,7 @@ namespace Spire
 				worlds.Add(controlPointWorld.Ptr());
 				worlds.Add(cornerPointWorld.Ptr());
 				GenerateHeader(ctx.GlobalHeader, stage);
-				ctx.GlobalHeader << L"layout(vertices = " << numControlPoints.Value << L") out;\n";
+				ctx.GlobalHeader << "layout(vertices = " << numControlPoints.Value << ") out;\n";
 				GenerateStructs(ctx.GlobalHeader, program);
 				GenerateReferencedFunctions(ctx.GlobalHeader, program, worlds.GetArrayView());
 				extCompInfo.Clear();
@@ -680,7 +680,7 @@ namespace Spire
 				HashSet<String> declaredInputs;
 
 				patchWorld->Code->NameAllInstructions();
-				outputStrategy = CreateStandardOutputStrategy(patchWorld.Ptr(), L"patch");
+				outputStrategy = CreateStandardOutputStrategy(patchWorld.Ptr(), "patch");
 				for (auto & input : patchWorld->Inputs)
 				{
 					if (declaredInputs.Add(input.Name))
@@ -690,7 +690,7 @@ namespace Spire
 				GenerateCode(ctx, patchWorld->Code.Ptr());
 
 				controlPointWorld->Code->NameAllInstructions();
-				outputStrategy = CreateArrayOutputStrategy(controlPointWorld.Ptr(), false, 0, L"gl_InvocationID");
+				outputStrategy = CreateArrayOutputStrategy(controlPointWorld.Ptr(), false, 0, "gl_InvocationID");
 				for (auto & input : controlPointWorld->Inputs)
 				{
 					if (declaredInputs.Add(input.Name))
@@ -700,17 +700,17 @@ namespace Spire
 				GenerateCode(ctx, controlPointWorld->Code.Ptr());
 
 				cornerPointWorld->Code->NameAllInstructions();
-				outputStrategy = CreateArrayOutputStrategy(cornerPointWorld.Ptr(), true, (domain.Value == L"triangles" ? 3 : 4), L"sysLocalIterator");
+				outputStrategy = CreateArrayOutputStrategy(cornerPointWorld.Ptr(), true, (domain.Value == "triangles" ? 3 : 4), "sysLocalIterator");
 				for (auto & input : cornerPointWorld->Inputs)
 				{
 					if (declaredInputs.Add(input.Name))
 						DeclareInput(ctx, input, false);
 				}
 				outputStrategy->DeclareOutput(ctx, stage);
-				ctx.Body << L"for (int sysLocalIterator = 0; sysLocalIterator < gl_PatchVerticesIn; sysLocalIterator++)\n{\n";
+				ctx.Body << "for (int sysLocalIterator = 0; sysLocalIterator < gl_PatchVerticesIn; sysLocalIterator++)\n{\n";
 				GenerateCode(ctx, cornerPointWorld->Code.Ptr());
 				auto debugStr = cornerPointWorld->Code->ToString();
-				ctx.Body << L"}\n";
+				ctx.Body << "}\n";
 
 				// generate epilog
 				bool found = false;
@@ -721,16 +721,16 @@ namespace Spire
 					{
 						for (int i = 0; i < 2; i++)
 						{
-							ctx.Body << L"gl_TessLevelInner[" << i << L"] = ";
+							ctx.Body << "gl_TessLevelInner[" << i << "] = ";
 							PrintOp(ctx, operand);
-							ctx.Body << L"[" << i << L"];\n";
+							ctx.Body << "[" << i << "];\n";
 						}
 						found = true;
 						break;
 					}
 				}
 				if (!found)
-					errWriter->Error(50041, L"'" + innerLevel.Value + L"': component not defined.",
+					errWriter->Error(50041, "'" + innerLevel.Value + "': component not defined.",
 						innerLevel.Position);
 
 				found = false;
@@ -741,9 +741,9 @@ namespace Spire
 					{
 						for (int i = 0; i < 4; i++)
 						{
-							ctx.Body << L"gl_TessLevelOuter[" << i << L"] = ";
+							ctx.Body << "gl_TessLevelOuter[" << i << "] = ";
 							PrintOp(ctx, operand);
-							ctx.Body << L"[" << i << L"];\n";
+							ctx.Body << "[" << i << "];\n";
 						}
 						found = true;
 						break;
@@ -751,12 +751,12 @@ namespace Spire
 
 				}
 				if (!found)
-					errWriter->Error(50041, L"'" + outerLevel.Value + L"': component not defined.",
+					errWriter->Error(50041, "'" + outerLevel.Value + "': component not defined.",
 						outerLevel.Position);
 
 				StringBuilder sb;
 				sb << ctx.GlobalHeader.ProduceString();
-				sb << L"void main()\n{\n" << ctx.Header.ProduceString() << ctx.Body.ProduceString() << L"}";
+				sb << "void main()\n{\n" << ctx.Header.ProduceString() << ctx.Body.ProduceString() << "}";
 				rs.MainCode = sb.ProduceString();
 				return rs;
 			}
@@ -777,20 +777,20 @@ namespace Spire
 				for (auto & field : world->OutputType->Members)
 				{
 					if (declPrefix.Length())
-						ctx.GlobalHeader << declPrefix << L" ";
+						ctx.GlobalHeader << declPrefix << " ";
 					if (field.Value.Type->IsIntegral())
-						ctx.GlobalHeader << L"flat ";
-					ctx.GlobalHeader << L"out ";
+						ctx.GlobalHeader << "flat ";
+					ctx.GlobalHeader << "out ";
 					String declName = field.Key;
 					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), AddWorldNameSuffix(declName, world->OutputType->TypeName));
-					ctx.GlobalHeader << L";\n";
+					ctx.GlobalHeader << ";\n";
 				}
 			}
 			virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) override
 			{
-				ctx.Body << AddWorldNameSuffix(instr->ComponentName, world->OutputType->TypeName) << L" = ";
+				ctx.Body << AddWorldNameSuffix(instr->ComponentName, world->OutputType->TypeName) << " = ";
 				codeGen->PrintOp(ctx, instr->Operand.Ptr());
-				ctx.Body << L";\n";
+				ctx.Body << ";\n";
 			}
 		};
 
@@ -813,20 +813,20 @@ namespace Spire
 				for (auto & field : world->OutputType->Members)
 				{
 					if (isPatch)
-						ctx.GlobalHeader << L"patch ";
-					ctx.GlobalHeader << L"out ";
+						ctx.GlobalHeader << "patch ";
+					ctx.GlobalHeader << "out ";
 					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), AddWorldNameSuffix(field.Key, world->Name));
-					ctx.GlobalHeader << L"[";
+					ctx.GlobalHeader << "[";
 					if (arraySize != 0)
 						ctx.GlobalHeader << arraySize;
-					ctx.GlobalHeader<<L"]; \n";
+					ctx.GlobalHeader<<"]; \n";
 				}
 			}
 			virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) override
 			{
-				ctx.Body << AddWorldNameSuffix(instr->ComponentName, world->Name) << L"[" << outputIndex << L"] = ";
+				ctx.Body << AddWorldNameSuffix(instr->ComponentName, world->Name) << "[" << outputIndex << "] = ";
 				codeGen->PrintOp(ctx, instr->Operand.Ptr());
-				ctx.Body << L";\n";
+				ctx.Body << ";\n";
 			}
 		};
 
@@ -840,9 +840,9 @@ namespace Spire
 			{
 				for (auto & field : world->OutputType->Members)
 				{
-					ctx.GlobalHeader << L"out ";
+					ctx.GlobalHeader << "out ";
 					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), field.Key);
-					ctx.GlobalHeader << L";\n";
+					ctx.GlobalHeader << ";\n";
 				}
 			}
 			virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * exportInstr) override
@@ -850,79 +850,79 @@ namespace Spire
 				String conversionFunction;
 				int size = 0;
 				String typeName = exportInstr->Type->ToString();
-				if (typeName == L"int")
+				if (typeName == "int")
 				{
-					conversionFunction = L"intBitsToFloat";
+					conversionFunction = "intBitsToFloat";
 					size = 1;
 				}
-				else if (typeName == L"ivec2")
+				else if (typeName == "ivec2")
 				{
-					conversionFunction = L"intBitsToFloat";
+					conversionFunction = "intBitsToFloat";
 					size = 2;
 				}
-				else if (typeName == L"ivec3")
+				else if (typeName == "ivec3")
 				{
-					conversionFunction = L"intBitsToFloat";
+					conversionFunction = "intBitsToFloat";
 					size = 3;
 				}
-				else if (typeName == L"ivec4")
+				else if (typeName == "ivec4")
 				{
-					conversionFunction = L"intBitsToFloat";
+					conversionFunction = "intBitsToFloat";
 					size = 4;
 				}
-				else if (typeName == L"uint")
+				else if (typeName == "uint")
 				{
-					conversionFunction = L"uintBitsToFloat";
+					conversionFunction = "uintBitsToFloat";
 					size = 1;
 				}
-				else if (typeName == L"uvec2")
+				else if (typeName == "uvec2")
 				{
-					conversionFunction = L"uintBitsToFloat";
+					conversionFunction = "uintBitsToFloat";
 					size = 2;
 				}
-				else if (typeName == L"uvec3")
+				else if (typeName == "uvec3")
 				{
-					conversionFunction = L"uintBitsToFloat";
+					conversionFunction = "uintBitsToFloat";
 					size = 3;
 				}
-				else if (typeName == L"uvec4")
+				else if (typeName == "uvec4")
 				{
-					conversionFunction = L"uintBitsToFloat";
+					conversionFunction = "uintBitsToFloat";
 					size = 4;
 				}
-				else if (typeName == L"float")
+				else if (typeName == "float")
 				{
-					conversionFunction = L"";
+					conversionFunction = "";
 					size = 1;
 				}
-				else if (typeName == L"vec2")
+				else if (typeName == "vec2")
 				{
-					conversionFunction = L"";
+					conversionFunction = "";
 					size = 2;
 				}
-				else if (typeName == L"vec3")
+				else if (typeName == "vec3")
 				{
-					conversionFunction = L"";
+					conversionFunction = "";
 					size = 3;
 				}
-				else if (typeName == L"vec4")
+				else if (typeName == "vec4")
 				{
-					conversionFunction = L"";
+					conversionFunction = "";
 					size = 4;
 				}
-				else if (typeName == L"mat3")
+				else if (typeName == "mat3")
 				{
-					conversionFunction = L"";
+					conversionFunction = "";
 					size = 9;
 				}
-				else if (typeName == L"mat4")
+				else if (typeName == "mat4")
 				{
-					conversionFunction = L"";
+					conversionFunction = "";
 					size = 16;
 				}
 				else
 				{
-					codeGen->Error(50082, L"importing type '" + typeName + L"' from PackedBuffer is not supported by the GLSL backend.",
+					codeGen->Error(50082, "importing type '" + typeName + "' from PackedBuffer is not supported by the GLSL backend.",
 						CodePosition());
 				}
 				auto recType = world->OutputType.Ptr();
@@ -935,17 +935,17 @@ namespace Spire
 				}
 				for (int i = 0; i < size; i++)
 				{
-					ctx.Body << L"sysOutputBuffer.content[gl_InvocationId.x * " << recTypeSize << L" + " + memberOffsets[exportInstr->ComponentName]()
-						<< L"] = " << conversionFunction << L"(";
+					ctx.Body << "sysOutputBuffer.content[gl_InvocationId.x * " << recTypeSize << " + " + memberOffsets[exportInstr->ComponentName]()
+						<< "] = " << conversionFunction << "(";
 					codeGen->PrintOp(ctx, exportInstr->Operand.Ptr());
 					if (size <= 4)
-						ctx.Body << L"[" << i << L"]";
+						ctx.Body << "[" << i << "]";
 					else
 					{
 						int width = size == 9 ? 3 : 4;
-						ctx.Body << L"[" << i / width << L"][" << i % width << L"]";
+						ctx.Body << "[" << i / width << "][" << i % width << "]";
 					}
-					ctx.Body << L");\n";
+					ctx.Body << ");\n";
 				}
 			}
 		};

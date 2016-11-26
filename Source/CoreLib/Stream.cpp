@@ -25,7 +25,7 @@ namespace CoreLib
 			{
 			case CoreLib::IO::FileMode::Create:
 				if (access == FileAccess::Read)
-					throw ArgumentException(L"Read-only access is incompatible with Create mode.");
+					throw ArgumentException("Read-only access is incompatible with Create mode.");
 				else if (access == FileAccess::ReadWrite)
 				{
 					mode = L"w+b";
@@ -62,10 +62,10 @@ namespace CoreLib
 			case CoreLib::IO::FileMode::CreateNew:
 				if (File::Exists(fileName))
 				{
-					throw IOException(L"Failed opening '" + fileName + L"', file already exists.");
+					throw IOException("Failed opening '" + fileName + "', file already exists.");
 				}
 				if (access == FileAccess::Read)
-					throw ArgumentException(L"Read-only access is incompatible with Create mode.");
+					throw ArgumentException("Read-only access is incompatible with Create mode.");
 				else if (access == FileAccess::ReadWrite)
 				{
 					mode = L"w+b";
@@ -79,7 +79,7 @@ namespace CoreLib
 				break;
 			case CoreLib::IO::FileMode::Append:
 				if (access == FileAccess::Read)
-					throw ArgumentException(L"Read-only access is incompatible with Append mode.");
+					throw ArgumentException("Read-only access is incompatible with Append mode.");
 				else if (access == FileAccess::ReadWrite)
 				{
 					mode = L"a+b";
@@ -111,16 +111,16 @@ namespace CoreLib
 				shFlag = _SH_DENYNO;
 				break;
 			default:
-				throw ArgumentException(L"Invalid file share mode.");
+				throw ArgumentException("Invalid file share mode.");
 				break;
 			}
-			handle = _wfsopen(fileName.Buffer(), mode, shFlag);
+			handle = _wfsopen(fileName.ToWString(), mode, shFlag);
 #else
 			handle = fopen(fileName.ToMultiByteString(), modeMBCS);
 #endif
 			if (!handle)
 			{
-				throw IOException(L"Cannot open file '" + fileName + L"'");
+				throw IOException("Cannot open file '" + fileName + "'");
 			}
 		}
 		FileStream::~FileStream()
@@ -157,7 +157,7 @@ namespace CoreLib
 				endReached = false;
 				break;
 			default:
-				throw NotSupportedException(L"Unsupported seek origin.");
+				throw NotSupportedException("Unsupported seek origin.");
 				break;
 			}
 #ifdef _WIN32
@@ -167,7 +167,7 @@ namespace CoreLib
 #endif
 			if (rs != 0)
 			{
-				throw IOException(L"FileStream seek failed.");
+				throw IOException("FileStream seek failed.");
 			}
 		}
 		Int64 FileStream::Read(void * buffer, Int64 length)
@@ -176,9 +176,9 @@ namespace CoreLib
 			if (bytes == 0 && length > 0)
 			{
 				if (!feof(handle))
-					throw IOException(L"FileStream read failed.");
+					throw IOException("FileStream read failed.");
 				else if (endReached)
-					throw EndOfStreamException(L"End of file is reached.");
+					throw EndOfStreamException("End of file is reached.");
 				endReached = true;
 			}
 			return (int)bytes;
@@ -188,7 +188,7 @@ namespace CoreLib
 			auto bytes = (Int64)fwrite(buffer, 1, (size_t)length, handle);
 			if (bytes < length)
 			{
-				throw IOException(L"FileStream write failed.");
+				throw IOException("FileStream write failed.");
 			}
 			return bytes;
 		}

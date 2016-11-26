@@ -151,7 +151,7 @@ namespace Spire
 			//		// check: size must be constant 1. Do not support array of array in IL level.
 			//		auto s = dynamic_cast<ILConstOperand*>(size);
 			//		if (!s || s->IntValues[0] != 1)
-			//			throw ArgumentException(L"AllocVar(arrayType, size): size must be constant 1.");
+			//			throw ArgumentException("AllocVar(arrayType, size): size must be constant 1.");
 			//		auto instr = new AllocVarInstruction(arrType->BaseType, program.CreateConstant(arrType->ArrayLength));
 			//		cfgNode->InsertTail(instr);
 			//		return instr;
@@ -171,7 +171,7 @@ namespace Spire
 					// check: size must be constant 1. Do not support array of array in IL level.
 					auto s = dynamic_cast<ILConstOperand*>(size);
 					if (!s || s->IntValues[0] != 1)
-						throw ArgumentException(L"AllocVar(arrayType, size): size must be constant 1.");
+						throw ArgumentException("AllocVar(arrayType, size): size must be constant 1.");
 					auto instr = new AllocVarInstruction(arrType->BaseType, constantPool->CreateConstant(arrType->ArrayLength));
 					cfgNode.Last()->InsertTail(instr);
 					return instr;

@@ -9,25 +9,25 @@ namespace Spire
 		{
 			RefPtr<KeyHoleNode> result = new KeyHoleNode();
 			result->NodeType = parser.ReadWord();
-			if (parser.LookAhead(L"<"))
+			if (parser.LookAhead("<"))
 			{
 				parser.ReadToken();
 				result->CaptureId = parser.ReadInt();
 				parser.ReadToken();
 			}
-			if (parser.LookAhead(L"("))
+			if (parser.LookAhead("("))
 			{
-				while (!parser.LookAhead(L")"))
+				while (!parser.LookAhead(")"))
 				{
 					result->Children.Add(ParseInternal(parser));
-					if (parser.LookAhead(L","))
+					if (parser.LookAhead(","))
 						parser.ReadToken();
 					else
 					{
 						break;
 					}
 				}
-				parser.Read(L")");
+				parser.Read(")");
 			}
 			return result;
 		}
@@ -41,21 +41,21 @@ namespace Spire
 		bool KeyHoleNode::Match(List<ILOperand*> & matchResult, ILOperand * instr)
 		{
 			bool matches = false;
-			if (NodeType == L"store")
+			if (NodeType == "store")
 				matches = dynamic_cast<StoreInstruction*>(instr) != nullptr;
-			else if (NodeType == L"op")
+			else if (NodeType == "op")
 				matches = true;
-			else if (NodeType == L"load")
+			else if (NodeType == "load")
 				matches = dynamic_cast<LoadInstruction*>(instr) != nullptr;
-			else if (NodeType == L"add")
+			else if (NodeType == "add")
 				matches = dynamic_cast<AddInstruction*>(instr) != nullptr;
-			else if (NodeType == L"mul")
+			else if (NodeType == "mu")
 				matches = dynamic_cast<MulInstruction*>(instr) != nullptr;
-			else if (NodeType == L"sub")
+			else if (NodeType == "sub")
 				matches = dynamic_cast<SubInstruction*>(instr) != nullptr;
-			else if (NodeType == L"call")
+			else if (NodeType == "cal")
 				matches = dynamic_cast<CallInstruction*>(instr) != nullptr;
-			else if (NodeType == L"switch")
+			else if (NodeType == "switch")
 				matches = dynamic_cast<SwitchInstruction*>(instr) != nullptr;
 			if (matches)
 			{

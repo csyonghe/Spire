@@ -337,7 +337,7 @@ namespace Spire
 					for (auto & w : cimpl->Worlds)
 						if (impl->Worlds.Contains(w) && impl->AlternateName == cimpl->AlternateName)
 						{
-							err->Error(33020, L"\'" + comp->Name + L"\' is already defined at '" + w + L"\'.", impl->SyntaxNode->Position);
+							err->Error(33020, "\'" + comp->Name + "\' is already defined at '" + w + "\'.", impl->SyntaxNode->Position);
 							rs = false;
 						}
 				}
@@ -348,7 +348,7 @@ namespace Spire
 				{
 					if (cimpl->Worlds.Count() == 0 && impl->Worlds.Count() == 0 && impl->AlternateName == cimpl->AlternateName)
 					{
-						err->Error(33020, L"\'" + comp->Name + L"\' is already defined.", impl->SyntaxNode->Position);
+						err->Error(33020, "\'" + comp->Name + "\' is already defined.", impl->SyntaxNode->Position);
 						rs = false;
 					}
 				}
@@ -357,32 +357,32 @@ namespace Spire
 			{
 				if (impl->SyntaxNode->IsOutput != cimpl->SyntaxNode->IsOutput)
 				{
-					err->Error(33021, L"\'" + comp->Name + L"\': inconsistent signature.\nsee previous definition at " + cimpl->SyntaxNode->Position.ToString(), impl->SyntaxNode->Position);
+					err->Error(33021, "\'" + comp->Name + "\': inconsistent signature.\nsee previous definition at " + cimpl->SyntaxNode->Position.ToString(), impl->SyntaxNode->Position);
 					rs = false;
 					break;
 				}
 				if (impl->SyntaxNode->IsParam != cimpl->SyntaxNode->IsParam)
 				{
-					err->Error(33021, L"\'" + comp->Name + L"\': inconsistent signature.\nsee previous definition at " + cimpl->SyntaxNode->Position.ToString(), impl->SyntaxNode->Position);
+					err->Error(33021, "\'" + comp->Name + "\': inconsistent signature.\nsee previous definition at " + cimpl->SyntaxNode->Position.ToString(), impl->SyntaxNode->Position);
 					rs = false;
 					break;
 				}
 				if (impl->SyntaxNode->IsPublic != cimpl->SyntaxNode->IsPublic)
 				{
-					err->Error(33021, L"\'" + comp->Name + L"\': inconsistent signature.\nsee previous definition at " + cimpl->SyntaxNode->Position.ToString(), impl->SyntaxNode->Position);
+					err->Error(33021, "\'" + comp->Name + "\': inconsistent signature.\nsee previous definition at " + cimpl->SyntaxNode->Position.ToString(), impl->SyntaxNode->Position);
 					rs = false;
 					break;
 				}
 				if (!impl->SyntaxNode->Type->Equals(cimpl->SyntaxNode->Type.Ptr()))
 				{
-					err->Error(33021, L"\'" + comp->Name + L"\': inconsistent signature.\nsee previous definition at " + cimpl->SyntaxNode->Position.ToString(), impl->SyntaxNode->Position);
+					err->Error(33021, "\'" + comp->Name + "\': inconsistent signature.\nsee previous definition at " + cimpl->SyntaxNode->Position.ToString(), impl->SyntaxNode->Position);
 					rs = false;
 					break;
 				}
 			}
 			if (impl->SyntaxNode->IsParam && comp->Implementations.Count() != 0)
 			{
-				err->Error(33022, L"\'" + comp->Name + L"\': parameter name conflicts with existing definition.", impl->SyntaxNode->Position);
+				err->Error(33022, "\'" + comp->Name + "\': parameter name conflicts with existing definition.", impl->SyntaxNode->Position);
 				rs = false;
 			}
 			return rs;
@@ -400,15 +400,15 @@ namespace Spire
 			else if (auto arr = type.As<ArrayExpressionType>())
 			{
 				if (arr->ArrayLength > 0)
-					return PrintType(arr->BaseType, recordReplaceStr) + L"[" + arr->ArrayLength + L"]";
+					return PrintType(arr->BaseType, recordReplaceStr) + "[" + arr->ArrayLength + "]";
 				else
-					return PrintType(arr->BaseType, recordReplaceStr) + L"[]";
+					return PrintType(arr->BaseType, recordReplaceStr) + "[]";
 			}
 			else if (auto gen = type.As<GenericExpressionType>())
 			{
-				return gen->GenericTypeName + L"<" + PrintType(gen->BaseType, recordReplaceStr) + L">";
+				return gen->GenericTypeName + "<" + PrintType(gen->BaseType, recordReplaceStr) + ">";
 			}
-			return L"";
+			return "";
 		}
 
 		bool SymbolTable::CheckTypeRequirement(const ImportPath & p, RefPtr<ExpressionType> type)
@@ -421,7 +421,7 @@ namespace Spire
 				sbInternalName << req->Name;
 				for (auto & op : req->Parameters)
 				{
-					sbInternalName << L"@" << PrintType(op->Type, typeStr);
+					sbInternalName << "@" << PrintType(op->Type, typeStr);
 				}
 				auto funcName = sbInternalName.ProduceString();
 				auto func = Functions.TryGetValue(funcName);

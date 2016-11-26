@@ -19,14 +19,14 @@ namespace Spire
 					if (genericTypeMappings)
 						return (*genericTypeMappings)[basicType->RecordTypeName]();
 					else
-						throw InvalidProgramException(L"unexpected record type.");
+						throw InvalidProgramException("unexpected record type.");
 				}
 				else if (basicType->BaseType == BaseType::Generic)
 				{
 					if (genericTypeMappings)
 						return (*genericTypeMappings)[basicType->GenericTypeVar]();
 					else
-						throw InvalidProgramException(L"unexpected generic type.");
+						throw InvalidProgramException("unexpected generic type.");
 				}
 				else
 				{

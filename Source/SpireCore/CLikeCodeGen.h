@@ -62,20 +62,20 @@ namespace Spire
 			{
 				StringBuilder nameBuilder;
 				int startPos = 0;
-				if (name.StartsWith(L"_sys_"))
-					startPos = name.IndexOf(L'_', 5) + 1;
+				if (name.StartsWith("_sys_"))
+					startPos = name.IndexOf('_', 5) + 1;
 				nameBuilder << prefix;
 				for (int i = startPos; i < name.Length(); i++)
 				{
-					if ((name[i] >= L'a' && name[i] <= L'z') || 
-						(name[i] >= L'A' && name[i] <= L'Z') ||
-						name[i] == L'_' || 
-						(name[i] >= L'0' && name[i] <= L'9'))
+					if ((name[i] >= 'a' && name[i] <= 'z') || 
+						(name[i] >= 'A' && name[i] <= 'Z') ||
+						name[i] == '_' || 
+						(name[i] >= '0' && name[i] <= '9'))
 					{
 						nameBuilder << name[i];
 					}
 					else
-						nameBuilder << L'_';
+						nameBuilder << '_';
 				}
 				auto rs = nameBuilder.ToString();
 				int i = 0;

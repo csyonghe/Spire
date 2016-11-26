@@ -15,13 +15,13 @@ namespace Spire
 	{
 		void PrintILShader(ILShader * shader)
 		{
-			printf("%S\n", shader->Name.Buffer());
-			printf("%S\n", shader->Position.ToString().Buffer());
+			printf("%S\n", shader->Name.ToWString());
+			printf("%S\n", shader->Position.ToString().ToWString());
 			printf("\n---\n\n");
 
 			for (auto& stage : shader->Stages)
 			{
-				printf("Stage: %S\n", stage.Key.Buffer());
+				printf("Stage: %S\n", stage.Key.ToWString());
 				auto& stageIL = stage.Value;
 
 				int maxAttrNameLength = 0;
@@ -38,9 +38,9 @@ namespace Spire
 				for (auto& attr : stageIL->Attributes)
 				{
 					printf("\t%-*S = %-*S (%S)\n",
-						maxAttrNameLength, attr.Value.Name.Buffer(),
-						maxAttrValueLength, attr.Value.Value.Buffer(),
-						attr.Value.Position.ToString().Buffer());
+						maxAttrNameLength, attr.Value.Name.ToWString(),
+						maxAttrValueLength, attr.Value.Value.ToWString(),
+						attr.Value.Position.ToString().ToWString());
 				}
 
 				printf("\n");
@@ -50,7 +50,7 @@ namespace Spire
 
 			for (auto& world : shader->Worlds)
 			{
-				printf("World: %S\n", world.Key.Buffer());
+				printf("World: %S\n", world.Key.ToWString());
 				//auto& worldIL = world.Value;
 			}
 		}

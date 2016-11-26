@@ -12,12 +12,12 @@ namespace Spire
 			bool isUnderScore = false;
 			for (auto ch : str)
 			{
-				if (ch == L'_')
+				if (ch == '_')
 				{
 					if (isUnderScore)
-						sb << L"I_";
+						sb << "I_";
 					else
-						sb << L"_";
+						sb << "_";
 					isUnderScore = true;
 				}
 				else
@@ -27,7 +27,7 @@ namespace Spire
 				}
 			}
 			if (isUnderScore)
-				sb << L"I";
+				sb << "I";
 			return sb.ProduceString();
 		}
 

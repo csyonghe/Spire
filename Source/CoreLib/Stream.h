@@ -112,10 +112,10 @@ namespace CoreLib
 			String ReadString()
 			{
 				int len = ReadInt32();
-				wchar_t * buffer = new wchar_t[len+1];
+				char * buffer = new char[len+1];
 				try
 				{
-					stream->Read(buffer, sizeof(wchar_t)*len);
+					stream->Read(buffer, len);
 				}
 				catch(IOException & e)
 				{

@@ -8,7 +8,7 @@ namespace CoreLib
 	{
 		TokenReader::TokenReader(String text)
 		{
-			this->tokens = TokenizeText(L"", text, [&](TokenizeErrorType, CodePosition) {legal = false; });
+			this->tokens = TokenizeText("", text, [&](TokenizeErrorType, CodePosition) {legal = false; });
 			tokenPtr = 0;
 		}
 
@@ -28,259 +28,259 @@ namespace CoreLib
 			while (pos < str.Length())
 			{
 				wchar_t curChar = str[pos];
-				wchar_t nextChar = (pos < str.Length() - 1) ? str[pos + 1] : L'\0';
-				wchar_t nextNextChar = (pos < str.Length() - 2) ? str[pos + 2] : L'\0';
+				wchar_t nextChar = (pos < str.Length() - 1) ? str[pos + 1] : '\0';
+				wchar_t nextNextChar = (pos < str.Length() - 2) ? str[pos + 2] : '\0';
 				auto InsertToken = [&](TokenType type, const String & ct)
 				{
 					tokens.Add(Token(type, ct, line, col + pos, pos, fileName));
 				};
 				switch (curChar)
 				{
-				case L'+':
-					if (nextChar == L'+')
+				case '+':
+					if (nextChar == '+')
 					{
-						InsertToken(TokenType::OpInc, L"++");
+						InsertToken(TokenType::OpInc, "++");
 						pos += 2;
 					}
-					else if (nextChar == L'=')
+					else if (nextChar == '=')
 					{
-						InsertToken(TokenType::OpAddAssign, L"+=");
-						pos += 2;
-					}
-					else
-					{
-						InsertToken(TokenType::OpAdd, L"+");
-						pos++;
-					}
-					break;
-				case L'-':
-					if (nextChar == L'-')
-					{
-						InsertToken(TokenType::OpDec, L"--");
-						pos += 2;
-					}
-					else if (nextChar == L'=')
-					{
-						InsertToken(TokenType::OpSubAssign, L"-=");
-						pos += 2;
-					}
-					else if (nextChar == L'>')
-					{
-						InsertToken(TokenType::RightArrow, L"->");
+						InsertToken(TokenType::OpAddAssign, "+=");
 						pos += 2;
 					}
 					else
 					{
-						InsertToken(TokenType::OpSub, L"-");
+						InsertToken(TokenType::OpAdd, "+");
 						pos++;
 					}
 					break;
-				case L'*':
-					if (nextChar == L'=')
+				case '-':
+					if (nextChar == '-')
 					{
-						InsertToken(TokenType::OpMulAssign, L"*=");
+						InsertToken(TokenType::OpDec, "--");
+						pos += 2;
+					}
+					else if (nextChar == '=')
+					{
+						InsertToken(TokenType::OpSubAssign, "-=");
+						pos += 2;
+					}
+					else if (nextChar == '>')
+					{
+						InsertToken(TokenType::RightArrow, "->");
 						pos += 2;
 					}
 					else
 					{
-						InsertToken(TokenType::OpMul, L"*");
+						InsertToken(TokenType::OpSub, "-");
 						pos++;
 					}
 					break;
-				case L'/':
-					if (nextChar == L'=')
+				case '*':
+					if (nextChar == '=')
 					{
-						InsertToken(TokenType::OpDivAssign, L"/=");
+						InsertToken(TokenType::OpMulAssign, "*=");
 						pos += 2;
 					}
 					else
 					{
-						InsertToken(TokenType::OpDiv, L"/");
+						InsertToken(TokenType::OpMul, "*");
 						pos++;
 					}
 					break;
-				case L'%':
-					if (nextChar == L'=')
+				case '/':
+					if (nextChar == '=')
 					{
-						InsertToken(TokenType::OpModAssign, L"%=");
+						InsertToken(TokenType::OpDivAssign, "/=");
 						pos += 2;
 					}
 					else
 					{
-						InsertToken(TokenType::OpMod, L"%");
+						InsertToken(TokenType::OpDiv, "/");
 						pos++;
 					}
 					break;
-				case L'|':
-					if (nextChar == L'|')
+				case '%':
+					if (nextChar == '=')
 					{
-						InsertToken(TokenType::OpOr, L"||");
-						pos += 2;
-					}
-					else if (nextChar == L'=')
-					{
-						InsertToken(TokenType::OpOrAssign, L"|=");
+						InsertToken(TokenType::OpModAssign, "%=");
 						pos += 2;
 					}
 					else
 					{
-						InsertToken(TokenType::OpBitOr, L"|");
+						InsertToken(TokenType::OpMod, "%");
 						pos++;
 					}
 					break;
-				case L'&':
-					if (nextChar == L'&')
+				case '|':
+					if (nextChar == '|')
 					{
-						InsertToken(TokenType::OpAnd, L"&&");
+						InsertToken(TokenType::OpOr, "||");
 						pos += 2;
 					}
-					else if (nextChar == L'=')
+					else if (nextChar == '=')
 					{
-						InsertToken(TokenType::OpAndAssign, L"&=");
-						pos += 2;
-					}
-					else
-					{
-						InsertToken(TokenType::OpBitAnd, L"&");
-						pos++;
-					}
-					break;
-				case L'^':
-					if (nextChar == L'=')
-					{
-						InsertToken(TokenType::OpXorAssign, L"^=");
+						InsertToken(TokenType::OpOrAssign, "|=");
 						pos += 2;
 					}
 					else
 					{
-						InsertToken(TokenType::OpBitXor, L"^");
+						InsertToken(TokenType::OpBitOr, "|");
 						pos++;
 					}
 					break;
-				case L'>':
-					if (nextChar == L'>')
+				case '&':
+					if (nextChar == '&')
 					{
-						if (nextNextChar == L'=')
+						InsertToken(TokenType::OpAnd, "&&");
+						pos += 2;
+					}
+					else if (nextChar == '=')
+					{
+						InsertToken(TokenType::OpAndAssign, "&=");
+						pos += 2;
+					}
+					else
+					{
+						InsertToken(TokenType::OpBitAnd, "&");
+						pos++;
+					}
+					break;
+				case '^':
+					if (nextChar == '=')
+					{
+						InsertToken(TokenType::OpXorAssign, "^=");
+						pos += 2;
+					}
+					else
+					{
+						InsertToken(TokenType::OpBitXor, "^");
+						pos++;
+					}
+					break;
+				case '>':
+					if (nextChar == '>')
+					{
+						if (nextNextChar == '=')
 						{
-							InsertToken(TokenType::OpShrAssign, L">>=");
+							InsertToken(TokenType::OpShrAssign, ">>=");
 							pos += 3;
 						}
 						else
 						{
-							InsertToken(TokenType::OpRsh, L">>");
+							InsertToken(TokenType::OpRsh, ">>");
 							pos += 2;
 						}
 					}
-					else if (nextChar == L'=')
+					else if (nextChar == '=')
 					{
-						InsertToken(TokenType::OpGeq, L">=");
+						InsertToken(TokenType::OpGeq, ">=");
 						pos += 2;
 					}
 					else
 					{
-						InsertToken(TokenType::OpGreater, L">");
+						InsertToken(TokenType::OpGreater, ">");
 						pos++;
 					}
 					break;
-				case L'<':
-					if (nextChar == L'<')
+				case '<':
+					if (nextChar == '<')
 					{
-						if (nextNextChar == L'=')
+						if (nextNextChar == '=')
 						{
-							InsertToken(TokenType::OpShlAssign, L"<<=");
+							InsertToken(TokenType::OpShlAssign, "<<=");
 							pos += 3;
 						}
 						else
 						{
-							InsertToken(TokenType::OpLsh, L"<<");
+							InsertToken(TokenType::OpLsh, "<<");
 							pos += 2;
 						}
 					}
-					else if (nextChar == L'=')
+					else if (nextChar == '=')
 					{
-						InsertToken(TokenType::OpLeq, L"<=");
+						InsertToken(TokenType::OpLeq, "<=");
 						pos += 2;
 					}
 					else
 					{
-						InsertToken(TokenType::OpLess, L"<");
+						InsertToken(TokenType::OpLess, "<");
 						pos++;
 					}
 					break;
-				case L'=':
-					if (nextChar == L'=')
+				case '=':
+					if (nextChar == '=')
 					{
-						InsertToken(TokenType::OpEql, L"==");
+						InsertToken(TokenType::OpEql, "==");
 						pos += 2;
 					}
 					else
 					{
-						InsertToken(TokenType::OpAssign, L"=");
+						InsertToken(TokenType::OpAssign, "=");
 						pos++;
 					}
 					break;
-				case L'!':
-					if (nextChar == L'=')
+				case '!':
+					if (nextChar == '=')
 					{
-						InsertToken(TokenType::OpNeq, L"!=");
+						InsertToken(TokenType::OpNeq, "!=");
 						pos += 2;
 					}
 					else
 					{
-						InsertToken(TokenType::OpNot, L"!");
+						InsertToken(TokenType::OpNot, "!");
 						pos++;
 					}
 					break;
-				case L'?':
-					InsertToken(TokenType::QuestionMark, L"?");
+				case '?':
+					InsertToken(TokenType::QuestionMark, "?");
 					pos++;
 					break;
-				case L'@':
-					InsertToken(TokenType::At, L"@");
+				case '@':
+					InsertToken(TokenType::At, "@");
 					pos++;
 					break;
-				case L':':
-					InsertToken(TokenType::Colon, L":");
+				case ':':
+					InsertToken(TokenType::Colon, ":");
 					pos++;
 					break;
-				case L'~':
-					InsertToken(TokenType::OpBitNot, L"~");
+				case '~':
+					InsertToken(TokenType::OpBitNot, "~");
 					pos++;
 					break;
-				case L';':
-					InsertToken(TokenType::Semicolon, L";");
+				case ';':
+					InsertToken(TokenType::Semicolon, ";");
 					pos++;
 					break;
-				case L',':
-					InsertToken(TokenType::Comma, L",");
+				case ',':
+					InsertToken(TokenType::Comma, ",");
 					pos++;
 					break;
-				case L'.':
-					InsertToken(TokenType::Dot, L".");
+				case '.':
+					InsertToken(TokenType::Dot, ".");
 					pos++;
 					break;
-				case L'{':
-					InsertToken(TokenType::LBrace, L"{");
+				case '{':
+					InsertToken(TokenType::LBrace, "{");
 					pos++;
 					break;
-				case L'}':
-					InsertToken(TokenType::RBrace, L"}");
+				case '}':
+					InsertToken(TokenType::RBrace, "}");
 					pos++;
 					break;
-				case L'[':
-					InsertToken(TokenType::LBracket, L"[");
+				case '[':
+					InsertToken(TokenType::LBracket, "[");
 					pos++;
 					break;
-				case L']':
-					InsertToken(TokenType::RBracket, L"]");
+				case ']':
+					InsertToken(TokenType::RBracket, "]");
 					pos++;
 					break;
-				case L'(':
-					InsertToken(TokenType::LParent, L"(");
+				case '(':
+					InsertToken(TokenType::LParent, "(");
 					pos++;
 					break;
-				case L')':
-					InsertToken(TokenType::RParent, L")");
+				case ')':
+					InsertToken(TokenType::RParent, ")");
 					pos++;
 					break;
 				}
@@ -303,39 +303,39 @@ namespace CoreLib
 				tokenList.Add(Token(type, tokenBuilder.ToString(), tokenLine, tokenCol, pos, file));
 				tokenBuilder.Clear();
 			};
-			auto ProcessTransferChar = [&](wchar_t nextChar)
+			auto ProcessTransferChar = [&](char nextChar)
 			{
 				switch (nextChar)
 				{
-				case L'\\':
-				case L'\"':
-				case L'\'':
+				case '\\':
+				case '\"':
+				case '\'':
 					tokenBuilder.Append(nextChar);
 					break;
-				case L't':
+				case 't':
 					tokenBuilder.Append('\t');
 					break;
-				case L's':
+				case 's':
 					tokenBuilder.Append(' ');
 					break;
-				case L'n':
+				case 'n':
 					tokenBuilder.Append('\n');
 					break;
-				case L'r':
+				case 'r':
 					tokenBuilder.Append('\r');
 					break;
-				case L'b':
+				case 'b':
 					tokenBuilder.Append('\b');
 					break;
 				}
 			};
 			while (pos <= text.Length())
 			{
-				wchar_t curChar = (pos < text.Length() ? text[pos] : L' ');
-				wchar_t nextChar = (pos < text.Length() - 1) ? text[pos + 1] : L'\0';
+				char curChar = (pos < text.Length() ? text[pos] : ' ');
+				char nextChar = (pos < text.Length() - 1) ? text[pos + 1] : '\0';
 				if (lastPos != pos)
 				{
-					if (curChar == L'\n')
+					if (curChar == '\n')
 					{
 						line++;
 						col = 0;
@@ -360,28 +360,28 @@ namespace CoreLib
 						tokenLine = line;
 						tokenCol = col;
 					}
-					else if (curChar == L'\'')
+					else if (curChar == '\'')
 					{
 						state = State::Char;
 						pos++;
 						tokenLine = line;
 						tokenCol = col;
 					}
-					else if (curChar == L'"')
+					else if (curChar == '"')
 					{
 						state = State::String;
 						pos++;
 						tokenLine = line;
 						tokenCol = col;
 					}
-					else if (curChar == L' ' || curChar == L'\t' || curChar == L'\r' || curChar == L'\n' || curChar == 160) // 160:non-break space
+					else if (curChar == ' ' || curChar == '\t' || curChar == '\r' || curChar == '\n' || curChar == -62 || curChar== -96) // -62/-96:non-break space
 						pos++;
-					else if (curChar == L'/' && nextChar == L'/')
+					else if (curChar == '/' && nextChar == '/')
 					{
 						state = State::SingleComment;
 						pos += 2;
 					}
-					else if (curChar == L'/' && nextChar == L'*')
+					else if (curChar == '/' && nextChar == '*')
 					{
 						pos += 2;
 						state = State::MultiComment;
@@ -407,18 +407,18 @@ namespace CoreLib
 					else
 					{
 						auto tokenStr = tokenBuilder.ToString();
-						if (tokenStr == L"#line_reset#")
+						if (tokenStr == "#line_reset#")
 						{
 							line = 0;
 							col = 0;
 							tokenBuilder.Clear();
 						}
-						else if (tokenStr == L"#line")
+						else if (tokenStr == "#line")
 						{
 							derivative = LexDerivative::Line;
 							tokenBuilder.Clear();
 						}
-						else if (tokenStr == L"#file")
+						else if (tokenStr == "#file")
 						{
 							derivative = LexDerivative::File;
 							tokenBuilder.Clear();
@@ -431,7 +431,7 @@ namespace CoreLib
 					}
 					break;
 				case State::Operator:
-					if (IsPunctuation(curChar) && !((curChar == L'/' && nextChar == L'/') || (curChar == L'/' && nextChar == L'*')))
+					if (IsPunctuation(curChar) && !((curChar == '/' && nextChar == '/') || (curChar == '/' && nextChar == '*')))
 					{
 						tokenBuilder.Append(curChar);
 						pos++;
@@ -450,17 +450,17 @@ namespace CoreLib
 						tokenBuilder.Append(curChar);
 						pos++;
 					}
-					else if (curChar == L'.')
+					else if (curChar == '.')
 					{
 						state = State::Fixed;
 						tokenBuilder.Append(curChar);
 						pos++;
 					}
-					else if (curChar == L'e' || curChar == L'E')
+					else if (curChar == 'e' || curChar == 'E')
 					{
 						state = State::Double;
 						tokenBuilder.Append(curChar);
-						if (nextChar == L'-' || nextChar == L'+')
+						if (nextChar == '-' || nextChar == '+')
 						{
 							tokenBuilder.Append(nextChar);
 							pos++;
@@ -489,11 +489,11 @@ namespace CoreLib
 						tokenBuilder.Append(curChar);
 						pos++;
 					}
-					else if (curChar == L'e' || curChar == L'E')
+					else if (curChar == 'e' || curChar == 'E')
 					{
 						state = State::Double;
 						tokenBuilder.Append(curChar);
-						if (nextChar == L'-' || nextChar == L'+')
+						if (nextChar == '-' || nextChar == '+')
 						{
 							tokenBuilder.Append(nextChar);
 							pos++;
@@ -502,7 +502,7 @@ namespace CoreLib
 					}
 					else
 					{
-						if (curChar == L'f')
+						if (curChar == 'f')
 							pos++;
 						InsertToken(TokenType::DoubleLiterial);
 						state = State::Start;
@@ -516,16 +516,16 @@ namespace CoreLib
 					}
 					else
 					{
-						if (curChar == L'f')
+						if (curChar == 'f')
 							pos++;
 						InsertToken(TokenType::DoubleLiterial);
 						state = State::Start;
 					}
 					break;
 				case State::String:
-					if (curChar != L'"')
+					if (curChar != '"')
 					{
-						if (curChar == L'\\')
+						if (curChar == '\\')
 						{
 							ProcessTransferChar(nextChar);
 							pos++;
@@ -550,9 +550,9 @@ namespace CoreLib
 					pos++;
 					break;
 				case State::Char:
-					if (curChar != L'\'')
+					if (curChar != '\'')
 					{
-						if (curChar == L'\\')
+						if (curChar == '\\')
 						{
 							ProcessTransferChar(nextChar);
 							pos++;
@@ -571,12 +571,12 @@ namespace CoreLib
 					pos++;
 					break;
 				case State::SingleComment:
-					if (curChar == L'\n')
+					if (curChar == '\n')
 						state = State::Start;
 					pos++;
 					break;
 				case State::MultiComment:
-					if (curChar == L'*' && nextChar == '/')
+					if (curChar == '*' && nextChar == '/')
 					{
 						state = State::Start;
 						pos += 2;
@@ -594,47 +594,47 @@ namespace CoreLib
 		}
 		List<Token> TokenizeText(const String & text)
 		{
-			return TokenizeText(L"", text, [](TokenizeErrorType, CodePosition) {});
+			return TokenizeText("", text, [](TokenizeErrorType, CodePosition) {});
 		}
 
 		String EscapeStringLiteral(String str)
 		{
 			StringBuilder sb;
-			sb << L"\"";
+			sb << "\"";
 			for (int i = 0; i < str.Length(); i++)
 			{
 				switch (str[i])
 				{
-				case L' ':
-					sb << L"\\s";
+				case ' ':
+					sb << "\\s";
 					break;
-				case L'\n':
-					sb << L"\\n";
+				case '\n':
+					sb << "\\n";
 					break;
-				case L'\r':
-					sb << L"\\r";
+				case '\r':
+					sb << "\\r";
 					break;
-				case L'\t':
-					sb << L"\\t";
+				case '\t':
+					sb << "\\t";
 					break;
-				case L'\v':
-					sb << L"\\v";
+				case '\v':
+					sb << "\\v";
 					break;
-				case L'\'':
-					sb << L"\\\'";
+				case '\'':
+					sb << "\\\'";
 					break;
-				case L'\"':
-					sb << L"\\\"";
+				case '\"':
+					sb << "\\\"";
 					break;
-				case L'\\':
-					sb << L"\\\\";
+				case '\\':
+					sb << "\\\\";
 					break;
 				default:
 					sb << str[i];
 					break;
 				}
 			}
-			sb << L"\"";
+			sb << "\"";
 			return sb.ProduceString();
 		}
 
@@ -643,33 +643,33 @@ namespace CoreLib
 			StringBuilder sb;
 			for (int i = 0; i < str.Length(); i++)
 			{
-				if (str[i] == L'\\' && i < str.Length() - 1)
+				if (str[i] == '\\' && i < str.Length() - 1)
 				{
 					switch (str[i + 1])
 					{
-					case L's':
-						sb << L" ";
+					case 's':
+						sb << " ";
 						break;
-					case L't':
-						sb << L'\t';
+					case 't':
+						sb << '\t';
 						break;
-					case L'n':
-						sb << L'\n';
+					case 'n':
+						sb << '\n';
 						break;
-					case L'r':
-						sb << L'\r';
+					case 'r':
+						sb << '\r';
 						break;
-					case L'v':
-						sb << L'\v';
+					case 'v':
+						sb << '\v';
 						break;
-					case L'\'':
-						sb << L'\'';
+					case '\'':
+						sb << '\'';
 						break;
-					case L'\"':
-						sb << L"\"";
+					case '\"':
+						sb << "\"";
 						break;
-					case L'\\':
-						sb << L"\\";
+					case '\\':
+						sb << "\\";
 						break;
 					default:
 						i = i - 1;
@@ -689,99 +689,99 @@ namespace CoreLib
 			switch (type)
 			{
 			case TokenType::Unknown:
-				return L"UnknownToken";
+				return "UnknownToken";
 			case TokenType::Identifier:
-				return L"Identifier";
+				return "Identifier";
 			case TokenType::IntLiterial:
-				return L"Int Literial";
+				return "Int Literia";
 			case TokenType::DoubleLiterial:
-				return L"Double Literial";
+				return "Double Literia";
 			case TokenType::StringLiterial:
-				return L"String Literial";
+				return "String Literia";
 			case TokenType::CharLiterial:
-				return L"CharLiterial";
+				return "CharLiteria";
 			case TokenType::QuestionMark:
-				return L"'?'";
+				return "'?'";
 			case TokenType::Colon:
-				return L"':'";
+				return "':'";
 			case TokenType::Semicolon:
-				return L"';'";
+				return "';'";
 			case TokenType::Comma:
-				return L"','";
+				return "','";
 			case TokenType::LBrace:
-				return L"'{'";
+				return "'{'";
 			case TokenType::RBrace:
-				return L"'}'";
+				return "'}'";
 			case TokenType::LBracket:
-				return L"'['";
+				return "'['";
 			case TokenType::RBracket:
-				return L"']'";
+				return "']'";
 			case TokenType::LParent:
-				return L"'('";
+				return "'('";
 			case TokenType::RParent:
-				return L"')'";
+				return "')'";
 			case TokenType::At:
-				return L"'@'";
+				return "'@'";
 			case TokenType::OpAssign:
-				return L"'='";
+				return "'='";
 			case TokenType::OpAdd:
-				return L"'+'";
+				return "'+'";
 			case TokenType::OpSub:
-				return L"'-'";
+				return "'-'";
 			case TokenType::OpMul:
-				return L"'*'";
+				return "'*'";
 			case TokenType::OpDiv:
-				return L"'/'";
+				return "'/'";
 			case TokenType::OpMod:
-				return L"'%'";
+				return "'%'";
 			case TokenType::OpNot:
-				return L"'!'";
+				return "'!'";
 			case TokenType::OpLsh:
-				return L"'<<'";
+				return "'<<'";
 			case TokenType::OpRsh:
-				return L"'>>'";
+				return "'>>'";
 			case TokenType::OpAddAssign:
-				return L"'+='";
+				return "'+='";
 			case TokenType::OpSubAssign:
-				return L"'-='";
+				return "'-='";
 			case TokenType::OpMulAssign:
-				return L"'*='";
+				return "'*='";
 			case TokenType::OpDivAssign:
-				return L"'/='";
+				return "'/='";
 			case TokenType::OpModAssign:
-				return L"'%='";
+				return "'%='";
 			case TokenType::OpEql:
-				return L"'=='";
+				return "'=='";
 			case TokenType::OpNeq:
-				return L"'!='";
+				return "'!='";
 			case TokenType::OpGreater:
-				return L"'>'";
+				return "'>'";
 			case TokenType::OpLess:
-				return L"'<'";
+				return "'<'";
 			case TokenType::OpGeq:
-				return L"'>='";
+				return "'>='";
 			case TokenType::OpLeq:
-				return L"'<='";
+				return "'<='";
 			case TokenType::OpAnd:
-				return L"'&&'";
+				return "'&&'";
 			case TokenType::OpOr:
-				return L"'||'";
+				return "'||'";
 			case TokenType::OpBitXor:
-				return L"'^'";
+				return "'^'";
 			case TokenType::OpBitAnd:
-				return L"'&'";
+				return "'&'";
 			case TokenType::OpBitOr:
-				return L"'|'";
+				return "'|'";
 			case TokenType::OpInc:
-				return L"'++'";
+				return "'++'";
 			case TokenType::OpDec:
-				return L"'--'";
+				return "'--'";
 			default:
-				return L"";
+				return "";
 			}
 		}
 
-		List<String> Split(String text, wchar_t c)
+		List<String> Split(String text, char c)
 		{
 			List<String> result;
 			StringBuilder sb;

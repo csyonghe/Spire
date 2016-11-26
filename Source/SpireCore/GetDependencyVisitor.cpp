@@ -21,7 +21,7 @@ namespace Spire
 		RefPtr<ExpressionSyntaxNode> GetDependencyVisitor::VisitMemberExpression(MemberExpressionSyntaxNode * member)
 		{
 			RefPtr<Object> refCompObj;
-			if (member->Tags.TryGetValue(L"ComponentReference", refCompObj))
+			if (member->Tags.TryGetValue("ComponentReference", refCompObj))
 			{
 				auto refComp = refCompObj.As<StringObject>().Ptr();
 				Result.Add(ComponentDependency(refComp->Content, nullptr));
@@ -33,7 +33,7 @@ namespace Spire
 		RefPtr<ExpressionSyntaxNode> GetDependencyVisitor::VisitVarExpression(VarExpressionSyntaxNode * var)
 		{
 			RefPtr<Object> refCompObj;
-			if (var->Tags.TryGetValue(L"ComponentReference", refCompObj))
+			if (var->Tags.TryGetValue("ComponentReference", refCompObj))
 			{
 				auto refComp = refCompObj.As<StringObject>().Ptr();
 				Result.Add(ComponentDependency(refComp->Content, nullptr));

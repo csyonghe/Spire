@@ -762,7 +762,6 @@
     <ClInclude Include="Stream.h" />
     <ClInclude Include="TextIO.h" />
     <ClInclude Include="TypeTraits.h" />
-    <ClInclude Include="WideChar.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="LibIO.cpp" />
@@ -771,7 +770,6 @@
     <ClCompile Include="Tokenizer.cpp" />
     <ClCompile Include="Stream.cpp" />
     <ClCompile Include="TextIO.cpp" />
-    <ClCompile Include="WideChar.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="corelib.natvis" />

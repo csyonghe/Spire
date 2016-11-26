@@ -1,33 +1,34 @@
 #include "LibString.h"
+#include "TextIO.h"
 
 namespace CoreLib
 {
 	namespace Basic
 	{
 		_EndLine EndLine;
-		String StringConcat(const wchar_t * lhs, int leftLen, const wchar_t * rhs, int rightLen)
+		String StringConcat(const char * lhs, int leftLen, const char * rhs, int rightLen)
 		{
 			String res;
 			res.length = leftLen + rightLen;
-			res.buffer = new wchar_t[res.length + 1];
-			wcscpy_s(res.buffer.Ptr(), res.length + 1, lhs);
-			wcscpy_s(res.buffer + leftLen, res.length + 1 - leftLen, rhs);
+			res.buffer = new char[res.length + 1];
+			strcpy_s(res.buffer.Ptr(), res.length + 1, lhs);
+			strcpy_s(res.buffer + leftLen, res.length + 1 - leftLen, rhs);
 			return res;
 		}
-		String operator+(const wchar_t * op1, const String & op2)
+		String operator+(const char * op1, const String & op2)
 		{
 			if(!op2.buffer)
 				return String(op1);
 
-			return StringConcat(op1, (int)wcslen(op1), op2.buffer.Ptr(), op2.length);
+			return StringConcat(op1, (int)strlen(op1), op2.buffer.Ptr(), op2.length);
 		}
 
-		String operator+(const String & op1, const wchar_t*op2)
+		String operator+(const String & op1, const char * op2)
 		{
 			if(!op1.buffer)
 				return String(op2);
 
-			return StringConcat(op1.buffer.Ptr(), op1.length, op2, (int)wcslen(op2));
+			return StringConcat(op1.buffer.Ptr(), op1.length, op2, (int)strlen(op2));
 		}
 
 		String operator+(const String & op1, const String & op2)
@@ -44,16 +45,19 @@ namespace CoreLib
 
 		int StringToInt(const String & str, int radix)
 		{
-			return (int)wcstol(str.Buffer(), NULL, radix);
-			//return (int)_wcstoi64(str.Buffer(), NULL, 10);
+			return (int)strtol(str.Buffer(), NULL, radix);
 		}
 		unsigned int StringToUInt(const String & str, int radix)
 		{
-			return (unsigned int)wcstoul(str.Buffer(), NULL, radix);
+			return (unsigned int)strtoul(str.Buffer(), NULL, radix);
 		}
 		double StringToDouble(const String & str)
 		{
-			return (double)wcstod(str.Buffer(), NULL);
+			return (double)strtod(str.Buffer(), NULL);
+		}
+		float StringToFloat(const String & str)
+		{
+			return strtof(str.Buffer(), NULL);
 		}
 
 		String String::ReplaceAll(String src, String dst) const
@@ -70,7 +74,36 @@ namespace CoreLib
 			return rs;
 		}
 
-		String String::PadLeft(wchar_t ch, int pLen)
+		String String::FromWString(const wchar_t * wstr)
+		{
+#ifdef _WIN32
+			return CoreLib::IO::Encoding::UTF16->ToString((const char*)wstr, (int)(wcslen(wstr) * sizeof(wchar_t)));
+#else
+			return CoreLib::IO::Encoding::UTF32->ToString((const char*)wstr, (int)(wcslen(wstr) * sizeof(wchar_t)));
+#endif
+		}
+
+		wchar_t * String::ToWString(int * len) const
+		{
+			if (!buffer)
+				return L"";
+			else
+			{
+				if (wcharBuffer)
+					return wcharBuffer;
+				List<char> buf;
+				CoreLib::IO::Encoding::UTF16->GetBytes(buf, *this);
+				if (len)
+					*len = buf.Count() / sizeof(wchar_t);
+				buf.Add(0);
+				buf.Add(0);
+				const_cast<String*>(this)->wcharBuffer = (wchar_t*)buf.Buffer();
+				buf.ReleaseBuffer();
+				return wcharBuffer;
+			}
+		}
+
+		String String::PadLeft(char ch, int pLen)
 		{
 			StringBuilder sb;
 			for (int i = 0; i < pLen - this->length; i++)
@@ -80,7 +113,7 @@ namespace CoreLib
 			return sb.ProduceString();
 		}
 
-		String String::PadRight(wchar_t ch, int pLen)
+		String String::PadRight(char ch, int pLen)
 		{
 			StringBuilder sb;
 			for (int i = 0; i < this->length; i++)

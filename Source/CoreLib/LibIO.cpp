@@ -16,66 +16,70 @@ namespace CoreLib
 		bool File::Exists(const String & fileName)
 		{
 			struct _stat32 statVar;
-			return ::_stat32(((String)fileName).ToMultiByteString(), &statVar) != -1;
+#ifdef _WIN32
+			return ::_wstat32(((String)fileName).ToWString(), &statVar) != -1;
+#else
+			return ::_stat32(((String)fileName).Buffer(), &statVar) != -1;
+#endif
 		}
 
 		String Path::TruncateExt(const String & path)
 		{
-			int dotPos = path.LastIndexOf(L'.');
+			int dotPos = path.LastIndexOf('.');
 			if (dotPos != -1)
 				return path.SubString(0, dotPos);
 			else
 				return path;
 		}
-		String Path::ReplaceExt(const String & path, const wchar_t * newExt)
+		String Path::ReplaceExt(const String & path, const char * newExt)
 		{
 			StringBuilder sb(path.Length()+10);
-			int dotPos = path.LastIndexOf(L'.');
+			int dotPos = path.LastIndexOf('.');
 			if (dotPos == -1)
 				dotPos = path.Length();
 			sb.Append(path.Buffer(), dotPos);
-			sb.Append(L'.');
+			sb.Append('.');
 			sb.Append(newExt);
 			return sb.ProduceString();
 		}
 		String Path::GetFileName(const String & path)
 		{
-			int pos = path.LastIndexOf(L'/');
-			pos = Math::Max(path.LastIndexOf(L'\\'), pos) + 1;
+			int pos = path.LastIndexOf('/');
+			pos = Math::Max(path.LastIndexOf('\\'), pos) + 1;
 			return path.SubString(pos, path.Length()-pos);
 		}
 		String Path::GetFileNameWithoutEXT(const String & path)
 		{
-			int pos = path.LastIndexOf(L'/');
-			pos = Math::Max(path.LastIndexOf(L'\\'), pos) + 1;
-			int dotPos = path.LastIndexOf(L'.');
+			int pos = path.LastIndexOf('/');
+			pos = Math::Max(path.LastIndexOf('\\'), pos) + 1;
+			int dotPos = path.LastIndexOf('.');
 			if (dotPos <= pos)
 				dotPos = path.Length();
 			return path.SubString(pos, dotPos - pos);
 		}
 		String Path::GetFileExt(const String & path)
 		{
-			int dotPos = path.LastIndexOf(L'.');
+			int dotPos = path.LastIndexOf('.');
 			if (dotPos != -1)
 				return path.SubString(dotPos+1, path.Length()-dotPos-1);
 			else
-				return L"";
+				return "";
 		}
 		String Path::GetDirectoryName(const String & path)
 		{
-			int pos = path.LastIndexOf(L'/');
-			pos = Math::Max(path.LastIndexOf(L'\\'), pos);
+			int pos = path.LastIndexOf('/');
+			pos = Math::Max(path.LastIndexOf('\\'), pos);
 			if (pos != -1)
 				return path.SubString(0, pos);
 			else
-				return L"";
+				return "";
 		}
 		String Path::Combine(const String & path1, const String & path2)
 		{
 			if (path1.Length() == 0) return path2;
 			StringBuilder sb(path1.Length()+path2.Length()+2);
 			sb.Append(path1);
-			if (!path1.EndsWith(L'\\') && !path1.EndsWith(L'/'))
+			if (!path1.EndsWith('\\') && !path1.EndsWith('/'))
 				sb.Append(PathDelimiter);
 			sb.Append(path2);
 			return sb.ProduceString();
@@ -84,10 +88,10 @@ namespace CoreLib
 		{
 			StringBuilder sb(path1.Length()+path2.Length()+path3.Length()+3);
 			sb.Append(path1);
-			if (!path1.EndsWith(L'\\') && !path1.EndsWith(L'/'))
+			if (!path1.EndsWith('\\') && !path1.EndsWith('/'))
 				sb.Append(PathDelimiter);
 			sb.Append(path2);
-			if (!path2.EndsWith(L'\\') && !path2.EndsWith(L'/'))
+			if (!path2.EndsWith('\\') && !path2.EndsWith('/'))
 				sb.Append(PathDelimiter);
 			sb.Append(path3);
 			return sb.ProduceString();
@@ -98,9 +102,9 @@ namespace CoreLib
 		bool Path::CreateDirectory(const String & path)
 		{
 #if defined(_WIN32)
-			return _mkdir(path.ToMultiByteString()) == 0;
+			return _wmkdir(path.ToWString()) == 0;
 #else 
-			return mkdir(path.ToMultiByteString(), 0777) == 0;
+			return mkdir(path.Buffer(), 0777) == 0;
 #endif
 		}
 

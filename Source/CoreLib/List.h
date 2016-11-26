@@ -119,10 +119,22 @@ namespace CoreLib
 			{
 				return buffer+_count;
 			}
+		private:
+			template<typename... Args>
+			void Init(const T & val, Args... args)
+			{
+				Add(val);
+				Init(args...);
+			}
 		public:
 			List()
 				: buffer(0), _count(0), bufferSize(0)
 			{
+			}
+			template<typename... Args>
+			List(Args... args)
+			{
+				Init(args...);
 			}
 			List(const List<T> & list)
 				: buffer(0), _count(0), bufferSize(0)
@@ -132,8 +144,15 @@ namespace CoreLib
 			List(List<T> && list)
 				: buffer(0), _count(0), bufferSize(0)
 			{
-				//int t = static_cast<int>(1.0f); reinterpret_cast<double*>(&t), dynamic_cast<> 
 				this->operator=(static_cast<List<T>&&>(list));
+			}
+			static List<T> Create(const T & val, int count)
+			{
+				List<T> rs;
+				rs.SetSize(count);
+				for (int i = 0; i < count; i++)
+					rs[i] = val;
+				return rs;
 			}
 			~List()
 			{
@@ -192,6 +211,15 @@ namespace CoreLib
 				TAllocator tmpAlloc = _Move(this->allocator);
 				this->allocator = _Move(other.allocator);
 				other.allocator = _Move(tmpAlloc);
+			}
+
+			T* ReleaseBuffer()
+			{
+				T* rs = buffer;
+				buffer = nullptr;
+				_count = 0;
+				bufferSize = 0;
+				return rs;
 			}
 
 			inline ArrayView<T> GetArrayView() const
@@ -439,7 +467,7 @@ namespace CoreLib
 			{
 #if _DEBUG
 				if(id >= _count || id < 0)
-					throw IndexOutofRangeException(L"Operator[]: Index out of Range.");
+					throw IndexOutofRangeException("Operator[]: Index out of Range.");
 #endif
 				return buffer[id];
 			}

@@ -63,10 +63,10 @@ namespace Spire
 						value = CreateConstant(0.0f, 16);
 					}
 					else
-						throw NotImplementedException(L"default value for this type is not implemented.");
+						throw NotImplementedException("default value for this type is not implemented.");
 				}
 				else
-					throw NotImplementedException(L"default value for this type is not implemented.");
+					throw NotImplementedException("default value for this type is not implemented.");
 				return value;
 			}
 			ILConstOperand * CreateConstantIntVec(int val, int val2)
@@ -187,7 +187,7 @@ namespace Spire
 					baseType = ILBaseType::Int4;
 					break;
 				default:
-					throw InvalidOperationException(L"Invalid vector size.");
+					throw InvalidOperationException("Invalid vector size.");
 				}
 				rs->Type = new ILBasicType(baseType);
 				rs->IntValues[0] = val;
@@ -205,7 +205,7 @@ namespace Spire
 					return rs;
 				if (Math::IsNaN(val) || Math::IsInf(val))
 				{
-					throw InvalidOperationException(L"Attempting to create NAN constant.");
+					throw InvalidOperationException("Attempting to create NAN constant.");
 				}
 				rs = new ILConstOperand();
 				ILBaseType baseType;
@@ -231,7 +231,7 @@ namespace Spire
 					baseType = ILBaseType::Float4x4;
 					break;
 				default:
-					throw InvalidOperationException(L"Invalid vector size.");
+					throw InvalidOperationException("Invalid vector size.");
 				}
 				rs->Type = new ILBasicType(baseType);
 				for (int i = 0; i < 16; i++)
@@ -248,7 +248,7 @@ namespace Spire
 				ILConstOperand * rs = 0;
 				if (Math::IsNaN(val) || Math::IsInf(val) || Math::IsNaN(val2) || Math::IsInf(val2))
 				{
-					throw InvalidOperationException(L"Attempting to create NAN constant.");
+					throw InvalidOperationException("Attempting to create NAN constant.");
 				}
 				auto key = ConstKey<float>::FromValues(val, val2);
 				if (floatConsts.TryGetValue(key, rs))
@@ -269,7 +269,7 @@ namespace Spire
 				ILConstOperand * rs = 0;
 				if (Math::IsNaN(val) || Math::IsInf(val) || Math::IsNaN(val2) || Math::IsInf(val2) || Math::IsNaN(val3) || Math::IsInf(val3))
 				{
-					throw InvalidOperationException(L"Attempting to create NAN constant.");
+					throw InvalidOperationException("Attempting to create NAN constant.");
 				}
 				auto key = ConstKey<float>::FromValues(val, val2, val3);
 				if (floatConsts.TryGetValue(key, rs))
@@ -291,7 +291,7 @@ namespace Spire
 			{
 				if (Math::IsNaN(val) || Math::IsInf(val) || Math::IsNaN(val2) || Math::IsInf(val2) || Math::IsNaN(val3) || Math::IsInf(val3) || Math::IsNaN(val4) || Math::IsInf(val4))
 				{
-					throw InvalidOperationException(L"Attempting to create NAN constant.");
+					throw InvalidOperationException("Attempting to create NAN constant.");
 				}
 				ILConstOperand * rs = 0;
 				auto key = ConstKey<float>::FromValues(val, val2, val3, val4);
@@ -316,12 +316,12 @@ namespace Spire
 				trueConst = new ILConstOperand();
 				trueConst->Type = new ILBasicType(ILBaseType::Bool);
 				trueConst->IntValues[0] = trueConst->IntValues[1] = trueConst->IntValues[2] = trueConst->IntValues[3] = 1;
-				trueConst->Name = L"true";
+				trueConst->Name = "true";
 
 				falseConst = new ILConstOperand();
 				falseConst->Type = new ILBasicType(ILBaseType::Bool);
 				falseConst->IntValues[0] = falseConst->IntValues[1] = falseConst->IntValues[2] = falseConst->IntValues[3] = 0;
-				trueConst->Name = L"false";
+				trueConst->Name = "false";
 
 			}
 		};

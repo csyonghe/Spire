@@ -44,11 +44,11 @@ namespace Spire
 							{
 								try
 								{
-									if (attrib.Value.StartsWith(L"%"))
+									if (attrib.Value.StartsWith("%"))
 									{
 										CoreLib::Text::TokenReader parser(attrib.Value.SubString(1, attrib.Value.Length() - 1));
 										auto compName = parser.ReadWord();
-										parser.Read(L".");
+										parser.Read(".");
 										auto compAttrib = parser.ReadWord();
 										RefPtr<ShaderComponentSymbol> compSym;
 										if (shader->Components.TryGetValue(compName, compSym))
@@ -124,8 +124,8 @@ namespace Spire
 							}
 							else
 							{
-								cresult.GetErrorWriter()->Warning(33101, L"'" + selectedDef->WorldName + L"' is not a valid choice for '" + choice.Key
-									+ L"'.", selectedDef.Ptr()->Position);
+								cresult.GetErrorWriter()->Warning(33101, "'" + selectedDef->WorldName + "' is not a valid choice for '" + choice.Key
+									+ "'.", selectedDef.Ptr()->Position);
 							}
 						}
 					}
@@ -159,7 +159,7 @@ namespace Spire
 							def->Type = comp.Value->Type->DataType;
 							def->IsEntryPoint = (impl->ExportWorlds.Contains(w) ||
 								(shader->Pipeline->IsAbstractWorld(w) &&
-								(impl->SyntaxNode->LayoutAttributes.ContainsKey(L"Pinned") || shader->Pipeline->Worlds[w]().SyntaxNode->LayoutAttributes.ContainsKey(L"Pinned"))));
+								(impl->SyntaxNode->LayoutAttributes.ContainsKey("Pinned") || shader->Pipeline->Worlds[w]().SyntaxNode->LayoutAttributes.ContainsKey("Pinned"))));
 							CloneContext cloneCtx;
 							def->SyntaxNode = impl->SyntaxNode->Clone(cloneCtx);
 							def->World = w;
@@ -187,7 +187,7 @@ namespace Spire
 					{
 						if (def->Dependency.Contains(def.Ptr()))
 						{
-							cresult.GetErrorWriter()->Error(33102, L"component definition \'" + def->OriginalName + L"\' involves circular reference.",
+							cresult.GetErrorWriter()->Error(33102, "component definition \'" + def->OriginalName + "\' involves circular reference.",
 								def->SyntaxNode->Position);
 							return nullptr;
 						}
@@ -276,13 +276,13 @@ namespace Spire
 					switch(options.Target)
 					{
 					case CodeGenTarget::SPIRV:
-						backend = backends[L"spirv"]().Ptr();
+						backend = backends["spirv"]().Ptr();
 						break;
 					case CodeGenTarget::GLSL:
-						backend = backends[L"glsl"]().Ptr();
+						backend = backends["gls"]().Ptr();
 						break;
 					case CodeGenTarget::HLSL:
-						backend = backends[L"hlsl"]().Ptr();
+						backend = backends["hls"]().Ptr();
 						break;
 					default:
 						// TODO: emit an appropriate diagnostic
@@ -290,7 +290,7 @@ namespace Spire
 					}
 
 					Schedule schedule;
-					if (options.ScheduleSource != L"")
+					if (options.ScheduleSource != "")
 					{
 						schedule = Schedule::Parse(options.ScheduleSource, options.ScheduleFileName, result.ErrorList);
 					}
@@ -404,7 +404,7 @@ namespace Spire
 					}
 					else
 					{
-						result.GetErrorWriter()->Error(2, L"unsupported compiler mode.", CodePosition());
+						result.GetErrorWriter()->Error(2, "unsupported compiler mode.", CodePosition());
 						return;
 					}
 					context.Program = result.Program;
@@ -427,9 +427,9 @@ namespace Spire
 					BasicExpressionType::Init();
 				}
 				compilerInstances++;
-				backends.Add(L"glsl", CreateGLSLCodeGen());
-				backends.Add(L"hlsl", CreateHLSLCodeGen());
-				backends.Add(L"spirv", CreateSpirVCodeGen());
+				backends.Add("gls", CreateGLSLCodeGen());
+				backends.Add("hls", CreateHLSLCodeGen());
+				backends.Add("spirv", CreateSpirVCodeGen());
 			}
 
 			~ShaderCompilerImpl()

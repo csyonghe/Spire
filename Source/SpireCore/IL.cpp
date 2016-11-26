@@ -12,43 +12,43 @@ namespace Spire
 
 		RefPtr<ILType> BaseTypeFromString(CoreLib::Text::TokenReader & parser)
 		{
-			if (parser.LookAhead(L"int"))
+			if (parser.LookAhead("int"))
 				return new ILBasicType(ILBaseType::Int);
-			else if (parser.LookAhead(L"uint"))
+			else if (parser.LookAhead("uint"))
 				return new ILBasicType(ILBaseType::UInt);
-			else if (parser.LookAhead(L"uvec2"))
+			else if (parser.LookAhead("uvec2"))
 				return new ILBasicType(ILBaseType::UInt2);
-			else if (parser.LookAhead(L"uvec3"))
+			else if (parser.LookAhead("uvec3"))
 				return new ILBasicType(ILBaseType::UInt3);
-			else if (parser.LookAhead(L"uvec4"))
+			else if (parser.LookAhead("uvec4"))
 				return new ILBasicType(ILBaseType::UInt4);
-			if (parser.LookAhead(L"float"))
+			if (parser.LookAhead("float"))
 				return new ILBasicType(ILBaseType::Float);
-			if (parser.LookAhead(L"vec2"))
+			if (parser.LookAhead("vec2"))
 				return new ILBasicType(ILBaseType::Float2);
-			if (parser.LookAhead(L"vec3"))
+			if (parser.LookAhead("vec3"))
 				return new ILBasicType(ILBaseType::Float3);
-			if (parser.LookAhead(L"vec4"))
+			if (parser.LookAhead("vec4"))
 				return new ILBasicType(ILBaseType::Float4);
-			if (parser.LookAhead(L"ivec2"))
+			if (parser.LookAhead("ivec2"))
 				return new ILBasicType(ILBaseType::Int2);
-			if (parser.LookAhead(L"mat3"))
+			if (parser.LookAhead("mat3"))
 				return new ILBasicType(ILBaseType::Float3x3);
-			if (parser.LookAhead(L"mat4"))
+			if (parser.LookAhead("mat4"))
 				return new ILBasicType(ILBaseType::Float4x4);
-			if (parser.LookAhead(L"ivec3"))
+			if (parser.LookAhead("ivec3"))
 				return new ILBasicType(ILBaseType::Int3);
-			if (parser.LookAhead(L"ivec4"))
+			if (parser.LookAhead("ivec4"))
 				return new ILBasicType(ILBaseType::Int4);
-			if (parser.LookAhead(L"sampler2D"))
+			if (parser.LookAhead("sampler2D"))
 				return new ILBasicType(ILBaseType::Texture2D);
-			if (parser.LookAhead(L"sampler2DShadow"))
+			if (parser.LookAhead("sampler2DShadow"))
 				return new ILBasicType(ILBaseType::TextureShadow);
-			if (parser.LookAhead(L"samplerCube"))
+			if (parser.LookAhead("samplerCube"))
 				return new ILBasicType(ILBaseType::TextureCube);
-			if (parser.LookAhead(L"samplerCubeShadow"))
+			if (parser.LookAhead("samplerCubeShadow"))
 				return new ILBasicType(ILBaseType::TextureCubeShadow);
-			if (parser.LookAhead(L"bool"))
+			if (parser.LookAhead("bool"))
 				return new ILBasicType(ILBaseType::Bool);
 			return nullptr;
 		}
@@ -57,15 +57,15 @@ namespace Spire
 		{
 			auto result = BaseTypeFromString(parser);
 			parser.ReadToken();
-			while (parser.LookAhead(L"["))
+			while (parser.LookAhead("["))
 			{
 				parser.ReadToken();
 				RefPtr<ILArrayType> newResult = new ILArrayType();
 				newResult->BaseType = result;
-				if (!parser.LookAhead(L"]"))
+				if (!parser.LookAhead("]"))
 					newResult->ArrayLength = parser.ReadInt();
 				result = newResult;
-				parser.Read(L"]");
+				parser.Read("]");
 			}
 			return result;
 		}
@@ -308,7 +308,7 @@ namespace Spire
 				numBuilder.Clear();
 				for (auto & c : instr.Name)
 				{
-					if (c >= L'0' && c <= '9')
+					if (c >= '0' && c <= '9')
 						numBuilder.Append(c);
 					else
 						numBuilder.Clear();
@@ -324,7 +324,7 @@ namespace Spire
 			for (auto & instr : GetAllInstructions())
 			{
 				if (instr.Name.Length() == 0)
-					instr.Name = String(L"t") + String(NamingCounter++, 16);
+					instr.Name = String("t") + String(NamingCounter++, 16);
 				else
 				{
 					int counter = 1;
@@ -345,7 +345,7 @@ namespace Spire
 			printf("===========\n");
 			for (auto& instr : *this)
 			{
-				printf("%s\n", instr.ToString().ToMultiByteString());
+				printf("%S\n", instr.ToString().ToWString());
 			}
 			printf("===========\n");
 		}
@@ -356,7 +356,7 @@ namespace Spire
 			Operand = dest;
 			Type = dest->Type->Clone();
 			if (!Spire::Compiler::Is<AllocVarInstruction>(dest) && !Spire::Compiler::Is<FetchArgInstruction>(dest))
-				throw L"invalid address operand";
+				throw "invalid address operand";
 		}
 		void MemberUpdateInstruction::Accept(InstructionVisitor * visitor)
 		{
@@ -532,19 +532,19 @@ namespace Spire
 		String ImportInstruction::ToString()
 		{
 			StringBuilder rs;
-			rs << Name << L" = import [" << ComponentName << L"](";
+			rs << Name << " = import [" << ComponentName << "](";
 			for (auto & arg : Arguments)
 			{
-				rs << arg->ToString() << L", ";
+				rs << arg->ToString() << ", ";
 			}
-			rs << L")";
-			rs << L"\n{";
-			rs << ImportOperator->ToString() << L"}\n";
+			rs << ")";
+			rs << "\n{";
+			rs << ImportOperator->ToString() << "}\n";
 			return rs.ProduceString();
 		}
 		String ImportInstruction::GetOperatorString()
 		{
-			return L"import";
+			return "import";
 		}
 		void ImportInstruction::Accept(InstructionVisitor * visitor)
 		{

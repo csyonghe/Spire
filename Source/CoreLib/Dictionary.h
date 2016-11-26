@@ -130,6 +130,12 @@ namespace CoreLib
 			}
 		};
 
+		template<typename TKey, typename TValue>
+		inline KeyValuePair<TKey, TValue> KVPair(const TKey & k, const TValue & v)
+		{
+			return KeyValuePair<TKey, TValue>(k, v);
+		}
+
 		const float MaxLoadFactor = 0.7f;
 
 		template<typename TKey, typename TValue>
@@ -224,7 +230,7 @@ namespace CoreLib
 				}
 				if (insertPos != -1)
 					return FindPositionResult(-1, insertPos);
-				throw InvalidOperationException(L"Hash map is full. This indicates an error in Key::Equal or Key::GetHashCode.");
+				throw InvalidOperationException("Hash map is full. This indicates an error in Key::Equal or Key::GetHashCode.");
 			}
 			TValue & _Insert(KeyValuePair<TKey, TValue> && kvPair, int pos)
 			{
@@ -273,12 +279,12 @@ namespace CoreLib
 					return true;
 				}
 				else
-					throw InvalidOperationException(L"Inconsistent find result returned. This is a bug in Dictionary implementation.");
+					throw InvalidOperationException("Inconsistent find result returned. This is a bug in Dictionary implementation.");
 			}
 			void Add(KeyValuePair<TKey, TValue> && kvPair)
 			{
 				if (!AddIfNotExists(_Move(kvPair)))
-					throw KeyExistsException(L"The key already exists in Dictionary.");
+					throw KeyExistsException("The key already exists in Dictionary.");
 			}
 			TValue & Set(KeyValuePair<TKey, TValue> && kvPair)
 			{
@@ -292,7 +298,7 @@ namespace CoreLib
 					return _Insert(_Move(kvPair), pos.InsertionPosition);
 				}
 				else
-					throw InvalidOperationException(L"Inconsistent find result returned. This is a bug in Dictionary implementation.");
+					throw InvalidOperationException("Inconsistent find result returned. This is a bug in Dictionary implementation.");
 			}
 		public:
 			class Iterator
@@ -450,7 +456,7 @@ namespace CoreLib
 						return dict->hashMap[pos.ObjectPosition].Value;
 					}
 					else
-						throw KeyNotFoundException(L"The key does not exists in dictionary.");
+						throw KeyNotFoundException("The key does not exists in dictionary.");
 				}
 				inline TValue & operator()() const
 				{
@@ -481,6 +487,13 @@ namespace CoreLib
 			{
 				return _count;
 			}
+		private:
+			template<typename... Args>
+			void Init(const KeyValuePair<TKey, TValue> & kvPair, Args... args)
+			{
+				Add(kvPair);
+				Init(args...);
+			}
 		public:
 			Dictionary()
 			{
@@ -488,6 +501,11 @@ namespace CoreLib
 				shiftBits = 32;
 				_count = 0;
 				hashMap = 0;
+			}
+			template<typename... Args>
+			Dictionary(Args... args)
+			{
+				Init(args...);
 			}
 			Dictionary(const Dictionary<TKey, TValue> & other)
 				: bucketSizeMinusOne(-1), _count(0), hashMap(0)
@@ -642,7 +660,7 @@ namespace CoreLib
 				}
 				if (insertPos != -1)
 					return FindPositionResult(-1, insertPos);
-				throw InvalidOperationException(L"Hash map is full. This indicates an error in Key::Equal or Key::GetHashCode.");
+				throw InvalidOperationException("Hash map is full. This indicates an error in Key::Equal or Key::GetHashCode.");
 			}
 			TValue & _Insert(KeyValuePair<TKey, TValue> && kvPair, int pos)
 			{
@@ -693,12 +711,12 @@ namespace CoreLib
 					return true;
 				}
 				else
-					throw InvalidOperationException(L"Inconsistent find result returned. This is a bug in Dictionary implementation.");
+					throw InvalidOperationException("Inconsistent find result returned. This is a bug in Dictionary implementation.");
 			}
 			void Add(KeyValuePair<TKey, TValue> && kvPair)
 			{
 				if (!AddIfNotExists(_Move(kvPair)))
-					throw KeyExistsException(L"The key already exists in Dictionary.");
+					throw KeyExistsException("The key already exists in Dictionary.");
 			}
 			TValue & Set(KeyValuePair<TKey, TValue> && kvPair)
 			{
@@ -715,7 +733,7 @@ namespace CoreLib
 					return _Insert(_Move(kvPair), pos.InsertionPosition);
 				}
 				else
-					throw InvalidOperationException(L"Inconsistent find result returned. This is a bug in Dictionary implementation.");
+					throw InvalidOperationException("Inconsistent find result returned. This is a bug in Dictionary implementation.");
 			}
 		public:
 			typedef typename LinkedList<KeyValuePair<TKey, TValue>>::Iterator Iterator;
@@ -820,7 +838,7 @@ namespace CoreLib
 					}
 					else
 					{
-						throw KeyNotFoundException(L"The key does not exists in dictionary.");
+						throw KeyNotFoundException("The key does not exists in dictionary.");
 					}
 				}
 				inline TValue & operator()() const
@@ -860,6 +878,13 @@ namespace CoreLib
 			{
 				return kvPairs.Last();
 			}
+		private:
+			template<typename... Args>
+			void Init(const KeyValuePair<TKey, TValue> & kvPair, Args... args)
+			{
+				Add(kvPair);
+				Init(args...);
+			}
 		public:
 			EnumerableDictionary()
 			{
@@ -867,6 +892,11 @@ namespace CoreLib
 				shiftBits = 32;
 				_count = 0;
 				hashMap = 0;
+			}
+			template<typename... Args>
+			EnumerableDictionary(Args... args)
+			{
+				Init(args...);
 			}
 			EnumerableDictionary(const EnumerableDictionary<TKey, TValue> & other)
 				: bucketSizeMinusOne(-1), _count(0), hashMap(0)
@@ -917,9 +947,21 @@ namespace CoreLib
 		{
 		protected:
 			DictionaryType dict;
+		private:
+			template<typename... Args>
+			void Init(const T & v, Args... args)
+			{
+				Add(v);
+				Init(args...);
+			}
 		public:
 			HashSetBase()
 			{}
+			template<typename... Args>
+			HashSetBase(Args... args)
+			{
+				Init(args...);
+			}
 			HashSetBase(const HashSetBase & set)
 			{
 				operator=(set);

@@ -11,9 +11,9 @@ namespace Spire
 			for (int c = 0; c < src.Length(); c++)
 			{
 				auto ch = src[c];
-				if (ch == L'\n')
+				if (ch == '\n')
 				{
-					sb << L"\n";
+					sb << "\n";
 
 					beginTrim = true;
 				}
@@ -21,21 +21,21 @@ namespace Spire
 				{
 					if (beginTrim)
 					{
-						while (c < src.Length() - 1 && (src[c] == L'\t' || src[c] == L'\n' || src[c] == L'\r' || src[c] == L' '))
+						while (c < src.Length() - 1 && (src[c] == '\t' || src[c] == '\n' || src[c] == '\r' || src[c] == ' '))
 						{
 							c++;
 							ch = src[c];
 						}
 						for (int i = 0; i < indent - 1; i++)
-							sb << L'\t';
+							sb << '\t';
 						if (ch != '}' && indent > 0)
-							sb << L'\t';
+							sb << '\t';
 						beginTrim = false;
 					}
 
-					if (ch == L'{')
+					if (ch == '{')
 						indent++;
-					else if (ch == L'}')
+					else if (ch == '}')
 						indent--;
 					if (indent < 0)
 						indent = 0;
@@ -47,9 +47,9 @@ namespace Spire
 		ShaderChoiceValue ShaderChoiceValue::Parse(String str)
 		{
 			ShaderChoiceValue result;
-			int idx = str.IndexOf(L':');
+			int idx = str.IndexOf(':');
 			if (idx == -1)
-				return ShaderChoiceValue(str, L"");
+				return ShaderChoiceValue(str, "");
 			return ShaderChoiceValue(str.SubString(0, idx), str.SubString(idx + 1, str.Length() - idx - 1));
 		}
 		

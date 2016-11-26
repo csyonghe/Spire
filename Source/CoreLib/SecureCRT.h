@@ -76,6 +76,15 @@ inline size_t strnlen_s(const char * str, size_t numberofElements)
 	return strnlen(str, numberofElements);
 }
 
+inline int sprintf_s(char * buffer, size_t sizeOfBuffer, const char * format, ...)
+{
+	va_list argptr;
+	va_start(argptr, format);
+	int rs = sprintf(buffer, sizeOfBuffer, format, argptr);
+	va_end(argptr);
+	return rs;
+}
+
 inline int swprintf_s(wchar_t * buffer, size_t sizeOfBuffer, const wchar_t * format, ...)
 {
 	va_list argptr;
@@ -85,16 +94,24 @@ inline int swprintf_s(wchar_t * buffer, size_t sizeOfBuffer, const wchar_t * for
 	return rs;
 }
 
-inline void wcscpy_s(wchar_t * strDestination, size_t numberOfElements, const wchar_t * strSource)
+inline void wcscpy_s(wchar_t * strDestination, size_t /*numberOfElements*/, const wchar_t * strSource)
 {
 	wcscpy(strDestination, strSource);
 }
+inline void strcpy_s(char * strDestination, size_t /*numberOfElements*/, const char * strSource)
+{
+	strcpy(strDestination, strSource);
+}
 
-inline void wcsncpy_s(wchar_t * strDestination, size_t numberOfElements, const wchar_t * strSource, size_t count)
+inline void wcsncpy_s(wchar_t * strDestination, size_t /*numberOfElements*/, const wchar_t * strSource, size_t count)
 {
 	wcsncpy(strDestination, strSource, count);
 	//wcsncpy(strDestination, strSource, count);
 }
-
+inline void strncpy_s(char * strDestination, size_t /*numberOfElements*/, const char * strSource, size_t count)
+{
+	strncpy(strDestination, strSource, count);
+	//wcsncpy(strDestination, strSource, count);
+}
 #endif
 #endif

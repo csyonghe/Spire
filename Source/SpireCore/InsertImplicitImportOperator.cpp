@@ -30,7 +30,7 @@ namespace Spire
 			ComponentDefinitionIR * MakeComponentAvailableAtWorldInternal(HashSet<String> & visitedComponents, String componentUniqueName, String world)
 			{
 				RefPtr<ComponentDefinitionIR> refDef;
-				if (passThroughComponents.TryGetValue(EscapeDoubleUnderscore(componentUniqueName + L"_" + world), refDef))
+				if (passThroughComponents.TryGetValue(EscapeDoubleUnderscore(componentUniqueName + "_" + world), refDef))
 					return refDef.Ptr();
 				if (visitedComponents.Contains(componentUniqueName + "@" + world))
 				{
@@ -40,10 +40,10 @@ namespace Spire
 					{
 						refs << comp;
 						if (count != visitedComponents.Count() - 1)
-							refs << L", ";
+							refs << ", ";
 						count++;
 					}
-					Error(34062, L"cyclic reference: " + refs.ProduceString(), currentCompDef->SyntaxNode.Ptr());
+					Error(34062, "cyclic reference: " + refs.ProduceString(), currentCompDef->SyntaxNode.Ptr());
 					return nullptr;
 				}
 				visitedComponents.Add(componentUniqueName);
@@ -69,7 +69,7 @@ namespace Spire
 				{
 					auto & node = importPath.Nodes.Last();
 					RefPtr<ComponentDefinitionIR> thruDef;
-					auto thruDefName = EscapeDoubleUnderscore(componentUniqueName + L"_" + node.TargetWorld);
+					auto thruDefName = EscapeDoubleUnderscore(componentUniqueName + "_" + node.TargetWorld);
 					if (!passThroughComponents.TryGetValue(thruDefName, thruDef))
 					{
 						auto srcDef = MakeComponentAvailableAtWorldInternal(visitedComponents, componentUniqueName, node.ImportOperator->SourceWorld.Content);
@@ -79,7 +79,7 @@ namespace Spire
 						srcDef->Users.Add(thruDef.Ptr());
 						thruDef->OriginalName = referencedDef->OriginalName;
 						thruDef->UniqueName = thruDefName;
-						thruDef->UniqueKey = referencedDef->UniqueKey + L"@" + node.TargetWorld;
+						thruDef->UniqueKey = referencedDef->UniqueKey + "@" + node.TargetWorld;
 						thruDef->IsEntryPoint = false;
 						thruDef->SyntaxNode = new ComponentSyntaxNode();
 						thruDef->SyntaxNode->Type = thruDef->Type = srcDef->SyntaxNode->Type;
@@ -106,9 +106,9 @@ namespace Spire
 				{
 					StringBuilder sb;
 					auto targetComp = shaderIR->Shader->AllComponents[componentUniqueName]();
-					sb << L"cannot find import operator to import component '" << targetComp->Name << "' to world '"
-						<< world << L"' when compiling '" << currentCompDef->OriginalName << L"'.\nsee definition of '" << targetComp->Name << L"' at " <<
-						targetComp->Implementations.First()->SyntaxNode->Position.ToString() << L".";
+					sb << "cannot find import operator to import component '" << targetComp->Name << "' to world '"
+						<< world << "' when compiling '" << currentCompDef->OriginalName << "'.\nsee definition of '" << targetComp->Name << "' at " <<
+						targetComp->Implementations.First()->SyntaxNode->Position.ToString() << ".";
 					Error(34064, sb.ProduceString(), currentCompDef->SyntaxNode.Ptr());
 					return currentCompDef;
 				}
@@ -122,7 +122,7 @@ namespace Spire
 				{
 					refNode->Variable = refDef->UniqueName;
 					refNode->Type = refDef->Type;
-					refNode->Tags[L"ComponentReference"] = new StringObject(refDef->UniqueName);
+					refNode->Tags["ComponentReference"] = new StringObject(refDef->UniqueName);
 					currentCompDef->Dependency.Add(refDef);
 					refDef->Users.Add(currentCompDef);
 				}
@@ -131,7 +131,7 @@ namespace Spire
 			RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode * var) override
 			{
 				RefPtr<Object> refCompObj;
-				if (var->Tags.TryGetValue(L"ComponentReference", refCompObj))
+				if (var->Tags.TryGetValue("ComponentReference", refCompObj))
 				{
 					auto refComp = refCompObj.As<StringObject>().Ptr();
 					return ProcessComponentReference(refComp->Content);
@@ -142,7 +142,7 @@ namespace Spire
 			RefPtr<ExpressionSyntaxNode> VisitMemberExpression(MemberExpressionSyntaxNode * member) override
 			{
 				RefPtr<Object> refCompObj;
-				if (member->Tags.TryGetValue(L"ComponentReference", refCompObj))
+				if (member->Tags.TryGetValue("ComponentReference", refCompObj))
 				{
 					auto refComp = refCompObj.As<StringObject>().Ptr();
 					return ProcessComponentReference(refComp->Content);

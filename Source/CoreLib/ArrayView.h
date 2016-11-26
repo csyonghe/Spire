@@ -60,7 +60,7 @@ namespace CoreLib
 			{
 #if _DEBUG
 				if (id >= _count || id < 0)
-					throw IndexOutofRangeException(L"Operator[]: Index out of Range.");
+					throw IndexOutofRangeException("Operator[]: Index out of Range.");
 #endif
 				return *(T*)((char*)_buffer+id*stride);
 			}

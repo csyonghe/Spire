@@ -305,18 +305,6 @@ namespace CoreLib
 #endif 
 
 /***********************************************************************
-CORELIB\WIDECHAR.H
-***********************************************************************/
-#ifndef WIDE_CHAR_H
-#define WIDE_CHAR_H
-
-void MByteToWideChar(wchar_t * buffer, int bufferSize, const char * str, int length);
-char * WideCharToMByte(const wchar_t * buffer, int length);
-wchar_t * MByteToWideChar(const char * buffer, int length);
-
-#endif
-
-/***********************************************************************
 CORELIB\TYPETRAITS.H
 ***********************************************************************/
 #ifndef CORELIB_TYPETRAITS_H
@@ -913,6 +901,15 @@ inline size_t strnlen_s(const char * str, size_t numberofElements)
 	return strnlen(str, numberofElements);
 }
 
+inline int sprintf_s(char * buffer, size_t sizeOfBuffer, const char * format, ...)
+{
+	va_list argptr;
+	va_start(argptr, format);
+	int rs = sprintf(buffer, sizeOfBuffer, format, argptr);
+	va_end(argptr);
+	return rs;
+}
+
 inline int swprintf_s(wchar_t * buffer, size_t sizeOfBuffer, const wchar_t * format, ...)
 {
 	va_list argptr;
@@ -922,17 +919,25 @@ inline int swprintf_s(wchar_t * buffer, size_t sizeOfBuffer, const wchar_t * for
 	return rs;
 }
 
-inline void wcscpy_s(wchar_t * strDestination, size_t numberOfElements, const wchar_t * strSource)
+inline void wcscpy_s(wchar_t * strDestination, size_t /*numberOfElements*/, const wchar_t * strSource)
 {
 	wcscpy(strDestination, strSource);
 }
+inline void strcpy_s(char * strDestination, size_t /*numberOfElements*/, const char * strSource)
+{
+	strcpy(strDestination, strSource);
+}
 
-inline void wcsncpy_s(wchar_t * strDestination, size_t numberOfElements, const wchar_t * strSource, size_t count)
+inline void wcsncpy_s(wchar_t * strDestination, size_t /*numberOfElements*/, const wchar_t * strSource, size_t count)
 {
 	wcsncpy(strDestination, strSource, count);
 	//wcsncpy(strDestination, strSource, count);
 }
-
+inline void strncpy_s(char * strDestination, size_t /*numberOfElements*/, const char * strSource, size_t count)
+{
+	strncpy(strDestination, strSource, count);
+	//wcsncpy(strDestination, strSource, count);
+}
 #endif
 #endif
 
@@ -952,117 +957,152 @@ namespace CoreLib
 		class _EndLine
 		{};
 		extern _EndLine EndLine;
+
+		// in-place reversion, works only for ascii string
+		inline void ReverseInternalAscii(char * buffer, int length)
+		{
+			int i, j;
+			char c;
+			for (i = 0, j = length - 1; i<j; i++, j--)
+			{
+				c = buffer[i];
+				buffer[i] = buffer[j];
+				buffer[j] = c;
+			}
+		}
+		template<typename IntType>
+		inline int IntToAscii(char * buffer, IntType val, int radix)
+		{
+			int i = 0;
+			IntType sign;
+			sign = val;
+			if (sign < 0)
+				val = (IntType)(0-val);
+			do
+			{
+				int digit = (val % radix);
+				if (digit <= 9)
+					buffer[i++] = (char)(digit + '0');
+				else
+					buffer[i++] = (char)(digit - 10 + 'A');
+			} while ((val /= radix) > 0);
+			if (sign < 0)
+				buffer[i++] = '-';
+			buffer[i] = '\0';
+			return i;
+		}
+
+		/*!
+		@brief Represents a UTF-8 encoded string.
+		*/
+
 		class String
 		{
 			friend class StringBuilder;
 		private:
-			RefPtr<wchar_t, RefPtrArrayDestructor> buffer;
-			char * multiByteBuffer;
+			RefPtr<char, RefPtrArrayDestructor> buffer;
+			wchar_t * wcharBuffer;
 			int length;
 			void Free()
 			{
 				if (buffer)
 					buffer = 0;
-				if (multiByteBuffer)
-					delete [] multiByteBuffer;
+				if (wcharBuffer)
+					delete [] wcharBuffer;
 				buffer = 0;
-				multiByteBuffer = 0;
+				wcharBuffer = 0;
 				length = 0;
 			}
 		public:
-			static String FromBuffer(RefPtr<wchar_t, RefPtrArrayDestructor> buffer, int len)
+			static String FromBuffer(RefPtr<char, RefPtrArrayDestructor> buffer, int len)
 			{
 				String rs;
 				rs.buffer = buffer;
 				rs.length = len;
 				return rs;
 			}
+			static String FromWString(const wchar_t * wstr);
 			String()
-				:buffer(0), multiByteBuffer(0), length(0)
+				:buffer(0), wcharBuffer(0), length(0)
 			{
 			}
-			String(const wchar_t * str) :buffer(0), multiByteBuffer(0), length(0)
-			{
-				this->operator=(str);
-			}
-			String(const wchar_t ch)
-				:buffer(0), multiByteBuffer(0), length(0)
-			{
-				wchar_t arr[] = {ch, 0};
-				*this = String(arr);
-			}
-			const wchar_t * begin() const
+			const char * begin() const
 			{
 				return buffer.Ptr();
 			}
-			const wchar_t * end() const
+			const char * end() const
 			{
 				return buffer.Ptr() + length;
 			}
 			String(int val, int radix = 10)
-				:buffer(0), multiByteBuffer(0), length(0)
+				:buffer(0), wcharBuffer(0), length(0)
 			{
-				buffer = new wchar_t[33];
-				_itow_s(val, buffer.Ptr(), 33, radix);
-				length = (int)wcsnlen_s(buffer.Ptr(), 33);
+				buffer = new char[33];
+				length = IntToAscii(buffer.Ptr(), val, radix);
+				ReverseInternalAscii(buffer.Ptr(), length);
+			}
+			String(unsigned int val, int radix = 10)
+				:buffer(0), wcharBuffer(0), length(0)
+			{
+				buffer = new char[33];
+				length = IntToAscii(buffer.Ptr(), val, radix);
+				ReverseInternalAscii(buffer.Ptr(), length);
 			}
 			String(long long val, int radix = 10)
-				:buffer(0), multiByteBuffer(0), length(0)
+				:buffer(0), wcharBuffer(0), length(0)
 			{
-				buffer = new wchar_t[65];
-				_i64tow_s(val, buffer.Ptr(), 65, radix);
-				length = (int)wcsnlen_s(buffer.Ptr(), 65);
+				buffer = new char[65];
+				length = IntToAscii(buffer.Ptr(), val, radix);
+				ReverseInternalAscii(buffer.Ptr(), length);
 			}
-			String(float val, const wchar_t * format = L"%g")
-				:buffer(0), multiByteBuffer(0), length(0)
+			String(float val, const char * format = "%g")
+				:buffer(0), wcharBuffer(0), length(0)
 			{
-				buffer = new wchar_t[128];
-				swprintf_s(buffer.Ptr(), 128, format, val);
-				length = (int)wcsnlen_s(buffer.Ptr(), 128);
+				buffer = new char[128];
+				sprintf_s(buffer.Ptr(), 128, format, val);
+				length = (int)strnlen_s(buffer.Ptr(), 128);
 			}
-			String(double val, const wchar_t * format = L"%g")
-				:buffer(0), multiByteBuffer(0), length(0)
+			String(double val, const char * format = "%g")
+				:buffer(0), wcharBuffer(0), length(0)
 			{
-				buffer = new wchar_t[128];
-				swprintf_s(buffer.Ptr(), 128, format, val);
-				length = (int)wcsnlen_s(buffer.Ptr(), 128);
+				buffer = new char[128];
+				sprintf_s(buffer.Ptr(), 128, format, val);
+				length = (int)strnlen_s(buffer.Ptr(), 128);
 			}
 			String(const char * str)
-				:buffer(0), multiByteBuffer(0), length(0)
+				:buffer(0), wcharBuffer(0), length(0)
 			{
 				if (str)
 				{
-					buffer = MByteToWideChar(str, (int)strlen(str));
-					if (buffer)
-						length = (int)wcslen(buffer.Ptr());
-					else
-						length = 0;
+					length = (int)strlen(str);
+					buffer = new char[length + 1];
+					memcpy(buffer.Ptr(), str, length + 1);
+				}
+			}
+			String(char chr)
+				:buffer(0), wcharBuffer(0), length(0)
+			{
+				if (chr)
+				{
+					length = 1;
+					buffer = new char[2];
+					buffer[0] = chr;
+					buffer[1] = '\0';
 				}
 			}
 			String(const String & str)
-				:buffer(0), multiByteBuffer(0), length(0)
+				:buffer(0), wcharBuffer(0), length(0)
 			{				
 				this->operator=(str);
 			}
 			String(String&& other)
-				:buffer(0), multiByteBuffer(0), length(0)
+				:buffer(0), wcharBuffer(0), length(0)
 			{
 				this->operator=(static_cast<String&&>(other));
 			}
 			~String()
 			{
 				Free();
-			}
-			String & operator=(const wchar_t * str)
-			{
-				Free();
-				if (str)
-				{
-					length = (int)wcslen(str);
-					buffer = new wchar_t[length + 1];
-					wcscpy_s(buffer.Ptr(), length + 1, str);
-				}
-				return *this;
 			}
 			String & operator=(const String & str)
 			{
@@ -1073,7 +1113,7 @@ namespace CoreLib
 				{
 					length = str.length;
 					buffer = str.buffer;
-					multiByteBuffer = 0;
+					wcharBuffer = 0;
 				}
 				return *this;
 			}
@@ -1084,14 +1124,14 @@ namespace CoreLib
 					Free();
 					buffer = _Move(other.buffer);
 					length = other.length;
-					multiByteBuffer = other.multiByteBuffer;
+					wcharBuffer = other.wcharBuffer;
 					other.buffer = 0;
 					other.length = 0;
-					other.multiByteBuffer = 0;
+					other.wcharBuffer = 0;
 				}
 				return *this;
 			}
-			wchar_t operator[](int id) const
+			char operator[](int id) const
 			{
 #if _DEBUG
 				if (id < 0 || id >= length)
@@ -1100,9 +1140,9 @@ namespace CoreLib
 				return buffer.Ptr()[id];
 			}
 
-			friend String StringConcat(const wchar_t * lhs, int leftLen, const wchar_t * rhs, int rightLen);
-			friend String operator+(const wchar_t*op1, const String & op2);
-			friend String operator+(const String & op1, const wchar_t * op2);
+			friend String StringConcat(const char * lhs, int leftLen, const char * rhs, int rightLen);
+			friend String operator+(const char*op1, const String & op2);
+			friend String operator+(const String & op1, const char * op2);
 			friend String operator+(const String & op1, const String & op2);
 
 			String TrimStart() const
@@ -1111,7 +1151,7 @@ namespace CoreLib
 					return *this;
 				int startIndex = 0;
 				while (startIndex < length && 
-					(buffer[startIndex] == L' ' || buffer[startIndex] == L'\t' || buffer[startIndex] == L'\r' || buffer[startIndex] == L'\n'))
+					(buffer[startIndex] == ' ' || buffer[startIndex] == '\t' || buffer[startIndex] == '\r' || buffer[startIndex] == '\n'))
 						startIndex++;
 				return String(buffer + startIndex);
 			}
@@ -1123,12 +1163,12 @@ namespace CoreLib
 
 				int endIndex = length - 1;
 				while (endIndex >= 0 &&
-					(buffer[endIndex] == L' ' || buffer[endIndex] == L'\t' || buffer[endIndex] == L'\r' || buffer[endIndex] == L'\n'))
+					(buffer[endIndex] == ' ' || buffer[endIndex] == '\t' || buffer[endIndex] == '\r' || buffer[endIndex] == '\n'))
 					endIndex--;
 				String res;
 				res.length = endIndex + 1;
-				res.buffer = new wchar_t[endIndex + 2];
-				wcsncpy_s(res.buffer.Ptr(), endIndex + 2, buffer.Ptr(), endIndex + 1);
+				res.buffer = new char[endIndex + 2];
+				strncpy_s(res.buffer.Ptr(), endIndex + 2, buffer.Ptr(), endIndex + 1);
 				return res;
 			}
 
@@ -1139,25 +1179,25 @@ namespace CoreLib
 
 				int startIndex = 0;
 				while (startIndex < length && 
-					(buffer[startIndex] == L' ' || buffer[startIndex] == L'\t'))
+					(buffer[startIndex] == ' ' || buffer[startIndex] == '\t'))
 						startIndex++;
 				int endIndex = length - 1;
 				while (endIndex >= startIndex &&
-					(buffer[endIndex] == L' ' || buffer[endIndex] == L'\t'))
+					(buffer[endIndex] == ' ' || buffer[endIndex] == '\t'))
 					endIndex--;
 
 				String res;
 				res.length = endIndex - startIndex + 1;
-				res.buffer = new wchar_t[res.length + 1];
-				memcpy(res.buffer.Ptr(), buffer + startIndex, sizeof(wchar_t) * res.length);
-				res.buffer[res.length] = L'\0';
+				res.buffer = new char[res.length + 1];
+				memcpy(res.buffer.Ptr(), buffer + startIndex, res.length);
+				res.buffer[res.length] = '\0';
 				return res;
 			}
 
 			String SubString(int id, int len) const
 			{
 				if (len == 0)
-					return L"";
+					return "";
 				if (id + len > length)
 					len = length - id;
 #if _DEBUG
@@ -1167,63 +1207,35 @@ namespace CoreLib
 					throw "SubString: length less than zero.";
 #endif
 				String res;
-				res.buffer = new wchar_t[len + 1];
+				res.buffer = new char[len + 1];
 				res.length = len;
-				wcsncpy_s(res.buffer.Ptr(), len + 1, buffer + id, len);
+				strncpy_s(res.buffer.Ptr(), len + 1, buffer + id, len);
 				res.buffer[len] = 0;
 				return res;
 			}
 
-			wchar_t * Buffer() const
+			char * Buffer() const
 			{
 				if (buffer)
 					return buffer.Ptr();
 				else
-					return (wchar_t*)L"";
+					return "";
 			}
 
-			char * ToMultiByteString(int * len = 0) const
-			{
-				if (!buffer)
-					return (char*)"";
-				else
-				{
-					if (multiByteBuffer)
-						return multiByteBuffer;
-					((String*)this)->multiByteBuffer = WideCharToMByte(buffer.Ptr(), length);
-					if (len)
-						*len = (int)strnlen_s(multiByteBuffer, length*2);
-					return multiByteBuffer;
-					/*if (multiByteBuffer)
-						return multiByteBuffer;
-					size_t requiredBufferSize;
-					requiredBufferSize = WideCharToMultiByte(CP_OEMCP, NULL, buffer.Ptr(), length, 0, 0, NULL, NULL)+1;
-					if (len)
-						*len = requiredBufferSize-1;
-					if (requiredBufferSize)
-					{
-						multiByteBuffer = new char[requiredBufferSize];
-						WideCharToMultiByte(CP_OEMCP, NULL, buffer.Ptr(), length, multiByteBuffer, requiredBufferSize, NULL, NULL);
-						multiByteBuffer[requiredBufferSize-1] = 0;
-						return multiByteBuffer;
-					}
-					else
-						return "";*/
-				}
-			}
+			wchar_t * ToWString(int * len = 0) const;
 
 			bool Equals(const String & str, bool caseSensitive = true)
 			{
 				if (!buffer)
 					return (str.buffer == 0);
 				if (caseSensitive)
-					return (wcscmp(buffer.Ptr(), str.buffer.Ptr()) == 0);
+					return (strcmp(buffer.Ptr(), str.buffer.Ptr()) == 0);
 				else
 				{
 #ifdef _MSC_VER
-					return (_wcsicmp(buffer.Ptr(), str.buffer.Ptr()) == 0);
+					return (_stricmp(buffer.Ptr(), str.buffer.Ptr()) == 0);
 #else
-					return (wcscasecmp(buffer.Ptr(), str.buffer.Ptr()) == 0);
+					return (strcasecmp(buffer.Ptr(), str.buffer.Ptr()) == 0);
 #endif
 				}
 			}
@@ -1231,18 +1243,18 @@ namespace CoreLib
 			bool operator==(const String & str) const
 			{
 				if (!buffer)
-					return (str.buffer == 0 || wcscmp(str.buffer.Ptr(), L"")==0);
+					return (str.buffer == 0 || strcmp(str.buffer.Ptr(), "")==0);
 				if (!str.buffer)
-					return buffer == nullptr || wcscmp(buffer.Ptr(), L"") == 0;
-				return (wcscmp(buffer.Ptr(), str.buffer.Ptr()) == 0);
+					return buffer == nullptr || strcmp(buffer.Ptr(), "") == 0;
+				return (strcmp(buffer.Ptr(), str.buffer.Ptr()) == 0);
 			}
 			bool operator!=(const String & str) const
 			{
 				if (!buffer)
-					return (str.buffer != 0 && wcscmp(str.buffer.Ptr(), L"") != 0);
+					return (str.buffer != 0 && strcmp(str.buffer.Ptr(), "") != 0);
 				if (str.buffer.Ptr() == 0)
 					return length != 0;
-				return (wcscmp(buffer.Ptr(), str.buffer.Ptr()) != 0);
+				return (strcmp(buffer.Ptr(), str.buffer.Ptr()) != 0);
 			}
 			bool operator>(const String & str) const
 			{
@@ -1250,7 +1262,7 @@ namespace CoreLib
 					return false;
 				if (!str.buffer)
 					return buffer.Ptr() != nullptr && length != 0;
-				return (wcscmp(buffer.Ptr(), str.buffer.Ptr()) > 0);
+				return (strcmp(buffer.Ptr(), str.buffer.Ptr()) > 0);
 			}
 			bool operator<(const String & str) const
 			{
@@ -1258,7 +1270,7 @@ namespace CoreLib
 					return (str.buffer != 0);
 				if (!str.buffer)
 					return false;
-				return (wcscmp(buffer.Ptr(), str.buffer.Ptr()) < 0);
+				return (strcmp(buffer.Ptr(), str.buffer.Ptr()) < 0);
 			}
 			bool operator>=(const String & str) const
 			{
@@ -1266,7 +1278,7 @@ namespace CoreLib
 					return (str.buffer == 0);
 				if (!str.buffer)
 					return length == 0;
-				int res = wcscmp(buffer.Ptr(), str.buffer.Ptr());
+				int res = strcmp(buffer.Ptr(), str.buffer.Ptr());
 				return (res > 0 || res == 0);
 			}
 			bool operator<=(const String & str) const
@@ -1275,7 +1287,7 @@ namespace CoreLib
 					return true;
 				if (!str.buffer)
 					return length > 0;
-				int res = wcscmp(buffer.Ptr(), str.buffer.Ptr());
+				int res = strcmp(buffer.Ptr(), str.buffer.Ptr());
 				return (res < 0 || res == 0);
 			}
 
@@ -1285,10 +1297,10 @@ namespace CoreLib
 					return *this;
 				String res;
 				res.length = length;
-				res.buffer = new wchar_t[length + 1];
+				res.buffer = new char[length + 1];
 				for (int i = 0; i <= length; i++)
-					res.buffer[i] = (buffer[i] >= L'a' && buffer[i] <= L'z')? 
-									(buffer[i] - L'a' + L'A') : buffer[i];
+					res.buffer[i] = (buffer[i] >= 'a' && buffer[i] <= 'z')? 
+									(buffer[i] - 'a' + 'A') : buffer[i];
 				return res;
 			}
 
@@ -1298,10 +1310,10 @@ namespace CoreLib
 					return *this;
 				String res;
 				res.length = length;
-				res.buffer = new wchar_t[length + 1];
+				res.buffer = new char[length + 1];
 				for (int i = 0; i <= length; i++)
-					res.buffer[i] = (buffer[i] >= L'A' && buffer[i] <= L'Z')? 
-									(buffer[i] - L'A' + L'a') : buffer[i];
+					res.buffer[i] = (buffer[i] >= 'A' && buffer[i] <= 'Z')? 
+									(buffer[i] - 'A' + 'a') : buffer[i];
 				return res;
 			}
 			
@@ -1310,13 +1322,13 @@ namespace CoreLib
 				return length;
 			}
 
-			int IndexOf(const wchar_t * str, int id) const // String str
+			int IndexOf(const char * str, int id) const // String str
 			{
 				if(!buffer)
 					return -1;
 				if (id < 0 || id >= length)
 					return -1;
-				auto findRs = wcsstr(buffer + id, str);
+				auto findRs = strstr(buffer + id, str);
 				int res = findRs ? (int)(findRs - buffer.Ptr()) : -1;
 				if (res >= 0)
 					return res;
@@ -1329,7 +1341,7 @@ namespace CoreLib
 				return IndexOf(str.buffer.Ptr(), id);
 			}
 
-			int IndexOf(const wchar_t * str) const
+			int IndexOf(const char * str) const
 			{
 				return IndexOf(str, 0);
 			}
@@ -1339,7 +1351,7 @@ namespace CoreLib
 				return IndexOf(str.buffer.Ptr(), 0);
 			}
 
-			int IndexOf(wchar_t ch, int id) const
+			int IndexOf(char ch, int id) const
 			{
 #if _DEBUG
 				if (id < 0 || id >= length)
@@ -1353,12 +1365,12 @@ namespace CoreLib
 				return -1;
 			}
 
-			int IndexOf(wchar_t ch) const
+			int IndexOf(char ch) const
 			{
 				return IndexOf(ch, 0);
 			}
 
-			int LastIndexOf(wchar_t ch) const
+			int LastIndexOf(char ch) const
 			{
 				for (int i = length-1; i>=0; i--)
 					if (buffer[i] == ch)
@@ -1366,11 +1378,11 @@ namespace CoreLib
 				return -1;
 			}
 
-			bool StartsWith(const wchar_t * str) const // String str
+			bool StartsWith(const char * str) const // String str
 			{
 				if(!buffer)
 					return false;
-				int strLen =(int) wcslen(str);
+				int strLen =(int) strlen(str);
 				if (strLen > length)
 					return false;
 				for (int i = 0; i < strLen; i++)
@@ -1381,14 +1393,14 @@ namespace CoreLib
 
 			bool StartsWith(const String & str) const
 			{
-				return StartsWith((const wchar_t*)str.buffer.Ptr());
+				return StartsWith(str.buffer.Ptr());
 			}
 
-			bool EndsWith(wchar_t * str)  const // String str
+			bool EndsWith(char * str)  const // String str
 			{
 				if(!buffer)
 					return false;
-				int strLen = (int)wcslen(str);
+				int strLen = (int)strlen(str);
 				if (strLen > length)
 					return false;
 				for (int i = strLen - 1; i >= 0; i--)
@@ -1402,7 +1414,7 @@ namespace CoreLib
 				return EndsWith(str.buffer.Ptr());
 			}
 
-			bool Contains(const wchar_t * str) const // String str
+			bool Contains(const char * str) const // String str
 			{
 				if(!buffer)
 					return false;
@@ -1420,7 +1432,7 @@ namespace CoreLib
 					return 0;
 				int hash = 0;
 				int c;
-				wchar_t * str = buffer.Ptr();
+				char * str = buffer.Ptr();
 				c = *str++;
 				while (c)
 				{
@@ -1429,15 +1441,15 @@ namespace CoreLib
 				}
 				return hash;
 			}
-			String PadLeft(wchar_t ch, int length);
-			String PadRight(wchar_t ch, int length);
+			String PadLeft(char ch, int length);
+			String PadRight(char ch, int length);
 			String ReplaceAll(String src, String dst) const;
 		};
 
 		class StringBuilder
 		{
 		private:
-			wchar_t * buffer;
+			char * buffer;
 			int length;
 			int bufferSize;
 			static const int InitialSize = 512;
@@ -1445,8 +1457,8 @@ namespace CoreLib
 			StringBuilder(int bufferSize = 1024)
 				:buffer(0), length(0), bufferSize(0)
 			{
-				buffer = new wchar_t[InitialSize]; // new a larger buffer 
-				buffer[0] = L'\0';
+				buffer = new char[InitialSize]; // new a larger buffer 
+				buffer[0] = '\0';
 				length = 0;
 				bufferSize = InitialSize;
 			}
@@ -1459,10 +1471,10 @@ namespace CoreLib
 			{
 				if(bufferSize < size)
 				{
-					wchar_t * newBuffer = new wchar_t[size + 1];
+					char * newBuffer = new char[size + 1];
 					if(buffer)
 					{
-						wcscpy_s(newBuffer, size + 1, buffer);
+						strcpy_s(newBuffer, size + 1, buffer);
 						delete [] buffer;
 					}
 					buffer = newBuffer;
@@ -1470,32 +1482,9 @@ namespace CoreLib
 				}
 			}
 
-			//void Append(wchar_t * str)
-			//{
-			//	length += wcslen(str);
-			//	if(bufferSize < length + 1)
-			//	{
-			//		int newBufferSize = InitialSize;
-			//		while(newBufferSize < length + 1)
-			//			newBufferSize <<= 1;
-			//		wchar_t * newBuffer = new wchar_t[newBufferSize];
-			//		if (buffer)
-			//		{
-			//			wcscpy_s(newBuffer, newBufferSize, buffer);
-			//			delete [] buffer;
-			//		}
-			//		wcscat_s(newBuffer, newBufferSize, str); // use memcpy, manually deal with zero terminator
-			//		buffer = newBuffer;
-			//		bufferSize = newBufferSize;
-			//	}
-			//	else
-			//	{
-			//		wcscat_s(buffer, bufferSize, str); // use memcpy, manually deal with zero terminator
-			//	}
-			//}
-			StringBuilder & operator << (const wchar_t * str)
+			StringBuilder & operator << (const char * str)
 			{
-				Append(str, (int)wcslen(str));
+				Append(str, (int)strlen(str));
 				return *this;
 			}
 			StringBuilder & operator << (const String & str)
@@ -1505,28 +1494,29 @@ namespace CoreLib
 			}
 			StringBuilder & operator << (const _EndLine)
 			{
-				Append(L'\n');
+				Append('\n');
 				return *this;
 			}
-			void Append(wchar_t ch)
+			void Append(char ch)
 			{
 				Append(&ch, 1);
 			}
 			void Append(int value, int radix = 10)
 			{
-				wchar_t vBuffer[33];
-				_itow_s(value, vBuffer, 33, radix);
+				char vBuffer[33];
+				int len = IntToAscii(vBuffer, value, radix);
+				ReverseInternalAscii(vBuffer, len);
 				Append(vBuffer);
 			}
 			void Append(const String & str)
 			{
 				Append(str.Buffer(), str.Length());
 			}
-			void Append(const wchar_t * str)
+			void Append(const char * str)
 			{
-				Append(str, (int)wcslen(str));
+				Append(str, (int)strlen(str));
 			}
-			void Append(const wchar_t * str, int strLen)
+			void Append(const char * str, int strLen)
 			{
 				int newLength = length + strLen;
 				if(bufferSize < newLength + 1)
@@ -1534,24 +1524,21 @@ namespace CoreLib
 					int newBufferSize = InitialSize;
 					while(newBufferSize < newLength + 1)
 						newBufferSize <<= 1;
-					wchar_t * newBuffer = new wchar_t[newBufferSize];
+					char * newBuffer = new char[newBufferSize];
 					if (buffer)
 					{
-						//wcscpy_s(newBuffer, newBufferSize, buffer);
-						memcpy(newBuffer, buffer, sizeof(wchar_t) * length);
+						memcpy(newBuffer, buffer, length);
 						delete [] buffer;
 					}
-					//wcscat_s(newBuffer, newBufferSize, str);
-					memcpy(newBuffer + length, str, sizeof(wchar_t) * strLen);
-					newBuffer[newLength] = L'\0';
+					memcpy(newBuffer + length, str, strLen);
+					newBuffer[newLength] = '\0';
 					buffer = newBuffer;
 					bufferSize = newBufferSize;
 				}
 				else
 				{
-					memcpy(buffer + length, str, sizeof(wchar_t) * strLen);
-					buffer[newLength] = L'\0';
-					//wcscat_s(buffer, bufferSize, str); // use memcpy, manually deal with zero terminator
+					memcpy(buffer + length, str, strLen);
+					buffer[newLength] = '\0';
 				}
 				length = newLength;
 			}
@@ -1561,7 +1548,7 @@ namespace CoreLib
 				return bufferSize;
 			}
 
-			wchar_t * Buffer()
+			char * Buffer()
 			{
 				return buffer;
 			}
@@ -1591,9 +1578,9 @@ namespace CoreLib
 			String GetSubString(int start, int count)
 			{
 				String rs;
-				rs.buffer = new wchar_t[count+1];
+				rs.buffer = new char[count+1];
 				rs.length = count;
-				wcsncpy_s(rs.buffer.Ptr(), count+1, buffer+start, count);
+				strncpy_s(rs.buffer.Ptr(), count+1, buffer+start, count);
 				rs.buffer[count] = 0;
 				return rs;
 			}
@@ -1623,8 +1610,7 @@ namespace CoreLib
 		int StringToInt(const String & str, int radix = 10);
 		unsigned int StringToUInt(const String & str, int radix = 10);
 		double StringToDouble(const String & str);
-
-		
+		float StringToFloat(const String & str);
 	}
 }
 
@@ -1811,7 +1797,7 @@ namespace CoreLib
 			{
 #if _DEBUG
 				if (id >= _count || id < 0)
-					throw IndexOutofRangeException(L"Operator[]: Index out of Range.");
+					throw IndexOutofRangeException("Operator[]: Index out of Range.");
 #endif
 				return *(T*)((char*)_buffer+id*stride);
 			}
@@ -1923,7 +1909,7 @@ namespace CoreLib
 			{
 #ifdef _DEBUG
 				if (newSize > size)
-					throw IndexOutofRangeException(L"size too large.");
+					throw IndexOutofRangeException("size too large.");
 #endif
 				_count = newSize;
 			}
@@ -1931,7 +1917,7 @@ namespace CoreLib
 			{
 #ifdef _DEBUG
 				if (_count == size)
-					throw IndexOutofRangeException(L"out of range access to static array.");
+					throw IndexOutofRangeException("out of range access to static array.");
 #endif
 				_buffer[_count++] = item;
 			}
@@ -1939,7 +1925,7 @@ namespace CoreLib
 			{
 #ifdef _DEBUG
 				if (_count == size)
-					throw IndexOutofRangeException(L"out of range access to static array.");
+					throw IndexOutofRangeException("out of range access to static array.");
 #endif
 				_buffer[_count++] = _Move(item);
 			}
@@ -1948,7 +1934,7 @@ namespace CoreLib
 			{
 #if _DEBUG
 				if(id >= _count || id < 0)
-					throw IndexOutofRangeException(L"Operator[]: Index out of Range.");
+					throw IndexOutofRangeException("Operator[]: Index out of Range.");
 #endif
 				return ((T*)_buffer)[id];
 			}
@@ -2185,10 +2171,22 @@ namespace CoreLib
 			{
 				return buffer+_count;
 			}
+		private:
+			template<typename... Args>
+			void Init(const T & val, Args... args)
+			{
+				Add(val);
+				Init(args...);
+			}
 		public:
 			List()
 				: buffer(0), _count(0), bufferSize(0)
 			{
+			}
+			template<typename... Args>
+			List(Args... args)
+			{
+				Init(args...);
 			}
 			List(const List<T> & list)
 				: buffer(0), _count(0), bufferSize(0)
@@ -2198,8 +2196,15 @@ namespace CoreLib
 			List(List<T> && list)
 				: buffer(0), _count(0), bufferSize(0)
 			{
-				//int t = static_cast<int>(1.0f); reinterpret_cast<double*>(&t), dynamic_cast<> 
 				this->operator=(static_cast<List<T>&&>(list));
+			}
+			static List<T> Create(const T & val, int count)
+			{
+				List<T> rs;
+				rs.SetSize(count);
+				for (int i = 0; i < count; i++)
+					rs[i] = val;
+				return rs;
 			}
 			~List()
 			{
@@ -2258,6 +2263,15 @@ namespace CoreLib
 				TAllocator tmpAlloc = _Move(this->allocator);
 				this->allocator = _Move(other.allocator);
 				other.allocator = _Move(tmpAlloc);
+			}
+
+			T* ReleaseBuffer()
+			{
+				T* rs = buffer;
+				buffer = nullptr;
+				_count = 0;
+				bufferSize = 0;
+				return rs;
 			}
 
 			inline ArrayView<T> GetArrayView() const
@@ -2505,7 +2519,7 @@ namespace CoreLib
 			{
 #if _DEBUG
 				if(id >= _count || id < 0)
-					throw IndexOutofRangeException(L"Operator[]: Index out of Range.");
+					throw IndexOutofRangeException("Operator[]: Index out of Range.");
 #endif
 				return buffer[id];
 			}
@@ -3333,6 +3347,12 @@ namespace CoreLib
 			}
 		};
 
+		template<typename TKey, typename TValue>
+		inline KeyValuePair<TKey, TValue> KVPair(const TKey & k, const TValue & v)
+		{
+			return KeyValuePair<TKey, TValue>(k, v);
+		}
+
 		const float MaxLoadFactor = 0.7f;
 
 		template<typename TKey, typename TValue>
@@ -3427,7 +3447,7 @@ namespace CoreLib
 				}
 				if (insertPos != -1)
 					return FindPositionResult(-1, insertPos);
-				throw InvalidOperationException(L"Hash map is full. This indicates an error in Key::Equal or Key::GetHashCode.");
+				throw InvalidOperationException("Hash map is full. This indicates an error in Key::Equal or Key::GetHashCode.");
 			}
 			TValue & _Insert(KeyValuePair<TKey, TValue> && kvPair, int pos)
 			{
@@ -3476,12 +3496,12 @@ namespace CoreLib
 					return true;
 				}
 				else
-					throw InvalidOperationException(L"Inconsistent find result returned. This is a bug in Dictionary implementation.");
+					throw InvalidOperationException("Inconsistent find result returned. This is a bug in Dictionary implementation.");
 			}
 			void Add(KeyValuePair<TKey, TValue> && kvPair)
 			{
 				if (!AddIfNotExists(_Move(kvPair)))
-					throw KeyExistsException(L"The key already exists in Dictionary.");
+					throw KeyExistsException("The key already exists in Dictionary.");
 			}
 			TValue & Set(KeyValuePair<TKey, TValue> && kvPair)
 			{
@@ -3495,7 +3515,7 @@ namespace CoreLib
 					return _Insert(_Move(kvPair), pos.InsertionPosition);
 				}
 				else
-					throw InvalidOperationException(L"Inconsistent find result returned. This is a bug in Dictionary implementation.");
+					throw InvalidOperationException("Inconsistent find result returned. This is a bug in Dictionary implementation.");
 			}
 		public:
 			class Iterator
@@ -3653,7 +3673,7 @@ namespace CoreLib
 						return dict->hashMap[pos.ObjectPosition].Value;
 					}
 					else
-						throw KeyNotFoundException(L"The key does not exists in dictionary.");
+						throw KeyNotFoundException("The key does not exists in dictionary.");
 				}
 				inline TValue & operator()() const
 				{
@@ -3684,6 +3704,13 @@ namespace CoreLib
 			{
 				return _count;
 			}
+		private:
+			template<typename... Args>
+			void Init(const KeyValuePair<TKey, TValue> & kvPair, Args... args)
+			{
+				Add(kvPair);
+				Init(args...);
+			}
 		public:
 			Dictionary()
 			{
@@ -3691,6 +3718,11 @@ namespace CoreLib
 				shiftBits = 32;
 				_count = 0;
 				hashMap = 0;
+			}
+			template<typename... Args>
+			Dictionary(Args... args)
+			{
+				Init(args...);
 			}
 			Dictionary(const Dictionary<TKey, TValue> & other)
 				: bucketSizeMinusOne(-1), _count(0), hashMap(0)
@@ -3845,7 +3877,7 @@ namespace CoreLib
 				}
 				if (insertPos != -1)
 					return FindPositionResult(-1, insertPos);
-				throw InvalidOperationException(L"Hash map is full. This indicates an error in Key::Equal or Key::GetHashCode.");
+				throw InvalidOperationException("Hash map is full. This indicates an error in Key::Equal or Key::GetHashCode.");
 			}
 			TValue & _Insert(KeyValuePair<TKey, TValue> && kvPair, int pos)
 			{
@@ -3896,12 +3928,12 @@ namespace CoreLib
 					return true;
 				}
 				else
-					throw InvalidOperationException(L"Inconsistent find result returned. This is a bug in Dictionary implementation.");
+					throw InvalidOperationException("Inconsistent find result returned. This is a bug in Dictionary implementation.");
 			}
 			void Add(KeyValuePair<TKey, TValue> && kvPair)
 			{
 				if (!AddIfNotExists(_Move(kvPair)))
-					throw KeyExistsException(L"The key already exists in Dictionary.");
+					throw KeyExistsException("The key already exists in Dictionary.");
 			}
 			TValue & Set(KeyValuePair<TKey, TValue> && kvPair)
 			{
@@ -3918,7 +3950,7 @@ namespace CoreLib
 					return _Insert(_Move(kvPair), pos.InsertionPosition);
 				}
 				else
-					throw InvalidOperationException(L"Inconsistent find result returned. This is a bug in Dictionary implementation.");
+					throw InvalidOperationException("Inconsistent find result returned. This is a bug in Dictionary implementation.");
 			}
 		public:
 			typedef typename LinkedList<KeyValuePair<TKey, TValue>>::Iterator Iterator;
@@ -4023,7 +4055,7 @@ namespace CoreLib
 					}
 					else
 					{
-						throw KeyNotFoundException(L"The key does not exists in dictionary.");
+						throw KeyNotFoundException("The key does not exists in dictionary.");
 					}
 				}
 				inline TValue & operator()() const
@@ -4063,6 +4095,13 @@ namespace CoreLib
 			{
 				return kvPairs.Last();
 			}
+		private:
+			template<typename... Args>
+			void Init(const KeyValuePair<TKey, TValue> & kvPair, Args... args)
+			{
+				Add(kvPair);
+				Init(args...);
+			}
 		public:
 			EnumerableDictionary()
 			{
@@ -4070,6 +4109,11 @@ namespace CoreLib
 				shiftBits = 32;
 				_count = 0;
 				hashMap = 0;
+			}
+			template<typename... Args>
+			EnumerableDictionary(Args... args)
+			{
+				Init(args...);
 			}
 			EnumerableDictionary(const EnumerableDictionary<TKey, TValue> & other)
 				: bucketSizeMinusOne(-1), _count(0), hashMap(0)
@@ -4120,9 +4164,21 @@ namespace CoreLib
 		{
 		protected:
 			DictionaryType dict;
+		private:
+			template<typename... Args>
+			void Init(const T & v, Args... args)
+			{
+				Add(v);
+				Init(args...);
+			}
 		public:
 			HashSetBase()
 			{}
+			template<typename... Args>
+			HashSetBase(Args... args)
+			{
+				Init(args...);
+			}
 			HashSetBase(const HashSetBase & set)
 			{
 				operator=(set);
@@ -5050,29 +5106,29 @@ namespace CoreLib
 			{}
 		};
 
-		inline bool IsLetter(wchar_t ch)
+		inline bool IsLetter(char ch)
 		{
-			return ((ch >= L'a' && ch <= L'z') ||
-				(ch >= L'A' && ch <= L'Z') || ch == L'_' || ch == L'#');
+			return ((ch >= 'a' && ch <= 'z') ||
+				(ch >= 'A' && ch <= 'Z') || ch == '_' || ch == '#');
 		}
 
-		inline bool IsDigit(wchar_t ch)
+		inline bool IsDigit(char ch)
 		{
-			return ch >= L'0' && ch <= L'9';
+			return ch >= '0' && ch <= '9';
 		}
 
-		inline bool IsPunctuation(wchar_t ch)
+		inline bool IsPunctuation(char ch)
 		{
-			return  ch == L'+' || ch == L'-' || ch == L'*' || ch == L'/' || ch == L'%' ||
-				ch == L'!' || ch == L'^' || ch == L'&' || ch == L'(' || ch == L')' ||
-				ch == L'=' || ch == L'{' || ch == L'}' || ch == L'[' || ch == L']' ||
-				ch == L'|' || ch == L';' || ch == L',' || ch == L'.' || ch == L'<' ||
-				ch == L'>' || ch == L'~' || ch == L'@' || ch == L':' || ch == L'?';
+			return  ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '%' ||
+				ch == '!' || ch == '^' || ch == '&' || ch == '(' || ch == ')' ||
+				ch == '=' || ch == '{' || ch == '}' || ch == '[' || ch == ']' ||
+				ch == '|' || ch == ';' || ch == ',' || ch == '.' || ch == '<' ||
+				ch == '>' || ch == '~' || ch == '@' || ch == ':' || ch == '?';
 		}
 
-		inline bool IsWhiteSpace(wchar_t ch)
+		inline bool IsWhiteSpace(char ch)
 		{
-			return (ch == L' ' || ch == L'\t' || ch == L'\n' || ch == L'\r' || ch == L'\v');
+			return (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\v');
 		}
 
 		class CodePosition
@@ -5085,7 +5141,7 @@ namespace CoreLib
 				StringBuilder sb(100);
 				sb << FileName;
 				if (Line != -1)
-					sb << L"(" << Line << L")";
+					sb << "(" << Line << ")";
 				return sb.ProduceString();
 			}
 			CodePosition() = default;
@@ -5167,7 +5223,7 @@ namespace CoreLib
 			{
 				auto token = ReadToken();
 				bool neg = false;
-				if (token.Content == L'-')
+				if (token.Content == '-')
 				{
 					neg = true;
 					token = ReadToken();
@@ -5179,7 +5235,7 @@ namespace CoreLib
 					else
 						return StringToInt(token.Content);
 				}
-				throw TextFormatException(L"Text parsing error: int expected.");
+				throw TextFormatException("Text parsing error: int expected.");
 			}
 			unsigned int ReadUInt()
 			{
@@ -5188,13 +5244,13 @@ namespace CoreLib
 				{
 					return StringToUInt(token.Content);
 				}
-				throw TextFormatException(L"Text parsing error: int expected.");
+				throw TextFormatException("Text parsing error: int expected.");
 			}
 			double ReadDouble()
 			{
 				auto token = ReadToken();
 				bool neg = false;
-				if (token.Content == L'-')
+				if (token.Content == '-')
 				{
 					neg = true;
 					token = ReadToken();
@@ -5206,7 +5262,11 @@ namespace CoreLib
 					else
 						return StringToDouble(token.Content);
 				}
-				throw TextFormatException(L"Text parsing error: floating point value expected.");
+				throw TextFormatException("Text parsing error: floating point value expected.");
+			}
+			float ReadFloat()
+			{
+				return (float)ReadDouble();
 			}
 			String ReadWord()
 			{
@@ -5215,16 +5275,16 @@ namespace CoreLib
 				{
 					return token.Content;
 				}
-				throw TextFormatException(L"Text parsing error: identifier expected.");
+				throw TextFormatException("Text parsing error: identifier expected.");
 			}
-			String Read(const wchar_t * expectedStr)
+			String Read(const char * expectedStr)
 			{
 				auto token = ReadToken();
 				if (token.Content == expectedStr)
 				{
 					return token.Content;
 				}
-				throw TextFormatException(L"Text parsing error: \'" + String(expectedStr) + L"\' expected.");
+				throw TextFormatException("Text parsing error: \'" + String(expectedStr) + "\' expected.");
 			}
 			String Read(String expectedStr)
 			{
@@ -5233,7 +5293,7 @@ namespace CoreLib
 				{
 					return token.Content;
 				}
-				throw TextFormatException(L"Text parsing error: \'" + expectedStr + L"\' expected.");
+				throw TextFormatException("Text parsing error: \'" + expectedStr + "\' expected.");
 			}
 			
 			String ReadStringLiteral()
@@ -5243,7 +5303,7 @@ namespace CoreLib
 				{
 					return UnescapeStringLiteral(token.Content.SubString(1, token.Content.Length()-2));
 				}
-				throw TextFormatException(L"Text parsing error: string literal expected.");
+				throw TextFormatException("Text parsing error: string literal expected.");
 			}
 			void Back(int count)
 			{
@@ -5257,7 +5317,7 @@ namespace CoreLib
 					tokenPtr++;
 					return rs;
 				}
-				throw TextFormatException(L"Unexpected ending.");
+				throw TextFormatException("Unexpected ending.");
 			}
 			Token NextToken()
 			{
@@ -5293,7 +5353,7 @@ namespace CoreLib
 			}
 		};
 
-		List<String> Split(String str, wchar_t c);
+		List<String> Split(String str, char c);
 	}
 }
 
@@ -5500,55 +5560,55 @@ namespace Spire
 			virtual String ToString() override
 			{
 				if (Type == ILBaseType::Int)
-					return L"int";
+					return "int";
 				else if (Type == ILBaseType::UInt)
-					return L"uint";
+					return "uint";
 				else if (Type == ILBaseType::UInt2)
-					return L"uvec2";
+					return "uvec2";
 				else if (Type == ILBaseType::UInt3)
-					return L"uvec3";
+					return "uvec3";
 				else if (Type == ILBaseType::UInt4)
-					return L"uvec4";
+					return "uvec4";
 				else if (Type == ILBaseType::Int2)
-					return L"ivec2";
+					return "ivec2";
 				else if (Type == ILBaseType::Int3)
-					return L"ivec3";
+					return "ivec3";
 				else if (Type == ILBaseType::Int4)
-					return L"ivec4";
+					return "ivec4";
 				else if (Type == ILBaseType::Float)
-					return L"float";
+					return "float";
 				else if (Type == ILBaseType::Float2)
-					return L"vec2";
+					return "vec2";
 				else if (Type == ILBaseType::Float3)
-					return L"vec3";
+					return "vec3";
 				else if (Type == ILBaseType::Float4)
-					return L"vec4";
+					return "vec4";
 				else if (Type == ILBaseType::Float3x3)
-					return L"mat3";
+					return "mat3";
 				else if (Type == ILBaseType::Float4x4)
-					return L"mat4";
+					return "mat4";
 				else if (Type == ILBaseType::Texture2D)
-					return L"sampler2D";
+					return "sampler2D";
 				else if (Type == ILBaseType::TextureCube)
-					return L"samplerCube";
+					return "samplerCube";
 				else if (Type == ILBaseType::TextureCubeShadow)
-					return L"samplerCubeShadow";
+					return "samplerCubeShadow";
 				else if (Type == ILBaseType::TextureShadow)
-					return L"sampler2DShadow";
+					return "sampler2DShadow";
 				else if (Type == ILBaseType::Bool)
-					return L"bool";
+					return "bool";
 				else if (Type == ILBaseType::Bool2)
-					return L"bvec2";
+					return "bvec2";
 				else if (Type == ILBaseType::Bool3)
-					return L"bvec3";
+					return "bvec3";
 				else if (Type == ILBaseType::Bool4)
-					return L"bvec4";
+					return "bvec4";
 				else if (Type == ILBaseType::SamplerState)
-					return L"SamplerState";
+					return "SamplerState";
 				else if (Type == ILBaseType::Void)
-					return L"void";
+					return "void";
 				else
-					return L"?unknown";
+					return "?unknown";
 			}
 			virtual int GetAlignment(LayoutRule rule) override
 			{
@@ -5650,9 +5710,9 @@ namespace Spire
 			virtual String ToString() override
 			{
 				if (ArrayLength > 0)
-					return BaseType->ToString() + L"[" + String(ArrayLength) + L"]";
+					return BaseType->ToString() + "[" + String(ArrayLength) + "]";
 				else
-					return BaseType->ToString() + L"[]";
+					return BaseType->ToString() + "[]";
 			}
 			virtual int GetSize(LayoutRule layoutRule) override
 			{
@@ -5691,7 +5751,7 @@ namespace Spire
 			}
 			virtual String ToString() override
 			{
-				return GenericTypeName + L"<" + BaseType->ToString() + L">";
+				return GenericTypeName + "<" + BaseType->ToString() + ">";
 			}
 			virtual int GetSize(LayoutRule rule) override
 			{
@@ -5866,7 +5926,7 @@ namespace Spire
 			}
 			virtual String ToString()
 			{
-				return L"<operand>";
+				return "<operand>";
 			}
 			virtual bool IsUndefined()
 			{
@@ -5879,11 +5939,11 @@ namespace Spire
 		public:
 			ILUndefinedOperand()
 			{
-				Name = L"<undef>";
+				Name = "<undef>";
 			}
 			virtual String ToString() override
 			{
-				return L"<undef>";
+				return "<undef>";
 			}
 			virtual bool IsUndefined() override
 			{
@@ -5930,7 +5990,7 @@ namespace Spire
 				if (ref.Ptr())
 				{
 					if (!user)
-						throw InvalidOperationException(L"user not initialized.");
+						throw InvalidOperationException("user not initialized.");
 					ref.Ptr()->Users.Add(user);
 				}
 			}
@@ -5942,7 +6002,7 @@ namespace Spire
 				if (newRef)
 				{
 					if (!user)
-						throw InvalidOperationException(L"user not initialized.");
+						throw InvalidOperationException("user not initialized.");
 					newRef->Users.Add(user);
 				}
 			}
@@ -5975,7 +6035,7 @@ namespace Spire
 				if (reference)
 					return reference->Name;
 				else
-					return L"<null>";
+					return "<null>";
 			}
 		};
 
@@ -6048,38 +6108,38 @@ namespace Spire
 			virtual String ToString() override
 			{
 				if (Type->IsFloat())
-					return String(FloatValues[0]) + L"f";
+					return String(FloatValues[0]) + "f";
 				else if (Type->IsInt())
 					return String(IntValues[0]);
 				else if (auto baseType = dynamic_cast<ILBasicType*>(Type.Ptr()))
 				{
 					StringBuilder sb(256);
 					if (baseType->Type == ILBaseType::Float2)
-						sb << L"vec2(" << FloatValues[0] << L"f, " << FloatValues[1] << L"f)";
+						sb << "vec2(" << FloatValues[0] << "f, " << FloatValues[1] << "f)";
 					else if (baseType->Type == ILBaseType::Float3)
-						sb << L"vec3(" << FloatValues[0] << L"f, " << FloatValues[1] << L"f, " << FloatValues[2] << L"f)";
+						sb << "vec3(" << FloatValues[0] << "f, " << FloatValues[1] << "f, " << FloatValues[2] << "f)";
 					else if (baseType->Type == ILBaseType::Float4)
-						sb << L"vec4(" << FloatValues[0] << L"f, " << FloatValues[1] << L"f, " << FloatValues[2] << L"f, " << FloatValues[3] << L"f)";
+						sb << "vec4(" << FloatValues[0] << "f, " << FloatValues[1] << "f, " << FloatValues[2] << "f, " << FloatValues[3] << "f)";
 					else if (baseType->Type == ILBaseType::Float3x3)
-						sb << L"mat3(...)";
+						sb << "mat3(...)";
 					else if (baseType->Type == ILBaseType::Float4x4)
-						sb << L"mat4(...)";
+						sb << "mat4(...)";
 					else if (baseType->Type == ILBaseType::Int2)
-						sb << L"ivec2(" << IntValues[0] << L", " << IntValues[1] << L")";
+						sb << "ivec2(" << IntValues[0] << ", " << IntValues[1] << ")";
 					else if (baseType->Type == ILBaseType::Int3)
-						sb << L"ivec3(" << IntValues[0] << L", " << IntValues[1] << L", " << IntValues[2] << L")";
+						sb << "ivec3(" << IntValues[0] << ", " << IntValues[1] << ", " << IntValues[2] << ")";
 					else if (baseType->Type == ILBaseType::Int4)
-						sb << L"ivec4(" << IntValues[0] << L", " << IntValues[1] << L", " << IntValues[2] << L", " << IntValues[3] << L")";
+						sb << "ivec4(" << IntValues[0] << ", " << IntValues[1] << ", " << IntValues[2] << ", " << IntValues[3] << ")";
 					else if (baseType->Type == ILBaseType::UInt2)
-						sb << L"uvec2(" << IntValues[0] << L", " << IntValues[1] << L")";
+						sb << "uvec2(" << IntValues[0] << ", " << IntValues[1] << ")";
 					else if (baseType->Type == ILBaseType::UInt3)
-						sb << L"uvec3(" << IntValues[0] << L", " << IntValues[1] << L", " << IntValues[2] << L")";
+						sb << "uvec3(" << IntValues[0] << ", " << IntValues[1] << ", " << IntValues[2] << ")";
 					else if (baseType->Type == ILBaseType::UInt4)
-						sb << L"uvec4(" << IntValues[0] << L", " << IntValues[1] << L", " << IntValues[2] << L", " << IntValues[3] << L")";
+						sb << "uvec4(" << IntValues[0] << ", " << IntValues[1] << ", " << IntValues[2] << ", " << IntValues[3] << ")";
 					return sb.ToString();
 				}
 				else
-					throw InvalidOperationException(L"Illegal constant.");
+					throw InvalidOperationException("Illegal constant.");
 			}
 		};
 
@@ -6117,7 +6177,7 @@ namespace Spire
 
 			virtual String GetOperatorString()
 			{
-				return L"<instruction>";
+				return "<instruction>";
 			}
 			virtual bool HasSideEffect()
 			{
@@ -6170,7 +6230,7 @@ namespace Spire
 				Remove();
 				if (Users.Count())
 				{
-					throw InvalidOperationException(L"All uses must be removed before removing this instruction");
+					throw InvalidOperationException("All uses must be removed before removing this instruction");
 				}
 				delete this;
 			}
@@ -6228,18 +6288,18 @@ namespace Spire
 			{
 				StringBuilder sb(256);
 				sb << Name;
-				sb << L" = switch ";
+				sb << " = switch ";
 				for (auto & op : Candidates)
 				{
 					sb << op.ToString();
 					if (op != Candidates.Last())
-						sb << L", ";
+						sb << ", ";
 				}
 				return sb.ProduceString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"switch";
+				return "switch";
 			}
 			virtual bool HasSideEffect() override
 			{
@@ -6350,11 +6410,11 @@ namespace Spire
 			}
 			virtual String ToString() override
 			{
-				return Name + L" = INPUT " + InputName;
+				return Name + " = INPUT " + InputName;
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"input";
+				return "input";
 			}
 			virtual LoadInputInstruction * Clone() override
 			{
@@ -6378,7 +6438,7 @@ namespace Spire
 			{
 				auto ptrType = type->Clone();
 				if (!type)
-					throw ArgumentException(L"type cannot be null.");
+					throw ArgumentException("type cannot be null.");
 				this->Type = ptrType;
 				this->Size = count;
 			}
@@ -6393,7 +6453,7 @@ namespace Spire
 			}
 			virtual String ToString() override
 			{
-				return Name + L" = VAR " + Type->ToString() + L", " + Size.ToString();
+				return Name + " = VAR " + Type->ToString() + ", " + Size.ToString();
 			}
 			virtual OperandIterator begin() override
 			{
@@ -6405,7 +6465,7 @@ namespace Spire
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"avar";
+				return "avar";
 			}
 			virtual AllocVarInstruction * Clone() override
 			{
@@ -6425,11 +6485,11 @@ namespace Spire
 			}
 			virtual String ToString() override
 			{
-				return Name + L" = ARG " + Type->ToString();
+				return Name + " = ARG " + Type->ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"arg " + String(ArgId);
+				return "arg " + String(ArgId);
 			}
 			virtual bool IsDeterministic() override
 			{
@@ -6713,7 +6773,7 @@ namespace Spire
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"phi";
+				return "phi";
 			}
 			virtual OperandIterator begin() override
 			{
@@ -6726,7 +6786,7 @@ namespace Spire
 			virtual String ToString() override
 			{
 				StringBuilder sb;
-				sb << Name << L" = phi ";
+				sb << Name << " = phi ";
 				for (auto & op : Operands)
 				{
 					if (op)
@@ -6734,8 +6794,8 @@ namespace Spire
 						sb << op.ToString();
 					}
 					else
-						sb << L"<?>";
-					sb << L", ";
+						sb << "<?>";
+					sb << ", ";
 				}
 				return sb.ProduceString();
 			}
@@ -6782,9 +6842,9 @@ namespace Spire
 			virtual String ToString() override
 			{
 				StringBuilder sb;
-				sb << Name << L" = project ";
+				sb << Name << " = project ";
 				sb << Operand.ToString();
-				sb << L", " << ComponentName;
+				sb << ", " << ComponentName;
 				return sb.ProduceString();
 			}
 			virtual ProjectInstruction * Clone() override
@@ -6813,11 +6873,11 @@ namespace Spire
 			}
 			virtual String ToString() override
 			{
-				return L"export [" + ComponentName + L"], " + Operand.ToString();
+				return "export [" + ComponentName + "], " + Operand.ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"export [" + ComponentName + L"]";
+				return "export [" + ComponentName + "]";
 			}
 			virtual ExportInstruction * Clone() override
 			{
@@ -6900,11 +6960,11 @@ namespace Spire
 
 			virtual String ToString() override
 			{
-				return Name + L" = select " + Operands[0].ToString() + L": " + Operands[1].ToString() + L", " + Operands[2].ToString();
+				return Name + " = select " + Operands[0].ToString() + ": " + Operands[1].ToString() + ", " + Operands[2].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"select";
+				return "select";
 			}
 			virtual SelectInstruction * Clone() override
 			{
@@ -6931,19 +6991,19 @@ namespace Spire
 			{
 				StringBuilder sb(256);
 				sb << Name;
-				sb << L" = call " << Function << L"(";
+				sb << " = call " << Function << "(";
 				for (auto & op : Arguments)
 				{
 					sb << op.ToString();
 					if (op != Arguments.Last())
-						sb << L", ";
+						sb << ", ";
 				}
-				sb << L")";
+				sb << ")";
 				return sb.ProduceString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"call " + Function;
+				return "call " + Function;
 			}
 			virtual bool HasSideEffect() override
 			{
@@ -6980,11 +7040,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return  Name + L" = not " + Operand.ToString();
+				return  Name + " = not " + Operand.ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"not";
+				return "not";
 			}
 			virtual NotInstruction * Clone() override
 			{
@@ -7006,11 +7066,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return  Name + L" = neg " + Operand.ToString();
+				return  Name + " = neg " + Operand.ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"neg";
+				return "neg";
 			}
 			virtual NegInstruction * Clone() override
 			{
@@ -7026,11 +7086,11 @@ namespace Spire
 			String SwizzleString;
 			virtual String ToString() override
 			{
-				return  Name + L" = " + Operand.ToString() + L"." + SwizzleString;
+				return  Name + " = " + Operand.ToString() + "." + SwizzleString;
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"swizzle";
+				return "swizzle";
 			}
 			virtual SwizzleInstruction * Clone() override
 			{
@@ -7044,11 +7104,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return  Name + L" = bnot " + Operand.ToString();
+				return  Name + " = bnot " + Operand.ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"bnot";
+				return "bnot";
 			}
 			virtual BitNotInstruction * Clone() override
 			{
@@ -7078,11 +7138,11 @@ namespace Spire
 			}
 			virtual String ToString() override
 			{
-				return Name + L" = add " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = add " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"add";
+				return "add";
 			}
 			virtual AddInstruction * Clone() override
 			{
@@ -7134,26 +7194,26 @@ namespace Spire
 						Type = new ILBasicType(ILBaseType::UInt);
 						break;
 					default:
-						throw InvalidOperationException(L"Unsupported aggregate type.");
+						throw InvalidOperationException("Unsupported aggregate type.");
 					}
 				}
 				else if (auto structType = dynamic_cast<ILStructType*>(v0->Type.Ptr()))
 				{
 					auto cv1 = dynamic_cast<ILConstOperand*>(v1);
 					if (!cv1)
-						throw InvalidProgramException(L"member field access offset is not constant.");
+						throw InvalidProgramException("member field access offset is not constant.");
 					if (cv1->IntValues[0] < 0 || cv1->IntValues[0] >= structType->Members.Count())
-						throw InvalidProgramException(L"member field access offset out of bounds.");
+						throw InvalidProgramException("member field access offset out of bounds.");
 					Type = structType->Members[cv1->IntValues[0]].Type;
 				}
 			}
 			virtual String ToString() override
 			{
-				return Name + L" = retrieve " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = retrieve " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"retrieve";
+				return "retrieve";
 			}
 			virtual MemberLoadInstruction * Clone() override
 			{
@@ -7167,11 +7227,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = sub " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = sub " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"sub";
+				return "sub";
 			}
 			virtual SubInstruction * Clone() override
 			{
@@ -7194,11 +7254,11 @@ namespace Spire
 
 			virtual String ToString() override
 			{
-				return Name + L" = mul " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = mul " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"mul";
+				return "mu";
 			}
 			virtual MulInstruction * Clone() override
 			{
@@ -7212,11 +7272,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = div " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = div " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"div";
+				return "div";
 			}
 			virtual DivInstruction * Clone() override
 			{
@@ -7229,11 +7289,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = mod " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = mod " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"mod";
+				return "mod";
 			}
 			virtual ModInstruction * Clone() override
 			{
@@ -7246,11 +7306,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = and " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = and " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"and";
+				return "and";
 			}
 			virtual AndInstruction * Clone() override
 			{
@@ -7264,11 +7324,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = or " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = or " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"or";
+				return "or";
 			}
 			virtual OrInstruction * Clone() override
 			{
@@ -7290,11 +7350,11 @@ namespace Spire
 			BitAndInstruction(const BitAndInstruction &) = default;
 			virtual String ToString() override
 			{
-				return Name + L" = band " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = band " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"band";
+				return "band";
 			}
 			virtual BitAndInstruction * Clone() override
 			{
@@ -7308,11 +7368,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = bor " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = bor " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"bor";
+				return "bor";
 			}
 			virtual BitOrInstruction * Clone() override
 			{
@@ -7334,11 +7394,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = bxor " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = bxor " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"bxor";
+				return "bxor";
 			}
 			virtual BitXorInstruction * Clone() override
 			{
@@ -7352,11 +7412,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = shl " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = shl " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"shl";
+				return "sh";
 			}
 			virtual ShlInstruction * Clone() override
 			{
@@ -7369,11 +7429,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = shr " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = shr " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"shr";
+				return "shr";
 			}
 			virtual ShrInstruction * Clone() override
 			{
@@ -7388,11 +7448,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = gt " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = gt " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"gt";
+				return "gt";
 			}
 			virtual CmpgtInstruction * Clone() override
 			{
@@ -7405,11 +7465,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = ge " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = ge " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"ge";
+				return "ge";
 			}
 			virtual CmpgeInstruction * Clone() override
 			{
@@ -7422,11 +7482,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = lt " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = lt " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"lt";
+				return "lt";
 			}
 			virtual CmpltInstruction * Clone() override
 			{
@@ -7448,11 +7508,11 @@ namespace Spire
 
 			virtual String ToString() override
 			{
-				return Name + L" = le " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = le " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"le";
+				return "le";
 			}
 			virtual CmpleInstruction * Clone() override
 			{
@@ -7465,12 +7525,12 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = eql " + Operands[0].ToString()
-					+ L", " + Operands[1].ToString();
+				return Name + " = eql " + Operands[0].ToString()
+					+ ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"eql";
+				return "eq";
 			}
 			virtual CmpeqlInstruction * Clone() override
 			{
@@ -7483,11 +7543,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = neq " + Operands[0].ToString() + L", " + Operands[1].ToString();
+				return Name + " = neq " + Operands[0].ToString() + ", " + Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"neq";
+				return "neq";
 			}
 			virtual CmpneqInstruction * Clone() override
 			{
@@ -7513,11 +7573,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = f2i " + Operand.ToString();
+				return Name + " = f2i " + Operand.ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"f2i";
+				return "f2i";
 			}
 			virtual Float2IntInstruction * Clone() override
 			{
@@ -7540,11 +7600,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = i2f " + Operand.ToString();
+				return Name + " = i2f " + Operand.ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"i2f";
+				return "i2f";
 			}
 			virtual Int2FloatInstruction * Clone() override
 			{
@@ -7567,11 +7627,11 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = " + Operand.ToString();
+				return Name + " = " + Operand.ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"copy";
+				return "copy";
 			}
 			virtual CopyInstruction * Clone() override
 			{
@@ -7597,7 +7657,7 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return Name + L" = load " + Operand.ToString();
+				return Name + " = load " + Operand.ToString();
 			}
 			virtual bool IsDeterministic() override
 			{
@@ -7605,7 +7665,7 @@ namespace Spire
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"ld";
+				return "ld";
 			}
 			virtual LoadInstruction * Clone() override
 			{
@@ -7630,11 +7690,11 @@ namespace Spire
 			}
 			virtual String ToString() override
 			{
-				return  L"discard";
+				return  "discard";
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"discard";
+				return "discard";
 			}
 			virtual DiscardInstruction * Clone() override
 			{
@@ -7659,12 +7719,12 @@ namespace Spire
 		public:
 			virtual String ToString() override
 			{
-				return L"store " + Operands[0].ToString() + L", " +
+				return "store " + Operands[0].ToString() + ", " +
 					Operands[1].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"st";
+				return "st";
 			}
 			virtual bool HasSideEffect() override
 			{
@@ -7717,11 +7777,11 @@ namespace Spire
 			}
 			virtual String ToString() override
 			{
-				return Name + L" = update " + Operands[0].ToString() + L", " + Operands[1].ToString() + L"," + Operands[2].ToString();
+				return Name + " = update " + Operands[0].ToString() + ", " + Operands[1].ToString() + "," + Operands[2].ToString();
 			}
 			virtual String GetOperatorString() override
 			{
-				return L"update";
+				return "update";
 			}
 			virtual MemberUpdateInstruction * Clone() override
 			{
@@ -7828,11 +7888,11 @@ namespace Spire
 			virtual String ToString() override
 			{
 				StringBuilder sb;
-				sb << L"for (" << InitialCode->ToString() << L"; " << ConditionCode->ToString() << L"; ";
-				sb << SideEffectCode->ToString() << L")" << EndLine;
-				sb << L"{" << EndLine;
+				sb << "for (" << InitialCode->ToString() << "; " << ConditionCode->ToString() << "; ";
+				sb << SideEffectCode->ToString() << ")" << EndLine;
+				sb << "{" << EndLine;
 				sb << BodyCode->ToString() << EndLine;
-				sb << L"}" << EndLine;
+				sb << "}" << EndLine;
 				return sb.ProduceString();
 			}
 		};
@@ -7859,16 +7919,16 @@ namespace Spire
 			virtual String ToString() override
 			{
 				StringBuilder sb;
-				sb << L"if (" << Operand->ToString() << L")" << EndLine;
-				sb << L"{" << EndLine;
+				sb << "if (" << Operand->ToString() << ")" << EndLine;
+				sb << "{" << EndLine;
 				sb << TrueCode->ToString() << EndLine;
-				sb << L"}" << EndLine;
+				sb << "}" << EndLine;
 				if (FalseCode)
 				{
-					sb << L"else" << EndLine;
-					sb << L"{" << EndLine;
+					sb << "else" << EndLine;
+					sb << "{" << EndLine;
 					sb << FalseCode->ToString() << EndLine;
-					sb << L"}" << EndLine;
+					sb << "}" << EndLine;
 				}
 				return sb.ProduceString();
 			}
@@ -7893,10 +7953,10 @@ namespace Spire
 			virtual String ToString() override
 			{
 				StringBuilder sb;
-				sb << L"while (" << ConditionCode->ToString() << L")" << EndLine;
-				sb << L"{" << EndLine;
+				sb << "while (" << ConditionCode->ToString() << ")" << EndLine;
+				sb << "{" << EndLine;
 				sb << BodyCode->ToString();
-				sb << L"}" << EndLine;
+				sb << "}" << EndLine;
 				return sb.ProduceString();
 			}
 		};
@@ -7920,10 +7980,10 @@ namespace Spire
 			virtual String ToString() override
 			{
 				StringBuilder sb;
-				sb << L"{" << EndLine;
+				sb << "{" << EndLine;
 				sb << BodyCode->ToString();
-				sb << L"}" << EndLine;
-				sb << L"while (" << ConditionCode->ToString() << L")" << EndLine;
+				sb << "}" << EndLine;
+				sb << "while (" << ConditionCode->ToString() << ")" << EndLine;
 				return sb.ProduceString();
 			}
 		};
@@ -7938,7 +7998,7 @@ namespace Spire
 
 			virtual String ToString() override
 			{
-				return L"return " + Operand->ToString() + L";";
+				return "return " + Operand->ToString() + ";";
 			}
 		};
 		class BreakInstruction : public ILInstruction
@@ -8030,39 +8090,39 @@ namespace Spire
 			Error = 16384,
 		};
 
-		inline const wchar_t * BaseTypeToString(BaseType t)
+		inline const char * BaseTypeToString(BaseType t)
 		{
 			switch (t)
 			{
 			case BaseType::Void:
-				return L"void";
+				return "void";
 			case BaseType::Bool:
 			case BaseType::Int:
-				return L"int";
+				return "int";
 			case BaseType::Int2:
-				return L"int2";
+				return "int2";
 			case BaseType::Int3:
-				return L"int3";
+				return "int3";
 			case BaseType::Int4:
-				return L"int4";
+				return "int4";
 			case BaseType::Float:
-				return L"float";
+				return "float";
 			case BaseType::Float2:
-				return L"float2";
+				return "float2";
 			case BaseType::Float3:
-				return L"float3";
+				return "float3";
 			case BaseType::Float4:
-				return L"float4";
+				return "float4";
 			case BaseType::Float3x3:
-				return L"float3x3";
+				return "float3x3";
 			case BaseType::Float4x4:
-				return L"float4x4";
+				return "float4x4";
 			case BaseType::Texture2D:
-				return L"sampler2D";
+				return "sampler2D";
 			case BaseType::TextureCube:
-				return L"samplerCube";
+				return "samplerCube";
 			default:
-				return L"<err-type>";
+				return "<err-type>";
 			}
 		}
 
@@ -9276,7 +9336,7 @@ namespace Spire
 				if (AlternateName.Length() == 0)
 					return WorldName;
 				else
-					return WorldName + L":" + AlternateName;
+					return WorldName + ":" + AlternateName;
 			}
 			bool operator == (const ShaderChoiceValue & val)
 			{
@@ -9381,14 +9441,14 @@ namespace Spire
 			{
 				for (int i = 0; i < ErrorList.Count(); i++)
 				{
-					fprintf(stderr, "%s(%d): error %d: %s\n", ErrorList[i].Position.FileName.ToMultiByteString(), ErrorList[i].Position.Line,
-						ErrorList[i].ErrorID, ErrorList[i].Message.ToMultiByteString());
+					fprintf(stderr, "%S(%d): error %d: %S\n", ErrorList[i].Position.FileName.ToWString(), ErrorList[i].Position.Line,
+						ErrorList[i].ErrorID, ErrorList[i].Message.ToWString());
 				}
 				if (printWarning)
 					for (int i = 0; i < WarningList.Count(); i++)
 					{
-						fprintf(stderr, "%s(%d): warning %d: %s\n", WarningList[i].Position.FileName.ToMultiByteString(),
-							WarningList[i].Position.Line, WarningList[i].ErrorID, WarningList[i].Message.ToMultiByteString());
+						fprintf(stderr, "%S(%d): warning %d: %S\n", WarningList[i].Position.FileName.ToWString(),
+							WarningList[i].Position.Line, WarningList[i].ErrorID, WarningList[i].Message.ToWString());
 					}
 			}
 			CompileResult()
@@ -9999,10 +10059,10 @@ namespace CoreLib
 			String ReadString()
 			{
 				int len = ReadInt32();
-				wchar_t * buffer = new wchar_t[len+1];
+				char * buffer = new char[len+1];
 				try
 				{
-					stream->Read(buffer, sizeof(wchar_t)*len);
+					stream->Read(buffer, len);
 				}
 				catch(IOException & e)
 				{
@@ -10109,11 +10169,10 @@ namespace CoreLib
 
 		class TextReader : public CoreLib::Basic::Object
 		{
-		private:
-			wchar_t lookAhead = 0;
-			bool hasLookAhead = false;
 		protected:
-			virtual wchar_t ReadChar() = 0;
+			char decodedChar[5];
+			int decodedCharPtr = 0, decodedCharSize = 0;
+			virtual void ReadChar() = 0;
 		public:
 			~TextReader()
 			{
@@ -10123,24 +10182,24 @@ namespace CoreLib
 			virtual String ReadLine()=0;
 			virtual String ReadToEnd()=0;
 			virtual bool IsEnd() = 0;
-			int Read(wchar_t * buffer, int count);
-			wchar_t Read()
+			int Read(char * buffer, int count);
+			char Read()
 			{
-				if (!hasLookAhead)
-					return ReadChar();
+				if (decodedCharPtr == decodedCharSize)
+					ReadChar();
+				if (decodedCharPtr < decodedCharSize)
+					return decodedChar[decodedCharPtr++];
 				else
-				{
-					hasLookAhead = false;
-					return lookAhead;
-				}
+					return 0;
 			}
-			wchar_t Peak()
+			char Peak()
 			{
-				if (hasLookAhead)
-					return lookAhead;
-				lookAhead = Read();
-				hasLookAhead = true;
-				return lookAhead;
+				if (decodedCharPtr == decodedCharSize)
+					ReadChar();
+				if (decodedCharPtr < decodedCharSize)
+					return decodedChar[decodedCharPtr];
+				else
+					return 0;
 			}
 		};
 
@@ -10152,18 +10211,12 @@ namespace CoreLib
 				Close();
 			}
 			virtual void Write(const String & str)=0;
-			virtual void Write(const wchar_t * str)=0;
 			virtual void Write(const char * str)=0;
 			virtual void Close(){}
 			template<typename T>
 			TextWriter & operator << (const T& val)
 			{
 				Write(val.ToString());
-				return *this;
-			}
-			TextWriter & operator << (wchar_t value)
-			{
-				Write(String(value));
 				return *this;
 			}
 			TextWriter & operator << (int value)
@@ -10186,16 +10239,6 @@ namespace CoreLib
 				Write(value);
 				return *this;
 			}
-			TextWriter & operator << (const wchar_t * const val)
-			{
-				Write(val);
-				return *this;
-			}
-			TextWriter & operator << (wchar_t * const val)
-			{
-				Write(val);
-				return *this;
-			}
 			TextWriter & operator << (const String & val)
 			{
 				Write(val);
@@ -10204,19 +10247,159 @@ namespace CoreLib
 			TextWriter & operator << (const _EndLine &)
 			{
 #ifdef _WIN32
-				Write(L"\r\n");
+				Write("\r\n");
 #else
-				Write(L"\n");
+				Write("\n");
 #endif
 				return *this;
 			}
 		};
 
+		template <typename ReadCharFunc>
+		int GetUnicodePointFromUTF8(const ReadCharFunc & get)
+		{
+			int codePoint = 0;
+			int leading = get(0);
+			int mask = 0x80;
+			int count = 0;
+			while (leading & mask)
+			{
+				count++;
+				mask >>= 1;
+			}
+			codePoint = (leading & (mask - 1));
+			for (int i = 1; i <= count - 1; i++)
+			{
+				codePoint <<= 6;
+				codePoint += (get(i) & 0x3F);
+			}
+			return codePoint;
+		}
+
+		template <typename ReadCharFunc>
+		int GetUnicodePointFromUTF16(const ReadCharFunc & get)
+		{
+			int byte0 = get(0);
+			int byte1 = get(1);
+			int word0 = byte0 + (byte1 << 8);
+			if (word0 >= 0xD800 && word0 <= 0xDFFF)
+			{
+				int byte2 = get(2);
+				int byte3 = get(3);
+				int word1 = byte2 + (byte3 << 8);
+				return ((word0 & 0x3FF) << 10) + (word1 & 0x3FF);
+			}
+			else
+				return word0;
+		}
+
+		template <typename ReadCharFunc>
+		int GetUnicodePointFromUTF16Reversed(const ReadCharFunc & get)
+		{
+			int byte0 = get(0);
+			int byte1 = get(1);
+			int word0 = (byte0 << 8) + byte1;
+			if (word0 >= 0xD800 && word0 <= 0xDFFF)
+			{
+				int byte2 = get(2);
+				int byte3 = get(3);
+				int word1 = (byte2 << 8) + byte3;
+				return ((word0 & 0x3FF) << 10) + (word1 & 0x3FF);
+			}
+			else
+				return word0;
+		}
+
+		template <typename ReadCharFunc>
+		int GetUnicodePointFromUTF32(const ReadCharFunc & get)
+		{
+			int byte0 = get(0);
+			int byte1 = get(1);
+			int byte2 = get(2);
+			int byte3 = get(3);
+			return byte0 + (byte1 << 8) + (byte2 << 16) + (byte3 << 24);
+		}
+
+		inline int EncodeUnicodePointToUTF8(char * buffer, int codePoint)
+		{
+			int count = 0;
+			if (codePoint <= 0x7F)
+				buffer[count++] = ((char)codePoint);
+			else if (codePoint <= 0x7FF)
+			{
+				unsigned char byte = (unsigned char)(0xC0 + (codePoint >> 6));
+				buffer[count++] = ((char)byte);
+				byte = 0x80 + (codePoint & 0x3F);
+				buffer[count++] = ((char)byte);
+			}
+			else if (codePoint <= 0xFFFF)
+			{
+				unsigned char byte = (unsigned char)(0xE0 + (codePoint >> 12));
+				buffer[count++] = ((char)byte);
+				byte = (unsigned char)(0x80 + ((codePoint >> 6) & (0x3F)));
+				buffer[count++] = ((char)byte);
+				byte = (unsigned char)(0x80 + (codePoint & 0x3F));
+				buffer[count++] = ((char)byte);
+			}
+			else
+			{
+				unsigned char byte = (unsigned char)(0xF0 + (codePoint >> 18));
+				buffer[count++] = ((char)byte);
+				byte = (unsigned char)(0x80 + ((codePoint >> 12) & 0x3F));
+				buffer[count++] = ((char)byte);
+				byte = (unsigned char)(0x80 + ((codePoint >> 6) & 0x3F));
+				buffer[count++] = ((char)byte);
+				byte = (unsigned char)(0x80 + (codePoint & 0x3F));
+				buffer[count++] = ((char)byte);
+			}
+			return count;
+		}
+
+		inline int EncodeUnicodePointToUTF16(unsigned short * buffer, int codePoint)
+		{
+			int count = 0;
+			if (codePoint <= 0xD7FF || (codePoint >= 0xE000 && codePoint <= 0xFFFF))
+				buffer[count++] = (unsigned short)codePoint;
+			else
+			{
+				int sub = codePoint - 0x10000;
+				int high = (sub >> 10) + 0xD800;
+				int low = (sub & 0x3FF) + 0xDC00;
+				buffer[count++] = (unsigned short)high;
+				buffer[count++] = (unsigned short)low;
+			}
+			return count;
+		}
+
+		inline unsigned short ReverseBitOrder(unsigned short val)
+		{
+			int byte0 = val & 0xFF;
+			int byte1 = val >> 8;
+			return (unsigned short)(byte1 + (byte0 << 8));
+		}
+
+		inline int EncodeUnicodePointToUTF16Reversed(unsigned short * buffer, int codePoint)
+		{
+			int count = 0;
+			if (codePoint <= 0xD7FF || (codePoint >= 0xE000 && codePoint <= 0xFFFF))
+				buffer[count++] = ReverseBitOrder((unsigned short)codePoint);
+			else
+			{
+				int sub = codePoint - 0x10000;
+				int high = (sub >> 10) + 0xD800;
+				int low = (sub & 0x3FF) + 0xDC00;
+				buffer[count++] = ReverseBitOrder((unsigned short)high);
+				buffer[count++] = ReverseBitOrder((unsigned short)low);
+			}
+			return count;
+		}
+
 		class Encoding
 		{
 		public:
-			static Encoding * UTF8, * Ansi, * UTF16, *UTF16Reversed;
-			virtual void GetBytes(List<char> & buffer, const String & str)=0;
+			static Encoding * UTF8, * UTF16, *UTF16Reversed, * UTF32;
+			virtual void GetBytes(List<char>& buffer, const String & str) = 0;
+			virtual String ToString(const char * buffer, int length) = 0;
 			virtual ~Encoding()
 			{}
 		};
@@ -10231,7 +10414,6 @@ namespace CoreLib
 			StreamWriter(const String & path, Encoding * encoding = Encoding::UTF8);
 			StreamWriter(RefPtr<Stream> stream, Encoding * encoding = Encoding::UTF8);
 			virtual void Write(const String & str);
-			virtual void Write(const wchar_t * str);
 			virtual void Write(const char * str);
 			virtual void Close()
 			{
@@ -10242,90 +10424,28 @@ namespace CoreLib
 		class StreamReader : public TextReader
 		{
 		private:
-			wchar_t lowSurrogate = 0;
-			bool hasLowSurrogate = false;
 			RefPtr<Stream> stream;
 			List<char> buffer;
 			Encoding * encoding;
 			int ptr;
 			char ReadBufferChar();
 			void ReadBuffer();
-			template<typename GetFunc>
-			wchar_t GetChar(GetFunc get)
-			{
-				wchar_t decoded = 0;
-				if (encoding == Encoding::UTF8)
-				{
-					if (hasLowSurrogate)
-					{
-						hasLowSurrogate = false;
-						return lowSurrogate;
-					}
-					int codePoint = 0;
-					int leading = get(0);
-					int mask = 0x80;
-					int count = 0;
-					while (leading & mask)
-					{
-						count++;
-						mask >>= 1;
-					}
-					codePoint = (leading & (mask - 1));
-					for (int i = 1; i <= count - 1; i++)
-					{
-						codePoint <<= 6;
-						codePoint += (get(i) & 0x3F);
-					}
-#ifdef _WIN32
-					if (codePoint <= 0xD7FF || (codePoint >= 0xE000 && codePoint <= 0xFFFF))
-						return (wchar_t)codePoint;
-					else
-					{
-						int sub = codePoint - 0x10000;
-						int high = (sub >> 10) + 0xD800;
-						int low = (sub & 0x3FF) + 0xDC00;
-						hasLowSurrogate = true;
-						lowSurrogate = (wchar_t)low;
-						return (wchar_t)high;
-					}
-#else
-					return (wchar_t)codePoint; // linux platforms use UTF32
-#endif
-				}
-				else if (encoding == Encoding::UTF16)
-				{
-					decoded = get(0) + (get(1) << 8);
-#ifndef _WIN32
-					if (decoded >= 0xD800 && decoded <= 0xDBFF) // high surrogate detected
-					{
-						unsigned short lowSurrogate = get(2) + (get(3) << 8);
-						decoded = ((decoded - 0xD800) << 10) + (lowSurrogate - 0xDC00);
-					}
-#endif
-					return decoded;
-				}
-				else if (encoding == Encoding::UTF16Reversed)
-				{
-					decoded = (get(0) << 8) + get(1);
-#ifndef _WIN32
-					if (decoded >= 0xD800 && decoded <= 0xDBFF) // high surrogate detected
-					{
-						unsigned short lowSurrogate = (get(2) << 8) + get(3);
-						decoded = ((decoded - 0xD800) << 10) + (lowSurrogate - 0xDC00);
-					}
-#endif
-					return decoded;
-				}
-				else
-				{
-					return get(0);
-				}
-			}
+			
 			Encoding * DetermineEncoding();
 		protected:
-			virtual wchar_t ReadChar()
+			virtual void ReadChar()
 			{
-				return GetChar([&](int) {return ReadBufferChar(); });
+				decodedCharPtr = 0;
+				int codePoint = 0;
+				if (encoding == Encoding::UTF8)
+					codePoint = GetUnicodePointFromUTF8([&](int) {return ReadBufferChar(); });
+				else if (encoding == Encoding::UTF16)
+					codePoint = GetUnicodePointFromUTF16([&](int) {return ReadBufferChar(); });
+				else if (encoding == Encoding::UTF16Reversed)
+					codePoint = GetUnicodePointFromUTF16Reversed([&](int) {return ReadBufferChar(); });
+				else if (encoding == Encoding::UTF32)
+					codePoint = GetUnicodePointFromUTF32([&](int) {return ReadBufferChar(); });
+				decodedCharSize = EncodeUnicodePointToUTF8(decodedChar, codePoint);
 			}
 		public:
 			StreamReader(const String & path);
@@ -10409,20 +10529,20 @@ namespace Spire
 			{
 				StringBuilder nameBuilder;
 				int startPos = 0;
-				if (name.StartsWith(L"_sys_"))
-					startPos = name.IndexOf(L'_', 5) + 1;
+				if (name.StartsWith("_sys_"))
+					startPos = name.IndexOf('_', 5) + 1;
 				nameBuilder << prefix;
 				for (int i = startPos; i < name.Length(); i++)
 				{
-					if ((name[i] >= L'a' && name[i] <= L'z') || 
-						(name[i] >= L'A' && name[i] <= L'Z') ||
-						name[i] == L'_' || 
-						(name[i] >= L'0' && name[i] <= L'9'))
+					if ((name[i] >= 'a' && name[i] <= 'z') || 
+						(name[i] >= 'A' && name[i] <= 'Z') ||
+						name[i] == '_' || 
+						(name[i] >= '0' && name[i] <= '9'))
 					{
 						nameBuilder << name[i];
 					}
 					else
-						nameBuilder << L'_';
+						nameBuilder << '_';
 				}
 				auto rs = nameBuilder.ToString();
 				int i = 0;
@@ -10809,7 +10929,7 @@ namespace Spire
 			//		// check: size must be constant 1. Do not support array of array in IL level.
 			//		auto s = dynamic_cast<ILConstOperand*>(size);
 			//		if (!s || s->IntValues[0] != 1)
-			//			throw ArgumentException(L"AllocVar(arrayType, size): size must be constant 1.");
+			//			throw ArgumentException("AllocVar(arrayType, size): size must be constant 1.");
 			//		auto instr = new AllocVarInstruction(arrType->BaseType, program.CreateConstant(arrType->ArrayLength));
 			//		cfgNode->InsertTail(instr);
 			//		return instr;
@@ -10829,7 +10949,7 @@ namespace Spire
 					// check: size must be constant 1. Do not support array of array in IL level.
 					auto s = dynamic_cast<ILConstOperand*>(size);
 					if (!s || s->IntValues[0] != 1)
-						throw ArgumentException(L"AllocVar(arrayType, size): size must be constant 1.");
+						throw ArgumentException("AllocVar(arrayType, size): size must be constant 1.");
 					auto instr = new AllocVarInstruction(arrType->BaseType, constantPool->CreateConstant(arrType->ArrayLength));
 					cfgNode.Last()->InsertTail(instr);
 					return instr;
@@ -10962,12 +11082,12 @@ namespace CoreLib
 		{
 		public:
 #ifdef _WIN32
-			static const wchar_t PathDelimiter = L'\\';
+			static const char PathDelimiter = '\\';
 #else
-			static const wchar_t PathDelimiter = L'/';
+			static const char PathDelimiter = '/';
 #endif
 			static String TruncateExt(const String & path);
-			static String ReplaceExt(const String & path, const wchar_t * newExt);
+			static String ReplaceExt(const String & path, const char * newExt);
 			static String GetFileName(const String & path);
 			static String GetFileNameWithoutEXT(const String & path);
 			static String GetFileExt(const String & path);
@@ -11039,61 +11159,61 @@ namespace Spire
 			Parser(List<Token> & _tokens, List<CompileError> & _errors, String _fileName)
 				: pos(0), tokens(_tokens), errors(_errors), fileName(_fileName)
 			{
-				typeNames.Add(L"int");
-				typeNames.Add(L"uint");
-				typeNames.Add(L"bool");
-				typeNames.Add(L"float");
-				typeNames.Add(L"half");
-				typeNames.Add(L"void");
-				typeNames.Add(L"ivec2");
-				typeNames.Add(L"ivec3");
-				typeNames.Add(L"ivec4");
-				typeNames.Add(L"uvec2");
-				typeNames.Add(L"uvec3");
-				typeNames.Add(L"uvec4");
-				typeNames.Add(L"vec2");
-				typeNames.Add(L"vec3");
-				typeNames.Add(L"vec4");
-				typeNames.Add(L"mat3");
-				typeNames.Add(L"mat4");
-				typeNames.Add(L"mat4x4");
-				typeNames.Add(L"mat3x3");
-				typeNames.Add(L"int2");
-				typeNames.Add(L"int3");
-				typeNames.Add(L"int4");
-				typeNames.Add(L"uint2");
-				typeNames.Add(L"uint3");
-				typeNames.Add(L"uint4");
-				typeNames.Add(L"float2");
-				typeNames.Add(L"float3");
-				typeNames.Add(L"float4");
-				typeNames.Add(L"half2");
-				typeNames.Add(L"half3");
-				typeNames.Add(L"half4");
-				typeNames.Add(L"float3x3");
-				typeNames.Add(L"float4x4");
-				typeNames.Add(L"half3x3");
-				typeNames.Add(L"half4x4");
-				typeNames.Add(L"Texture2D");
-				typeNames.Add(L"texture");
-				typeNames.Add(L"Texture");
-				typeNames.Add(L"sampler");
-				typeNames.Add(L"SamplerState");
-				typeNames.Add(L"sampler_state");
-				typeNames.Add(L"Uniform");
-				typeNames.Add(L"StructuredBuffer");
-				typeNames.Add(L"RWStructuredBuffer");
-				typeNames.Add(L"PackedBuffer");
-				typeNames.Add(L"StorageBuffer");
-				typeNames.Add(L"Patch");
+				typeNames.Add("int");
+				typeNames.Add("uint");
+				typeNames.Add("bool");
+				typeNames.Add("float");
+				typeNames.Add("half");
+				typeNames.Add("void");
+				typeNames.Add("ivec2");
+				typeNames.Add("ivec3");
+				typeNames.Add("ivec4");
+				typeNames.Add("uvec2");
+				typeNames.Add("uvec3");
+				typeNames.Add("uvec4");
+				typeNames.Add("vec2");
+				typeNames.Add("vec3");
+				typeNames.Add("vec4");
+				typeNames.Add("mat3");
+				typeNames.Add("mat4");
+				typeNames.Add("mat4x4");
+				typeNames.Add("mat3x3");
+				typeNames.Add("int2");
+				typeNames.Add("int3");
+				typeNames.Add("int4");
+				typeNames.Add("uint2");
+				typeNames.Add("uint3");
+				typeNames.Add("uint4");
+				typeNames.Add("float2");
+				typeNames.Add("float3");
+				typeNames.Add("float4");
+				typeNames.Add("half2");
+				typeNames.Add("half3");
+				typeNames.Add("half4");
+				typeNames.Add("float3x3");
+				typeNames.Add("float4x4");
+				typeNames.Add("half3x3");
+				typeNames.Add("half4x4");
+				typeNames.Add("Texture2D");
+				typeNames.Add("texture");
+				typeNames.Add("Texture");
+				typeNames.Add("sampler");
+				typeNames.Add("SamplerState");
+				typeNames.Add("sampler_state");
+				typeNames.Add("Uniform");
+				typeNames.Add("StructuredBuffer");
+				typeNames.Add("RWStructuredBuffer");
+				typeNames.Add("PackedBuffer");
+				typeNames.Add("StorageBuffer");
+				typeNames.Add("Patch");
 			}
 			RefPtr<ProgramSyntaxNode> Parse();
 		private:
 			Token & ReadToken();
 			Token & ReadToken(TokenType type);
-			Token & ReadToken(const wchar_t * string);
+			Token & ReadToken(const char * string);
 			bool LookAheadToken(TokenType type, int offset = 0);
-			bool LookAheadToken(const wchar_t * string, int offset = 0);
+			bool LookAheadToken(const char * string, int offset = 0);
 			Token & ReadTypeKeyword();
 			VariableModifier ReadVariableModifier();
 			bool IsTypeKeyword();
@@ -13387,7 +13507,7 @@ namespace Spire
 			if (name.EndsWith(suffix))
 				return name;
 			else
-				return EscapeDoubleUnderscore(name + L"_" + suffix);
+				return EscapeDoubleUnderscore(name + "_" + suffix);
 		}
 
 
@@ -13404,10 +13524,10 @@ namespace Spire
 		void CLikeCodeGen::PrintDef(StringBuilder & sbCode, ILType* type, const String & name)
 		{
 			PrintType(sbCode, type);
-			sbCode << L" ";
+			sbCode << " ";
 			sbCode << name;
 			if (name.Length() == 0)
-				throw InvalidProgramException(L"unnamed instruction.");
+				throw InvalidProgramException("unnamed instruction.");
 		}
 
 		String CLikeCodeGen::GetFunctionCallName(String name)
@@ -13415,13 +13535,13 @@ namespace Spire
 			StringBuilder rs;
 			for (int i = 0; i < name.Length(); i++)
 			{
-				if ((name[i] >= L'a' && name[i] <= L'z') || (name[i] >= L'A' && name[i] <= L'Z') || 
-					name[i] == L'_' || (name[i] >= L'0' && name[i] <= L'9'))
+				if ((name[i] >= 'a' && name[i] <= 'z') || (name[i] >= 'A' && name[i] <= 'Z') || 
+					name[i] == '_' || (name[i] >= '0' && name[i] <= '9'))
 				{
 					rs << name[i];
 				}
 				else if (i != name.Length() - 1)
-					rs << L'_';
+					rs << '_';
 			}
 			return rs.ProduceString();
 		}
@@ -13429,7 +13549,7 @@ namespace Spire
 		String CLikeCodeGen::GetFuncOriginalName(const String & name)
 		{
 			String originalName;
-			int splitPos = name.IndexOf(L'@');
+			int splitPos = name.IndexOf('@');
 			if (splitPos == 0)
 				return name;
 			if (splitPos != -1)
@@ -13443,11 +13563,11 @@ namespace Spire
 		{
 			auto makeFloat = [](float v)
 			{
-				String rs(v, L"%.12e");
-				if (!rs.Contains(L'.') && !rs.Contains(L'e') && !rs.Contains(L'E'))
-					rs = rs + L".0";
-				if (rs.StartsWith(L"-"))
-					rs = L"(" + rs + L")";
+				String rs(v, "%.12e");
+				if (!rs.Contains('.') && !rs.Contains('e') && !rs.Contains('E'))
+					rs = rs + ".0";
+				if (rs.StartsWith("-"))
+					rs = "(" + rs + ")";
 				return rs;
 			};
 			
@@ -13459,26 +13579,26 @@ namespace Spire
 				else if (type->IsInt())
 					ctx.Body << (c->IntValues[0]);
 				else if (type->IsBool())
-					ctx.Body << ((c->IntValues[0] != 0) ? L"true" : L"false");
+					ctx.Body << ((c->IntValues[0] != 0) ? "true" : "false");
 				else if (auto baseType = dynamic_cast<ILBasicType*>(type))
 				{
 					PrintType(ctx.Body, baseType);
 					ctx.Body << "(";
 
 					if (baseType->Type == ILBaseType::Float2)
-						ctx.Body << makeFloat(c->FloatValues[0]) << L", " << makeFloat(c->FloatValues[1]);
+						ctx.Body << makeFloat(c->FloatValues[0]) << ", " << makeFloat(c->FloatValues[1]);
 					else if (baseType->Type == ILBaseType::Float3)
-						ctx.Body << makeFloat(c->FloatValues[0]) << L", " << makeFloat(c->FloatValues[1]) << L", " << makeFloat(c->FloatValues[2]);
+						ctx.Body << makeFloat(c->FloatValues[0]) << ", " << makeFloat(c->FloatValues[1]) << ", " << makeFloat(c->FloatValues[2]);
 					else if (baseType->Type == ILBaseType::Float4)
-						ctx.Body << makeFloat(c->FloatValues[0]) << L", " << makeFloat(c->FloatValues[1]) << L", " << makeFloat(c->FloatValues[2]) << L", " << makeFloat(c->FloatValues[3]);
+						ctx.Body << makeFloat(c->FloatValues[0]) << ", " << makeFloat(c->FloatValues[1]) << ", " << makeFloat(c->FloatValues[2]) << ", " << makeFloat(c->FloatValues[3]);
 					else if (baseType->Type == ILBaseType::Float3x3)
 					{
-						ctx.Body << L"mat3(";
+						ctx.Body << "mat3(";
 						for (int i = 0; i < 9; i++)
 						{
 							ctx.Body << makeFloat(c->FloatValues[i]);
 							if (i != 8)
-								ctx.Body << L", ";
+								ctx.Body << ", ";
 						}
 						ctx.Body;
 					}
@@ -13488,20 +13608,20 @@ namespace Spire
 						{
 							ctx.Body << makeFloat(c->FloatValues[i]);
 							if (i != 15)
-								ctx.Body << L", ";
+								ctx.Body << ", ";
 						}
 					}
 					else if (baseType->Type == ILBaseType::Int2)
-						ctx.Body << c->IntValues[0] << L", " << c->IntValues[1];
+						ctx.Body << c->IntValues[0] << ", " << c->IntValues[1];
 					else if (baseType->Type == ILBaseType::Int3)
-						ctx.Body << c->IntValues[0] << L", " << c->IntValues[1] << L", " << c->IntValues[2];
+						ctx.Body << c->IntValues[0] << ", " << c->IntValues[1] << ", " << c->IntValues[2];
 					else if (baseType->Type == ILBaseType::Int4)
-						ctx.Body << c->IntValues[0] << L", " << c->IntValues[1] << L", " << c->IntValues[2] << L", " << c->IntValues[3];
+						ctx.Body << c->IntValues[0] << ", " << c->IntValues[1] << ", " << c->IntValues[2] << ", " << c->IntValues[3];
 
 					ctx.Body << ")";
 				}
 				else
-					throw InvalidOperationException(L"Illegal constant.");
+					throw InvalidOperationException("Illegal constant.");
 			}
 			else if (auto instr = dynamic_cast<ILInstruction*>(op))
 			{
@@ -13512,7 +13632,7 @@ namespace Spire
 				else
 				{
 					if (forceExpression)
-						throw InvalidProgramException(L"cannot generate code block as an expression.");
+						throw InvalidProgramException("cannot generate code block as an expression.");
 					String substituteName;
 					if (ctx.SubstituteNames.TryGetValue(instr->Name, substituteName))
 						ctx.Body << substituteName;
@@ -13521,7 +13641,7 @@ namespace Spire
 				}
 			}
 			else
-				throw InvalidOperationException(L"Unsupported operand type.");
+				throw InvalidOperationException("Unsupported operand type.");
 		}
 
 		static bool IsMatrix(ILOperand* operand)
@@ -13533,11 +13653,11 @@ namespace Spire
 
 		void CLikeCodeGen::PrintMatrixMulInstrExpr(CodeGenContext & ctx, ILOperand* op0, ILOperand* op1)
 		{
-			ctx.Body << L"(";
+			ctx.Body << "(";
 			PrintOp(ctx, op0);
-			ctx.Body << L" * ";
+			ctx.Body << " * ";
 			PrintOp(ctx, op1);
-			ctx.Body << L")";
+			ctx.Body << ")";
 		}
 
 		void CLikeCodeGen::PrintBinaryInstrExpr(CodeGenContext & ctx, BinaryInstruction * instr)
@@ -13546,18 +13666,18 @@ namespace Spire
 			{
 				auto op0 = instr->Operands[0].Ptr();
 				auto op1 = instr->Operands[1].Ptr();
-				ctx.Body << L"(";
+				ctx.Body << "(";
 				PrintOp(ctx, op0);
-				ctx.Body << L" = ";
+				ctx.Body << " = ";
 				PrintOp(ctx, op1);
-				ctx.Body << L")";
+				ctx.Body << ")";
 				return;
 			}
 			auto op0 = instr->Operands[0].Ptr();
 			auto op1 = instr->Operands[1].Ptr();
 			if (instr->Is<StoreInstruction>())
 			{
-				throw InvalidOperationException(L"store instruction cannot appear as expression.");
+				throw InvalidOperationException("store instruction cannot appear as expression.");
 			}
 			if (instr->Is<MemberLoadInstruction>())
 			{
@@ -13570,19 +13690,19 @@ namespace Spire
 						switch (c->IntValues[0])
 						{
 						case 0:
-							ctx.Body << L".x";
+							ctx.Body << ".x";
 							break;
 						case 1:
-							ctx.Body << L".y";
+							ctx.Body << ".y";
 							break;
 						case 2:
-							ctx.Body << L".z";
+							ctx.Body << ".z";
 							break;
 						case 3:
-							ctx.Body << L".w";
+							ctx.Body << ".w";
 							break;
 						default:
-							throw InvalidOperationException(L"Invalid member access.");
+							throw InvalidOperationException("Invalid member access.");
 						}
 						printDefault = false;
 					}
@@ -13591,28 +13711,28 @@ namespace Spire
 				{
 					if (auto c = dynamic_cast<ILConstOperand*>(op1))
 					{
-						ctx.Body << L"." << structType->Members[c->IntValues[0]].FieldName;
+						ctx.Body << "." << structType->Members[c->IntValues[0]].FieldName;
 					}
 					printDefault = false;
 				}
 				if (printDefault)
 				{
-					ctx.Body << L"[";
+					ctx.Body << "[";
 					PrintOp(ctx, op1);
-					ctx.Body << L"]";
+					ctx.Body << "]";
 				}
 				
 				
 				return;
 			}
-			const wchar_t * op = L"";
+			const char * op = "";
 			if (instr->Is<AddInstruction>())
 			{
-				op = L"+";
+				op = "+";
 			}
 			else if (instr->Is<SubInstruction>())
 			{
-				op = L"-";
+				op = "-";
 			}
 			else if (instr->Is<MulInstruction>())
 			{
@@ -13626,81 +13746,81 @@ namespace Spire
 					return;
 				}
 
-				op = L"*";
+				op = "*";
 			}
 			else if (instr->Is<DivInstruction>())
 			{
-				op = L"/";
+				op = "/";
 			}
 			else if (instr->Is<ModInstruction>())
 			{
-				op = L"%";
+				op = "%";
 			}
 			else if (instr->Is<ShlInstruction>())
 			{
-				op = L"<<";
+				op = "<<";
 			}
 			else if (instr->Is<ShrInstruction>())
 			{
-				op = L">>";
+				op = ">>";
 			}
 			else if (instr->Is<CmpeqlInstruction>())
 			{
-				op = L"==";
-				//ctx.Body << L"int";
+				op = "==";
+				//ctx.Body << "int";
 			}
 			else if (instr->Is<CmpgeInstruction>())
 			{
-				op = L">=";
-				//ctx.Body << L"int";
+				op = ">=";
+				//ctx.Body << "int";
 			}
 			else if (instr->Is<CmpgtInstruction>())
 			{
-				op = L">";
-				//ctx.Body << L"int";
+				op = ">";
+				//ctx.Body << "int";
 			}
 			else if (instr->Is<CmpleInstruction>())
 			{
-				op = L"<=";
-				//ctx.Body << L"int";
+				op = "<=";
+				//ctx.Body << "int";
 			}
 			else if (instr->Is<CmpltInstruction>())
 			{
-				op = L"<";
-				//ctx.Body << L"int";
+				op = "<";
+				//ctx.Body << "int";
 			}
 			else if (instr->Is<CmpneqInstruction>())
 			{
-				op = L"!=";
-				//ctx.Body << L"int";
+				op = "!=";
+				//ctx.Body << "int";
 			}
 			else if (instr->Is<AndInstruction>())
 			{
-				op = L"&&";
+				op = "&&";
 			}
 			else if (instr->Is<OrInstruction>())
 			{
-				op = L"||";
+				op = "||";
 			}
 			else if (instr->Is<BitXorInstruction>())
 			{
-				op = L"^";
+				op = "^";
 			}
 			else if (instr->Is<BitAndInstruction>())
 			{
-				op = L"&";
+				op = "&";
 			}
 			else if (instr->Is<BitOrInstruction>())
 			{
-				op = L"|";
+				op = "|";
 			}
 			else
-				throw InvalidProgramException(L"unsupported binary instruction.");
-			ctx.Body << L"(";
+				throw InvalidProgramException("unsupported binary instruction.");
+			ctx.Body << "(";
 			PrintOp(ctx, op0);
-			ctx.Body << L" " << op << L" ";
+			ctx.Body << " " << op << " ";
 			PrintOp(ctx, op1);
-			ctx.Body << L")";
+			ctx.Body << ")";
 		}
 
 		void CLikeCodeGen::PrintBinaryInstr(CodeGenContext & ctx, BinaryInstruction * instr)
@@ -13710,22 +13830,22 @@ namespace Spire
 			if (instr->Is<StoreInstruction>())
 			{
 				PrintOp(ctx, op0);
-				ctx.Body << L" = ";
+				ctx.Body << " = ";
 				PrintOp(ctx, op1);
-				ctx.Body << L";\n";
+				ctx.Body << ";\n";
 				return;
 			}
 			auto varName = ctx.DefineVariable(instr);
 			if (instr->Is<MemberLoadInstruction>())
 			{
-				ctx.Body << varName << L" = ";
+				ctx.Body << varName << " = ";
 				PrintBinaryInstrExpr(ctx, instr);
-				ctx.Body << L";\n";
+				ctx.Body << ";\n";
 				return;
 			}
-			ctx.Body << varName << L" = ";
+			ctx.Body << varName << " = ";
 			PrintBinaryInstrExpr(ctx, instr);
-			ctx.Body << L";\n";
+			ctx.Body << ";\n";
 		}
 
 		void CLikeCodeGen::PrintUnaryInstrExpr(CodeGenContext & ctx, UnaryInstruction * instr)
@@ -13741,32 +13861,32 @@ namespace Spire
 				PrintSwizzleInstrExpr(ctx, instr->As<SwizzleInstruction>());
 				return;
 			}
-			const wchar_t * op = L"";
+			const char * op = "";
 			if (instr->Is<BitNotInstruction>())
-				op = L"~";
+				op = "~";
 			else if (instr->Is<Float2IntInstruction>())
-				op = L"(int)";
+				op = "(int)";
 			else if (instr->Is<Int2FloatInstruction>())
-				op = L"(float)";
+				op = "(float)";
 			else if (instr->Is<CopyInstruction>())
-				op = L"";
+				op = "";
 			else if (instr->Is<NegInstruction>())
-				op = L"-";
+				op = "-";
 			else if (instr->Is<NotInstruction>())
-				op = L"!";
+				op = "!";
 			else
-				throw InvalidProgramException(L"unsupported unary instruction.");
-			ctx.Body << L"(" << op;
+				throw InvalidProgramException("unsupported unary instruction.");
+			ctx.Body << "(" << op;
 			PrintOp(ctx, op0);
-			ctx.Body << L")";
+			ctx.Body << ")";
 		}
 
 		void CLikeCodeGen::PrintUnaryInstr(CodeGenContext & ctx, UnaryInstruction * instr)
 		{
 			auto varName = ctx.DefineVariable(instr);
-			ctx.Body << varName << L" = ";
+			ctx.Body << varName << " = ";
 			PrintUnaryInstrExpr(ctx, instr);
-			ctx.Body << L";\n";
+			ctx.Body << ";\n";
 		}
 
 		void CLikeCodeGen::PrintAllocVarInstrExpr(CodeGenContext & ctx, AllocVarInstruction * instr)
@@ -13781,7 +13901,7 @@ namespace Spire
 				ctx.DefineVariable(instr);
 			}
 			else
-				throw InvalidProgramException(L"size operand of allocVar instr is not an intermediate.");
+				throw InvalidProgramException("size operand of allocVar instr is not an intermediate.");
 		}
 
 		void CLikeCodeGen::PrintFetchArgInstrExpr(CodeGenContext & ctx, FetchArgInstruction * instr)
@@ -13799,21 +13919,21 @@ namespace Spire
 
 		void CLikeCodeGen::PrintSelectInstrExpr(CodeGenContext & ctx, SelectInstruction * instr)
 		{
-			ctx.Body << L"(";
+			ctx.Body << "(";
 			PrintOp(ctx, instr->Operands[0].Ptr());
-			ctx.Body << L"?";
+			ctx.Body << "?";
 			PrintOp(ctx, instr->Operands[1].Ptr());
-			ctx.Body << L":";
+			ctx.Body << ":";
 			PrintOp(ctx, instr->Operands[2].Ptr());
-			ctx.Body << L")";
+			ctx.Body << ")";
 		}
 
 		void CLikeCodeGen::PrintSelectInstr(CodeGenContext & ctx, SelectInstruction * instr)
 		{
 			auto varName = ctx.DefineVariable(instr);
-			ctx.Body << varName << L" = ";
+			ctx.Body << varName << " = ";
 			PrintSelectInstrExpr(ctx, instr);
-			ctx.Body << L";\n";
+			ctx.Body << ";\n";
 		}
 
 		void CLikeCodeGen::PrintCallInstrExprForTarget(CodeGenContext & ctx, CallInstruction * instr, String const& name)
@@ -13823,16 +13943,16 @@ namespace Spire
 
 		void CLikeCodeGen::PrintDefaultCallInstrArgs(CodeGenContext & ctx, CallInstruction * instr)
 		{
-			ctx.Body << L"(";
+			ctx.Body << "(";
 			int id = 0;
 			for (auto & arg : instr->Arguments)
 			{
 				PrintOp(ctx, arg.Ptr());
 				if (id != instr->Arguments.Count() - 1)
-					ctx.Body << L", ";
+					ctx.Body << ", ";
 				id++;
 			}
-			ctx.Body << L")";
+			ctx.Body << ")";
 		}
 
 
@@ -13860,39 +13980,39 @@ namespace Spire
 			{
 				auto varName = ctx.DefineVariable(instr);
 				ctx.Body << varName;
-				ctx.Body << L" = ";
+				ctx.Body << " = ";
 			}
 			PrintCallInstrExpr(ctx, instr);
-			ctx.Body << L";\n";
+			ctx.Body << ";\n";
 		}
 
 		void CLikeCodeGen::PrintCastF2IInstrExpr(CodeGenContext & ctx, Float2IntInstruction * instr)
 		{
-			ctx.Body << L"((int)(";
+			ctx.Body << "((int)(";
 			PrintOp(ctx, instr->Operand.Ptr());
-			ctx.Body << L"))";
+			ctx.Body << "))";
 		}
 		void CLikeCodeGen::PrintCastF2IInstr(CodeGenContext & ctx, Float2IntInstruction * instr)
 		{
 			auto varName = ctx.DefineVariable(instr);
 			ctx.Body << varName;
-			ctx.Body << L" = ";
+			ctx.Body << " = ";
 			PrintCastF2IInstrExpr(ctx, instr);
-			ctx.Body << L";\n";
+			ctx.Body << ";\n";
 		}
 		void CLikeCodeGen::PrintCastI2FInstrExpr(CodeGenContext & ctx, Int2FloatInstruction * instr)
 		{
-			ctx.Body << L"((float)(";
+			ctx.Body << "((float)(";
 			PrintOp(ctx, instr->Operand.Ptr());
-			ctx.Body << L"))";
+			ctx.Body << "))";
 		}
 		void CLikeCodeGen::PrintCastI2FInstr(CodeGenContext & ctx, Int2FloatInstruction * instr)
 		{
 			auto varName = ctx.DefineVariable(instr);
 			ctx.Body << varName;
-			ctx.Body << L" = ";
+			ctx.Body << " = ";
 			PrintCastI2FInstrExpr(ctx, instr);
-			ctx.Body << L";\n";
+			ctx.Body << ";\n";
 		}
 
 		bool CLikeCodeGen::AppearAsExpression(ILInstruction & instr, bool force)
@@ -13946,18 +14066,18 @@ namespace Spire
 				ctx.Body << varName;
 				if (auto structType = dynamic_cast<ILStructType*>(srcType))
 				{
-					ctx.Body << L".";
+					ctx.Body << ".";
 					ctx.Body << structType->Members[dynamic_cast<ILConstOperand*>(op1)->IntValues[0]].FieldName;
 				}
 				else
 				{
-					ctx.Body << L"[";
+					ctx.Body << "[";
 					PrintOp(ctx, op1);
-					ctx.Body << L"]";
+					ctx.Body << "]";
 				}
-				ctx.Body << L" = ";
+				ctx.Body << " = ";
 				PrintOp(ctx, op2);
-				ctx.Body << L";\n";
+				ctx.Body << ";\n";
 			};
 			if (auto srcInstr = dynamic_cast<ILInstruction*>(instr->Operands[0].Ptr()))
 			{
@@ -13976,7 +14096,7 @@ namespace Spire
 		void CLikeCodeGen::PrintSwizzleInstrExpr(CodeGenContext & ctx, SwizzleInstruction * swizzle)
 		{
 			PrintOp(ctx, swizzle->Operand.Ptr());
-			ctx.Body << L"." << swizzle->SwizzleString;
+			ctx.Body << "." << swizzle->SwizzleString;
 		}
 
 		void CLikeCodeGen::PrintImportInstr(CodeGenContext & ctx, ImportInstruction * importInstr)
@@ -14021,12 +14141,12 @@ namespace Spire
 			else if (auto import = instr.As<ImportInstruction>())
 				PrintImportInstrExpr(ctx, import);
 			else if (instr.As<MemberUpdateInstruction>())
-				throw InvalidOperationException(L"member update instruction cannot appear as expression.");
+				throw InvalidOperationException("member update instruction cannot appear as expression.");
 		}
 
 		void CLikeCodeGen::PrintInstr(CodeGenContext & ctx, ILInstruction & instr)
 		{
-			// ctx.Body << L"// " << instr.ToString() << L";\n";
+			// ctx.Body << "// " << instr.ToString() << ";\n";
 			if (!AppearAsExpression(instr, false))
 			{
 				if (auto binInstr = instr.As<BinaryInstruction>())
@@ -14066,75 +14186,75 @@ namespace Spire
 			{
 				if (auto ifInstr = instr.As<IfInstruction>())
 				{
-					context.Body << L"if (bool(";
+					context.Body << "if (bool(";
 					PrintOp(context, ifInstr->Operand.Ptr(), true);
-					context.Body << L"))\n{\n";
+					context.Body << "))\n{\n";
 					GenerateCode(context, ifInstr->TrueCode.Ptr());
-					context.Body << L"}\n";
+					context.Body << "}\n";
 					if (ifInstr->FalseCode)
 					{
-						context.Body << L"else\n{\n";
+						context.Body << "else\n{\n";
 						GenerateCode(context, ifInstr->FalseCode.Ptr());
-						context.Body << L"}\n";
+						context.Body << "}\n";
 					}
 				}
 				else if (auto forInstr = instr.As<ForInstruction>())
 				{
-					context.Body << L"for (";
+					context.Body << "for (";
 					if (forInstr->InitialCode)
 						PrintOp(context, forInstr->InitialCode->GetLastInstruction(), true);
-					context.Body << L"; ";
+					context.Body << "; ";
 					if (forInstr->ConditionCode)
 						PrintOp(context, forInstr->ConditionCode->GetLastInstruction(), true);
-					context.Body << L"; ";
+					context.Body << "; ";
 					if (forInstr->SideEffectCode)
 						PrintOp(context, forInstr->SideEffectCode->GetLastInstruction(), true);
-					context.Body << L")\n{\n";
+					context.Body << ")\n{\n";
 					GenerateCode(context, forInstr->BodyCode.Ptr());
-					context.Body << L"}\n";
+					context.Body << "}\n";
 				}
 				else if (auto doInstr = instr.As<DoInstruction>())
 				{
-					context.Body << L"do\n{\n";
+					context.Body << "do\n{\n";
 					GenerateCode(context, doInstr->BodyCode.Ptr());
-					context.Body << L"} while (bool(";
+					context.Body << "} while (bool(";
 					PrintOp(context, doInstr->ConditionCode->GetLastInstruction()->As<ReturnInstruction>()->Operand.Ptr(), true);
-					context.Body << L"));\n";
+					context.Body << "));\n";
 				}
 				else if (auto whileInstr = instr.As<WhileInstruction>())
 				{
-					context.Body << L"while (bool(";
+					context.Body << "while (bool(";
 					PrintOp(context, whileInstr->ConditionCode->GetLastInstruction()->As<ReturnInstruction>()->Operand.Ptr(), true);
-					context.Body << L"))\n{\n";
+					context.Body << "))\n{\n";
 					GenerateCode(context, whileInstr->BodyCode.Ptr());
-					context.Body << L"}\n";
+					context.Body << "}\n";
 				}
 				else if (auto ret = instr.As<ReturnInstruction>())
 				{
 					if (currentImportInstr) 
 					{
-						context.Body << currentImportInstr->Name << L" = ";
+						context.Body << currentImportInstr->Name << " = ";
 						PrintOp(context, ret->Operand.Ptr());
-						context.Body << L";\n";
+						context.Body << ";\n";
 					}
 					else
 					{
-						context.Body << L"return ";
+						context.Body << "return ";
 						PrintOp(context, ret->Operand.Ptr());
-						context.Body << L";\n";
+						context.Body << ";\n";
 					}
 				}
 				else if (instr.Is<BreakInstruction>())
 				{
-					context.Body << L"break;\n";
+					context.Body << "break;\n";
 				}
 				else if (instr.Is<ContinueInstruction>())
 				{
-					context.Body << L"continue;\n";
+					context.Body << "continue;\n";
 				}
 				else if (instr.Is<DiscardInstruction>())
 				{
-					context.Body << L"discard;\n";
+					context.Body << "discard;\n";
 				}
 				else
 					PrintInstr(context, instr);
@@ -14143,9 +14263,9 @@ namespace Spire
 
 		CLikeCodeGen::CLikeCodeGen()
 		{
-			intrinsicTextureFunctions.Add(L"Sample");
-			intrinsicTextureFunctions.Add(L"SampleBias");
-			intrinsicTextureFunctions.Add(L"SampleGrad");
+			intrinsicTextureFunctions.Add("Sample");
+			intrinsicTextureFunctions.Add("SampleBias");
+			intrinsicTextureFunctions.Add("SampleGrad");
 		}
 
 		CompiledShaderSource CLikeCodeGen::GenerateShader(CompileResult & result, SymbolTable *, ILShader * shader, ErrorWriter * err)
@@ -14157,14 +14277,14 @@ namespace Spire
 			for (auto & stage : shader->Stages)
 			{
 				StageSource src;
-				if (stage.Value->StageType == L"VertexShader" || stage.Value->StageType == L"FragmentShader" || stage.Value->StageType == L"DomainShader")
+				if (stage.Value->StageType == "VertexShader" || stage.Value->StageType == "FragmentShader" || stage.Value->StageType == "DomainShader")
 					src = GenerateVertexFragmentDomainShader(result.Program.Ptr(), shader, stage.Value.Ptr());
-				else if (stage.Value->StageType == L"ComputeShader")
+				else if (stage.Value->StageType == "ComputeShader")
 					src = GenerateComputeShader(result.Program.Ptr(), shader, stage.Value.Ptr());
-				else if (stage.Value->StageType == L"HullShader")
+				else if (stage.Value->StageType == "HullShader")
 					src = GenerateHullShader(result.Program.Ptr(), shader, stage.Value.Ptr());
 				else
-					errWriter->Error(50020, L"Unknown stage type '" + stage.Value->StageType + L"'.", stage.Value->Position);
+					errWriter->Error(50020, "Unknown stage type '" + stage.Value->StageType + "'.", stage.Value->Position);
 				rs.Stages[stage.Key] = src;
 			}
 				
@@ -14180,13 +14300,13 @@ namespace Spire
 			{
 				if (!st->IsIntrinsic)
 				{
-					sb << L"struct " << st->TypeName << L"\n{\n";
+					sb << "struct " << st->TypeName << "\n{\n";
 					for (auto & f : st->Members)
 					{
 						sb << f.Type->ToString();
-						sb << " " << f.FieldName << L";\n";
+						sb << " " << f.FieldName << ";\n";
 					}
-					sb << L"};\n";
+					sb << "};\n";
 				}
 			}
 		}
@@ -14202,7 +14322,7 @@ namespace Spire
 				if (refFuncs.Contains(func.Value->Name))
 				{
 					GenerateFunctionDeclaration(sb, func.Value.Ptr());
-					sb << L";\n";
+					sb << ";\n";
 				}
 			}
 			for (auto & func : program->Functions)
@@ -14219,22 +14339,22 @@ namespace Spire
 			ExternComponentCodeGenInfo info;
 			info.Type = type;
 			String bindingVal;
-			if (input.Attributes.TryGetValue(L"Binding", bindingVal))
+			if (input.Attributes.TryGetValue("Binding", bindingVal))
 				info.Binding = StringToInt(bindingVal);
 			if (recType)
 			{
 				if (auto genType = dynamic_cast<ILGenericType*>(type))
 				{
 					type = genType->BaseType.Ptr();
-					if (genType->GenericTypeName == L"Uniform")
+					if (genType->GenericTypeName == "Uniform")
 						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::UniformBuffer;
-					else if (genType->GenericTypeName == L"Patch")
+					else if (genType->GenericTypeName == "Patch")
 						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::Patch;
-					else if (genType->GenericTypeName == L"Texture")
+					else if (genType->GenericTypeName == "Texture")
 						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::Texture;
-					else if (genType->GenericTypeName == L"PackedBuffer")
+					else if (genType->GenericTypeName == "PackedBuffer")
 						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::PackedBuffer;
-					else if (genType->GenericTypeName == L"StructuredBuffer" || genType->GenericTypeName == L"RWStructuredBuffer")
+					else if (genType->GenericTypeName == "StructuredBuffer" || genType->GenericTypeName == "RWStructuredBuffer")
 						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::ArrayBuffer;
 				}
 				if (auto arrType = dynamic_cast<ILArrayType*>(type))
@@ -14242,7 +14362,7 @@ namespace Spire
 					if (info.DataStructure != ExternComponentCodeGenInfo::DataStructureType::StandardInput &&
 						info.DataStructure != ExternComponentCodeGenInfo::DataStructureType::UniformBuffer &&
 						info.DataStructure != ExternComponentCodeGenInfo::DataStructureType::Patch)
-						errWriter->Error(51090, L"cannot generate code for extern component type '" + type->ToString() + L"'.",
+						errWriter->Error(51090, "cannot generate code for extern component type '" + type->ToString() + "'.",
 							input.Position);
 					type = arrType->BaseType.Ptr();
 					info.IsArray = true;
@@ -14250,48 +14370,48 @@ namespace Spire
 				}
 				if (type != recType)
 				{
-					errWriter->Error(51090, L"cannot generate code for extern component type '" + type->ToString() + L"'.",
+					errWriter->Error(51090, "cannot generate code for extern component type '" + type->ToString() + "'.",
 						input.Position);
 				}
 			}
 			else
 			{
 				// check for attributes 
-				if (input.Attributes.ContainsKey(L"TessCoord"))
+				if (input.Attributes.ContainsKey("TessCoord"))
 				{
 					info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::TessCoord;
 					if (!(input.Type->IsFloatVector() && input.Type->GetVectorSize() <= 3))
-						Error(50020, L"TessCoord must have vec2 or vec3 type.", input.Position);
+						Error(50020, "TessCoord must have vec2 or vec3 type.", input.Position);
 				}
-				else if (input.Attributes.ContainsKey(L"FragCoord"))
+				else if (input.Attributes.ContainsKey("FragCoord"))
 				{
 					info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::FragCoord;
 					if (!(input.Type->IsFloatVector() && input.Type->GetVectorSize() == 4))
-						Error(50020, L"FragCoord must be a vec4.", input.Position);
+						Error(50020, "FragCoord must be a vec4.", input.Position);
 				}
-				else if (input.Attributes.ContainsKey(L"InvocationId"))
+				else if (input.Attributes.ContainsKey("InvocationId"))
 				{
 					info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::InvocationId;
 					if (!input.Type->IsInt())
-						Error(50020, L"InvocationId must have int type.", input.Position);
+						Error(50020, "InvocationId must have int type.", input.Position);
 				}
-				else if (input.Attributes.ContainsKey(L"ThreadId"))
+				else if (input.Attributes.ContainsKey("ThreadId"))
 				{
 					info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::InvocationId;
 					if (!input.Type->IsInt())
-						Error(50020, L"ThreadId must have int type.", input.Position);
+						Error(50020, "ThreadId must have int type.", input.Position);
 				}
-				else if (input.Attributes.ContainsKey(L"PrimitiveId"))
+				else if (input.Attributes.ContainsKey("PrimitiveId"))
 				{
 					info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::PrimitiveId;
 					if (!input.Type->IsInt())
-						Error(50020, L"PrimitiveId must have int type.", input.Position);
+						Error(50020, "PrimitiveId must have int type.", input.Position);
 				}
-				else if (input.Attributes.ContainsKey(L"PatchVertexCount"))
+				else if (input.Attributes.ContainsKey("PatchVertexCount"))
 				{
 					info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::PatchVertexCount;
 					if (!input.Type->IsInt())
-						Error(50020, L"PatchVertexCount must have int type.", input.Position);
+						Error(50020, "PatchVertexCount must have int type.", input.Position);
 				}
 			}
 			return info;
@@ -14378,7 +14498,7 @@ namespace Spire
 					return;
 
 				default:
-					errWriter->Error(99999, L"internal error: unexpected data structure for record type",
+					errWriter->Error(99999, "internal error: unexpected data structure for record type",
 							input.Position);
 					break;
 				}
@@ -14388,7 +14508,7 @@ namespace Spire
 		void CLikeCodeGen::GenerateVertexShaderEpilog(CodeGenContext & ctx, ILWorld * world, ILStage * stage)
 		{
 			StageAttribute positionVar;
-			if (stage->Attributes.TryGetValue(L"Position", positionVar))
+			if (stage->Attributes.TryGetValue("Position", positionVar))
 			{
 				ILOperand * operand;
 				if (world->Components.TryGetValue(positionVar.Value, operand))
@@ -14398,11 +14518,11 @@ namespace Spire
 						PrintRasterPositionOutputWrite(ctx, operand);
 					}
 					else
-						errWriter->Error(50040, L"'" + positionVar.Value + L"': component used as 'Position' output must be of vec4 type.",
+						errWriter->Error(50040, "'" + positionVar.Value + "': component used as 'Position' output must be of vec4 type.",
 							positionVar.Position);
 				}
 				else
-					errWriter->Error(50041, L"'" + positionVar.Value + L"': component not defined.",
+					errWriter->Error(50041, "'" + positionVar.Value + "': component not defined.",
 						positionVar.Position);
 			}
 		}
@@ -14411,12 +14531,12 @@ namespace Spire
 		{
 			RefPtr<ILWorld> world = nullptr;
 			StageAttribute worldName;
-			if (stage->Attributes.TryGetValue(L"World", worldName))
+			if (stage->Attributes.TryGetValue("World", worldName))
 			{
 				if (!shader->Worlds.TryGetValue(worldName.Value, world))
-					errWriter->Error(50022, L"world '" + worldName.Value + L"' is not defined.", worldName.Position);
+					errWriter->Error(50022, "world '" + worldName.Value + "' is not defined.", worldName.Position);
 			}
-			outputStrategy = CreateStandardOutputStrategy(world.Ptr(), L"");
+			outputStrategy = CreateStandardOutputStrategy(world.Ptr(), "");
 			return GenerateSingleWorldShader(program, shader, stage);
 		}
 
@@ -14424,10 +14544,10 @@ namespace Spire
 		{
 			RefPtr<ILWorld> world = nullptr;
 			StageAttribute worldName;
-			if (stage->Attributes.TryGetValue(L"World", worldName))
+			if (stage->Attributes.TryGetValue("World", worldName))
 			{
 				if (!shader->Worlds.TryGetValue(worldName.Value, world))
-					errWriter->Error(50022, L"world '" + worldName.Value + L"' is not defined.", worldName.Position);
+					errWriter->Error(50022, "world '" + worldName.Value + "' is not defined.", worldName.Position);
 			}
 			outputStrategy = CreatePackedBufferOutputStrategy(world.Ptr());
 			return GenerateSingleWorldShader(program, shader, stage);
@@ -14440,8 +14560,8 @@ namespace Spire
 			if (retType)
 				PrintType(sbCode, retType);
 			else
-				sbCode << L"void";
-			sbCode << L" " << GetFuncOriginalName(function->Name) << L"(";
+				sbCode << "void";
+			sbCode << " " << GetFuncOriginalName(function->Name) << "(";
 			int id = 0;
 			auto paramIter = function->Parameters.begin();
 			for (auto & instr : *function->Code)
@@ -14452,22 +14572,22 @@ namespace Spire
 					{
 						if (id > 0)
 						{
-							sbCode << L", ";
+							sbCode << ", ";
 						}
 						auto qualifier = (*paramIter).Value.Qualifier;
 						if (qualifier == ParameterQualifier::InOut)
-							sbCode << L"inout ";
+							sbCode << "inout ";
 						else if (qualifier == ParameterQualifier::Out)
-							sbCode << L"out ";
+							sbCode << "out ";
 						else if (qualifier == ParameterQualifier::Uniform)
-							sbCode << L"uniform ";
+							sbCode << "uniform ";
 						PrintDef(sbCode, arg->Type.Ptr(), arg->Name);
 						id++;
 					}
 					++paramIter;
 				}
 			}
-			sbCode << L")";
+			sbCode << ")";
 		}
 		String CLikeCodeGen::GenerateFunction(ILFunction * function)
 		{
@@ -14478,17 +14598,17 @@ namespace Spire
 			ctx.Body.Clear();
 			ctx.Header.Clear();
 			ctx.Arguments.Clear();
-			ctx.ReturnVarName = L"";
+			ctx.ReturnVarName = "";
 			ctx.VarName.Clear();
 				
 			function->Code->NameAllInstructions();
 			GenerateFunctionDeclaration(sbCode, function);
-			sbCode << L"\n{\n";
+			sbCode << "\n{\n";
 			GenerateCode(ctx, function->Code.Ptr());
 			sbCode << ctx.Header.ToString() << ctx.Body.ToString();
 			if (ctx.ReturnVarName.Length())
-				sbCode << L"return " << ctx.ReturnVarName << L";\n";
-			sbCode << L"}\n";
+				sbCode << "return " << ctx.ReturnVarName << ";\n";
+			sbCode << "}\n";
 			return sbCode.ProduceString();
 		}
 
@@ -14501,13 +14621,13 @@ namespace Spire
 			}
 			else
 			{
-				auto name = GenerateCodeName(op->Name, L"");
+				auto name = GenerateCodeName(op->Name, "");
 				codeGen->PrintDef(Header, op->Type.Ptr(), name);
 				if (op->Type->IsInt() || op->Type->IsUInt())
 				{
-					Header << L" = 0";
+					Header << " = 0";
 				}
-				Header << L";\n";
+				Header << ";\n";
 				VarName.Add(op, name);
 				op->Name = name;
 				return op->Name;
@@ -14534,10 +14654,10 @@ namespace Spire
 					comp.Value->Implementations.First()->SyntaxNode->IsOutput))
 				{
 					if (parent->Components.TryGetValue(comp.Key, ccomp))
-						err->Error(33022, L"\'" + comp.Key + L"\' is already defined in current scope.\nsee previous definition at " + ccomp->Implementations.First()->SyntaxNode->Position.ToString(),
+						err->Error(33022, "\'" + comp.Key + "\' is already defined in current scope.\nsee previous definition at " + ccomp->Implementations.First()->SyntaxNode->Position.ToString(),
 							comp.Value->Implementations.First()->SyntaxNode->Position);
 					else if (parent->SubClosures.TryGetValue(comp.Key, su))
-						err->Error(33022, L"\'" + comp.Key + L"\' is already defined in current scope.\nsee previous definition at " + su->UsingPosition.ToString(),
+						err->Error(33022, "\'" + comp.Key + "\' is already defined in current scope.\nsee previous definition at " + su->UsingPosition.ToString(),
 							comp.Value->Implementations.First()->SyntaxNode->Position);
 				}
 			}
@@ -14548,10 +14668,10 @@ namespace Spire
 					RefPtr<ShaderComponentSymbol> ccomp;
 					RefPtr<ShaderClosure> su;
 					if (parent->Components.TryGetValue(c.Key, ccomp))
-						err->Error(33022, L"\'" + c.Key + L"\' is already defined in current scope.\nsee previous definition at " + ccomp->Implementations.First()->SyntaxNode->Position.ToString(),
+						err->Error(33022, "\'" + c.Key + "\' is already defined in current scope.\nsee previous definition at " + ccomp->Implementations.First()->SyntaxNode->Position.ToString(),
 							c.Value->UsingPosition);
 					else if (parent->SubClosures.TryGetValue(c.Key, su))
-						err->Error(33022, L"\'" + c.Key + L"\' is already defined in current scope.\nsee previous definition at " + su->UsingPosition.ToString(),
+						err->Error(33022, "\'" + c.Key + "\' is already defined in current scope.\nsee previous definition at " + su->UsingPosition.ToString(),
 							c.Value->UsingPosition);
 					for (auto & sc : c.Value->SubClosures)
 						if (sc.Value->IsInPlace)
@@ -14578,8 +14698,8 @@ namespace Spire
 				else if (!rootShader->Pipeline->IsChildOf(shader->Pipeline))
 				{
 					StringBuilder sb;
-					sb << L"pipeline '" << shader->Pipeline->SyntaxNode->Name.Content << L"' targeted by module '" <<
-						shader->SyntaxNode->Name.Content << L"' is incompatible with pipeline '" << rootShader->Pipeline->SyntaxNode->Name.Content << L"' targeted by shader '" << rootShader->Name << L"'.\nsee definition of shader '" << shader->SyntaxNode->Name.Content << L"' at " << shader->SyntaxNode->Position.ToString();
+					sb << "pipeline '" << shader->Pipeline->SyntaxNode->Name.Content << "' targeted by module '" <<
+						shader->SyntaxNode->Name.Content << "' is incompatible with pipeline '" << rootShader->Pipeline->SyntaxNode->Name.Content << "' targeted by shader '" << rootShader->Name << "'.\nsee definition of shader '" << shader->SyntaxNode->Name.Content << "' at " << shader->SyntaxNode->Position.ToString();
 					err->Error(33041, sb.ProduceString(), shader->SyntaxNode->Position);
 				}
 			}
@@ -14596,7 +14716,7 @@ namespace Spire
 					for (auto & arg : import->Arguments)
 					{
 						RefPtr<ShaderComponentSymbol> ccomp = new ShaderComponentSymbol();
-						auto compName = L"arg" + String(rs->Components.Count()) + L"_" + 
+						auto compName = "arg" + String(rs->Components.Count()) + "_" + 
 							(import->ObjectName.Content.Length()==0?import->ShaderName.Content:import->ObjectName.Content) + arg->ArgumentName.Content;
 						auto impl = new ShaderComponentImplSymbol();
 						auto compSyntax = new ComponentSyntaxNode();
@@ -14636,7 +14756,7 @@ namespace Spire
 						{
 							refClosure->IsInPlace = true;
 							CheckComponentRedefinition(err, rs.Ptr(), refClosure.Ptr());
-							rs->SubClosures[L"annonymousObj" + String(UniqueIdGenerator::Next())] = refClosure;
+							rs->SubClosures["annonymousObj" + String(UniqueIdGenerator::Next())] = refClosure;
 						}
 						else
 						{
@@ -14662,25 +14782,25 @@ namespace Spire
 					!pRefMap.ContainsKey(comp.Key))
 				{
 					StringBuilder errMsg;
-					errMsg << L"parameter '" << comp.Key << L"' of module '" << shader->SyntaxNode->Name.Content << L"' is unassigned.";
+					errMsg << "parameter '" << comp.Key << "' of module '" << shader->SyntaxNode->Name.Content << "' is unassigned.";
 					// try to provide more info on why it is unassigned
 					auto arg = rootShader->FindComponent(comp.Key, true, false);
 					if (!arg)
-						errMsg << L" implicit parameter matching failed because shader '" << rootShader->Name << L"' does not define component '" + comp.Key + L"'.";
+						errMsg << " implicit parameter matching failed because shader '" << rootShader->Name << "' does not define component '" + comp.Key + "'.";
 					else
 					{
 						if (comp.Value->Type->DataType->Equals(arg->Type->DataType.Ptr()))
 						{
-							errMsg << L" implicit parameter matching failed because the component of the same name is not accessible from '" << shader->SyntaxNode->Name.Content << L"'.\ncheck if you have declared necessary requirements and properly used the 'public' qualifier.";
+							errMsg << " implicit parameter matching failed because the component of the same name is not accessible from '" << shader->SyntaxNode->Name.Content << "'.\ncheck if you have declared necessary requirements and properly used the 'public' qualifier.";
 						}
 						else
 						{
-							errMsg << L"implicit parameter matching failed because the component of the same name does not match parameter type '"
-								<< comp.Value->Type->DataType->ToString() << L"'.";
+							errMsg << "implicit parameter matching failed because the component of the same name does not match parameter type '"
+								<< comp.Value->Type->DataType->ToString() << "'.";
 						}
-						errMsg << L"\nsee requirement declaration at " << comp.Value->Implementations.First()->SyntaxNode->Position.ToString() << L".";
-						errMsg << L"\nsee potential definition of component '" << comp.Key << L"' at " << arg->Implementations.First()->SyntaxNode->Position.ToString()
-							<< L".\n";
+						errMsg << "\nsee requirement declaration at " << comp.Value->Implementations.First()->SyntaxNode->Position.ToString() << ".";
+						errMsg << "\nsee potential definition of component '" << comp.Key << "' at " << arg->Implementations.First()->SyntaxNode->Position.ToString()
+							<< ".\n";
 					}
 					err->Error(33023,errMsg.ProduceString(), rs->UsingPosition);
 				}
@@ -14740,9 +14860,9 @@ namespace Spire
 			{
 				currentImport = import;
 				import->Component->Accept(this);
-				if (import->Component->Tags.ContainsKey(L"ComponentReference"))
+				if (import->Component->Tags.ContainsKey("ComponentReference"))
 				{
-					import->ComponentUniqueName = import->Component->Tags[L"ComponentReference"]().As<StringObject>()->Content;
+					import->ComponentUniqueName = import->Component->Tags["ComponentReference"]().As<StringObject>()->Content;
 				}
 				currentImport = nullptr;
 				for (auto & arg : import->Arguments)
@@ -14753,7 +14873,7 @@ namespace Spire
 			RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode * var) override
 			{
 				RefPtr<Object> compRef;
-				if (var->Tags.TryGetValue(L"ComponentReference", compRef))
+				if (var->Tags.TryGetValue("ComponentReference", compRef))
 				{
 					ReplaceReference(compRef.As<StringObject>());
 				}
@@ -14764,7 +14884,7 @@ namespace Spire
 			{
 				member->BaseExpression->Accept(this);
 				RefPtr<Object> compRef;
-				if (member->Tags.TryGetValue(L"ComponentReference", compRef))
+				if (member->Tags.TryGetValue("ComponentReference", compRef))
 				{
 					ReplaceReference(compRef.As<StringObject>());
 				}
@@ -14812,13 +14932,13 @@ namespace Spire
 			{
 				currentImport = import;
 				import->Component->Accept(this);
-				if (!import->Component->Tags.ContainsKey(L"ComponentReference"))
+				if (!import->Component->Tags.ContainsKey("ComponentReference"))
 				{
-					Error(32047, L"first argument of an import operator call does not resolve to a component.", import->Component.Ptr());
+					Error(32047, "first argument of an import operator call does not resolve to a component.", import->Component.Ptr());
 				}
 				else
 				{
-					import->ComponentUniqueName = import->Component->Tags[L"ComponentReference"]().As<StringObject>()->Content;
+					import->ComponentUniqueName = import->Component->Tags["ComponentReference"]().As<StringObject>()->Content;
 				}
 				currentImport = nullptr;
 				for (auto & arg : import->Arguments)
@@ -14838,17 +14958,17 @@ namespace Spire
 						{
 							if (comp->Implementations.First()->SyntaxNode->IsParam)
 								shaderClosure->RefMap.TryGetValue(comp->Name, comp);
-							var->Tags[L"ComponentReference"] = new StringObject(comp->UniqueName);
+							var->Tags["ComponentReference"] = new StringObject(comp->UniqueName);
 							AddReference(comp.Ptr(), currentImport, var->Position);
 						}
 						else
-							throw InvalidProgramException(L"cannot resolve reference.");
+							throw InvalidProgramException("cannot resolve reference.");
 					}
 					if (auto comp = shaderClosure->FindComponent(var->Variable))
 					{
 						if (comp->Implementations.First()->SyntaxNode->IsParam)
 							shaderClosure->RefMap.TryGetValue(var->Variable, comp);
-						var->Tags[L"ComponentReference"] = new StringObject(comp->UniqueName);
+						var->Tags["ComponentReference"] = new StringObject(comp->UniqueName);
 
 						AddReference(comp.Ptr(), currentImport, var->Position);
 					}
@@ -14860,7 +14980,7 @@ namespace Spire
 						var->Type = new BasicExpressionType(originalShader, closure.Ptr());
 					}
 					else if (!(var->Type->AsBasicType() && var->Type->AsBasicType()->BaseType == BaseType::Function))
-						throw InvalidProgramException(L"cannot resolve reference.");
+						throw InvalidProgramException("cannot resolve reference.");
 				}
 				return var;
 			}
@@ -14872,7 +14992,7 @@ namespace Spire
 				{
 					if (auto comp = member->BaseExpression->Type->AsBasicType()->ShaderClosure->FindComponent(member->MemberName))
 					{
-						member->Tags[L"ComponentReference"] = new StringObject(comp->UniqueName);
+						member->Tags["ComponentReference"] = new StringObject(comp->UniqueName);
 						AddReference(comp.Ptr(), currentImport, member->Position);
 					}
 					else if (auto shader = member->BaseExpression->Type->AsBasicType()->ShaderClosure->FindClosure(member->MemberName))
@@ -14887,11 +15007,11 @@ namespace Spire
 				{
 					if (auto comp = shaderClosure->FindComponent(member->Type->AsBasicType()->Component->Name))
 					{
-						member->Tags[L"ComponentReference"] = new StringObject(comp->UniqueName);
+						member->Tags["ComponentReference"] = new StringObject(comp->UniqueName);
 						AddReference(comp.Ptr(), currentImport, member->Position);
 					}
 					else
-						throw InvalidProgramException(L"cannot resolve reference.");
+						throw InvalidProgramException("cannot resolve reference.");
 				}
 				return member;
 			}
@@ -14951,8 +15071,8 @@ namespace Spire
 			StringBuilder sb;
 			for (auto ch : name)
 			{
-				if (ch == L'.')
-					sb << L"_";
+				if (ch == '.')
+					sb << "_";
 				else
 					sb << ch;
 			}
@@ -14988,9 +15108,9 @@ namespace Spire
 			for (auto & subClosure : shader->SubClosures)
 			{
 				if (subClosure.Value->IsInPlace)
-					AssignUniqueNames(subClosure.Value.Ptr(), namePrefix + subClosure.Value->Name + L".", publicNamePrefix);
+					AssignUniqueNames(subClosure.Value.Ptr(), namePrefix + subClosure.Value->Name + ".", publicNamePrefix);
 				else
-					AssignUniqueNames(subClosure.Value.Ptr(), namePrefix + subClosure.Key + L".", publicNamePrefix + subClosure.Key + L".");
+					AssignUniqueNames(subClosure.Value.Ptr(), namePrefix + subClosure.Key + ".", publicNamePrefix + subClosure.Key + ".");
 			}
 		}
 
@@ -15021,23 +15141,23 @@ namespace Spire
 						// silently ignore consistently defined global components (components in abstract worlds)
 						if (!IsConsistentGlobalComponentDefinition(comp.Value.Ptr(), existingComp))
 						{
-							err->Error(34025, L"'" + existingComp->Name + L"': global component conflicts with previous declaration.\nsee previous declaration at " + existingComp->Implementations.First()->SyntaxNode->Position.ToString(),
+							err->Error(34025, "'" + existingComp->Name + "': global component conflicts with previous declaration.\nsee previous declaration at " + existingComp->Implementations.First()->SyntaxNode->Position.ToString(),
 								comp.Value->Implementations.First()->SyntaxNode->Position);
 						}
 						else
 						{
-							err->Warning(34026, L"'" + existingComp->Name + L"': component is already defined when compiling shader '" + closure->Name + L"'. use 'require' to declare it as a parameter. \nsee previous declaration at " + existingComp->Implementations.First()->SyntaxNode->Position.ToString(),
+							err->Warning(34026, "'" + existingComp->Name + "': component is already defined when compiling shader '" + closure->Name + "'. use 'require' to declare it as a parameter. \nsee previous declaration at " + existingComp->Implementations.First()->SyntaxNode->Position.ToString(),
 								comp.Value->Implementations.First()->SyntaxNode->Position);
 						}
 					}
 					else if (comp.Value->Implementations.First()->SyntaxNode->Parameters.Count() == 0)
 					{
 						StringBuilder errBuilder;
-						errBuilder << L"component named '" << comp.Value->UniqueKey << L"\' is already defined when compiling '" << closure->Name << L"'.";
+						errBuilder << "component named '" << comp.Value->UniqueKey << "\' is already defined when compiling '" << closure->Name << "'.";
 						auto currentClosure = subClosure;
 						while (currentClosure != nullptr && currentClosure != closure)
 						{
-							errBuilder << L"\nsee inclusion of '" << currentClosure->Name << L"' at " << currentClosure->UsingPosition.ToString() << L".";
+							errBuilder << "\nsee inclusion of '" << currentClosure->Name << "' at " << currentClosure->UsingPosition.ToString() << ".";
 							currentClosure = currentClosure->Parent;
 						}
 						err->Error(34024, errBuilder.ProduceString(), comp.Value->Implementations.First()->SyntaxNode->Position);
@@ -15097,8 +15217,8 @@ namespace Spire
 						ShaderComponentSymbol* unaccessibleComp = nullptr;
 						if (!IsWorldFeasible(symTable, shader->Pipeline, impl.Ptr(), w, unaccessibleComp))
 						{
-							err->Error(33100, L"'" + comp->Name + L"' cannot be computed at '" + w + L"' because the dependent component '" + unaccessibleComp->Name + L"' is not accessible.\nsee definition of '"
-								+ unaccessibleComp->Name + L"' at " + unaccessibleComp->Implementations.First()->SyntaxNode->Position.ToString(),
+							err->Error(33100, "'" + comp->Name + "' cannot be computed at '" + w + "' because the dependent component '" + unaccessibleComp->Name + "' is not accessible.\nsee definition of '"
+								+ unaccessibleComp->Name + "' at " + unaccessibleComp->Implementations.First()->SyntaxNode->Position.ToString(),
 								impl->ComponentReferencePositions[unaccessibleComp]());
 						}
 						autoWorld.Remove(w);
@@ -15174,7 +15294,7 @@ namespace Spire
 								}
 								if (rcomp.Key == comp.Value)
 								{
-									err->Error(32013, L"'" + rcomp.Key->Name + L"': circular reference is not allowed.", impl->SyntaxNode->Position);
+									err->Error(32013, "'" + rcomp.Key->Name + "': circular reference is not allowed.", impl->SyntaxNode->Position);
 									rs = true;
 								}
 							}
@@ -15219,8 +15339,8 @@ namespace Spire
 						{
 							if (!symTable->IsWorldImplicitlyReachable(shader->Pipeline, arg->Type->FeasibleWorlds, w, requirement->Type->DataType))
 							{
-								err->Error(32015, L"argument '" + arg->Name + L"' is not available in world '" + w + L"' as required by '" + shader->Name
-									+ L"'.\nsee requirement declaration at " +
+								err->Error(32015, "argument '" + arg->Name + "' is not available in world '" + w + "' as required by '" + shader->Name
+									+ "'.\nsee requirement declaration at " +
 									requirement->Implementations.First()->SyntaxNode->Position.ToString(), arg->Implementations.First()->SyntaxNode->Position);
 							}
 						}
@@ -15269,7 +15389,7 @@ namespace Spire
 					!comp.Value->Implementations.First()->SyntaxNode->IsOutput)
 				{
 					RefPtr<Object> compRef;
-					if (comp.Value->Implementations.First()->SyntaxNode->Expression->Tags.TryGetValue(L"ComponentReference", compRef))
+					if (comp.Value->Implementations.First()->SyntaxNode->Expression->Tags.TryGetValue("ComponentReference", compRef))
 					{
 						compSub[comp.Key] = compRef.As<StringObject>()->Content;
 					}
@@ -15308,16 +15428,16 @@ namespace Spire
 					{
 						if (!comp->Type->DataType->Equals(req.Value->Type->DataType.Ptr()))
 						{
-							errMsg << L"component '" << req.Key << L"' has type '" << comp->Type->DataType->ToString() << L"', but pipeline '"
-								<< shader->Pipeline->SyntaxNode->Name.Content << L"' requires it to be '" << req.Value->Type->DataType->ToString() 
-								<< L"'.\nsee pipeline requirement definition at " << req.Value->Implementations.First()->SyntaxNode->Position.ToString();
+							errMsg << "component '" << req.Key << "' has type '" << comp->Type->DataType->ToString() << "', but pipeline '"
+								<< shader->Pipeline->SyntaxNode->Name.Content << "' requires it to be '" << req.Value->Type->DataType->ToString() 
+								<< "'.\nsee pipeline requirement definition at " << req.Value->Implementations.First()->SyntaxNode->Position.ToString();
 							err->Error(32051, errMsg.ProduceString(), comp->Implementations.First()->SyntaxNode->Position);
 						}
 					}
 					else
 					{
-						errMsg << L"shader '" << shader->Name << L"' does not define '" << req.Key << L"' as required by pipeline '"
-							<< shader->Pipeline->SyntaxNode->Name.Content << L"''.\nsee pipeline requirement definition at "
+						errMsg << "shader '" << shader->Name << "' does not define '" << req.Key << "' as required by pipeline '"
+							<< shader->Pipeline->SyntaxNode->Name.Content << "''.\nsee pipeline requirement definition at "
 							<< req.Value->Implementations.First()->SyntaxNode->Position.ToString();
 						err->Error(32052, errMsg.ProduceString(), shader->Position);
 					}
@@ -15329,12 +15449,12 @@ namespace Spire
 		{
 			if (shader->Parent)
 			{
-				sb << L"see module '" + shader->Name << L"' being used in '" + shader->Parent->Name << L"' at " << shader->Position.ToString() << L"\n";
+				sb << "see module '" + shader->Name << "' being used in '" + shader->Parent->Name << "' at " << shader->Position.ToString() << "\n";
 				PrintModuleUsingStack(sb, shader->Parent);
 			}
 			else
 			{
-				sb << L"shader '" << shader->Name << L"' is targeting pipeline '" << shader->Pipeline->SyntaxNode->Name.Content << L"' at " << shader->Position.ToString() << L"\nalso see pipeline definition at " << shader->Pipeline->SyntaxNode->Position.ToString();
+				sb << "shader '" << shader->Name << "' is targeting pipeline '" << shader->Pipeline->SyntaxNode->Name.Content << "' at " << shader->Position.ToString() << "\nalso see pipeline definition at " << shader->Pipeline->SyntaxNode->Position.ToString();
 			}
 		}
 	
@@ -15352,8 +15472,8 @@ namespace Spire
 						{
 							{
 								StringBuilder sb;
-								sb << L"\'" << world.World.Content << L"' is not a defined world in '" <<
-									shader->Pipeline->SyntaxNode->Name.Content << L"'.\n";
+								sb << "\'" << world.World.Content << "' is not a defined world in '" <<
+									shader->Pipeline->SyntaxNode->Name.Content << "'.\n";
 								PrintModuleUsingStack(sb, shader);
 								if (!shader->Pipeline->WorldDependency.ContainsKey(world.World.Content))
 									err->Error(33012, sb.ProduceString(), world.World.Position);
@@ -15367,7 +15487,7 @@ namespace Spire
 									if (userSpecifiedWorlds.Count() > 1)
 									{
 										StringBuilder sb;
-										sb << L"abstract world cannot appear with other worlds.\n";
+										sb << "abstract world cannot appear with other worlds.\n";
 										PrintModuleUsingStack(sb, shader);
 										err->Error(33013, sb.ProduceString(),
 											world.World.Position);
@@ -15380,7 +15500,7 @@ namespace Spire
 					if (!inAbstractWorld && !impl->SyntaxNode->IsParam && !impl->SyntaxNode->IsInput
 						&& !impl->SyntaxNode->Expression && !impl->SyntaxNode->BlockStatement)
 					{
-						err->Error(33014, L"non-abstract component must have an implementation.",
+						err->Error(33014, "non-abstract component must have an implementation.",
 							impl->SyntaxNode->Position);
 					}
 
@@ -15404,7 +15524,7 @@ namespace Spire
 					if (impl->SyntaxNode->Expression || impl->SyntaxNode->BlockStatement)
 					{
 						if (isDefinedInAbstractWorld)
-							err->Error(33039, L"'" + impl->SyntaxNode->Name.Content + L"': no code allowed for component defined in input world.", impl->SyntaxNode->Position);
+							err->Error(33039, "'" + impl->SyntaxNode->Name.Content + "': no code allowed for component defined in input world.", impl->SyntaxNode->Position);
 					}
 				}
 			}
@@ -15418,7 +15538,7 @@ namespace Spire
 			AddPipelineComponents(shader);
 			CheckPipelineShaderConsistency(err, shader);
 			// assign choice names
-			AssignUniqueNames(shader, L"", L"");
+			AssignUniqueNames(shader, "", "");
 			// traverse closures to get component list
 			GatherComponents(err, shader, shader);
 			PropagatePipelineRequirements(err, shader);
@@ -15438,8 +15558,8 @@ namespace Spire
 				auto comp = shader->FindComponent(requirement.Key);
 				if (!comp)
 				{
-					err->Error(32014, L"shader '" + shader->Name + L"' does not provide '" + requirement.Key + L"' as required by '" + shader->Pipeline->SyntaxNode->Name.Content
-						+ L"'.\nsee requirement declaration at " +
+					err->Error(32014, "shader '" + shader->Name + "' does not provide '" + requirement.Key + "' as required by '" + shader->Pipeline->SyntaxNode->Name.Content
+						+ "'.\nsee requirement declaration at " +
 						requirement.Value->Implementations.First()->SyntaxNode->Position.ToString(), shader->Position);
 				}
 				else
@@ -15450,8 +15570,8 @@ namespace Spire
 						{
 							if (!symTable->IsWorldImplicitlyReachable(shader->Pipeline, comp->Type->FeasibleWorlds, w, requirement.Value->Type->DataType))
 							{
-								err->Error(32015, L"component '" + comp->Name + L"' is not available in world '" + w + L"' as required by '" + shader->Pipeline->SyntaxNode->Name.Content
-									+ L"'.\nsee requirement declaration at " +
+								err->Error(32015, "component '" + comp->Name + "' is not available in world '" + w + "' as required by '" + shader->Pipeline->SyntaxNode->Name.Content
+									+ "'.\nsee requirement declaration at " +
 									requirement.Value->Implementations.First()->SyntaxNode->Position.ToString(), comp->Implementations.First()->SyntaxNode->Position);
 							}
 						}
@@ -15576,14 +15696,14 @@ namespace Spire
 			String GetComponentFunctionName(ComponentSyntaxNode * comp)
 			{
 				StringBuilder nameSb;
-				nameSb << comp->ParentModuleName.Content << L"." << comp->Name.Content;
+				nameSb << comp->ParentModuleName.Content << "." << comp->Name.Content;
 				StringBuilder finalNameSb;
 				for (auto ch : nameSb.ProduceString())
 				{
-					if ((ch >= L'0' && ch <= L'9') || (ch >= L'a' && ch <= L'z') || (ch >= 'A' && ch <= 'Z'))
+					if ((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z'))
 						finalNameSb << ch;
 					else
-						finalNameSb << L'_';
+						finalNameSb << '_';
 				}
 				return EscapeDoubleUnderscore(finalNameSb.ProduceString());
 			}
@@ -15751,7 +15871,7 @@ namespace Spire
 							if (dep->SyntaxNode->Parameters.Count() == 0)
 							{
 								auto paramType = TranslateExpressionType(dep->Type, &genericTypeMappings);
-								String paramName = EscapeDoubleUnderscore(L"p" + String(id) + L"_" + dep->OriginalName); 
+								String paramName = EscapeDoubleUnderscore("p" + String(id) + "_" + dep->OriginalName); 
 								func->Parameters.Add(paramName, ILParameter(paramType));
 								auto argInstr = codeWriter.FetchArg(paramType, id + 1);
 								argInstr->Name = paramName;
@@ -15762,7 +15882,7 @@ namespace Spire
 						for (auto & param : comp->SyntaxNode->Parameters)
 						{
 							auto paramType = TranslateExpressionType(param->Type, &genericTypeMappings);
-							String paramName = EscapeDoubleUnderscore(L"p" + String(id) + L"_" + param->Name);
+							String paramName = EscapeDoubleUnderscore("p" + String(id) + "_" + param->Name);
 							func->Parameters.Add(paramName, ILParameter(paramType, param->Qualifier));
 							auto argInstr = codeWriter.FetchArg(paramType, id + 1);
 							argInstr->Name = paramName;
@@ -15904,7 +16024,7 @@ namespace Spire
 				{
 					func->Parameters.Add(param->Name, ILParameter(TranslateExpressionType(param->Type), param->Qualifier));
 					auto op = FetchArg(param->Type.Ptr(), ++id);
-					op->Name = EscapeDoubleUnderscore(String(L"p_") + param->Name);
+					op->Name = EscapeDoubleUnderscore(String("p_") + param->Name);
 					variables.Add(param->Name, op);
 				}
 				function->Body->Accept(this);
@@ -15962,7 +16082,7 @@ namespace Spire
 				}
 				ILOperand * iterVar = nullptr;
 				if (stmt->IterationVariable.Content.Length() && !variables.TryGetValue(stmt->IterationVariable.Content, iterVar))
-					throw InvalidProgramException(L"Iteration variable not found in variables dictionary. This should have been checked by semantics analyzer.");
+					throw InvalidProgramException("Iteration variable not found in variables dictionary. This should have been checked by semantics analyzer.");
 				if (stmt->InitialExpression)
 				{
 					codeWriter.PushNode();
@@ -16124,20 +16244,20 @@ namespace Spire
 					{
 						switch (swizzle->SwizzleString[i])
 						{
-						case L'r':
-						case L'x':
+						case 'r':
+						case 'x':
 							index = 0;
 							break;
-						case L'g':
-						case L'y':
+						case 'g':
+						case 'y':
 							index = 1;
 							break;
-						case L'b':
-						case L'z':
+						case 'b':
+						case 'z':
 							index = 2;
 							break;
-						case L'a':
-						case L'w':
+						case 'a':
+						case 'w':
 							index = 3;
 							break;
 						}
@@ -16234,7 +16354,7 @@ namespace Spire
 						rs = new CmpltInstruction();
 						break;
 					default:
-						throw NotImplementedException(L"Code gen not implemented for this operator.");
+						throw NotImplementedException("Code gen not implemented for this operator.");
 					}
 					rs->Operands.SetSize(2);
 					rs->Operands[0] = left;
@@ -16357,7 +16477,7 @@ namespace Spire
 			virtual RefPtr<ExpressionSyntaxNode> VisitMemberExpression(MemberExpressionSyntaxNode * expr) override
 			{
 				RefPtr<Object> refObj;
-				if (expr->Tags.TryGetValue(L"ComponentReference", refObj))
+				if (expr->Tags.TryGetValue("ComponentReference", refObj))
 				{
 					if (auto refComp = refObj.As<StringObject>())
 					{
@@ -16365,7 +16485,7 @@ namespace Spire
 						if (variables.TryGetValue(refComp->Content, op))
 							PushStack(op);
 						else
-							throw InvalidProgramException(L"referencing undefined component/variable. probable cause: unchecked circular reference.");
+							throw InvalidProgramException("referencing undefined component/variable. probable cause: unchecked circular reference.");
 					}
 				}
 				else
@@ -16373,14 +16493,14 @@ namespace Spire
 					expr->BaseExpression->Access = expr->Access;
 					expr->BaseExpression->Accept(this);
 					auto base = PopStack();
-					auto generateSingleMember = [&](wchar_t memberName)
+					auto generateSingleMember = [&](char memberName)
 					{
 						int idx = 0;
-						if (memberName == L'y' || memberName == L'g')
+						if (memberName == 'y' || memberName == 'g')
 							idx = 1;
-						else if (memberName == L'z' || memberName == L'b')
+						else if (memberName == 'z' || memberName == 'b')
 							idx = 2;
-						else if (memberName == L'w' || memberName == L'a')
+						else if (memberName == 'w' || memberName == 'a')
 							idx = 3;
 
 						GenerateIndexExpression(base, result.Program->ConstantPool->CreateConstant(idx),
@@ -16409,7 +16529,7 @@ namespace Spire
 							expr->Access == ExpressionAccess::Read);
 					}
 					else
-						throw NotImplementedException(L"member expression codegen");
+						throw NotImplementedException("member expression codegen");
 				}
 				return expr;
 			}
@@ -16434,7 +16554,7 @@ namespace Spire
 					}
 					else if (basicType->Component)
 					{
-						auto funcCompName = expr->FunctionExpr->Tags[L"ComponentReference"]().As<StringObject>()->Content;
+						auto funcCompName = expr->FunctionExpr->Tags["ComponentReference"]().As<StringObject>()->Content;
 						auto funcComp = *(currentShader->DefinitionsByComponent[funcCompName]().TryGetValue(currentComponent->World));
 						funcName = GetComponentFunctionName(funcComp->SyntaxNode.Ptr());
 						for (auto & param : funcComp->SyntaxNode->Parameters)
@@ -16454,7 +16574,7 @@ namespace Spire
 								if (variables.TryGetValue(dep->UniqueName, op))
 									args.Add(op);
 								else
-									throw InvalidProgramException(L"cannot resolve reference for implicit component function argument.");
+									throw InvalidProgramException("cannot resolve reference for implicit component function argument.");
 							}
 						}
 					}
@@ -16502,8 +16622,8 @@ namespace Spire
 				}
 				else
 				{
-					Error(40001, L"Invalid type cast: \"" + expr->Expression->Type->ToString() + L"\" to \"" +
-						expr->Type->ToString() + L"\"", expr);
+					Error(40001, "Invalid type cast: \"" + expr->Expression->Type->ToString() + "\" to \"" +
+						expr->Type->ToString() + "\"", expr);
 				}
 				return expr;
 			}
@@ -16582,7 +16702,7 @@ namespace Spire
 							rs = new BitNotInstruction();
 							break;
 						default:
-							throw NotImplementedException(L"Code gen is not implemented for this operator.");
+							throw NotImplementedException("Code gen is not implemented for this operator.");
 						}
 						rs->Operand = input;
 						rs->Type = input->Type;
@@ -16614,7 +16734,7 @@ namespace Spire
 			virtual RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode* expr) override
 			{
 				RefPtr<Object> refObj;
-				if (expr->Tags.TryGetValue(L"ComponentReference", refObj))
+				if (expr->Tags.TryGetValue("ComponentReference", refObj))
 				{
 					if (auto refComp = refObj.As<StringObject>())
 					{
@@ -16622,12 +16742,12 @@ namespace Spire
 						if (variables.TryGetValue(refComp->Content, op))
 							PushStack(op);
 						else
-							throw InvalidProgramException(String(L"referencing undefined component/variable '") + refComp->Content + L"'. probable cause: unchecked circular reference.");
+							throw InvalidProgramException(String("referencing undefined component/variable '") + refComp->Content + "'. probable cause: unchecked circular reference.");
 					}
 				}
 				else if (!GenerateVarRef(expr->Variable, expr->Access))
 				{
-					throw InvalidProgramException(L"identifier is neither a variable nor a recognized component.");
+					throw InvalidProgramException("identifier is neither a variable nor a recognized component.");
 				}
 				return expr;
 			}
@@ -16664,9 +16784,9 @@ namespace Spire
 			for (int c = 0; c < src.Length(); c++)
 			{
 				auto ch = src[c];
-				if (ch == L'\n')
+				if (ch == '\n')
 				{
-					sb << L"\n";
+					sb << "\n";
 
 					beginTrim = true;
 				}
@@ -16674,21 +16794,21 @@ namespace Spire
 				{
 					if (beginTrim)
 					{
-						while (c < src.Length() - 1 && (src[c] == L'\t' || src[c] == L'\n' || src[c] == L'\r' || src[c] == L' '))
+						while (c < src.Length() - 1 && (src[c] == '\t' || src[c] == '\n' || src[c] == '\r' || src[c] == ' '))
 						{
 							c++;
 							ch = src[c];
 						}
 						for (int i = 0; i < indent - 1; i++)
-							sb << L'\t';
+							sb << '\t';
 						if (ch != '}' && indent > 0)
-							sb << L'\t';
+							sb << '\t';
 						beginTrim = false;
 					}
 
-					if (ch == L'{')
+					if (ch == '{')
 						indent++;
-					else if (ch == L'}')
+					else if (ch == '}')
 						indent--;
 					if (indent < 0)
 						indent = 0;
@@ -16700,9 +16820,9 @@ namespace Spire
 		ShaderChoiceValue ShaderChoiceValue::Parse(String str)
 		{
 			ShaderChoiceValue result;
-			int idx = str.IndexOf(L':');
+			int idx = str.IndexOf(':');
 			if (idx == -1)
-				return ShaderChoiceValue(str, L"");
+				return ShaderChoiceValue(str, "");
 			return ShaderChoiceValue(str.SubString(0, idx), str.SubString(idx + 1, str.Length() - idx - 1));
 		}
 		
@@ -16775,10 +16895,10 @@ namespace Spire
 						value = CreateConstant(0.0f, 16);
 					}
 					else
-						throw NotImplementedException(L"default value for this type is not implemented.");
+						throw NotImplementedException("default value for this type is not implemented.");
 				}
 				else
-					throw NotImplementedException(L"default value for this type is not implemented.");
+					throw NotImplementedException("default value for this type is not implemented.");
 				return value;
 			}
 			ILConstOperand * CreateConstantIntVec(int val, int val2)
@@ -16899,7 +17019,7 @@ namespace Spire
 					baseType = ILBaseType::Int4;
 					break;
 				default:
-					throw InvalidOperationException(L"Invalid vector size.");
+					throw InvalidOperationException("Invalid vector size.");
 				}
 				rs->Type = new ILBasicType(baseType);
 				rs->IntValues[0] = val;
@@ -16917,7 +17037,7 @@ namespace Spire
 					return rs;
 				if (Math::IsNaN(val) || Math::IsInf(val))
 				{
-					throw InvalidOperationException(L"Attempting to create NAN constant.");
+					throw InvalidOperationException("Attempting to create NAN constant.");
 				}
 				rs = new ILConstOperand();
 				ILBaseType baseType;
@@ -16943,7 +17063,7 @@ namespace Spire
 					baseType = ILBaseType::Float4x4;
 					break;
 				default:
-					throw InvalidOperationException(L"Invalid vector size.");
+					throw InvalidOperationException("Invalid vector size.");
 				}
 				rs->Type = new ILBasicType(baseType);
 				for (int i = 0; i < 16; i++)
@@ -16960,7 +17080,7 @@ namespace Spire
 				ILConstOperand * rs = 0;
 				if (Math::IsNaN(val) || Math::IsInf(val) || Math::IsNaN(val2) || Math::IsInf(val2))
 				{
-					throw InvalidOperationException(L"Attempting to create NAN constant.");
+					throw InvalidOperationException("Attempting to create NAN constant.");
 				}
 				auto key = ConstKey<float>::FromValues(val, val2);
 				if (floatConsts.TryGetValue(key, rs))
@@ -16981,7 +17101,7 @@ namespace Spire
 				ILConstOperand * rs = 0;
 				if (Math::IsNaN(val) || Math::IsInf(val) || Math::IsNaN(val2) || Math::IsInf(val2) || Math::IsNaN(val3) || Math::IsInf(val3))
 				{
-					throw InvalidOperationException(L"Attempting to create NAN constant.");
+					throw InvalidOperationException("Attempting to create NAN constant.");
 				}
 				auto key = ConstKey<float>::FromValues(val, val2, val3);
 				if (floatConsts.TryGetValue(key, rs))
@@ -17003,7 +17123,7 @@ namespace Spire
 			{
 				if (Math::IsNaN(val) || Math::IsInf(val) || Math::IsNaN(val2) || Math::IsInf(val2) || Math::IsNaN(val3) || Math::IsInf(val3) || Math::IsNaN(val4) || Math::IsInf(val4))
 				{
-					throw InvalidOperationException(L"Attempting to create NAN constant.");
+					throw InvalidOperationException("Attempting to create NAN constant.");
 				}
 				ILConstOperand * rs = 0;
 				auto key = ConstKey<float>::FromValues(val, val2, val3, val4);
@@ -17028,12 +17148,12 @@ namespace Spire
 				trueConst = new ILConstOperand();
 				trueConst->Type = new ILBasicType(ILBaseType::Bool);
 				trueConst->IntValues[0] = trueConst->IntValues[1] = trueConst->IntValues[2] = trueConst->IntValues[3] = 1;
-				trueConst->Name = L"true";
+				trueConst->Name = "true";
 
 				falseConst = new ILConstOperand();
 				falseConst->Type = new ILBasicType(ILBaseType::Bool);
 				falseConst->IntValues[0] = falseConst->IntValues[1] = falseConst->IntValues[2] = falseConst->IntValues[3] = 0;
-				trueConst->Name = L"false";
+				trueConst->Name = "false";
 
 			}
 		};
@@ -17125,7 +17245,7 @@ namespace Spire
 		RefPtr<ExpressionSyntaxNode> GetDependencyVisitor::VisitMemberExpression(MemberExpressionSyntaxNode * member)
 		{
 			RefPtr<Object> refCompObj;
-			if (member->Tags.TryGetValue(L"ComponentReference", refCompObj))
+			if (member->Tags.TryGetValue("ComponentReference", refCompObj))
 			{
 				auto refComp = refCompObj.As<StringObject>().Ptr();
 				Result.Add(ComponentDependency(refComp->Content, nullptr));
@@ -17137,7 +17257,7 @@ namespace Spire
 		RefPtr<ExpressionSyntaxNode> GetDependencyVisitor::VisitVarExpression(VarExpressionSyntaxNode * var)
 		{
 			RefPtr<Object> refCompObj;
-			if (var->Tags.TryGetValue(L"ComponentReference", refCompObj))
+			if (var->Tags.TryGetValue("ComponentReference", refCompObj))
 			{
 				auto refComp = refCompObj.As<StringObject>().Ptr();
 				Result.Add(ComponentDependency(refComp->Content, nullptr));
@@ -17172,7 +17292,7 @@ namespace Spire
 				// GLSL does not have sampler type, print 0 as placeholder
 				if (op->Type->IsSamplerState())
 				{
-					ctx.Body << L"0";
+					ctx.Body << "0";
 					return;
 				}
 				CLikeCodeGen::PrintOp(ctx, op, forceExpression);
@@ -17180,32 +17300,32 @@ namespace Spire
 
 			void PrintRasterPositionOutputWrite(CodeGenContext & ctx, ILOperand * operand) override
 			{
-				ctx.Body << L"gl_Position = ";
+				ctx.Body << "gl_Position = ";
 				PrintOp(ctx, operand);
-				ctx.Body << L";\n";
+				ctx.Body << ";\n";
 			}
 
 			void PrintUniformBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
 			{
 				if ((!currentImportInstr->Type->IsTexture() || useBindlessTexture) && !currentImportInstr->Type.As<ILGenericType>())
-					sb << L"blk" << inputName << L"." << componentName;
+					sb << "blk" << inputName << "." << componentName;
 				else
 					sb << componentName;
 			}
 
 			void PrintStorageBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
 			{
-				sb << L"blk" << inputName << L"." << componentName;
+				sb << "blk" << inputName << "." << componentName;
 			}
 
 			void PrintArrayBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
 			{
-				sb << L"blk" << inputName << L".content";
+				sb << "blk" << inputName << ".content";
 			}
 
 			void PrintPackedBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
 			{
-				sb << L"blk" << inputName << L".content";
+				sb << "blk" << inputName << ".content";
 			}
 
 			void PrintStandardInputReference(StringBuilder& sb, ILRecordType* recType, String inputName, String componentName) override
@@ -17238,22 +17358,22 @@ namespace Spire
 				switch(systemVar)
 				{
 				case ExternComponentCodeGenInfo::SystemVarType::FragCoord:
-					sb << L"gl_FragCoord";
+					sb << "gl_FragCoord";
 					break;
 				case ExternComponentCodeGenInfo::SystemVarType::TessCoord:
-					sb << L"gl_TessCoord";
+					sb << "gl_TessCoord";
 					break;
 				case ExternComponentCodeGenInfo::SystemVarType::InvocationId:
-					sb << L"gl_InvocationID";
+					sb << "gl_InvocationID";
 					break;
 				case ExternComponentCodeGenInfo::SystemVarType::ThreadId:
-					sb << L"gl_GlobalInvocationID.x";
+					sb << "gl_GlobalInvocationID.x";
 					break;
 				case ExternComponentCodeGenInfo::SystemVarType::PatchVertexCount:
-					sb << L"gl_PatchVerticesIn";
+					sb << "gl_PatchVerticesIn";
 					break;
 				case ExternComponentCodeGenInfo::SystemVarType::PrimitiveId:
-					sb << L"gl_PrimitiveID";
+					sb << "gl_PrimitiveID";
 					break;
 				default:
 					sb << inputName;
@@ -17267,87 +17387,87 @@ namespace Spire
 				{
 					bool overrideBaseMemberLoad = false;
 					auto genType = dynamic_cast<ILGenericType*>(memberLoadInstr->Operands[0]->Type.Ptr());
-					if (genType && genType->GenericTypeName == L"PackedBuffer")
+					if (genType && genType->GenericTypeName == "PackedBuffer")
 					{
 						// load record type from packed buffer
 						String conversionFunction;
 						int size = 0;
-						if (memberLoadInstr->Type->ToString() == L"int")
+						if (memberLoadInstr->Type->ToString() == "int")
 						{
-							conversionFunction = L"floatBitsToInt";
+							conversionFunction = "floatBitsToInt";
 							size = 1;
 						}
-						else if (memberLoadInstr->Type->ToString() == L"ivec2")
+						else if (memberLoadInstr->Type->ToString() == "ivec2")
 						{
-							conversionFunction = L"floatBitsToInt";
+							conversionFunction = "floatBitsToInt";
 							size = 2;
 						}
-						else if (memberLoadInstr->Type->ToString() == L"ivec3")
+						else if (memberLoadInstr->Type->ToString() == "ivec3")
 						{
-							conversionFunction = L"floatBitsToInt";
+							conversionFunction = "floatBitsToInt";
 							size = 3;
 						}
-						else if (memberLoadInstr->Type->ToString() == L"ivec4")
+						else if (memberLoadInstr->Type->ToString() == "ivec4")
 						{
-							conversionFunction = L"floatBitsToInt";
+							conversionFunction = "floatBitsToInt";
 							size = 4;
 						}
-						else if (memberLoadInstr->Type->ToString() == L"uint")
+						else if (memberLoadInstr->Type->ToString() == "uint")
 						{
-							conversionFunction = L"floatBitsToUint";
+							conversionFunction = "floatBitsToUint";
 							size = 1;
 						}
-						else if (memberLoadInstr->Type->ToString() == L"uvec2")
+						else if (memberLoadInstr->Type->ToString() == "uvec2")
 						{
-							conversionFunction = L"floatBitsToUint";
+							conversionFunction = "floatBitsToUint";
 							size = 2;
 						}
-						else if (memberLoadInstr->Type->ToString() == L"uvec3")
+						else if (memberLoadInstr->Type->ToString() == "uvec3")
 						{
-							conversionFunction = L"floatBitsToUint";
+							conversionFunction = "floatBitsToUint";
 							size = 3;
 						}
-						else if (memberLoadInstr->Type->ToString() == L"uvec4")
+						else if (memberLoadInstr->Type->ToString() == "uvec4")
 						{
-							conversionFunction = L"floatBitsToUint";
+							conversionFunction = "floatBitsToUint";
 							size = 4;
 						}
-						else if (memberLoadInstr->Type->ToString() == L"float")
+						else if (memberLoadInstr->Type->ToString() == "float")
 						{
-							conversionFunction = L"";
+							conversionFunction = "";
 							size = 1;
 						}
-						else if (memberLoadInstr->Type->ToString() == L"vec2")
+						else if (memberLoadInstr->Type->ToString() == "vec2")
 						{
-							conversionFunction = L"";
+							conversionFunction = "";
 							size = 2;
 						}
-						else if (memberLoadInstr->Type->ToString() == L"vec3")
+						else if (memberLoadInstr->Type->ToString() == "vec3")
 						{
-							conversionFunction = L"";
+							conversionFunction = "";
 							size = 3;
 						}
-						else if (memberLoadInstr->Type->ToString() == L"vec4")
+						else if (memberLoadInstr->Type->ToString() == "vec4")
 						{
-							conversionFunction = L"";
+							conversionFunction = "";
 							size = 4;
 						}
-						else if (memberLoadInstr->Type->ToString() == L"mat3")
+						else if (memberLoadInstr->Type->ToString() == "mat3")
 						{
-							conversionFunction = L"";
+							conversionFunction = "";
 							size = 9;
 						}
-						else if (memberLoadInstr->Type->ToString() == L"mat4")
+						else if (memberLoadInstr->Type->ToString() == "mat4")
 						{
-							conversionFunction = L"";
+							conversionFunction = "";
 							size = 16;
 						}
 						else
 						{
-							errWriter->Error(50082, L"importing type '" + memberLoadInstr->Type->ToString() + L"' from PackedBuffer is not supported by the GLSL backend.",
+							errWriter->Error(50082, "importing type '" + memberLoadInstr->Type->ToString() + "' from PackedBuffer is not supported by the GLSL backend.",
 								CodePosition());
 						}
-						ctx.Body << memberLoadInstr->Type->ToString() << L"(";
+						ctx.Body << memberLoadInstr->Type->ToString() << "(";
 						auto recType = dynamic_cast<ILRecordType*>(genType->BaseType.Ptr());
 						int recTypeSize = 0;
 						EnumerableDictionary<String, int> memberOffsets;
@@ -17358,24 +17478,24 @@ namespace Spire
 						}
 						for (int i = 0; i < size; i++)
 						{
-							ctx.Body << conversionFunction << L"(";
+							ctx.Body << conversionFunction << "(";
 							PrintOp(ctx, memberLoadInstr->Operands[0].Ptr());
-							ctx.Body << L"[(";
+							ctx.Body << "[(";
 							PrintOp(ctx, memberLoadInstr->Operands[1].Ptr());
-							ctx.Body << L") * " << recTypeSize << L" + " << memberOffsets[proj->ComponentName]() << L"])";
+							ctx.Body << ") * " << recTypeSize << " + " << memberOffsets[proj->ComponentName]() << "])";
 							if (i != size - 1)
-								ctx.Body << L", ";
+								ctx.Body << ", ";
 						}
-						ctx.Body << L")";
+						ctx.Body << ")";
 						overrideBaseMemberLoad = true;
 					}
 					if (!overrideBaseMemberLoad)
 						PrintOp(ctx, memberLoadInstr, true);
 					if (genType)
 					{
-						if ((genType->GenericTypeName == L"StructuredBuffer" || genType->GenericTypeName == L"RWStructuredBuffer")
+						if ((genType->GenericTypeName == "StructuredBuffer" || genType->GenericTypeName == "RWStructuredBuffer")
 							&& dynamic_cast<ILRecordType*>(genType->BaseType.Ptr()))
-							ctx.Body << L"." << proj->ComponentName;
+							ctx.Body << "." << proj->ComponentName;
 					}
 				}
 				else
@@ -17389,72 +17509,72 @@ namespace Spire
 
 				// GLSL does not have sampler type, use int as placeholder
 				if (type->IsSamplerState())
-					sb << L"int";
+					sb << "int";
 				else
 					sb << type->ToString();
 			}
 
 			void PrintTextureCall(CodeGenContext & ctx, CallInstruction * instr)
 			{
-				if (instr->Function == L"Sample")
+				if (instr->Function == "Sample")
 				{
 					if (instr->Arguments.Count() == 4)
-						ctx.Body << L"textureOffset";
+						ctx.Body << "textureOffset";
 					else
-						ctx.Body << L"texture";
-					ctx.Body << L"(";
+						ctx.Body << "texture";
+					ctx.Body << "(";
 					for (int i = 0; i < instr->Arguments.Count(); i++)
 					{
 						if (i == 1) continue; // skip sampler_state parameter
 						PrintOp(ctx, instr->Arguments[i].Ptr());
 						if (i < instr->Arguments.Count() - 1)
-							ctx.Body << L", ";
+							ctx.Body << ", ";
 					}
-					ctx.Body << L")";
+					ctx.Body << ")";
 				}
-				else if (instr->Function == L"SampleGrad")
+				else if (instr->Function == "SampleGrad")
 				{
 					if (instr->Arguments.Count() == 6)
-						ctx.Body << L"textureGradOffset";
+						ctx.Body << "textureGradOffset";
 					else
-						ctx.Body << L"textureGrad";
-					ctx.Body << L"(";
+						ctx.Body << "textureGrad";
+					ctx.Body << "(";
 					for (int i = 0; i < instr->Arguments.Count(); i++)
 					{
 						if (i == 1) continue; // skip sampler_state parameter
 						PrintOp(ctx, instr->Arguments[i].Ptr());
 						if (i < instr->Arguments.Count() - 1)
-							ctx.Body << L", ";
+							ctx.Body << ", ";
 					}
-					ctx.Body << L")";
+					ctx.Body << ")";
 				}
-				else if (instr->Function == L"SampleBias")
+				else if (instr->Function == "SampleBias")
 				{
 					if (instr->Arguments.Count() == 5) // loc, bias, offset
 					{
-						ctx.Body << L"textureOffset(";
+						ctx.Body << "textureOffset(";
 						PrintOp(ctx, instr->Arguments[0].Ptr());
-						ctx.Body << L", ";
+						ctx.Body << ", ";
 						PrintOp(ctx, instr->Arguments[2].Ptr());
-						ctx.Body << L", ";
+						ctx.Body << ", ";
 						PrintOp(ctx, instr->Arguments[4].Ptr());
-						ctx.Body << L", ";
+						ctx.Body << ", ";
 						PrintOp(ctx, instr->Arguments[3].Ptr());
-						ctx.Body << L")";
+						ctx.Body << ")";
 					}
 					else
 					{
-						ctx.Body << L"texture(";
+						ctx.Body << "texture(";
 						PrintOp(ctx, instr->Arguments[0].Ptr());
-						ctx.Body << L", ";
+						ctx.Body << ", ";
 						PrintOp(ctx, instr->Arguments[2].Ptr());
-						ctx.Body << L", ";
+						ctx.Body << ", ";
 						PrintOp(ctx, instr->Arguments[3].Ptr());
-						ctx.Body << L")";
+						ctx.Body << ")";
 					}
 				}
 				else
-					throw NotImplementedException(L"CodeGen for texture function '" + instr->Function + L"' is not implemented.");
+					throw NotImplementedException("CodeGen for texture function '" + instr->Function + "' is not implemented.");
 			}
 
 			void DeclareUniformBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool /*isVertexShader*/) override
@@ -17468,10 +17588,10 @@ namespace Spire
 				int declarationStart = sb.GlobalHeader.Length();
 				int itemsDeclaredInBlock = 0;
 
-				sb.GlobalHeader << L"layout(std140";
+				sb.GlobalHeader << "layout(std140";
 				if (info.Binding != -1)
-					sb.GlobalHeader << L", binding = " << info.Binding;
-				sb.GlobalHeader << L") uniform " << input.Name << L"\n{\n";
+					sb.GlobalHeader << ", binding = " << info.Binding;
+				sb.GlobalHeader << ") uniform " << input.Name << "\n{\n";
 
 				int index = 0;
 				for (auto & field : recType->Members)
@@ -17487,12 +17607,12 @@ namespace Spire
 					itemsDeclaredInBlock++;
 					if (info.IsArray)
 					{
-						sb.GlobalHeader << L"[";
+						sb.GlobalHeader << "[";
 						if (info.ArrayLength)
 							sb.GlobalHeader << String(info.ArrayLength);
-						sb.GlobalHeader << L"]";
+						sb.GlobalHeader << "]";
 					}
-					sb.GlobalHeader << L";\n";
+					sb.GlobalHeader << ";\n";
 
 					index++;
 				}
@@ -17502,7 +17622,7 @@ namespace Spire
 				}
 				else
 				{
-					sb.GlobalHeader << L"} blk" << input.Name << L";\n";
+					sb.GlobalHeader << "} blk" << input.Name << ";\n";
 				}
 				if (!useBindlessTexture)
 				{
@@ -17512,16 +17632,16 @@ namespace Spire
 							//continue;
 						if (field.Value.Type->IsTexture())
 						{
-							if (field.Value.Attributes.ContainsKey(L"Binding"))
-								sb.GlobalHeader << L"layout(binding = " << field.Value.Attributes[L"Binding"]() << L") ";
+							if (field.Value.Attributes.ContainsKey("Binding"))
+								sb.GlobalHeader << "layout(binding = " << field.Value.Attributes["Binding"]() << ") ";
 							else
 							{
-								sb.GlobalHeader << L"layout(binding = " << sb.TextureBindingsAllocator << L") ";
+								sb.GlobalHeader << "layout(binding = " << sb.TextureBindingsAllocator << ") ";
 								sb.TextureBindingsAllocator++;
 							}
-							sb.GlobalHeader << L"uniform ";
+							sb.GlobalHeader << "uniform ";
 							PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), field.Key);
-							sb.GlobalHeader << L";\n";
+							sb.GlobalHeader << ";\n";
 						}
 					}
 				}
@@ -17530,16 +17650,16 @@ namespace Spire
 					auto genType = field.Value.Type.As<ILGenericType>();
 					if (!genType)
 						continue;
-					if (genType->GenericTypeName == L"StructuredBuffer" || genType->GenericTypeName == L"RWStructuredBuffer")
+					if (genType->GenericTypeName == "StructuredBuffer" || genType->GenericTypeName == "RWStructuredBuffer")
 					{
-						if (field.Value.Attributes.ContainsKey(L"Binding"))
-							sb.GlobalHeader << L"layout(std430, binding = " << field.Value.Attributes[L"Binding"]() << L") ";
+						if (field.Value.Attributes.ContainsKey("Binding"))
+							sb.GlobalHeader << "layout(std430, binding = " << field.Value.Attributes["Binding"]() << ") ";
 						else
-							sb.GlobalHeader << L"layout(std430) ";
+							sb.GlobalHeader << "layout(std430) ";
 
-						sb.GlobalHeader << L"buffer buf" << field.Key << L"\n{\n";
+						sb.GlobalHeader << "buffer buf" << field.Key << "\n{\n";
 						PrintType(sb.GlobalHeader, genType->BaseType.Ptr());
-						sb.GlobalHeader << L" " << field.Key << L"[];\n};\n";
+						sb.GlobalHeader << " " << field.Key << "[];\n};\n";
 					}
 				}
 			}
@@ -17553,7 +17673,7 @@ namespace Spire
 				assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::ArrayBuffer);
 
 				int itemsDeclaredInBlock = 0;
-				sb.GlobalHeader << L"struct T" << input.Name << L"\n{\n";
+				sb.GlobalHeader << "struct T" << input.Name << "\n{\n";
 					
 				int index = 0;
 				for (auto & field : recType->Members)
@@ -17563,14 +17683,14 @@ namespace Spire
 					String declName = field.Key;
 					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
 					itemsDeclaredInBlock++;
-					sb.GlobalHeader << L";\n";
+					sb.GlobalHeader << ";\n";
 					index++;
 				}
 
-				sb.GlobalHeader << L"};\nlayout(std430";
+				sb.GlobalHeader << "};\nlayout(std430";
 				if (info.Binding != -1)
-					sb.GlobalHeader << L", binding = " << info.Binding;
-				sb.GlobalHeader  << ") buffer " << input.Name << L"\n{\nT" << input.Name << L" content[];\n} blk" << input.Name << L";\n";
+					sb.GlobalHeader << ", binding = " << info.Binding;
+				sb.GlobalHeader  << ") buffer " << input.Name << "\n{\nT" << input.Name << " content[];\n} blk" << input.Name << ";\n";
 			}
 
 			void DeclarePackedBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool /*isVertexShader*/) override
@@ -17581,10 +17701,10 @@ namespace Spire
 				assert(recType);
 				assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::PackedBuffer);
 
-				sb.GlobalHeader << L"layout(std430";
+				sb.GlobalHeader << "layout(std430";
 				if (info.Binding != -1)
-					sb.GlobalHeader << L", binding = " << info.Binding;
-				sb.GlobalHeader << L") uniform " << input.Name << L"\n{\nfloat content[];\n} blk" << input.Name << L";\n";
+					sb.GlobalHeader << ", binding = " << info.Binding;
+				sb.GlobalHeader << ") uniform " << input.Name << "\n{\nfloat content[];\n} blk" << input.Name << ";\n";
 			}
 
 			void DeclareTextureInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool /*isVertexShader*/) override
@@ -17598,12 +17718,12 @@ namespace Spire
 				{
 					if(field.Value.Type->IsFloat() || field.Value.Type->IsFloatVector() && !field.Value.Type->IsFloatMatrix())
 					{
-						sb.GlobalHeader << L"layout(binding = " << sb.TextureBindingsAllocator << L") uniform sampler2D " << field.Key << L";\n";
+						sb.GlobalHeader << "layout(binding = " << sb.TextureBindingsAllocator << ") uniform sampler2D " << field.Key << ";\n";
 						sb.TextureBindingsAllocator++;
 					}
 					else
 					{
-						errWriter->Error(51091, L"type '" + field.Value.Type->ToString() + L"' cannot be placed in a texture.",
+						errWriter->Error(51091, "type '" + field.Value.Type->ToString() + "' cannot be placed in a texture.",
 							field.Value.Position);
 					}
 				}
@@ -17623,11 +17743,11 @@ namespace Spire
 				{
 					if (field.Value.Type->IsSamplerState())
 						continue;
-					if (input.Attributes.ContainsKey(L"VertexInput"))
-						sb.GlobalHeader << L"layout(location = " << index << L") ";
-					if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat") || field.Value.Type->IsIntegral()))
-						sb.GlobalHeader << L"flat ";
-					sb.GlobalHeader << L"in ";
+					if (input.Attributes.ContainsKey("VertexInput"))
+						sb.GlobalHeader << "layout(location = " << index << ") ";
+					if (!isVertexShader && (input.Attributes.ContainsKey("Flat") || field.Value.Type->IsIntegral()))
+						sb.GlobalHeader << "flat ";
+					sb.GlobalHeader << "in ";
 
 					String declName = field.Key;
 					declName = AddWorldNameSuffix(declName, recType->ToString());
@@ -17636,12 +17756,12 @@ namespace Spire
 					itemsDeclaredInBlock++;
 					if (info.IsArray)
 					{
-						sb.GlobalHeader << L"[";
+						sb.GlobalHeader << "[";
 						if (info.ArrayLength)
 							sb.GlobalHeader << String(info.ArrayLength);
-						sb.GlobalHeader << L"]";
+						sb.GlobalHeader << "]";
 					}
-					sb.GlobalHeader << L";\n";
+					sb.GlobalHeader << ";\n";
 
 					index++;
 				}
@@ -17662,9 +17782,9 @@ namespace Spire
 				{
 					if (field.Value.Type->IsSamplerState())
 						continue;
-					if (!isVertexShader && (input.Attributes.ContainsKey(L"Flat")))
-						sb.GlobalHeader << L"flat ";
-					sb.GlobalHeader << L"patch in ";
+					if (!isVertexShader && (input.Attributes.ContainsKey("Flat")))
+						sb.GlobalHeader << "flat ";
+					sb.GlobalHeader << "patch in ";
 
 					String declName = field.Key;
 					declName = AddWorldNameSuffix(declName, recType->ToString());
@@ -17673,12 +17793,12 @@ namespace Spire
 					itemsDeclaredInBlock++;
 					if (info.IsArray)
 					{
-						sb.GlobalHeader << L"[";
+						sb.GlobalHeader << "[";
 						if (info.ArrayLength)
 							sb.GlobalHeader << String(info.ArrayLength);
-						sb.GlobalHeader << L"]";
+						sb.GlobalHeader << "]";
 					}
-					sb.GlobalHeader << L";\n";
+					sb.GlobalHeader << ";\n";
 
 					index++;
 				}
@@ -17686,132 +17806,132 @@ namespace Spire
 
 			void GenerateHeader(StringBuilder & sb, ILStage * stage)
 			{
-				sb << L"#version 440\n";
-				if (stage->Attributes.ContainsKey(L"BindlessTexture"))
-					sb << L"#extension GL_ARB_bindless_texture: require\n#extension GL_NV_gpu_shader5 : require\n";
-				if (stage->Attributes.ContainsKey(L"NV_CommandList"))
-					sb << L"#extension GL_NV_command_list: require\n";
+				sb << "#version 440\n";
+				if (stage->Attributes.ContainsKey("BindlessTexture"))
+					sb << "#extension GL_ARB_bindless_texture: require\n#extension GL_NV_gpu_shader5 : require\n";
+				if (stage->Attributes.ContainsKey("NV_CommandList"))
+					sb << "#extension GL_NV_command_list: require\n";
 			}
 
 			void GenerateDomainShaderProlog(CodeGenContext & ctx, ILStage * stage)
 			{
-				ctx.GlobalHeader << L"layout(";
+				ctx.GlobalHeader << "layout(";
 				StageAttribute val;
-				if (stage->Attributes.TryGetValue(L"Domain", val))
-					ctx.GlobalHeader << ((val.Value == L"quads") ? L"quads" : L"triangles");
+				if (stage->Attributes.TryGetValue("Domain", val))
+					ctx.GlobalHeader << ((val.Value == "quads") ? "quads" : "triangles");
 				else
-					ctx.GlobalHeader << L"triangles";
-				if (val.Value != L"triangles" && val.Value != L"quads")
-					Error(50093, L"'Domain' should be either 'triangles' or 'quads'.", val.Position);
-				if (stage->Attributes.TryGetValue(L"Winding", val))
+					ctx.GlobalHeader << "triangles";
+				if (val.Value != "triangles" && val.Value != "quads")
+					Error(50093, "'Domain' should be either 'triangles' or 'quads'.", val.Position);
+				if (stage->Attributes.TryGetValue("Winding", val))
 				{
-					if (val.Value == L"cw")
-						ctx.GlobalHeader << L", cw";
+					if (val.Value == "cw")
+						ctx.GlobalHeader << ", cw";
 					else
-						ctx.GlobalHeader << L", ccw";
+						ctx.GlobalHeader << ", ccw";
 				}
-				if (stage->Attributes.TryGetValue(L"EqualSpacing", val))
+				if (stage->Attributes.TryGetValue("EqualSpacing", val))
 				{
-					if (val.Value == L"1" || val.Value == L"true")
-						ctx.GlobalHeader << L", equal_spacing";
+					if (val.Value == "1" || val.Value == "true")
+						ctx.GlobalHeader << ", equal_spacing";
 				}
-				ctx.GlobalHeader << L") in;\n";
+				ctx.GlobalHeader << ") in;\n";
 			}
 			StageSource GenerateSingleWorldShader(ILProgram * program, ILShader * shader, ILStage * stage) override
 			{
-				useBindlessTexture = stage->Attributes.ContainsKey(L"BindlessTexture");
+				useBindlessTexture = stage->Attributes.ContainsKey("BindlessTexture");
 				StageSource rs;
 				CodeGenContext ctx;
 				GenerateHeader(ctx.GlobalHeader, stage);
-				if (stage->StageType == L"DomainShader")
+				if (stage->StageType == "DomainShader")
 					GenerateDomainShaderProlog(ctx, stage);
 
 				GenerateStructs(ctx.GlobalHeader, program);
 				StageAttribute worldName;
 				RefPtr<ILWorld> world = nullptr;
-				if (stage->Attributes.TryGetValue(L"World", worldName))
+				if (stage->Attributes.TryGetValue("World", worldName))
 				{
 					if (!shader->Worlds.TryGetValue(worldName.Value, world))
-						errWriter->Error(50022, L"world '" + worldName.Value + L"' is not defined.", worldName.Position);
+						errWriter->Error(50022, "world '" + worldName.Value + "' is not defined.", worldName.Position);
 				}
 				else
-					errWriter->Error(50023, L"'" + stage->StageType + L"' should provide 'World' attribute.", stage->Position);
+					errWriter->Error(50023, "'" + stage->StageType + "' should provide 'World' attribute.", stage->Position);
 				if (!world)
 					return rs;
 				GenerateReferencedFunctions(ctx.GlobalHeader, program, MakeArrayView(world.Ptr()));
 				extCompInfo.Clear();
 				for (auto & input : world->Inputs)
 				{
-					DeclareInput(ctx, input, stage->StageType == L"VertexShader");
+					DeclareInput(ctx, input, stage->StageType == "VertexShader");
 				}
 		
 				outputStrategy->DeclareOutput(ctx, stage);
 				ctx.codeGen = this;
 				world->Code->NameAllInstructions();
 				GenerateCode(ctx, world->Code.Ptr());
-				if (stage->StageType == L"VertexShader" || stage->StageType == L"DomainShader")
+				if (stage->StageType == "VertexShader" || stage->StageType == "DomainShader")
 					GenerateVertexShaderEpilog(ctx, world.Ptr(), stage);
 
 				StringBuilder sb;
 				sb << ctx.GlobalHeader.ProduceString();
-				sb << L"void main()\n{\n";
+				sb << "void main()\n{\n";
 				sb << ctx.Header.ProduceString() << ctx.Body.ProduceString();
-				sb << L"}";
+				sb << "}";
 				rs.MainCode = sb.ProduceString();
 				return rs;
 			}
 
 			StageSource GenerateHullShader(ILProgram * program, ILShader * shader, ILStage * stage) override
 			{
-				useBindlessTexture = stage->Attributes.ContainsKey(L"BindlessTexture");
+				useBindlessTexture = stage->Attributes.ContainsKey("BindlessTexture");
 
 				StageSource rs;
 				StageAttribute patchWorldName, controlPointWorldName, cornerPointWorldName, domain, innerLevel, outerLevel, numControlPoints;
 				RefPtr<ILWorld> patchWorld, controlPointWorld, cornerPointWorld;
-				if (!stage->Attributes.TryGetValue(L"PatchWorld", patchWorldName))
+				if (!stage->Attributes.TryGetValue("PatchWorld", patchWorldName))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'PatchWorld'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'PatchWorld'.", stage->Position);
 					return rs;
 				}
 				if (!shader->Worlds.TryGetValue(patchWorldName.Value, patchWorld))
-					errWriter->Error(50022, L"world '" + patchWorldName.Value + L"' is not defined.", patchWorldName.Position);
-				if (!stage->Attributes.TryGetValue(L"ControlPointWorld", controlPointWorldName))
+					errWriter->Error(50022, "world '" + patchWorldName.Value + "' is not defined.", patchWorldName.Position);
+				if (!stage->Attributes.TryGetValue("ControlPointWorld", controlPointWorldName))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'ControlPointWorld'.", stage->Position); 
+					errWriter->Error(50052, "'HullShader' requires attribute 'ControlPointWorld'.", stage->Position); 
 					return rs;
 				}
 				if (!shader->Worlds.TryGetValue(controlPointWorldName.Value, controlPointWorld))
-					errWriter->Error(50022, L"world '" + controlPointWorldName.Value + L"' is not defined.", controlPointWorldName.Position);
-				if (!stage->Attributes.TryGetValue(L"CornerPointWorld", cornerPointWorldName))
+					errWriter->Error(50022, "world '" + controlPointWorldName.Value + "' is not defined.", controlPointWorldName.Position);
+				if (!stage->Attributes.TryGetValue("CornerPointWorld", cornerPointWorldName))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'CornerPointWorld'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'CornerPointWorld'.", stage->Position);
 					return rs;
 				}
 				if (!shader->Worlds.TryGetValue(cornerPointWorldName.Value, cornerPointWorld))
-					errWriter->Error(50022, L"world '" + cornerPointWorldName.Value + L"' is not defined.", cornerPointWorldName.Position);
-				if (!stage->Attributes.TryGetValue(L"Domain", domain))
+					errWriter->Error(50022, "world '" + cornerPointWorldName.Value + "' is not defined.", cornerPointWorldName.Position);
+				if (!stage->Attributes.TryGetValue("Domain", domain))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'Domain'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'Domain'.", stage->Position);
 					return rs;
 				}
-				if (domain.Value != L"triangles" && domain.Value != L"quads")
+				if (domain.Value != "triangles" && domain.Value != "quads")
 				{
-					errWriter->Error(50053, L"'Domain' should be either 'triangles' or 'quads'.", domain.Position);
+					errWriter->Error(50053, "'Domain' should be either 'triangles' or 'quads'.", domain.Position);
 					return rs;
 				}
-				if (!stage->Attributes.TryGetValue(L"TessLevelOuter", outerLevel))
+				if (!stage->Attributes.TryGetValue("TessLevelOuter", outerLevel))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'TessLevelOuter'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'TessLevelOuter'.", stage->Position);
 					return rs;
 				}
-				if (!stage->Attributes.TryGetValue(L"TessLevelInner", innerLevel))
+				if (!stage->Attributes.TryGetValue("TessLevelInner", innerLevel))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'TessLevelInner'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'TessLevelInner'.", stage->Position);
 					return rs;
 				}
-				if (!stage->Attributes.TryGetValue(L"ControlPointCount", numControlPoints))
+				if (!stage->Attributes.TryGetValue("ControlPointCount", numControlPoints))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'ControlPointCount'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'ControlPointCount'.", stage->Position);
 					return rs;
 				}
 				CodeGenContext ctx;
@@ -17821,7 +17941,7 @@ namespace Spire
 				worlds.Add(controlPointWorld.Ptr());
 				worlds.Add(cornerPointWorld.Ptr());
 				GenerateHeader(ctx.GlobalHeader, stage);
-				ctx.GlobalHeader << L"layout(vertices = " << numControlPoints.Value << L") out;\n";
+				ctx.GlobalHeader << "layout(vertices = " << numControlPoints.Value << ") out;\n";
 				GenerateStructs(ctx.GlobalHeader, program);
 				GenerateReferencedFunctions(ctx.GlobalHeader, program, worlds.GetArrayView());
 				extCompInfo.Clear();
@@ -17829,7 +17949,7 @@ namespace Spire
 				HashSet<String> declaredInputs;
 
 				patchWorld->Code->NameAllInstructions();
-				outputStrategy = CreateStandardOutputStrategy(patchWorld.Ptr(), L"patch");
+				outputStrategy = CreateStandardOutputStrategy(patchWorld.Ptr(), "patch");
 				for (auto & input : patchWorld->Inputs)
 				{
 					if (declaredInputs.Add(input.Name))
@@ -17839,7 +17959,7 @@ namespace Spire
 				GenerateCode(ctx, patchWorld->Code.Ptr());
 
 				controlPointWorld->Code->NameAllInstructions();
-				outputStrategy = CreateArrayOutputStrategy(controlPointWorld.Ptr(), false, 0, L"gl_InvocationID");
+				outputStrategy = CreateArrayOutputStrategy(controlPointWorld.Ptr(), false, 0, "gl_InvocationID");
 				for (auto & input : controlPointWorld->Inputs)
 				{
 					if (declaredInputs.Add(input.Name))
@@ -17849,17 +17969,17 @@ namespace Spire
 				GenerateCode(ctx, controlPointWorld->Code.Ptr());
 
 				cornerPointWorld->Code->NameAllInstructions();
-				outputStrategy = CreateArrayOutputStrategy(cornerPointWorld.Ptr(), true, (domain.Value == L"triangles" ? 3 : 4), L"sysLocalIterator");
+				outputStrategy = CreateArrayOutputStrategy(cornerPointWorld.Ptr(), true, (domain.Value == "triangles" ? 3 : 4), "sysLocalIterator");
 				for (auto & input : cornerPointWorld->Inputs)
 				{
 					if (declaredInputs.Add(input.Name))
 						DeclareInput(ctx, input, false);
 				}
 				outputStrategy->DeclareOutput(ctx, stage);
-				ctx.Body << L"for (int sysLocalIterator = 0; sysLocalIterator < gl_PatchVerticesIn; sysLocalIterator++)\n{\n";
+				ctx.Body << "for (int sysLocalIterator = 0; sysLocalIterator < gl_PatchVerticesIn; sysLocalIterator++)\n{\n";
 				GenerateCode(ctx, cornerPointWorld->Code.Ptr());
 				auto debugStr = cornerPointWorld->Code->ToString();
-				ctx.Body << L"}\n";
+				ctx.Body << "}\n";
 
 				// generate epilog
 				bool found = false;
@@ -17870,16 +17990,16 @@ namespace Spire
 					{
 						for (int i = 0; i < 2; i++)
 						{
-							ctx.Body << L"gl_TessLevelInner[" << i << L"] = ";
+							ctx.Body << "gl_TessLevelInner[" << i << "] = ";
 							PrintOp(ctx, operand);
-							ctx.Body << L"[" << i << L"];\n";
+							ctx.Body << "[" << i << "];\n";
 						}
 						found = true;
 						break;
 					}
 				}
 				if (!found)
-					errWriter->Error(50041, L"'" + innerLevel.Value + L"': component not defined.",
+					errWriter->Error(50041, "'" + innerLevel.Value + "': component not defined.",
 						innerLevel.Position);
 
 				found = false;
@@ -17890,9 +18010,9 @@ namespace Spire
 					{
 						for (int i = 0; i < 4; i++)
 						{
-							ctx.Body << L"gl_TessLevelOuter[" << i << L"] = ";
+							ctx.Body << "gl_TessLevelOuter[" << i << "] = ";
 							PrintOp(ctx, operand);
-							ctx.Body << L"[" << i << L"];\n";
+							ctx.Body << "[" << i << "];\n";
 						}
 						found = true;
 						break;
@@ -17900,12 +18020,12 @@ namespace Spire
 
 				}
 				if (!found)
-					errWriter->Error(50041, L"'" + outerLevel.Value + L"': component not defined.",
+					errWriter->Error(50041, "'" + outerLevel.Value + "': component not defined.",
 						outerLevel.Position);
 
 				StringBuilder sb;
 				sb << ctx.GlobalHeader.ProduceString();
-				sb << L"void main()\n{\n" << ctx.Header.ProduceString() << ctx.Body.ProduceString() << L"}";
+				sb << "void main()\n{\n" << ctx.Header.ProduceString() << ctx.Body.ProduceString() << "}";
 				rs.MainCode = sb.ProduceString();
 				return rs;
 			}
@@ -17926,20 +18046,20 @@ namespace Spire
 				for (auto & field : world->OutputType->Members)
 				{
 					if (declPrefix.Length())
-						ctx.GlobalHeader << declPrefix << L" ";
+						ctx.GlobalHeader << declPrefix << " ";
 					if (field.Value.Type->IsIntegral())
-						ctx.GlobalHeader << L"flat ";
-					ctx.GlobalHeader << L"out ";
+						ctx.GlobalHeader << "flat ";
+					ctx.GlobalHeader << "out ";
 					String declName = field.Key;
 					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), AddWorldNameSuffix(declName, world->OutputType->TypeName));
-					ctx.GlobalHeader << L";\n";
+					ctx.GlobalHeader << ";\n";
 				}
 			}
 			virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) override
 			{
-				ctx.Body << AddWorldNameSuffix(instr->ComponentName, world->OutputType->TypeName) << L" = ";
+				ctx.Body << AddWorldNameSuffix(instr->ComponentName, world->OutputType->TypeName) << " = ";
 				codeGen->PrintOp(ctx, instr->Operand.Ptr());
-				ctx.Body << L";\n";
+				ctx.Body << ";\n";
 			}
 		};
 
@@ -17962,20 +18082,20 @@ namespace Spire
 				for (auto & field : world->OutputType->Members)
 				{
 					if (isPatch)
-						ctx.GlobalHeader << L"patch ";
-					ctx.GlobalHeader << L"out ";
+						ctx.GlobalHeader << "patch ";
+					ctx.GlobalHeader << "out ";
 					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), AddWorldNameSuffix(field.Key, world->Name));
-					ctx.GlobalHeader << L"[";
+					ctx.GlobalHeader << "[";
 					if (arraySize != 0)
 						ctx.GlobalHeader << arraySize;
-					ctx.GlobalHeader<<L"]; \n";
+					ctx.GlobalHeader<<"]; \n";
 				}
 			}
 			virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) override
 			{
-				ctx.Body << AddWorldNameSuffix(instr->ComponentName, world->Name) << L"[" << outputIndex << L"] = ";
+				ctx.Body << AddWorldNameSuffix(instr->ComponentName, world->Name) << "[" << outputIndex << "] = ";
 				codeGen->PrintOp(ctx, instr->Operand.Ptr());
-				ctx.Body << L";\n";
+				ctx.Body << ";\n";
 			}
 		};
 
@@ -17989,9 +18109,9 @@ namespace Spire
 			{
 				for (auto & field : world->OutputType->Members)
 				{
-					ctx.GlobalHeader << L"out ";
+					ctx.GlobalHeader << "out ";
 					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), field.Key);
-					ctx.GlobalHeader << L";\n";
+					ctx.GlobalHeader << ";\n";
 				}
 			}
 			virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * exportInstr) override
@@ -17999,79 +18119,79 @@ namespace Spire
 				String conversionFunction;
 				int size = 0;
 				String typeName = exportInstr->Type->ToString();
-				if (typeName == L"int")
+				if (typeName == "int")
 				{
-					conversionFunction = L"intBitsToFloat";
+					conversionFunction = "intBitsToFloat";
 					size = 1;
 				}
-				else if (typeName == L"ivec2")
+				else if (typeName == "ivec2")
 				{
-					conversionFunction = L"intBitsToFloat";
+					conversionFunction = "intBitsToFloat";
 					size = 2;
 				}
-				else if (typeName == L"ivec3")
+				else if (typeName == "ivec3")
 				{
-					conversionFunction = L"intBitsToFloat";
+					conversionFunction = "intBitsToFloat";
 					size = 3;
 				}
-				else if (typeName == L"ivec4")
+				else if (typeName == "ivec4")
 				{
-					conversionFunction = L"intBitsToFloat";
+					conversionFunction = "intBitsToFloat";
 					size = 4;
 				}
-				else if (typeName == L"uint")
+				else if (typeName == "uint")
 				{
-					conversionFunction = L"uintBitsToFloat";
+					conversionFunction = "uintBitsToFloat";
 					size = 1;
 				}
-				else if (typeName == L"uvec2")
+				else if (typeName == "uvec2")
 				{
-					conversionFunction = L"uintBitsToFloat";
+					conversionFunction = "uintBitsToFloat";
 					size = 2;
 				}
-				else if (typeName == L"uvec3")
+				else if (typeName == "uvec3")
 				{
-					conversionFunction = L"uintBitsToFloat";
+					conversionFunction = "uintBitsToFloat";
 					size = 3;
 				}
-				else if (typeName == L"uvec4")
+				else if (typeName == "uvec4")
 				{
-					conversionFunction = L"uintBitsToFloat";
+					conversionFunction = "uintBitsToFloat";
 					size = 4;
 				}
-				else if (typeName == L"float")
+				else if (typeName == "float")
 				{
-					conversionFunction = L"";
+					conversionFunction = "";
 					size = 1;
 				}
-				else if (typeName == L"vec2")
+				else if (typeName == "vec2")
 				{
-					conversionFunction = L"";
+					conversionFunction = "";
 					size = 2;
 				}
-				else if (typeName == L"vec3")
+				else if (typeName == "vec3")
 				{
-					conversionFunction = L"";
+					conversionFunction = "";
 					size = 3;
 				}
-				else if (typeName == L"vec4")
+				else if (typeName == "vec4")
 				{
-					conversionFunction = L"";
+					conversionFunction = "";
 					size = 4;
 				}
-				else if (typeName == L"mat3")
+				else if (typeName == "mat3")
 				{
-					conversionFunction = L"";
+					conversionFunction = "";
 					size = 9;
 				}
-				else if (typeName == L"mat4")
+				else if (typeName == "mat4")
 				{
-					conversionFunction = L"";
+					conversionFunction = "";
 					size = 16;
 				}
 				else
 				{
-					codeGen->Error(50082, L"importing type '" + typeName + L"' from PackedBuffer is not supported by the GLSL backend.",
+					codeGen->Error(50082, "importing type '" + typeName + "' from PackedBuffer is not supported by the GLSL backend.",
 						CodePosition());
 				}
 				auto recType = world->OutputType.Ptr();
@@ -18084,17 +18204,17 @@ namespace Spire
 				}
 				for (int i = 0; i < size; i++)
 				{
-					ctx.Body << L"sysOutputBuffer.content[gl_InvocationId.x * " << recTypeSize << L" + " + memberOffsets[exportInstr->ComponentName]()
-						<< L"] = " << conversionFunction << L"(";
+					ctx.Body << "sysOutputBuffer.content[gl_InvocationId.x * " << recTypeSize << " + " + memberOffsets[exportInstr->ComponentName]()
+						<< "] = " << conversionFunction << "(";
 					codeGen->PrintOp(ctx, exportInstr->Operand.Ptr());
 					if (size <= 4)
-						ctx.Body << L"[" << i << L"]";
+						ctx.Body << "[" << i << "]";
 					else
 					{
 						int width = size == 9 ? 3 : 4;
-						ctx.Body << L"[" << i / width << L"][" << i % width << L"]";
+						ctx.Body << "[" << i / width << "][" << i % width << "]";
 					}
-					ctx.Body << L");\n";
+					ctx.Body << ");\n";
 				}
 			}
 		};
@@ -18139,9 +18259,9 @@ namespace Spire
 
 			void PrintRasterPositionOutputWrite(CodeGenContext & ctx, ILOperand * operand) override
 			{
-				ctx.Body << L"stage_output.sv_position = ";
+				ctx.Body << "stage_output.sv_position = ";
 				PrintOp(ctx, operand);
-				ctx.Body << L";\n";
+				ctx.Body << ";\n";
 			}
 
 			void PrintMatrixMulInstrExpr(CodeGenContext & ctx, ILOperand* op0, ILOperand* op1) override
@@ -18153,17 +18273,17 @@ namespace Spire
 				// This function is called by the code generator for that op
 				// and allows us to print it appropriately.
 
-				ctx.Body << L"mul(";
+				ctx.Body << "mul(";
 				PrintOp(ctx, op1);
-				ctx.Body << L", ";
+				ctx.Body << ", ";
 				PrintOp(ctx, op0);
-				ctx.Body << L")";
+				ctx.Body << ")";
 			}
 
 			void PrintUniformBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
 			{
 				if (!currentImportInstr->Type->IsTexture() || useBindlessTexture)
-					sb << L"blk" << inputName;
+					sb << "blk" << inputName;
 				else
 					sb << componentName;
 			}
@@ -18175,27 +18295,27 @@ namespace Spire
 
 			void PrintArrayBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
 			{
-				sb << L"blk" << inputName << L".content";
+				sb << "blk" << inputName << ".content";
 			}
 
 			void PrintPackedBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
 			{
-				sb << L"blk" << inputName << L".content";
+				sb << "blk" << inputName << ".content";
 			}
 
 			void PrintStandardInputReference(StringBuilder& sb, ILRecordType* /*recType*/, String inputName, String componentName) override
 			{
-				sb << L"stage_input/*standard*/";
+				sb << "stage_input/*standard*/";
 			}
 
 			void PrintStandardArrayInputReference(StringBuilder& sb, ILRecordType* /*recType*/, String inputName, String componentName) override
 			{
-				sb << L"stage_input/*array*/";
+				sb << "stage_input/*array*/";
 			}
 
 			void PrintPatchInputReference(StringBuilder& sb, ILRecordType* /*recType*/, String inputName, String componentName) override
 			{
-				sb << L"stage_input_patch/*patch*/." << inputName;
+				sb << "stage_input_patch/*patch*/." << inputName;
 			}
 
 			void PrintDefaultInputReference(StringBuilder& sb, ILRecordType* /*recType*/, String inputName, String componentName) override
@@ -18210,23 +18330,23 @@ namespace Spire
 				switch(systemVar)
 				{
 				case ExternComponentCodeGenInfo::SystemVarType::FragCoord:
-					sb << L"sv_FragPosition";
+					sb << "sv_FragPosition";
 					break;
 				case ExternComponentCodeGenInfo::SystemVarType::TessCoord:
-					sb << L"sv_DomainLocation";
+					sb << "sv_DomainLocation";
 					break;
 				case ExternComponentCodeGenInfo::SystemVarType::InvocationId:
-					sb << L"sv_ThreadID";
+					sb << "sv_ThreadID";
 					break;
 				case ExternComponentCodeGenInfo::SystemVarType::ThreadId:
-					sb << L"sv_GlobalThreadID.x";
+					sb << "sv_GlobalThreadID.x";
 					break;
 				case ExternComponentCodeGenInfo::SystemVarType::PatchVertexCount:
 					// TODO(tfoley): there is no equivalent of this in HLSL
-					sb << L"sv_InputControlPointCount";
+					sb << "sv_InputControlPointCount";
 					break;
 				case ExternComponentCodeGenInfo::SystemVarType::PrimitiveId:
-					sb << L"sv_PrimitiveID";
+					sb << "sv_PrimitiveID";
 					break;
 				default:
 					sb << inputName;
@@ -18246,32 +18366,32 @@ namespace Spire
 				// Note 2: Well, actually, the Right Answer is for the type representation to
 				// be better than just a string, so that we don't have to do this string->string map.
 				static const struct {
-					wchar_t const* glslName;
-					wchar_t const* hlslName;
+					char const* glslName;
+					char const* hlslName;
 				} kNameRemaps[] =
 				{
-					{ L"vec2", L"*float2" },
-					{ L"vec3", L"*float3" },
-					{ L"vec4", L"*float4" },
+					{ "vec2", "*float2" },
+					{ "vec3", "*float3" },
+					{ "vec4", "*float4" },
 
-					{ L"ivec2", L"*int2" },
-					{ L"ivec3", L"*int3" },
-					{ L"ivec4", L"*int4" },
+					{ "ivec2", "*int2" },
+					{ "ivec3", "*int3" },
+					{ "ivec4", "*int4" },
 
-					{ L"uvec2", L"*uint2" },
-					{ L"uvec3", L"*uint3" },
-					{ L"uvec4", L"*uint4" },
+					{ "uvec2", "*uint2" },
+					{ "uvec3", "*uint3" },
+					{ "uvec4", "*uint4" },
 
-					{ L"mat3", L"float3x3" },
-					{ L"mat4", L"float4x4" },
+					{ "mat3", "float3x3" },
+					{ "mat4", "float4x4" },
 				};
 
 				for(auto remap : kNameRemaps)
 				{
-					if(wcscmp(name.Buffer(), remap.glslName) == 0)
+					if(strcmp(name.Buffer(), remap.glslName) == 0)
 					{
-						wchar_t const* hlslName = remap.hlslName;
-						if(*hlslName == L'*')
+						char const* hlslName = remap.hlslName;
+						if(*hlslName == '*')
 						{
 							hlslName++;
 
@@ -18284,9 +18404,9 @@ namespace Spire
 							// it differently
 							if(instr->Arguments.Count() == 1)
 							{
-								ctx.Body << L"((" << hlslName << L") ";
+								ctx.Body << "((" << hlslName << ") ";
 								PrintOp(ctx, instr->Arguments[0].Ptr());
-								ctx.Body << L")";
+								ctx.Body << ")";
 								return;
 							}
 						}
@@ -18305,22 +18425,22 @@ namespace Spire
 				// internally, texObj.Sample(sampler_obj, uv, ..) is represented as Sample(texObj, sampler_obj, uv, ...)
 				// so we need to lift first argument to the front
 				PrintOp(ctx, instr->Arguments[0].Ptr(), true);
-				ctx.Body << L"." << instr->Function;
-				ctx.Body << L"(";
+				ctx.Body << "." << instr->Function;
+				ctx.Body << "(";
 				for (int i = 1; i < instr->Arguments.Count(); i++)
 				{
 					PrintOp(ctx, instr->Arguments[i].Ptr());
 					if (i < instr->Arguments.Count() - 1)
-						ctx.Body << L", ";
+						ctx.Body << ", ";
 				}
-				ctx.Body << L")";
+				ctx.Body << ")";
 			}
 
 			void PrintProjectInstrExpr(CodeGenContext & ctx, ProjectInstruction * proj) override
 			{
 				// project component out of record type. 
 				PrintOp(ctx, proj->Operand.Ptr());
-				ctx.Body << L"." << proj->ComponentName;
+				ctx.Body << "." << proj->ComponentName;
 			}
 
 			void PrintTypeName(StringBuilder& sb, ILType* type) override
@@ -18335,30 +18455,30 @@ namespace Spire
 				// Note 2: Well, actually, the Right Answer is for the type representation to
 				// be better than just a string, so that we don't have to do this string->string map.
 				static const struct {
-					wchar_t const* glslName;
-					wchar_t const* hlslName;
+					char const* glslName;
+					char const* hlslName;
 				} kNameRemaps[] =
 				{
-					{ L"vec2", L"float2" },
-					{ L"vec3", L"float3" },
-					{ L"vec4", L"float4" },
+					{ "vec2", "float2" },
+					{ "vec3", "float3" },
+					{ "vec4", "float4" },
 
-					{ L"ivec2", L"int2" },
-					{ L"ivec3", L"int3" },
-					{ L"ivec4", L"int4" },
+					{ "ivec2", "int2" },
+					{ "ivec3", "int3" },
+					{ "ivec4", "int4" },
 
-					{ L"uvec2", L"uint2" },
-					{ L"uvec3", L"uint3" },
-					{ L"uvec4", L"uint4" },
+					{ "uvec2", "uint2" },
+					{ "uvec3", "uint3" },
+					{ "uvec4", "uint4" },
 
-					{ L"mat3", L"float3x3" },
-					{ L"mat4", L"float4x4" },
+					{ "mat3", "float3x3" },
+					{ "mat4", "float4x4" },
 				};
 
 				String typeName = type->ToString();
 				for(auto remap : kNameRemaps)
 				{
-					if(wcscmp(typeName.Buffer(), remap.glslName) == 0)
+					if(strcmp(typeName.Buffer(), remap.glslName) == 0)
 					{
 						sb << remap.hlslName;
 						return;
@@ -18382,14 +18502,14 @@ namespace Spire
 				int declarationStart = sb.GlobalHeader.Length();
 				int itemsDeclaredInBlock = 0;
 
-				sb.GlobalHeader << L"cbuffer " << input.Name;
+				sb.GlobalHeader << "cbuffer " << input.Name;
 				if (info.Binding != -1)
-					sb.GlobalHeader << L" : register(b" << info.Binding << L")";
-				sb.GlobalHeader << L"\n{\n";
+					sb.GlobalHeader << " : register(b" << info.Binding << ")";
+				sb.GlobalHeader << "\n{\n";
 
 				// We declare an inline struct inside the `cbuffer` to ensure that
 				// the members have an appropriate prefix on their name.
-				sb.GlobalHeader << L"struct {\n";
+				sb.GlobalHeader << "struct {\n";
 
 				int index = 0;
 				for (auto & field : recType->Members)
@@ -18401,12 +18521,12 @@ namespace Spire
 					itemsDeclaredInBlock++;
 					if (info.IsArray)
 					{
-						sb.GlobalHeader << L"[";
+						sb.GlobalHeader << "[";
 						if (info.ArrayLength)
 							sb.GlobalHeader << String(info.ArrayLength);
-						sb.GlobalHeader << L"]";
+						sb.GlobalHeader << "]";
 					}
-					sb.GlobalHeader << L";\n";
+					sb.GlobalHeader << ";\n";
 
 					index++;
 				}
@@ -18417,23 +18537,23 @@ namespace Spire
 					return;
 				}
 
-				sb.GlobalHeader << L"} blk" << input.Name << L";\n";
-				sb.GlobalHeader << L"};\n";
+				sb.GlobalHeader << "} blk" << input.Name << ";\n";
+				sb.GlobalHeader << "};\n";
 
 				for (auto & field : recType->Members)
 				{
 					if (field.Value.Type->IsTexture())
 					{
-						if (field.Value.Attributes.ContainsKey(L"Binding"))
-							sb.GlobalHeader << L"layout(binding = " << field.Value.Attributes[L"Binding"]() << L") ";
+						if (field.Value.Attributes.ContainsKey("Binding"))
+							sb.GlobalHeader << "layout(binding = " << field.Value.Attributes["Binding"]() << ") ";
 						else
 						{
-							sb.GlobalHeader << L"layout(binding = " << sb.TextureBindingsAllocator << L") ";
+							sb.GlobalHeader << "layout(binding = " << sb.TextureBindingsAllocator << ") ";
 							sb.TextureBindingsAllocator++;
 						}
-						sb.GlobalHeader << L"uniform ";
+						sb.GlobalHeader << "uniform ";
 						PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), field.Key);
-						sb.GlobalHeader << L";\n";
+						sb.GlobalHeader << ";\n";
 					}
 				}
 			}
@@ -18461,23 +18581,23 @@ namespace Spire
 						// TODO(tfoley): texture binding allocation needs to be per-stage in D3D11, but should be global for D3D12
 						int slotIndex = sb.TextureBindingsAllocator++;
 
-						sb.GlobalHeader << L"Texture2D " << field.Key;
-						sb.GlobalHeader << L" : register(t" << slotIndex << L")";
-						sb.GlobalHeader << L";\n";
+						sb.GlobalHeader << "Texture2D " << field.Key;
+						sb.GlobalHeader << " : register(t" << slotIndex << ")";
+						sb.GlobalHeader << ";\n";
 
-						sb.GlobalHeader << L"SamplerState " << field.Key << "_sampler";
-						sb.GlobalHeader << L" : register(s" << slotIndex << L")";
-						sb.GlobalHeader << L";\n";
+						sb.GlobalHeader << "SamplerState " << field.Key << "_sampler";
+						sb.GlobalHeader << " : register(s" << slotIndex << ")";
+						sb.GlobalHeader << ";\n";
 					}
 					else
 					{
-						errWriter->Error(51091, L"type '" + field.Value.Type->ToString() + L"' cannot be placed in a texture.",
+						errWriter->Error(51091, "type '" + field.Value.Type->ToString() + "' cannot be placed in a texture.",
 							field.Value.Position);
 					}
 				}
 			}
 
-			void DeclareStandardInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) override
+			void DeclareStandardInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool /*isVertexShader*/) override
 			{
 				auto info = ExtractExternComponentInfo(input);
 				extCompInfo[input.Name] = info;
@@ -18496,12 +18616,12 @@ namespace Spire
 			void GenerateDomainShaderAttributes(StringBuilder & sb, ILStage * stage)
 			{
 				StageAttribute val;
-				if (stage->Attributes.TryGetValue(L"Domain", val))
-					sb << L"[domain(\"" << ((val.Value == L"quads") ? L"quad" : L"tri") << L"\")]\n";
+				if (stage->Attributes.TryGetValue("Domain", val))
+					sb << "[domain(\"" << ((val.Value == "quads") ? "quad" : "tri") << "\")]\n";
 				else
-					sb << L"[domain(\"tri\")]\n";
-				if (val.Value != L"triangles" && val.Value != L"quads")
-					Error(50093, L"'Domain' should be either 'triangles' or 'quads'.", val.Position);
+					sb << "[domain(\"tri\")]\n";
+				if (val.Value != "triangles" && val.Value != "quads")
+					Error(50093, "'Domain' should be either 'triangles' or 'quads'.", val.Position);
 			}
 
 			void PrintHeaderBoilerplate(CodeGenContext& ctx)
@@ -18545,7 +18665,7 @@ namespace Spire
 
 				// TODO(tfoley): Ther are no bindles textures in HLSL, so I'm
 				// not sure what to do with this flag.
-				useBindlessTexture = stage->Attributes.ContainsKey(L"BindlessTexture");
+				useBindlessTexture = stage->Attributes.ContainsKey("BindlessTexture");
 
 				StageSource rs;
 				CodeGenContext ctx;
@@ -18555,13 +18675,13 @@ namespace Spire
 				GenerateStructs(ctx.GlobalHeader, program);
 				StageAttribute worldName;
 				RefPtr<ILWorld> world = nullptr;
-				if (stage->Attributes.TryGetValue(L"World", worldName))
+				if (stage->Attributes.TryGetValue("World", worldName))
 				{
 					if (!shader->Worlds.TryGetValue(worldName.Value, world))
-						errWriter->Error(50022, L"world '" + worldName.Value + L"' is not defined.", worldName.Position);
+						errWriter->Error(50022, "world '" + worldName.Value + "' is not defined.", worldName.Position);
 				}
 				else
-					errWriter->Error(50023, L"'" + stage->StageType + L"' should provide 'World' attribute.", stage->Position);
+					errWriter->Error(50023, "'" + stage->StageType + "' should provide 'World' attribute.", stage->Position);
 				if (!world)
 					return rs;
 				GenerateReferencedFunctions(ctx.GlobalHeader, program, MakeArrayView(world.Ptr()));
@@ -18584,7 +18704,7 @@ namespace Spire
 				// shader is passed to us more explicitly.
 				for (auto & input : world->Inputs)
 				{
-					DeclareInput(ctx, input, stage->StageType == L"VertexShader");
+					DeclareInput(ctx, input, stage->StageType == "VertexShader");
 
 					// We need to detect the world that represents the ordinary stage input...
 					// TODO(tfoley): It seems like this is logically part of the stage definition.
@@ -18618,7 +18738,7 @@ namespace Spire
 				}
 				if(!stageInputType)
 				{
-					errWriter->Error(99999, L"'" + stage->StageType + L"' doesn't appear to have any input world", stage->Position);
+					errWriter->Error(99999, "'" + stage->StageType + "' doesn't appear to have any input world", stage->Position);
 				}
 		
 				// For a domain shader, we need to know how many corners the
@@ -18628,15 +18748,15 @@ namespace Spire
 				int cornerCount = 3;
 				if(stage->StageType == "DomainShader")
 				{
-					if (!stage->Attributes.TryGetValue(L"ControlPointCount", controlPointCount))
+					if (!stage->Attributes.TryGetValue("ControlPointCount", controlPointCount))
 					{
-						errWriter->Error(50052, L"'DomainShader' requires attribute 'ControlPointCount'.", stage->Position);
+						errWriter->Error(50052, "'DomainShader' requires attribute 'ControlPointCount'.", stage->Position);
 					}
 					StageAttribute val;
-					if(stage->Attributes.TryGetValue(L"Domain", val))
+					if(stage->Attributes.TryGetValue("Domain", val))
 					{
-						if(val.Value == L"quads")			cornerCount = 4;
-						else if(val.Value == L"triangles")	cornerCount = 3;
+						if(val.Value == "quads")			cornerCount = 4;
+						else if(val.Value == "triangles")	cornerCount = 3;
 					}
 				}
 
@@ -18648,7 +18768,7 @@ namespace Spire
 				// For shader types that might output the special `SV_Position`
 				// output, we check if the stage in the pipeline actually
 				// declares this output, and emit the logic as needed.
-				if (stage->StageType == L"VertexShader" || stage->StageType == L"DomainShader")
+				if (stage->StageType == "VertexShader" || stage->StageType == "DomainShader")
 					GenerateVertexShaderEpilog(ctx, world.Ptr(), stage);
 
 				StringBuilder sb;
@@ -18659,8 +18779,8 @@ namespace Spire
 				// work, we generate a combined `struct` that comprises
 				// the user-declared outputs (in a nested `struct`) along
 				// with any system-interpreted outputs we need.
-				sb << L"struct T" << world->OutputType->TypeName << "Ext\n{\n";
-				sb << L"T" << world->OutputType->TypeName << " user";
+				sb << "struct T" << world->OutputType->TypeName << "Ext\n{\n";
+				sb << "T" << world->OutputType->TypeName << " user";
 
 				// The fragment shader needs to use the specific output
 				// semantic `SV_Target` as expected by the HLSL compiler.
@@ -18671,19 +18791,19 @@ namespace Spire
 				// already applied to the fields of the output `struct`.
 				if(stage->StageType == "FragmentShader")
 				{
-					sb << L" : SV_Target";
+					sb << " : SV_Target";
 				}
-				sb << L";\n";
+				sb << ";\n";
 
 				// We emit any required system-output semantics here.
 				// For now we are just handling `SV_Position`, but
 				// values like fragment shader depth output, etc.
 				// would also go here.
-				if(stage->Attributes.TryGetValue(L"Position"))
+				if(stage->Attributes.TryGetValue("Position"))
 				{
-					sb << L"float4 sv_position : SV_Position;\n";
+					sb << "float4 sv_position : SV_Position;\n";
 				}
-				sb << L"};\n";
+				sb << "};\n";
 
 				if(dsPatchType || dsCornerPointType)
 				{
@@ -18697,15 +18817,15 @@ namespace Spire
 					// above, we are going to output a single `struct`
 					// that combines user-defined and system inputs.
 
-					sb << L"struct TStageInputPatch\n{\n";
+					sb << "struct TStageInputPatch\n{\n";
 					if(dsPatchType)
 					{
 						// In order to ensure consistent semantics, we apply
 						// a blanket `P` semantic here to the per-patch input.
 						// This semantic will override any per-field semantics
 						// that got emitted for the record type itself.
-						sb << L"T" << dsPatchType->TypeName << L" "
-							<< dsPatchInput->Name << L" : P;\n";
+						sb << "T" << dsPatchType->TypeName << " "
+							<< dsPatchInput->Name << " : P;\n";
 					}
 					if(dsCornerPointType)
 					{
@@ -18714,9 +18834,9 @@ namespace Spire
 						// apply a single blanket semantic that will go and
 						// recursively enumerate unique semantics for all
 						// the array elements and fields.
-						sb << L"T" << dsCornerPointType->TypeName << L" "
+						sb << "T" << dsCornerPointType->TypeName << " "
 							<< dsCornerPointInput->Name
-							<< L"[" << cornerCount << L"] : C;\n";
+							<< "[" << cornerCount << "] : C;\n";
 					}
 
 					// Note: HLSL requires tessellation level to be declared
@@ -18726,18 +18846,18 @@ namespace Spire
 					// attribute by string comparison is dangerous, and needs
 					// to be handled more centrally and robustly.
 					StageAttribute val;
-					if(stage->Attributes.TryGetValue(L"Domain", val) && (val.Value == L"quads"))
+					if(stage->Attributes.TryGetValue("Domain", val) && (val.Value == "quads"))
 					{
-						sb << L"    float sv_TessFactors[4] : SV_TessFactor;\n";
-						sb << L"    float sv_InsideTessFactors[2] : SV_InsideTessFactor;\n";
+						sb << "    float sv_TessFactors[4] : SV_TessFactor;\n";
+						sb << "    float sv_InsideTessFactors[2] : SV_InsideTessFactor;\n";
 					}
 					else
 					{
-						sb << L"    float sv_TessFactors[3] : SV_TessFactor;\n";
-						sb << L"    float sv_InsideTessFactors[1] : SV_InsideTessFactor;\n";
+						sb << "    float sv_TessFactors[3] : SV_TessFactor;\n";
+						sb << "    float sv_InsideTessFactors[1] : SV_InsideTessFactor;\n";
 					}
 
-					sb << L"};\n";
+					sb << "};\n";
 				}
 
 				// The domain shader has a few required attributes that need
@@ -18747,7 +18867,7 @@ namespace Spire
 					GenerateDomainShaderAttributes(sb, stage);
 				}
 
-				sb << L"T" << world->OutputType->TypeName << L"Ext main(";
+				sb << "T" << world->OutputType->TypeName << "Ext main(";
 
 				if(stageInputType)
 				{
@@ -18760,7 +18880,7 @@ namespace Spire
 						// A domain shader needs to declare an array of input
 						// control points, using the special-purpose generic type
 						// provided by HLSL.
-						sb << L"OutputPatch<T" << stageInputType->TypeName << ", " << controlPointCount.Value << L"> stage_input";
+						sb << "OutputPatch<T" << stageInputType->TypeName << ", " << controlPointCount.Value << "> stage_input";
 					}
 					else if (stage->StageType == "VertexShader")
 					{
@@ -18770,14 +18890,14 @@ namespace Spire
 						// so that the individual vertex elements in the input
 						// layout will all get the semantic "A" with sequential
 						// indices starting at zero.
-						sb << L"\n    T" << stageInputType->TypeName << " stage_input : A";
+						sb << "\n    T" << stageInputType->TypeName << " stage_input : A";
 					}
 					else
 					{
 						// Finally, the default case just uses the semantics
 						// that were automatically assigned to the fields
 						// of the input record type.
-						sb << L"\n    T" << stageInputType->TypeName << " stage_input";
+						sb << "\n    T" << stageInputType->TypeName << " stage_input";
 					}
 				}
 
@@ -18785,33 +18905,33 @@ namespace Spire
 				{
 					// For a domain shader, we also need to declare
 					// the per-patch (and per-corner point) input.
-					sb << L",\n    TStageInputPatch stage_input_patch";
+					sb << ",\n    TStageInputPatch stage_input_patch";
 				}
 
 				// Next we declare any addition system inputs that ended up
 				// being used during code generation.
 				if(ctx.UsedSystemInputs.Contains(ExternComponentCodeGenInfo::SystemVarType::TessCoord))
 				{
-					sb << L",\n    ";
+					sb << ",\n    ";
 
 					StageAttribute val;
-					if(stage->Attributes.TryGetValue(L"Domain", val))
-						sb << ((val.Value == L"quads") ? L"float2" : L"float3");
+					if(stage->Attributes.TryGetValue("Domain", val))
+						sb << ((val.Value == "quads") ? "float2" : "float3");
 					else
-						sb << L"float3";
+						sb << "float3";
 
-					sb << L" sv_DomainLocation : SV_DomainLocation";
+					sb << " sv_DomainLocation : SV_DomainLocation";
 				}
 				if(ctx.UsedSystemInputs.Contains(ExternComponentCodeGenInfo::SystemVarType::FragCoord))
 				{
-					sb << L",\n    float4 sv_FragPosition : SV_Position";
+					sb << ",\n    float4 sv_FragPosition : SV_Position";
 				}
 
 				sb << ")\n{ \n";
 				sb << "T" << world->OutputType->TypeName << "Ext stage_output;\n";
 				sb << ctx.Header.ProduceString() << ctx.Body.ProduceString();
 				sb << "return stage_output;\n";
-				sb << L"}";
+				sb << "}";
 				rs.MainCode = sb.ProduceString();
 				return rs;
 			}
@@ -18820,7 +18940,7 @@ namespace Spire
 			{
 				// By convention, the name of the generated `struct` is
 				// "T" prefixed onto the name of the record type.
-				ctx.GlobalHeader << L"struct T" << recType->TypeName << L"\n{\n";
+				ctx.GlobalHeader << "struct T" << recType->TypeName << "\n{\n";
 
 				int index = 0;
 				for (auto & field : recType->Members)
@@ -18830,7 +18950,7 @@ namespace Spire
 					// this relaly only affects records that flow
 					// through rasterization/setup/interpolation.
 					if (field.Value.Type->IsIntegral())
-						ctx.GlobalHeader << L"noperspective ";
+						ctx.GlobalHeader << "noperspective ";
 
 					// Declare the field as a `struct` member
 					String declName = field.Key;
@@ -18866,7 +18986,7 @@ namespace Spire
 					index++;
 				}
 
-				ctx.GlobalHeader << L"};\n";
+				ctx.GlobalHeader << "};\n";
 			}
 
 			// Most of our generated HLSL code can use a single simple output
@@ -18892,9 +19012,9 @@ namespace Spire
 
 				virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) override
 				{
-					ctx.Body << prefix << L"." << instr->ComponentName << L" = ";
+					ctx.Body << prefix << "." << instr->ComponentName << " = ";
 					codeGen->PrintOp(ctx, instr->Operand.Ptr());
-					ctx.Body << L";\n";
+					ctx.Body << ";\n";
 				}
 			};
 
@@ -18912,55 +19032,55 @@ namespace Spire
 				StageAttribute patchWorldName, controlPointWorldName, cornerPointWorldName, domain, innerLevel, outerLevel, numControlPoints;
 				StageAttribute inputControlPointCount;
 				RefPtr<ILWorld> patchWorld, controlPointWorld, cornerPointWorld;
-				if (!stage->Attributes.TryGetValue(L"PatchWorld", patchWorldName))
+				if (!stage->Attributes.TryGetValue("PatchWorld", patchWorldName))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'PatchWorld'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'PatchWorld'.", stage->Position);
 					return rs;
 				}
 				if (!shader->Worlds.TryGetValue(patchWorldName.Value, patchWorld))
-					errWriter->Error(50022, L"world '" + patchWorldName.Value + L"' is not defined.", patchWorldName.Position);
-				if (!stage->Attributes.TryGetValue(L"ControlPointWorld", controlPointWorldName))
+					errWriter->Error(50022, "world '" + patchWorldName.Value + "' is not defined.", patchWorldName.Position);
+				if (!stage->Attributes.TryGetValue("ControlPointWorld", controlPointWorldName))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'ControlPointWorld'.", stage->Position); 
+					errWriter->Error(50052, "'HullShader' requires attribute 'ControlPointWorld'.", stage->Position); 
 					return rs;
 				}
 				if (!shader->Worlds.TryGetValue(controlPointWorldName.Value, controlPointWorld))
-					errWriter->Error(50022, L"world '" + controlPointWorldName.Value + L"' is not defined.", controlPointWorldName.Position);
-				if (!stage->Attributes.TryGetValue(L"CornerPointWorld", cornerPointWorldName))
+					errWriter->Error(50022, "world '" + controlPointWorldName.Value + "' is not defined.", controlPointWorldName.Position);
+				if (!stage->Attributes.TryGetValue("CornerPointWorld", cornerPointWorldName))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'CornerPointWorld'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'CornerPointWorld'.", stage->Position);
 					return rs;
 				}
 				if (!shader->Worlds.TryGetValue(cornerPointWorldName.Value, cornerPointWorld))
-					errWriter->Error(50022, L"world '" + cornerPointWorldName.Value + L"' is not defined.", cornerPointWorldName.Position);
-				if (!stage->Attributes.TryGetValue(L"Domain", domain))
+					errWriter->Error(50022, "world '" + cornerPointWorldName.Value + "' is not defined.", cornerPointWorldName.Position);
+				if (!stage->Attributes.TryGetValue("Domain", domain))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'Domain'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'Domain'.", stage->Position);
 					return rs;
 				}
-				if (domain.Value != L"triangles" && domain.Value != L"quads")
+				if (domain.Value != "triangles" && domain.Value != "quads")
 				{
-					errWriter->Error(50053, L"'Domain' should be either 'triangles' or 'quads'.", domain.Position);
+					errWriter->Error(50053, "'Domain' should be either 'triangles' or 'quads'.", domain.Position);
 					return rs;
 				}
-				if (!stage->Attributes.TryGetValue(L"TessLevelOuter", outerLevel))
+				if (!stage->Attributes.TryGetValue("TessLevelOuter", outerLevel))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'TessLevelOuter'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'TessLevelOuter'.", stage->Position);
 					return rs;
 				}
-				if (!stage->Attributes.TryGetValue(L"TessLevelInner", innerLevel))
+				if (!stage->Attributes.TryGetValue("TessLevelInner", innerLevel))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'TessLevelInner'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'TessLevelInner'.", stage->Position);
 					return rs;
 				}
-				if (!stage->Attributes.TryGetValue(L"InputControlPointCount", inputControlPointCount))
+				if (!stage->Attributes.TryGetValue("InputControlPointCount", inputControlPointCount))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'InputControlPointCount'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'InputControlPointCount'.", stage->Position);
 					return rs;
 				}
-				if (!stage->Attributes.TryGetValue(L"ControlPointCount", numControlPoints))
+				if (!stage->Attributes.TryGetValue("ControlPointCount", numControlPoints))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'ControlPointCount'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'ControlPointCount'.", stage->Position);
 					return rs;
 				}
 
@@ -18970,15 +19090,15 @@ namespace Spire
 				// or only require them when generating HLSL.
 				//
 				StageAttribute partitioning;
-				if(!stage->Attributes.TryGetValue(L"Partitioning", partitioning))
+				if(!stage->Attributes.TryGetValue("Partitioning", partitioning))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'Partitioning'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'Partitioning'.", stage->Position);
 					return rs;
 				}
 				StageAttribute outputTopology;
-				if(!stage->Attributes.TryGetValue(L"OutputTopology", outputTopology))
+				if(!stage->Attributes.TryGetValue("OutputTopology", outputTopology))
 				{
-					errWriter->Error(50052, L"'HullShader' requires attribute 'OutputTopology'.", stage->Position);
+					errWriter->Error(50052, "'HullShader' requires attribute 'OutputTopology'.", stage->Position);
 					return rs;
 				}
 				// TODO(tfoley): Any reason to include an optional
@@ -18994,9 +19114,9 @@ namespace Spire
 				PrintHeaderBoilerplate(ctx);
 
 				int cornerCount = 3;
-				if(domain.Value == L"triangles")
+				if(domain.Value == "triangles")
 					cornerCount = 3;
-				else if(domain.Value == L"quads")
+				else if(domain.Value == "quads")
 					cornerCount = 4;
 
 
@@ -19014,9 +19134,8 @@ namespace Spire
 				// Similar to the single-world case, we try to capture
 				// some information about inputs so that we can use it
 				// to inform code generation later.
-				String perCornerIteratorInputName = L"perCornerIterator";
-				ILRecordType* coarseVertexType;
-
+				String perCornerIteratorInputName = "perCornerIterator";
+				ILRecordType* coarseVertexType = nullptr;
 				//
 				for (auto & input : controlPointWorld->Inputs)
 				{
@@ -19065,7 +19184,7 @@ namespace Spire
 				cornerPointWorld->Code->NameAllInstructions();
 
 				StringBuilder cornerPointOutputPrefix;
-				cornerPointOutputPrefix << L"stage_output.corners[" << perCornerIteratorInputName << L"]";
+				cornerPointOutputPrefix << "stage_output.corners[" << perCornerIteratorInputName << "]";
 
 				outputStrategy = new SimpleOutputStrategy(this, cornerPointWorld.Ptr(), cornerPointOutputPrefix.ProduceString());
 				outputStrategy->DeclareOutput(ctx, stage);
@@ -19073,17 +19192,17 @@ namespace Spire
 				// Note(tfoley): We use the `[unroll]` attribute here, because
 				// the HLSL compiler will end up unrolling this loop anyway,
 				// and we'd rather not get their warning about it.
-				ctx.Body << L"[unroll] for (uint " << perCornerIteratorInputName << " = 0; "
-					<< perCornerIteratorInputName << " < " << cornerCount << L"; "
+				ctx.Body << "[unroll] for (uint " << perCornerIteratorInputName << " = 0; "
+					<< perCornerIteratorInputName << " < " << cornerCount << "; "
 					<< perCornerIteratorInputName << "++)\n{\n";
 				GenerateCode(ctx, cornerPointWorld->Code.Ptr());
 				auto debugStr = cornerPointWorld->Code->ToString();
-				ctx.Body << L"}\n";
+				ctx.Body << "}\n";
 				outputStrategy = NULL;
 
 				// Perform per-patch computation
 				patchWorld->Code->NameAllInstructions();
-				outputStrategy = CreateStandardOutputStrategy(patchWorld.Ptr(), L"patch");
+				outputStrategy = CreateStandardOutputStrategy(patchWorld.Ptr(), "patch");
 				outputStrategy->DeclareOutput(ctx, stage);
 				GenerateCode(ctx, patchWorld->Code.Ptr());
 
@@ -19091,7 +19210,7 @@ namespace Spire
 				StageAttribute val;
 				int tessFactorCount = 3;
 				int insideFactorCount = 1;
-				if(stage->Attributes.TryGetValue(L"Domain", val) && (val.Value == L"quads"))
+				if(stage->Attributes.TryGetValue("Domain", val) && (val.Value == "quads"))
 				{
 					tessFactorCount = 4;
 					insideFactorCount = 2;
@@ -19126,9 +19245,9 @@ namespace Spire
 						{
 							// TODO(tfoley): is this needlessly re-computing the operand multiple times?
 
-							ctx.Body << L"stage_output.sv_TessFactors[" << i << L"] = ";
+							ctx.Body << "stage_output.sv_TessFactors[" << i << "] = ";
 							PrintOp(ctx, operand);
-							ctx.Body << L"[" << i << L"];\n";
+							ctx.Body << "[" << i << "];\n";
 						}
 						found = true;
 						break;
@@ -19136,7 +19255,7 @@ namespace Spire
 
 				}
 				if (!found)
-					errWriter->Error(50041, L"'" + outerLevel.Value + L"': component not defined.",
+					errWriter->Error(50041, "'" + outerLevel.Value + "': component not defined.",
 						outerLevel.Position);
 
 
@@ -19148,16 +19267,16 @@ namespace Spire
 					{
 						for (int i = 0; i < insideFactorCount; i++)
 						{
-							ctx.Body << L"stage_output.sv_InsideTessFactors[" << i << L"] = ";
+							ctx.Body << "stage_output.sv_InsideTessFactors[" << i << "] = ";
 							PrintOp(ctx, operand);
-							ctx.Body << L"[" << i << L"];\n";
+							ctx.Body << "[" << i << "];\n";
 						}
 						found = true;
 						break;
 					}
 				}
 				if (!found)
-					errWriter->Error(50041, L"'" + innerLevel.Value + L"': component not defined.",
+					errWriter->Error(50041, "'" + innerLevel.Value + "': component not defined.",
 						innerLevel.Position);
 
 				// Now surround the code with the boilerplate needed to
@@ -19165,17 +19284,17 @@ namespace Spire
 
 				StringBuilder patchMain;
 
-				patchMain << L"struct SPIRE_PatchOutput\n{\n";
-				patchMain << L"T" << patchWorld->OutputType->TypeName << " user : P;\n";
-				patchMain << L"T" << cornerPointWorld->OutputType->TypeName << L" corners[" << cornerCount << L"] : C;\n";
+				patchMain << "struct SPIRE_PatchOutput\n{\n";
+				patchMain << "T" << patchWorld->OutputType->TypeName << " user : P;\n";
+				patchMain << "T" << cornerPointWorld->OutputType->TypeName << " corners[" << cornerCount << "] : C;\n";
 
-				patchMain << L"    float sv_TessFactors[" << tessFactorCount << L"] : SV_TessFactor;\n";
-				patchMain << L"    float sv_InsideTessFactors[" << insideFactorCount << "] : SV_InsideTessFactor;\n";
+				patchMain << "    float sv_TessFactors[" << tessFactorCount << "] : SV_TessFactor;\n";
+				patchMain << "    float sv_InsideTessFactors[" << insideFactorCount << "] : SV_InsideTessFactor;\n";
 
-				patchMain << L"};\n";
+				patchMain << "};\n";
 
 
-				patchMain << L"SPIRE_PatchOutput SPIRE_patchOutput(";
+				patchMain << "SPIRE_PatchOutput SPIRE_patchOutput(";
 
 				if (coarseVertexType)
 				{
@@ -19184,7 +19303,7 @@ namespace Spire
 				// TODO(tfoley): provide other input shere like SV_PrimitiveID
 
 
-				patchMain << L")\n{\n";
+				patchMain << ")\n{\n";
 				patchMain << "SPIRE_PatchOutput stage_output;\n";
 				patchMain << ctx.Header.ProduceString() << ctx.Body.ProduceString();
 				patchMain << "return stage_output;\n";
@@ -19211,90 +19330,90 @@ namespace Spire
 				// state for it).
 
 				// Name of the entry point to use for the patch-constant phase
-				controlPointMain << L"[patchconstantfunc(\"SPIRE_patchOutput\")]\n";
+				controlPointMain << "[patchconstantfunc(\"SPIRE_patchOutput\")]\n";
 
 				// Domain for tessellation.
-				controlPointMain << L"[domain(\"";
-				if(domain.Value == L"quads")
+				controlPointMain << "[domain(\"";
+				if(domain.Value == "quads")
 				{
-					controlPointMain << L"quad";
+					controlPointMain << "quad";
 				}
-				else if(domain.Value == L"triangles")
+				else if(domain.Value == "triangles")
 				{
-					controlPointMain << L"tri";
+					controlPointMain << "tri";
 				}
 				else
 				{
-					errWriter->Error(50053, L"'Domain' should be either 'triangles' or 'quads'.", domain.Position);
+					errWriter->Error(50053, "'Domain' should be either 'triangles' or 'quads'.", domain.Position);
 					return rs;
 				}
-				controlPointMain << L"\")]\n";
+				controlPointMain << "\")]\n";
 
 				// Parititoning mode (integer, fractional, etc.)
-				controlPointMain << L"[partitioning(\"";
-				if(partitioning.Value == L"integer")
+				controlPointMain << "[partitioning(\"";
+				if(partitioning.Value == "integer")
 				{
 					controlPointMain << "integer";
 				}
-				else if(partitioning.Value == L"pow2")
+				else if(partitioning.Value == "pow2")
 				{
 					controlPointMain << "pow2";
 				}
-				else if(partitioning.Value == L"fractional_even")
+				else if(partitioning.Value == "fractional_even")
 				{
 					controlPointMain << "fractional_even";
 				}
-				else if(partitioning.Value == L"fractional_odd")
+				else if(partitioning.Value == "fractional_odd")
 				{
 					controlPointMain << "fractional_odd";
 				}
 				else
 				{
-					errWriter->Error(50053, L"'Partitioning' must be one of: 'integer', 'pow2', 'fractional_even', or 'fractional_odd'.", partitioning.Position);
+					errWriter->Error(50053, "'Partitioning' must be one of: 'integer', 'pow2', 'fractional_even', or 'fractional_odd'.", partitioning.Position);
 					return rs;
 				}
-				controlPointMain << L"\")]\n";
+				controlPointMain << "\")]\n";
 
 				// Desired output topology, including winding order
 				// for triangles.
-				controlPointMain << L"[outputtopology(\"";
-				if(outputTopology.Value == L"point")
+				controlPointMain << "[outputtopology(\"";
+				if(outputTopology.Value == "point")
 				{
 					controlPointMain << "point";
 				}
-				else if(outputTopology.Value == L"line")
+				else if(outputTopology.Value == "line")
 				{
 					controlPointMain << "line";
 				}
-				else if(outputTopology.Value == L"triangle_cw")
+				else if(outputTopology.Value == "triangle_cw")
 				{
 					controlPointMain << "triangle_cw";
 				}
-				else if(outputTopology.Value == L"triangle_ccw")
+				else if(outputTopology.Value == "triangle_ccw")
 				{
 					controlPointMain << "triangle_ccw";
 				}
 				else
 				{
-					errWriter->Error(50053, L"'OutputTopology' must be one of: 'point', 'line', 'triangle_cw', or 'triangle_ccw'.", partitioning.Position);
+					errWriter->Error(50053, "'OutputTopology' must be one of: 'point', 'line', 'triangle_cw', or 'triangle_ccw'.", partitioning.Position);
 					return rs;
 				}
-				controlPointMain << L"\")]\n";
+				controlPointMain << "\")]\n";
 
 				// Number of output control points
-				controlPointMain << L"[outputcontrolpoints(" << numControlPoints.Value << ")]\n";
+				controlPointMain << "[outputcontrolpoints(" << numControlPoints.Value << ")]\n";
 
 				// With all the attributes dealt with, we can emit the actual `main()` routine
 
-				controlPointMain << L"T" << controlPointWorld->OutputType->TypeName << " main(";
+				controlPointMain << "T" << controlPointWorld->OutputType->TypeName << " main(";
 
-				controlPointMain << L"    InputPatch<T" << coarseVertexType->TypeName << L", " << inputControlPointCount.Value << L"> stage_input";
-				controlPointMain << L",\n    uint sv_ControlPointID : SV_OutputControlPointID";
+				controlPointMain << "    InputPatch<T" << coarseVertexType->TypeName << ", " << inputControlPointCount.Value << "> stage_input";
+				controlPointMain << ",\n    uint sv_ControlPointID : SV_OutputControlPointID";
 
-				controlPointMain << L")\n{\n";
-				controlPointMain << L"T" << controlPointWorld->OutputType->TypeName << " stage_output;\n";
+				controlPointMain << ")\n{\n";
+				controlPointMain << "T" << controlPointWorld->OutputType->TypeName << " stage_output;\n";
 				controlPointMain << ctx.Header.ProduceString() << ctx.Body.ProduceString();
-				controlPointMain << L"return stage_output;\n";
+				controlPointMain << "return stage_output;\n";
 				controlPointMain << "}\n";
 
 				StringBuilder sb;
@@ -19323,21 +19442,21 @@ namespace Spire
 			}
 			virtual void DeclareOutput(CodeGenContext & ctx, ILStage *) override
 			{
-				ctx.GlobalHeader << L"struct T" << world->OutputType->TypeName << L"\n{\n";
+				ctx.GlobalHeader << "struct T" << world->OutputType->TypeName << "\n{\n";
 
 				for (auto & field : world->OutputType->Members)
 				{
 					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), field.Key);
-					ctx.GlobalHeader << L";\n";
+					ctx.GlobalHeader << ";\n";
 				}
 
-				ctx.GlobalHeader << L"};\n";
+				ctx.GlobalHeader << "};\n";
 			}
 			virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) override
 			{
-				ctx.Body << AddWorldNameSuffix(instr->ComponentName, world->Name) << L"[" << outputIndex << L"] = ";
+				ctx.Body << AddWorldNameSuffix(instr->ComponentName, world->Name) << "[" << outputIndex << "] = ";
 				codeGen->PrintOp(ctx, instr->Operand.Ptr());
-				ctx.Body << L";\n";
+				ctx.Body << ";\n";
 			}
 		};
 
@@ -19352,9 +19471,9 @@ namespace Spire
 			{
 				for (auto & field : world->OutputType->Members)
 				{
-					ctx.GlobalHeader << L"out ";
+					ctx.GlobalHeader << "out ";
 					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), field.Key);
-					ctx.GlobalHeader << L";\n";
+					ctx.GlobalHeader << ";\n";
 				}
 			}
 			virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * exportInstr) override
@@ -19362,79 +19481,79 @@ namespace Spire
 				String conversionFunction;
 				int size = 0;
 				String typeName = exportInstr->Type->ToString();
-				if (typeName == L"int")
+				if (typeName == "int")
 				{
-					conversionFunction = L"intBitsToFloat";
+					conversionFunction = "intBitsToFloat";
 					size = 1;
 				}
-				else if (typeName == L"ivec2")
+				else if (typeName == "ivec2")
 				{
-					conversionFunction = L"intBitsToFloat";
+					conversionFunction = "intBitsToFloat";
 					size = 2;
 				}
-				else if (typeName == L"ivec3")
+				else if (typeName == "ivec3")
 				{
-					conversionFunction = L"intBitsToFloat";
+					conversionFunction = "intBitsToFloat";
 					size = 3;
 				}
-				else if (typeName == L"ivec4")
+				else if (typeName == "ivec4")
 				{
-					conversionFunction = L"intBitsToFloat";
+					conversionFunction = "intBitsToFloat";
 					size = 4;
 				}
-				else if (typeName == L"uint")
+				else if (typeName == "uint")
 				{
-					conversionFunction = L"uintBitsToFloat";
+					conversionFunction = "uintBitsToFloat";
 					size = 1;
 				}
-				else if (typeName == L"uvec2")
+				else if (typeName == "uvec2")
 				{
-					conversionFunction = L"uintBitsToFloat";
+					conversionFunction = "uintBitsToFloat";
 					size = 2;
 				}
-				else if (typeName == L"uvec3")
+				else if (typeName == "uvec3")
 				{
-					conversionFunction = L"uintBitsToFloat";
+					conversionFunction = "uintBitsToFloat";
 					size = 3;
 				}
-				else if (typeName == L"uvec4")
+				else if (typeName == "uvec4")
 				{
-					conversionFunction = L"uintBitsToFloat";
+					conversionFunction = "uintBitsToFloat";
 					size = 4;
 				}
-				else if (typeName == L"float")
+				else if (typeName == "float")
 				{
-					conversionFunction = L"";
+					conversionFunction = "";
 					size = 1;
 				}
-				else if (typeName == L"vec2")
+				else if (typeName == "vec2")
 				{
-					conversionFunction = L"";
+					conversionFunction = "";
 					size = 2;
 				}
-				else if (typeName == L"vec3")
+				else if (typeName == "vec3")
 				{
-					conversionFunction = L"";
+					conversionFunction = "";
 					size = 3;
 				}
-				else if (typeName == L"vec4")
+				else if (typeName == "vec4")
 				{
-					conversionFunction = L"";
+					conversionFunction = "";
 					size = 4;
 				}
-				else if (typeName == L"mat3")
+				else if (typeName == "mat3")
 				{
-					conversionFunction = L"";
+					conversionFunction = "";
 					size = 9;
 				}
-				else if (typeName == L"mat4")
+				else if (typeName == "mat4")
 				{
-					conversionFunction = L"";
+					conversionFunction = "";
 					size = 16;
 				}
 				else
 				{
-					codeGen->Error(50082, L"importing type '" + typeName + L"' from PackedBuffer is not supported by the GLSL backend.",
+					codeGen->Error(50082, "importing type '" + typeName + "' from PackedBuffer is not supported by the GLSL backend.",
 						CodePosition());
 				}
 				auto recType = world->OutputType.Ptr();
@@ -19447,17 +19566,17 @@ namespace Spire
 				}
 				for (int i = 0; i < size; i++)
 				{
-					ctx.Body << L"sysOutputBuffer.content[gl_InvocationId.x * " << recTypeSize << L" + " + memberOffsets[exportInstr->ComponentName]()
-						<< L"] = " << conversionFunction << L"(";
+					ctx.Body << "sysOutputBuffer.content[gl_InvocationId.x * " << recTypeSize << " + " + memberOffsets[exportInstr->ComponentName]()
+						<< "] = " << conversionFunction << "(";
 					codeGen->PrintOp(ctx, exportInstr->Operand.Ptr());
 					if (size <= 4)
-						ctx.Body << L"[" << i << L"]";
+						ctx.Body << "[" << i << "]";
 					else
 					{
 						int width = size == 9 ? 3 : 4;
-						ctx.Body << L"[" << i / width << L"][" << i % width << L"]";
+						ctx.Body << "[" << i / width << "][" << i % width << "]";
 					}
-					ctx.Body << L");\n";
+					ctx.Body << ");\n";
 				}
 			}
 		};
@@ -19495,43 +19614,43 @@ namespace Spire
 
 		RefPtr<ILType> BaseTypeFromString(CoreLib::Text::TokenReader & parser)
 		{
-			if (parser.LookAhead(L"int"))
+			if (parser.LookAhead("int"))
 				return new ILBasicType(ILBaseType::Int);
-			else if (parser.LookAhead(L"uint"))
+			else if (parser.LookAhead("uint"))
 				return new ILBasicType(ILBaseType::UInt);
-			else if (parser.LookAhead(L"uvec2"))
+			else if (parser.LookAhead("uvec2"))
 				return new ILBasicType(ILBaseType::UInt2);
-			else if (parser.LookAhead(L"uvec3"))
+			else if (parser.LookAhead("uvec3"))
 				return new ILBasicType(ILBaseType::UInt3);
-			else if (parser.LookAhead(L"uvec4"))
+			else if (parser.LookAhead("uvec4"))
 				return new ILBasicType(ILBaseType::UInt4);
-			if (parser.LookAhead(L"float"))
+			if (parser.LookAhead("float"))
 				return new ILBasicType(ILBaseType::Float);
-			if (parser.LookAhead(L"vec2"))
+			if (parser.LookAhead("vec2"))
 				return new ILBasicType(ILBaseType::Float2);
-			if (parser.LookAhead(L"vec3"))
+			if (parser.LookAhead("vec3"))
 				return new ILBasicType(ILBaseType::Float3);
-			if (parser.LookAhead(L"vec4"))
+			if (parser.LookAhead("vec4"))
 				return new ILBasicType(ILBaseType::Float4);
-			if (parser.LookAhead(L"ivec2"))
+			if (parser.LookAhead("ivec2"))
 				return new ILBasicType(ILBaseType::Int2);
-			if (parser.LookAhead(L"mat3"))
+			if (parser.LookAhead("mat3"))
 				return new ILBasicType(ILBaseType::Float3x3);
-			if (parser.LookAhead(L"mat4"))
+			if (parser.LookAhead("mat4"))
 				return new ILBasicType(ILBaseType::Float4x4);
-			if (parser.LookAhead(L"ivec3"))
+			if (parser.LookAhead("ivec3"))
 				return new ILBasicType(ILBaseType::Int3);
-			if (parser.LookAhead(L"ivec4"))
+			if (parser.LookAhead("ivec4"))
 				return new ILBasicType(ILBaseType::Int4);
-			if (parser.LookAhead(L"sampler2D"))
+			if (parser.LookAhead("sampler2D"))
 				return new ILBasicType(ILBaseType::Texture2D);
-			if (parser.LookAhead(L"sampler2DShadow"))
+			if (parser.LookAhead("sampler2DShadow"))
 				return new ILBasicType(ILBaseType::TextureShadow);
-			if (parser.LookAhead(L"samplerCube"))
+			if (parser.LookAhead("samplerCube"))
 				return new ILBasicType(ILBaseType::TextureCube);
-			if (parser.LookAhead(L"samplerCubeShadow"))
+			if (parser.LookAhead("samplerCubeShadow"))
 				return new ILBasicType(ILBaseType::TextureCubeShadow);
-			if (parser.LookAhead(L"bool"))
+			if (parser.LookAhead("bool"))
 				return new ILBasicType(ILBaseType::Bool);
 			return nullptr;
 		}
@@ -19540,15 +19659,15 @@ namespace Spire
 		{
 			auto result = BaseTypeFromString(parser);
 			parser.ReadToken();
-			while (parser.LookAhead(L"["))
+			while (parser.LookAhead("["))
 			{
 				parser.ReadToken();
 				RefPtr<ILArrayType> newResult = new ILArrayType();
 				newResult->BaseType = result;
-				if (!parser.LookAhead(L"]"))
+				if (!parser.LookAhead("]"))
 					newResult->ArrayLength = parser.ReadInt();
 				result = newResult;
-				parser.Read(L"]");
+				parser.Read("]");
 			}
 			return result;
 		}
@@ -19791,7 +19910,7 @@ namespace Spire
 				numBuilder.Clear();
 				for (auto & c : instr.Name)
 				{
-					if (c >= L'0' && c <= '9')
+					if (c >= '0' && c <= '9')
 						numBuilder.Append(c);
 					else
 						numBuilder.Clear();
@@ -19807,7 +19926,7 @@ namespace Spire
 			for (auto & instr : GetAllInstructions())
 			{
 				if (instr.Name.Length() == 0)
-					instr.Name = String(L"t") + String(NamingCounter++, 16);
+					instr.Name = String("t") + String(NamingCounter++, 16);
 				else
 				{
 					int counter = 1;
@@ -19828,7 +19947,7 @@ namespace Spire
 			printf("===========\n");
 			for (auto& instr : *this)
 			{
-				printf("%s\n", instr.ToString().ToMultiByteString());
+				printf("%S\n", instr.ToString().ToWString());
 			}
 			printf("===========\n");
 		}
@@ -19839,7 +19958,7 @@ namespace Spire
 			Operand = dest;
 			Type = dest->Type->Clone();
 			if (!Spire::Compiler::Is<AllocVarInstruction>(dest) && !Spire::Compiler::Is<FetchArgInstruction>(dest))
-				throw L"invalid address operand";
+				throw "invalid address operand";
 		}
 		void MemberUpdateInstruction::Accept(InstructionVisitor * visitor)
 		{
@@ -20015,19 +20134,19 @@ namespace Spire
 		String ImportInstruction::ToString()
 		{
 			StringBuilder rs;
-			rs << Name << L" = import [" << ComponentName << L"](";
+			rs << Name << " = import [" << ComponentName << "](";
 			for (auto & arg : Arguments)
 			{
-				rs << arg->ToString() << L", ";
+				rs << arg->ToString() << ", ";
 			}
-			rs << L")";
-			rs << L"\n{";
-			rs << ImportOperator->ToString() << L"}\n";
+			rs << ")";
+			rs << "\n{";
+			rs << ImportOperator->ToString() << "}\n";
 			return rs.ProduceString();
 		}
 		String ImportInstruction::GetOperatorString()
 		{
-			return L"import";
+			return "import";
 		}
 		void ImportInstruction::Accept(InstructionVisitor * visitor)
 		{
@@ -20174,7 +20293,7 @@ namespace Spire
 			ComponentDefinitionIR * MakeComponentAvailableAtWorldInternal(HashSet<String> & visitedComponents, String componentUniqueName, String world)
 			{
 				RefPtr<ComponentDefinitionIR> refDef;
-				if (passThroughComponents.TryGetValue(EscapeDoubleUnderscore(componentUniqueName + L"_" + world), refDef))
+				if (passThroughComponents.TryGetValue(EscapeDoubleUnderscore(componentUniqueName + "_" + world), refDef))
 					return refDef.Ptr();
 				if (visitedComponents.Contains(componentUniqueName + "@" + world))
 				{
@@ -20184,10 +20303,10 @@ namespace Spire
 					{
 						refs << comp;
 						if (count != visitedComponents.Count() - 1)
-							refs << L", ";
+							refs << ", ";
 						count++;
 					}
-					Error(34062, L"cyclic reference: " + refs.ProduceString(), currentCompDef->SyntaxNode.Ptr());
+					Error(34062, "cyclic reference: " + refs.ProduceString(), currentCompDef->SyntaxNode.Ptr());
 					return nullptr;
 				}
 				visitedComponents.Add(componentUniqueName);
@@ -20213,7 +20332,7 @@ namespace Spire
 				{
 					auto & node = importPath.Nodes.Last();
 					RefPtr<ComponentDefinitionIR> thruDef;
-					auto thruDefName = EscapeDoubleUnderscore(componentUniqueName + L"_" + node.TargetWorld);
+					auto thruDefName = EscapeDoubleUnderscore(componentUniqueName + "_" + node.TargetWorld);
 					if (!passThroughComponents.TryGetValue(thruDefName, thruDef))
 					{
 						auto srcDef = MakeComponentAvailableAtWorldInternal(visitedComponents, componentUniqueName, node.ImportOperator->SourceWorld.Content);
@@ -20223,7 +20342,7 @@ namespace Spire
 						srcDef->Users.Add(thruDef.Ptr());
 						thruDef->OriginalName = referencedDef->OriginalName;
 						thruDef->UniqueName = thruDefName;
-						thruDef->UniqueKey = referencedDef->UniqueKey + L"@" + node.TargetWorld;
+						thruDef->UniqueKey = referencedDef->UniqueKey + "@" + node.TargetWorld;
 						thruDef->IsEntryPoint = false;
 						thruDef->SyntaxNode = new ComponentSyntaxNode();
 						thruDef->SyntaxNode->Type = thruDef->Type = srcDef->SyntaxNode->Type;
@@ -20250,9 +20369,9 @@ namespace Spire
 				{
 					StringBuilder sb;
 					auto targetComp = shaderIR->Shader->AllComponents[componentUniqueName]();
-					sb << L"cannot find import operator to import component '" << targetComp->Name << "' to world '"
-						<< world << L"' when compiling '" << currentCompDef->OriginalName << L"'.\nsee definition of '" << targetComp->Name << L"' at " <<
-						targetComp->Implementations.First()->SyntaxNode->Position.ToString() << L".";
+					sb << "cannot find import operator to import component '" << targetComp->Name << "' to world '"
+						<< world << "' when compiling '" << currentCompDef->OriginalName << "'.\nsee definition of '" << targetComp->Name << "' at " <<
+						targetComp->Implementations.First()->SyntaxNode->Position.ToString() << ".";
 					Error(34064, sb.ProduceString(), currentCompDef->SyntaxNode.Ptr());
 					return currentCompDef;
 				}
@@ -20266,7 +20385,7 @@ namespace Spire
 				{
 					refNode->Variable = refDef->UniqueName;
 					refNode->Type = refDef->Type;
-					refNode->Tags[L"ComponentReference"] = new StringObject(refDef->UniqueName);
+					refNode->Tags["ComponentReference"] = new StringObject(refDef->UniqueName);
 					currentCompDef->Dependency.Add(refDef);
 					refDef->Users.Add(currentCompDef);
 				}
@@ -20275,7 +20394,7 @@ namespace Spire
 			RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode * var) override
 			{
 				RefPtr<Object> refCompObj;
-				if (var->Tags.TryGetValue(L"ComponentReference", refCompObj))
+				if (var->Tags.TryGetValue("ComponentReference", refCompObj))
 				{
 					auto refComp = refCompObj.As<StringObject>().Ptr();
 					return ProcessComponentReference(refComp->Content);
@@ -20286,7 +20405,7 @@ namespace Spire
 			RefPtr<ExpressionSyntaxNode> VisitMemberExpression(MemberExpressionSyntaxNode * member) override
 			{
 				RefPtr<Object> refCompObj;
-				if (member->Tags.TryGetValue(L"ComponentReference", refCompObj))
+				if (member->Tags.TryGetValue("ComponentReference", refCompObj))
 				{
 					auto refComp = refCompObj.As<StringObject>().Ptr();
 					return ProcessComponentReference(refComp->Content);
@@ -20346,25 +20465,25 @@ namespace Spire
 		{
 			RefPtr<KeyHoleNode> result = new KeyHoleNode();
 			result->NodeType = parser.ReadWord();
-			if (parser.LookAhead(L"<"))
+			if (parser.LookAhead("<"))
 			{
 				parser.ReadToken();
 				result->CaptureId = parser.ReadInt();
 				parser.ReadToken();
 			}
-			if (parser.LookAhead(L"("))
+			if (parser.LookAhead("("))
 			{
-				while (!parser.LookAhead(L")"))
+				while (!parser.LookAhead(")"))
 				{
 					result->Children.Add(ParseInternal(parser));
-					if (parser.LookAhead(L","))
+					if (parser.LookAhead(","))
 						parser.ReadToken();
 					else
 					{
 						break;
 					}
 				}
-				parser.Read(L")");
+				parser.Read(")");
 			}
 			return result;
 		}
@@ -20378,21 +20497,21 @@ namespace Spire
 		bool KeyHoleNode::Match(List<ILOperand*> & matchResult, ILOperand * instr)
 		{
 			bool matches = false;
-			if (NodeType == L"store")
+			if (NodeType == "store")
 				matches = dynamic_cast<StoreInstruction*>(instr) != nullptr;
-			else if (NodeType == L"op")
+			else if (NodeType == "op")
 				matches = true;
-			else if (NodeType == L"load")
+			else if (NodeType == "load")
 				matches = dynamic_cast<LoadInstruction*>(instr) != nullptr;
-			else if (NodeType == L"add")
+			else if (NodeType == "add")
 				matches = dynamic_cast<AddInstruction*>(instr) != nullptr;
-			else if (NodeType == L"mul")
+			else if (NodeType == "mu")
 				matches = dynamic_cast<MulInstruction*>(instr) != nullptr;
-			else if (NodeType == L"sub")
+			else if (NodeType == "sub")
 				matches = dynamic_cast<SubInstruction*>(instr) != nullptr;
-			else if (NodeType == L"call")
+			else if (NodeType == "cal")
 				matches = dynamic_cast<CallInstruction*>(instr) != nullptr;
-			else if (NodeType == L"switch")
+			else if (NodeType == "switch")
 				matches = dynamic_cast<SwitchInstruction*>(instr) != nullptr;
 			if (matches)
 			{
@@ -20445,10 +20564,10 @@ namespace Spire
 				switch (errType)
 				{
 				case CoreLib::Text::TokenizeErrorType::InvalidCharacter:
-					errorList.Add(CompileError(L"Illegal character '\\x" + String((int)curChar, 16) + L"'", 10000, pos));
+					errorList.Add(CompileError("Illegal character '\\x" + String((unsigned char)curChar, 16) + "'", 10000, pos));
 					break;
 				case CoreLib::Text::TokenizeErrorType::InvalidEscapeSequence:
-					errorList.Add(CompileError(L"Illegal character literial.", 10001, pos));
+					errorList.Add(CompileError("Illegal character literial.", 10001, pos));
 					break;
 				default:
 					break;
@@ -20474,12 +20593,12 @@ namespace Spire
 			bool isUnderScore = false;
 			for (auto ch : str)
 			{
-				if (ch == L'_')
+				if (ch == '_')
 				{
 					if (isUnderScore)
-						sb << L"I_";
+						sb << "I_";
 					else
-						sb << L"_";
+						sb << "_";
 					isUnderScore = true;
 				}
 				else
@@ -20489,7 +20608,7 @@ namespace Spire
 				}
 			}
 			if (isUnderScore)
-				sb << L"I";
+				sb << "I";
 			return sb.ProduceString();
 		}
 
@@ -20510,13 +20629,13 @@ namespace Spire
 	{
 		void PrintILShader(ILShader * shader)
 		{
-			printf("%S\n", shader->Name.Buffer());
-			printf("%S\n", shader->Position.ToString().Buffer());
+			printf("%S\n", shader->Name.ToWString());
+			printf("%S\n", shader->Position.ToString().ToWString());
 			printf("\n---\n\n");
 
 			for (auto& stage : shader->Stages)
 			{
-				printf("Stage: %S\n", stage.Key.Buffer());
+				printf("Stage: %S\n", stage.Key.ToWString());
 				auto& stageIL = stage.Value;
 
 				int maxAttrNameLength = 0;
@@ -20533,9 +20652,9 @@ namespace Spire
 				for (auto& attr : stageIL->Attributes)
 				{
 					printf("\t%-*S = %-*S (%S)\n",
-						maxAttrNameLength, attr.Value.Name.Buffer(),
-						maxAttrValueLength, attr.Value.Value.Buffer(),
-						attr.Value.Position.ToString().Buffer());
+						maxAttrNameLength, attr.Value.Name.ToWString(),
+						maxAttrValueLength, attr.Value.Value.ToWString(),
+						attr.Value.Position.ToString().ToWString());
 				}
 
 				printf("\n");
@@ -20545,7 +20664,7 @@ namespace Spire
 
 			for (auto& world : shader->Worlds)
 			{
-				printf("World: %S\n", world.Key.Buffer());
+				printf("World: %S\n", world.Key.ToWString());
 				//auto& worldIL = world.Value;
 			}
 		}
@@ -20576,16 +20695,16 @@ namespace Spire
 {
 	namespace Compiler
 	{
-		Token & Parser::ReadToken(const wchar_t * string)
+		Token & Parser::ReadToken(const char * string)
 		{
 			if (pos >= tokens.Count())
 			{
-				errors.Add(CompileError(String(L"\"") + string + String(L"\" expected but end of file encountered."), 20001, CodePosition(0, 0, 0, fileName)));
+				errors.Add(CompileError(String("\"") + string + String("\" expected but end of file encountered."), 20001, CodePosition(0, 0, 0, fileName)));
 				throw 0;
 			}
 			else if (tokens[pos].Content != string)
 			{
-				errors.Add(CompileError(String(L"\"") + string + String(L"\" expected"), 20001, tokens[pos].Position));
+				errors.Add(CompileError(String("\"") + string + String("\" expected"), 20001, tokens[pos].Position));
 				throw 20001;
 			}
 			return tokens[pos++];
@@ -20595,7 +20714,7 @@ namespace Spire
 		{
 			if (pos >= tokens.Count())
 			{
-				errors.Add(CompileError(String(L" Unexpected end of file."), 20001, CodePosition(0, 0, 0, fileName)));
+				errors.Add(CompileError(String(" Unexpected end of file."), 20001, CodePosition(0, 0, 0, fileName)));
 				throw 0;
 			}
 			return tokens[pos++];
@@ -20605,22 +20724,22 @@ namespace Spire
 		{
 			if (pos >= tokens.Count())
 			{
-				errors.Add(CompileError(TokenTypeToString(type) + String(L" expected but end of file encountered."), 20001, CodePosition(0, 0, 0, fileName)));
+				errors.Add(CompileError(TokenTypeToString(type) + String(" expected but end of file encountered."), 20001, CodePosition(0, 0, 0, fileName)));
 				throw 0;
 			}
 			else if(tokens[pos].Type != type)
 			{
-				errors.Add(CompileError(TokenTypeToString(type) + String(L" expected"), 20001, tokens[pos].Position));
+				errors.Add(CompileError(TokenTypeToString(type) + String(" expected"), 20001, tokens[pos].Position));
 				throw 20001;
 			}
 			return tokens[pos++];
 		}
 
-		bool Parser::LookAheadToken(const wchar_t * string, int offset)
+		bool Parser::LookAheadToken(const char * string, int offset)
 		{
 			if (pos + offset >= tokens.Count())
 			{
-				errors.Add(CompileError(String(L"\'") + string + String(L"\' expected but end of file encountered."), 20001, CodePosition(0, 0, 0, fileName)));
+				errors.Add(CompileError(String("\'") + string + String("\' expected but end of file encountered."), 20001, CodePosition(0, 0, 0, fileName)));
 				return false;
 			}
 			else
@@ -20636,7 +20755,7 @@ namespace Spire
 		{
 			if (pos + offset >= tokens.Count())
 			{
-				errors.Add(CompileError(TokenTypeToString(type) + String(L" expected but end of file encountered."), 20001, CodePosition(0, 0, 0, fileName)));
+				errors.Add(CompileError(TokenTypeToString(type) + String(" expected but end of file encountered."), 20001, CodePosition(0, 0, 0, fileName)));
 				return false;
 			}
 			else
@@ -20652,12 +20771,12 @@ namespace Spire
 		{
 			if (pos >= tokens.Count())
 			{
-				errors.Add(CompileError(String(L"type name expected but end of file encountered."), 20001, CodePosition(0, 0, 0, fileName)));
+				errors.Add(CompileError(String("type name expected but end of file encountered."), 20001, CodePosition(0, 0, 0, fileName)));
 				throw 0;
 			}
 			if(!IsTypeKeyword())
 			{
-				errors.Add(CompileError(String(L"type name expected but '" + tokens[pos].Content + L"' encountered."), 20001, tokens[pos].Position));
+				errors.Add(CompileError(String("type name expected but '" + tokens[pos].Content + "' encountered."), 20001, tokens[pos].Position));
 				throw 20001;
 			}
 			return tokens[pos++];
@@ -20667,7 +20786,7 @@ namespace Spire
 		{
 			if (pos >= tokens.Count())
 			{
-				errors.Add(CompileError(String(L"Unexpected end of file."), 20001, tokens[pos].Position));
+				errors.Add(CompileError(String("Unexpected end of file."), 20001, tokens[pos].Position));
 				throw 0;
 			}
 
@@ -20687,9 +20806,9 @@ namespace Spire
 				ReadToken(TokenType::LBracket);
 				auto name = ReadToken(TokenType::Identifier).Content;
 				String value;
-				if (LookAheadToken(L":"))
+				if (LookAheadToken(":"))
 				{
-					ReadToken(L":");
+					ReadToken(":");
 					value = ReadToken(TokenType::StringLiterial).Content;
 				}
 				rs[name] = value;
@@ -20711,27 +20830,27 @@ namespace Spire
 				{
 					try
 					{
-						if (LookAheadToken(L"shader") || LookAheadToken(L"module"))
+						if (LookAheadToken("shader") || LookAheadToken("module"))
 							program->Shaders.Add(ParseShader());
-						else if (LookAheadToken(L"pipeline"))
+						else if (LookAheadToken("pipeline"))
 							program->Pipelines.Add(ParsePipeline());
-						else if (LookAheadToken(L"struct"))
+						else if (LookAheadToken("struct"))
 							program->Structs.Add(ParseStruct());
-						else if (LookAheadToken(L"using"))
+						else if (LookAheadToken("using"))
 						{
-							ReadToken(L"using");
+							ReadToken("using");
 							program->Usings.Add(ReadToken(TokenType::StringLiterial));
 							ReadToken(TokenType::Semicolon);
 						}
-						else if (IsTypeKeyword() || LookAheadToken(L"inline") || LookAheadToken(L"extern")
-							|| LookAheadToken(L"__intrinsic") || LookAheadToken(TokenType::Identifier))
+						else if (IsTypeKeyword() || LookAheadToken("inline") || LookAheadToken("extern")
+							|| LookAheadToken("__intrinsic") || LookAheadToken(TokenType::Identifier))
 							program->Functions.Add(ParseFunction());
 						else if (LookAheadToken(TokenType::Semicolon))
 							ReadToken(TokenType::Semicolon);
 						else
 						{
 							if (lastPosBeforeError == 0 && pos < tokens.Count())
-								errors.Add(CompileError(L"unexpected token \'" + tokens[pos].Content + L"\'.", 20003, tokens[pos].Position));
+								errors.Add(CompileError("unexpected token \'" + tokens[pos].Content + "\'.", 20003, tokens[pos].Position));
 							throw 0;
 						}
 					}
@@ -20752,21 +20871,21 @@ namespace Spire
 		RefPtr<ShaderSyntaxNode> Parser::ParseShader()
 		{
 			RefPtr<ShaderSyntaxNode> shader = new ShaderSyntaxNode();
-			if (LookAheadToken(L"module"))
+			if (LookAheadToken("module"))
 			{
 				shader->IsModule = true;
-				ReadToken(L"module");
+				ReadToken("module");
 			}
 			else
-				ReadToken(L"shader");
+				ReadToken("shader");
 			PushScope();
 			FillPosition(shader.Ptr());
 			shader->Name = ReadToken(TokenType::Identifier);
 			try
 			{
-				if (LookAheadToken(L":"))
+				if (LookAheadToken(":"))
 				{
-					ReadToken(L":");
+					ReadToken(":");
 					shader->Pipeline = ReadToken(TokenType::Identifier);
 				}
 			}
@@ -20780,15 +20899,15 @@ namespace Spire
 			{
 				try
 				{
-					if (LookAheadToken(L"inline") || (LookAheadToken(L"public") && !LookAheadToken(L"using", 1)) ||
-						LookAheadToken(L"out") || LookAheadToken(L"@") || IsTypeKeyword()
-						|| LookAheadToken(L"[") || LookAheadToken(L"require") || LookAheadToken(L"extern"))
+					if (LookAheadToken("inline") || (LookAheadToken("public") && !LookAheadToken("using", 1)) ||
+						LookAheadToken("out") || LookAheadToken("@") || IsTypeKeyword()
+						|| LookAheadToken("[") || LookAheadToken("require") || LookAheadToken("extern"))
 					{
 						auto comp = ParseComponent();
 						comp->ParentModuleName = shader->Name;
 						shader->Members.Add(comp);
 					}
-					else if (LookAheadToken(L"using") || (LookAheadToken(L"public") && LookAheadToken(L"using", 1)))
+					else if (LookAheadToken("using") || (LookAheadToken("public") && LookAheadToken("using", 1)))
 					{
 						auto imp = ParseImport();
 						imp->ParentModuleName = shader->Name;
@@ -20797,7 +20916,7 @@ namespace Spire
 					else
 					{
 						if (lastErrorPos == 0 && pos < tokens.Count())
-							errors.Add(CompileError(L"unexpected token \'" + tokens[pos].Content + L"\', only component definitions are allowed in a shader scope.", 
+							errors.Add(CompileError("unexpected token \'" + tokens[pos].Content + "\', only component definitions are allowed in a shader scope.", 
 								20004, tokens[pos].Position));
 						throw 0;
 					}
@@ -20818,7 +20937,7 @@ namespace Spire
 		RefPtr<PipelineSyntaxNode> Parser::ParsePipeline()
 		{
 			RefPtr<PipelineSyntaxNode> pipeline = new PipelineSyntaxNode();
-			ReadToken(L"pipeline");
+			ReadToken("pipeline");
 			PushScope();
 			FillPosition(pipeline.Ptr());
 			pipeline->Name = ReadToken(TokenType::Identifier);
@@ -20831,19 +20950,19 @@ namespace Spire
 			while (!LookAheadToken(TokenType::RBrace))
 			{
 				auto attribs = ParseAttribute();
-				if (LookAheadToken(L"input") || LookAheadToken(L"world"))
+				if (LookAheadToken("input") || LookAheadToken("world"))
 				{
 					auto w = ParseWorld();
 					w->LayoutAttributes = attribs;
 					pipeline->Worlds.Add(w);
 				}
-				else if (LookAheadToken(L"import"))
+				else if (LookAheadToken("import"))
 				{
 					auto op = ParseImportOperator();
 					op->LayoutAttributes = attribs;
 					pipeline->ImportOperators.Add(op);
 				}
-				else if (LookAheadToken(L"stage"))
+				else if (LookAheadToken("stage"))
 				{
 					pipeline->Stages.Add(ParseStage());
 				}
@@ -20862,7 +20981,7 @@ namespace Spire
 		RefPtr<StageSyntaxNode> Parser::ParseStage()
 		{
 			RefPtr<StageSyntaxNode> stage = new StageSyntaxNode();
-			ReadToken(L"stage");
+			ReadToken("stage");
 			stage->Name = ReadToken(TokenType::Identifier);
 			FillPosition(stage.Ptr());
 			ReadToken(TokenType::Colon);
@@ -20889,45 +21008,45 @@ namespace Spire
 			RefPtr<ComponentSyntaxNode> component = new ComponentSyntaxNode();
 			PushScope();
 			component->LayoutAttributes = ParseAttribute();
-			while (LookAheadToken(L"inline") || LookAheadToken(L"out") || LookAheadToken(L"require") || LookAheadToken(L"public") ||
-				LookAheadToken(L"extern"))
+			while (LookAheadToken("inline") || LookAheadToken("out") || LookAheadToken("require") || LookAheadToken("public") ||
+				LookAheadToken("extern"))
 			{
-				if (LookAheadToken(L"inline"))
+				if (LookAheadToken("inline"))
 				{
 					component->IsInline = true;
-					ReadToken(L"inline");
+					ReadToken("inline");
 				}
-				else if (LookAheadToken(L"out"))
+				else if (LookAheadToken("out"))
 				{
 					component->IsOutput = true;
-					ReadToken(L"out");
+					ReadToken("out");
 				}
-				else if (LookAheadToken(L"public"))
+				else if (LookAheadToken("public"))
 				{
 					component->IsPublic = true;
-					ReadToken(L"public");
+					ReadToken("public");
 				}
-				else if (LookAheadToken(L"require"))
+				else if (LookAheadToken("require"))
 				{
 					component->IsParam = true;
-					ReadToken(L"require");
+					ReadToken("require");
 				}
-				else if (LookAheadToken(L"extern"))
+				else if (LookAheadToken("extern"))
 				{
 					component->IsInput = true;
-					ReadToken(L"extern");
+					ReadToken("extern");
 				}
 				else
 					break;
 			}
-			if (LookAheadToken(L"@"))
+			if (LookAheadToken("@"))
 				component->Rate = ParseRate();
 			component->TypeNode = ParseType();
 			FillPosition(component.Ptr());
 			component->Name = ReadToken(TokenType::Identifier);
-			if (LookAheadToken(L":"))
+			if (LookAheadToken(":"))
 			{
-				ReadToken(L":");
+				ReadToken(":");
 				component->AlternateName = ReadToken(TokenType::Identifier);
 			}
 			if (LookAheadToken(TokenType::LParent))
@@ -20963,10 +21082,10 @@ namespace Spire
 		{
 			RefPtr<WorldSyntaxNode> world = new WorldSyntaxNode();
 			world->LayoutAttributes = ParseAttribute();
-			world->IsAbstract = LookAheadToken(L"input");
+			world->IsAbstract = LookAheadToken("input");
 			if (world->IsAbstract)
-				ReadToken(L"input");
-			ReadToken(L"world");
+				ReadToken("input");
+			ReadToken("world");
 			FillPosition(world.Ptr());
 			world->Name = ReadToken(TokenType::Identifier);
 			ReadToken(TokenType::Semicolon);
@@ -21013,12 +21132,12 @@ namespace Spire
 		RefPtr<ImportSyntaxNode> Parser::ParseImport()
 		{
 			RefPtr<ImportSyntaxNode> rs = new ImportSyntaxNode();
-			if (LookAheadToken(L"public"))
+			if (LookAheadToken("public"))
 			{
 				rs->IsPublic = true;
-				ReadToken(L"public");
+				ReadToken("public");
 			}
-			ReadToken(L"using");
+			ReadToken("using");
 			rs->IsInplace = !LookAheadToken(TokenType::OpAssign, 1);
 			if (!rs->IsInplace)
 			{
@@ -21037,7 +21156,7 @@ namespace Spire
 					RefPtr<ImportArgumentSyntaxNode> arg = new ImportArgumentSyntaxNode();
 					FillPosition(arg.Ptr());
 					auto expr = ParseExpression();
-					if (LookAheadToken(L":"))
+					if (LookAheadToken(":"))
 					{
 						if (auto varExpr = dynamic_cast<VarExpressionSyntaxNode*>(expr.Ptr()))
 						{
@@ -21045,8 +21164,8 @@ namespace Spire
 							arg->ArgumentName.Position = varExpr->Position;
 						}
 						else
-							errors.Add(CompileError(L"unexpected ':'.", 20011, pos < tokens.Count() ? tokens[pos].Position : CodePosition(0, 0, 0, fileName)));
-						ReadToken(L":");
+							errors.Add(CompileError("unexpected ':'.", 20011, pos < tokens.Count() ? tokens[pos].Position : CodePosition(0, 0, 0, fileName)));
+						ReadToken(":");
 						arg->Expression = ParseExpression();
 					}
 					else
@@ -21076,7 +21195,7 @@ namespace Spire
 			RefPtr<ImportOperatorDefSyntaxNode> op = new ImportOperatorDefSyntaxNode();
 			PushScope();
 			FillPosition(op.Ptr());
-			ReadToken(L"import");
+			ReadToken("import");
 			ReadToken(TokenType::LParent);
 			op->SourceWorld = ReadToken(TokenType::Identifier);
 			ReadToken(TokenType::RightArrow);
@@ -21093,7 +21212,7 @@ namespace Spire
 			else
 			{
 				op->TypeName.Position = op->Name.Position;
-				op->TypeName.Content = L"TComponentType";
+				op->TypeName.Content = "TComponentType";
 			}
 			ReadToken(TokenType::LParent);
 			while (!LookAheadToken(TokenType::RParent))
@@ -21105,9 +21224,9 @@ namespace Spire
 					break;
 			}
 			ReadToken(TokenType::RParent);
-			while (LookAheadToken(L"require"))
+			while (LookAheadToken("require"))
 			{
-				ReadToken(L"require");
+				ReadToken("require");
 				op->Requirements.Add(ParseFunction(false));
 			}
 			isInImportOperator = true;
@@ -21121,13 +21240,13 @@ namespace Spire
 		{
 			anonymousParamCounter = 0;
 			RefPtr<FunctionSyntaxNode> function = new FunctionSyntaxNode();
-			if (LookAheadToken(L"__intrinsic"))
+			if (LookAheadToken("__intrinsic"))
 			{
 				function->HasSideEffect = false;
 				function->IsExtern = true;
 				pos++;
 			}
-			else if (LookAheadToken(L"extern"))
+			else if (LookAheadToken("extern"))
 			{
 				function->IsExtern = true;
 				pos++;
@@ -21135,7 +21254,7 @@ namespace Spire
 			else
 				function->IsExtern = false;
 			function->IsInline = true;
-			if (LookAheadToken(L"inline"))
+			if (LookAheadToken("inline"))
 			{
 				function->IsInline = true;
 				pos++;
@@ -21147,7 +21266,7 @@ namespace Spire
 			{
 				FillPosition(function.Ptr());
 				Token name;
-				if (LookAheadToken(L"operator"))
+				if (LookAheadToken("operator"))
 				{
 					ReadToken();
 					name = ReadToken();
@@ -21160,7 +21279,7 @@ namespace Spire
 					case TokenType::OpBitOr: case TokenType::OpInc: case TokenType::OpDec:
 						break;
 					default:
-						errors.Add(CompileError(L"invalid operator '" + name.Content + L"'.", 20008, name.Position));
+						errors.Add(CompileError("invalid operator '" + name.Content + "'.", 20008, name.Position));
 						break;
 					}
 				}
@@ -21204,15 +21323,15 @@ namespace Spire
 		{
 			RefPtr<StructSyntaxNode> rs = new StructSyntaxNode();
 			FillPosition(rs.Ptr());
-			ReadToken(L"struct");
+			ReadToken("struct");
 			rs->Name = ReadToken(TokenType::Identifier);
-			if (LookAheadToken(L"__intrinsic"))
+			if (LookAheadToken("__intrinsic"))
 			{
 				ReadToken();
 				rs->IsIntrinsic = true;
 			}
-			ReadToken(L"{");
-			while (!LookAheadToken(L"}") && pos < tokens.Count())
+			ReadToken("{");
+			while (!LookAheadToken("}") && pos < tokens.Count())
 			{
 				RefPtr<TypeSyntaxNode> type = ParseType();
 				do
@@ -21228,7 +21347,7 @@ namespace Spire
 				} while (pos < tokens.Count());
 				ReadToken(TokenType::Semicolon);
 			}
-			ReadToken(L"}");
+			ReadToken("}");
 			return rs;
 		}
 
@@ -21237,29 +21356,29 @@ namespace Spire
 			RefPtr<StatementSyntaxNode> statement;
 			if (LookAheadToken(TokenType::LBrace))
 				statement = ParseBlockStatement();
-			else if (IsTypeKeyword() || LookAheadToken(L"const"))
+			else if (IsTypeKeyword() || LookAheadToken("const"))
 				statement = ParseVarDeclrStatement();
-			else if (LookAheadToken(L"if"))
+			else if (LookAheadToken("if"))
 				statement = ParseIfStatement();
-			else if (LookAheadToken(L"for"))
+			else if (LookAheadToken("for"))
 				statement = ParseForStatement();
-			else if (LookAheadToken(L"while"))
+			else if (LookAheadToken("while"))
 				statement = ParseWhileStatement();
-			else if (LookAheadToken(L"do"))
+			else if (LookAheadToken("do"))
 				statement = ParseDoWhileStatement();
-			else if (LookAheadToken(L"break"))
+			else if (LookAheadToken("break"))
 				statement = ParseBreakStatement();
-			else if (LookAheadToken(L"continue"))
+			else if (LookAheadToken("continue"))
 				statement = ParseContinueStatement();
-			else if (LookAheadToken(L"return"))
+			else if (LookAheadToken("return"))
 				statement = ParseReturnStatement();
-			else if (LookAheadToken(L"using") || (LookAheadToken(L"public") && LookAheadToken(L"using", 1)))
+			else if (LookAheadToken("using") || (LookAheadToken("public") && LookAheadToken("using", 1)))
 				statement = ParseImportStatement();
-			else if (LookAheadToken(L"discard"))
+			else if (LookAheadToken("discard"))
 			{
 				statement = new DiscardStatementSyntaxNode();
 				FillPosition(statement.Ptr());
-				ReadToken(L"discard");
+				ReadToken("discard");
 				ReadToken(TokenType::Semicolon);
 			}
 			else if (LookAheadToken(TokenType::Identifier))
@@ -21294,7 +21413,7 @@ namespace Spire
 			}
 			else
 			{
-				errors.Add(CompileError(String(L"syntax error."), 20002, tokens[pos].Position));
+				errors.Add(CompileError(String("syntax error."), 20002, tokens[pos].Position));
 				throw 20002;
 			}
 			return statement;
@@ -21331,21 +21450,21 @@ namespace Spire
 		VariableModifier Parser::ReadVariableModifier()
 		{
 			auto & token = ReadToken(TokenType::Identifier);
-			if (token.Content == L"in")
+			if (token.Content == "in")
 				return VariableModifier::In;
-			else if (token.Content == L"out")
+			else if (token.Content == "out")
 				return VariableModifier::Out;
-			else if (token.Content == L"uniform")
+			else if (token.Content == "uniform")
 				return VariableModifier::Uniform;
-			else if (token.Content == L"parameter")
+			else if (token.Content == "parameter")
 				return VariableModifier::Parameter;
-			else if (token.Content == L"const")
+			else if (token.Content == "const")
 				return VariableModifier::Const;
-			else if (token.Content == L"centroid")
+			else if (token.Content == "centroid")
 				return VariableModifier::Centroid;
-			else if (token.Content == L"instance")
+			else if (token.Content == "instance")
 				return VariableModifier::Instance;
-			else if (token.Content == L"__builtin")
+			else if (token.Content == "__builtin")
 				return VariableModifier::Builtin;
 			return VariableModifier::None; 
 		}
@@ -21358,9 +21477,9 @@ namespace Spire
 				FillPosition(varDeclrStatement.Ptr());
 			while (pos < tokens.Count())
 			{
-				if (LookAheadToken(L"layout"))
+				if (LookAheadToken("layout"))
 				{
-					ReadToken(L"layout");
+					ReadToken("layout");
 					ReadToken(TokenType::LParent);
 					StringBuilder layoutSB;
 					while (!LookAheadToken(TokenType::RParent))
@@ -21374,7 +21493,7 @@ namespace Spire
 						if (!LookAheadToken(TokenType::Comma))
 							break;
 						else
-							layoutSB.Append(L", ");
+							layoutSB.Append(", ");
 					}
 					ReadToken(TokenType::RParent);
 					varDeclrStatement->LayoutString = layoutSB.ProduceString();
@@ -21410,14 +21529,14 @@ namespace Spire
 		{
 			RefPtr<IfStatementSyntaxNode> ifStatement = new IfStatementSyntaxNode();
 			FillPosition(ifStatement.Ptr());
-			ReadToken(L"if");
+			ReadToken("if");
 			ReadToken(TokenType::LParent);
 			ifStatement->Predicate = ParseExpression();
 			ReadToken(TokenType::RParent);
 			ifStatement->PositiveStatement = ParseStatement();
-			if (LookAheadToken(L"else"))
+			if (LookAheadToken("else"))
 			{
-				ReadToken(L"else");
+				ReadToken("else");
 				ifStatement->NegativeStatement = ParseStatement();
 			}
 			return ifStatement;
@@ -21428,7 +21547,7 @@ namespace Spire
 			RefPtr<ForStatementSyntaxNode> stmt = new ForStatementSyntaxNode();
 			PushScope();
 			FillPosition(stmt.Ptr());
-			ReadToken(L"for");
+			ReadToken("for");
 			ReadToken(TokenType::LParent);
 			if (IsTypeKeyword())
 			{
@@ -21470,7 +21589,7 @@ namespace Spire
 			RefPtr<WhileStatementSyntaxNode> whileStatement = new WhileStatementSyntaxNode();
 			PushScope();
 			FillPosition(whileStatement.Ptr());
-			ReadToken(L"while");
+			ReadToken("while");
 			ReadToken(TokenType::LParent);
 			whileStatement->Predicate = ParseExpression();
 			ReadToken(TokenType::RParent);
@@ -21484,9 +21603,9 @@ namespace Spire
 			RefPtr<DoWhileStatementSyntaxNode> doWhileStatement = new DoWhileStatementSyntaxNode();
 			PushScope();
 			FillPosition(doWhileStatement.Ptr());
-			ReadToken(L"do");
+			ReadToken("do");
 			doWhileStatement->Statement = ParseStatement();
-			ReadToken(L"while");
+			ReadToken("while");
 			ReadToken(TokenType::LParent);
 			doWhileStatement->Predicate = ParseExpression();
 			ReadToken(TokenType::RParent);
@@ -21499,7 +21618,7 @@ namespace Spire
 		{
 			RefPtr<BreakStatementSyntaxNode> breakStatement = new BreakStatementSyntaxNode();
 			FillPosition(breakStatement.Ptr());
-			ReadToken(L"break");
+			ReadToken("break");
 			ReadToken(TokenType::Semicolon);
 			return breakStatement;
 		}
@@ -21508,7 +21627,7 @@ namespace Spire
 		{
 			RefPtr<ContinueStatementSyntaxNode> continueStatement = new ContinueStatementSyntaxNode();
 			FillPosition(continueStatement.Ptr());
-			ReadToken(L"continue");
+			ReadToken("continue");
 			ReadToken(TokenType::Semicolon);
 			return continueStatement;
 		}
@@ -21517,7 +21636,7 @@ namespace Spire
 		{
 			RefPtr<ReturnStatementSyntaxNode> returnStatement = new ReturnStatementSyntaxNode();
 			FillPosition(returnStatement.Ptr());
-			ReadToken(L"return");
+			ReadToken("return");
 			if (!LookAheadToken(TokenType::Semicolon))
 				returnStatement->Expression = ParseExpression();
 			ReadToken(TokenType::Semicolon);
@@ -21538,27 +21657,27 @@ namespace Spire
 		RefPtr<ParameterSyntaxNode> Parser::ParseParameter()
 		{
 			RefPtr<ParameterSyntaxNode> parameter = new ParameterSyntaxNode();
-			if (LookAheadToken(L"in"))
+			if (LookAheadToken("in"))
 			{
 				parameter->Qualifier = ParameterQualifier::In;
-				ReadToken(L"in");
+				ReadToken("in");
 			}
-			else if (LookAheadToken(L"inout"))
+			else if (LookAheadToken("inout"))
 			{
 				parameter->Qualifier = ParameterQualifier::InOut;
-				ReadToken(L"inout");
+				ReadToken("inout");
 			}
-			else if (LookAheadToken(L"out"))
+			else if (LookAheadToken("out"))
 			{
 				parameter->Qualifier = ParameterQualifier::Out;
-				ReadToken(L"out");
+				ReadToken("out");
 			}
-			else if (LookAheadToken(L"uniform"))
+			else if (LookAheadToken("uniform"))
 			{
 				parameter->Qualifier = ParameterQualifier::Uniform;
-				ReadToken(L"uniform");
-				if (LookAheadToken(L"in"))
-					ReadToken(L"in");
+				ReadToken("uniform");
+				if (LookAheadToken("in"))
+					ReadToken("in");
 			}
 			parameter->TypeNode = ParseType();
 			if (LookAheadToken(TokenType::Identifier))
@@ -21567,7 +21686,7 @@ namespace Spire
 				parameter->Name = name.Content;
 			}
 			else
-				parameter->Name = L"_anonymousParam" + String(anonymousParamCounter++);
+				parameter->Name = "_anonymousParam" + String(anonymousParamCounter++);
 			FillPosition(parameter.Ptr());
 			return parameter;
 		}
@@ -21604,7 +21723,7 @@ namespace Spire
 				arrType->BaseType = rs;
 				ReadToken(TokenType::LBracket);
 				if (LookAheadToken(TokenType::IntLiterial))
-					arrType->ArrayLength = atoi(ReadToken(TokenType::IntLiterial).Content.ToMultiByteString());
+					arrType->ArrayLength = StringToInt(ReadToken(TokenType::IntLiterial).Content);
 				else
 					arrType->ArrayLength = 0;
 				ReadToken(TokenType::RBracket);
@@ -21746,7 +21865,7 @@ namespace Spire
 			case TokenType::OpBitNot:
 				return Operator::BitNot;
 			default:
-				throw L"Illegal TokenType.";
+				throw "Illegal TokenType.";
 			}
 		}
 
@@ -21810,11 +21929,11 @@ namespace Spire
 		RefPtr<ExpressionSyntaxNode> Parser::ParseLeafExpression()
 		{
 			RefPtr<ExpressionSyntaxNode> rs;
-			if (LookAheadToken(L"project"))
+			if (LookAheadToken("project"))
 			{
 				RefPtr<ProjectExpressionSyntaxNode> project = new ProjectExpressionSyntaxNode();
 				FillPosition(project.Ptr());
-				ReadToken(L"project");
+				ReadToken("project");
 				ReadToken(TokenType::LParent);
 				project->BaseExpression = ParseExpression();
 				ReadToken(TokenType::RParent);
@@ -21880,13 +21999,13 @@ namespace Spire
 				}
 				rs = constExpr;
 			}
-			else if (LookAheadToken(L"true") || LookAheadToken(L"false"))
+			else if (LookAheadToken("true") || LookAheadToken("false"))
 			{
 				RefPtr<ConstantExpressionSyntaxNode> constExpr = new ConstantExpressionSyntaxNode();
 				auto token = tokens[pos++];
 				FillPosition(constExpr.Ptr());
 				constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Bool;
-				constExpr->IntValue = token.Content == L"true" ? 1 : 0;
+				constExpr->IntValue = token.Content == "true" ? 1 : 0;
 				rs = constExpr;
 			}
 			else if (LookAheadToken(TokenType::Identifier))
@@ -21971,7 +22090,7 @@ namespace Spire
 				{
 					codePos = tokens[pos].Position;
 				}
-				errors.Add(CompileError(String(L"syntax error."), 20002, codePos));
+				errors.Add(CompileError(String("syntax error."), 20002, codePos));
 				throw 20005;
 			}
 			return rs;
@@ -21995,16 +22114,16 @@ namespace Spire
 			List<Token> tokens;
 			int pos;
 			String fileName;
-			Token & ReadToken(const wchar_t * string)
+			Token & ReadToken(const char * string)
 			{
 				if (pos >= tokens.Count())
 				{
-					errors.Add(CompileError(String(L"\"") + string + String(L"\" expected but end of file encountered."), 0, CodePosition(0, 0, 0, fileName)));
+					errors.Add(CompileError(String("\"") + string + String("\" expected but end of file encountered."), 0, CodePosition(0, 0, 0, fileName)));
 					throw 0;
 				}
 				else if (tokens[pos].Content != string)
 				{
-					errors.Add(CompileError(String(L"\"") + string + String(L"\" expected"), 0, tokens[pos].Position));
+					errors.Add(CompileError(String("\"") + string + String("\" expected"), 0, tokens[pos].Position));
 					throw 20001;
 				}
 				return tokens[pos++];
@@ -22014,22 +22133,22 @@ namespace Spire
 			{
 				if (pos >= tokens.Count())
 				{
-					errors.Add(CompileError(TokenTypeToString(type) + String(L" expected but end of file encountered."), 0, CodePosition(0, 0, 0, fileName)));
+					errors.Add(CompileError(TokenTypeToString(type) + String(" expected but end of file encountered."), 0, CodePosition(0, 0, 0, fileName)));
 					throw 0;
 				}
 				else if (tokens[pos].Type != type)
 				{
-					errors.Add(CompileError(TokenTypeToString(type) + String(L" expected"), 20001, tokens[pos].Position));
+					errors.Add(CompileError(TokenTypeToString(type) + String(" expected"), 20001, tokens[pos].Position));
 					throw 20001;
 				}
 				return tokens[pos++];
 			}
 
-			bool LookAheadToken(const wchar_t * string)
+			bool LookAheadToken(const char * string)
 			{
 				if (pos >= tokens.Count())
 				{
-					errors.Add(CompileError(String(L"\'") + string + String(L"\' expected but end of file encountered."), 0, CodePosition(0, 0, 0, fileName)));
+					errors.Add(CompileError(String("\'") + string + String("\' expected but end of file encountered."), 0, CodePosition(0, 0, 0, fileName)));
 					return false;
 				}
 				else
@@ -22055,14 +22174,14 @@ namespace Spire
 				{
 					while (pos < tokens.Count())
 					{
-						if (LookAheadToken(L"attrib"))
+						if (LookAheadToken("attrib"))
 						{
 							EnumerableDictionary<String, String> additionalAttributes;
-							ReadToken(L"attrib");
+							ReadToken("attrib");
 							String choiceName = ReadToken(TokenType::Identifier).Content;
-							while (LookAheadToken(L"."))
+							while (LookAheadToken("."))
 							{
-								choiceName = choiceName + L".";
+								choiceName = choiceName + ".";
 								ReadToken(TokenType::Dot);
 								choiceName = choiceName + ReadToken(TokenType::Identifier).Content;
 							}
@@ -22072,13 +22191,13 @@ namespace Spire
 							{
 								auto name = ReadToken(TokenType::Identifier).Content;
 								String value;
-								if (LookAheadToken(L":"))
+								if (LookAheadToken(":"))
 								{
-									ReadToken(L":");
+									ReadToken(":");
 									value = ReadToken(TokenType::StringLiterial).Content;
 								}
 								additionalAttributes[name] = value;
-								if (LookAheadToken(L","))
+								if (LookAheadToken(","))
 									ReadToken(TokenType::Comma);
 								else
 									break;
@@ -22088,9 +22207,9 @@ namespace Spire
 						else
 						{
 							String choiceName = ReadToken(TokenType::Identifier).Content;
-							while (LookAheadToken(L"."))
+							while (LookAheadToken("."))
 							{
-								choiceName = choiceName + L".";
+								choiceName = choiceName + ".";
 								ReadToken(TokenType::Dot);
 								choiceName = choiceName + ReadToken(TokenType::Identifier).Content;
 							}
@@ -22101,7 +22220,7 @@ namespace Spire
 								auto & token = ReadToken(TokenType::StringLiterial);
 								RefPtr<ChoiceValueSyntaxNode> choiceValue = new ChoiceValueSyntaxNode();
 								choiceValue->Position = token.Position;
-								int splitterPos = token.Content.IndexOf(L':');
+								int splitterPos = token.Content.IndexOf(':');
 								if (splitterPos != -1)
 								{
 									choiceValue->WorldName = token.Content.SubString(0, splitterPos);
@@ -22112,7 +22231,7 @@ namespace Spire
 									choiceValue->WorldName = token.Content;
 								}
 								worlds.Add(choiceValue);
-								if (LookAheadToken(L","))
+								if (LookAheadToken(","))
 									ReadToken(TokenType::Comma);
 								else
 									break;
@@ -22155,37 +22274,37 @@ namespace Spire
 			sb << comp->Name.Content;
 			for (auto & param : comp->Parameters)
 			{
-				sb << L"@" << param->Type->ToString();
+				sb << "@" << param->Type->ToString();
 			}
 			return sb.ProduceString();
 		}
 
 		String TranslateHLSLTypeNames(String name)
 		{
-			if (name == L"float2" || name == L"half2")
-				return L"vec2";
-			else if (name == L"float3" || name == L"half3")
-				return L"vec3";
-			else if (name == L"float4" || name == L"half4")
-				return L"vec4";
-			else if (name == L"half")
-				return L"float";
-			else if (name == L"int2")
-				return L"ivec2";
-			else if (name == L"int3")
-				return L"ivec3";
-			else if (name == L"int4")
-				return L"ivec4";
-			else if (name == L"uint2")
-				return L"uvec2";
-			else if (name == L"uint3")
-				return L"uvec3";
-			else if (name == L"uint4")
-				return L"uvec4";
-			else if (name == L"float3x3" || name == L"half3x3")
-				return L"mat3";
-			else if (name == L"float4x4" || name == L"half4x4")
-				return L"mat4";
+			if (name == "float2" || name == "half2")
+				return "vec2";
+			else if (name == "float3" || name == "half3")
+				return "vec3";
+			else if (name == "float4" || name == "half4")
+				return "vec4";
+			else if (name == "half")
+				return "float";
+			else if (name == "int2")
+				return "ivec2";
+			else if (name == "int3")
+				return "ivec3";
+			else if (name == "int4")
+				return "ivec4";
+			else if (name == "uint2")
+				return "uvec2";
+			else if (name == "uint3")
+				return "uvec3";
+			else if (name == "uint4")
+				return "uvec4";
+			else if (name == "float3x3" || name == "half3x3")
+				return "mat3";
+			else if (name == "float4x4" || name == "half4x4")
+				return "mat4";
 			else
 				return name;
 		}
@@ -22247,43 +22366,43 @@ namespace Spire
 			RefPtr<TypeSyntaxNode> VisitBasicType(BasicTypeSyntaxNode * typeNode) override
 			{
 				RefPtr<BasicExpressionType> expType = new BasicExpressionType();
-				if (typeNode->TypeName == L"int")
+				if (typeNode->TypeName == "int")
 					expType->BaseType = BaseType::Int;
-				else if (typeNode->TypeName == L"uint")
+				else if (typeNode->TypeName == "uint")
 					expType->BaseType = BaseType::UInt;
-				else if (typeNode->TypeName == L"float" || typeNode->TypeName == L"half")
+				else if (typeNode->TypeName == "float" || typeNode->TypeName == "half")
 					expType->BaseType = BaseType::Float;
-				else if (typeNode->TypeName == L"ivec2" || typeNode->TypeName == L"int2")
+				else if (typeNode->TypeName == "ivec2" || typeNode->TypeName == "int2")
 					expType->BaseType = BaseType::Int2;
-				else if (typeNode->TypeName == L"ivec3" || typeNode->TypeName == L"int3")
+				else if (typeNode->TypeName == "ivec3" || typeNode->TypeName == "int3")
 					expType->BaseType = BaseType::Int3;
-				else if (typeNode->TypeName == L"ivec4" || typeNode->TypeName == L"int4")
+				else if (typeNode->TypeName == "ivec4" || typeNode->TypeName == "int4")
 					expType->BaseType = BaseType::Int4;
-				else if (typeNode->TypeName == L"uvec2" || typeNode->TypeName == L"uint2")
+				else if (typeNode->TypeName == "uvec2" || typeNode->TypeName == "uint2")
 					expType->BaseType = BaseType::UInt2;
-				else if (typeNode->TypeName == L"uvec3" || typeNode->TypeName == L"uint3")
+				else if (typeNode->TypeName == "uvec3" || typeNode->TypeName == "uint3")
 					expType->BaseType = BaseType::UInt3;
-				else if (typeNode->TypeName == L"uvec4" || typeNode->TypeName == L"uint4")
+				else if (typeNode->TypeName == "uvec4" || typeNode->TypeName == "uint4")
 					expType->BaseType = BaseType::UInt4;
-				else if (typeNode->TypeName == L"vec2" || typeNode->TypeName == L"float2" || typeNode->TypeName == L"half2")
+				else if (typeNode->TypeName == "vec2" || typeNode->TypeName == "float2" || typeNode->TypeName == "half2")
 					expType->BaseType = BaseType::Float2;
-				else if (typeNode->TypeName == L"vec3" || typeNode->TypeName == L"float3" || typeNode->TypeName == L"half3")
+				else if (typeNode->TypeName == "vec3" || typeNode->TypeName == "float3" || typeNode->TypeName == "half3")
 					expType->BaseType = BaseType::Float3;
-				else if (typeNode->TypeName == L"vec4" || typeNode->TypeName == L"float4" || typeNode->TypeName == L"half4")
+				else if (typeNode->TypeName == "vec4" || typeNode->TypeName == "float4" || typeNode->TypeName == "half4")
 					expType->BaseType = BaseType::Float4;
-				else if (typeNode->TypeName == L"mat3" || typeNode->TypeName == L"mat3x3" || typeNode->TypeName == L"float3x3" || typeNode->TypeName == L"half3x3")
+				else if (typeNode->TypeName == "mat3" || typeNode->TypeName == "mat3x3" || typeNode->TypeName == "float3x3" || typeNode->TypeName == "half3x3")
 					expType->BaseType = BaseType::Float3x3;
-				else if (typeNode->TypeName == L"mat4" || typeNode->TypeName == L"mat4x4" || typeNode->TypeName == L"float4x4" || typeNode->TypeName == L"half4x4")
+				else if (typeNode->TypeName == "mat4" || typeNode->TypeName == "mat4x4" || typeNode->TypeName == "float4x4" || typeNode->TypeName == "half4x4")
 					expType->BaseType = BaseType::Float4x4;
-				else if (typeNode->TypeName == L"texture" || typeNode->TypeName == L"Texture" || typeNode->TypeName == L"Texture2D")
+				else if (typeNode->TypeName == "texture" || typeNode->TypeName == "Texture" || typeNode->TypeName == "Texture2D")
 					expType->BaseType = BaseType::Texture2D;
-				else if (typeNode->TypeName == L"TextureCUBE" || typeNode->TypeName == L"TextureCube")
+				else if (typeNode->TypeName == "TextureCUBE" || typeNode->TypeName == "TextureCube")
 					expType->BaseType = BaseType::TextureCube;
-				else if (typeNode->TypeName == L"SamplerState" || typeNode->TypeName == L"sampler" || typeNode->TypeName == L"sampler_state")
+				else if (typeNode->TypeName == "SamplerState" || typeNode->TypeName == "sampler" || typeNode->TypeName == "sampler_state")
 					expType->BaseType = BaseType::SamplerState;
-				else if (typeNode->TypeName == L"void")
+				else if (typeNode->TypeName == "void")
 					expType->BaseType = BaseType::Void;
-				else if (typeNode->TypeName == L"bool")
+				else if (typeNode->TypeName == "bool")
 					expType->BaseType = BaseType::Bool;
 				else
 				{
@@ -22318,13 +22437,13 @@ namespace Spire
 						}
 						if (!matched)
 						{
-							Error(31040, L"undefined type name: '" + typeNode->TypeName + L"'.", typeNode);
+							Error(31040, "undefined type name: '" + typeNode->TypeName + "'.", typeNode);
 							typeResult = ExpressionType::Error;
 						}
 					}
 					else
 					{
-						Error(31040, L"undefined type name: '" + typeNode->TypeName + L"'.", typeNode);
+						Error(31040, "undefined type name: '" + typeNode->TypeName + "'.", typeNode);
 						typeResult = ExpressionType::Error;
 						return typeNode;
 					}
@@ -22347,13 +22466,13 @@ namespace Spire
 				typeNode->BaseType->Accept(this);
 				rs->BaseType = typeResult;
 				rs->GenericTypeName = typeNode->GenericTypeName;
-				if (rs->GenericTypeName != L"PackedBuffer" &&
-					rs->GenericTypeName != L"StructuredBuffer" &&
-					rs->GenericTypeName != L"RWStructuredBuffer" &&
-					rs->GenericTypeName != L"Uniform" &&
-					rs->GenericTypeName != L"Patch" &&
-					rs->GenericTypeName != L"PackedBuffer")
-					Error(30015, L"'" + rs->GenericTypeName + L"': undefined identifier.", typeNode);
+				if (rs->GenericTypeName != "PackedBuffer" &&
+					rs->GenericTypeName != "StructuredBuffer" &&
+					rs->GenericTypeName != "RWStructuredBuffer" &&
+					rs->GenericTypeName != "Uniform" &&
+					rs->GenericTypeName != "Patch" &&
+					rs->GenericTypeName != "PackedBuffer")
+					Error(30015, "'" + rs->GenericTypeName + "': undefined identifier.", typeNode);
 				typeResult = rs;
 				return typeNode;
 			}
@@ -22371,7 +22490,7 @@ namespace Spire
 					}
 					else
 					{
-						Error(33010, L"pipeline '" + pipeline->ParentPipeline.Content + L"' is undefined.", pipeline->ParentPipeline);
+						Error(33010, "pipeline '" + pipeline->ParentPipeline.Content + "' is undefined.", pipeline->ParentPipeline);
 					}
 				}
 				currentPipeline = psymbol.Ptr();
@@ -22388,7 +22507,7 @@ namespace Spire
 					}
 					else
 					{
-						Error(33001, L"world \'" + world->Name.Content + L"\' is already defined.", world.Ptr());
+						Error(33001, "world \'" + world->Name.Content + "\' is already defined.", world.Ptr());
 					}
 				}
 				for (auto comp : pipeline->AbstractComponents)
@@ -22398,7 +22517,7 @@ namespace Spire
 						&& psymbol->IsAbstractWorld(comp->Rate->Worlds.First().World.Content)))
 						AddNewComponentSymbol(psymbol->Components, psymbol->FunctionComponents, comp);
 					else
-						Error(33003, L"cannot define components in a pipeline.",
+						Error(33003, "cannot define components in a pipeline.",
 							comp.Ptr());
 				}
 				for (auto & op : pipeline->ImportOperators)
@@ -22409,18 +22528,18 @@ namespace Spire
 				for (auto op : pipeline->ImportOperators)
 				{
 					if (!psymbol->WorldDependency.ContainsKey(op->DestWorld.Content))
-						Error(33004, L"undefined world name '" + op->DestWorld.Content + L"'.", op->DestWorld);
+						Error(33004, "undefined world name '" + op->DestWorld.Content + "'.", op->DestWorld);
 					else
 					{
 						if (psymbol->Worlds[op->DestWorld.Content].GetValue().IsAbstract)
-							Error(33005, L"abstract world cannot appear as target as an import operator.", op->DestWorld);
+							Error(33005, "abstract world cannot appear as target as an import operator.", op->DestWorld);
 						else if (!psymbol->WorldDependency.ContainsKey(op->SourceWorld.Content))
-							Error(33006, L"undefined world name '" + op->SourceWorld.Content + L"'.", op->SourceWorld);
+							Error(33006, "undefined world name '" + op->SourceWorld.Content + "'.", op->SourceWorld);
 						else
 						{
 							if (IsWorldDependent(psymbol.Ptr(), op->SourceWorld.Content, op->DestWorld.Content))
 							{
-								Error(33007, L"import operator '" + op->Name.Content + L"' creates a circular dependency between world '" + op->SourceWorld.Content + L"' and '" + op->DestWorld.Content + L"'",
+								Error(33007, "import operator '" + op->Name.Content + "' creates a circular dependency between world '" + op->SourceWorld.Content + "' and '" + op->DestWorld.Content + "'",
 									op->Name);
 							}
 							else
@@ -22464,7 +22583,7 @@ namespace Spire
 					for (auto & para : op->Parameters)
 					{
 						if (paraNames.Contains(para->Name))
-							Error(30002, L"parameter \'" + para->Name + L"\' already defined.", para.Ptr());
+							Error(30002, "parameter \'" + para->Name + "\' already defined.", para.Ptr());
 						else
 							paraNames.Add(para->Name);
 						VariableEntry varEntry;
@@ -22473,7 +22592,7 @@ namespace Spire
 						varEntry.Type.DataType = para->Type;
 						op->Scope->Variables.AddIfNotExists(varEntry.Name, varEntry);
 						if (varEntry.Type.DataType->Equals(ExpressionType::Void.Ptr()))
-							Error(30016, L"'void' can not be parameter type.", para.Ptr());
+							Error(30016, "'void' can not be parameter type.", para.Ptr());
 					}
 					auto oldSymFuncs = symbolTable->Functions;
 					auto oldSymFuncOverloads = symbolTable->FunctionOverloads;
@@ -22511,12 +22630,12 @@ namespace Spire
 						{
 							if (namedArgumentAppeared)
 							{
-								Error(33030, L"positional argument cannot appear after a named argument.", arg->Expression.Ptr());
+								Error(33030, "positional argument cannot appear after a named argument.", arg->Expression.Ptr());
 								break;
 							}
 							if (position >= paramList.Count())
 							{
-								Error(33031, L"too many arguments.", arg->Expression.Ptr());
+								Error(33031, "too many arguments.", arg->Expression.Ptr());
 								break;
 							}
 							arg->ArgumentName.Content = paramList[position]->Name;
@@ -22552,24 +22671,24 @@ namespace Spire
 											varExpr->Variable = funcType->Component->Name;
 									}
 									else
-										Error(30052, L"ordinary functions not allowed as argument to function-typed module parameter.", arg.Ptr());
+										Error(30052, "ordinary functions not allowed as argument to function-typed module parameter.", arg.Ptr());
 								}
 								else
-									Error(30051, L"invalid value for argument '" + arg->ArgumentName.Content, arg.Ptr());
+									Error(30051, "invalid value for argument '" + arg->ArgumentName.Content, arg.Ptr());
 							}
 							else
 							{
 								arg->Accept(this);
 								if (!refComp->Type->DataType->Equals(arg->Expression->Type.Ptr()))
 								{
-									Error(33027, L"argument type (" + arg->Expression->Type->ToString() + L") does not match parameter type (" + refComp->Type->DataType->ToString() + L")", arg->Expression.Ptr());
+									Error(33027, "argument type (" + arg->Expression->Type->ToString() + ") does not match parameter type (" + refComp->Type->DataType->ToString() + ")", arg->Expression.Ptr());
 								}
 								if (!refComp->IsParam())
-									Error(33028, L"'" + arg->ArgumentName.Content + L"' is not a parameter of '" + import->ShaderName.Content + L"'.", arg->ArgumentName);
+									Error(33028, "'" + arg->ArgumentName.Content + "' is not a parameter of '" + import->ShaderName.Content + "'.", arg->ArgumentName);
 							}
 						}
 						else
-							Error(33028, L"'" + arg->ArgumentName.Content + L"' is not a parameter of '" + import->ShaderName.Content + L"'.", arg->ArgumentName);
+							Error(33028, "'" + arg->ArgumentName.Content + "' is not a parameter of '" + import->ShaderName.Content + "'.", arg->ArgumentName);
 					}
 				}
 				return import;
@@ -22606,7 +22725,7 @@ namespace Spire
 					if (comp->Expression || comp->BlockStatement)
 					{
 						if (compSym->IsParam())
-							Error(33040, L"'require': cannot define computation on component requirements.", comp);
+							Error(33040, "'require': cannot define computation on component requirements.", comp);
 					}
 					currentComp = nullptr;
 					return comp;
@@ -22616,7 +22735,7 @@ namespace Spire
 					RefPtr<ShaderSymbol> refShader;
 					symbolTable->Shaders.TryGetValue(import->ShaderName.Content, refShader);
 					if (!refShader)
-						Error(33015, L"undefined identifier \'" + import->ShaderName.Content + L"\'.", import->ShaderName);
+						Error(33015, "undefined identifier \'" + import->ShaderName.Content + "\'.", import->ShaderName);
 					currentShader->DependentShaders.Add(refShader.Ptr());
 					if (!currentComp)
 					{
@@ -22632,13 +22751,13 @@ namespace Spire
 							if (currentShader->ShaderObjects.ContainsKey(import->ObjectName.Content) ||
 								currentShader->Components.ContainsKey(import->ObjectName.Content))
 							{
-								Error(33018, L"\'" + import->ShaderName.Content + L"\' is already defined.", import->ShaderName);
+								Error(33018, "\'" + import->ShaderName.Content + "\' is already defined.", import->ShaderName);
 							}
 							currentShader->ShaderObjects[import->ObjectName.Content] = su;
 						}
 					}
 					if (currentComp)
-						Error(33016, L"'using': importing not allowed in component definition.", import->ShaderName);
+						Error(33016, "'using': importing not allowed in component definition.", import->ShaderName);
 					return import;
 				}
 			};
@@ -22663,8 +22782,8 @@ namespace Spire
 					{
 						// current compilation context has more than one pipeline defined,
 						// in which case we do not allow implicit pipeline specification
-						Error(33002, L"explicit pipeline specification required for shader '" +
-							shader->Name.Content + L"' because multiple pipelines are defined in current context.", curShader->Name);
+						Error(33002, "explicit pipeline specification required for shader '" +
+							shader->Name.Content + "' because multiple pipelines are defined in current context.", curShader->Name);
 					}
 				}
 
@@ -22676,7 +22795,7 @@ namespace Spire
 						shaderSymbol->Pipeline = pipeline->Ptr();
 					else
 					{
-						Error(33010, L"pipeline \'" + pipelineName + L"' is not defined.", shader->Pipeline);
+						Error(33010, "pipeline \'" + pipelineName + "' is not defined.", shader->Pipeline);
 						throw 0;
 					}
 				}
@@ -22694,7 +22813,7 @@ namespace Spire
 							shaderSymbol->IsAbstract = true;
 							if (!shaderSymbol->SyntaxNode->IsModule)
 							{
-								Error(33009, L"parameters can only be defined in modules.", shaderSymbol->SyntaxNode);
+								Error(33009, "parameters can only be defined in modules.", shaderSymbol->SyntaxNode);
 							}
 						}
 						for (auto & param : comp->Parameters)
@@ -22718,8 +22837,8 @@ namespace Spire
 							for (auto & world : userSpecifiedWorlds)
 							{
 								if (!shaderSymbol->Pipeline->WorldDependency.ContainsKey(world.World.Content))
-									Error(33012, L"\'" + world.World.Content + L"' is not a defined world in '" +
-										pipelineName + L"'.", world.World);
+									Error(33012, "\'" + world.World.Content + "' is not a defined world in '" +
+										pipelineName + "'.", world.World);
 								WorldSymbol worldSym;
 
 								if (shaderSymbol->Pipeline->Worlds.TryGetValue(world.World.Content, worldSym))
@@ -22729,7 +22848,7 @@ namespace Spire
 										inAbstractWorld = true;
 										if (userSpecifiedWorlds.Count() > 1)
 										{
-											Error(33013, L"abstract world cannot appear with other worlds.",
+											Error(33013, "abstract world cannot appear with other worlds.",
 												world.World);
 										}
 									}
@@ -22739,7 +22858,7 @@ namespace Spire
 						if (!inAbstractWorld && !impl->SyntaxNode->IsParam
 							&& !impl->SyntaxNode->Expression && !impl->SyntaxNode->BlockStatement)
 						{
-							Error(33014, L"non-abstract component must have an implementation.",
+							Error(33014, "non-abstract component must have an implementation.",
 								impl->SyntaxNode.Ptr());
 						}
 					}
@@ -22810,8 +22929,8 @@ namespace Spire
 					comp->Expression = comp->Expression->Accept(this).As<ExpressionSyntaxNode>();
 					if (!MatchType_ValueReceiver(compSym->Type->DataType.Ptr(), comp->Expression->Type.Ptr()) && 
 						!comp->Expression->Type->Equals(ExpressionType::Error.Ptr()))
-						Error(30019, L"type mismatch \'" + comp->Expression->Type->ToString() + L"\' and \'" +
-							currentComp->Type->DataType->ToString() + L"\'", comp->Name);
+						Error(30019, "type mismatch \'" + comp->Expression->Type->ToString() + "\' and \'" +
+							currentComp->Type->DataType->ToString() + "\'", comp->Name);
 				}
 				if (comp->BlockStatement)
 					comp->BlockStatement->Accept(this);
@@ -22853,11 +22972,11 @@ namespace Spire
 					}
 					else
 					{
-						Error(33019, L"component \'" + compImpl->SyntaxNode->Name.Content + L"\': definition marked as 'export' must have an explicitly specified world.",
+						Error(33019, "component \'" + compImpl->SyntaxNode->Name.Content + "\': definition marked as 'export' must have an explicitly specified world.",
 							compImpl->SyntaxNode.Ptr());
 					}
 					if (compImpl->SyntaxNode->Parameters.Count() > 0)
-						Error(33037, L"component '" + compImpl->SyntaxNode->Name.Content + L"\': definition marked as 'export' cannot have parameters.",
+						Error(33037, "component '" + compImpl->SyntaxNode->Name.Content + "\': definition marked as 'export' cannot have parameters.",
 							compImpl->SyntaxNode->Name);
 				}
 				auto compName = GetFullComponentName(comp.Ptr());
@@ -22872,16 +22991,16 @@ namespace Spire
 				else
 				{
 					if (comp->IsParam)
-						Error(33029, L"\'" + compImpl->SyntaxNode->Name.Content + L"\': requirement clash with previous definition.",
+						Error(33029, "\'" + compImpl->SyntaxNode->Name.Content + "\': requirement clash with previous definition.",
 							compImpl->SyntaxNode.Ptr());
 					else
 					{
 						if (!compSym->Type->DataType->Equals(comp->Type.Ptr()))
-							Error(30035, L"'" + comp->Name.Content + L"': type of overloaded component mismatches previous definition.\nsee previous definition at " +
+							Error(30035, "'" + comp->Name.Content + "': type of overloaded component mismatches previous definition.\nsee previous definition at " +
 								compSym->Implementations.First()->SyntaxNode->Position.ToString(), comp->Name);
 					}
 					if (compImpl->SyntaxNode->Parameters.Count())
-						Error(33032, L"\'" + compImpl->SyntaxNode->Name.Content + L"\': function redefinition.\nsee previous definition at " +
+						Error(33032, "\'" + compImpl->SyntaxNode->Name.Content + "\': function redefinition.\nsee previous definition at " +
 							compSym->Implementations.Last()->SyntaxNode->Position.ToString(), compImpl->SyntaxNode.Ptr());
 					symbolTable->CheckComponentImplementationConsistency(err, compSym.Ptr(), compImpl.Ptr());
 				}
@@ -22919,15 +23038,15 @@ namespace Spire
 					if (funcNames.Contains(func->InternalName))
 					{
 						StringBuilder argList;
-						argList << L"(";
+						argList << "(";
 						for (auto & param : func->Parameters)
 						{
 							argList << param->Type->ToString();
 							if (param != func->Parameters.Last())
-								argList << L", ";
+								argList << ", ";
 						}
-						argList << L")";
-						Error(30001, L"\'" + func->Name + argList.ProduceString() + L"\': function redefinition.", func.Ptr());
+						argList << ")";
+						Error(30001, "\'" + func->Name + argList.ProduceString() + "\': function redefinition.", func.Ptr());
 					}
 					else
 						funcNames.Add(func->InternalName);
@@ -22947,7 +23066,7 @@ namespace Spire
 					shaderSym->SyntaxNode = shader.Ptr();
 					if (symbolTable->Shaders.ContainsKey(shader->Name.Content))
 					{
-						Error(33018, L"shader '" + shader->Name.Content + "' has already been defined.", shader->Name);
+						Error(33018, "shader '" + shader->Name.Content + "' has already been defined.", shader->Name);
 					}
 					symbolTable->Shaders[shader->Name.Content] = shaderSym;
 				}
@@ -22966,7 +23085,7 @@ namespace Spire
 					for (auto & shader : symbolTable->Shaders)
 						if (!sortedShaders.Contains(shader.Value.Ptr()))
 						{
-							Error(33011, L"shader '" + shader.Key + L"' involves circular reference.", shader.Value->SyntaxNode->Name);
+							Error(33011, "shader '" + shader.Key + "' involves circular reference.", shader.Value->SyntaxNode->Name);
 						}
 				}
 
@@ -23024,7 +23143,7 @@ namespace Spire
 				for (auto & para : functionNode->Parameters)
 				{
 					if (paraNames.Contains(para->Name))
-						Error(30002, L"parameter \'" + para->Name + L"\' already defined.", para.Ptr());
+						Error(30002, "parameter \'" + para->Name + "\' already defined.", para.Ptr());
 					else
 						paraNames.Add(para->Name);
 					VariableEntry varEntry;
@@ -23033,8 +23152,8 @@ namespace Spire
 					varEntry.Type.DataType = para->Type;
 					functionNode->Scope->Variables.AddIfNotExists(varEntry.Name, varEntry);
 					if (varEntry.Type.DataType->Equals(ExpressionType::Void.Ptr()))
-						Error(30016, L"'void' can not be parameter type.", para.Ptr());
-					internalName << L"@" << varEntry.Type.DataType->ToString();
+						Error(30016, "'void' can not be parameter type.", para.Ptr());
+					internalName << "@" << varEntry.Type.DataType->ToString();
 				}
 				functionNode->InternalName = internalName.ProduceString();	
 				RefPtr<FunctionSymbol> symbol = new FunctionSymbol();
@@ -23061,13 +23180,13 @@ namespace Spire
 			virtual RefPtr<StatementSyntaxNode> VisitBreakStatement(BreakStatementSyntaxNode *stmt) override
 			{
 				if (!loops.Count())
-					Error(30003, L"'break' must appear inside loop constructs.", stmt);
+					Error(30003, "'break' must appear inside loop constructs.", stmt);
 				return stmt;
 			}
 			virtual RefPtr<StatementSyntaxNode> VisitContinueStatement(ContinueStatementSyntaxNode *stmt) override
 			{
 				if (!loops.Count())
-					Error(30004, L"'continue' must appear inside loop constructs.", stmt);
+					Error(30004, "'continue' must appear inside loop constructs.", stmt);
 				return stmt;
 			}
 			virtual RefPtr<StatementSyntaxNode> VisitDoWhileStatement(DoWhileStatementSyntaxNode *stmt) override
@@ -23078,7 +23197,7 @@ namespace Spire
 				if (!stmt->Predicate->Type->Equals(ExpressionType::Error.Ptr()) && 
 					!stmt->Predicate->Type->Equals(ExpressionType::Int.Ptr()) &&
 					!stmt->Predicate->Type->Equals(ExpressionType::Bool.Ptr()))
-					Error(30005, L"'while': expression must evaluate to int.", stmt);
+					Error(30005, "'while': expression must evaluate to int.", stmt);
 				stmt->Statement->Accept(this);
 
 				loops.RemoveAt(loops.Count() - 1);
@@ -23109,7 +23228,7 @@ namespace Spire
 						!stmt->PredicateExpression->Type->Equals(ExpressionType::Int.Ptr()) &&
 						!stmt->PredicateExpression->Type->Equals(ExpressionType::UInt.Ptr()))
 					{
-						Error(30028, L"'for': predicate expression must evaluate to bool.", stmt->PredicateExpression.Ptr());
+						Error(30028, "'for': predicate expression must evaluate to bool.", stmt->PredicateExpression.Ptr());
 					}
 				}
 				if (stmt->SideEffectExpression)
@@ -23128,7 +23247,7 @@ namespace Spire
 				if (!stmt->Predicate->Type->Equals(ExpressionType::Error.Ptr()) 
 					&& (!stmt->Predicate->Type->Equals(ExpressionType::Int.Ptr()) && 
 						!stmt->Predicate->Type->Equals(ExpressionType::Bool.Ptr())))
-					Error(30006, L"'if': expression must evaluate to int.", stmt);
+					Error(30006, "'if': expression must evaluate to int.", stmt);
 
 				if (stmt->PositiveStatement != NULL)
 					stmt->PositiveStatement->Accept(this);
@@ -23142,12 +23261,12 @@ namespace Spire
 				if (currentCompNode && currentCompNode->BlockStatement->Statements.Count() &&
 					stmt != currentCompNode->BlockStatement->Statements.Last().Ptr())
 				{
-					Error(30026, L"'return' can only appear as the last statement in component definition.", stmt);
+					Error(30026, "'return' can only appear as the last statement in component definition.", stmt);
 				}
 				if (!stmt->Expression)
 				{
 					if (function && !function->ReturnType->Equals(ExpressionType::Void.Ptr()))
-						Error(30006, L"'return' should have an expression.", stmt);
+						Error(30006, "'return' should have an expression.", stmt);
 				}
 				else
 				{
@@ -23155,18 +23274,18 @@ namespace Spire
 					if (!stmt->Expression->Type->Equals(ExpressionType::Error.Ptr()))
 					{
 						if (function && !MatchType_ValueReceiver(function->ReturnType.Ptr(), stmt->Expression->Type.Ptr()))
-							Error(30007, L"expression type '" + stmt->Expression->Type->ToString()
-								+ L"' does not match function's return type '"
-								+ function->ReturnType->ToString() + L"'", stmt);
+							Error(30007, "expression type '" + stmt->Expression->Type->ToString()
+								+ "' does not match function's return type '"
+								+ function->ReturnType->ToString() + "'", stmt);
 						if (currentComp && !MatchType_ValueReceiver(currentComp->Type->DataType.Ptr(), stmt->Expression->Type.Ptr()))
 						{
-							Error(30007, L"expression type '" + stmt->Expression->Type->ToString()
-								+ L"' does not match component's type '"
-								+ currentComp->Type->DataType->ToString() + L"'", stmt);
+							Error(30007, "expression type '" + stmt->Expression->Type->ToString()
+								+ "' does not match component's type '"
+								+ currentComp->Type->DataType->ToString() + "'", stmt);
 						}
 						if (currentImportOperator && !MatchType_GenericType(currentImportOperator->TypeName.Content, stmt->Expression->Type.Ptr()))
-							Error(30020, L"import operator should return '" + currentImportOperator->TypeName.Content
-								+ L"', but the expression has type '" + stmt->Expression->Type->ToString() + L"'. do you forget 'project'?", stmt);
+							Error(30020, "import operator should return '" + currentImportOperator->TypeName.Content
+								+ "', but the expression has type '" + stmt->Expression->Type->ToString() + "'. do you forget 'project'?", stmt);
 					}
 				}
 				return stmt;
@@ -23176,24 +23295,24 @@ namespace Spire
 				stmt->Type = TranslateTypeNode(stmt->TypeNode);
 				if (stmt->Type->IsTextureOrSampler() || stmt->Type->AsGenericType())
 				{
-					Error(30033, L"cannot declare a local variable of this type.", stmt);
+					Error(30033, "cannot declare a local variable of this type.", stmt);
 				}
 				else if (stmt->Type->AsBasicType() && stmt->Type->AsBasicType()->RecordTypeName.Length())
 				{
-					Error(33034, L"cannot declare a record-typed variable in an import operator.", stmt);
+					Error(33034, "cannot declare a record-typed variable in an import operator.", stmt);
 				}
 				for (auto & para : stmt->Variables)
 				{
 					VariableEntry varDeclr;
 					varDeclr.Name = para->Name;
 					if (stmt->Scope->Variables.ContainsKey(para->Name))
-						Error(30008, L"variable " + para->Name + L" already defined.", para.Ptr());
+						Error(30008, "variable " + para->Name + " already defined.", para.Ptr());
 
 					varDeclr.Type.DataType = stmt->Type;
 					if (varDeclr.Type.DataType->Equals(ExpressionType::Void.Ptr()))
-						Error(30009, L"invalid type 'void'.", stmt);
+						Error(30009, "invalid type 'void'.", stmt);
 					if (varDeclr.Type.DataType->IsArray() && varDeclr.Type.DataType->AsArrayType()->ArrayLength <= 0)
-						Error(30025, L"array size must be larger than zero.", stmt);
+						Error(30025, "array size must be larger than zero.", stmt);
 
 					stmt->Scope->Variables.AddIfNotExists(para->Name, varDeclr);
 					if (para->Expression != NULL)
@@ -23202,8 +23321,8 @@ namespace Spire
 						if (!MatchType_ValueReceiver(varDeclr.Type.DataType.Ptr(), para->Expression->Type.Ptr())
 							&& !para->Expression->Type->Equals(ExpressionType::Error.Ptr()))
 						{
-							Error(30019, L"type mismatch \'" + para->Expression->Type->ToString() + L"\' and \'" +
-								varDeclr.Type.DataType->ToString() + L"\'", para.Ptr());
+							Error(30019, "type mismatch \'" + para->Expression->Type->ToString() + "\' and \'" +
+								varDeclr.Type.DataType->ToString() + "\'", para.Ptr());
 						}
 					}
 				}
@@ -23216,7 +23335,7 @@ namespace Spire
 				if (!stmt->Predicate->Type->Equals(ExpressionType::Error.Ptr()) && 
 					!stmt->Predicate->Type->Equals(ExpressionType::Int.Ptr()) &&
 					!stmt->Predicate->Type->Equals(ExpressionType::Bool.Ptr()))
-					Error(30010, L"'while': expression must evaluate to int.", stmt);
+					Error(30010, "'while': expression must evaluate to int.", stmt);
 
 				stmt->Statement->Accept(this);
 				loops.RemoveAt(loops.Count() - 1);
@@ -23238,7 +23357,7 @@ namespace Spire
 				{
 					if (!(leftType->AsBasicType() && leftType->AsBasicType()->IsLeftValue) &&
 						!leftType->Equals(ExpressionType::Error.Ptr()))
-						Error(30011, L"left of '=' is not an l-value.", expr->LeftExpression.Ptr());
+						Error(30011, "left of '=' is not an l-value.", expr->LeftExpression.Ptr());
 					if (expr->Operator == Operator::AndAssign ||
 						expr->Operator == Operator::OrAssign ||
 						expr->Operator == Operator::XorAssign ||
@@ -23247,7 +23366,7 @@ namespace Spire
 					{
 						if (!(leftType->IsIntegral() && rightType->IsIntegral()))
 						{
-							Error(30041, L"bit operation: operand must be integral type.", expr);
+							Error(30041, "bit operation: operand must be integral type.", expr);
 						}
 					}
 					expr->LeftExpression->Access = ExpressionAccess::Write;
@@ -23275,8 +23394,8 @@ namespace Spire
 					{
 						expr->Type = ExpressionType::Error;
 						if (!leftType->Equals(ExpressionType::Error.Ptr()) && !rightType->Equals(ExpressionType::Error.Ptr()))
-							Error(30012, L"no overload found for operator " + OperatorToString(expr->Operator) + L" (" + leftType->ToString() + L", "
-								+ rightType->ToString() + L").", expr);
+							Error(30012, "no overload found for operator " + OperatorToString(expr->Operator) + " (" + leftType->ToString() + ", "
+								+ rightType->ToString() + ").", expr);
 					}
 					else
 					{
@@ -23317,20 +23436,20 @@ namespace Spire
 				{
 					auto & baseExprType = expr->BaseExpression->Type;
 					bool isValid = baseExprType->AsGenericType() &&
-							(baseExprType->AsGenericType()->GenericTypeName == L"StructuredBuffer" ||
-								baseExprType->AsGenericType()->GenericTypeName == L"RWStructuredBuffer" ||
-							 baseExprType->AsGenericType()->GenericTypeName == L"PackedBuffer");
+							(baseExprType->AsGenericType()->GenericTypeName == "StructuredBuffer" ||
+								baseExprType->AsGenericType()->GenericTypeName == "RWStructuredBuffer" ||
+							 baseExprType->AsGenericType()->GenericTypeName == "PackedBuffer");
 					isValid = isValid || (baseExprType->AsBasicType() && GetVectorSize(baseExprType->AsBasicType()->BaseType) != 0);
 					isValid = isValid || baseExprType->AsArrayType();
 					if (!isValid)
 					{
-						Error(30013, L"'[]' can only index on arrays.", expr);
+						Error(30013, "'[]' can only index on arrays.", expr);
 						expr->Type = ExpressionType::Error;
 					}
 					if (!expr->IndexExpression->Type->Equals(ExpressionType::Int.Ptr()) && 
 						!expr->IndexExpression->Type->Equals(ExpressionType::UInt.Ptr()))
 					{
-						Error(30014, L"index expression must evaluate to int.", expr);
+						Error(30014, "index expression must evaluate to int.", expr);
 						expr->Type = ExpressionType::Error;
 					}
 				}
@@ -23497,14 +23616,14 @@ namespace Spire
 						// component with explicit import operator call must be qualified with explicit rate
 						if (!currentCompNode->Rate)
 						{
-							Error(33071, L"cannot call an import operator from an auto-placed component '" + currentCompNode->Name.Content + L"'. try qualify the component with explicit worlds.",
+							Error(33071, "cannot call an import operator from an auto-placed component '" + currentCompNode->Name.Content + "'. try qualify the component with explicit worlds.",
 								varExpr);
 							invoke->Type = ExpressionType::Error;
 							return invoke;
 						}
 						// for now we do not support calling import operator from a multi-world component definition
 						if (currentCompNode->Rate->Worlds.Count() > 1)
-							Error(33073, L"cannot call an import operator from a multi-world component definition. consider qualify the component with only one explicit world.",
+							Error(33073, "cannot call an import operator from a multi-world component definition. consider qualify the component with only one explicit world.",
 								varExpr);
 						auto validOverloads = From(*impOpList).Where([&](RefPtr<ImportOperatorDefSyntaxNode> imp) { return imp->DestWorld.Content == currentCompNode->Rate->Worlds.First().World.Content; }).ToList();
 						auto func = FindFunctionOverload(validOverloads, [](RefPtr<ImportOperatorDefSyntaxNode> imp)
@@ -23533,11 +23652,11 @@ namespace Spire
 							{
 								argList << arguments[i]->Type->ToString();
 								if (i != arguments.Count() - 1)
-									argList << L", ";
+									argList << ", ";
 							}
-							Error(33072, L"'" + varExpr->Variable + L"' is an import operator defined in pipeline '" + currentShader->Pipeline->SyntaxNode->Name.Content
-								+ L"', but none of the import operator overloads converting to world '" + currentCompNode->Rate->Worlds.First().World.Content + L"' matches argument list (" +
-								argList.ProduceString() + L").",
+							Error(33072, "'" + varExpr->Variable + "' is an import operator defined in pipeline '" + currentShader->Pipeline->SyntaxNode->Name.Content
+								+ "', but none of the import operator overloads converting to world '" + currentCompNode->Rate->Worlds.First().World.Content + "' matches argument list (" +
+								argList.ProduceString() + ").",
 								varExpr);
 							invoke->Type = ExpressionType::Error;
 						}
@@ -23550,8 +23669,8 @@ namespace Spire
 				RefPtr<FunctionSymbol> func;
 				varExpr->Variable = TranslateHLSLTypeNames(varExpr->Variable);
 
-				if (varExpr->Variable == L"texture" && arguments.Count() > 0 &&
-					arguments[0]->Type->IsGenericType(L"Texture"))
+				if (varExpr->Variable == "texture" && arguments.Count() > 0 &&
+					arguments[0]->Type->IsGenericType("Texture"))
 				{
 					if (arguments.Count() != 2)
 					{
@@ -23576,13 +23695,13 @@ namespace Spire
 						}
 					}
 					auto funcType = new BasicExpressionType(BaseType::Function);
-					funcType->Func = symbolTable->FunctionOverloads[L"texture"]().First().Ptr();
+					funcType->Func = symbolTable->FunctionOverloads["texture"]().First().Ptr();
 					varExpr->Type = funcType;
 				}
 				else
 				{
 					// find function overload with implicit argument type conversions
-					auto namePrefix = varExpr->Variable + L"@";
+					auto namePrefix = varExpr->Variable + "@";
 					List<RefPtr<FunctionSymbol>> * functionOverloads = symbolTable->FunctionOverloads.TryGetValue(varExpr->Variable);
 					if (functionOverloads)
 					{
@@ -23616,12 +23735,12 @@ namespace Spire
 					{
 						argList << arguments[i]->Type->ToString();
 						if (i != arguments.Count() - 1)
-							argList << L", ";
+							argList << ", ";
 					}
 					if (functionNameFound)
-						Error(30021, varExpr->Variable + L": no overload takes arguments (" + argList.ProduceString() + L")", varExpr);
+						Error(30021, varExpr->Variable + ": no overload takes arguments (" + argList.ProduceString() + ")", varExpr);
 					else
-						Error(30015, L"undefined identifier '" + varExpr->Variable + L"'.", varExpr);
+						Error(30015, "undefined identifier '" + varExpr->Variable + "'.", varExpr);
 				}
 				return invoke;
 			}
@@ -23630,13 +23749,13 @@ namespace Spire
 			{
 				if (currentImportOperator == nullptr)
 				{
-					Error(30030, L"'project': invalid use outside import operator.", project);
+					Error(30030, "'project': invalid use outside import operator.", project);
 					return project;
 				}
 				project->BaseExpression->Accept(this);
 				auto baseType = project->BaseExpression->Type->AsBasicType();
 				if (!baseType || baseType->RecordTypeName != currentImportOperator->SourceWorld.Content)
-					Error(30031, L"'project': expression must evaluate to record type '" + currentImportOperator->SourceWorld.Content + L"'.", project);
+					Error(30031, "'project': expression must evaluate to record type '" + currentImportOperator->SourceWorld.Content + "'.", project);
 				auto rsType = new BasicExpressionType(BaseType::Generic);
 				project->Type = rsType;
 				rsType->GenericTypeVar = currentImportOperator->TypeName.Content;
@@ -23655,7 +23774,7 @@ namespace Spire
 				}
 				else
 				{
-					Error(33070, L"expression preceding parenthesis of apparent call must have function type.", expr->FunctionExpr.Ptr());
+					Error(33070, "expression preceding parenthesis of apparent call must have function type.", expr->FunctionExpr.Ptr());
 					expr->Type = ExpressionType::Error;
 				}
 				return expr;
@@ -23691,7 +23810,7 @@ namespace Spire
 									if (i < expr->Arguments.Count() && expr->Arguments[i]->Type->AsBasicType() &&
 										!expr->Arguments[i]->Type->AsBasicType()->IsLeftValue)
 									{
-										Error(30047, L"argument passed to parameter '" + (*params)[i]->Name + L"' must be l-value.",
+										Error(30047, "argument passed to parameter '" + (*params)[i]->Name + "' must be l-value.",
 											expr->Arguments[i].Ptr());
 									}
 								}
@@ -23707,67 +23826,67 @@ namespace Spire
 				switch (op)
 				{
 				case Spire::Compiler::Operator::Neg:
-					return L"-";
+					return "-";
 				case Spire::Compiler::Operator::Not:
-					return L"!";
+					return "!";
 				case Spire::Compiler::Operator::PreInc:
-					return L"++";
+					return "++";
 				case Spire::Compiler::Operator::PreDec:
-					return L"--";
+					return "--";
 				case Spire::Compiler::Operator::PostInc:
-					return L"++";
+					return "++";
 				case Spire::Compiler::Operator::PostDec:
-					return L"--";
+					return "--";
 				case Spire::Compiler::Operator::Mul:
 				case Spire::Compiler::Operator::MulAssign:
-					return L"*";
+					return "*";
 				case Spire::Compiler::Operator::Div:
 				case Spire::Compiler::Operator::DivAssign:
-					return L"/";
+					return "/";
 				case Spire::Compiler::Operator::Mod:
 				case Spire::Compiler::Operator::ModAssign:
-					return L"%";
+					return "%";
 				case Spire::Compiler::Operator::Add:
 				case Spire::Compiler::Operator::AddAssign:
-					return L"+";
+					return "+";
 				case Spire::Compiler::Operator::Sub:
 				case Spire::Compiler::Operator::SubAssign:
-					return L"-";
+					return "-";
 				case Spire::Compiler::Operator::Lsh:
 				case Spire::Compiler::Operator::LshAssign:
-					return L"<<";
+					return "<<";
 				case Spire::Compiler::Operator::Rsh:
 				case Spire::Compiler::Operator::RshAssign:
-					return L">>";
+					return ">>";
 				case Spire::Compiler::Operator::Eql:
-					return L"==";
+					return "==";
 				case Spire::Compiler::Operator::Neq:
-					return L"!=";
+					return "!=";
 				case Spire::Compiler::Operator::Greater:
-					return L">";
+					return ">";
 				case Spire::Compiler::Operator::Less:
-					return L"<";
+					return "<";
 				case Spire::Compiler::Operator::Geq:
-					return L">=";
+					return ">=";
 				case Spire::Compiler::Operator::Leq:
-					return L"<=";
+					return "<=";
 				case Spire::Compiler::Operator::BitAnd:
 				case Spire::Compiler::Operator::AndAssign:
-					return L"&";
+					return "&";
 				case Spire::Compiler::Operator::BitXor:
 				case Spire::Compiler::Operator::XorAssign:
-					return L"^";
+					return "^";
 				case Spire::Compiler::Operator::BitOr:
 				case Spire::Compiler::Operator::OrAssign:
-					return L"|";
+					return "|";
 				case Spire::Compiler::Operator::And:
-					return L"&&";
+					return "&&";
 				case Spire::Compiler::Operator::Or:
-					return L"||";
+					return "||";
 				case Spire::Compiler::Operator::Assign:
-					return L"=";
+					return "=";
 				default:
-					return L"ERROR";
+					return "ERROR";
 				}
 			}
 			virtual RefPtr<ExpressionSyntaxNode> VisitUnaryExpression(UnaryExpressionSyntaxNode *expr) override
@@ -23784,7 +23903,7 @@ namespace Spire
 				{
 					expr->Type = ExpressionType::Error;
 					if (!expr->Expression->Type->Equals(ExpressionType::Error.Ptr()))
-						Error(30012, L"no overload found for operator " + OperatorToString(expr->Operator) + L" (" + expr->Expression->Type->ToString() + L").", expr);
+						Error(30012, "no overload found for operator " + OperatorToString(expr->Operator) + " (" + expr->Expression->Type->ToString() + ").", expr);
 				}
 				else
 				{
@@ -23819,7 +23938,7 @@ namespace Spire
 						expr->Type = comp->Type->DataType;
 					}
 					else
-						Error(30015, L"undefined identifier \'" + expr->Variable + L"\'", expr);
+						Error(30015, "undefined identifier \'" + expr->Variable + "\'", expr);
 				}
 				else if (currentShader)
 				{
@@ -23832,16 +23951,16 @@ namespace Spire
 					}
 					else if (compRef.Component)
 					{
-						Error(30017, L"component \'" + expr->Variable + L"\' is not accessible from shader '" + currentShader->SyntaxNode->Name.Content + L"'.", expr);
+						Error(30017, "component \'" + expr->Variable + "\' is not accessible from shader '" + currentShader->SyntaxNode->Name.Content + "'.", expr);
 					}
 					else
-						Error(30015, L"undefined identifier \'" + expr->Variable + L"\'", expr);
-					expr->Tags[L"ComponentReference"] = new ComponentReferenceObject(compRef.Component);
+						Error(30015, "undefined identifier \'" + expr->Variable + "\'", expr);
+					expr->Tags["ComponentReference"] = new ComponentReferenceObject(compRef.Component);
 				}
 				else
-					Error(30015, L"undefined identifier \'" + expr->Variable + L"\'", expr);
+					Error(30015, "undefined identifier \'" + expr->Variable + "\'", expr);
 
-				if (expr->Type->IsGenericType(L"Uniform") || expr->Type->IsGenericType(L"Patch") || expr->Type->IsGenericType(L"StorageBuffer"))
+				if (expr->Type->IsGenericType("Uniform") || expr->Type->IsGenericType("Patch") || expr->Type->IsGenericType("StorageBuffer"))
 					expr->Type = expr->Type->AsGenericType()->BaseType;
 
 				return expr;
@@ -23867,8 +23986,8 @@ namespace Spire
 					expr->Type = ExpressionType::Error;
 				if (expr->Type->Equals(ExpressionType::Error.Ptr()) && !expr->Expression->Type->Equals(ExpressionType::Error.Ptr()))
 				{
-					Error(30022, L"invalid type cast between \"" + expr->Expression->Type->ToString() + L"\" and \"" +
-						targetType->ToString() + L"\".", expr);
+					Error(30022, "invalid type cast between \"" + expr->Expression->Type->ToString() + "\" and \"" +
+						targetType->ToString() + "\".", expr);
 				}
 				return expr;
 			}
@@ -23879,13 +23998,13 @@ namespace Spire
 					&& !expr->SelectorExpr->Type->Equals(ExpressionType::Error.Ptr()))
 				{
 					expr->Type = ExpressionType::Error;
-					Error(30079, L"selector must evaluate to bool.", expr);
+					Error(30079, "selector must evaluate to bool.", expr);
 				}
 				expr->Expr0 = expr->Expr0->Accept(this).As<ExpressionSyntaxNode>();
 				expr->Expr1 = expr->Expr1->Accept(this).As<ExpressionSyntaxNode>();
 				if (!expr->Expr0->Type->Equals(expr->Expr1->Type.Ptr()))
 				{
-					Error(30080, L"the two value expressions in a select clause must have same type.", expr);
+					Error(30080, "the two value expressions in a select clause must have same type.", expr);
 				}
 				expr->Type = expr->Expr0->Type;
 				return expr;
@@ -23910,20 +24029,20 @@ namespace Spire
 							auto ch = expr->MemberName[i];
 							switch (ch)
 							{
-							case L'x':
-							case L'r':
+							case 'x':
+							case 'r':
 								children.Add(0);
 								break;
-							case L'y':
-							case L'g':
+							case 'y':
+							case 'g':
 								children.Add(1);
 								break;
-							case L'z':
-							case L'b':
+							case 'z':
+							case 'b':
 								children.Add(2);
 								break;
-							case L'w':
-							case L'a':
+							case 'w':
+							case 'a':
 								children.Add(3);
 								break;
 							default:
@@ -23993,7 +24112,7 @@ namespace Spire
 					}
 					else
 						expr->Type = ExpressionType::Error;
-					expr->Tags[L"ComponentReference"] = new ComponentReferenceObject(refComp.Component);
+					expr->Tags["ComponentReference"] = new ComponentReferenceObject(refComp.Component);
 				}
 				else if (baseType->IsStruct())
 				{
@@ -24001,8 +24120,8 @@ namespace Spire
 					if (id == -1)
 					{
 						expr->Type = ExpressionType::Error;
-						Error(30027, L"\'" + expr->MemberName + L"\' is not a member of \'" +
-							baseType->AsBasicType()->Struct->Name + L"\'.", expr);
+						Error(30027, "\'" + expr->MemberName + "\' is not a member of \'" +
+							baseType->AsBasicType()->Struct->Name + "\'.", expr);
 					}
 					else
 						expr->Type = baseType->AsBasicType()->Struct->SyntaxNode->Fields[id]->Type;
@@ -24016,8 +24135,8 @@ namespace Spire
 				if (!baseType->Equals(ExpressionType::Error.Ptr()) &&
 					expr->Type->Equals(ExpressionType::Error.Ptr()))
 				{
-					Error(30023, L"\"" + baseType->ToString() + L"\" does not have public member \"" +
-						expr->MemberName + L"\".", expr);
+					Error(30023, "\"" + baseType->ToString() + "\" does not have public member \"" +
+						expr->MemberName + "\".", expr);
 				}
 				return expr;
 			}
@@ -24069,11 +24188,11 @@ namespace Spire
 							{
 								try
 								{
-									if (attrib.Value.StartsWith(L"%"))
+									if (attrib.Value.StartsWith("%"))
 									{
 										CoreLib::Text::TokenReader parser(attrib.Value.SubString(1, attrib.Value.Length() - 1));
 										auto compName = parser.ReadWord();
-										parser.Read(L".");
+										parser.Read(".");
 										auto compAttrib = parser.ReadWord();
 										RefPtr<ShaderComponentSymbol> compSym;
 										if (shader->Components.TryGetValue(compName, compSym))
@@ -24149,8 +24268,8 @@ namespace Spire
 							}
 							else
 							{
-								cresult.GetErrorWriter()->Warning(33101, L"'" + selectedDef->WorldName + L"' is not a valid choice for '" + choice.Key
-									+ L"'.", selectedDef.Ptr()->Position);
+								cresult.GetErrorWriter()->Warning(33101, "'" + selectedDef->WorldName + "' is not a valid choice for '" + choice.Key
+									+ "'.", selectedDef.Ptr()->Position);
 							}
 						}
 					}
@@ -24184,7 +24303,7 @@ namespace Spire
 							def->Type = comp.Value->Type->DataType;
 							def->IsEntryPoint = (impl->ExportWorlds.Contains(w) ||
 								(shader->Pipeline->IsAbstractWorld(w) &&
-								(impl->SyntaxNode->LayoutAttributes.ContainsKey(L"Pinned") || shader->Pipeline->Worlds[w]().SyntaxNode->LayoutAttributes.ContainsKey(L"Pinned"))));
+								(impl->SyntaxNode->LayoutAttributes.ContainsKey("Pinned") || shader->Pipeline->Worlds[w]().SyntaxNode->LayoutAttributes.ContainsKey("Pinned"))));
 							CloneContext cloneCtx;
 							def->SyntaxNode = impl->SyntaxNode->Clone(cloneCtx);
 							def->World = w;
@@ -24212,7 +24331,7 @@ namespace Spire
 					{
 						if (def->Dependency.Contains(def.Ptr()))
 						{
-							cresult.GetErrorWriter()->Error(33102, L"component definition \'" + def->OriginalName + L"\' involves circular reference.",
+							cresult.GetErrorWriter()->Error(33102, "component definition \'" + def->OriginalName + "\' involves circular reference.",
 								def->SyntaxNode->Position);
 							return nullptr;
 						}
@@ -24301,13 +24420,13 @@ namespace Spire
 					switch(options.Target)
 					{
 					case CodeGenTarget::SPIRV:
-						backend = backends[L"spirv"]().Ptr();
+						backend = backends["spirv"]().Ptr();
 						break;
 					case CodeGenTarget::GLSL:
-						backend = backends[L"glsl"]().Ptr();
+						backend = backends["gls"]().Ptr();
 						break;
 					case CodeGenTarget::HLSL:
-						backend = backends[L"hlsl"]().Ptr();
+						backend = backends["hls"]().Ptr();
 						break;
 					default:
 						// TODO: emit an appropriate diagnostic
@@ -24315,7 +24434,7 @@ namespace Spire
 					}
 
 					Schedule schedule;
-					if (options.ScheduleSource != L"")
+					if (options.ScheduleSource != "")
 					{
 						schedule = Schedule::Parse(options.ScheduleSource, options.ScheduleFileName, result.ErrorList);
 					}
@@ -24429,7 +24548,7 @@ namespace Spire
 					}
 					else
 					{
-						result.GetErrorWriter()->Error(2, L"unsupported compiler mode.", CodePosition());
+						result.GetErrorWriter()->Error(2, "unsupported compiler mode.", CodePosition());
 						return;
 					}
 					context.Program = result.Program;
@@ -24452,9 +24571,9 @@ namespace Spire
 					BasicExpressionType::Init();
 				}
 				compilerInstances++;
-				backends.Add(L"glsl", CreateGLSLCodeGen());
-				backends.Add(L"hlsl", CreateHLSLCodeGen());
-				backends.Add(L"spirv", CreateSpirVCodeGen());
+				backends.Add("gls", CreateGLSLCodeGen());
+				backends.Add("hls", CreateHLSLCodeGen());
+				backends.Add("spirv", CreateSpirVCodeGen());
 			}
 
 			~ShaderCompilerImpl()
@@ -24505,23 +24624,23 @@ namespace Spire
 			switch (em)
 			{
 			case ExecutionModel::Invalid:
-				return L"invalid";
+				return "invalid";
 			case ExecutionModel::Vertex:
-				return L"Vertex";
+				return "Vertex";
 			case ExecutionModel::TessellationControl:
-				return L"TessellationControl";
+				return "TessellationContro";
 			case ExecutionModel::TessellationEvaluation:
-				return L"TessellationEvaluation";
+				return "TessellationEvaluation";
 			case ExecutionModel::Geometry:
-				return L"Geometry";
+				return "Geometry";
 			case ExecutionModel::Fragment:
-				return L"Fragment";
+				return "Fragment";
 			case ExecutionModel::GLCompute:
-				return L"GLCompute";
+				return "GLCompute";
 			case ExecutionModel::Kernel:
-				return L"Kernel";
+				return "Kerne";
 			default:
-				throw NotImplementedException(L"unknown ExecutionModel");
+				throw NotImplementedException("unknown ExecutionMode");
 			}
 		}
 
@@ -24545,29 +24664,29 @@ namespace Spire
 			switch (em)
 			{
 			case ExecutionMode::Invalid:
-				return L"invalid";
+				return "invalid";
 			case ExecutionMode::Invocations:
-				return L"Invocations";
+				return "Invocations";
 			case ExecutionMode::PixelCenterInteger:
-				return L"PixelCenterInteger";
+				return "PixelCenterInteger";
 			case ExecutionMode::OriginUpperLeft:
-				return L"OriginUpperLeft";
+				return "OriginUpperLeft";
 			case ExecutionMode::OriginLowerLeft:
-				return L"OriginLowerLeft";
+				return "OriginLowerLeft";
 			case ExecutionMode::EarlyFragmentTests:
-				return L"EarlyFragmentTests";
+				return "EarlyFragmentTests";
 			case ExecutionMode::DepthReplacing:
-				return L"DepthReplacing";
+				return "DepthReplacing";
 			case ExecutionMode::DepthGreater:
-				return L"DepthGreater";
+				return "DepthGreater";
 			case ExecutionMode::DepthLess:
-				return L"DepthLess";
+				return "DepthLess";
 			case ExecutionMode::DepthUnchanged:
-				return L"DepthUnchanged";
+				return "DepthUnchanged";
 			case ExecutionMode::LocalSize:
-				return L"LocalSize";
+				return "LocalSize";
 			default:
-				throw NotImplementedException(L"unknown ExecutionMode");
+				throw NotImplementedException("unknown ExecutionMode");
 			}
 		}
 
@@ -24593,31 +24712,31 @@ namespace Spire
 			switch (store)
 			{
 			case StorageClass::UniformConstant:
-				return L"UniformConstant";
+				return "UniformConstant";
 			case StorageClass::Input:
-				return L"Input";
+				return "Input";
 			case StorageClass::Uniform:
-				return L"Uniform";
+				return "Uniform";
 			case StorageClass::Output:
-				return L"Output";
+				return "Output";
 			case StorageClass::Workgroup:
-				return L"Workgroup";
+				return "Workgroup";
 			case StorageClass::CrossWorkGroup:
-				return L"CrossWorkGroup";
+				return "CrossWorkGroup";
 			case StorageClass::Private:
-				return L"Private";
+				return "Private";
 			case StorageClass::Function:
-				return L"Function";
+				return "Function";
 			case StorageClass::Generic:
-				return L"Generic";
+				return "Generic";
 			case StorageClass::PushConstant:
-				return L"PushConstant";
+				return "PushConstant";
 			case StorageClass::AtomicCounter:
-				return L"AtomicCounter";
+				return "AtomicCounter";
 			case StorageClass::Image:
-				return L"Image";
+				return "Image";
 			default:
-				throw NotImplementedException(L"Unknown StorageClass: ");
+				throw NotImplementedException("Unknown StorageClass: ");
 			}
 		}
 
@@ -24634,15 +24753,15 @@ namespace Spire
 			switch (ma)
 			{
 			case MemoryAccess::None:
-				return L"None";
+				return "None";
 			case MemoryAccess::Volatile:
-				return L"Volatile";
+				return "Volatile";
 			case MemoryAccess::Aligned:
-				return L"Aligned";
+				return "Aligned";
 			case MemoryAccess::Nontemporal:
-				return L"Nontemporal";
+				return "Nontempora";
 			default:
-				throw NotImplementedException(L"Unknown MemoryAccess");
+				throw NotImplementedException("Unknown MemoryAccess");
 			}
 		}
 
@@ -24671,39 +24790,39 @@ namespace Spire
 			switch (d)
 			{
 			case Decoration::Invalid:
-				return L"invalid";
+				return "invalid";
 			case Decoration::Block:
-				return L"Block";
+				return "Block";
 			case Decoration::BufferBlock:
-				return L"BufferBlock";
+				return "BufferBlock";
 			case Decoration::RowMajor:
-				return L"RowMajor";
+				return "RowMajor";
 			case Decoration::ColMajor:
-				return L"ColMajor";
+				return "ColMajor";
 			case Decoration::ArrayStride:
-				return L"ArrayStride";
+				return "ArrayStride";
 			case Decoration::MatrixStride:
-				return L"MatrixStride";
+				return "MatrixStride";
 			case Decoration::BuiltIn:
-				return L"BuiltIn";
+				return "BuiltIn";
 			case Decoration::Flat:
-				return L"Flat";
+				return "Flat";
 			case Decoration::Constant:
-				return L"Constant";
+				return "Constant";
 			case Decoration::Location:
-				return L"Location";
+				return "Location";
 			case Decoration::Component:
-				return L"Component";
+				return "Component";
 			case Decoration::Index:
-				return L"Index";
+				return "Index";
 			case Decoration::Binding:
-				return L"Binding";
+				return "Binding";
 			case Decoration::DescriptorSet:
-				return L"DescriptorSet";
+				return "DescriptorSet";
 			case Decoration::Offset:
-				return L"Offset";
+				return "Offset";
 			default:
-				throw NotImplementedException(L"unknown Decoration");
+				throw NotImplementedException("unknown Decoration");
 			}
 		}
 
@@ -24724,23 +24843,23 @@ namespace Spire
 			switch (b)
 			{
 			case BuiltIn::Invalid:
-				return L"invalid";
+				return "invalid";
 			case BuiltIn::Position:
-				return L"Position";
+				return "Position";
 			case BuiltIn::PointSize:
-				return L"PointSize";
+				return "PointSize";
 			case BuiltIn::ClipDistance:
-				return L"ClipDistance";
+				return "ClipDistance";
 			case BuiltIn::CullDistance:
-				return L"CullDistance";
+				return "CullDistance";
 			case BuiltIn::FragDepth:
-				return L"FragDepth";
+				return "FragDepth";
 			case BuiltIn::WorkgroupSize:
-				return L"WorkgroupSize";
+				return "WorkgroupSize";
 			case BuiltIn::GlobalInvocationId:
-				return L"GlobalInvocationId";
+				return "GlobalInvocationId";
 			default:
-				throw NotImplementedException(L"unknown Builtin");
+				throw NotImplementedException("unknown Builtin");
 			}
 		}
 
@@ -24760,21 +24879,21 @@ namespace Spire
 			switch (b)
 			{
 			case Dim::e1D:
-				return L"1D";
+				return "1D";
 			case Dim::e2D:
-				return L"2D";
+				return "2D";
 			case Dim::e3D:
-				return L"3D";
+				return "3D";
 			case Dim::eCube:
-				return L"Cube";
+				return "Cube";
 			case Dim::eRect:
-				return L"Rect";
+				return "Rect";
 			case Dim::eBuffer:
-				return L"Buffer";
+				return "Buffer";
 			case Dim::eSubpassData:
-				return L"SubpassData";
+				return "SubpassData";
 			default:
-				throw NotImplementedException(L"unknown Builtin");
+				throw NotImplementedException("unknown Builtin");
 			}
 		}
 
@@ -24796,25 +24915,25 @@ namespace Spire
 			switch (io)
 			{
 			case ImageOperands::None:
-				return L"None";
+				return "None";
 			case ImageOperands::Bias:
-				return L"Bias";
+				return "Bias";
 			case ImageOperands::Lod:
-				return L"Lod";
+				return "Lod";
 			case ImageOperands::Grad:
-				return L"Grad";
+				return "Grad";
 			case ImageOperands::ConstOffset:
-				return L"ConstOffset";
+				return "ConstOffset";
 			case ImageOperands::Offset:
-				return L"Offset";
+				return "Offset";
 			case ImageOperands::ConstOffsets:
-				return L"ConstOffsets";
+				return "ConstOffsets";
 			case ImageOperands::Sample:
-				return L"Sample";
+				return "Sample";
 			case ImageOperands::MinLod:
-				return L"MinLod";
+				return "MinLod";
 			default:
-				throw NotImplementedException(L"unknown Image Operands");
+				throw NotImplementedException("unknown Image Operands");
 			}
 		}
 
@@ -24823,42 +24942,42 @@ namespace Spire
 		{
 			Dictionary<String, int> ret;
 
-			ret[L"abs"] = 4;	//fabs, actually :(
-			ret[L"sign"] = 6;	//fsign, actually :(
-			ret[L"floor"] = 8;
-			ret[L"ceil"] = 9;
-			ret[L"fract"] = 10;
-			ret[L"sin"] = 13;
-			ret[L"cos"] = 14;
-			ret[L"tan"] = 15;
-			ret[L"asin"] = 16;
-			ret[L"acos"] = 17;
-			ret[L"atan"] = 18;
-			ret[L"atan2"] = 25;
-			ret[L"pow"] = 26;
-			ret[L"exp"] = 27;
-			ret[L"log"] = 28;
-			ret[L"exp2"] = 29;
-			ret[L"log2"] = 30;
+			ret["abs"] = 4;	//fabs, actually :(
+			ret["sign"] = 6;	//fsign, actually :(
+			ret["floor"] = 8;
+			ret["cei"] = 9;
+			ret["fract"] = 10;
+			ret["sin"] = 13;
+			ret["cos"] = 14;
+			ret["tan"] = 15;
+			ret["asin"] = 16;
+			ret["acos"] = 17;
+			ret["atan"] = 18;
+			ret["atan2"] = 25;
+			ret["pow"] = 26;
+			ret["exp"] = 27;
+			ret["log"] = 28;
+			ret["exp2"] = 29;
+			ret["log2"] = 30;
 
-			ret[L"sqrt"] = 31;
+			ret["sqrt"] = 31;
 
-			ret[L"min"] = 37;
-			ret[L"max"] = 40;
-			ret[L"clamp"] = 43;
+			ret["min"] = 37;
+			ret["max"] = 40;
+			ret["clamp"] = 43;
 
-			ret[L"mix"] = 46;
+			ret["mix"] = 46;
 
-			ret[L"step"] = 48;
-			ret[L"smoothstep"] = 49;
+			ret["step"] = 48;
+			ret["smoothstep"] = 49;
 
 			ret["length"] = 66;
 
-			ret[L"cross"] = 68;
-			ret[L"normalize"] = 69;
+			ret["cross"] = 68;
+			ret["normalize"] = 69;
 
-			ret[L"reflect"] = 71;
-			ret[L"refract"] = 72;
+			ret["reflect"] = 71;
+			ret["refract"] = 72;
 
 			return ret;
 		}
@@ -24866,7 +24985,7 @@ namespace Spire
 		String GetFuncOriginalName(const String & name)
 		{
 			String originalName;
-			int splitPos = name.IndexOf(L'@');
+			int splitPos = name.IndexOf('@');
 			if (splitPos == 0)
 				return name;
 			if (splitPos != -1)
@@ -24878,9 +24997,9 @@ namespace Spire
 
 		String SpirVFloatToString(float v)
 		{
-			String rs(v, L"%.12e");
-			if (!rs.Contains(L'.') && !rs.Contains(L'e') && !rs.Contains(L'E'))
-				rs = rs + L".0";
+			String rs(v, "%.12e");
+			if (!rs.Contains('.') && !rs.Contains('e') && !rs.Contains('E'))
+				rs = rs + ".0";
 			return rs;
 		};
 
@@ -24888,7 +25007,7 @@ namespace Spire
 		{
 			String s;
 			if (i >> 31)
-				s = s + L"1";
+				s = s + "1";
 			s = s + int(i & 0x7fffffff);
 			return s;
 		}
@@ -25002,12 +25121,12 @@ namespace Spire
 				ret.available = true;
 				ret.idClass = IDClass::TypeofValue;
 				ret.ID = ID;
-				ret.typeName = L"";
+				ret.typeName = "";
 				if (typeIL) 
 				{
 					ret.typeName = typeIL->ToString();
 					if (UniformOrBuffer)
-						ret.typeName = ret.typeName + L"#" + UniformOrBuffer;
+						ret.typeName = ret.typeName + "#" + UniformOrBuffer;
 				}
 				ret.typeID = ID;
 				ret.typeIL = typeIL;
@@ -25023,7 +25142,7 @@ namespace Spire
 				if (op)
 					ret.variableName = op->Name;
 				else
-					ret.variableName = L"";
+					ret.variableName = "";
 				ret.op = op;
 				ret.typeName = typeIL->ToString();
 				ret.typeID = typeID;
@@ -25041,7 +25160,7 @@ namespace Spire
 				if (op)
 					ret.variableName = op->Name;
 				else
-					ret.variableName = L"";
+					ret.variableName = "";
 				ret.typeName = basetypeIL->ToString();
 				ret.typeID = typeID;
 				ret.baseTypeID = basetypeID;
@@ -25115,12 +25234,12 @@ namespace Spire
 			}
 			String GetVariableName()
 			{
-				if (!available) return L"";
+				if (!available) return "";
 				return variableName;
 			}
 			String GetTypeName()
 			{
-				if (!available) return L"";
+				if (!available) return "";
 				return typeName;
 			}
 			int GetTypeID()
@@ -25438,7 +25557,7 @@ namespace Spire
 				streamHeader.Add(0);
 				streamHeader.Add((int)currentExecutionModel);
 				streamHeader.Add(entryID);
-				int NameLen = EncodeString(streamHeader, L"main");
+				int NameLen = EncodeString(streamHeader, "main");
 				for (auto & id : interfaceIDs)
 					streamHeader.Add(id);
 				streamHeader[len_i] = (15) + ((1 + 1 + NameLen + 1 + interfaceIDs.Count()) << 16);
@@ -25469,7 +25588,7 @@ namespace Spire
 			int Decorate(const Decoration deco, int op1 = 0)
 			{
 				int len = 0;
-				sbTextAnnotation << L" " << DecorationToString(deco);
+				sbTextAnnotation << " " << DecorationToString(deco);
 				streamAnnotation.Add((int)deco);
 				len++;
 				if (deco == Decoration::Location ||
@@ -25592,80 +25711,80 @@ namespace Spire
 				int opCode = -1;
 				String opStr_prefix = opStr.SubString(0, 2);
 				opStr = opStr.SubString(2, opStr.Length() - 2);
-				if (opStr == L"FMul")
+				if (opStr == "FMu")
 					opCode = 133;
-				else if (opStr == L"IMul")
+				else if (opStr == "IMu")
 					opCode = 132;
-				else if (opStr == L"FAdd")
+				else if (opStr == "FAdd")
 					opCode = 129;
-				else if (opStr == L"IAdd")
+				else if (opStr == "IAdd")
 					opCode = 128;
-				else if (opStr == L"UDiv")
+				else if (opStr == "UDiv")
 					opCode = 134;
-				else if (opStr == L"SDiv")
+				else if (opStr == "SDiv")
 					opCode = 135;
-				else if (opStr == L"FDiv")
+				else if (opStr == "FDiv")
 					opCode = 136;
-				else if (opStr == L"FSub")
+				else if (opStr == "FSub")
 					opCode = 131;
-				else if (opStr == L"ISub")
+				else if (opStr == "ISub")
 					opCode = 130;
-				else if (opStr == L"UMod")
+				else if (opStr == "UMod")
 					opCode = 137;
-				else if (opStr == L"SMod")
+				else if (opStr == "SMod")
 					opCode = 139;
-				else if (opStr == L"FMod")
+				else if (opStr == "FMod")
 					opCode = 141;
-				else if (opStr == L"ShiftLeftLogical")
+				else if (opStr == "ShiftLeftLogica")
 					opCode = 196;
-				else if (opStr == L"ShiftRightArithmetic")
+				else if (opStr == "ShiftRightArithmetic")
 					opCode = 195;
-				else if (opStr == L"ShiftRightLogical")
+				else if (opStr == "ShiftRightLogica")
 					opCode = 194;
-				else if (opStr == L"BitwiseXor")
+				else if (opStr == "BitwiseXor")
 					opCode = 198;
-				else if (opStr == L"BitwiseAnd")
+				else if (opStr == "BitwiseAnd")
 					opCode = 199;
-				else if (opStr == L"BitwiseOr")
+				else if (opStr == "BitwiseOr")
 					opCode = 197;
-				else if (opStr == L"LogicalAnd")
+				else if (opStr == "LogicalAnd")
 					opCode = 167;
-				else if (opStr == L"LogicalOr")
+				else if (opStr == "LogicalOr")
 					opCode = 166;
-				else if (opStr == L"INotEqual")
+				else if (opStr == "INotEqua")
 					opCode = 171;
-				else if (opStr == L"FOrdNotEqual")
+				else if (opStr == "FOrdNotEqua")
 					opCode = 182;
-				else if (opStr == L"IEqual")
+				else if (opStr == "IEqua")
 					opCode = 170;
-				else if (opStr == L"FOrdEqual")
+				else if (opStr == "FOrdEqua")
 					opCode = 180;
-				else if (opStr == L"SGreaterThanEqual")
+				else if (opStr == "SGreaterThanEqua")
 					opCode = 175;
-				else if (opStr == L"FOrdGreaterThanEqual")
+				else if (opStr == "FOrdGreaterThanEqua")
 					opCode = 190;
-				else if (opStr == L"SGreaterThan")
+				else if (opStr == "SGreaterThan")
 					opCode = 173;
-				else if (opStr == L"FOrdGreaterThan")
+				else if (opStr == "FOrdGreaterThan")
 					opCode = 186;
-				else if (opStr == L"SLessThanEqual")
+				else if (opStr == "SLessThanEqua")
 					opCode = 179;
-				else if (opStr == L"FOrdLessThanEqual")
+				else if (opStr == "FOrdLessThanEqua")
 					opCode = 188;
-				else if (opStr == L"SLessThan")
+				else if (opStr == "SLessThan")
 					opCode = 177;
-				else if (opStr == L"FOrdLessThan")
+				else if (opStr == "FOrdLessThan")
 					opCode = 184;
-				else if (opStr == L"UGreaterThan")
+				else if (opStr == "UGreaterThan")
 					opCode = 172;
-				else if (opStr == L"UGreaterThanEqual")
+				else if (opStr == "UGreaterThanEqua")
 					opCode = 174;
-				else if (opStr == L"ULessThan")
+				else if (opStr == "ULessThan")
 					opCode = 176;
-				else if (opStr == L"ULessThanEqual")
+				else if (opStr == "ULessThanEqua")
 					opCode = 178;
 				if (opCode == -1)
-					throw InvalidOperationException(L"unrecognized op string in CodeGenerator::OpBinaryInstr(): " + opStr);
+					throw InvalidOperationException("unrecognized op string in CodeGenerator::OpBinaryInstr(): " + opStr);
 
 				streamFunctionBody.Add(opCode + (5 << 16));
 				streamFunctionBody.Add(typeID);
@@ -25841,7 +25960,7 @@ namespace Spire
 					<< variableID << LR"( )" << MemoryAccessToString(ma) << EndLine;
 
 				if (ma != MemoryAccess::None)
-					throw NotImplementedException(L"not support memory access in CodeGenerator::OpLoad(): " + MemoryAccessToString(ma));
+					throw NotImplementedException("not support memory access in CodeGenerator::OpLoad(): " + MemoryAccessToString(ma));
 
 				streamFunctionBody.Add(61 + (4 << 16));
 				streamFunctionBody.Add(typeID);
@@ -26416,86 +26535,86 @@ namespace Spire
 					return TypeNameToID[typeName];
 				TypeNameToID[typeName] = -1; //marked as visited
 
-				if (typeName == L"int" || typeName.StartsWith(L"ivec"))
+				if (typeName == "int" || typeName.StartsWith("ivec"))
 				{
 					DefineBasicType(new ILBasicType(ILBaseType::Int));
 
-					if (typeName == L"int")
+					if (typeName == "int")
 					{
 						++CurrentID;
 						CodeGen.OpTypeInt(CurrentID, 32, 1);
 						TypeNameToID[typeName] = CurrentID;
 					}
 
-					if (typeName.StartsWith(L"ivec"))
+					if (typeName.StartsWith("ivec"))
 					{
 						++CurrentID;
-						CodeGen.OpTypeVector(CurrentID, TypeNameToID[L"int"](), StringToInt(typeName[4]));
+						CodeGen.OpTypeVector(CurrentID, TypeNameToID["int"](), StringToInt(typeName[4]));
 						TypeNameToID[typeName] = CurrentID;
 					}
 				}
 
-				if (typeName == L"uint" || typeName.StartsWith(L"uvec"))
+				if (typeName == "uint" || typeName.StartsWith("uvec"))
 				{
 					DefineBasicType(new ILBasicType(ILBaseType::UInt));
 
-					if (typeName == L"uint") {
+					if (typeName == "uint") {
 						++CurrentID;
 						CodeGen.OpTypeInt(CurrentID, 32, 0);
 						TypeNameToID[typeName] = CurrentID;
 					}
 
-					if (typeName.StartsWith(L"uvec"))
+					if (typeName.StartsWith("uvec"))
 					{
 						++CurrentID;
-						CodeGen.OpTypeVector(CurrentID, TypeNameToID[L"uint"](), StringToInt(typeName[4]));
+						CodeGen.OpTypeVector(CurrentID, TypeNameToID["uint"](), StringToInt(typeName[4]));
 						TypeNameToID[typeName] = CurrentID;
 					}
 				}
 
-				if (typeName == L"float" || typeName.StartsWith(L"vec") || typeName.StartsWith(L"mat"))
+				if (typeName == "float" || typeName.StartsWith("vec") || typeName.StartsWith("mat"))
 				{
 					DefineBasicType(new ILBasicType(ILBaseType::Float));
 
-					if (typeName == L"float")
+					if (typeName == "float")
 					{
 						++CurrentID;
 						CodeGen.OpTypeFloat(CurrentID, 32);
 						TypeNameToID[typeName] = CurrentID;
 					}
 
-					if (typeName.StartsWith(L"vec"))
+					if (typeName.StartsWith("vec"))
 					{
 						++CurrentID;
-						CodeGen.OpTypeVector(CurrentID, TypeNameToID[L"float"](), StringToInt(typeName[3]));
+						CodeGen.OpTypeVector(CurrentID, TypeNameToID["float"](), StringToInt(typeName[3]));
 						TypeNameToID[typeName] = CurrentID;
 					}
 
-					if (typeName == L"mat3")
+					if (typeName == "mat3")
 					{
 						DefineBasicType(new ILBasicType(ILBaseType::Float3));
 						++CurrentID;
-						CodeGen.OpTypeMatrix(CurrentID, TypeNameToID[L"vec3"](), 3);
+						CodeGen.OpTypeMatrix(CurrentID, TypeNameToID["vec3"](), 3);
 						TypeNameToID[typeName] = CurrentID;
 					}
 
-					if (typeName == L"mat4")
+					if (typeName == "mat4")
 					{
 						DefineBasicType(new ILBasicType(ILBaseType::Float4));
 						++CurrentID;
-						CodeGen.OpTypeMatrix(CurrentID, TypeNameToID[L"vec4"](), 4);
+						CodeGen.OpTypeMatrix(CurrentID, TypeNameToID["vec4"](), 4);
 						TypeNameToID[typeName] = CurrentID;
 					}
 				}
 
-				if (typeName == L"sampler2D")
+				if (typeName == "sampler2D")
 				{
 					//according to vulkan specification
 					//	Resource Descriptors, Descriptor Types, Sampled Image
 					DefineBasicType(new ILBasicType(ILBaseType::Float));
 
 					++CurrentID;
-					CodeGen.OpTypeImage(CurrentID, TypeNameToID[L"float"](), Dim::e2D, 0);
+					CodeGen.OpTypeImage(CurrentID, TypeNameToID["float"](), Dim::e2D, 0);
 					int tmp = CurrentID;
 
 					++CurrentID;
@@ -26503,12 +26622,12 @@ namespace Spire
 					TypeNameToID[typeName] = CurrentID;
 				}
 
-				if (typeName == L"samplerCube")
+				if (typeName == "samplerCube")
 				{
 					DefineBasicType(new ILBasicType(ILBaseType::Float));
 
 					++CurrentID;
-					CodeGen.OpTypeImage(CurrentID, TypeNameToID[L"float"](), Dim::eCube, 0);
+					CodeGen.OpTypeImage(CurrentID, TypeNameToID["float"](), Dim::eCube, 0);
 					int tmp = CurrentID;
 
 					++CurrentID;
@@ -26516,12 +26635,12 @@ namespace Spire
 					TypeNameToID[typeName] = CurrentID;
 				}
 
-				if (typeName == L"samplerCubeShadow")
+				if (typeName == "samplerCubeShadow")
 				{
 					DefineBasicType(new ILBasicType(ILBaseType::Float));
 
 					++CurrentID;
-					CodeGen.OpTypeImage(CurrentID, TypeNameToID[L"float"](), Dim::eCube, 1);
+					CodeGen.OpTypeImage(CurrentID, TypeNameToID["float"](), Dim::eCube, 1);
 					int tmp = CurrentID;
 
 					++CurrentID;
@@ -26529,12 +26648,12 @@ namespace Spire
 					TypeNameToID[typeName] = CurrentID;
 				}
 
-				if (typeName == L"sampler2DShadow")
+				if (typeName == "sampler2DShadow")
 				{
 					DefineBasicType(new ILBasicType(ILBaseType::Float));
 
 					++CurrentID;
-					CodeGen.OpTypeImage(CurrentID, TypeNameToID[L"float"](), Dim::e2D, 1);
+					CodeGen.OpTypeImage(CurrentID, TypeNameToID["float"](), Dim::e2D, 1);
 					int tmp = CurrentID;
 
 					++CurrentID;
@@ -26542,7 +26661,7 @@ namespace Spire
 					TypeNameToID[typeName] = CurrentID;
 				}
 
-				if (typeName == L"bool")
+				if (typeName == "bool")
 				{
 					++CurrentID;
 					CodeGen.OpTypeBool(CurrentID);
@@ -26551,7 +26670,7 @@ namespace Spire
 
 				if (TypeNameToID[typeName] == -1)
 				{
-					throw InvalidProgramException(L"fail to generate type definition for: " + typeName);
+					throw InvalidProgramException("fail to generate type definition for: " + typeName);
 				}
 
 				int id = TypeNameToID[typeName];
@@ -26565,12 +26684,12 @@ namespace Spire
 			{
 				if (!Type)
 				{
-					if (TypeNameToID.ContainsKey(L"void"))
-						return TypeNameToID[L"void"];
+					if (TypeNameToID.ContainsKey("void"))
+						return TypeNameToID["void"];
 					++CurrentID;
 					//TypeDefinition << LR"(%)" <<  << LR"( = OpTypeVoid)" << EndLine;
 					CodeGen.OpTypeVoid(CurrentID);
-					TypeNameToID[L"void"] = CurrentID;
+					TypeNameToID["void"] = CurrentID;
 					IDInfos[CurrentID] = IDInfo::CreateIDInfoForTypeofValue(CurrentID, nullptr);
 					return CurrentID;
 				}
@@ -26579,7 +26698,7 @@ namespace Spire
 				{
 					String IndexName = Type->ToString();
 					if (UniformOrBuffer != 0)
-						IndexName = IndexName + L"#" + UniformOrBuffer;
+						IndexName = IndexName + "#" + UniformOrBuffer;
 					if (TypeNameToID.ContainsKey(IndexName))
 						return TypeNameToID[IndexName];
 
@@ -26616,7 +26735,7 @@ namespace Spire
 				{
 					String IndexName = Type->ToString();
 					if (UniformOrBuffer != 0)
-						IndexName = IndexName + L"#" + UniformOrBuffer;
+						IndexName = IndexName + "#" + UniformOrBuffer;
 					if (TypeNameToID.ContainsKey(IndexName))
 						return TypeNameToID[IndexName];
 
@@ -26677,7 +26796,7 @@ namespace Spire
 
 			int DefineTypePointer(RefPtr<ILType> Type, StorageClass store, int UniformOrBuffer = 0)
 			{
-				String PointerName = Type->ToString() + L"$" + StorageClassToString(store) + L"#" + UniformOrBuffer;
+				String PointerName = Type->ToString() + "$" + StorageClassToString(store) + "#" + UniformOrBuffer;
 				if (TypeStorageToTypePointerID.ContainsKey(PointerName))
 					return TypeStorageToTypePointerID[PointerName]();
 
@@ -26703,7 +26822,7 @@ namespace Spire
 				if (func)
 					FunctionNameToFunctionTypeID[func->Name] = functionTypeID;
 				else
-					FunctionNameToFunctionTypeID[L"main"] = functionTypeID;
+					FunctionNameToFunctionTypeID["main"] = functionTypeID;
 				return functionTypeID;
 			}
 
@@ -26712,7 +26831,7 @@ namespace Spire
 				if (Dictionary_ConstantBoolToID.ContainsKey(value != 0))
 					return Dictionary_ConstantBoolToID[value != 0].GetValue();
 
-				auto Type = GetTypeFromString(L"bool");
+				auto Type = GetTypeFromString("bool");
 				int typeID = DefineType(Type);
 				++CurrentID;
 				CodeGen.OpConstantBool(typeID, CurrentID, value != 0);
@@ -26723,7 +26842,7 @@ namespace Spire
 
 			int AddInstrConstantFloat(float f)
 			{
-				auto Type = GetTypeFromString(L"float");
+				auto Type = GetTypeFromString("float");
 				int typeID = DefineType(Type);
 				++CurrentID;
 				CodeGen.OpConstantFloat(CurrentID, typeID, f);
@@ -26733,7 +26852,7 @@ namespace Spire
 
 			int AddInstrConstantInt(int i)
 			{
-				auto Type = GetTypeFromString(L"int");
+				auto Type = GetTypeFromString("int");
 				if (Dictionary_ConstantIntToID.ContainsKey(i))
 					return Dictionary_ConstantIntToID[i].GetValue();
 
@@ -26747,7 +26866,7 @@ namespace Spire
 
 			int AddInstrConstantUInt(unsigned int i)
 			{
-				auto Type = GetTypeFromString(L"uint");
+				auto Type = GetTypeFromString("uint");
 				if (Dictionary_ConstantUIntToID.ContainsKey(i))
 					return Dictionary_ConstantUIntToID[i].GetValue();
 
@@ -26763,13 +26882,13 @@ namespace Spire
 			{
 				RefPtr<ILType> Type;
 				if (len == 2)
-					Type = GetTypeFromString(L"vec2");
+					Type = GetTypeFromString("vec2");
 				else if (len == 3)
-					Type = GetTypeFromString(L"vec3");
+					Type = GetTypeFromString("vec3");
 				else if (len == 4)
-					Type = GetTypeFromString(L"vec4");
+					Type = GetTypeFromString("vec4");
 				else
-					throw InvalidOperationException(L"Invalid type in AddInstrConstantCompositeFloat(): vec"+len);
+					throw InvalidOperationException("Invalid type in AddInstrConstantCompositeFloat(): vec"+len);
 				int typeID = DefineType(Type);
 
 				List<int> elementIDs;
@@ -26787,13 +26906,13 @@ namespace Spire
 			{
 				RefPtr<ILType> Type;
 				if (len == 2)
-					Type = GetTypeFromString(L"ivec2");
+					Type = GetTypeFromString("ivec2");
 				else if (len == 3)
-					Type = GetTypeFromString(L"ivec3");
+					Type = GetTypeFromString("ivec3");
 				else if (len == 4)
-					Type = GetTypeFromString(L"ivec4");
+					Type = GetTypeFromString("ivec4");
 				else
-					throw InvalidOperationException(L"Invalid type in AddInstrConstantCompositeInt(): ivec" + len);
+					throw InvalidOperationException("Invalid type in AddInstrConstantCompositeInt(): ivec" + len);
 				int typeID = DefineType(Type);
 
 				List<int> elementIDs;
@@ -26811,13 +26930,13 @@ namespace Spire
 			{
 				RefPtr<ILType> Type;
 				if (len == 2)
-					Type = GetTypeFromString(L"uvec2");
+					Type = GetTypeFromString("uvec2");
 				else if (len == 3)
-					Type = GetTypeFromString(L"uvec3");
+					Type = GetTypeFromString("uvec3");
 				else if (len == 4)
-					Type = GetTypeFromString(L"uvec4");
+					Type = GetTypeFromString("uvec4");
 				else
-					throw InvalidOperationException(L"Invalid type in AddInstrConstantCompositeUInt(): uvec" + len);
+					throw InvalidOperationException("Invalid type in AddInstrConstantCompositeUInt(): uvec" + len);
 				int typeID = DefineType(Type);
 
 				List<int> elementIDs;
@@ -26835,11 +26954,11 @@ namespace Spire
 			{
 				RefPtr<ILType> Type;
 				if (n == 3)
-					Type = GetTypeFromString(L"mat3");
+					Type = GetTypeFromString("mat3");
 				else if (n == 4)
-					Type = GetTypeFromString(L"mat4");
+					Type = GetTypeFromString("mat4");
 				else
-					throw InvalidOperationException(L"Invalid type in AddInstrConstantMatrix(): mat" + n);
+					throw InvalidOperationException("Invalid type in AddInstrConstantMatrix(): mat" + n);
 				int typeID = DefineType(Type);
 
 				List<int> vectorIDs;
@@ -26899,7 +27018,7 @@ namespace Spire
 				return;
 			}
 
-			int AddInstrVariableDeclaration(ILOperand *op, RefPtr<ILType> typeIL, StorageClass store, String DebugName = L"", int UniformOrBuffer = 0)
+			int AddInstrVariableDeclaration(ILOperand *op, RefPtr<ILType> typeIL, StorageClass store, String DebugName = "", int UniformOrBuffer = 0)
 			{
 				int typeID = DefineTypePointer(typeIL, store, UniformOrBuffer);
 				++CurrentID;
@@ -26908,15 +27027,15 @@ namespace Spire
 				IDInfos[CurrentID] =
 					IDInfo::CreateIDInfoForPointer(CurrentID, op, typeID, typeIL, IDInfos[typeID]().GetBaseTypeID(), store);
 				//Debug Information
-				CodeGen.OpName(CurrentID, DebugName!=L""? DebugName : (op?op->Name:L""));
+				CodeGen.OpName(CurrentID, DebugName!=""? DebugName : (op?op->Name:""));
 				return CurrentID;
 			}
 
 			int AddInstrAccessChain_VectorMember(ILOperand *op, int ID, int indexID, int index)
 			{
-				String variableName = L"";
+				String variableName = "";
 				if (index == -1 && indexID == -1)
-					throw InvalidOperationException(L"indexID=-1 && index=-1 in AddInstrAccessChain_VectorMember()");
+					throw InvalidOperationException("indexID=-1 && index=-1 in AddInstrAccessChain_VectorMember()");
 
 				if (indexID == -1) {
 					//indexID == -1 && index != -1
@@ -26925,7 +27044,7 @@ namespace Spire
 
 				if (index != -1)
 				{
-					variableName = IDInfos[ID]().GetVariableName() + L"[" + index + L"]";
+					variableName = IDInfos[ID]().GetVariableName() + "[" + index + "]";
 				}
 
 				RefPtr<ILType> TypeIL = IDInfos[ID]().GetILType();
@@ -26933,24 +27052,24 @@ namespace Spire
 				if (TypeIL->IsFloatMatrix())
 				{
 					if (TypeIL->ToString() == "mat3")
-						memberTypeIL = GetTypeFromString(L"vec3");
+						memberTypeIL = GetTypeFromString("vec3");
 					else if (TypeIL->ToString() == "mat4")
-						memberTypeIL = GetTypeFromString(L"vec4");
+						memberTypeIL = GetTypeFromString("vec4");
 				}
 				else if (TypeIL->IsFloatVector())
 				{
-					memberTypeIL = GetTypeFromString(L"float");
+					memberTypeIL = GetTypeFromString("float");
 				}
 				else if (TypeIL->IsIntVector())
 				{
-					memberTypeIL = GetTypeFromString(L"int");
+					memberTypeIL = GetTypeFromString("int");
 				}
 				else if (TypeIL->IsUIntVector())
 				{
-					memberTypeIL = GetTypeFromString(L"uint");
+					memberTypeIL = GetTypeFromString("uint");
 				}
 				else
-					throw InvalidOperationException(L"invalid operand type for access chain: " + TypeIL->ToString());
+					throw InvalidOperationException("invalid operand type for access chain: " + TypeIL->ToString());
 
 				int memberTypeID = DefineTypePointer(memberTypeIL, IDInfos[ID]().GetStorageClass());
 
@@ -27006,7 +27125,7 @@ namespace Spire
 				int structID = FindVariableID(op);
 				ILStructType* structIL = dynamic_cast<ILStructType*>(IDInfos[structID]().GetILType().Ptr());
 				if (!structIL)
-					throw InvalidProgramException(L"can not convert to ILStruct in AddInstrAccessChain_StructMember()");
+					throw InvalidProgramException("can not convert to ILStruct in AddInstrAccessChain_StructMember()");
 				int index = structIL->Members.FindFirst([&](ILStructType::ILStructField member)
 				{
 					return member.FieldName == memberName;
@@ -27019,7 +27138,7 @@ namespace Spire
 			{
 				ILStructType* structIL = dynamic_cast<ILStructType*>(IDInfos[structID]().GetILType().Ptr());
 				if (!structIL)
-					throw InvalidProgramException(L"can not convert to ILStruct in AddInstrAccessChain_StructMember()");
+					throw InvalidProgramException("can not convert to ILStruct in AddInstrAccessChain_StructMember()");
 				int index = structIL->Members.FindFirst([&](ILStructType::ILStructField member)
 				{
 					return member.FieldName == memberName;
@@ -27031,7 +27150,7 @@ namespace Spire
 			int AddInstrAccessChain_ArrayMember(ILOperand *op, RefPtr<ILType> Type, int ID, int indexID)
 			{
 				if (!Type)
-					throw InvalidProgramException(L"empty type in AddInstrAccessChain_ArrayMember()");
+					throw InvalidProgramException("empty type in AddInstrAccessChain_ArrayMember()");
 				auto arrayType = dynamic_cast<ILArrayType*>(Type.Ptr());
 				int baseTypeID = DefineTypePointer(arrayType->BaseType, IDInfos[ID]().GetStorageClass()); //it's a pointer
 
@@ -27086,7 +27205,7 @@ namespace Spire
 
 			int AddInstrINotEqual(int id0, int id1)
 			{
-				RefPtr<ILType> typeIL = GetTypeFromString(L"bool");
+				RefPtr<ILType> typeIL = GetTypeFromString("bool");
 				int typeID = DefineType(typeIL);
 				++CurrentID;
 				CodeGen.OpINotEqual(CurrentID, typeID, id0, id1);
@@ -27109,7 +27228,7 @@ namespace Spire
 				int GradX = -1,
 				int GradY = -1)
 			{
-				RefPtr<ILType> typeIL = GetTypeFromString(L"vec4");
+				RefPtr<ILType> typeIL = GetTypeFromString("vec4");
 				int typeID = DefineType(typeIL);
 
 				++CurrentID;
@@ -27141,11 +27260,11 @@ namespace Spire
 				int coordinateID, 
 				ExecutionModel currentExecutionModel) 
 			{
-				RefPtr<ILType> typeIL = GetTypeFromString(L"vec4");
+				RefPtr<ILType> typeIL = GetTypeFromString("vec4");
 				int typeID = DefineType(typeIL);
 
 				int veclen = IDInfos[coordinateID]().GetILType()->GetVectorSize();
-				int DrefID = AddInstrCompositeExtract(coordinateID, GetTypeFromString(L"float"), veclen-1);
+				int DrefID = AddInstrCompositeExtract(coordinateID, GetTypeFromString("float"), veclen-1);
 
 				++CurrentID;
 				if (currentExecutionModel == ExecutionModel::Fragment)
@@ -27176,11 +27295,11 @@ namespace Spire
 				int coordinateID,	////coordinateID: u, v, depth, q
 				ExecutionModel currentExecutionModel)
 			{
-				RefPtr<ILType> typeIL = GetTypeFromString(L"vec4");
+				RefPtr<ILType> typeIL = GetTypeFromString("vec4");
 				int typeID = DefineType(typeIL);
 
-				int DrefID = AddInstrCompositeExtract(coordinateID, GetTypeFromString(L"float"), 2);
-				int qID = AddInstrCompositeExtract(coordinateID, GetTypeFromString(L"float"), 3);
+				int DrefID = AddInstrCompositeExtract(coordinateID, GetTypeFromString("float"), 2);
+				int qID = AddInstrCompositeExtract(coordinateID, GetTypeFromString("float"), 3);
 				int NewCoordinateID = AddInstrCompositeInsert(IDInfos[coordinateID]().GetILType(), coordinateID, 2, qID);
 
 				++CurrentID;
@@ -27469,7 +27588,7 @@ namespace Spire
 						return AddInstrINotEqual(operandID, AddInstrConstantInt(0));
 					if (srcType->IsUInt())
 						return AddInstrINotEqual(operandID, AddInstrConstantUInt(0));
-					throw NotImplementedException(L"only convert int to bool in ConvertBasicType(): " + srcType->ToString());
+					throw NotImplementedException("only convert int to bool in ConvertBasicType(): " + srcType->ToString());
 				}
 
 				//from column vector to column vector
@@ -27537,20 +27656,20 @@ namespace Spire
 					return operandID;
 
 				//from scalar to matrix
-				if ((srcStr == L"float" || srcStr == L"int" || srcStr == L"uint") && dstType->IsFloatMatrix())
+				if ((srcStr == "float" || srcStr == "int" || srcStr == "uint") && dstType->IsFloatMatrix())
 				{
-					throw NotImplementedException(L"scalar to matrix conversion is not supported yet.");
+					throw NotImplementedException("scalar to matrix conversion is not supported yet.");
 				}
 
 				//from matrix to matrix
 				if (srcType->IsFloatMatrix() && dstType->IsFloatMatrix())
 				{
-					throw NotImplementedException(L"matrix to matrix conversion is not supported yet.");
+					throw NotImplementedException("matrix to matrix conversion is not supported yet.");
 				}
 
 				if (srcType->GetVectorSize() != dstType->GetVectorSize())
 				{
-					throw NotImplementedException(L"can not convert " + srcType->ToString() + L" to " + dstType->ToString());
+					throw NotImplementedException("can not convert " + srcType->ToString() + " to " + dstType->ToString());
 				}
 
 				//component-wise conversion
@@ -27576,7 +27695,7 @@ namespace Spire
 				else if (srcUint && dstInt)
 					return AddInstrConvertUToS(destTypeID, operandID);
 				else
-					throw NotImplementedException(L"can not convert " + srcType->ToString() + L" to " + dstType->ToString());
+					throw NotImplementedException("can not convert " + srcType->ToString() + " to " + dstType->ToString());
 			}
 
 			void AddInstrSelectionMerge(int MergeLabel) {
@@ -27864,7 +27983,7 @@ namespace Spire
 						}
 					}
 					else
-						throw InvalidOperationException(L"Illegal constant.");
+						throw InvalidOperationException("Illegal constant.");
 				}
 				else if (auto instr = dynamic_cast<ILInstruction*>(op))
 				{
@@ -27876,7 +27995,7 @@ namespace Spire
 					}
 				}
 				else
-					throw InvalidOperationException(L"Unsupported operand type.");
+					throw InvalidOperationException("Unsupported operand type.");
 
 				return id;
 			}
@@ -27898,13 +28017,13 @@ namespace Spire
 					{
 						int valueID = ctx.FindValueID(op);
 						if (valueID == -1)
-							throw InvalidOperationException(L"can not find variable ID in Get OperandPointer(): " + op->ToString());
+							throw InvalidOperationException("can not find variable ID in Get OperandPointer(): " + op->ToString());
 						id = ctx.AddInstrVariableDeclaration(op, instr->Type, StorageClass::Function);
 						ctx.AddInstrStore(op, id, valueID);
 					}
 				}
 				else
-					throw InvalidOperationException(L"Unsupported operand type.");
+					throw InvalidOperationException("Unsupported operand type.");
 
 				return id;
 			}
@@ -27916,7 +28035,7 @@ namespace Spire
 					ctx.AddInstrVariableDeclaration((ILOperand*)instr, instr->Type, store);
 				}
 				else
-					throw InvalidProgramException(L"size operand of allocVar instr is not an intermediate.");
+					throw InvalidProgramException("size operand of allocVar instr is not an intermediate.");
 			}
 
 			Dictionary<String, int> GLSLstd450InstructionSet = GenGLSLstd450InstructionSet();
@@ -27927,11 +28046,11 @@ namespace Spire
 				String callName = GetFuncOriginalName(instr->Function);
 
 				//------------------------- texture instructions -------------------------
-				if (callName == L"texture")
+				if (callName == "texture")
 				{
 					if (instr->Arguments[0]->Type->IsNonShadowTexture())
 					{
-						if (instr->Arguments[0]->Type->ToString() == L"sampler2D")
+						if (instr->Arguments[0]->Type->ToString() == "sampler2D")
 						{
 							//*** no bias!!!
 							//__intrinsic vec4 texture(sampler2D tex, vec2 coord);
@@ -27943,7 +28062,7 @@ namespace Spire
 							);
 							return;
 						}
-						else if (instr->Arguments[0]->Type->ToString() == L"samplerCube")
+						else if (instr->Arguments[0]->Type->ToString() == "samplerCube")
 						{
 							if (instr->Arguments.Count() == 2)
 							{
@@ -27986,7 +28105,7 @@ namespace Spire
 					}
 				}
 
-				if (callName == L"textureGrad")
+				if (callName == "textureGrad")
 				{
 					//__intrinsic vec4 textureGrad(sampler2D tex, vec2 coord, vec2 dPdx, vec2 dPdy);
 					//__intrinsic vec4 textureGrad(samplerCube tex, vec3 coord, vec3 dPdx, vec3 dPdy);
@@ -28002,9 +28121,9 @@ namespace Spire
 					return;
 				}
 
-				if (callName == L"textureProj")
+				if (callName == "textureProj")
 				{
-					if (instr->Arguments[0]->Type->ToString() == L"sampler2DShadow")
+					if (instr->Arguments[0]->Type->ToString() == "sampler2DShadow")
 					{
 						//__intrinsic float textureProj(sampler2DShadow tex, vec4 coord);
 						ctx.AddInstrTexture2DShadowProj(
@@ -28018,7 +28137,7 @@ namespace Spire
 				}
 
 				//------------------------- Dot Instruction ------------------------------
-				if (callName == L"dot"
+				if (callName == "dot"
 					&& instr->Arguments.Count() == 2
 					&& instr->Arguments[0]->Type->ToString() == instr->Arguments[1]->Type->ToString()
 					&& instr->Arguments[0]->Type->IsFloatVector()
@@ -28034,24 +28153,24 @@ namespace Spire
 				}
 
 				//------------------------- Transpose Instruction ------------------------------
-				if (callName == L"transpose" && instr->Arguments.Count() == 1 && instr->Arguments[0]->Type->IsFloatMatrix())
+				if (callName == "transpose" && instr->Arguments.Count() == 1 && instr->Arguments[0]->Type->IsFloatMatrix())
 				{
 					ctx.AddInstrTranspose((ILOperand*)instr, instr->Type, GetOperandValue(instr->Arguments[0].Ptr()));
 					return;
 				}
 
 				//------------------------- Derivative Instruction -----------------------------
-				if (callName == L"dFdx")
+				if (callName == "dFdx")
 				{
 					ctx.AddInstrDFdx((ILOperand*)instr, instr->Type, GetOperandValue(instr->Arguments[0].Ptr()));
 					return;
 				}
-				else if (callName == L"dFdy")
+				else if (callName == "dFdy")
 				{
 					ctx.AddInstrDFdy((ILOperand*)instr, instr->Type, GetOperandValue(instr->Arguments[0].Ptr()));
 					return;
 				}
-				else if (callName == L"fwidth")
+				else if (callName == "fwidth")
 				{
 					ctx.AddInstrFwidth((ILOperand*)instr, instr->Type, GetOperandValue(instr->Arguments[0].Ptr()));
 					return;
@@ -28068,7 +28187,7 @@ namespace Spire
 						List<int> args;
 						for (auto & arg : instr->Arguments) {
 							int valueID = GetOperandValue(arg.Ptr());
-							int paramID = ctx.AddInstrVariableDeclaration(0, arg->Type, StorageClass::Function, L"param");
+							int paramID = ctx.AddInstrVariableDeclaration(0, arg->Type, StorageClass::Function, "param");
 							// the name of the parameter must be empty; or may conflict with non-param variables
 							ctx.AddInstrStore(0, paramID, valueID);
 							args.Add(paramID);
@@ -28082,7 +28201,7 @@ namespace Spire
 
 				for (auto & arg : instr->Arguments) {
 					int valueID = GetOperandValue(arg.Ptr());
-					if (callName == L"mix") {
+					if (callName == "mix") {
 						//the mix instruction in spirv only accept mix(vec_, vec_, vec_);
 						//however, front end of SPIRE can accept mix(vec_, vec_, float);
 						valueID = ctx.ConvertBasicType(valueID, arg->Type, instr->Type);
@@ -28101,7 +28220,7 @@ namespace Spire
 
 				RefPtr<ILType> dstType = GetTypeFromString(callName);
 				if (dstType == nullptr)
-					throw InvalidOperationException(L"can not call: " + callName);
+					throw InvalidOperationException("can not call: " + callName);
 				RefPtr<ILBasicType> dstBasicType = dstType;
 
 				if (instr->Arguments.Count() > 1)
@@ -28163,7 +28282,7 @@ namespace Spire
 				}
 
 				if (instr->Is<NotInstruction>())
-					instr->Type = GetTypeFromString(L"bool");
+					instr->Type = GetTypeFromString("bool");
 
 				int op0ValueID = GetOperandValue(op0);
 				op0ValueID = ctx.ConvertBasicType(op0ValueID, ctx.IDInfos[op0ValueID]().GetILType(), instr->Type);
@@ -28184,14 +28303,14 @@ namespace Spire
 					else if (op0ILType->IsInt() || op0ILType->IsIntVector())
 						ctx.AddInstrSnegate((ILOperand*)instr, instrTypeID, op0ValueID);
 					else if (op0ILType->IsUInt() || op0ILType->IsUIntVector())
-						throw InvalidOperationException(L"trying to negate a uint in PrintUnaryInstruction(): " + instr->ToString());
+						throw InvalidOperationException("trying to negate a uint in PrintUnaryInstruction(): " + instr->ToString());
 				}
 				else if (instr->Is<BitNotInstruction>())
 					ctx.AddInstrNot((ILOperand*)instr, instrTypeID, op0ValueID);
 				else if (instr->Is<NotInstruction>())
 					ctx.AddInstrLogicalNot((ILOperand*)instr, instrTypeID, op0ValueID);
 				else
-					throw InvalidProgramException(L"unsupported unary instruction.");
+					throw InvalidProgramException("unsupported unary instruction.");
 			}
 
 			void PrintBinaryInstr(BinaryInstruction * instr)
@@ -28261,7 +28380,7 @@ namespace Spire
 							return;
 						}
 						else
-							throw InvalidOperationException(L"wrong: " + instr->ToString());
+							throw InvalidOperationException("wrong: " + instr->ToString());
 					}
 					else if (auto arrayType = dynamic_cast<ILArrayType*>(op0->Type.Ptr()))
 					{
@@ -28271,7 +28390,7 @@ namespace Spire
 						return;
 					}
 					else
-						throw InvalidOperationException(L"wrong op0 type for MemberLoadInstruction(): " + op0->Type->ToString());
+						throw InvalidOperationException("wrong op0 type for MemberLoadInstruction(): " + op0->Type->ToString());
 				}
 
 				int ID0 = GetOperandValue(op0);
@@ -28289,7 +28408,7 @@ namespace Spire
 						if (ID1Type->IsFloatMatrix())
 							Swap(ID0, ID1);
 						//now ID0 is matrix, ID1 is scalar, 
-						ID1 = ctx.ConvertBasicType(ID1, ctx.IDInfos[ID1]().GetILType(), GetTypeFromString(L"float"));
+						ID1 = ctx.ConvertBasicType(ID1, ctx.IDInfos[ID1]().GetILType(), GetTypeFromString("float"));
 						ctx.AddInstrMatrixTimesScalar((ILOperand*)instr, ID0, ID1);
 						return;
 					}
@@ -28332,22 +28451,22 @@ namespace Spire
 					RefPtr<ILType> OperandType = nullptr;
 					if (instr->Is<OrInstruction>() || instr->Is<AndInstruction>())
 					{
-						OperandType = GetTypeFromString(L"bool");
+						OperandType = GetTypeFromString("bool");
 					}
 					else
 					{
 						if (ID0Type->IsFloat() || ID1Type->IsFloat())
-							OperandType = GetTypeFromString(L"float");
+							OperandType = GetTypeFromString("float");
 						else if (ID0Type->IsUInt() || ID1Type->IsUInt())
-							OperandType = GetTypeFromString(L"uint");
+							OperandType = GetTypeFromString("uint");
 						else if (ID0Type->IsInt() || ID1Type->IsInt())
-							OperandType = GetTypeFromString(L"int");
+							OperandType = GetTypeFromString("int");
 					}
 
 					ID0 = ctx.ConvertBasicType(ID0, ID0Type, OperandType);
 					ID1 = ctx.ConvertBasicType(ID1, ID1Type, OperandType);
 
-					instr->Type = GetTypeFromString(L"bool");
+					instr->Type = GetTypeFromString("bool");
 					ID0Type = ctx.IDInfos[ID0]().GetILType();
 					ID1Type = ctx.IDInfos[ID1]().GetILType();
 				}
@@ -28366,126 +28485,126 @@ namespace Spire
 				bool Signed = false;
 				if (instr->Is<MulInstruction>())
 				{
-					opStr = L"Mul";
+					opStr = "Mu";
 					needPrefix = true;
 				}
 				else if (instr->Is<AddInstruction>())
 				{
-					opStr = L"Add";
+					opStr = "Add";
 					needPrefix = true;
 				}
 				else if (instr->Is<DivInstruction>())
 				{
-					opStr = L"Div";
+					opStr = "Div";
 					needPrefix = true;
 					Signed = true;
 				}
 				else if (instr->Is<SubInstruction>())
 				{
-					opStr = L"Sub";
+					opStr = "Sub";
 					needPrefix = true;
 				}
 				else if (instr->Is<ModInstruction>())
 				{
-					opStr = L"Mod";
+					opStr = "Mod";
 					needPrefix = true;
 					Signed = true;
 				}
 				else if (instr->Is<ShlInstruction>())
 				{
-					opStr = L"ShiftLeftLogical";
+					opStr = "ShiftLeftLogica";
 				}
 				else if (instr->Is<ShrInstruction>())
 				{
 					if (ID0Type->IsUInt() || ID0Type->IsUIntVector())
-						opStr = L"ShiftRightLogical";
+						opStr = "ShiftRightLogica";
 					else
-						opStr = L"ShiftRightArithmetic";
+						opStr = "ShiftRightArithmetic";
 				}
 				else if (instr->Is<BitXorInstruction>())
 				{
-					opStr = L"BitwiseXor";
+					opStr = "BitwiseXor";
 				}
 				else if (instr->Is<BitAndInstruction>())
 				{
-					opStr = L"BitwiseAnd";
+					opStr = "BitwiseAnd";
 				}
 				else if (instr->Is<BitOrInstruction>())
 				{
-					opStr = L"BitwiseOr";
+					opStr = "BitwiseOr";
 				}
 				else if (instr->Is<AndInstruction>())
 				{
-					opStr = L"LogicalAnd";
+					opStr = "LogicalAnd";
 				}
 				else if (instr->Is<OrInstruction>())
 				{
-					opStr = L"LogicalOr";
+					opStr = "LogicalOr";
 				}
 				else if (instr->Is<CmpneqInstruction>())
 				{
 					if (ID0Type->IsIntegral())
-						opStr = L"INotEqual";
+						opStr = "INotEqua";
 					else
-						opStr = L"FOrdNotEqual";
+						opStr = "FOrdNotEqua";
 				}
 				else if (instr->Is<CmpeqlInstruction>())
 				{
 					if (ID0Type->IsIntegral())
-						opStr = L"IEqual";
+						opStr = "IEqua";
 					else
-						opStr = L"FOrdEqual";
+						opStr = "FOrdEqua";
 				}
 				else if (instr->Is<CmpgeInstruction>())
 				{
 					if (ID0Type->IsIntegral())
 					{
 						if (ID0Type->IsUInt() || ID0Type->IsUIntVector())
-							opStr = L"UGreaterThanEqual";
+							opStr = "UGreaterThanEqua";
 						else
-							opStr = L"SGreaterThanEqual";
+							opStr = "SGreaterThanEqua";
 					}
 					else
-						opStr = L"FOrdGreaterThanEqual";
+						opStr = "FOrdGreaterThanEqua";
 				}
 				else if (instr->Is<CmpgtInstruction>())
 				{
 					if (ID0Type->IsIntegral())
 					{
 						if (ID0Type->IsUInt() || ID0Type->IsUIntVector())
-							opStr = L"UGreaterThan";
+							opStr = "UGreaterThan";
 						else
-							opStr = L"SGreaterThan";
+							opStr = "SGreaterThan";
 					}
 					else
-						opStr = L"FOrdGreaterThan";
+						opStr = "FOrdGreaterThan";
 				}
 				else if (instr->Is<CmpleInstruction>())
 				{
 					if (ID0Type->IsIntegral())
 					{
 						if (ID0Type->IsUInt() || ID0Type->IsUIntVector())
-							opStr = L"ULessThanEqual";
+							opStr = "ULessThanEqua";
 						else
-							opStr = L"SLessThanEqual";
+							opStr = "SLessThanEqua";
 					}
 					else
-						opStr = L"FOrdLessThanEqual";
+						opStr = "FOrdLessThanEqua";
 				}
 				else if (instr->Is<CmpltInstruction>())
 				{
 					if (ID0Type->IsIntegral())
 					{
 						if (ID0Type->IsUInt() || ID0Type->IsUIntVector())
-							opStr = L"ULessThan";
+							opStr = "ULessThan";
 						else
-							opStr = L"SLessThan";
+							opStr = "SLessThan";
 					}
 					else
-						opStr = L"FOrdLessThan";
+						opStr = "FOrdLessThan";
 				}
 				else
-					throw InvalidProgramException(L"unsupported binary instruction: " + instr->ToString());
+					throw InvalidProgramException("unsupported binary instruction: " + instr->ToString());
 
 				//---------------------------------------Generate Instrction---------------------------------------
 
@@ -28517,7 +28636,7 @@ namespace Spire
 				int indexID = GetOperandValue(instr->Operands[1].Ptr());
 
 				if (indexID == -1)
-					throw InvalidOperationException(L"bad index in PrintUpdateInstr(): " + instr->Operands[1]->ToString());
+					throw InvalidOperationException("bad index in PrintUpdateInstr(): " + instr->Operands[1]->ToString());
 
 				if (auto structType = dynamic_cast<ILStructType*>(typeIL))
 				{
@@ -28525,7 +28644,7 @@ namespace Spire
 					if (c)
 						memberID = ctx.AddInstrAccessChain_StructMember(0, variableID, indexID, c->IntValues[0]);
 					else
-						throw InvalidOperationException(L"index of struct must be const in PrintUpdateInstr(): " + instr->Operands[1]->ToString());
+						throw InvalidOperationException("index of struct must be const in PrintUpdateInstr(): " + instr->Operands[1]->ToString());
 				}
 				else if (auto arrayType = dynamic_cast<ILArrayType*>(typeIL))
 				{
@@ -28534,11 +28653,11 @@ namespace Spire
 				else if (auto vecType = dynamic_cast<ILBasicType*>(typeIL))
 				{
 					if (!typeIL->IsVector())
-						throw InvalidOperationException(L"unable to update members of type: " + typeIL->ToString());
+						throw InvalidOperationException("unable to update members of type: " + typeIL->ToString());
 					memberID = ctx.AddInstrAccessChain_VectorMember(0, variableID, indexID, -1);
 				}
 				else
-					throw InvalidOperationException(L"not supported type in PrintUpdateInstr(): " + typeIL->ToString());
+					throw InvalidOperationException("not supported type in PrintUpdateInstr(): " + typeIL->ToString());
 
 				ctx.AddInstrStore(
 					0,
@@ -28554,7 +28673,7 @@ namespace Spire
 				ID0 = ctx.ConvertBasicType(
 					ID0,
 					ctx.IDInfos[ID0]().GetILType(),
-					GetTypeFromString(L"bool"));
+					GetTypeFromString("bool"));
 
 				int TrueLabel = ++ctx.CurrentID;
 				int FalseLabel = ++ctx.CurrentID;
@@ -28590,27 +28709,27 @@ namespace Spire
 			{
 				String exportOpName = instr->ExportOperator;
 
-				if (exportOpName == L"fragmentExport")
+				if (exportOpName == "fragmentExport")
 				{
 					CompiledComponent ccomp;
 					bool isNormal = false;
 					bool isDepthOutput = false;
 					if (currentWorld->LocalComponents.TryGetValue(instr->ComponentName, ccomp))
 					{
-						if (ccomp.Attributes.ContainsKey(L"Normal"))
+						if (ccomp.Attributes.ContainsKey("Norma"))
 							isNormal = true;
-						if (ccomp.Attributes.ContainsKey(L"DepthOutput"))
+						if (ccomp.Attributes.ContainsKey("DepthOutput"))
 							isDepthOutput = true;
 					}
 					String exportName;
 					if (isDepthOutput)
-						exportName = L"gl_FragDepth";
+						exportName = "gl_FragDepth";
 					else
 						exportName = instr->ComponentName;
 
 					int exportID = ctx.InterfaceNameToID[exportName];
 					if (exportID == -1)
-						throw InvalidOperationException(L"can not find component for export instruction for fragmentExport in PrintExportInstr(): " + exportName);
+						throw InvalidOperationException("can not find component for export instruction for fragmentExport in PrintExportInstr(): " + exportName);
 
 					int operandID = GetOperandValue(instr->Operand.Ptr());
 					if (isNormal)
@@ -28619,33 +28738,33 @@ namespace Spire
 					ctx.AddInstrStore((ILOperand*)instr, exportID, operandID);
 				}
 
-				else if (exportOpName == L"standardExport")
+				else if (exportOpName == "standardExport")
 				{
-					int storeID = ctx.AddInstrAccessChain_StructMember(0, ctx.InterfaceNameToID[L"blk" + currentWorld->WorldOutput->Name], instr->ComponentName);
+					int storeID = ctx.AddInstrAccessChain_StructMember(0, ctx.InterfaceNameToID["blk" + currentWorld->WorldOutput->Name], instr->ComponentName);
 					ctx.AddInstrStore((ILOperand*)instr, storeID, GetOperandValue(instr->Operand.Ptr()));
 				}
 
-				else if (exportOpName == L"bufferExport")
+				else if (exportOpName == "bufferExport")
 				{
 					auto & comp = currentWorld->WorldOutput->Entries[instr->ComponentName]();
 
-					auto UIntType = GetTypeFromString(L"uint");
-					auto FloatType = GetTypeFromString(L"float");
+					auto UIntType = GetTypeFromString("uint");
+					auto FloatType = GetTypeFromString("float");
 					int GIIDx = ctx.AddInstrLoad(
-						ctx.AddInstrAccessChain_VectorMember(0, ctx.InterfaceNameToID[L"gl_GlobalInvocationID"], -1, 0),
+						ctx.AddInstrAccessChain_VectorMember(0, ctx.InterfaceNameToID["gl_GlobalInvocationID"], -1, 0),
 						MemoryAccess::None
 					);	//GlobalInvocationID.x
 					int baseIndex = ctx.AddInstrBinaryInstr(
 						0,
 						UIntType,
-						L"OpIMul",
+						"OpIMu",
 						GIIDx,
 						ctx.AddInstrConstantUInt(currentWorld->WorldOutput->Size / 4)
 					);
 					baseIndex = ctx.AddInstrBinaryInstr(
 						0,
 						UIntType,
-						L"OpIAdd",
+						"OpIAdd",
 						baseIndex,
 						ctx.AddInstrConstantUInt(comp.Offset / 4)
 					);
@@ -28653,19 +28772,19 @@ namespace Spire
 					RefPtr<ILType> compElementType =
 						(!comp.Type->IsIntegral())
 						? FloatType
-						: ((comp.Type->IsUInt() || comp.Type->IsUIntVector()) ? UIntType : GetTypeFromString(L"int"));
+						: ((comp.Type->IsUInt() || comp.Type->IsUIntVector()) ? UIntType : GetTypeFromString("int"));
 
 					for (int i = 0; i < comp.Type->GetVectorSize(); i++)
 					{
 						int index = ctx.AddInstrBinaryInstr(
 							0,
 							UIntType,
-							L"OpIAdd",
+							"OpIAdd",
 							baseIndex,
 							ctx.AddInstrConstantUInt(i)
 						);
 
-						int blockID = ctx.InterfaceNameToID[L"blk" + currentWorld->WorldOutput->Name];
+						int blockID = ctx.InterfaceNameToID["blk" + currentWorld->WorldOutput->Name];
 						int arrayID = ctx.AddInstrAccessChain_StructMember(0, blockID, -1, 0);
 						int storeID = ctx.AddInstrAccessChain_ArrayMember(
 							0,
@@ -28696,42 +28815,42 @@ namespace Spire
 				}
 
 				else
-					throw InvalidOperationException(L"not valid export operator in PrintExportInstr(): " + exportOpName);
+					throw InvalidOperationException("not valid export operator in PrintExportInstr(): " + exportOpName);
 			}
 
 			void PrintImportInstr(ImportInstruction * instr)
 			{
 				auto block = instr->SourceWorld->WorldOutput;
 
-				if (instr->ImportOperator->Name.Content == L"standardImport")
+				if (instr->ImportOperator->Name.Content == "standardImport")
 				{
-					ctx.AddInstrAccessChain_StructMember(instr, ctx.InterfaceNameToID[L"blk" + block->Name], instr->ComponentName);
+					ctx.AddInstrAccessChain_StructMember(instr, ctx.InterfaceNameToID["blk" + block->Name], instr->ComponentName);
 				}
 
-				else if (instr->ImportOperator->Name.Content == L"vertexImport")
+				else if (instr->ImportOperator->Name.Content == "vertexImport")
 				{
 					int componentID = ctx.InterfaceNameToID[instr->ComponentName];
 					if (componentID == -1)
-						throw InvalidOperationException(L"can not find import component for vertexImport in PrintImportInstr(): " + instr->ComponentName);
+						throw InvalidOperationException("can not find import component for vertexImport in PrintImportInstr(): " + instr->ComponentName);
 					ctx.UpdateVariable(instr, componentID);
 				}
 
-				else if (instr->ImportOperator->Name.Content == L"uniformImport")
+				else if (instr->ImportOperator->Name.Content == "uniformImport")
 				{
 					if (instr->Type->IsTexture())
 					{
 						int pointerID = ctx.InterfaceNameToID[instr->ComponentName];
 						if (pointerID == -1)
-							throw InvalidOperationException(L"can not find import component for uniformImport in PrintImportInstr(): " + instr->ComponentName);
+							throw InvalidOperationException("can not find import component for uniformImport in PrintImportInstr(): " + instr->ComponentName);
 						ctx.UpdateVariable(instr, pointerID);
 					}
 					else
 					{
-						ctx.AddInstrAccessChain_StructMember(instr, ctx.InterfaceNameToID[L"blk" + block->Name], instr->ComponentName);
+						ctx.AddInstrAccessChain_StructMember(instr, ctx.InterfaceNameToID["blk" + block->Name], instr->ComponentName);
 					}
 				}
 
-				else if (instr->ImportOperator->Name.Content == L"textureImport")
+				else if (instr->ImportOperator->Name.Content == "textureImport")
 				{
 					int textureStorageID = ctx.InterfaceNameToID[instr->ComponentName];
 					int textureValueID = ctx.AddInstrLoad(textureStorageID, MemoryAccess::None);
@@ -28751,7 +28870,7 @@ namespace Spire
 					CompiledComponent ccomp;
 					if (instr->SourceWorld->LocalComponents.TryGetValue(instr->ComponentName, ccomp))
 					{
-						if (ccomp.Attributes.ContainsKey(L"Normal"))
+						if (ccomp.Attributes.ContainsKey("Norma"))
 							operandID = ctx.AddInstrMulAdd(operandID, 2.0, -1.0);
 					}
 
@@ -28759,29 +28878,29 @@ namespace Spire
 					ctx.AddInstrStore((ILOperand*)instr, storeID, operandID);
 				}
 
-				else if (instr->ImportOperator->Name.Content == L"bufferImport")
+				else if (instr->ImportOperator->Name.Content == "bufferImport")
 				{
 					//instr->Name[][] = 
 					//	*(int*/float*) 
 					//	( block->Name + block->Entries[instr->ComponentName].GetValue().Offset / 4 + i + gl_GlobalInvocationID.x * block->Size / 4 )
 
-					auto UIntType = GetTypeFromString(L"uint");
-					auto FloatType = GetTypeFromString(L"float");
+					auto UIntType = GetTypeFromString("uint");
+					auto FloatType = GetTypeFromString("float");
 					int GIIDx = ctx.AddInstrLoad(
-						ctx.AddInstrAccessChain_VectorMember(0, ctx.InterfaceNameToID[L"gl_GlobalInvocationID"], -1, 0),
+						ctx.AddInstrAccessChain_VectorMember(0, ctx.InterfaceNameToID["gl_GlobalInvocationID"], -1, 0),
 						MemoryAccess::None
 					);	//GlobalInvocationID.x
 					int baseIndex = ctx.AddInstrBinaryInstr(
 						0,
 						UIntType,
-						L"OpIMul",
+						"OpIMu",
 						GIIDx,
 						ctx.AddInstrConstantUInt(block->Size / 4)
 					);
 					baseIndex = ctx.AddInstrBinaryInstr(
 						0,
 						UIntType,
-						L"OpIAdd",
+						"OpIAdd",
 						baseIndex,
 						ctx.AddInstrConstantUInt(block->Entries[instr->ComponentName]().Offset / 4)
 					);
@@ -28789,7 +28908,7 @@ namespace Spire
 					RefPtr<ILType> instrElementType =
 						(!instr->Type->IsIntegral())
 						? FloatType
-						: ((instr->Type->IsUInt() || instr->Type->IsUIntVector()) ? UIntType : GetTypeFromString(L"int"));
+						: ((instr->Type->IsUInt() || instr->Type->IsUIntVector()) ? UIntType : GetTypeFromString("int"));
 
 					int vecSize = instr->Type->GetVectorSize();
 					int srcIDs[16];
@@ -28798,11 +28917,11 @@ namespace Spire
 						int index = ctx.AddInstrBinaryInstr(
 							0,
 							UIntType,
-							L"OpIAdd",
+							"OpIAdd",
 							baseIndex,
 							ctx.AddInstrConstantUInt(i)
 						);
-						int blockID = ctx.InterfaceNameToID[L"blk" + block->Name];
+						int blockID = ctx.InterfaceNameToID["blk" + block->Name];
 						int arrayID = ctx.AddInstrAccessChain_StructMember(0, blockID, -1, 0);
 						int srcID = ctx.AddInstrLoad(
 							ctx.AddInstrAccessChain_ArrayMember(0, ctx.IDInfos[arrayID]().GetILType(), arrayID, index),
@@ -28816,11 +28935,11 @@ namespace Spire
 					if (instr->Type->IsFloatMatrix())
 					{
 						int n = 3;
-						auto colType = GetTypeFromString(L"vec3");
+						auto colType = GetTypeFromString("vec3");
 						if (instr->Type->GetVectorSize() == 16)
 						{
 							n = 4;
-							colType = GetTypeFromString(L"vec4");
+							colType = GetTypeFromString("vec4");
 						}
 						int colIDs[4];
 						for (int i = 0; i < n; i++)
@@ -28855,7 +28974,7 @@ namespace Spire
 				}
 
 				else
-					throw NotImplementedException(L"import in PrintImportInstr(): " + instr->ImportOperator->Name.Content);
+					throw NotImplementedException("import in PrintImportInstr(): " + instr->ImportOperator->Name.Content);
 			}
 
 			void PrintInstr(ILInstruction & instr)
@@ -28869,13 +28988,13 @@ namespace Spire
 				else if (auto exportInstr = instr.As<ExportInstruction>())
 				{
 					PrintExportInstr(exportInstr);
-					//throw InvalidOperationException(L"export instruction not supported");
+					//throw InvalidOperationException("export instruction not supported");
 
 				}
 				else if (auto import = instr.As<ImportInstruction>())
 				{
 					PrintImportInstr(import);
-					//throw InvalidOperationException(L"import instruction not supported");
+					//throw InvalidOperationException("import instruction not supported");
 				}
 				else if (auto update = instr.As<MemberUpdateInstruction>())
 					PrintUpdateInstr(update);
@@ -28886,7 +29005,7 @@ namespace Spire
 				else if (auto fetchArg = instr.As<FetchArgInstruction>()) //for function: return instruction
 					PrintFetchArgInstr(fetchArg);
 				else
-					throw NotImplementedException(L"unsupported instruction in PrintInstr()" + instr.ToString());
+					throw NotImplementedException("unsupported instruction in PrintInstr()" + instr.ToString());
 			}
 
 			void PrintIf(IfInstruction * instr)
@@ -28895,7 +29014,7 @@ namespace Spire
 				operandID = ctx.ConvertBasicType(
 					operandID,
 					ctx.IDInfos[operandID]().GetILType(),
-					GetTypeFromString(L"bool"));
+					GetTypeFromString("bool"));
 
 				int TrueLabel = ++ctx.CurrentID;
 				int FalseLabel = ++ctx.CurrentID;
@@ -28942,7 +29061,7 @@ namespace Spire
 				conditionID = ctx.ConvertBasicType(
 					conditionID,
 					ctx.IDInfos[conditionID]().GetILType(),
-					GetTypeFromString(L"bool"));
+					GetTypeFromString("bool"));
 				ctx.AddInstrBranchConditional(conditionID, BodyBlockLabel, MergeBlockLabel);
 				ctx.PopScope();
 
@@ -28991,7 +29110,7 @@ namespace Spire
 				conditionID = ctx.ConvertBasicType(
 					conditionID,
 					ctx.IDInfos[conditionID]().GetILType(),
-					GetTypeFromString(L"bool")
+					GetTypeFromString("bool")
 				);
 				ctx.AddInstrBranchConditional(conditionID, BodyBlockLabel, MergeBlockLabel);
 				ctx.PopScope();
@@ -29049,7 +29168,7 @@ namespace Spire
 				conditionID = ctx.ConvertBasicType(
 					conditionID,
 					ctx.IDInfos[conditionID]().GetILType(),
-					GetTypeFromString(L"bool")
+					GetTypeFromString("bool")
 				);
 				ctx.AddInstrBranchConditional(conditionID, HeaderBlockLabel, MergeBlockLabel);
 				ctx.PopScope();
@@ -29189,8 +29308,8 @@ namespace Spire
 					int valueID = ctx.AddInstrLoad(nullptr, vertexOutput, MemoryAccess::None);
 					int gl_PositionID = ctx.AddInstrAccessChain_StructMember(
 						0,
-						ctx.InterfaceNameToID[L"variable_gl_PerVertex"],
-						L"gl_Position"
+						ctx.InterfaceNameToID["variable_gl_PerVertex"],
+						"gl_Position"
 					);
 					ctx.AddInstrStore(0, gl_PositionID, valueID);
 				}
@@ -29252,9 +29371,9 @@ namespace Spire
 			int GenerateGlGlobalInvocationID()
 				//return the ID of the gl_GlobalInvocationID variable
 			{
-				int GlobalInvocationID = ctx.AddInstrVariableDeclaration(0, GetTypeFromString(L"uvec3"), StorageClass::Input, L"gl_GlobalInvocationID", 0);
+				int GlobalInvocationID = ctx.AddInstrVariableDeclaration(0, GetTypeFromString("uvec3"), StorageClass::Input, "gl_GlobalInvocationID", 0);
 				ctx.AddInstrDecorate(GlobalInvocationID, Decoration::BuiltIn, (int)BuiltIn::GlobalInvocationId);
-				ctx.InterfaceNameToID[L"gl_GlobalInvocationID"] = GlobalInvocationID;
+				ctx.InterfaceNameToID["gl_GlobalInvocationID"] = GlobalInvocationID;
 				return GlobalInvocationID;
 			}
 
@@ -29372,11 +29491,11 @@ namespace Spire
 
 					List<RefPtr<ILType>> memberTypes;
 					List<String> memberNames;
-					memberTypes.Add(GetTypeFromString(L"uint"));
-					memberNames.Add(L"sys_thread_count");
+					memberTypes.Add(GetTypeFromString("uint"));
+					memberNames.Add("sys_thread_count");
 					spvModule.GenerateInterfaceForStructVariable(
-						L"SystemBlock",
-						L"blkSystemBlock",
+						"SystemBlock",
+						"blkSystemBlock",
 						memberTypes,
 						memberNames,
 						1,
@@ -29388,11 +29507,11 @@ namespace Spire
 
 				List<RefPtr<ILType>> memberTypes;
 				List<String> memberNames;
-				memberTypes.Add(GetTypeFromString(L"float[0]"));
-				memberNames.Add(L"a");
+				memberTypes.Add(GetTypeFromString("float[0]"));
+				memberNames.Add("a");
 				spvModule.GenerateInterfaceForStructVariable(
 					blkName,
-					L"blk" + blkName,
+					"blk" + blkName,
 					memberTypes,
 					memberNames,
 					2,
@@ -29406,15 +29525,15 @@ namespace Spire
 			{
 				
 				currentExecutionModel = ExecutionModel::Invalid;
-				if (shaderWorld->ExportOperator.Content == L"fragmentExport")
+				if (shaderWorld->ExportOperator.Content == "fragmentExport")
 					currentExecutionModel = ExecutionModel::Fragment;
-				else if (shaderWorld->BackendParameters.ContainsKey(L"vertex"))
+				else if (shaderWorld->BackendParameters.ContainsKey("vertex"))
 					currentExecutionModel = ExecutionModel::Vertex;
-				else if (shaderWorld->ExportOperator.Content == L"bufferExport")
+				else if (shaderWorld->ExportOperator.Content == "bufferExport")
 					currentExecutionModel = ExecutionModel::GLCompute;
 
 				CompiledFunction mainFunction;
-				mainFunction.Name = L"main";
+				mainFunction.Name = "main";
 				mainFunction.ReturnType = nullptr;
 				mainFunction.Code = shaderWorld->Code;
 
@@ -29439,7 +29558,7 @@ namespace Spire
 						continue;
 					String impOpName = inputBlock.Value.ImportOperator.Name.Content;
 
-					if (impOpName == L"standardImport")
+					if (impOpName == "standardImport")
 					{
 						List<RefPtr<ILType>> memberTypes;
 						List<String> memberNames;
@@ -29450,7 +29569,7 @@ namespace Spire
 						}
 						spvModule.GenerateInterfaceForStructVariable(
 							block->Name,
-							L"blk"+block->Name,
+							"blk"+block->Name,
 							memberTypes,
 							memberNames,
 							0,
@@ -29459,7 +29578,7 @@ namespace Spire
 						);
 					}
 
-					else if (impOpName == L"vertexImport")
+					else if (impOpName == "vertexImport")
 					{
 						int location = 0;
 						for (auto & ent : block->Entries)
@@ -29474,7 +29593,7 @@ namespace Spire
 						}
 					}
 
-					else if (impOpName == L"uniformImport")
+					else if (impOpName == "uniformImport")
 					{
 						int nonTextureCount = 0;
 						for (auto & ent : block->Entries)
@@ -29482,7 +29601,7 @@ namespace Spire
 								nonTextureCount++;
 
 						int TypeOfStruct = 1; //1: uniform buffer; 2: shader storage buffer; 0: not a buffer
-						if (block->Attributes.ContainsKey(L"ShaderStorageBlock"))
+						if (block->Attributes.ContainsKey("ShaderStorageBlock"))
 							TypeOfStruct = 2;
 
 						if (nonTextureCount)
@@ -29497,11 +29616,11 @@ namespace Spire
 								}
 							String strIndex;
 							int index = -1;
-							if (block->Attributes.TryGetValue(L"Index", strIndex))
+							if (block->Attributes.TryGetValue("Index", strIndex))
 								index = StringToInt(strIndex);
 							spvModule.GenerateInterfaceForStructVariable(
 								block->Name,
-								L"blk" + block->Name,
+								"blk" + block->Name,
 								memberTypes,
 								memberNames,
 								TypeOfStruct,
@@ -29513,7 +29632,7 @@ namespace Spire
 						
 						int bindPoint = 0;
 						String bindingStart;
-						if (backendArguments.TryGetValue(L"TextureBindingStart", bindingStart))
+						if (backendArguments.TryGetValue("TextureBindingStart", bindingStart))
 							bindPoint = StringToInt(bindingStart);
 
 						for(auto & ent : block->Entries)
@@ -29530,11 +29649,11 @@ namespace Spire
 							}
 					}
 
-					else if (impOpName == L"textureImport")
+					else if (impOpName == "textureImport")
 					{
 						int bindPoint = 0;
 						String strIndex;
-						if (block->Attributes.TryGetValue(L"Index", strIndex))
+						if (block->Attributes.TryGetValue("Index", strIndex))
 							bindPoint = StringToInt(strIndex);
 						for (auto & ent : block->Entries)
 						{
@@ -29549,24 +29668,24 @@ namespace Spire
 						}
 					}
 
-					else if (impOpName == L"bufferImport")
+					else if (impOpName == "bufferImport")
 					{
 						String strIdx;
 						int index = 0;
-						if (block->Attributes.TryGetValue(L"Index", strIdx))
+						if (block->Attributes.TryGetValue("Index", strIdx))
 							index = StringToInt(strIdx);
 						ProcessBufferImportOrExportInterfaces(spvModule, block->Name, index);
 					}
 
 					else 
-						throw NotImplementedException(L"not implemented input interface: " + impOpName);
+						throw NotImplementedException("not implemented input interface: " + impOpName);
 				}
 
-				if (shaderWorld->ExportOperator.Content == L"fragmentExport")
+				if (shaderWorld->ExportOperator.Content == "fragmentExport")
 				{
 					int location = 0;
 					for (auto & ent : shaderWorld->WorldOutput->Entries)
-						if (!ent.Value.LayoutAttribs.ContainsKey(L"DepthOutput"))
+						if (!ent.Value.LayoutAttribs.ContainsKey("DepthOutput"))
 						{
 							spvModule.GenerateInterfaceForSingleVariable(
 								ent.Key,
@@ -29579,7 +29698,7 @@ namespace Spire
 						else
 						{
 							int entID = spvModule.GenerateInterfaceForSingleVariable(
-								L"gl_FragDepth",
+								"gl_FragDepth",
 								ent.Value.Type,
 								StorageClass::Output,
 								location
@@ -29589,7 +29708,7 @@ namespace Spire
 						}
 				}
 
-				else if (shaderWorld->ExportOperator.Content == L"standardExport")
+				else if (shaderWorld->ExportOperator.Content == "standardExport")
 				{
 					List<RefPtr<ILType>> memberTypes;
 					List<String> memberNames;
@@ -29600,7 +29719,7 @@ namespace Spire
 					}
 					spvModule.GenerateInterfaceForStructVariable(
 						shaderWorld->WorldOutput->Name,
-						L"blk" + shaderWorld->WorldOutput->Name,
+						"blk" + shaderWorld->WorldOutput->Name,
 						memberTypes,
 						memberNames,
 						0,
@@ -29609,17 +29728,17 @@ namespace Spire
 					);
 				}
 
-				else if (shaderWorld->ExportOperator.Content == L"bufferExport")
+				else if (shaderWorld->ExportOperator.Content == "bufferExport")
 				{
 					String strIdx;
 					int index = 0;
-					if (shaderWorld->WorldOutput->Attributes.TryGetValue(L"Index", strIdx))
+					if (shaderWorld->WorldOutput->Attributes.TryGetValue("Index", strIdx))
 						index = StringToInt(strIdx);
 					ProcessBufferImportOrExportInterfaces(spvModule, shaderWorld->WorldOutput->Name, index);
 				}
 
 				else
-					throw NotImplementedException(L"not implemented output interface: " + shaderWorld->ExportOperator.Content);
+					throw NotImplementedException("not implemented output interface: " + shaderWorld->ExportOperator.Content);
 
 				if (vertexOutputName.Length())
 				{
@@ -29628,18 +29747,18 @@ namespace Spire
 					{
 						List<RefPtr<ILType>> memberTypes;
 						List<String> memberNames;
-						memberTypes.Add(GetTypeFromString(L"vec4"));
-						memberNames.Add(L"gl_Position");
-						memberTypes.Add(GetTypeFromString(L"float"));
-						memberNames.Add(L"gl_PointSize");
-						memberTypes.Add(GetTypeFromString(L"float[1]"));
-						memberNames.Add(L"gl_ClipDistance");
-						memberTypes.Add(GetTypeFromString(L"float[1]"));
-						memberNames.Add(L"gl_CullDistance");
+						memberTypes.Add(GetTypeFromString("vec4"));
+						memberNames.Add("gl_Position");
+						memberTypes.Add(GetTypeFromString("float"));
+						memberNames.Add("gl_PointSize");
+						memberTypes.Add(GetTypeFromString("float[1]"));
+						memberNames.Add("gl_ClipDistance");
+						memberTypes.Add(GetTypeFromString("float[1]"));
+						memberNames.Add("gl_CullDistance");
 
 						int typeID = spvModule.GenerateInterfaceForStructVariable(
-							L"gl_PerVertex",
-							L"variable_gl_PerVertex",
+							"gl_PerVertex",
+							"variable_gl_PerVertex",
 							memberTypes,
 							memberNames,
 							0,
@@ -29665,7 +29784,7 @@ namespace Spire
 						vertexOutput = ccomp.CodeOperand;
 					}
 					else
-						throw InvalidOperationException(L"can not find vertexOutputName");
+						throw InvalidOperationException("can not find vertexOutputName");
 				}
 
 				int mainFunctionID = spvModule.GenerateFunctionDefinition(&mainFunction, vertexOutput);
@@ -29682,15 +29801,15 @@ namespace Spire
 				ctx.Result = &result;
 
 				currentExecutionModel = ExecutionModel::Invalid;
-				if (currentWorld->ExportOperator.Content == L"fragmentExport")
+				if (currentWorld->ExportOperator.Content == "fragmentExport")
 					currentExecutionModel = ExecutionModel::Fragment;
-				else if (currentWorld->BackendParameters.ContainsKey(L"vertex"))
+				else if (currentWorld->BackendParameters.ContainsKey("vertex"))
 					currentExecutionModel = ExecutionModel::Vertex;
-				else if (currentWorld->ExportOperator.Content == L"bufferExport")
+				else if (currentWorld->ExportOperator.Content == "bufferExport")
 					currentExecutionModel = ExecutionModel::GLCompute;
 
 				if (ExecutionModel::Invalid == currentExecutionModel)
-					throw InvalidOperationException(L"invalid execution model for shader world: " + currentWorld->WorldName);
+					throw InvalidOperationException("invalid execution model for shader world: " + currentWorld->WorldName);
 
 				ctx.CurrentID = 1;
 
@@ -29780,28 +29899,28 @@ namespace Spire
 					if (currentWorld->LocalComponents.TryGetValue(vertexOutputName, ccomp))
 					{
 						RefPtr<ILStructType> structIL = new ILStructType();
-						structIL->TypeName = L"gl_PerVertex";
+						structIL->TypeName = "gl_PerVertex";
 
 						ILStructType::ILStructField f1;
-						f1.Type = GetTypeFromString(L"vec4");
-						f1.FieldName = L"gl_Position";
+						f1.Type = GetTypeFromString("vec4");
+						f1.FieldName = "gl_Position";
 						structIL->Members.Add(f1);
 						ILStructType::ILStructField f2;
-						f2.Type = GetTypeFromString(L"float");
-						f2.FieldName = L"gl_PointSize";
+						f2.Type = GetTypeFromString("float");
+						f2.FieldName = "gl_PointSize";
 						structIL->Members.Add(f2);
 						ILStructType::ILStructField f3;
-						f3.Type = GetTypeFromString(L"float[1]");
-						f3.FieldName = L"gl_ClipDistance";
+						f3.Type = GetTypeFromString("float[1]");
+						f3.FieldName = "gl_ClipDistance";
 						structIL->Members.Add(f3);
 						ILStructType::ILStructField f4;
-						f4.Type = GetTypeFromString(L"float[1]");
-						f4.FieldName = L"gl_CullDistance";
+						f4.Type = GetTypeFromString("float[1]");
+						f4.FieldName = "gl_CullDistance";
 						structIL->Members.Add(f4);
 
 						int structTypeID = ctx.DefineType(structIL);
-						int structVariableID = ctx.AddInstrVariableDeclaration(0, structIL, StorageClass::Output, L"gl_PerVertex");
-						ctx.InterfaceNameToID[L"gl_PerVertex"] = structVariableID;
+						int structVariableID = ctx.AddInstrVariableDeclaration(0, structIL, StorageClass::Output, "gl_PerVertex");
+						ctx.InterfaceNameToID["gl_PerVertex"] = structVariableID;
 
 						ctx.AddInstrDecorate(structTypeID, Decoration::Block);
 						ctx.AddInstrMemberDecorate(structTypeID, 0, Decoration::BuiltIn, (int)BuiltIn::Position);
@@ -29812,7 +29931,7 @@ namespace Spire
 						interfaceIDs.Add(structVariableID);
 					}
 					else
-						throw InvalidOperationException(L"can not find vertexOutputName");
+						throw InvalidOperationException("can not find vertexOutputName");
 				}
 
 				//add Main function type definition
@@ -29839,7 +29958,7 @@ namespace Spire
 				}
 
 				//MainFunction
-				ctx.AddInstrFunction(ctx.MainFunctionID, ctx.TypeNameToID[L"void"](), ctx.MainFunctionTypeID, L"main");
+				ctx.AddInstrFunction(ctx.MainFunctionID, ctx.TypeNameToID["void"](), ctx.MainFunctionTypeID, "main");
 
 				++ctx.CurrentID;
 				ctx.AddInstrLabel_AtFunctionHeader(ctx.CurrentID);
@@ -29847,15 +29966,15 @@ namespace Spire
 				if (BufferImportOrExport)
 				{
 					int GIIDx = ctx.AddInstrLoad(
-						ctx.AddInstrAccessChain_VectorMember(0, ctx.InterfaceNameToID[L"gl_GlobalInvocationID"], -1, 0),
+						ctx.AddInstrAccessChain_VectorMember(0, ctx.InterfaceNameToID["gl_GlobalInvocationID"], -1, 0),
 						MemoryAccess::None
 					);	//GlobalInvocationID.x
 					int SysThreadCountID = ctx.AddInstrLoad(
-						ctx.AddInstrAccessChain_StructMember(0, ctx.InterfaceNameToID[L"SystemBlock"], L"sys_thread_count"),
+						ctx.AddInstrAccessChain_StructMember(0, ctx.InterfaceNameToID["SystemBlock"], "sys_thread_count"),
 						MemoryAccess::None
 					);
 					int conditionID = ctx.AddInstrBinaryInstr(
-						0, GetTypeFromString(L"bool"), L"OpUGreaterThanEqual", GIIDx, SysThreadCountID
+						0, GetTypeFromString("bool"), "OpUGreaterThanEqua", GIIDx, SysThreadCountID
 					);
 					int MergeLabel = ++ctx.CurrentID;
 					int TrueLabel = ++ctx.CurrentID;
@@ -29877,13 +29996,13 @@ namespace Spire
 						int valueID = ctx.AddInstrLoad(nullptr, ccomp.CodeOperand, MemoryAccess::None);
 						int gl_PositionID = ctx.AddInstrAccessChain_StructMember(
 							0,
-							ctx.InterfaceNameToID[L"gl_PerVertex"],
-							L"gl_Position"
+							ctx.InterfaceNameToID["gl_PerVertex"],
+							"gl_Position"
 						);
 						ctx.AddInstrStore(0, gl_PositionID, valueID);
 					}
 					else
-						throw InvalidOperationException(L"can not find vertexOutputName");
+						throw InvalidOperationException("can not find vertexOutputName");
 				}
 
 				//MainFunction End
@@ -29900,7 +30019,7 @@ namespace Spire
 
 				rs.MainCode = ctx.ProduceTextCode();
 
-				rs.OutputDeclarations = L"spirv";
+				rs.OutputDeclarations = "spirv";
 
 				//print IL 
 				{
@@ -29908,42 +30027,42 @@ namespace Spire
 					StringBuilder sb;
 
 					//function part
-					sb << L"function" << EndLine;
-					sb << L"{" << EndLine;
+					sb << "function" << EndLine;
+					sb << "{" << EndLine;
 					for (auto &pfunc : compiledProgram->Functions) {
-						sb << pfunc->ReturnType->ToString() << L" " << pfunc->Name << L"(";
+						sb << pfunc->ReturnType->ToString() << " " << pfunc->Name << "(";
 						bool first = true;
 						for (auto &name2param : pfunc->Parameters) {
 							if (!first)
-								sb << L", ";
-							sb << name2param.Value->ToString() << L" " << name2param.Key;
+								sb << ", ";
+							sb << name2param.Value->ToString() << " " << name2param.Key;
 							first = false;
 						}
-						sb << L")" << EndLine;
-						sb << L"{" << EndLine;
+						sb << ")" << EndLine;
+						sb << "{" << EndLine;
 						pfunc->Code->NameAllInstructions();
 						sb << pfunc->Code->ToString() << EndLine;
-						sb << L"}" << EndLine;
+						sb << "}" << EndLine;
 					}
-					sb << L"}" << EndLine;
+					sb << "}" << EndLine;
 
 					//shader part
 					for (auto &pshader : compiledProgram->Shaders) {
-						sb << L"Shader " << pshader->MetaData.ShaderName << EndLine;
-						sb << L"{" << EndLine;
+						sb << "Shader " << pshader->MetaData.ShaderName << EndLine;
+						sb << "{" << EndLine;
 						for (auto &pworld : pshader->Worlds) {
-							sb << L"World " << pworld.Key << EndLine;
-							sb << L"{" << EndLine;
+							sb << "World " << pworld.Key << EndLine;
+							sb << "{" << EndLine;
 							pworld.Value.Ptr()->Code->NameAllInstructions();
 							sb << pworld.Value.Ptr()->Code->ToString() << EndLine;
-							sb << L"}" << EndLine;
+							sb << "}" << EndLine;
 						}
-						sb << L"}" << EndLine;
+						sb << "}" << EndLine;
 					}
 
 					StringBuilder sb_indent;
 					IndentString(sb_indent, sb.ToSt\`ring());
-					CoreLib::IO::StreamWriter sw(L"IL-" + currentWorld->ShaderName + L"-" + currentWorld->WorldOutput->Name + String(L".out"));
+					CoreLib::IO::StreamWriter sw("IL-" + currentWorld->ShaderName + "-" + currentWorld->WorldOutput->Name + String(".out"));
 					sw.Write(sb_indent.ToString());
 				}
 
@@ -29956,8 +30075,8 @@ namespace Spire
 			virtual void SetParameters(const EnumerableDictionary<String, String>& arguments) override
 			{
 				backendArguments = arguments;
-				if (!arguments.TryGetValue(L"vertex", vertexOutputName))
-					vertexOutputName = L"";
+				if (!arguments.TryGetValue("vertex", vertexOutputName))
+					vertexOutputName = "";
 			}
 		};
 
@@ -30224,28 +30343,28 @@ namespace Spire
 				Operator::BitAnd, Operator::BitXor, Operator::BitOr,
 				Operator::And,
 				Operator::Or };
-			String floatTypes[] = { L"float", L"vec2", L"vec3", L"vec4" };
-			String intTypes[] = { L"int", L"ivec2", L"ivec3", L"ivec4" };
-			String uintTypes[] = { L"uint", L"uvec2", L"uvec3", L"uvec4" };
+			String floatTypes[] = { "float", "vec2", "vec3", "vec4" };
+			String intTypes[] = { "int", "ivec2", "ivec3", "ivec4" };
+			String uintTypes[] = { "uint", "uvec2", "uvec3", "uvec4" };
 
-			sb << L"__intrinsic vec3 operator * (vec3, mat3);\n";
-			sb << L"__intrinsic vec3 operator * (mat3, vec3);\n";
+			sb << "__intrinsic vec3 operator * (vec3, mat3);\n";
+			sb << "__intrinsic vec3 operator * (mat3, vec3);\n";
 
-			sb << L"__intrinsic vec4 operator * (vec4, mat4);\n";
-			sb << L"__intrinsic vec4 operator * (mat4, vec4);\n";
+			sb << "__intrinsic vec4 operator * (vec4, mat4);\n";
+			sb << "__intrinsic vec4 operator * (mat4, vec4);\n";
 
-			sb << L"__intrinsic mat3 operator * (mat3, mat3);\n";
-			sb << L"__intrinsic mat4 operator * (mat4, mat4);\n";
+			sb << "__intrinsic mat3 operator * (mat3, mat3);\n";
+			sb << "__intrinsic mat4 operator * (mat4, mat4);\n";
 
-			sb << L"__intrinsic bool operator && (bool, bool);\n";
-			sb << L"__intrinsic bool operator || (bool, bool);\n";
+			sb << "__intrinsic bool operator && (bool, bool);\n";
+			sb << "__intrinsic bool operator || (bool, bool);\n";
 
 			for (auto type : intTypes)
 			{
-				sb << L"__intrinsic bool operator && (bool, " << type << L");\n";
-				sb << L"__intrinsic bool operator || (bool, " << type << L");\n";
-				sb << L"__intrinsic bool operator && (" << type << ", bool);\n";
-				sb << L"__intrinsic bool operator || (" << type << ", bool);\n";
+				sb << "__intrinsic bool operator && (bool, " << type << ");\n";
+				sb << "__intrinsic bool operator || (bool, " << type << ");\n";
+				sb << "__intrinsic bool operator && (" << type << ", bool);\n";
+				sb << "__intrinsic bool operator || (" << type << ", bool);\n";
 			}
 
 			for (auto op : intUnaryOps)
@@ -30257,8 +30376,8 @@ namespace Spire
 					auto utype = uintTypes[i];
 					for (int j = 0; j < 2; j++)
 					{
-						auto retType = (op == Operator::Not) ? L"bool" : j == 0 ? itype : utype;
-						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << (j == 0 ? itype : utype) << L");\n";
+						auto retType = (op == Operator::Not) ? "bool" : j == 0 ? itype : utype;
+						sb << "__intrinsic " << retType << " operator " << opName << "(" << (j == 0 ? itype : utype) << ");\n";
 					}
 				}
 			}
@@ -30269,8 +30388,8 @@ namespace Spire
 				for (int i = 0; i < 4; i++)
 				{
 					auto type = floatTypes[i];
-					auto retType = (op == Operator::Not) ? L"bool" : type;
-					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L");\n";
+					auto retType = (op == Operator::Not) ? "bool" : type;
+					sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ");\n";
 				}
 			}
 
@@ -30282,22 +30401,22 @@ namespace Spire
 					auto type = floatTypes[i];
 					auto itype = intTypes[i];
 					auto utype = uintTypes[i];
-					auto retType = ((op >= Operator::Eql && op <= Operator::Leq) || op == Operator::And || op == Operator::Or) ? L"bool" : type;
-					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << type << L");\n";
-					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << itype << L", " << type << L");\n";
-					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << utype << L", " << type << L");\n";
-					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << itype << L");\n";
-					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << utype << L");\n";
+					auto retType = ((op >= Operator::Eql && op <= Operator::Leq) || op == Operator::And || op == Operator::Or) ? "bool" : type;
+					sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << type << ");\n";
+					sb << "__intrinsic " << retType << " operator " << opName << "(" << itype << ", " << type << ");\n";
+					sb << "__intrinsic " << retType << " operator " << opName << "(" << utype << ", " << type << ");\n";
+					sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << itype << ");\n";
+					sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << utype << ");\n";
 					if (i > 0)
 					{
-						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << floatTypes[0] << L");\n";
-						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << floatTypes[0] << L", " << type << L");\n";
+						sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << floatTypes[0] << ");\n";
+						sb << "__intrinsic " << retType << " operator " << opName << "(" << floatTypes[0] << ", " << type << ");\n";
 
-						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << intTypes[0] << L");\n";
-						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << intTypes[0] << L", " << type << L");\n";
+						sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << intTypes[0] << ");\n";
+						sb << "__intrinsic " << retType << " operator " << opName << "(" << intTypes[0] << ", " << type << ");\n";
 
-						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << uintTypes[0] << L");\n";
-						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << uintTypes[0] << L", " << type << L");\n";
+						sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << uintTypes[0] << ");\n";
+						sb << "__intrinsic " << retType << " operator " << opName << "(" << uintTypes[0] << ", " << type << ");\n";
 					}
 				}
 			}
@@ -30309,18 +30428,18 @@ namespace Spire
 				{
 					auto type = intTypes[i];
 					auto utype = uintTypes[i];
-					auto retType = ((op >= Operator::Eql && op <= Operator::Leq) || op == Operator::And || op == Operator::Or) ? L"bool" : type;
-					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << type << L");\n";
-					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << utype << L", " << type << L");\n";
-					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << utype << L");\n";
-					sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << utype << L", " << utype << L");\n";
+					auto retType = ((op >= Operator::Eql && op <= Operator::Leq) || op == Operator::And || op == Operator::Or) ? "bool" : type;
+					sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << type << ");\n";
+					sb << "__intrinsic " << retType << " operator " << opName << "(" << utype << ", " << type << ");\n";
+					sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << utype << ");\n";
+					sb << "__intrinsic " << retType << " operator " << opName << "(" << utype << ", " << utype << ");\n";
 					if (i > 0)
 					{
-						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << intTypes[0] << L");\n";
-						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << intTypes[0] << L", " << type << L");\n";
+						sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << intTypes[0] << ");\n";
+						sb << "__intrinsic " << retType << " operator " << opName << "(" << intTypes[0] << ", " << type << ");\n";
 
-						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << type << L", " << uintTypes[0] << L");\n";
-						sb << L"__intrinsic " << retType << L" operator " << opName << L"(" << uintTypes[0] << L", " << type << L");\n";
+						sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << uintTypes[0] << ");\n";
+						sb << "__intrinsic " << retType << " operator " << opName << "(" << uintTypes[0] << ", " << type << ");\n";
 					}
 				}
 			}
@@ -30678,7 +30797,7 @@ namespace Spire
 					for (auto & w : cimpl->Worlds)
 						if (impl->Worlds.Contains(w) && impl->AlternateName == cimpl->AlternateName)
 						{
-							err->Error(33020, L"\'" + comp->Name + L"\' is already defined at '" + w + L"\'.", impl->SyntaxNode->Position);
+							err->Error(33020, "\'" + comp->Name + "\' is already defined at '" + w + "\'.", impl->SyntaxNode->Position);
 							rs = false;
 						}
 				}
@@ -30689,7 +30808,7 @@ namespace Spire
 				{
 					if (cimpl->Worlds.Count() == 0 && impl->Worlds.Count() == 0 && impl->AlternateName == cimpl->AlternateName)
 					{
-						err->Error(33020, L"\'" + comp->Name + L"\' is already defined.", impl->SyntaxNode->Position);
+						err->Error(33020, "\'" + comp->Name + "\' is already defined.", impl->SyntaxNode->Position);
 						rs = false;
 					}
 				}
@@ -30698,32 +30817,32 @@ namespace Spire
 			{
 				if (impl->SyntaxNode->IsOutput != cimpl->SyntaxNode->IsOutput)
 				{
-					err->Error(33021, L"\'" + comp->Name + L"\': inconsistent signature.\nsee previous definition at " + cimpl->SyntaxNode->Position.ToString(), impl->SyntaxNode->Position);
+					err->Error(33021, "\'" + comp->Name + "\': inconsistent signature.\nsee previous definition at " + cimpl->SyntaxNode->Position.ToString(), impl->SyntaxNode->Position);
 					rs = false;
 					break;
 				}
 				if (impl->SyntaxNode->IsParam != cimpl->SyntaxNode->IsParam)
 				{
-					err->Error(33021, L"\'" + comp->Name + L"\': inconsistent signature.\nsee previous definition at " + cimpl->SyntaxNode->Position.ToString(), impl->SyntaxNode->Position);
+					err->Error(33021, "\'" + comp->Name + "\': inconsistent signature.\nsee previous definition at " + cimpl->SyntaxNode->Position.ToString(), impl->SyntaxNode->Position);
 					rs = false;
 					break;
 				}
 				if (impl->SyntaxNode->IsPublic != cimpl->SyntaxNode->IsPublic)
 				{
-					err->Error(33021, L"\'" + comp->Name + L"\': inconsistent signature.\nsee previous definition at " + cimpl->SyntaxNode->Position.ToString(), impl->SyntaxNode->Position);
+					err->Error(33021, "\'" + comp->Name + "\': inconsistent signature.\nsee previous definition at " + cimpl->SyntaxNode->Position.ToString(), impl->SyntaxNode->Position);
 					rs = false;
 					break;
 				}
 				if (!impl->SyntaxNode->Type->Equals(cimpl->SyntaxNode->Type.Ptr()))
 				{
-					err->Error(33021, L"\'" + comp->Name + L"\': inconsistent signature.\nsee previous definition at " + cimpl->SyntaxNode->Position.ToString(), impl->SyntaxNode->Position);
+					err->Error(33021, "\'" + comp->Name + "\': inconsistent signature.\nsee previous definition at " + cimpl->SyntaxNode->Position.ToString(), impl->SyntaxNode->Position);
 					rs = false;
 					break;
 				}
 			}
 			if (impl->SyntaxNode->IsParam && comp->Implementations.Count() != 0)
 			{
-				err->Error(33022, L"\'" + comp->Name + L"\': parameter name conflicts with existing definition.", impl->SyntaxNode->Position);
+				err->Error(33022, "\'" + comp->Name + "\': parameter name conflicts with existing definition.", impl->SyntaxNode->Position);
 				rs = false;
 			}
 			return rs;
@@ -30741,15 +30860,15 @@ namespace Spire
 			else if (auto arr = type.As<ArrayExpressionType>())
 			{
 				if (arr->ArrayLength > 0)
-					return PrintType(arr->BaseType, recordReplaceStr) + L"[" + arr->ArrayLength + L"]";
+					return PrintType(arr->BaseType, recordReplaceStr) + "[" + arr->ArrayLength + "]";
 				else
-					return PrintType(arr->BaseType, recordReplaceStr) + L"[]";
+					return PrintType(arr->BaseType, recordReplaceStr) + "[]";
 			}
 			else if (auto gen = type.As<GenericExpressionType>())
 			{
-				return gen->GenericTypeName + L"<" + PrintType(gen->BaseType, recordReplaceStr) + L">";
+				return gen->GenericTypeName + "<" + PrintType(gen->BaseType, recordReplaceStr) + ">";
 			}
-			return L"";
+			return "";
 		}
 
 		bool SymbolTable::CheckTypeRequirement(const ImportPath & p, RefPtr<ExpressionType> type)
@@ -30762,7 +30881,7 @@ namespace Spire
 				sbInternalName << req->Name;
 				for (auto & op : req->Parameters)
 				{
-					sbInternalName << L"@" << PrintType(op->Type, typeStr);
+					sbInternalName << "@" << PrintType(op->Type, typeStr);
 				}
 				auto funcName = sbInternalName.ProduceString();
 				auto func = Functions.TryGetValue(funcName);
@@ -30980,55 +31099,55 @@ namespace Spire
 			switch (BaseType)
 			{
 			case Compiler::BaseType::Int:
-				res.Append(L"int");
+				res.Append("int");
 				break;
 			case Compiler::BaseType::UInt:
-				res.Append(L"uint");
+				res.Append("uint");
 				break;
 			case Compiler::BaseType::Bool:
-				res.Append(L"bool");
+				res.Append("bool");
 				break;
 			case Compiler::BaseType::Float:
-				res.Append(L"float");
+				res.Append("float");
 				break;
 			case Compiler::BaseType::Int2:
-				res.Append(L"ivec2");
+				res.Append("ivec2");
 				break;
 			case Compiler::BaseType::UInt2:
-				res.Append(L"uvec2");
+				res.Append("uvec2");
 				break;
 			case Compiler::BaseType::Float2:
-				res.Append(L"vec2");
+				res.Append("vec2");
 				break;
 			case Compiler::BaseType::Int3:
-				res.Append(L"ivec3");
+				res.Append("ivec3");
 				break;
 			case Compiler::BaseType::UInt3:
-				res.Append(L"uvec3");
+				res.Append("uvec3");
 				break;
 			case Compiler::BaseType::Float3:
-				res.Append(L"vec3");
+				res.Append("vec3");
 				break;
 			case Compiler::BaseType::Int4:
-				res.Append(L"ivec4");
+				res.Append("ivec4");
 				break;
 			case Compiler::BaseType::UInt4:
-				res.Append(L"uvec4");
+				res.Append("uvec4");
 				break;
 			case Compiler::BaseType::Float4:
-				res.Append(L"vec4");
+				res.Append("vec4");
 				break;
 			case Compiler::BaseType::Float3x3:
-				res.Append(L"mat3");
+				res.Append("mat3");
 				break;
 			case Compiler::BaseType::Float4x4:
-				res.Append(L"mat4");
+				res.Append("mat4");
 				break;
 			case Compiler::BaseType::Texture2D:
-				res.Append(L"sampler2D");
+				res.Append("sampler2D");
 				break;
 			case Compiler::BaseType::TextureCube:
-				res.Append(L"samplerCube");
+				res.Append("samplerCube");
 				break;
 			case Compiler::BaseType::Function:
 				res.Append(Func->SyntaxNode->InternalName);
@@ -31043,7 +31162,7 @@ namespace Spire
 				res.Append(RecordTypeName);
 				break;
 			case Compiler::BaseType::Error:
-				res.Append(L"<errtype>");
+				res.Append("<errtype>");
 				break;
 			default:
 				break;
@@ -31562,9 +31681,9 @@ namespace Spire
 		CoreLib::Basic::String ArrayExpressionType::ToString() const
 		{
 			if (ArrayLength > 0)
-				return BaseType->ToString() + L"[" + String(ArrayLength) + L"]";
+				return BaseType->ToString() + "[" + String(ArrayLength) + "]";
 			else
-				return BaseType->ToString() + L"[]";
+				return BaseType->ToString() + "[]";
 		}
 		ExpressionType * ArrayExpressionType::Clone()
 		{
@@ -31601,7 +31720,7 @@ namespace Spire
 		}
 		CoreLib::Basic::String GenericExpressionType::ToString() const
 		{
-			return GenericTypeName + L"<" + BaseType->ToString() + L">";
+			return GenericTypeName + "<" + BaseType->ToString() + ">";
 		}
 		ExpressionType * GenericExpressionType::Clone()
 		{
@@ -31643,64 +31762,64 @@ namespace Spire
 			{
 			case Operator::Add:
 			case Operator::AddAssign:
-				return L"+";
+				return "+";
 			case Operator::Sub:
 			case Operator::SubAssign:
-				return L"-";
+				return "-";
 			case Operator::Neg:
-				return L"-";
+				return "-";
 			case Operator::Not:
-				return L"!";
+				return "!";
 			case Operator::BitNot:
-				return L"~";
+				return "~";
 			case Operator::PreInc:
 			case Operator::PostInc:
-				return L"++";
+				return "++";
 			case Operator::PreDec:
 			case Operator::PostDec:
-				return L"--";
+				return "--";
 			case Operator::Mul:
 			case Operator::MulAssign:
-				return L"*";
+				return "*";
 			case Operator::Div:
 			case Operator::DivAssign:
-				return L"/";
+				return "/";
 			case Operator::Mod:
 			case Operator::ModAssign:
-				return L"%";
+				return "%";
 			case Operator::Lsh:
 			case Operator::LshAssign:
-				return L"<<";
+				return "<<";
 			case Operator::Rsh:
 			case Operator::RshAssign:
-				return L">>";
+				return ">>";
 			case Operator::Eql:
-				return L"==";
+				return "==";
 			case Operator::Neq:
-				return L"!=";
+				return "!=";
 			case Operator::Greater:
-				return L">";
+				return ">";
 			case Operator::Less:
-				return L"<";
+				return "<";
 			case Operator::Geq:
-				return L">=";
+				return ">=";
 			case Operator::Leq:
-				return L"<=";
+				return "<=";
 			case Operator::BitAnd:
 			case Operator::AndAssign:
-				return L"&";
+				return "&";
 			case Operator::BitXor:
 			case Operator::XorAssign:
-				return L"^";
+				return "^";
 			case Operator::BitOr:
 			case Operator::OrAssign:
-				return L"|";
+				return "|";
 			case Operator::And:
-				return L"&&";
+				return "&&";
 			case Operator::Or:
-				return L"||";
+				return "||";
 			default:
-				return L"";
+				return "";
 			}
 		}
 		RefPtr<SyntaxNode> ProjectExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
@@ -31738,14 +31857,14 @@ namespace Spire
 					if (genericTypeMappings)
 						return (*genericTypeMappings)[basicType->RecordTypeName]();
 					else
-						throw InvalidProgramException(L"unexpected record type.");
+						throw InvalidProgramException("unexpected record type.");
 				}
 				else if (basicType->BaseType == BaseType::Generic)
 				{
 					if (genericTypeMappings)
 						return (*genericTypeMappings)[basicType->GenericTypeVar]();
 					else
-						throw InvalidProgramException(L"unexpected generic type.");
+						throw InvalidProgramException("unexpected generic type.");
 				}
 				else
 				{
@@ -31945,7 +32064,7 @@ namespace Spire
 									{
 										ShaderComponentSymbol* refComp;
 										if (!Shader->AllComponents.TryGetValue(importUsing, refComp))
-											throw InvalidProgramException(L"import operator dependency not exists.");
+											throw InvalidProgramException("import operator dependency not exists.");
 										ReferenceWorkItem workItem;
 										workItem.Dependency = ComponentDependency(refComp->UniqueName, nullptr);
 										workItem.SourceWorld = importOp->SourceWorld.Content;
@@ -32055,11 +32174,11 @@ namespace SpireLib
 			auto token = parser.ReadToken();
 			int endPos = token.Position.Pos + 1;
 			int brace = 0;
-			while (endPos < src.Length() && !(src[endPos] == L'}' && brace == 0))
+			while (endPos < src.Length() && !(src[endPos] == '}' && brace == 0))
 			{
-				if (src[endPos] == L'{')
+				if (src[endPos] == '{')
 					brace++;
-				else if (src[endPos] == L'}')
+				else if (src[endPos] == '}')
 					brace--;
 				endPos++;
 			}
@@ -32068,24 +32187,24 @@ namespace SpireLib
 			parser.ReadToken();
 			return src.SubString(token.Position.Pos + 1, endPos - token.Position.Pos - 1);
 		};
-		while (!parser.IsEnd() && !parser.LookAhead(L"}"))
+		while (!parser.IsEnd() && !parser.LookAhead("}"))
 		{
 			auto worldName = parser.ReadWord();
 			StageSource compiledSrc;
-			if (parser.LookAhead(L"binary"))
+			if (parser.LookAhead("binary"))
 			{
 				parser.ReadToken();
-				parser.Read(L"{");
-				while (!parser.LookAhead(L"}") && !parser.IsEnd())
+				parser.Read("{");
+				while (!parser.LookAhead("}") && !parser.IsEnd())
 				{
 					auto val = parser.ReadUInt();
 					compiledSrc.BinaryCode.AddRange((unsigned char*)&val, sizeof(unsigned int));
-					if (parser.LookAhead(L","))
+					if (parser.LookAhead(","))
 						parser.ReadToken();
 				}
-				parser.Read(L"}");
+				parser.Read("}");
 			}
-			if (parser.LookAhead(L"text"))
+			if (parser.LookAhead("text"))
 			{
 				parser.ReadToken();
 				compiledSrc.MainCode = getShaderSource();
@@ -32166,7 +32285,7 @@ namespace SpireLib
 		auto searchDirs = options.SearchDirectories;
 		searchDirs.Add(Path::GetDirectoryName(fileName));
 		searchDirs.Reverse();
-		auto predefUnit = compiler->Parse(compileResult, SpireStdLib::GetCode(), L"stdlib");
+		auto predefUnit = compiler->Parse(compileResult, SpireStdLib::GetCode(), "stdlib");
 		for (int i = 0; i < unitsToInclude.Count(); i++)
 		{
 			auto inputFileName = unitsToInclude[i];
@@ -32197,14 +32316,14 @@ namespace SpireLib
 						}
 						if (!found)
 						{
-							compileResult.GetErrorWriter()->Error(2, L"cannot find file '" + inputFileName + L"'.", inc.Position);
+							compileResult.GetErrorWriter()->Error(2, "cannot find file '" + inputFileName + "'.", inc.Position);
 						}
 					}
 				}
 			}
 			catch (IOException)
 			{
-				compileResult.GetErrorWriter()->Error(1, L"cannot open file '" + inputFileName + L"'.", CodePosition(0, 0, 0, L""));
+				compileResult.GetErrorWriter()->Error(1, "cannot open file '" + inputFileName + "'.", CodePosition(0, 0, 0, ""));
 			}
 		}
 		units.Add(predefUnit);
@@ -32224,7 +32343,7 @@ namespace SpireLib
 		}
 		catch (IOException)
 		{
-			compileResult.GetErrorWriter()->Error(1, L"cannot open file '" + Path::GetFileName(sourceFileName) + L"'.", CodePosition(0, 0, 0, L""));
+			compileResult.GetErrorWriter()->Error(1, "cannot open file '" + Path::GetFileName(sourceFileName) + "'.", CodePosition(0, 0, 0, ""));
 		}
 		return List<ShaderLibFile>();
 	}
@@ -32236,61 +32355,61 @@ namespace SpireLib
 	CoreLib::String ShaderLibFile::ToString()
 	{
 		StringBuilder writer;
-		writer << L"name " << MetaData.ShaderName << EndLine;
+		writer << "name " << MetaData.ShaderName << EndLine;
 		for (auto & stage : MetaData.Stages)
 		{
-			writer << L"stage " << stage.Key << EndLine << L"{" << EndLine;
-			writer << L"target " << stage.Value.TargetName << EndLine;
+			writer << "stage " << stage.Key << EndLine << "{" << EndLine;
+			writer << "target " << stage.Value.TargetName << EndLine;
 			for (auto & blk : stage.Value.InputBlocks)
 			{
-				writer << L"in " << blk << L";\n";
+				writer << "in " << blk << ";\n";
 			}
-			writer << L"out " << stage.Value.OutputBlock << L";\n";
+			writer << "out " << stage.Value.OutputBlock << ";\n";
 			for (auto & comp : stage.Value.Components)
-				writer << L"comp " << comp << L";\n";
-			writer << L"}" << EndLine;
+				writer << "comp " << comp << ";\n";
+			writer << "}" << EndLine;
 		}
 		for (auto & ublock : MetaData.InterfaceBlocks)
 		{
-			writer << L"interface " << ublock.Key << L" size " << ublock.Value.Size << L"\n{\n";
+			writer << "interface " << ublock.Key << " size " << ublock.Value.Size << "\n{\n";
 			for (auto & entry : ublock.Value.Entries)
 			{
-				writer << entry.Type->ToString() << L" " << entry.Name << L" : " << entry.Offset << L"," << entry.Size;
+				writer << entry.Type->ToString() << " " << entry.Name << " : " << entry.Offset << "," << entry.Size;
 				if (entry.Attributes.Count())
 				{
-					writer << L"\n{\n";
+					writer << "\n{\n";
 					for (auto & attrib : entry.Attributes)
 					{
-						writer << attrib.Key << L" : " << CoreLib::Text::EscapeStringLiteral(attrib.Value) << L";\n";
+						writer << attrib.Key << " : " << CoreLib::Text::EscapeStringLiteral(attrib.Value) << ";\n";
 					}
-					writer << L"}";
+					writer << "}";
 				}
-				writer << L";\n";
+				writer << ";\n";
 			}
-			writer << L"}\n";
+			writer << "}\n";
 		}
-		writer << L"source" << EndLine << L"{" << EndLine;
+		writer << "source" << EndLine << "{" << EndLine;
 		for (auto & src : Sources)
 		{
 			writer << src.Key << EndLine;
 			if (src.Value.BinaryCode.Count())
 			{
-				writer << L"binary" << EndLine << L"{" << EndLine;
+				writer << "binary" << EndLine << "{" << EndLine;
 				auto binaryBuffer = (unsigned int*)src.Value.BinaryCode.Buffer();
 				for (int i = 0; i < src.Value.BinaryCode.Count() / 4; i++)
 				{
-					writer << String((long long)binaryBuffer[i]) << L",";
+					writer << String((long long)binaryBuffer[i]) << ",";
 					if ((i + 1) % 10)
 						writer << EndLine;
 				}
-				writer << EndLine << L"}" << EndLine;
+				writer << EndLine << "}" << EndLine;
 			}
-			writer << L"text" << EndLine << L"{" << EndLine;
+			writer << "text" << EndLine << "{" << EndLine;
 			writer << src.Value.MainCode << EndLine;
 
-			writer << L"}" << EndLine;
+			writer << "}" << EndLine;
 		}
-		writer << L"}" << EndLine;
+		writer << "}" << EndLine;
 		StringBuilder formatSB;
 		IndentString(formatSB, writer.ProduceString());
 		return formatSB.ProduceString();
@@ -32316,84 +32435,84 @@ namespace SpireLib
 		while (!parser.IsEnd())
 		{
 			auto fieldName = parser.ReadWord();
-			if (fieldName == L"name")
+			if (fieldName == "name")
 			{
 				MetaData.ShaderName = parser.ReadWord();
 			}
-			else if (fieldName == L"source")
+			else if (fieldName == "source")
 			{
-				parser.Read(L"{");
+				parser.Read("{");
 				ReadSource(Sources, parser, src);
-				parser.Read(L"}");
+				parser.Read("}");
 			}
 
-			else if (fieldName == L"stage")
+			else if (fieldName == "stage")
 			{
 				StageMetaData stage;
 				stage.Name = parser.ReadWord();
-				parser.Read(L"{");
-				while (!parser.LookAhead(L"}"))
+				parser.Read("{");
+				while (!parser.LookAhead("}"))
 				{
 					auto subFieldName = parser.ReadWord();
-					if (subFieldName == L"target")
+					if (subFieldName == "target")
 						stage.TargetName = parser.ReadWord();
-					else if (subFieldName == L"in")
+					else if (subFieldName == "in")
 					{
 						stage.InputBlocks.Add(parser.ReadWord());
-						parser.Read(L";");
+						parser.Read(";");
 					}
-					else if (subFieldName == L"out")
+					else if (subFieldName == "out")
 					{
 						stage.OutputBlock = parser.ReadWord();
-						parser.Read(L";");
+						parser.Read(";");
 					}
-					else if (subFieldName == L"comp")
+					else if (subFieldName == "comp")
 					{
 						auto compName = parser.ReadWord();
-						parser.Read(L";");
+						parser.Read(";");
 						stage.Components.Add(compName);
 					}
 				}
-				parser.Read(L"}");
+				parser.Read("}");
 				MetaData.Stages[stage.Name] = stage;
 			}
-			else if (fieldName == L"interface")
+			else if (fieldName == "interface")
 			{
 				InterfaceBlockMetaData block;
-				if (!parser.LookAhead(L"{") && !parser.LookAhead(L"size"))
+				if (!parser.LookAhead("{") && !parser.LookAhead("size"))
 					block.Name = parser.ReadWord();
-				if (parser.LookAhead(L"size"))
+				if (parser.LookAhead("size"))
 				{
 					parser.ReadWord();
 					block.Size = parser.ReadInt();
 				}
-				parser.Read(L"{");
-				while (!parser.LookAhead(L"}") && !parser.IsEnd())
+				parser.Read("{");
+				while (!parser.LookAhead("}") && !parser.IsEnd())
 				{
 					InterfaceBlockEntry entry;
 					entry.Type = TypeFromString(parser);
 					entry.Name = parser.ReadWord();
-					parser.Read(L":");
+					parser.Read(":");
 					entry.Offset = parser.ReadInt();
-					parser.Read(L",");
+					parser.Read(",");
 					entry.Size = parser.ReadInt();
-					if (parser.LookAhead(L"{"))
+					if (parser.LookAhead("{"))
 					{
-						parser.Read(L"{");
-						while (!parser.LookAhead(L"}") && !parser.IsEnd())
+						parser.Read("{");
+						while (!parser.LookAhead("}") && !parser.IsEnd())
 						{
 							auto attribName = parser.ReadWord();
-							parser.Read(L":");
+							parser.Read(":");
 							auto attribValue = parser.ReadStringLiteral();
-							parser.Read(L";");
+							parser.Read(";");
 							entry.Attributes[attribName] = attribValue;
 						}
-						parser.Read(L"}");
+						parser.Read("}");
 					}
-					parser.Read(L";");
+					parser.Read(";");
 					block.Entries.Add(entry);
 				}
-				parser.Read(L"}");
+				parser.Read("}");
 				MetaData.InterfaceBlocks[block.Name] = block;
 			}
 		}
@@ -32434,13 +32553,13 @@ namespace SpireLib
 		String GetSource() const
 		{
 			StringBuilder codeBuilder;
-			codeBuilder << L"shader " << shaderName;
+			codeBuilder << "shader " << shaderName;
 			if (targetPipeline.Length())
-				codeBuilder << L":" << targetPipeline;
-			codeBuilder << L"\n{\n";
+				codeBuilder << ":" << targetPipeline;
+			codeBuilder << "\n{\n";
 			for (auto & m : usings)
-				codeBuilder << L"using " << m << L";\n";
-			codeBuilder << L"\n}\n";
+				codeBuilder << "using " << m << ";\n";
+			codeBuilder << "\n}\n";
 			return codeBuilder.ToString();
 		}
 	};
@@ -32499,7 +32618,7 @@ namespace SpireLib
 		{
 			compiler = CreateShaderCompiler();
 			compileContext = new Spire::Compiler::CompilationContext();
-			LoadModuleSource(SpireStdLib::GetCode(), L"stdlib");
+			LoadModuleSource(SpireStdLib::GetCode(), "stdlib");
 		}
 
 		~CompilationContext()
@@ -32533,7 +32652,7 @@ namespace SpireLib
 						compMeta.TypeName = compMeta.Type->ToString();
 						for (auto & impl : comp.Value->Implementations)
 						{
-							impl->SyntaxNode->LayoutAttributes.TryGetValue(L"Binding", compMeta.Register);
+							impl->SyntaxNode->LayoutAttributes.TryGetValue("Binding", compMeta.Register);
 							if (impl->SyntaxNode->IsParam)
 							{
 								meta.Requirements.Add(compMeta);
@@ -32605,14 +32724,14 @@ namespace SpireLib
 							}
 							if (!found)
 							{
-								result.GetErrorWriter()->Error(2, L"cannot find file '" + inputFileName + L"'.", inc.Position);
+								result.GetErrorWriter()->Error(2, "cannot find file '" + inputFileName + "'.", inc.Position);
 							}
 						}
 					}
 				}
 				catch (IOException)
 				{
-					result.GetErrorWriter()->Error(1, L"cannot open file '" + inputFileName + L"'.", CodePosition(0, 0, 0, L""));
+					result.GetErrorWriter()->Error(1, "cannot open file '" + inputFileName + "'.", CodePosition(0, 0, 0, ""));
 				}
 			}
 			cresult.Errors.AddRange(result.ErrorList);
@@ -32730,7 +32849,7 @@ const char * spGetModuleName(SpireModule * module)
 {
 	if (!module) return nullptr;
 	auto moduleNode = MODULE(module);
-	return moduleNode->Name.ToMultiByteString();
+	return moduleNode->Name.Buffer();
 }
 
 int spComponentInfoCollectionGetComponent(SpireComponentInfoCollection * collection, int index, SpireComponentInfo * result)
@@ -32740,12 +32859,12 @@ int spComponentInfoCollectionGetComponent(SpireComponentInfoCollection * collect
 		return SPIRE_ERROR_INVALID_PARAMETER;
 	if (index < 0 || index >= list->Count())
 		return SPIRE_ERROR_INVALID_PARAMETER;
-	result->Name = (*list)[index].Name.ToMultiByteString();
+	result->Name = (*list)[index].Name.Buffer();
 	result->Alignment = (*list)[index].Alignment;
 	result->Offset = (*list)[index].Offset;
 	result->Size = (*list)[index].Type->GetSize();
-	result->Register = (*list)[index].Register.ToMultiByteString();
-	result->TypeName = (*list)[index].TypeName.ToMultiByteString();
+	result->Register = (*list)[index].Register.Buffer();
+	result->TypeName = (*list)[index].TypeName.Buffer();
 	return 0;
 }
 
@@ -32803,8 +32922,8 @@ int spModuleGetRequiredComponents(SpireModule * module, SpireComponentInfo * buf
 	int ptr = 0;
 	for (auto & comp : components)
 	{
-		buffer[ptr].Name = comp.Name.ToMultiByteString();
-		buffer[ptr].TypeName = comp.TypeName.ToMultiByteString();
+		buffer[ptr].Name = comp.Name.Buffer();
+		buffer[ptr].TypeName = comp.TypeName.Buffer();
 		buffer[ptr].Alignment = comp.Type->GetAlignment();
 		buffer[ptr].Size = comp.Type->GetSize();
 		buffer[ptr].Offset = comp.Offset;
@@ -32850,9 +32969,9 @@ int spGetMessageContent(SpireCompilationResult * result, int messageType, int in
 		if (index >= 0 && index < list->Count())
 		{
 			auto & msg = (*list)[index];
-			pMsg->Message = msg.Message.ToMultiByteString();
+			pMsg->Message = msg.Message.Buffer();
 			pMsg->ErrorId = msg.ErrorID;
-			pMsg->FileName = msg.Position.FileName.ToMultiByteString();
+			pMsg->FileName = msg.Position.FileName.Buffer();
 			pMsg->Line = msg.Position.Line;
 			pMsg->Col = msg.Position.Col;
 			return 1;
@@ -32883,11 +33002,11 @@ int spGetCompilerOutput(SpireCompilationResult * result, char * buffer, int buff
 	StringBuilder sb;
 	auto rs = RS(result);
 	for (auto & x : rs->Errors)
-		sb << L"error " << x.Message << L":" << x.Position.ToString() << L": " << x.Message << L"\n";
+		sb << "error " << x.Message << ":" << x.Position.ToString() << ": " << x.Message << "\n";
 	for (auto & x : rs->Warnings)
-		sb << L"error " << x.Message << L":" << x.Position.ToString() << L": " << x.Message << L"\n";
+		sb << "error " << x.Message << ":" << x.Position.ToString() << ": " << x.Message << "\n";
 	auto str = sb.ProduceString();
-	return ReturnStr(str.ToMultiByteString(), buffer, bufferSize);
+	return ReturnStr(str.Buffer(), buffer, bufferSize);
 }
 
 int spGetCompiledShaderNames(SpireCompilationResult * result, char * buffer, int bufferSize)
@@ -32898,12 +33017,12 @@ int spGetCompiledShaderNames(SpireCompilationResult * result, char * buffer, int
 	for (auto x : rs->Sources)
 	{
 		if (!first)
-			sb << L"\n";
+			sb << "\n";
 		sb << x.Key;
 		first = false;
 	}
 	auto str = sb.ProduceString();
-	return ReturnStr(str.ToMultiByteString(), buffer, bufferSize);
+	return ReturnStr(str.Buffer(), buffer, bufferSize);
 }
 
 int spGetCompiledShaderStageNames(SpireCompilationResult * result, const char * shaderName, char * buffer, int bufferSize)
@@ -32916,12 +33035,12 @@ int spGetCompiledShaderStageNames(SpireCompilationResult * result, const char * 
 		for (auto x : src->Stages)
 		{
 			if (!first)
-				sb << L"\n";
+				sb << "\n";
 			sb << x.Key;
 			first = false;
 		}
 		auto str = sb.ProduceString();
-		return ReturnStr(str.ToMultiByteString(), buffer, bufferSize);
+		return ReturnStr(str.Buffer(), buffer, bufferSize);
 	}
 	else
 	{
@@ -32949,8 +33068,8 @@ char * spGetShaderStageSource(SpireCompilationResult * result, const char * shad
 			if (state->MainCode.Length())
 			{
 				if (length)
-					*length = (int)strlen(state->MainCode.ToMultiByteString()) + 1;
-				return state->MainCode.ToMultiByteString();
+					*length = state->MainCode.Length() + 1;
+				return state->MainCode.Buffer();
 			}
 			else
 			{
@@ -32990,66 +33109,70 @@ namespace CoreLib
 		bool File::Exists(const String & fileName)
 		{
 			struct _stat32 statVar;
-			return ::_stat32(((String)fileName).ToMultiByteString(), &statVar) != -1;
+#ifdef _WIN32
+			return ::_wstat32(((String)fileName).ToWString(), &statVar) != -1;
+#else
+			return ::_stat32(((String)fileName).Buffer(), &statVar) != -1;
+#endif
 		}
 
 		String Path::TruncateExt(const String & path)
 		{
-			int dotPos = path.LastIndexOf(L'.');
+			int dotPos = path.LastIndexOf('.');
 			if (dotPos != -1)
 				return path.SubString(0, dotPos);
 			else
 				return path;
 		}
-		String Path::ReplaceExt(const String & path, const wchar_t * newExt)
+		String Path::ReplaceExt(const String & path, const char * newExt)
 		{
 			StringBuilder sb(path.Length()+10);
-			int dotPos = path.LastIndexOf(L'.');
+			int dotPos = path.LastIndexOf('.');
 			if (dotPos == -1)
 				dotPos = path.Length();
 			sb.Append(path.Buffer(), dotPos);
-			sb.Append(L'.');
+			sb.Append('.');
 			sb.Append(newExt);
 			return sb.ProduceString();
 		}
 		String Path::GetFileName(const String & path)
 		{
-			int pos = path.LastIndexOf(L'/');
-			pos = Math::Max(path.LastIndexOf(L'\\'), pos) + 1;
+			int pos = path.LastIndexOf('/');
+			pos = Math::Max(path.LastIndexOf('\\'), pos) + 1;
 			return path.SubString(pos, path.Length()-pos);
 		}
 		String Path::GetFileNameWithoutEXT(const String & path)
 		{
-			int pos = path.LastIndexOf(L'/');
-			pos = Math::Max(path.LastIndexOf(L'\\'), pos) + 1;
-			int dotPos = path.LastIndexOf(L'.');
+			int pos = path.LastIndexOf('/');
+			pos = Math::Max(path.LastIndexOf('\\'), pos) + 1;
+			int dotPos = path.LastIndexOf('.');
 			if (dotPos <= pos)
 				dotPos = path.Length();
 			return path.SubString(pos, dotPos - pos);
 		}
 		String Path::GetFileExt(const String & path)
 		{
-			int dotPos = path.LastIndexOf(L'.');
+			int dotPos = path.LastIndexOf('.');
 			if (dotPos != -1)
 				return path.SubString(dotPos+1, path.Length()-dotPos-1);
 			else
-				return L"";
+				return "";
 		}
 		String Path::GetDirectoryName(const String & path)
 		{
-			int pos = path.LastIndexOf(L'/');
-			pos = Math::Max(path.LastIndexOf(L'\\'), pos);
+			int pos = path.LastIndexOf('/');
+			pos = Math::Max(path.LastIndexOf('\\'), pos);
 			if (pos != -1)
 				return path.SubString(0, pos);
 			else
-				return L"";
+				return "";
 		}
 		String Path::Combine(const String & path1, const String & path2)
 		{
 			if (path1.Length() == 0) return path2;
 			StringBuilder sb(path1.Length()+path2.Length()+2);
 			sb.Append(path1);
-			if (!path1.EndsWith(L'\\') && !path1.EndsWith(L'/'))
+			if (!path1.EndsWith('\\') && !path1.EndsWith('/'))
 				sb.Append(PathDelimiter);
 			sb.Append(path2);
 			return sb.ProduceString();
@@ -33058,10 +33181,10 @@ namespace CoreLib
 		{
 			StringBuilder sb(path1.Length()+path2.Length()+path3.Length()+3);
 			sb.Append(path1);
-			if (!path1.EndsWith(L'\\') && !path1.EndsWith(L'/'))
+			if (!path1.EndsWith('\\') && !path1.EndsWith('/'))
 				sb.Append(PathDelimiter);
 			sb.Append(path2);
-			if (!path2.EndsWith(L'\\') && !path2.EndsWith(L'/'))
+			if (!path2.EndsWith('\\') && !path2.EndsWith('/'))
 				sb.Append(PathDelimiter);
 			sb.Append(path3);
 			return sb.ProduceString();
@@ -33072,9 +33195,9 @@ namespace CoreLib
 		bool Path::CreateDirectory(const String & path)
 		{
 #if defined(_WIN32)
-			return _mkdir(path.ToMultiByteString()) == 0;
+			return _wmkdir(path.ToWString()) == 0;
 #else 
-			return mkdir(path.ToMultiByteString(), 0777) == 0;
+			return mkdir(path.Buffer(), 0777) == 0;
 #endif
 		}
 
@@ -33117,29 +33240,29 @@ namespace CoreLib
 	namespace Basic
 	{
 		_EndLine EndLine;
-		String StringConcat(const wchar_t * lhs, int leftLen, const wchar_t * rhs, int rightLen)
+		String StringConcat(const char * lhs, int leftLen, const char * rhs, int rightLen)
 		{
 			String res;
 			res.length = leftLen + rightLen;
-			res.buffer = new wchar_t[res.length + 1];
-			wcscpy_s(res.buffer.Ptr(), res.length + 1, lhs);
-			wcscpy_s(res.buffer + leftLen, res.length + 1 - leftLen, rhs);
+			res.buffer = new char[res.length + 1];
+			strcpy_s(res.buffer.Ptr(), res.length + 1, lhs);
+			strcpy_s(res.buffer + leftLen, res.length + 1 - leftLen, rhs);
 			return res;
 		}
-		String operator+(const wchar_t * op1, const String & op2)
+		String operator+(const char * op1, const String & op2)
 		{
 			if(!op2.buffer)
 				return String(op1);
 
-			return StringConcat(op1, (int)wcslen(op1), op2.buffer.Ptr(), op2.length);
+			return StringConcat(op1, (int)strlen(op1), op2.buffer.Ptr(), op2.length);
 		}
 
-		String operator+(const String & op1, const wchar_t*op2)
+		String operator+(const String & op1, const char * op2)
 		{
 			if(!op1.buffer)
 				return String(op2);
 
-			return StringConcat(op1.buffer.Ptr(), op1.length, op2, (int)wcslen(op2));
+			return StringConcat(op1.buffer.Ptr(), op1.length, op2, (int)strlen(op2));
 		}
 
 		String operator+(const String & op1, const String & op2)
@@ -33156,16 +33279,19 @@ namespace CoreLib
 
 		int StringToInt(const String & str, int radix)
 		{
-			return (int)wcstol(str.Buffer(), NULL, radix);
-			//return (int)_wcstoi64(str.Buffer(), NULL, 10);
+			return (int)strtol(str.Buffer(), NULL, radix);
 		}
 		unsigned int StringToUInt(const String & str, int radix)
 		{
-			return (unsigned int)wcstoul(str.Buffer(), NULL, radix);
+			return (unsigned int)strtoul(str.Buffer(), NULL, radix);
 		}
 		double StringToDouble(const String & str)
 		{
-			return (double)wcstod(str.Buffer(), NULL);
+			return (double)strtod(str.Buffer(), NULL);
+		}
+		float StringToFloat(const String & str)
+		{
+			return strtof(str.Buffer(), NULL);
 		}
 
 		String String::ReplaceAll(String src, String dst) const
@@ -33182,7 +33308,36 @@ namespace CoreLib
 			return rs;
 		}
 
-		String String::PadLeft(wchar_t ch, int pLen)
+		String String::FromWString(const wchar_t * wstr)
+		{
+#ifdef _WIN32
+			return CoreLib::IO::Encoding::UTF16->ToString((const char*)wstr, (int)(wcslen(wstr) * sizeof(wchar_t)));
+#else
+			return CoreLib::IO::Encoding::UTF32->ToString((const char*)wstr, (int)(wcslen(wstr) * sizeof(wchar_t)));
+#endif
+		}
+
+		wchar_t * String::ToWString(int * len) const
+		{
+			if (!buffer)
+				return L"";
+			else
+			{
+				if (wcharBuffer)
+					return wcharBuffer;
+				List<char> buf;
+				CoreLib::IO::Encoding::UTF16->GetBytes(buf, *this);
+				if (len)
+					*len = buf.Count() / sizeof(wchar_t);
+				buf.Add(0);
+				buf.Add(0);
+				const_cast<String*>(this)->wcharBuffer = (wchar_t*)buf.Buffer();
+				buf.ReleaseBuffer();
+				return wcharBuffer;
+			}
+		}
+
+		String String::PadLeft(char ch, int pLen)
 		{
 			StringBuilder sb;
 			for (int i = 0; i < pLen - this->length; i++)
@@ -33192,7 +33347,7 @@ namespace CoreLib
 			return sb.ProduceString();
 		}
 
-		String String::PadRight(wchar_t ch, int pLen)
+		String String::PadRight(char ch, int pLen)
 		{
 			StringBuilder sb;
 			for (int i = 0; i < this->length; i++)
@@ -33234,7 +33389,7 @@ namespace CoreLib
 			{
 			case CoreLib::IO::FileMode::Create:
 				if (access == FileAccess::Read)
-					throw ArgumentException(L"Read-only access is incompatible with Create mode.");
+					throw ArgumentException("Read-only access is incompatible with Create mode.");
 				else if (access == FileAccess::ReadWrite)
 				{
 					mode = L"w+b";
@@ -33271,10 +33426,10 @@ namespace CoreLib
 			case CoreLib::IO::FileMode::CreateNew:
 				if (File::Exists(fileName))
 				{
-					throw IOException(L"Failed opening '" + fileName + L"', file already exists.");
+					throw IOException("Failed opening '" + fileName + "', file already exists.");
 				}
 				if (access == FileAccess::Read)
-					throw ArgumentException(L"Read-only access is incompatible with Create mode.");
+					throw ArgumentException("Read-only access is incompatible with Create mode.");
 				else if (access == FileAccess::ReadWrite)
 				{
 					mode = L"w+b";
@@ -33288,7 +33443,7 @@ namespace CoreLib
 				break;
 			case CoreLib::IO::FileMode::Append:
 				if (access == FileAccess::Read)
-					throw ArgumentException(L"Read-only access is incompatible with Append mode.");
+					throw ArgumentException("Read-only access is incompatible with Append mode.");
 				else if (access == FileAccess::ReadWrite)
 				{
 					mode = L"a+b";
@@ -33320,16 +33475,16 @@ namespace CoreLib
 				shFlag = _SH_DENYNO;
 				break;
 			default:
-				throw ArgumentException(L"Invalid file share mode.");
+				throw ArgumentException("Invalid file share mode.");
 				break;
 			}
-			handle = _wfsopen(fileName.Buffer(), mode, shFlag);
+			handle = _wfsopen(fileName.ToWString(), mode, shFlag);
 #else
 			handle = fopen(fileName.ToMultiByteString(), modeMBCS);
 #endif
 			if (!handle)
 			{
-				throw IOException(L"Cannot open file '" + fileName + L"'");
+				throw IOException("Cannot open file '" + fileName + "'");
 			}
 		}
 		FileStream::~FileStream()
@@ -33366,7 +33521,7 @@ namespace CoreLib
 				endReached = false;
 				break;
 			default:
-				throw NotSupportedException(L"Unsupported seek origin.");
+				throw NotSupportedException("Unsupported seek origin.");
 				break;
 			}
 #ifdef _WIN32
@@ -33376,7 +33531,7 @@ namespace CoreLib
 #endif
 			if (rs != 0)
 			{
-				throw IOException(L"FileStream seek failed.");
+				throw IOException("FileStream seek failed.");
 			}
 		}
 		Int64 FileStream::Read(void * buffer, Int64 length)
@@ -33385,9 +33540,9 @@ namespace CoreLib
 			if (bytes == 0 && length > 0)
 			{
 				if (!feof(handle))
-					throw IOException(L"FileStream read failed.");
+					throw IOException("FileStream read failed.");
 				else if (endReached)
-					throw EndOfStreamException(L"End of file is reached.");
+					throw EndOfStreamException("End of file is reached.");
 				endReached = true;
 			}
 			return (int)bytes;
@@ -33397,7 +33552,7 @@ namespace CoreLib
 			auto bytes = (Int64)fwrite(buffer, 1, (size_t)length, handle);
 			if (bytes < length)
 			{
-				throw IOException(L"FileStream write failed.");
+				throw IOException("FileStream write failed.");
 			}
 			return bytes;
 		}
@@ -33440,53 +33595,49 @@ namespace CoreLib
 	{
 		using namespace CoreLib::Basic;
 
-		class UnicodeEncoding : public Encoding //UTF8
+		class Utf8Encoding : public Encoding 
 		{
 		public:
 			virtual void GetBytes(List<char> & result, const String & str) override
 			{
-				for (int i = 0; i < str.Length(); i++)
+				result.AddRange(str.Buffer(), str.Length());
+			}
+			virtual String ToString(const char * bytes, int /*length*/) override
+			{
+				return String(bytes);
+			}
+		};
+
+		class Utf32Encoding : public Encoding
+		{
+		public:
+			virtual void GetBytes(List<char> & result, const String & str) override
+			{
+				int ptr = 0;
+				while (ptr < str.Length())
 				{
-					unsigned int codePoint = str[i];
-					if (codePoint >= 0xD800 && codePoint <= 0xDBFF && i < str.Length() - 1) // surrogate
+					int codePoint = GetUnicodePointFromUTF8([&](int)
 					{
-						codePoint -= 0xD800;
-						codePoint <<= 10;
-						i++;
-						codePoint += str[i] - 0xDC00;
-						codePoint += 0x10000;
-					}
-					// encode codePoint as UTF8
-					if (codePoint <= 0x7F)
-						result.Add((char)codePoint);
-					else if (codePoint <= 0x7FF)
-					{
-						unsigned char byte = (unsigned char)(0xC0 + (codePoint >> 6));
-						result.Add((char)byte);
-						byte = 0x80 + (codePoint & 0x3F);
-						result.Add((char)byte);
-					}
-					else if (codePoint <= 0xFFFF)
-					{
-						unsigned char byte = (unsigned char)(0xE0 + (codePoint >> 12));
-						result.Add((char)byte);
-						byte = (unsigned char)(0x80 + ((codePoint >> 6) & (0x3F)));
-						result.Add((char)byte);
-						byte = (unsigned char)(0x80 + (codePoint & 0x3F));
-						result.Add((char)byte);
-					}
-					else
-					{
-						unsigned char byte = (unsigned char)(0xF0 + (codePoint >> 18));
-						result.Add((char)byte);
-						byte = (unsigned char)(0x80 + ((codePoint >> 12) & 0x3F));
-						result.Add((char)byte);
-						byte = (unsigned char)(0x80 + ((codePoint >> 6) & 0x3F));
-						result.Add((char)byte);
-						byte = (unsigned char)(0x80 + (codePoint & 0x3F));
-						result.Add((char)byte);
-					}
+						if (ptr < str.Length())
+							return str[ptr++];
+						else
+							return '\0';
+					});
+					result.AddRange((char*)&codePoint, 4);
 				}
+			}
+			virtual String ToString(const char * bytes, int length) override
+			{
+				StringBuilder sb;
+				int * content = (int*)bytes;
+				for (int i = 0; i < (length >> 2); i++)
+				{
+					char buf[5];
+					int count = EncodeUnicodePointToUTF8(buf, content[i]);
+					for (int j = 0; j < count; j++)
+						sb.Append(buf[j]);
+				}
+				return sb.ProduceString();
 			}
 		};
 
@@ -33500,78 +33651,56 @@ namespace CoreLib
 			{}
 			virtual void GetBytes(List<char> & result, const String & str) override
 			{
-				auto addChar = [&](unsigned short ch)
+				int ptr = 0;
+				while (ptr < str.Length())
 				{
-					if (reverseOrder)
+					int codePoint = GetUnicodePointFromUTF8([&](int)
 					{
-						unsigned char firstByte = ch >> 8;
-						unsigned char lastByte = ch & 0xFF;
-						result.Add((char)firstByte);
-						result.Add((char)lastByte);
-					}
+						if (ptr < str.Length())
+							return str[ptr++];
+						else
+							return '\0';
+					});
+					unsigned short buffer[2];
+					int count;
+					if (!reverseOrder)
+						count = EncodeUnicodePointToUTF16(buffer, codePoint);
 					else
-						result.AddRange((char*)&ch, 2);
-				};
-#ifdef _WIN32
-				if (reverseOrder)
-				{
-					for (int i = 0; i < str.Length(); i++)
-					{
-						unsigned short ch = (unsigned short)str[i];
-						addChar(ch);
-					}
+						count = EncodeUnicodePointToUTF16Reversed(buffer, codePoint);
+					result.AddRange((char*)buffer, count * 2);
 				}
-				else
-					result.AddRange((char*)str.Buffer(), str.Length() * sizeof(wchar_t));
-#else
-				for (int i = 0; i < str.Length(); i++)
+			}
+			virtual String ToString(const char * bytes, int length) override
+			{
+				int ptr = 0;
+				StringBuilder sb;
+				while (ptr < length)
 				{
-					unsigned int codePoint = str[i];
-					if (codePoint <= 0xD7FF || codePoint >= 0xE000 && codePoint <= 0xFFFF)
+					int codePoint = GetUnicodePointFromUTF16([&](int)
 					{
-						unsigned short toWrite = (unsigned short)codePoint;
-						addChar(toWrite);
-					}
-					else
-					{
-						int sub = codePoint - 0x10000;
-						unsigned short high = (unsigned short)((sub >> 10) + 0xD800);
-						unsigned short low = (unsigned short)((sub & 0x3FF) + 0xDC00);
-						addChar(high);
-						addChar(low);
-					}
+						if (ptr < length)
+							return bytes[ptr++];
+						else
+							return '\0';
+					});
+					char buf[5];
+					int count = EncodeUnicodePointToUTF8(buf, codePoint);
+					for (int i = 0; i < count; i++)
+						sb.Append(buf[i]);
 				}
-#endif
+				return sb.ProduceString();
 			}
 		};
 
-
-		class AnsiEncoding : public Encoding
-		{
-		private:
-			static char * WideCharToAnsi(wchar_t * buffer, int length)
-			{
-				return WideCharToMByte(buffer, length);
-			}
-		public:
-			virtual void GetBytes(List<char> & result, const String & str) override
-			{
-				String cpy = str;
-				int len;
-				char * buffer = cpy.ToMultiByteString(&len);
-				result.AddRange(buffer, len);
-			}
-		};
-
-		UnicodeEncoding __unicodeEncoding;
+		Utf8Encoding __utf8Encoding;
 		Utf16Encoding __utf16Encoding(false);
 		Utf16Encoding __utf16EncodingReversed(true);
-		AnsiEncoding __ansiEncoding;
+		Utf32Encoding __utf32Encoding;
 
-		Encoding * Encoding::UTF8 = &__unicodeEncoding;
+		Encoding * Encoding::UTF8 = &__utf8Encoding;
 		Encoding * Encoding::UTF16 = &__utf16Encoding;
 		Encoding * Encoding::UTF16Reversed = &__utf16EncodingReversed;
-		Encoding * Encoding::Ansi = &__ansiEncoding;
+		Encoding * Encoding::UTF32 = &__utf32Encoding;
 
 		const unsigned short Utf16Header = 0xFEFF;
 		const unsigned short Utf16ReversedHeader = 0xFFFE;
@@ -33608,17 +33737,17 @@ namespace CoreLib
 			StringBuilder sb;
 			String newLine;
 #ifdef _WIN32
-			newLine = L"\r\n";
+			newLine = "\r\n";
 #else
-			newLine = L"\n";
+			newLine = "\n";
 #endif
 			for (int i = 0; i < str.Length(); i++)
 			{
-				if (str[i] == L'\r')
+				if (str[i] == '\r')
 					sb << newLine;
-				else if (str[i] == L'\n')
+				else if (str[i] == '\n')
 				{
-					if (i > 0 && str[i - 1] != L'\r')
+					if (i > 0 && str[i - 1] != '\r')
 						sb << newLine;
 				}
 				else
@@ -33626,10 +33755,6 @@ namespace CoreLib
 			}
 			encoding->GetBytes(encodingBuffer, sb.ProduceString());
 			stream->Write(encodingBuffer.Buffer(), encodingBuffer.Count());
-		}
-		void StreamWriter::Write(const wchar_t * str)
-		{
-			Write(String(str));
 		}
 		void StreamWriter::Write(const char * str)
 		{
@@ -33642,7 +33767,7 @@ namespace CoreLib
 			ReadBuffer();
 			encoding = DetermineEncoding();
 			if (encoding == 0)
-				encoding = Encoding::Ansi;
+				encoding = Encoding::UTF8;
 		}
 		StreamReader::StreamReader(RefPtr<Stream> stream, Encoding * encoding)
 		{
@@ -33683,7 +33808,7 @@ namespace CoreLib
 					else if (flag & (IS_TEXT_UNICODE_SIGNATURE | IS_TEXT_UNICODE_STATISTICS))
 						return Encoding::UTF16Reversed;
 					else if (flag & IS_TEXT_UNICODE_ASCII16)
-						return Encoding::Ansi;
+						return Encoding::UTF8;
 				}
 #endif 
 				return Encoding::UTF8;
@@ -33712,7 +33837,7 @@ namespace CoreLib
 			}
 			return 0;
 		}
-		int TextReader::Read(wchar_t * destBuffer, int length)
+		int TextReader::Read(char * destBuffer, int length)
 		{
 			int i = 0;
 			for (i = 0; i<length; i++)
@@ -33722,13 +33847,13 @@ namespace CoreLib
 					auto ch = Read();
 					if (IsEnd())
 						break;
-					if (ch == L'\r')
+					if (ch == '\r')
 					{
-						if (Peak() == L'\n')
+						if (Peak() == '\n')
 							Read();
 						break;
 					}
-					else if (ch == L'\n')
+					else if (ch == '\n')
 					{
 						break;
 					}
@@ -33751,13 +33876,13 @@ namespace CoreLib
 					auto ch = Read();
 					if (IsEnd())
 						break;
-					if (ch == L'\r')
+					if (ch == '\r')
 					{
-						if (Peak() == L'\n')
+						if (Peak() == '\n')
 							Read();
 						break;
 					}
-					else if (ch == L'\n')
+					else if (ch == '\n')
 					{
 						break;
 					}
@@ -33780,10 +33905,10 @@ namespace CoreLib
 					auto ch = Read();
 					if (IsEnd())
 						break;
-					if (ch == L'\r')
+					if (ch == '\r')
 					{
-						sb.Append(L'\n');
-						if (Peak() == L'\n')
+						sb.Append('\n');
+						if (Peak() == '\n')
 							Read();
 					}
 					else
@@ -33813,7 +33938,7 @@ namespace CoreLib
 	{
 		TokenReader::TokenReader(String text)
 		{
-			this->tokens = TokenizeText(L"", text, [&](TokenizeErrorType, CodePosition) {legal = false; });
+			this->tokens = TokenizeText("", text, [&](TokenizeErrorType, CodePosition) {legal = false; });
 			tokenPtr = 0;
 		}
 
@@ -33833,259 +33958,259 @@ namespace CoreLib
 			while (pos < str.Length())
 			{
 				wchar_t curChar = str[pos];
-				wchar_t nextChar = (pos < str.Length() - 1) ? str[pos + 1] : L'\0';
-				wchar_t nextNextChar = (pos < str.Length() - 2) ? str[pos + 2] : L'\0';
+				wchar_t nextChar = (pos < str.Length() - 1) ? str[pos + 1] : '\0';
+				wchar_t nextNextChar = (pos < str.Length() - 2) ? str[pos + 2] : '\0';
 				auto InsertToken = [&](TokenType type, const String & ct)
 				{
 					tokens.Add(Token(type, ct, line, col + pos, pos, fileName));
 				};
 				switch (curChar)
 				{
-				case L'+':
-					if (nextChar == L'+')
+				case '+':
+					if (nextChar == '+')
 					{
-						InsertToken(TokenType::OpInc, L"++");
+						InsertToken(TokenType::OpInc, "++");
 						pos += 2;
 					}
-					else if (nextChar == L'=')
+					else if (nextChar == '=')
 					{
-						InsertToken(TokenType::OpAddAssign, L"+=");
-						pos += 2;
-					}
-					else
-					{
-						InsertToken(TokenType::OpAdd, L"+");
-						pos++;
-					}
-					break;
-				case L'-':
-					if (nextChar == L'-')
-					{
-						InsertToken(TokenType::OpDec, L"--");
-						pos += 2;
-					}
-					else if (nextChar == L'=')
-					{
-						InsertToken(TokenType::OpSubAssign, L"-=");
-						pos += 2;
-					}
-					else if (nextChar == L'>')
-					{
-						InsertToken(TokenType::RightArrow, L"->");
+						InsertToken(TokenType::OpAddAssign, "+=");
 						pos += 2;
 					}
 					else
 					{
-						InsertToken(TokenType::OpSub, L"-");
+						InsertToken(TokenType::OpAdd, "+");
 						pos++;
 					}
 					break;
-				case L'*':
-					if (nextChar == L'=')
+				case '-':
+					if (nextChar == '-')
 					{
-						InsertToken(TokenType::OpMulAssign, L"*=");
+						InsertToken(TokenType::OpDec, "--");
+						pos += 2;
+					}
+					else if (nextChar == '=')
+					{
+						InsertToken(TokenType::OpSubAssign, "-=");
+						pos += 2;
+					}
+					else if (nextChar == '>')
+					{
+						InsertToken(TokenType::RightArrow, "->");
 						pos += 2;
 					}
 					else
 					{
-						InsertToken(TokenType::OpMul, L"*");
+						InsertToken(TokenType::OpSub, "-");
 						pos++;
 					}
 					break;
-				case L'/':
-					if (nextChar == L'=')
+				case '*':
+					if (nextChar == '=')
 					{
-						InsertToken(TokenType::OpDivAssign, L"/=");
+						InsertToken(TokenType::OpMulAssign, "*=");
 						pos += 2;
 					}
 					else
 					{
-						InsertToken(TokenType::OpDiv, L"/");
+						InsertToken(TokenType::OpMul, "*");
 						pos++;
 					}
 					break;
-				case L'%':
-					if (nextChar == L'=')
+				case '/':
+					if (nextChar == '=')
 					{
-						InsertToken(TokenType::OpModAssign, L"%=");
+						InsertToken(TokenType::OpDivAssign, "/=");
 						pos += 2;
 					}
 					else
 					{
-						InsertToken(TokenType::OpMod, L"%");
+						InsertToken(TokenType::OpDiv, "/");
 						pos++;
 					}
 					break;
-				case L'|':
-					if (nextChar == L'|')
+				case '%':
+					if (nextChar == '=')
 					{
-						InsertToken(TokenType::OpOr, L"||");
-						pos += 2;
-					}
-					else if (nextChar == L'=')
-					{
-						InsertToken(TokenType::OpOrAssign, L"|=");
+						InsertToken(TokenType::OpModAssign, "%=");
 						pos += 2;
 					}
 					else
 					{
-						InsertToken(TokenType::OpBitOr, L"|");
+						InsertToken(TokenType::OpMod, "%");
 						pos++;
 					}
 					break;
-				case L'&':
-					if (nextChar == L'&')
+				case '|':
+					if (nextChar == '|')
 					{
-						InsertToken(TokenType::OpAnd, L"&&");
+						InsertToken(TokenType::OpOr, "||");
 						pos += 2;
 					}
-					else if (nextChar == L'=')
+					else if (nextChar == '=')
 					{
-						InsertToken(TokenType::OpAndAssign, L"&=");
-						pos += 2;
-					}
-					else
-					{
-						InsertToken(TokenType::OpBitAnd, L"&");
-						pos++;
-					}
-					break;
-				case L'^':
-					if (nextChar == L'=')
-					{
-						InsertToken(TokenType::OpXorAssign, L"^=");
+						InsertToken(TokenType::OpOrAssign, "|=");
 						pos += 2;
 					}
 					else
 					{
-						InsertToken(TokenType::OpBitXor, L"^");
+						InsertToken(TokenType::OpBitOr, "|");
 						pos++;
 					}
 					break;
-				case L'>':
-					if (nextChar == L'>')
+				case '&':
+					if (nextChar == '&')
 					{
-						if (nextNextChar == L'=')
+						InsertToken(TokenType::OpAnd, "&&");
+						pos += 2;
+					}
+					else if (nextChar == '=')
+					{
+						InsertToken(TokenType::OpAndAssign, "&=");
+						pos += 2;
+					}
+					else
+					{
+						InsertToken(TokenType::OpBitAnd, "&");
+						pos++;
+					}
+					break;
+				case '^':
+					if (nextChar == '=')
+					{
+						InsertToken(TokenType::OpXorAssign, "^=");
+						pos += 2;
+					}
+					else
+					{
+						InsertToken(TokenType::OpBitXor, "^");
+						pos++;
+					}
+					break;
+				case '>':
+					if (nextChar == '>')
+					{
+						if (nextNextChar == '=')
 						{
-							InsertToken(TokenType::OpShrAssign, L">>=");
+							InsertToken(TokenType::OpShrAssign, ">>=");
 							pos += 3;
 						}
 						else
 						{
-							InsertToken(TokenType::OpRsh, L">>");
+							InsertToken(TokenType::OpRsh, ">>");
 							pos += 2;
 						}
 					}
-					else if (nextChar == L'=')
+					else if (nextChar == '=')
 					{
-						InsertToken(TokenType::OpGeq, L">=");
+						InsertToken(TokenType::OpGeq, ">=");
 						pos += 2;
 					}
 					else
 					{
-						InsertToken(TokenType::OpGreater, L">");
+						InsertToken(TokenType::OpGreater, ">");
 						pos++;
 					}
 					break;
-				case L'<':
-					if (nextChar == L'<')
+				case '<':
+					if (nextChar == '<')
 					{
-						if (nextNextChar == L'=')
+						if (nextNextChar == '=')
 						{
-							InsertToken(TokenType::OpShlAssign, L"<<=");
+							InsertToken(TokenType::OpShlAssign, "<<=");
 							pos += 3;
 						}
 						else
 						{
-							InsertToken(TokenType::OpLsh, L"<<");
+							InsertToken(TokenType::OpLsh, "<<");
 							pos += 2;
 						}
 					}
-					else if (nextChar == L'=')
+					else if (nextChar == '=')
 					{
-						InsertToken(TokenType::OpLeq, L"<=");
+						InsertToken(TokenType::OpLeq, "<=");
 						pos += 2;
 					}
 					else
 					{
-						InsertToken(TokenType::OpLess, L"<");
+						InsertToken(TokenType::OpLess, "<");
 						pos++;
 					}
 					break;
-				case L'=':
-					if (nextChar == L'=')
+				case '=':
+					if (nextChar == '=')
 					{
-						InsertToken(TokenType::OpEql, L"==");
+						InsertToken(TokenType::OpEql, "==");
 						pos += 2;
 					}
 					else
 					{
-						InsertToken(TokenType::OpAssign, L"=");
+						InsertToken(TokenType::OpAssign, "=");
 						pos++;
 					}
 					break;
-				case L'!':
-					if (nextChar == L'=')
+				case '!':
+					if (nextChar == '=')
 					{
-						InsertToken(TokenType::OpNeq, L"!=");
+						InsertToken(TokenType::OpNeq, "!=");
 						pos += 2;
 					}
 					else
 					{
-						InsertToken(TokenType::OpNot, L"!");
+						InsertToken(TokenType::OpNot, "!");
 						pos++;
 					}
 					break;
-				case L'?':
-					InsertToken(TokenType::QuestionMark, L"?");
+				case '?':
+					InsertToken(TokenType::QuestionMark, "?");
 					pos++;
 					break;
-				case L'@':
-					InsertToken(TokenType::At, L"@");
+				case '@':
+					InsertToken(TokenType::At, "@");
 					pos++;
 					break;
-				case L':':
-					InsertToken(TokenType::Colon, L":");
+				case ':':
+					InsertToken(TokenType::Colon, ":");
 					pos++;
 					break;
-				case L'~':
-					InsertToken(TokenType::OpBitNot, L"~");
+				case '~':
+					InsertToken(TokenType::OpBitNot, "~");
 					pos++;
 					break;
-				case L';':
-					InsertToken(TokenType::Semicolon, L";");
+				case ';':
+					InsertToken(TokenType::Semicolon, ";");
 					pos++;
 					break;
-				case L',':
-					InsertToken(TokenType::Comma, L",");
+				case ',':
+					InsertToken(TokenType::Comma, ",");
 					pos++;
 					break;
-				case L'.':
-					InsertToken(TokenType::Dot, L".");
+				case '.':
+					InsertToken(TokenType::Dot, ".");
 					pos++;
 					break;
-				case L'{':
-					InsertToken(TokenType::LBrace, L"{");
+				case '{':
+					InsertToken(TokenType::LBrace, "{");
 					pos++;
 					break;
-				case L'}':
-					InsertToken(TokenType::RBrace, L"}");
+				case '}':
+					InsertToken(TokenType::RBrace, "}");
 					pos++;
 					break;
-				case L'[':
-					InsertToken(TokenType::LBracket, L"[");
+				case '[':
+					InsertToken(TokenType::LBracket, "[");
 					pos++;
 					break;
-				case L']':
-					InsertToken(TokenType::RBracket, L"]");
+				case ']':
+					InsertToken(TokenType::RBracket, "]");
 					pos++;
 					break;
-				case L'(':
-					InsertToken(TokenType::LParent, L"(");
+				case '(':
+					InsertToken(TokenType::LParent, "(");
 					pos++;
 					break;
-				case L')':
-					InsertToken(TokenType::RParent, L")");
+				case ')':
+					InsertToken(TokenType::RParent, ")");
 					pos++;
 					break;
 				}
@@ -34108,39 +34233,39 @@ namespace CoreLib
 				tokenList.Add(Token(type, tokenBuilder.ToString(), tokenLine, tokenCol, pos, file));
 				tokenBuilder.Clear();
 			};
-			auto ProcessTransferChar = [&](wchar_t nextChar)
+			auto ProcessTransferChar = [&](char nextChar)
 			{
 				switch (nextChar)
 				{
-				case L'\\':
-				case L'\"':
-				case L'\'':
+				case '\\':
+				case '\"':
+				case '\'':
 					tokenBuilder.Append(nextChar);
 					break;
-				case L't':
+				case 't':
 					tokenBuilder.Append('\t');
 					break;
-				case L's':
+				case 's':
 					tokenBuilder.Append(' ');
 					break;
-				case L'n':
+				case 'n':
 					tokenBuilder.Append('\n');
 					break;
-				case L'r':
+				case 'r':
 					tokenBuilder.Append('\r');
 					break;
-				case L'b':
+				case 'b':
 					tokenBuilder.Append('\b');
 					break;
 				}
 			};
 			while (pos <= text.Length())
 			{
-				wchar_t curChar = (pos < text.Length() ? text[pos] : L' ');
-				wchar_t nextChar = (pos < text.Length() - 1) ? text[pos + 1] : L'\0';
+				char curChar = (pos < text.Length() ? text[pos] : ' ');
+				char nextChar = (pos < text.Length() - 1) ? text[pos + 1] : '\0';
 				if (lastPos != pos)
 				{
-					if (curChar == L'\n')
+					if (curChar == '\n')
 					{
 						line++;
 						col = 0;
@@ -34165,28 +34290,28 @@ namespace CoreLib
 						tokenLine = line;
 						tokenCol = col;
 					}
-					else if (curChar == L'\'')
+					else if (curChar == '\'')
 					{
 						state = State::Char;
 						pos++;
 						tokenLine = line;
 						tokenCol = col;
 					}
-					else if (curChar == L'"')
+					else if (curChar == '"')
 					{
 						state = State::String;
 						pos++;
 						tokenLine = line;
 						tokenCol = col;
 					}
-					else if (curChar == L' ' || curChar == L'\t' || curChar == L'\r' || curChar == L'\n' || curChar == 160) // 160:non-break space
+					else if (curChar == ' ' || curChar == '\t' || curChar == '\r' || curChar == '\n' || curChar == -62 || curChar== -96) // -62/-96:non-break space
 						pos++;
-					else if (curChar == L'/' && nextChar == L'/')
+					else if (curChar == '/' && nextChar == '/')
 					{
 						state = State::SingleComment;
 						pos += 2;
 					}
-					else if (curChar == L'/' && nextChar == L'*')
+					else if (curChar == '/' && nextChar == '*')
 					{
 						pos += 2;
 						state = State::MultiComment;
@@ -34212,18 +34337,18 @@ namespace CoreLib
 					else
 					{
 						auto tokenStr = tokenBuilder.ToString();
-						if (tokenStr == L"#line_reset#")
+						if (tokenStr == "#line_reset#")
 						{
 							line = 0;
 							col = 0;
 							tokenBuilder.Clear();
 						}
-						else if (tokenStr == L"#line")
+						else if (tokenStr == "#line")
 						{
 							derivative = LexDerivative::Line;
 							tokenBuilder.Clear();
 						}
-						else if (tokenStr == L"#file")
+						else if (tokenStr == "#file")
 						{
 							derivative = LexDerivative::File;
 							tokenBuilder.Clear();
@@ -34236,7 +34361,7 @@ namespace CoreLib
 					}
 					break;
 				case State::Operator:
-					if (IsPunctuation(curChar) && !((curChar == L'/' && nextChar == L'/') || (curChar == L'/' && nextChar == L'*')))
+					if (IsPunctuation(curChar) && !((curChar == '/' && nextChar == '/') || (curChar == '/' && nextChar == '*')))
 					{
 						tokenBuilder.Append(curChar);
 						pos++;
@@ -34255,17 +34380,17 @@ namespace CoreLib
 						tokenBuilder.Append(curChar);
 						pos++;
 					}
-					else if (curChar == L'.')
+					else if (curChar == '.')
 					{
 						state = State::Fixed;
 						tokenBuilder.Append(curChar);
 						pos++;
 					}
-					else if (curChar == L'e' || curChar == L'E')
+					else if (curChar == 'e' || curChar == 'E')
 					{
 						state = State::Double;
 						tokenBuilder.Append(curChar);
-						if (nextChar == L'-' || nextChar == L'+')
+						if (nextChar == '-' || nextChar == '+')
 						{
 							tokenBuilder.Append(nextChar);
 							pos++;
@@ -34294,11 +34419,11 @@ namespace CoreLib
 						tokenBuilder.Append(curChar);
 						pos++;
 					}
-					else if (curChar == L'e' || curChar == L'E')
+					else if (curChar == 'e' || curChar == 'E')
 					{
 						state = State::Double;
 						tokenBuilder.Append(curChar);
-						if (nextChar == L'-' || nextChar == L'+')
+						if (nextChar == '-' || nextChar == '+')
 						{
 							tokenBuilder.Append(nextChar);
 							pos++;
@@ -34307,7 +34432,7 @@ namespace CoreLib
 					}
 					else
 					{
-						if (curChar == L'f')
+						if (curChar == 'f')
 							pos++;
 						InsertToken(TokenType::DoubleLiterial);
 						state = State::Start;
@@ -34321,16 +34446,16 @@ namespace CoreLib
 					}
 					else
 					{
-						if (curChar == L'f')
+						if (curChar == 'f')
 							pos++;
 						InsertToken(TokenType::DoubleLiterial);
 						state = State::Start;
 					}
 					break;
 				case State::String:
-					if (curChar != L'"')
+					if (curChar != '"')
 					{
-						if (curChar == L'\\')
+						if (curChar == '\\')
 						{
 							ProcessTransferChar(nextChar);
 							pos++;
@@ -34355,9 +34480,9 @@ namespace CoreLib
 					pos++;
 					break;
 				case State::Char:
-					if (curChar != L'\'')
+					if (curChar != '\'')
 					{
-						if (curChar == L'\\')
+						if (curChar == '\\')
 						{
 							ProcessTransferChar(nextChar);
 							pos++;
@@ -34376,12 +34501,12 @@ namespace CoreLib
 					pos++;
 					break;
 				case State::SingleComment:
-					if (curChar == L'\n')
+					if (curChar == '\n')
 						state = State::Start;
 					pos++;
 					break;
 				case State::MultiComment:
-					if (curChar == L'*' && nextChar == '/')
+					if (curChar == '*' && nextChar == '/')
 					{
 						state = State::Start;
 						pos += 2;
@@ -34399,47 +34524,47 @@ namespace CoreLib
 		}
 		List<Token> TokenizeText(const String & text)
 		{
-			return TokenizeText(L"", text, [](TokenizeErrorType, CodePosition) {});
+			return TokenizeText("", text, [](TokenizeErrorType, CodePosition) {});
 		}
 
 		String EscapeStringLiteral(String str)
 		{
 			StringBuilder sb;
-			sb << L"\"";
+			sb << "\"";
 			for (int i = 0; i < str.Length(); i++)
 			{
 				switch (str[i])
 				{
-				case L' ':
-					sb << L"\\s";
+				case ' ':
+					sb << "\\s";
 					break;
-				case L'\n':
-					sb << L"\\n";
+				case '\n':
+					sb << "\\n";
 					break;
-				case L'\r':
-					sb << L"\\r";
+				case '\r':
+					sb << "\\r";
 					break;
-				case L'\t':
-					sb << L"\\t";
+				case '\t':
+					sb << "\\t";
 					break;
-				case L'\v':
-					sb << L"\\v";
+				case '\v':
+					sb << "\\v";
 					break;
-				case L'\'':
-					sb << L"\\\'";
+				case '\'':
+					sb << "\\\'";
 					break;
-				case L'\"':
-					sb << L"\\\"";
+				case '\"':
+					sb << "\\\"";
 					break;
-				case L'\\':
-					sb << L"\\\\";
+				case '\\':
+					sb << "\\\\";
 					break;
 				default:
 					sb << str[i];
 					break;
 				}
 			}
-			sb << L"\"";
+			sb << "\"";
 			return sb.ProduceString();
 		}
 
@@ -34448,33 +34573,33 @@ namespace CoreLib
 			StringBuilder sb;
 			for (int i = 0; i < str.Length(); i++)
 			{
-				if (str[i] == L'\\' && i < str.Length() - 1)
+				if (str[i] == '\\' && i < str.Length() - 1)
 				{
 					switch (str[i + 1])
 					{
-					case L's':
-						sb << L" ";
+					case 's':
+						sb << " ";
 						break;
-					case L't':
-						sb << L'\t';
+					case 't':
+						sb << '\t';
 						break;
-					case L'n':
-						sb << L'\n';
+					case 'n':
+						sb << '\n';
 						break;
-					case L'r':
-						sb << L'\r';
+					case 'r':
+						sb << '\r';
 						break;
-					case L'v':
-						sb << L'\v';
+					case 'v':
+						sb << '\v';
 						break;
-					case L'\'':
-						sb << L'\'';
+					case '\'':
+						sb << '\'';
 						break;
-					case L'\"':
-						sb << L"\"";
+					case '\"':
+						sb << "\"";
 						break;
-					case L'\\':
-						sb << L"\\";
+					case '\\':
+						sb << "\\";
 						break;
 					default:
 						i = i - 1;
@@ -34494,99 +34619,99 @@ namespace CoreLib
 			switch (type)
 			{
 			case TokenType::Unknown:
-				return L"UnknownToken";
+				return "UnknownToken";
 			case TokenType::Identifier:
-				return L"Identifier";
+				return "Identifier";
 			case TokenType::IntLiterial:
-				return L"Int Literial";
+				return "Int Literia";
 			case TokenType::DoubleLiterial:
-				return L"Double Literial";
+				return "Double Literia";
 			case TokenType::StringLiterial:
-				return L"String Literial";
+				return "String Literia";
 			case TokenType::CharLiterial:
-				return L"CharLiterial";
+				return "CharLiteria";
 			case TokenType::QuestionMark:
-				return L"'?'";
+				return "'?'";
 			case TokenType::Colon:
-				return L"':'";
+				return "':'";
 			case TokenType::Semicolon:
-				return L"';'";
+				return "';'";
 			case TokenType::Comma:
-				return L"','";
+				return "','";
 			case TokenType::LBrace:
-				return L"'{'";
+				return "'{'";
 			case TokenType::RBrace:
-				return L"'}'";
+				return "'}'";
 			case TokenType::LBracket:
-				return L"'['";
+				return "'['";
 			case TokenType::RBracket:
-				return L"']'";
+				return "']'";
 			case TokenType::LParent:
-				return L"'('";
+				return "'('";
 			case TokenType::RParent:
-				return L"')'";
+				return "')'";
 			case TokenType::At:
-				return L"'@'";
+				return "'@'";
 			case TokenType::OpAssign:
-				return L"'='";
+				return "'='";
 			case TokenType::OpAdd:
-				return L"'+'";
+				return "'+'";
 			case TokenType::OpSub:
-				return L"'-'";
+				return "'-'";
 			case TokenType::OpMul:
-				return L"'*'";
+				return "'*'";
 			case TokenType::OpDiv:
-				return L"'/'";
+				return "'/'";
 			case TokenType::OpMod:
-				return L"'%'";
+				return "'%'";
 			case TokenType::OpNot:
-				return L"'!'";
+				return "'!'";
 			case TokenType::OpLsh:
-				return L"'<<'";
+				return "'<<'";
 			case TokenType::OpRsh:
-				return L"'>>'";
+				return "'>>'";
 			case TokenType::OpAddAssign:
-				return L"'+='";
+				return "'+='";
 			case TokenType::OpSubAssign:
-				return L"'-='";
+				return "'-='";
 			case TokenType::OpMulAssign:
-				return L"'*='";
+				return "'*='";
 			case TokenType::OpDivAssign:
-				return L"'/='";
+				return "'/='";
 			case TokenType::OpModAssign:
-				return L"'%='";
+				return "'%='";
 			case TokenType::OpEql:
-				return L"'=='";
+				return "'=='";
 			case TokenType::OpNeq:
-				return L"'!='";
+				return "'!='";
 			case TokenType::OpGreater:
-				return L"'>'";
+				return "'>'";
 			case TokenType::OpLess:
-				return L"'<'";
+				return "'<'";
 			case TokenType::OpGeq:
-				return L"'>='";
+				return "'>='";
 			case TokenType::OpLeq:
-				return L"'<='";
+				return "'<='";
 			case TokenType::OpAnd:
-				return L"'&&'";
+				return "'&&'";
 			case TokenType::OpOr:
-				return L"'||'";
+				return "'||'";
 			case TokenType::OpBitXor:
-				return L"'^'";
+				return "'^'";
 			case TokenType::OpBitAnd:
-				return L"'&'";
+				return "'&'";
 			case TokenType::OpBitOr:
-				return L"'|'";
+				return "'|'";
 			case TokenType::OpInc:
-				return L"'++'";
+				return "'++'";
 			case TokenType::OpDec:
-				return L"'--'";
+				return "'--'";
 			default:
-				return L"";
+				return "";
 			}
 		}
 
-		List<String> Split(String text, wchar_t c)
+		List<String> Split(String text, char c)
 		{
 			List<String> result;
 			StringBuilder sb;
@@ -34998,85 +35123,5 @@ namespace VectorMath
 		return retVal;
 	}
 
-}
-#endif
-
-/***********************************************************************
-CORELIB\WIDECHAR.CPP
-***********************************************************************/
-#ifndef SPIRE_NO_CORE_LIB
-#include <locale.h>
-
-#define _CRT_SECUIRE_NO_WARNINGS
-
-class DefaultLocaleSetter
-{
-public:
-	DefaultLocaleSetter()
-	{
-		setlocale(LC_ALL, ""); 
-	};
-};
-
-
-char * WideCharToMByte(const wchar_t * buffer, int length)
-{
-	size_t requiredBufferSize;
-#ifdef _MSC_VER
-	wcstombs_s(&requiredBufferSize, nullptr, 0, buffer, length);
-#else
-	requiredBufferSize = std::wcstombs(nullptr, buffer, 0);
-#endif
-	if (requiredBufferSize > 0)
-	{
-		char * multiByteBuffer = new char[requiredBufferSize + 1];
-#ifdef _MSC_VER
-		wcstombs_s(&requiredBufferSize, multiByteBuffer, requiredBufferSize, buffer, length);
-		auto pos = requiredBufferSize;
-#else
-		auto pos = std::wcstombs(multiByteBuffer, buffer, requiredBufferSize + 1);
-#endif
-		if (pos <= requiredBufferSize)
-			multiByteBuffer[pos] = 0;
-		return multiByteBuffer;
-	}
-	else
-		return 0;
-}
-
-wchar_t * MByteToWideChar(const char * buffer, int length)
-{
-	// regard as ansi
-#ifdef _MSC_VER
-	size_t bufferSize;
-	mbstowcs_s((size_t*)&bufferSize, nullptr, 0, buffer, length);
-#else
-	size_t bufferSize = std::mbstowcs(nullptr, buffer, 0);
-#endif
-	if (bufferSize > 0)
-	{
-		wchar_t * rbuffer = new wchar_t[bufferSize +1];
-		size_t pos;
-#ifdef _MSC_VER
-		mbstowcs_s(&pos, rbuffer, bufferSize, buffer, length);
-#else
-		pos = std::mbstowcs(rbuffer, buffer, bufferSize + 1);
-#endif
-		if (pos <= bufferSize)
-			rbuffer[pos] = 0;
-		return rbuffer;
-	}
-	else
-		return 0;
-}
-
-void MByteToWideChar(wchar_t * buffer, int bufferSize, const char * str, int length)
-{
-#ifdef _MSC_VER
-	size_t pos;
-	mbstowcs_s(&pos, buffer, bufferSize, str, length);
-#else
-	std::mbstowcs(buffer, str, bufferSize);
-#endif
 }
 #endif

@@ -113,14 +113,14 @@ namespace Spire
 			String GetComponentFunctionName(ComponentSyntaxNode * comp)
 			{
 				StringBuilder nameSb;
-				nameSb << comp->ParentModuleName.Content << L"." << comp->Name.Content;
+				nameSb << comp->ParentModuleName.Content << "." << comp->Name.Content;
 				StringBuilder finalNameSb;
 				for (auto ch : nameSb.ProduceString())
 				{
-					if ((ch >= L'0' && ch <= L'9') || (ch >= L'a' && ch <= L'z') || (ch >= 'A' && ch <= 'Z'))
+					if ((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z'))
 						finalNameSb << ch;
 					else
-						finalNameSb << L'_';
+						finalNameSb << '_';
 				}
 				return EscapeDoubleUnderscore(finalNameSb.ProduceString());
 			}
@@ -288,7 +288,7 @@ namespace Spire
 							if (dep->SyntaxNode->Parameters.Count() == 0)
 							{
 								auto paramType = TranslateExpressionType(dep->Type, &genericTypeMappings);
-								String paramName = EscapeDoubleUnderscore(L"p" + String(id) + L"_" + dep->OriginalName); 
+								String paramName = EscapeDoubleUnderscore("p" + String(id) + "_" + dep->OriginalName); 
 								func->Parameters.Add(paramName, ILParameter(paramType));
 								auto argInstr = codeWriter.FetchArg(paramType, id + 1);
 								argInstr->Name = paramName;
@@ -299,7 +299,7 @@ namespace Spire
 						for (auto & param : comp->SyntaxNode->Parameters)
 						{
 							auto paramType = TranslateExpressionType(param->Type, &genericTypeMappings);
-							String paramName = EscapeDoubleUnderscore(L"p" + String(id) + L"_" + param->Name);
+							String paramName = EscapeDoubleUnderscore("p" + String(id) + "_" + param->Name);
 							func->Parameters.Add(paramName, ILParameter(paramType, param->Qualifier));
 							auto argInstr = codeWriter.FetchArg(paramType, id + 1);
 							argInstr->Name = paramName;
@@ -441,7 +441,7 @@ namespace Spire
 				{
 					func->Parameters.Add(param->Name, ILParameter(TranslateExpressionType(param->Type), param->Qualifier));
 					auto op = FetchArg(param->Type.Ptr(), ++id);
-					op->Name = EscapeDoubleUnderscore(String(L"p_") + param->Name);
+					op->Name = EscapeDoubleUnderscore(String("p_") + param->Name);
 					variables.Add(param->Name, op);
 				}
 				function->Body->Accept(this);
@@ -499,7 +499,7 @@ namespace Spire
 				}
 				ILOperand * iterVar = nullptr;
 				if (stmt->IterationVariable.Content.Length() && !variables.TryGetValue(stmt->IterationVariable.Content, iterVar))
-					throw InvalidProgramException(L"Iteration variable not found in variables dictionary. This should have been checked by semantics analyzer.");
+					throw InvalidProgramException("Iteration variable not found in variables dictionary. This should have been checked by semantics analyzer.");
 				if (stmt->InitialExpression)
 				{
 					codeWriter.PushNode();
@@ -661,20 +661,20 @@ namespace Spire
 					{
 						switch (swizzle->SwizzleString[i])
 						{
-						case L'r':
-						case L'x':
+						case 'r':
+						case 'x':
 							index = 0;
 							break;
-						case L'g':
-						case L'y':
+						case 'g':
+						case 'y':
 							index = 1;
 							break;
-						case L'b':
-						case L'z':
+						case 'b':
+						case 'z':
 							index = 2;
 							break;
-						case L'a':
-						case L'w':
+						case 'a':
+						case 'w':
 							index = 3;
 							break;
 						}
@@ -771,7 +771,7 @@ namespace Spire
 						rs = new CmpltInstruction();
 						break;
 					default:
-						throw NotImplementedException(L"Code gen not implemented for this operator.");
+						throw NotImplementedException("Code gen not implemented for this operator.");
 					}
 					rs->Operands.SetSize(2);
 					rs->Operands[0] = left;
@@ -894,7 +894,7 @@ namespace Spire
 			virtual RefPtr<ExpressionSyntaxNode> VisitMemberExpression(MemberExpressionSyntaxNode * expr) override
 			{
 				RefPtr<Object> refObj;
-				if (expr->Tags.TryGetValue(L"ComponentReference", refObj))
+				if (expr->Tags.TryGetValue("ComponentReference", refObj))
 				{
 					if (auto refComp = refObj.As<StringObject>())
 					{
@@ -902,7 +902,7 @@ namespace Spire
 						if (variables.TryGetValue(refComp->Content, op))
 							PushStack(op);
 						else
-							throw InvalidProgramException(L"referencing undefined component/variable. probable cause: unchecked circular reference.");
+							throw InvalidProgramException("referencing undefined component/variable. probable cause: unchecked circular reference.");
 					}
 				}
 				else
@@ -910,14 +910,14 @@ namespace Spire
 					expr->BaseExpression->Access = expr->Access;
 					expr->BaseExpression->Accept(this);
 					auto base = PopStack();
-					auto generateSingleMember = [&](wchar_t memberName)
+					auto generateSingleMember = [&](char memberName)
 					{
 						int idx = 0;
-						if (memberName == L'y' || memberName == L'g')
+						if (memberName == 'y' || memberName == 'g')
 							idx = 1;
-						else if (memberName == L'z' || memberName == L'b')
+						else if (memberName == 'z' || memberName == 'b')
 							idx = 2;
-						else if (memberName == L'w' || memberName == L'a')
+						else if (memberName == 'w' || memberName == 'a')
 							idx = 3;
 
 						GenerateIndexExpression(base, result.Program->ConstantPool->CreateConstant(idx),
@@ -946,7 +946,7 @@ namespace Spire
 							expr->Access == ExpressionAccess::Read);
 					}
 					else
-						throw NotImplementedException(L"member expression codegen");
+						throw NotImplementedException("member expression codegen");
 				}
 				return expr;
 			}
@@ -971,7 +971,7 @@ namespace Spire
 					}
 					else if (basicType->Component)
 					{
-						auto funcCompName = expr->FunctionExpr->Tags[L"ComponentReference"]().As<StringObject>()->Content;
+						auto funcCompName = expr->FunctionExpr->Tags["ComponentReference"]().As<StringObject>()->Content;
 						auto funcComp = *(currentShader->DefinitionsByComponent[funcCompName]().TryGetValue(currentComponent->World));
 						funcName = GetComponentFunctionName(funcComp->SyntaxNode.Ptr());
 						for (auto & param : funcComp->SyntaxNode->Parameters)
@@ -991,7 +991,7 @@ namespace Spire
 								if (variables.TryGetValue(dep->UniqueName, op))
 									args.Add(op);
 								else
-									throw InvalidProgramException(L"cannot resolve reference for implicit component function argument.");
+									throw InvalidProgramException("cannot resolve reference for implicit component function argument.");
 							}
 						}
 					}
@@ -1039,8 +1039,8 @@ namespace Spire
 				}
 				else
 				{
-					Error(40001, L"Invalid type cast: \"" + expr->Expression->Type->ToString() + L"\" to \"" +
-						expr->Type->ToString() + L"\"", expr);
+					Error(40001, "Invalid type cast: \"" + expr->Expression->Type->ToString() + "\" to \"" +
+						expr->Type->ToString() + "\"", expr);
 				}
 				return expr;
 			}
@@ -1119,7 +1119,7 @@ namespace Spire
 							rs = new BitNotInstruction();
 							break;
 						default:
-							throw NotImplementedException(L"Code gen is not implemented for this operator.");
+							throw NotImplementedException("Code gen is not implemented for this operator.");
 						}
 						rs->Operand = input;
 						rs->Type = input->Type;
@@ -1151,7 +1151,7 @@ namespace Spire
 			virtual RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode* expr) override
 			{
 				RefPtr<Object> refObj;
-				if (expr->Tags.TryGetValue(L"ComponentReference", refObj))
+				if (expr->Tags.TryGetValue("ComponentReference", refObj))
 				{
 					if (auto refComp = refObj.As<StringObject>())
 					{
@@ -1159,12 +1159,12 @@ namespace Spire
 						if (variables.TryGetValue(refComp->Content, op))
 							PushStack(op);
 						else
-							throw InvalidProgramException(String(L"referencing undefined component/variable '") + refComp->Content + L"'. probable cause: unchecked circular reference.");
+							throw InvalidProgramException(String("referencing undefined component/variable '") + refComp->Content + "'. probable cause: unchecked circular reference.");
 					}
 				}
 				else if (!GenerateVarRef(expr->Variable, expr->Access))
 				{
-					throw InvalidProgramException(L"identifier is neither a variable nor a recognized component.");
+					throw InvalidProgramException("identifier is neither a variable nor a recognized component.");
 				}
 				return expr;
 			}

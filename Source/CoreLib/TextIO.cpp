@@ -10,53 +10,49 @@ namespace CoreLib
 	{
 		using namespace CoreLib::Basic;
 
-		class UnicodeEncoding : public Encoding //UTF8
+		class Utf8Encoding : public Encoding 
 		{
 		public:
 			virtual void GetBytes(List<char> & result, const String & str) override
 			{
-				for (int i = 0; i < str.Length(); i++)
+				result.AddRange(str.Buffer(), str.Length());
+			}
+			virtual String ToString(const char * bytes, int /*length*/) override
+			{
+				return String(bytes);
+			}
+		};
+
+		class Utf32Encoding : public Encoding
+		{
+		public:
+			virtual void GetBytes(List<char> & result, const String & str) override
+			{
+				int ptr = 0;
+				while (ptr < str.Length())
 				{
-					unsigned int codePoint = str[i];
-					if (codePoint >= 0xD800 && codePoint <= 0xDBFF && i < str.Length() - 1) // surrogate
+					int codePoint = GetUnicodePointFromUTF8([&](int)
 					{
-						codePoint -= 0xD800;
-						codePoint <<= 10;
-						i++;
-						codePoint += str[i] - 0xDC00;
-						codePoint += 0x10000;
-					}
-					// encode codePoint as UTF8
-					if (codePoint <= 0x7F)
-						result.Add((char)codePoint);
-					else if (codePoint <= 0x7FF)
-					{
-						unsigned char byte = (unsigned char)(0xC0 + (codePoint >> 6));
-						result.Add((char)byte);
-						byte = 0x80 + (codePoint & 0x3F);
-						result.Add((char)byte);
-					}
-					else if (codePoint <= 0xFFFF)
-					{
-						unsigned char byte = (unsigned char)(0xE0 + (codePoint >> 12));
-						result.Add((char)byte);
-						byte = (unsigned char)(0x80 + ((codePoint >> 6) & (0x3F)));
-						result.Add((char)byte);
-						byte = (unsigned char)(0x80 + (codePoint & 0x3F));
-						result.Add((char)byte);
-					}
-					else
-					{
-						unsigned char byte = (unsigned char)(0xF0 + (codePoint >> 18));
-						result.Add((char)byte);
-						byte = (unsigned char)(0x80 + ((codePoint >> 12) & 0x3F));
-						result.Add((char)byte);
-						byte = (unsigned char)(0x80 + ((codePoint >> 6) & 0x3F));
-						result.Add((char)byte);
-						byte = (unsigned char)(0x80 + (codePoint & 0x3F));
-						result.Add((char)byte);
-					}
+						if (ptr < str.Length())
+							return str[ptr++];
+						else
+							return '\0';
+					});
+					result.AddRange((char*)&codePoint, 4);
 				}
+			}
+			virtual String ToString(const char * bytes, int length) override
+			{
+				StringBuilder sb;
+				int * content = (int*)bytes;
+				for (int i = 0; i < (length >> 2); i++)
+				{
+					char buf[5];
+					int count = EncodeUnicodePointToUTF8(buf, content[i]);
+					for (int j = 0; j < count; j++)
+						sb.Append(buf[j]);
+				}
+				return sb.ProduceString();
 			}
 		};
 
@@ -70,78 +66,56 @@ namespace CoreLib
 			{}
 			virtual void GetBytes(List<char> & result, const String & str) override
 			{
-				auto addChar = [&](unsigned short ch)
+				int ptr = 0;
+				while (ptr < str.Length())
 				{
-					if (reverseOrder)
+					int codePoint = GetUnicodePointFromUTF8([&](int)
 					{
-						unsigned char firstByte = ch >> 8;
-						unsigned char lastByte = ch & 0xFF;
-						result.Add((char)firstByte);
-						result.Add((char)lastByte);
-					}
+						if (ptr < str.Length())
+							return str[ptr++];
+						else
+							return '\0';
+					});
+					unsigned short buffer[2];
+					int count;
+					if (!reverseOrder)
+						count = EncodeUnicodePointToUTF16(buffer, codePoint);
 					else
-						result.AddRange((char*)&ch, 2);
-				};
-#ifdef _WIN32
-				if (reverseOrder)
-				{
-					for (int i = 0; i < str.Length(); i++)
-					{
-						unsigned short ch = (unsigned short)str[i];
-						addChar(ch);
-					}
+						count = EncodeUnicodePointToUTF16Reversed(buffer, codePoint);
+					result.AddRange((char*)buffer, count * 2);
 				}
-				else
-					result.AddRange((char*)str.Buffer(), str.Length() * sizeof(wchar_t));
-#else
-				for (int i = 0; i < str.Length(); i++)
+			}
+			virtual String ToString(const char * bytes, int length) override
+			{
+				int ptr = 0;
+				StringBuilder sb;
+				while (ptr < length)
 				{
-					unsigned int codePoint = str[i];
-					if (codePoint <= 0xD7FF || codePoint >= 0xE000 && codePoint <= 0xFFFF)
+					int codePoint = GetUnicodePointFromUTF16([&](int)
 					{
-						unsigned short toWrite = (unsigned short)codePoint;
-						addChar(toWrite);
-					}
-					else
-					{
-						int sub = codePoint - 0x10000;
-						unsigned short high = (unsigned short)((sub >> 10) + 0xD800);
-						unsigned short low = (unsigned short)((sub & 0x3FF) + 0xDC00);
-						addChar(high);
-						addChar(low);
-					}
+						if (ptr < length)
+							return bytes[ptr++];
+						else
+							return '\0';
+					});
+					char buf[5];
+					int count = EncodeUnicodePointToUTF8(buf, codePoint);
+					for (int i = 0; i < count; i++)
+						sb.Append(buf[i]);
 				}
-#endif
+				return sb.ProduceString();
 			}
 		};
 
-
-		class AnsiEncoding : public Encoding
-		{
-		private:
-			static char * WideCharToAnsi(wchar_t * buffer, int length)
-			{
-				return WideCharToMByte(buffer, length);
-			}
-		public:
-			virtual void GetBytes(List<char> & result, const String & str) override
-			{
-				String cpy = str;
-				int len;
-				char * buffer = cpy.ToMultiByteString(&len);
-				result.AddRange(buffer, len);
-			}
-		};
-
-		UnicodeEncoding __unicodeEncoding;
+		Utf8Encoding __utf8Encoding;
 		Utf16Encoding __utf16Encoding(false);
 		Utf16Encoding __utf16EncodingReversed(true);
-		AnsiEncoding __ansiEncoding;
+		Utf32Encoding __utf32Encoding;
 
-		Encoding * Encoding::UTF8 = &__unicodeEncoding;
+		Encoding * Encoding::UTF8 = &__utf8Encoding;
 		Encoding * Encoding::UTF16 = &__utf16Encoding;
 		Encoding * Encoding::UTF16Reversed = &__utf16EncodingReversed;
-		Encoding * Encoding::Ansi = &__ansiEncoding;
+		Encoding * Encoding::UTF32 = &__utf32Encoding;
 
 		const unsigned short Utf16Header = 0xFEFF;
 		const unsigned short Utf16ReversedHeader = 0xFFFE;
@@ -178,17 +152,17 @@ namespace CoreLib
 			StringBuilder sb;
 			String newLine;
 #ifdef _WIN32
-			newLine = L"\r\n";
+			newLine = "\r\n";
 #else
-			newLine = L"\n";
+			newLine = "\n";
 #endif
 			for (int i = 0; i < str.Length(); i++)
 			{
-				if (str[i] == L'\r')
+				if (str[i] == '\r')
 					sb << newLine;
-				else if (str[i] == L'\n')
+				else if (str[i] == '\n')
 				{
-					if (i > 0 && str[i - 1] != L'\r')
+					if (i > 0 && str[i - 1] != '\r')
 						sb << newLine;
 				}
 				else
@@ -196,10 +170,6 @@ namespace CoreLib
 			}
 			encoding->GetBytes(encodingBuffer, sb.ProduceString());
 			stream->Write(encodingBuffer.Buffer(), encodingBuffer.Count());
-		}
-		void StreamWriter::Write(const wchar_t * str)
-		{
-			Write(String(str));
 		}
 		void StreamWriter::Write(const char * str)
 		{
@@ -212,7 +182,7 @@ namespace CoreLib
 			ReadBuffer();
 			encoding = DetermineEncoding();
 			if (encoding == 0)
-				encoding = Encoding::Ansi;
+				encoding = Encoding::UTF8;
 		}
 		StreamReader::StreamReader(RefPtr<Stream> stream, Encoding * encoding)
 		{
@@ -253,7 +223,7 @@ namespace CoreLib
 					else if (flag & (IS_TEXT_UNICODE_SIGNATURE | IS_TEXT_UNICODE_STATISTICS))
 						return Encoding::UTF16Reversed;
 					else if (flag & IS_TEXT_UNICODE_ASCII16)
-						return Encoding::Ansi;
+						return Encoding::UTF8;
 				}
 #endif 
 				return Encoding::UTF8;
@@ -282,7 +252,7 @@ namespace CoreLib
 			}
 			return 0;
 		}
-		int TextReader::Read(wchar_t * destBuffer, int length)
+		int TextReader::Read(char * destBuffer, int length)
 		{
 			int i = 0;
 			for (i = 0; i<length; i++)
@@ -292,13 +262,13 @@ namespace CoreLib
 					auto ch = Read();
 					if (IsEnd())
 						break;
-					if (ch == L'\r')
+					if (ch == '\r')
 					{
-						if (Peak() == L'\n')
+						if (Peak() == '\n')
 							Read();
 						break;
 					}
-					else if (ch == L'\n')
+					else if (ch == '\n')
 					{
 						break;
 					}
@@ -321,13 +291,13 @@ namespace CoreLib
 					auto ch = Read();
 					if (IsEnd())
 						break;
-					if (ch == L'\r')
+					if (ch == '\r')
 					{
-						if (Peak() == L'\n')
+						if (Peak() == '\n')
 							Read();
 						break;
 					}
-					else if (ch == L'\n')
+					else if (ch == '\n')
 					{
 						break;
 					}
@@ -350,10 +320,10 @@ namespace CoreLib
 					auto ch = Read();
 					if (IsEnd())
 						break;
-					if (ch == L'\r')
+					if (ch == '\r')
 					{
-						sb.Append(L'\n');
-						if (Peak() == L'\n')
+						sb.Append('\n');
+						if (Peak() == '\n')
 							Read();
 					}
 					else
