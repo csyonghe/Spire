@@ -5,7 +5,7 @@
 // This file encapsulates the platform-specific operations needed by the test
 // runner that are not already provided by the core Spire libs
 
-#ifdef WIN32
+#ifdef _WIN32
 
 // Include Windows header in a way that minimized namespace pollution.
 // TODO: We could try to avoid including this at all, but it would
@@ -79,7 +79,7 @@ struct OSFindFilesResult
 // and return a logical collection of the results
 // that can be iterated with a range-based `for` loop:
 //
-// for( auto file : osFindFilesInDirectoryMatchingPattern(dir, L"*.txt"))
+// for( auto file : osFindFilesInDirectoryMatchingPattern(dir, "*.txt"))
 // { ... }
 //
 // Each element in the range is a `CoreLib::Basic::String` representing the

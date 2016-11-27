@@ -10,6 +10,7 @@ using namespace CoreLib::IO;
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 
 // Called for an error in the test-runner (not for an error involving
 // a test itself).
@@ -38,12 +39,12 @@ TestResult runTestImpl(
 
 	OSProcessSpawner spawner;
 
-	spawner.pushExecutableName(L"Source/Debug/SpireCompiler.exe");
+	spawner.pushExecutableName("Source/Debug/SpireCompiler.exe");
 	spawner.pushArgument(filePath);
 
 	if (spawner.spawnAndWaitForCompletion() != kOSError_None)
 	{
-		error("failed to run test '%ls'", filePath.begin());
+		error("failed to run test '%S'", filePath.ToWString());
 		return kTestResult_Fail;
 	}
 
@@ -57,17 +58,17 @@ TestResult runTestImpl(
 
 	// We construct a single output string that captures the results
 	StringBuilder actualOutputBuilder;
-	actualOutputBuilder.Append(L"result code = ");
+	actualOutputBuilder.Append("result code = ");
 	actualOutputBuilder.Append(resultCode);
-	actualOutputBuilder.Append(L"\nstandard error = {\n");
+	actualOutputBuilder.Append("\nstandard error = {\n");
 	actualOutputBuilder.Append(standardError);
-	actualOutputBuilder.Append(L"}\nstandard output = {\n");
+	actualOutputBuilder.Append("}\nstandard output = {\n");
 	actualOutputBuilder.Append(standardOuptut);
-	actualOutputBuilder.Append(L"}\n");
+	actualOutputBuilder.Append("}\n");
 
 	String actualOutput = actualOutputBuilder.ProduceString();
 
-	String expectedOutputPath = filePath + L".expected";
+	String expectedOutputPath = filePath + ".expected";
 	String expectedOutput;
 	try
 	{
@@ -98,7 +99,7 @@ TestResult runTestImpl(
 	// diagnose the problem.
 	if (result == kTestResult_Fail)
 	{
-		String actualOutputPath = filePath + L".actual";
+		String actualOutputPath = filePath + ".actual";
 		CoreLib::IO::File::WriteAllText(actualOutputPath, actualOutput);
 	}
 
@@ -130,14 +131,14 @@ void runTest(
 		context->failedTestCount++;
 	}
 
-	printf(" test: '%ls'\n", filePath.begin());
+	printf(" test: '%S'\n", filePath.ToWString());
 }
 
 void runTestsInDirectory(
 	TestContext*		context,
 	String				directoryPath)
 {
-	for (auto file : osFindFilesInDirectoryMatchingPattern(directoryPath, L"*.spire"))
+	for (auto file : osFindFilesInDirectoryMatchingPattern(directoryPath, "*.spire"))
 	{
 		runTest(context, file);
 	}
@@ -154,7 +155,7 @@ int main(
 	// Enumerate test files according to policy
 	// TODO: add more directories to this list
 	// TODO: allow for a command-line argument to select a particular directory
-	runTestsInDirectory(&context, L"Tests/FrontEnd/");
+	runTestsInDirectory(&context, "Tests/FrontEnd/");
 
 	if (!context.totalTestCount)
 	{

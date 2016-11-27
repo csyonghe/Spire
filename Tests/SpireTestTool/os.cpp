@@ -9,7 +9,7 @@ using namespace CoreLib::Basic;
 
 // Platform-specific code follows
 
-#ifdef WIN32
+#ifdef _WIN32
 
 #include <Windows.h>
 
@@ -21,7 +21,7 @@ bool OSFindFilesResult::findNextFile()
 	if (!result)
 		return false;
 
-	filePath_ = directoryPath_ + fileData_.cFileName;
+	filePath_ = directoryPath_ + String::FromWString(fileData_.cFileName);
 
 	return true;
 }
@@ -36,7 +36,7 @@ OSFindFilesResult osFindFilesInDirectoryMatchingPattern(
 
 	OSFindFilesResult result;
 	HANDLE findHandle = FindFirstFileW(
-		searchPath.Buffer(),
+		searchPath.ToWString(),
 		&result.fileData_);
 
 	result.directoryPath_ = directoryPath;
@@ -48,7 +48,7 @@ OSFindFilesResult osFindFilesInDirectoryMatchingPattern(
 	}
 	else
 	{
-		result.filePath_ = directoryPath + result.fileData_.cFileName;
+		result.filePath_ = directoryPath + String::FromWString(result.fileData_.cFileName);
 		result.error_ = kOSError_None;
 	}
 
@@ -118,16 +118,12 @@ static DWORD WINAPI osReaderThreadProc(LPVOID threadParam)
 
 			*writeCursor++ = c;
 		}
-		bytesRead = writeCursor - buffer;
-
-		wchar_t* wideBuffer = MByteToWideChar(buffer, bytesRead);
+		bytesRead = (DWORD)(writeCursor - buffer);
 
 		// Note: Current Spire CoreLib gives no way to know
 		// the length of the buffer, so we ultimately have
 		// to just assume null termination...
-		outputBuilder.Append(wideBuffer);
-
-		delete[] wideBuffer;
+		outputBuilder.Append(buffer, bytesRead);
 	}
 
 	info->output = outputBuilder.ProduceString();
@@ -146,7 +142,7 @@ void OSProcessSpawner::pushArgument(
 	CoreLib::Basic::String argument)
 {
 	// TODO(tfoley): handle cases where arguments need some escaping
-	commandLine_.Append(L" ");
+	commandLine_.Append(" ");
 	commandLine_.Append(argument);
 }
 
@@ -240,8 +236,8 @@ OSError OSProcessSpawner::spawnAndWaitForCompletion()
 
     // `CreateProcess` requires write access to this, for some reason...
 	BOOL success = CreateProcessW(
-		executableName_.Buffer(),
-		commandLine_.Buffer(),
+		executableName_.ToWString(),
+		commandLine_.ToString().ToWString(),
 		nullptr,
 		nullptr,
 		true,
