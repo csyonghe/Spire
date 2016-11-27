@@ -210,7 +210,7 @@ namespace CoreLib
 				auto token = ReadToken();
 				if (token.Type == TokenType::StringLiterial)
 				{
-					return UnescapeStringLiteral(token.Content.SubString(1, token.Content.Length()-2));
+					return token.Content;
 				}
 				throw TextFormatException("Text parsing error: string literal expected.");
 			}
@@ -228,10 +228,10 @@ namespace CoreLib
 				}
 				throw TextFormatException("Unexpected ending.");
 			}
-			Token NextToken()
+			Token NextToken(int offset = 0)
 			{
-				if (tokenPtr < tokens.Count())
-					return tokens[tokenPtr];
+				if (tokenPtr + offset < tokens.Count())
+					return tokens[tokenPtr + offset];
 				else
 				{
 					Token rs;

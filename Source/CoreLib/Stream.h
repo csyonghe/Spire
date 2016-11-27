@@ -73,6 +73,22 @@ namespace CoreLib
 			{
 				stream->Read(buffer, sizeof(T)*(Int64)count);
 			}
+			template<typename T>
+			void Read(T & buffer)
+			{
+				stream->Read(&buffer, sizeof(T));
+			}
+			template<typename T>
+			void Read(List<T> & buffer)
+			{
+				int count = ReadInt32();
+				buffer.SetSize(count);
+				Read(buffer.Buffer(), count);
+			}
+			void Read(String & buffer)
+			{
+				buffer = ReadString();
+			}
 			int ReadInt32()
 			{
 				int rs;
@@ -150,6 +166,12 @@ namespace CoreLib
 			{
 				stream->Write(buffer, sizeof(T)*(Int64)count);
 			}
+			template<typename T>
+			void Write(const List<T> & list)
+			{
+				Write(list.Count());
+				stream->Write(list.Buffer(), sizeof(T)*list.Count());
+			}
 			void Write(const String & str)
 			{
 				Write(str.Length());
@@ -200,6 +222,105 @@ namespace CoreLib
 			virtual bool CanWrite();
 			virtual void Close();
 			virtual bool IsEnd();
+		};
+
+		class MemoryStream : public Stream
+		{
+		private:
+			CoreLib::List<unsigned char> writeBuffer;
+			CoreLib::ArrayView<unsigned char> readBuffer;
+			int ptr = 0;
+			bool isReadStream;
+		public:
+			MemoryStream()
+			{
+				isReadStream = false;
+			}
+			MemoryStream(unsigned char * mem, int length)
+			{
+				isReadStream = true;
+				readBuffer = MakeArrayView(mem, length);
+			}
+			MemoryStream(CoreLib::ArrayView<unsigned char> source)
+			{
+				isReadStream = true;
+				readBuffer = source;
+			}
+			virtual Int64 GetPosition()
+			{
+				return ptr;
+			}
+			virtual void Seek(SeekOrigin origin, Int64 offset)
+			{
+				if (origin == SeekOrigin::Start)
+					ptr = (int)offset;
+				else if (origin == SeekOrigin::End)
+				{
+					if (isReadStream)
+						ptr = readBuffer.Count() + (int)offset;
+					else
+						ptr = writeBuffer.Count() + (int)offset;
+				}
+			}
+			virtual Int64 Read(void * pbuffer, Int64 length)
+			{
+				Int64 i;
+				for (i = 0; i < length; i++)
+				{
+					if (ptr + i < readBuffer.Count())
+					{
+						((unsigned char*)pbuffer)[i] = readBuffer[(int)(ptr + i)];
+					}
+					else
+						break;
+				}
+				return i;
+			}
+			virtual Int64 Write(const void * pbuffer, Int64 length)
+			{
+				writeBuffer.SetSize(ptr);
+				if (pbuffer)
+					writeBuffer.AddRange((unsigned char *)pbuffer, (int)length);
+				else
+					for (auto i = 0; i < length; i++)
+						writeBuffer.Add(0);
+				ptr = writeBuffer.Count();
+				return length;
+			}
+			virtual bool CanRead()
+			{
+				return isReadStream;
+			}
+			virtual bool CanWrite()
+			{
+				return !isReadStream;
+			}
+			virtual void Close()
+			{
+				writeBuffer.SetSize(0);
+				writeBuffer.Compress();
+			}
+			virtual bool IsEnd()
+			{
+				if (isReadStream)
+					return ptr >= readBuffer.Count();
+				else
+					return ptr == writeBuffer.Count();
+			}
+			void * GetBuffer()
+			{
+				if (isReadStream)
+					return readBuffer.Buffer();
+				else
+					return writeBuffer.Buffer();
+			}
+			int GetBufferSize()
+			{
+				if (isReadStream)
+					return readBuffer.Count();
+				else
+					return writeBuffer.Count();
+			}
 		};
 	}
 }

@@ -132,9 +132,9 @@ namespace CoreLib
 			{
 			}
 			template<typename... Args>
-			List(Args... args)
+			List(const T & val, Args... args)
 			{
-				Init(args...);
+				Init(val, args...);
 			}
 			List(const List<T> & list)
 				: buffer(0), _count(0), bufferSize(0)

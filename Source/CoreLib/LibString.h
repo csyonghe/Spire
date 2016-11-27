@@ -49,6 +49,16 @@ namespace CoreLib
 			return i;
 		}
 
+		inline bool IsUtf8LeadingByte(char ch)
+		{
+			return (((unsigned char)ch) & 0xC0) == 0xC0;
+		}
+
+		inline bool IsUtf8ContinuationByte(char ch)
+		{
+			return (((unsigned char)ch) & 0xC0) == 0x80;
+		}
+
 		/*!
 		@brief Represents a UTF-8 encoded string.
 		*/
@@ -79,6 +89,8 @@ namespace CoreLib
 				return rs;
 			}
 			static String FromWString(const wchar_t * wstr);
+			static String FromWChar(const wchar_t ch);
+			static String FromUnicodePoint(unsigned int codePoint);
 			String()
 				:buffer(0), wcharBuffer(0), length(0)
 			{
@@ -538,7 +550,36 @@ namespace CoreLib
 					bufferSize = size;
 				}
 			}
-
+			StringBuilder & operator << (char ch)
+			{
+				Append(&ch, 1);
+				return *this;
+			}
+			StringBuilder & operator << (int val)
+			{
+				Append(val);
+				return *this;
+			}
+			StringBuilder & operator << (unsigned int val)
+			{
+				Append(val);
+				return *this;
+			}
+			StringBuilder & operator << (long long val)
+			{
+				Append(val);
+				return *this;
+			}
+			StringBuilder & operator << (float val)
+			{
+				Append(val);
+				return *this;
+			}
+			StringBuilder & operator << (double val)
+			{
+				Append(val);
+				return *this;
+			}
 			StringBuilder & operator << (const char * str)
 			{
 				Append(str, (int)strlen(str));
@@ -558,9 +599,37 @@ namespace CoreLib
 			{
 				Append(&ch, 1);
 			}
+			void Append(float val)
+			{
+				char buf[128];
+				sprintf_s(buf, 128, "%g", val);
+				int len = (int)strnlen_s(buf, 128);
+				Append(buf, len);
+			}
+			void Append(double val)
+			{
+				char buf[128];
+				sprintf_s(buf, 128, "%g", val);
+				int len = (int)strnlen_s(buf, 128);
+				Append(buf, len);
+			}
+			void Append(unsigned int value, int radix = 10)
+			{
+				char vBuffer[33];
+				int len = IntToAscii(vBuffer, value, radix);
+				ReverseInternalAscii(vBuffer, len);
+				Append(vBuffer);
+			}
 			void Append(int value, int radix = 10)
 			{
 				char vBuffer[33];
+				int len = IntToAscii(vBuffer, value, radix);
+				ReverseInternalAscii(vBuffer, len);
+				Append(vBuffer);
+			}
+			void Append(long long value, int radix = 10)
+			{
+				char vBuffer[65];
 				int len = IntToAscii(vBuffer, value, radix);
 				ReverseInternalAscii(vBuffer, len);
 				Append(vBuffer);

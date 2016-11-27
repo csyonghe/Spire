@@ -123,15 +123,15 @@ namespace CoreLib
 		template <typename ReadCharFunc>
 		int GetUnicodePointFromUTF16(const ReadCharFunc & get)
 		{
-			int byte0 = get(0);
-			int byte1 = get(1);
+			int byte0 = (unsigned char)get(0);
+			int byte1 = (unsigned char)get(1);
 			int word0 = byte0 + (byte1 << 8);
 			if (word0 >= 0xD800 && word0 <= 0xDFFF)
 			{
-				int byte2 = get(2);
-				int byte3 = get(3);
+				int byte2 = (unsigned char)get(2);
+				int byte3 = (unsigned char)get(3);
 				int word1 = byte2 + (byte3 << 8);
-				return ((word0 & 0x3FF) << 10) + (word1 & 0x3FF);
+				return ((word0 & 0x3FF) << 10) + (word1 & 0x3FF) + 0x10000;
 			}
 			else
 				return word0;
@@ -140,13 +140,13 @@ namespace CoreLib
 		template <typename ReadCharFunc>
 		int GetUnicodePointFromUTF16Reversed(const ReadCharFunc & get)
 		{
-			int byte0 = get(0);
-			int byte1 = get(1);
+			int byte0 = (unsigned char)get(0);
+			int byte1 = (unsigned char)get(1);
 			int word0 = (byte0 << 8) + byte1;
 			if (word0 >= 0xD800 && word0 <= 0xDFFF)
 			{
-				int byte2 = get(2);
-				int byte3 = get(3);
+				int byte2 = (unsigned char)get(2);
+				int byte3 = (unsigned char)get(3);
 				int word1 = (byte2 << 8) + byte3;
 				return ((word0 & 0x3FF) << 10) + (word1 & 0x3FF);
 			}
@@ -157,10 +157,10 @@ namespace CoreLib
 		template <typename ReadCharFunc>
 		int GetUnicodePointFromUTF32(const ReadCharFunc & get)
 		{
-			int byte0 = get(0);
-			int byte1 = get(1);
-			int byte2 = get(2);
-			int byte3 = get(3);
+			int byte0 = (unsigned char)get(0);
+			int byte1 = (unsigned char)get(1);
+			int byte2 = (unsigned char)get(2);
+			int byte3 = (unsigned char)get(3);
 			return byte0 + (byte1 << 8) + (byte2 << 16) + (byte3 << 24);
 		}
 
@@ -305,6 +305,7 @@ namespace CoreLib
 				stream->Close();
 			}
 		};
+
 	}
 }
 

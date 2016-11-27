@@ -992,6 +992,16 @@ namespace CoreLib
 			return i;
 		}
 
+		inline bool IsUtf8LeadingByte(char ch)
+		{
+			return (((unsigned char)ch) & 0xC0) == 0xC0;
+		}
+
+		inline bool IsUtf8ContinuationByte(char ch)
+		{
+			return (((unsigned char)ch) & 0xC0) == 0x80;
+		}
+
 		/*!
 		@brief Represents a UTF-8 encoded string.
 		*/
@@ -1022,6 +1032,8 @@ namespace CoreLib
 				return rs;
 			}
 			static String FromWString(const wchar_t * wstr);
+			static String FromWChar(const wchar_t ch);
+			static String FromUnicodePoint(unsigned int codePoint);
 			String()
 				:buffer(0), wcharBuffer(0), length(0)
 			{
@@ -1481,7 +1493,36 @@ namespace CoreLib
 					bufferSize = size;
 				}
 			}
-
+			StringBuilder & operator << (char ch)
+			{
+				Append(&ch, 1);
+				return *this;
+			}
+			StringBuilder & operator << (int val)
+			{
+				Append(val);
+				return *this;
+			}
+			StringBuilder & operator << (unsigned int val)
+			{
+				Append(val);
+				return *this;
+			}
+			StringBuilder & operator << (long long val)
+			{
+				Append(val);
+				return *this;
+			}
+			StringBuilder & operator << (float val)
+			{
+				Append(val);
+				return *this;
+			}
+			StringBuilder & operator << (double val)
+			{
+				Append(val);
+				return *this;
+			}
 			StringBuilder & operator << (const char * str)
 			{
 				Append(str, (int)strlen(str));
@@ -1501,9 +1542,37 @@ namespace CoreLib
 			{
 				Append(&ch, 1);
 			}
+			void Append(float val)
+			{
+				char buf[128];
+				sprintf_s(buf, 128, "%g", val);
+				int len = (int)strnlen_s(buf, 128);
+				Append(buf, len);
+			}
+			void Append(double val)
+			{
+				char buf[128];
+				sprintf_s(buf, 128, "%g", val);
+				int len = (int)strnlen_s(buf, 128);
+				Append(buf, len);
+			}
+			void Append(unsigned int value, int radix = 10)
+			{
+				char vBuffer[33];
+				int len = IntToAscii(vBuffer, value, radix);
+				ReverseInternalAscii(vBuffer, len);
+				Append(vBuffer);
+			}
 			void Append(int value, int radix = 10)
 			{
 				char vBuffer[33];
+				int len = IntToAscii(vBuffer, value, radix);
+				ReverseInternalAscii(vBuffer, len);
+				Append(vBuffer);
+			}
+			void Append(long long value, int radix = 10)
+			{
+				char vBuffer[65];
 				int len = IntToAscii(vBuffer, value, radix);
 				ReverseInternalAscii(vBuffer, len);
 				Append(vBuffer);
@@ -2184,9 +2253,9 @@ namespace CoreLib
 			{
 			}
 			template<typename... Args>
-			List(Args... args)
+			List(const T & val, Args... args)
 			{
-				Init(args...);
+				Init(val, args...);
 			}
 			List(const List<T> & list)
 				: buffer(0), _count(0), bufferSize(0)
@@ -4429,6 +4498,14 @@ namespace CoreLib
 				funcPtr = new LambdaFuncPtr<TFuncObj, TResult, Arguments...>(func);
 				return *this;
 			}
+			bool operator == (const Func & f)
+			{
+				return *funcPtr == f.funcPtr.Ptr();
+			}
+			bool operator != (const Func & f)
+			{
+				return !(*this == f);
+			}
 			TResult operator()(Arguments... params)
 			{
 				return (*funcPtr)(params...);
@@ -5301,7 +5378,7 @@ namespace CoreLib
 				auto token = ReadToken();
 				if (token.Type == TokenType::StringLiterial)
 				{
-					return UnescapeStringLiteral(token.Content.SubString(1, token.Content.Length()-2));
+					return token.Content;
 				}
 				throw TextFormatException("Text parsing error: string literal expected.");
 			}
@@ -5319,10 +5396,10 @@ namespace CoreLib
 				}
 				throw TextFormatException("Unexpected ending.");
 			}
-			Token NextToken()
+			Token NextToken(int offset = 0)
 			{
-				if (tokenPtr < tokens.Count())
-					return tokens[tokenPtr];
+				if (tokenPtr + offset < tokens.Count())
+					return tokens[tokenPtr + offset];
 				else
 				{
 					Token rs;
@@ -10020,6 +10097,22 @@ namespace CoreLib
 			{
 				stream->Read(buffer, sizeof(T)*(Int64)count);
 			}
+			template<typename T>
+			void Read(T & buffer)
+			{
+				stream->Read(&buffer, sizeof(T));
+			}
+			template<typename T>
+			void Read(List<T> & buffer)
+			{
+				int count = ReadInt32();
+				buffer.SetSize(count);
+				Read(buffer.Buffer(), count);
+			}
+			void Read(String & buffer)
+			{
+				buffer = ReadString();
+			}
 			int ReadInt32()
 			{
 				int rs;
@@ -10097,6 +10190,12 @@ namespace CoreLib
 			{
 				stream->Write(buffer, sizeof(T)*(Int64)count);
 			}
+			template<typename T>
+			void Write(const List<T> & list)
+			{
+				Write(list.Count());
+				stream->Write(list.Buffer(), sizeof(T)*list.Count());
+			}
 			void Write(const String & str)
 			{
 				Write(str.Length());
@@ -10147,6 +10246,105 @@ namespace CoreLib
 			virtual bool CanWrite();
 			virtual void Close();
 			virtual bool IsEnd();
+		};
+
+		class MemoryStream : public Stream
+		{
+		private:
+			CoreLib::List<unsigned char> writeBuffer;
+			CoreLib::ArrayView<unsigned char> readBuffer;
+			int ptr = 0;
+			bool isReadStream;
+		public:
+			MemoryStream()
+			{
+				isReadStream = false;
+			}
+			MemoryStream(unsigned char * mem, int length)
+			{
+				isReadStream = true;
+				readBuffer = MakeArrayView(mem, length);
+			}
+			MemoryStream(CoreLib::ArrayView<unsigned char> source)
+			{
+				isReadStream = true;
+				readBuffer = source;
+			}
+			virtual Int64 GetPosition()
+			{
+				return ptr;
+			}
+			virtual void Seek(SeekOrigin origin, Int64 offset)
+			{
+				if (origin == SeekOrigin::Start)
+					ptr = (int)offset;
+				else if (origin == SeekOrigin::End)
+				{
+					if (isReadStream)
+						ptr = readBuffer.Count() + (int)offset;
+					else
+						ptr = writeBuffer.Count() + (int)offset;
+				}
+			}
+			virtual Int64 Read(void * pbuffer, Int64 length)
+			{
+				Int64 i;
+				for (i = 0; i < length; i++)
+				{
+					if (ptr + i < readBuffer.Count())
+					{
+						((unsigned char*)pbuffer)[i] = readBuffer[(int)(ptr + i)];
+					}
+					else
+						break;
+				}
+				return i;
+			}
+			virtual Int64 Write(const void * pbuffer, Int64 length)
+			{
+				writeBuffer.SetSize(ptr);
+				if (pbuffer)
+					writeBuffer.AddRange((unsigned char *)pbuffer, (int)length);
+				else
+					for (auto i = 0; i < length; i++)
+						writeBuffer.Add(0);
+				ptr = writeBuffer.Count();
+				return length;
+			}
+			virtual bool CanRead()
+			{
+				return isReadStream;
+			}
+			virtual bool CanWrite()
+			{
+				return !isReadStream;
+			}
+			virtual void Close()
+			{
+				writeBuffer.SetSize(0);
+				writeBuffer.Compress();
+			}
+			virtual bool IsEnd()
+			{
+				if (isReadStream)
+					return ptr >= readBuffer.Count();
+				else
+					return ptr == writeBuffer.Count();
+			}
+			void * GetBuffer()
+			{
+				if (isReadStream)
+					return readBuffer.Buffer();
+				else
+					return writeBuffer.Buffer();
+			}
+			int GetBufferSize()
+			{
+				if (isReadStream)
+					return readBuffer.Count();
+				else
+					return writeBuffer.Count();
+			}
 		};
 	}
 }
@@ -10279,15 +10477,15 @@ namespace CoreLib
 		template <typename ReadCharFunc>
 		int GetUnicodePointFromUTF16(const ReadCharFunc & get)
 		{
-			int byte0 = get(0);
-			int byte1 = get(1);
+			int byte0 = (unsigned char)get(0);
+			int byte1 = (unsigned char)get(1);
 			int word0 = byte0 + (byte1 << 8);
 			if (word0 >= 0xD800 && word0 <= 0xDFFF)
 			{
-				int byte2 = get(2);
-				int byte3 = get(3);
+				int byte2 = (unsigned char)get(2);
+				int byte3 = (unsigned char)get(3);
 				int word1 = byte2 + (byte3 << 8);
-				return ((word0 & 0x3FF) << 10) + (word1 & 0x3FF);
+				return ((word0 & 0x3FF) << 10) + (word1 & 0x3FF) + 0x10000;
 			}
 			else
 				return word0;
@@ -10296,13 +10494,13 @@ namespace CoreLib
 		template <typename ReadCharFunc>
 		int GetUnicodePointFromUTF16Reversed(const ReadCharFunc & get)
 		{
-			int byte0 = get(0);
-			int byte1 = get(1);
+			int byte0 = (unsigned char)get(0);
+			int byte1 = (unsigned char)get(1);
 			int word0 = (byte0 << 8) + byte1;
 			if (word0 >= 0xD800 && word0 <= 0xDFFF)
 			{
-				int byte2 = get(2);
-				int byte3 = get(3);
+				int byte2 = (unsigned char)get(2);
+				int byte3 = (unsigned char)get(3);
 				int word1 = (byte2 << 8) + byte3;
 				return ((word0 & 0x3FF) << 10) + (word1 & 0x3FF);
 			}
@@ -10313,10 +10511,10 @@ namespace CoreLib
 		template <typename ReadCharFunc>
 		int GetUnicodePointFromUTF32(const ReadCharFunc & get)
 		{
-			int byte0 = get(0);
-			int byte1 = get(1);
-			int byte2 = get(2);
-			int byte3 = get(3);
+			int byte0 = (unsigned char)get(0);
+			int byte1 = (unsigned char)get(1);
+			int byte2 = (unsigned char)get(2);
+			int byte3 = (unsigned char)get(3);
 			return byte0 + (byte1 << 8) + (byte2 << 16) + (byte3 << 24);
 		}
 
@@ -10461,6 +10659,7 @@ namespace CoreLib
 				stream->Close();
 			}
 		};
+
 	}
 }
 
@@ -11771,6 +11970,34 @@ extern "C" {  // only need to export C interface if
 #endif
 
 /***********************************************************************
+CORELIB\COMMANDLINEPARSER.H
+***********************************************************************/
+#ifndef CORE_LIB_COMMANDLINE_PARSER
+#define CORE_LIB_COMMANDLINE_PARSER
+
+
+namespace CoreLib
+{
+	namespace Text
+	{
+		class CommandLineParser : public Object
+		{
+		private:
+			List<String> stream;
+		public:
+			CommandLineParser(const String & cmdLine);
+			String GetFileName();
+			bool OptionExists(const String & opt);
+			String GetOptionValue(const String & opt);
+			String GetToken(int id);
+			int GetTokenCount();
+		};
+	}
+}
+
+#endif
+
+/***********************************************************************
 CORELIB\VECTORMATH.H
 ***********************************************************************/
 #ifndef VECTOR_MATH_H
@@ -11795,7 +12022,7 @@ namespace VectorMath
 	const int DefaultFloatUlps = 1024;
 	inline float Clamp(float val, float vmin, float vmax)
 	{
-		return val>vmax?vmax:val<vmin?vmin:val;
+		return val>vmax ? vmax : val<vmin ? vmin : val;
 	}
 	inline bool FloatEquals(float A, float B, int maxUlps = DefaultFloatUlps)
 	{
@@ -11814,11 +12041,11 @@ namespace VectorMath
 	}
 	inline bool FloatLarger(float A, float B, int maxUlps = DefaultFloatUlps)
 	{
-		return A>B && !FloatEquals(A,B,maxUlps);
+		return A>B && !FloatEquals(A, B, maxUlps);
 	}
 	inline bool FloatSmaller(float A, float B, int maxUlps = DefaultFloatUlps)
 	{
-		return A<B && !FloatEquals(A,B,maxUlps);
+		return A<B && !FloatEquals(A, B, maxUlps);
 	}
 	inline bool FloatSmallerOrEquals(float A, float B, int maxUlps = DefaultFloatUlps)
 	{
@@ -11949,14 +12176,10 @@ namespace VectorMath
 		}
 	};
 
-	struct Vec3_Struct
-	{
-		float x,y,z;
-	};
-
-	class Vec3 : public Vec3_Struct
+	class Vec3
 	{
 	public:
+		float x, y, z;
 #ifndef NO_VECTOR_CONSTRUCTORS
 		inline Vec3() = default;
 		inline Vec3(float f)
@@ -11980,6 +12203,10 @@ namespace VectorMath
 			Vec3 rs;
 			rs.x = vx;	rs.y = vy;	rs.z = vz;
 			return rs;
+		}
+		static inline Vec3 Lerp(const Vec3 & v0, const Vec3 & v1, float t)
+		{
+			return v0 * (1.0f - t) + v1 * t;
 		}
 		static inline Vec3 FromHomogeneous(const Vec4 & v);
 		inline void SetZero()
@@ -12029,7 +12256,7 @@ namespace VectorMath
 		}
 		inline Vec3 & operator -= (const Vec3 & vin)
 		{
-			x -= vin.x; y -= vin.y; z -= vin.z; 
+			x -= vin.x; y -= vin.y; z -= vin.z;
 			return *this;
 		}
 		inline Vec3 & operator *= (const Vec3 & vin)
@@ -12049,8 +12276,8 @@ namespace VectorMath
 		}
 		inline Vec3 & operator /= (float s)
 		{
-			float inv = 1.0f/s;
-			return (*this)*=inv;
+			float inv = 1.0f / s;
+			return (*this) *= inv;
 		}
 		inline bool operator == (const Vec3 & vin)
 		{
@@ -12110,11 +12337,11 @@ namespace VectorMath
 		}
 		inline float Length2() const
 		{
-			return x*x+y*y+z*z;
+			return x*x + y*y + z*z;
 		}
 		static inline void NormalizeFPU(Vec3 & rs, const Vec3 & vin)
 		{
-			float invLen = 1.0f/vin.LengthFPU();
+			float invLen = 1.0f / vin.LengthFPU();
 			Scale(rs, vin, invLen);
 		}
 		inline float Length() const;
@@ -12127,14 +12354,10 @@ namespace VectorMath
 		}
 	};
 
-	struct Vec4_Struct
-	{
-		float x,y,z,w;
-	};
-
-	class Vec4 : public Vec4_Struct
+	class Vec4
 	{
 	public:
+		float x, y, z, w;
 #ifndef NO_VECTOR_CONSTRUCTORS
 		inline Vec4() = default;
 		inline Vec4(const Vec4_Struct & v)
@@ -12198,7 +12421,7 @@ namespace VectorMath
 			rs.z = z;
 			return rs;
 		}
-		inline float& operator [] (int i)
+		inline float& operator [] (int i) const
 		{
 			return ((float*)this)[i];
 		}
@@ -12265,8 +12488,8 @@ namespace VectorMath
 		}
 		inline Vec4 & operator /= (float s)
 		{
-			float inv = 1.0f/s;
-			return (*this)*=inv;
+			float inv = 1.0f / s;
+			return (*this) *= inv;
 		}
 		inline bool operator == (const Vec4 & vin)
 		{
@@ -12337,8 +12560,8 @@ namespace VectorMath
 			struct
 			{
 				float _11, _12, _13,
-				_21, _22, _23,
-				_31, _32, _33;
+					_21, _22, _23,
+					_31, _32, _33;
 			} mi;
 		};
 		inline Vec3 Transform(const Vec3& vIn) const
@@ -12347,6 +12570,14 @@ namespace VectorMath
 			rs.x = m[0][0] * vIn.x + m[1][0] * vIn.y + m[2][0] * vIn.z;
 			rs.y = m[0][1] * vIn.x + m[1][1] * vIn.y + m[2][1] * vIn.z;
 			rs.z = m[0][2] * vIn.x + m[1][2] * vIn.y + m[2][2] * vIn.z;
+			return rs;
+		}
+		inline Vec3 TransformTransposed(const Vec3& vIn) const
+		{
+			Vec3 rs;
+			rs.x = m[0][0] * vIn.x + m[0][1] * vIn.y + m[0][2] * vIn.z;
+			rs.y = m[1][0] * vIn.x + m[1][1] * vIn.y + m[1][2] * vIn.z;
+			rs.z = m[2][0] * vIn.x + m[2][1] * vIn.y + m[2][2] * vIn.z;
 			return rs;
 		}
 		static inline void Multiply(Matrix3 & rs, Matrix3 & m1, Matrix3 & m2)
@@ -12371,17 +12602,17 @@ namespace VectorMath
 			float m[4][4];
 			struct
 			{
-				float _11,_12,_13,_14,
-				  _21,_22,_23,_24,
-				  _31,_32,_33,_34,
-				  _41,_42,_43,_44;
+				float _11, _12, _13, _14,
+					_21, _22, _23, _24,
+					_31, _32, _33, _34,
+					_41, _42, _43, _44;
 			} mi;
 			struct
 			{
-				float _11,_12,_13,_14,
-				  _21,_22,_23,_24,
-				  _31,_32,_33,_34,
-				  _41,_42,_43,_44;
+				float _11, _12, _13, _14,
+					_21, _22, _23, _24,
+					_31, _32, _33, _34,
+					_41, _42, _43, _44;
 			} mr;
 		};
 		Matrix4()
@@ -12408,8 +12639,8 @@ namespace VectorMath
 		{
 			Matrix3 rs;
 			for (int i = 0; i < 3; i++)
-			for (int j = 0; j < 3; j++)
-				rs.m[i][j] = m[i][j];
+				for (int j = 0; j < 3; j++)
+					rs.m[i][j] = m[i][j];
 			return rs;
 		}
 		inline Matrix4 & operator *= (const float & val)
@@ -12461,6 +12692,9 @@ namespace VectorMath
 		static inline void Translation(Matrix4 & rs, float tx, float ty, float tz);
 		inline void Transform(Vec3 & rs_d, const Vec3& vIn) const;
 		inline void Transform(Vec4 & rs_d, const Vec4& vIn) const;
+		inline Vec4 Transform(const Vec4& vIn) const;
+		inline Vec3 TransformNormal(const Vec3& vIn) const;
+
 		inline void TransformNormal(Vec3 & rs, const Vec3& vIn) const;
 		inline void TransposeTransformNormal(Vec3 & rs, const Vec3 & vIn) const;
 		inline void TransposeTransform(Vec3 & rs, const Vec3 & vIn) const;
@@ -12481,15 +12715,15 @@ namespace VectorMath
 	private:
 		static const __m128 VecOne;
 	public:
-		__m128 C1,C2,C3,C4;
+		__m128 C1, C2, C3, C4;
 		Matrix4_M128()
 		{}
 		Matrix4_M128(const Matrix4 & m)
 		{
 			C1 = _mm_loadu_ps(m.values);
-			C2 = _mm_loadu_ps(m.values+4);
-			C3 = _mm_loadu_ps(m.values+8);
-			C4 = _mm_loadu_ps(m.values+12);
+			C2 = _mm_loadu_ps(m.values + 4);
+			C3 = _mm_loadu_ps(m.values + 8);
+			C4 = _mm_loadu_ps(m.values + 12);
 		}
 		inline void ToMatrix4(Matrix4 & mOut) const;
 		inline void Transform(Vec4_M128 & rs, const Vec4& vIn) const;
@@ -12531,7 +12765,7 @@ namespace VectorMath
 	//}
 	inline Vec3 Vec3::FromHomogeneous(const Vec4 & v)
 	{
-		float invW = 1.0f/v.w;
+		float invW = 1.0f / v.w;
 		return v.xyz()*invW;
 	}
 	// Vec3
@@ -12615,14 +12849,14 @@ namespace VectorMath
 			addss	xmm0, xmm1;
 
 			sqrtss	xmm0, xmm0;
-			movss	dword ptr [ecx], xmm0;
+			movss	dword ptr[ecx], xmm0;
 		}
 		return f;
 #endif
 	}
 	inline void Vec4::NormalizeFPU(Vec4& vout, const Vec4& vin)
 	{
-		float len = 1.0f/vin.Length();
+		float len = 1.0f / vin.Length();
 		Scale(vout, vin, len);
 	}
 	inline void Vec4::Normalize(Vec4 &vout, const Vec4 &vin)
@@ -12667,13 +12901,13 @@ namespace VectorMath
 	inline void Matrix4::CreatePerspectiveMatrix(Matrix4 &mOut, float left, float right, float bottom, float top, float znear, float zfar)
 	{
 		memset(&mOut, 0, sizeof(Matrix4));
-		mOut.m[0][0] = (znear*2.0f)/(right-left);
-		mOut.m[1][1] = (2.0f*znear)/(top-bottom);
-		mOut.m[2][0] = (right+left)/(right-left);
-		mOut.m[2][1] = (top+bottom)/(top-bottom);
-		mOut.m[2][2] = (zfar+znear)/(znear-zfar);
+		mOut.m[0][0] = (znear*2.0f) / (right - left);
+		mOut.m[1][1] = (2.0f*znear) / (top - bottom);
+		mOut.m[2][0] = (right + left) / (right - left);
+		mOut.m[2][1] = (top + bottom) / (top - bottom);
+		mOut.m[2][2] = (zfar + znear) / (znear - zfar);
 		mOut.m[2][3] = -1.0f;
-		mOut.m[3][2] = 2.0f*zfar*znear/(znear-zfar);
+		mOut.m[3][2] = 2.0f*zfar*znear / (znear - zfar);
 	}
 
 	inline void Matrix4::CreatePerspectiveMatrixFromViewAngle(Matrix4 &mOut, float fovY, float aspect, float zNear, float zFar)
@@ -12696,7 +12930,7 @@ namespace VectorMath
 		x0 *= (xmax - xmin);  x0 += xmin;
 		y0 *= (ymax - ymin); y0 += ymin;
 		x1 *= (xmax - xmin);  x1 += xmin;
-		y1 *= (ymax - ymin); y1 += ymin; 
+		y1 *= (ymax - ymin); y1 += ymin;
 		Matrix4::CreatePerspectiveMatrix(mOut, x0, x1, y0, y1, zNear, zFar);
 	}
 
@@ -12704,7 +12938,7 @@ namespace VectorMath
 	{
 		for (int i = 0; i<16; i++)
 		{
-			mOut.values[i] = rand()/(float)RAND_MAX;
+			mOut.values[i] = rand() / (float)RAND_MAX;
 		}
 	}
 	inline void Matrix4::RotationX(Matrix4 & rs, float angle)
@@ -12714,8 +12948,8 @@ namespace VectorMath
 
 		Matrix4::CreateIdentityMatrix(rs);
 		rs.m[1][1] = c;
-		rs.m[2][1] = s;
-		rs.m[1][2] = -s;
+		rs.m[2][1] = -s;
+		rs.m[1][2] = s;
 		rs.m[2][2] = c;
 	}
 	inline void Matrix4::RotationY(Matrix4 & rs, float angle)
@@ -12736,8 +12970,8 @@ namespace VectorMath
 
 		Matrix4::CreateIdentityMatrix(rs);
 		rs.m[0][0] = c;
-		rs.m[1][0] = s;
-		rs.m[0][1] = -s;
+		rs.m[1][0] = -s;
+		rs.m[0][1] = s;
 		rs.m[1][1] = c;
 	}
 
@@ -12757,71 +12991,88 @@ namespace VectorMath
 	}
 	inline void Matrix4::TransposeTransformNormal(Vec3 & rs, const Vec3 & vIn) const
 	{
-		rs.x = m[0][0]*vIn.x + m[0][1]*vIn.y + m[0][2]*vIn.z;
-		rs.y = m[1][0]*vIn.x + m[1][1]*vIn.y + m[1][2]*vIn.z;
-		rs.z = m[2][0]*vIn.x + m[2][1]*vIn.y + m[2][2]*vIn.z;
+		rs.x = m[0][0] * vIn.x + m[0][1] * vIn.y + m[0][2] * vIn.z;
+		rs.y = m[1][0] * vIn.x + m[1][1] * vIn.y + m[1][2] * vIn.z;
+		rs.z = m[2][0] * vIn.x + m[2][1] * vIn.y + m[2][2] * vIn.z;
 	}
 	inline void Matrix4::TransposeTransform(Vec3 & rs, const Vec3 & vIn) const
 	{
-		rs.x = m[0][0]*vIn.x + m[0][1]*vIn.y + m[0][2]*vIn.z + m[0][3];
-		rs.y = m[1][0]*vIn.x + m[1][1]*vIn.y + m[1][2]*vIn.z + m[1][3];
-		rs.z = m[2][0]*vIn.x + m[2][1]*vIn.y + m[2][2]*vIn.z + m[2][3];
+		rs.x = m[0][0] * vIn.x + m[0][1] * vIn.y + m[0][2] * vIn.z + m[0][3];
+		rs.y = m[1][0] * vIn.x + m[1][1] * vIn.y + m[1][2] * vIn.z + m[1][3];
+		rs.z = m[2][0] * vIn.x + m[2][1] * vIn.y + m[2][2] * vIn.z + m[2][3];
 	}
 	inline void Matrix4::TransposeTransform(Vec4 & rs, const Vec4 & vIn) const
 	{
-		rs.x = m[0][0]*vIn.x + m[0][1]*vIn.y + m[0][2]*vIn.z + m[0][3]*vIn.w;
-		rs.y = m[1][0]*vIn.x + m[1][1]*vIn.y + m[1][2]*vIn.z + m[1][3]*vIn.w;
-		rs.z = m[2][0]*vIn.x + m[2][1]*vIn.y + m[2][2]*vIn.z + m[2][3]*vIn.w;
-		rs.w = m[3][0]*vIn.x + m[3][1]*vIn.y + m[3][2]*vIn.z + m[3][3]*vIn.w;
+		rs.x = m[0][0] * vIn.x + m[0][1] * vIn.y + m[0][2] * vIn.z + m[0][3] * vIn.w;
+		rs.y = m[1][0] * vIn.x + m[1][1] * vIn.y + m[1][2] * vIn.z + m[1][3] * vIn.w;
+		rs.z = m[2][0] * vIn.x + m[2][1] * vIn.y + m[2][2] * vIn.z + m[2][3] * vIn.w;
+		rs.w = m[3][0] * vIn.x + m[3][1] * vIn.y + m[3][2] * vIn.z + m[3][3] * vIn.w;
 	}
 	inline void Matrix4::Transform(Vec3 & rs, const Vec3& vIn) const
 	{
-		rs.x = m[0][0]*vIn.x + m[1][0]*vIn.y + m[2][0]*vIn.z + m[3][0];
-		rs.y = m[0][1]*vIn.x + m[1][1]*vIn.y + m[2][1]*vIn.z + m[3][1];
-		rs.z = m[0][2]*vIn.x + m[1][2]*vIn.y + m[2][2]*vIn.z + m[3][2];
+		rs.x = m[0][0] * vIn.x + m[1][0] * vIn.y + m[2][0] * vIn.z + m[3][0];
+		rs.y = m[0][1] * vIn.x + m[1][1] * vIn.y + m[2][1] * vIn.z + m[3][1];
+		rs.z = m[0][2] * vIn.x + m[1][2] * vIn.y + m[2][2] * vIn.z + m[3][2];
 	}
 	inline void Matrix4::TransformHomogeneous(Vec3 & rs, const Vec3 & vIn) const
 	{
-		rs.x = m[0][0]*vIn.x + m[1][0]*vIn.y + m[2][0]*vIn.z + m[3][0];
-		rs.y = m[0][1]*vIn.x + m[1][1]*vIn.y + m[2][1]*vIn.z + m[3][1];
-		rs.z = m[0][2]*vIn.x + m[1][2]*vIn.y + m[2][2]*vIn.z + m[3][2];
-		float w = 1.0f/(m[0][3]*vIn.x + m[1][3]*vIn.y + m[2][3]*vIn.z + m[3][3]);
+		rs.x = m[0][0] * vIn.x + m[1][0] * vIn.y + m[2][0] * vIn.z + m[3][0];
+		rs.y = m[0][1] * vIn.x + m[1][1] * vIn.y + m[2][1] * vIn.z + m[3][1];
+		rs.z = m[0][2] * vIn.x + m[1][2] * vIn.y + m[2][2] * vIn.z + m[3][2];
+		float w = 1.0f / (m[0][3] * vIn.x + m[1][3] * vIn.y + m[2][3] * vIn.z + m[3][3]);
 		rs.x *= w;
 		rs.y *= w;
 		rs.z *= w;
 	}
 	inline void Matrix4::TransformHomogeneous2D(Vec2 & rs, const Vec3 & vIn) const
 	{
-		rs.x = m[0][0]*vIn.x + m[1][0]*vIn.y + m[2][0]*vIn.z + m[3][0];
-		rs.y = m[0][1]*vIn.x + m[1][1]*vIn.y + m[2][1]*vIn.z + m[3][1];
-		float w = 1.0f/(m[0][3]*vIn.x + m[1][3]*vIn.y + m[2][3]*vIn.z + m[3][3]);
+		rs.x = m[0][0] * vIn.x + m[1][0] * vIn.y + m[2][0] * vIn.z + m[3][0];
+		rs.y = m[0][1] * vIn.x + m[1][1] * vIn.y + m[2][1] * vIn.z + m[3][1];
+		float w = 1.0f / (m[0][3] * vIn.x + m[1][3] * vIn.y + m[2][3] * vIn.z + m[3][3]);
 		rs.x *= w;
 		rs.y *= w;
 	}
 	inline void Matrix4::TransformNormal(Vec3 & rs, const Vec3& vIn) const
 	{
-		rs.x = m[0][0]*vIn.x + m[1][0]*vIn.y + m[2][0]*vIn.z;
-		rs.y = m[0][1]*vIn.x + m[1][1]*vIn.y + m[2][1]*vIn.z;
-		rs.z = m[0][2]*vIn.x + m[1][2]*vIn.y + m[2][2]*vIn.z;
+		rs.x = m[0][0] * vIn.x + m[1][0] * vIn.y + m[2][0] * vIn.z;
+		rs.y = m[0][1] * vIn.x + m[1][1] * vIn.y + m[2][1] * vIn.z;
+		rs.z = m[0][2] * vIn.x + m[1][2] * vIn.y + m[2][2] * vIn.z;
 	}
 	inline void Matrix4::Transform(Vec4 & rs, const Vec4& vIn) const
 	{
-		rs.x = m[0][0]*vIn.x + m[1][0]*vIn.y + m[2][0]*vIn.z + m[3][0]*vIn.w;
-		rs.y = m[0][1]*vIn.x + m[1][1]*vIn.y + m[2][1]*vIn.z + m[3][1]*vIn.w;
-		rs.z = m[0][2]*vIn.x + m[1][2]*vIn.y + m[2][2]*vIn.z + m[3][2]*vIn.w;
-		rs.w = m[0][3]*vIn.x + m[1][3]*vIn.y + m[2][3]*vIn.z + m[3][3]*vIn.w;
+		rs.x = m[0][0] * vIn.x + m[1][0] * vIn.y + m[2][0] * vIn.z + m[3][0] * vIn.w;
+		rs.y = m[0][1] * vIn.x + m[1][1] * vIn.y + m[2][1] * vIn.z + m[3][1] * vIn.w;
+		rs.z = m[0][2] * vIn.x + m[1][2] * vIn.y + m[2][2] * vIn.z + m[3][2] * vIn.w;
+		rs.w = m[0][3] * vIn.x + m[1][3] * vIn.y + m[2][3] * vIn.z + m[3][3] * vIn.w;
+	}
+	inline Vec3 Matrix4::TransformNormal(const Vec3& vIn) const
+	{
+		Vec3 rs;
+		rs.x = m[0][0] * vIn.x + m[1][0] * vIn.y + m[2][0] * vIn.z;
+		rs.y = m[0][1] * vIn.x + m[1][1] * vIn.y + m[2][1] * vIn.z;
+		rs.z = m[0][2] * vIn.x + m[1][2] * vIn.y + m[2][2] * vIn.z;
+		return rs;
+	}
+	inline Vec4 Matrix4::Transform(const Vec4& vIn) const
+	{
+		Vec4 rs;
+		rs.x = m[0][0] * vIn.x + m[1][0] * vIn.y + m[2][0] * vIn.z + m[3][0] * vIn.w;
+		rs.y = m[0][1] * vIn.x + m[1][1] * vIn.y + m[2][1] * vIn.z + m[3][1] * vIn.w;
+		rs.z = m[0][2] * vIn.x + m[1][2] * vIn.y + m[2][2] * vIn.z + m[3][2] * vIn.w;
+		rs.w = m[0][3] * vIn.x + m[1][3] * vIn.y + m[2][3] * vIn.z + m[3][3] * vIn.w;
+		return rs;
 	}
 	inline void Matrix4::MultiplyFPU(Matrix4 &mOut, const Matrix4& M1, const Matrix4& M2)
 	{
 		Matrix4 TempMat;
-		for (int i=0;i<4;i++) //col
+		for (int i = 0; i<4; i++) //col
 		{
-			for (int j=0;j<4;j++) // row
+			for (int j = 0; j<4; j++) // row
 			{
-				TempMat.m[i][j] = M1.m[0][j]*M2.m[i][0] + M1.m[1][j]*M2.m[i][1] + M1.m[2][j]*M2.m[i][2] + M1.m[3][j]*M2.m[i][3];
+				TempMat.m[i][j] = M1.m[0][j] * M2.m[i][0] + M1.m[1][j] * M2.m[i][1] + M1.m[2][j] * M2.m[i][2] + M1.m[3][j] * M2.m[i][3];
 			}
 		}
-		memcpy(&mOut,&TempMat,sizeof(Matrix4));
+		memcpy(&mOut, &TempMat, sizeof(Matrix4));
 	}
 
 	inline void Matrix4::Multiply(Matrix4 &mOut, const Matrix4 &M1, const Matrix4 &M2)
@@ -12849,9 +13100,9 @@ namespace VectorMath
 	inline void Matrix4_M128::ToMatrix4(Matrix4 & mOut) const
 	{
 		_mm_storeu_ps(mOut.values, C1);
-		_mm_storeu_ps(mOut.values+4, C2);
-		_mm_storeu_ps(mOut.values+8, C3);
-		_mm_storeu_ps(mOut.values+12, C4);
+		_mm_storeu_ps(mOut.values + 4, C2);
+		_mm_storeu_ps(mOut.values + 8, C3);
+		_mm_storeu_ps(mOut.values + 12, C4);
 	}
 	inline void Matrix4_M128::Transform(Vec4_M128 & rs, const Vec4& vIn) const
 	{
@@ -12889,7 +13140,7 @@ namespace VectorMath
 	inline void Matrix4_M128::Transform(Vec4_M128 & rs, const Vec4_M128& vIn) const
 	{
 		__m128 r;
-		__m128 x,y,z,w;
+		__m128 x, y, z, w;
 		x = _mm_shuffle_ps(vIn.vec, vIn.vec, _MM_SHUFFLE(0, 0, 0, 0));
 		r = _mm_mul_ps(C1, x);
 		y = _mm_shuffle_ps(vIn.vec, vIn.vec, _MM_SHUFFLE(1, 1, 1, 1));
@@ -12982,10 +13233,10 @@ namespace VectorMath
 	inline void Matrix4_M128::Multiply(Matrix4_M128 & rs, const Matrix4_M128 & mB) const
 	{
 		__m128 T0, T1, T2, T3, R0, R1, R2, R3;
-		T0 = _mm_shuffle_ps(mB.C1, mB.C1, _MM_SHUFFLE(0,0,0,0));
-		T1 = _mm_shuffle_ps(mB.C1, mB.C1, _MM_SHUFFLE(1,1,1,1));
-		T2 = _mm_shuffle_ps(mB.C1, mB.C1, _MM_SHUFFLE(2,2,2,2));
-		T3 = _mm_shuffle_ps(mB.C1, mB.C1, _MM_SHUFFLE(3,3,3,3));
+		T0 = _mm_shuffle_ps(mB.C1, mB.C1, _MM_SHUFFLE(0, 0, 0, 0));
+		T1 = _mm_shuffle_ps(mB.C1, mB.C1, _MM_SHUFFLE(1, 1, 1, 1));
+		T2 = _mm_shuffle_ps(mB.C1, mB.C1, _MM_SHUFFLE(2, 2, 2, 2));
+		T3 = _mm_shuffle_ps(mB.C1, mB.C1, _MM_SHUFFLE(3, 3, 3, 3));
 		R0 = _mm_mul_ps(C1, T0);
 		R1 = _mm_mul_ps(C2, T1);
 		R2 = _mm_mul_ps(C3, T2);
@@ -12994,10 +13245,10 @@ namespace VectorMath
 		R2 = _mm_add_ps(R2, R1);
 		rs.C1 = _mm_add_ps(R3, R2);
 
-		T0 = _mm_shuffle_ps(mB.C2, mB.C2, _MM_SHUFFLE(0,0,0,0));
-		T1 = _mm_shuffle_ps(mB.C2, mB.C2, _MM_SHUFFLE(1,1,1,1));
-		T2 = _mm_shuffle_ps(mB.C2, mB.C2, _MM_SHUFFLE(2,2,2,2));
-		T3 = _mm_shuffle_ps(mB.C2, mB.C2, _MM_SHUFFLE(3,3,3,3));
+		T0 = _mm_shuffle_ps(mB.C2, mB.C2, _MM_SHUFFLE(0, 0, 0, 0));
+		T1 = _mm_shuffle_ps(mB.C2, mB.C2, _MM_SHUFFLE(1, 1, 1, 1));
+		T2 = _mm_shuffle_ps(mB.C2, mB.C2, _MM_SHUFFLE(2, 2, 2, 2));
+		T3 = _mm_shuffle_ps(mB.C2, mB.C2, _MM_SHUFFLE(3, 3, 3, 3));
 		R0 = _mm_mul_ps(C1, T0);
 		R1 = _mm_mul_ps(C2, T1);
 		R2 = _mm_mul_ps(C3, T2);
@@ -13006,10 +13257,10 @@ namespace VectorMath
 		R2 = _mm_add_ps(R2, R1);
 		rs.C2 = _mm_add_ps(R3, R2);
 
-		T0 = _mm_shuffle_ps(mB.C3, mB.C3, _MM_SHUFFLE(0,0,0,0));
-		T1 = _mm_shuffle_ps(mB.C3, mB.C3, _MM_SHUFFLE(1,1,1,1));
-		T2 = _mm_shuffle_ps(mB.C3, mB.C3, _MM_SHUFFLE(2,2,2,2));
-		T3 = _mm_shuffle_ps(mB.C3, mB.C3, _MM_SHUFFLE(3,3,3,3));
+		T0 = _mm_shuffle_ps(mB.C3, mB.C3, _MM_SHUFFLE(0, 0, 0, 0));
+		T1 = _mm_shuffle_ps(mB.C3, mB.C3, _MM_SHUFFLE(1, 1, 1, 1));
+		T2 = _mm_shuffle_ps(mB.C3, mB.C3, _MM_SHUFFLE(2, 2, 2, 2));
+		T3 = _mm_shuffle_ps(mB.C3, mB.C3, _MM_SHUFFLE(3, 3, 3, 3));
 		R0 = _mm_mul_ps(C1, T0);
 		R1 = _mm_mul_ps(C2, T1);
 		R2 = _mm_mul_ps(C3, T2);
@@ -13018,10 +13269,10 @@ namespace VectorMath
 		R2 = _mm_add_ps(R2, R1);
 		rs.C3 = _mm_add_ps(R3, R2);
 
-		T0 = _mm_shuffle_ps(mB.C4, mB.C4, _MM_SHUFFLE(0,0,0,0));
-		T1 = _mm_shuffle_ps(mB.C4, mB.C4, _MM_SHUFFLE(1,1,1,1));
-		T2 = _mm_shuffle_ps(mB.C4, mB.C4, _MM_SHUFFLE(2,2,2,2));
-		T3 = _mm_shuffle_ps(mB.C4, mB.C4, _MM_SHUFFLE(3,3,3,3));
+		T0 = _mm_shuffle_ps(mB.C4, mB.C4, _MM_SHUFFLE(0, 0, 0, 0));
+		T1 = _mm_shuffle_ps(mB.C4, mB.C4, _MM_SHUFFLE(1, 1, 1, 1));
+		T2 = _mm_shuffle_ps(mB.C4, mB.C4, _MM_SHUFFLE(2, 2, 2, 2));
+		T3 = _mm_shuffle_ps(mB.C4, mB.C4, _MM_SHUFFLE(3, 3, 3, 3));
 		R0 = _mm_mul_ps(C1, T0);
 		R1 = _mm_mul_ps(C2, T1);
 		R2 = _mm_mul_ps(C3, T2);
@@ -13033,13 +13284,13 @@ namespace VectorMath
 
 	inline void CartesianToSphere(const Vec3 & dir, float & u, float & v)
 	{
-		const float inv2Pi = 0.5f/PI;
+		const float inv2Pi = 0.5f / PI;
 		v = acos(dir.y);
 		u = atan2(dir.z, dir.x);
 		if (u<0.0f)
 			u += PI * 2.0f;
 		u *= inv2Pi;
-		v *= 1.0f/PI;
+		v *= 1.0f / PI;
 	}
 
 	inline void SphereToCartesian(Vec3 & dir, float u, float v)
@@ -13112,8 +13363,8 @@ namespace VectorMath
 	}
 	inline __m128 operator - (const __m128 & v0)
 	{
-		static const __m128 SIGNMASK = 
-               _mm_castsi128_ps(_mm_set1_epi32(0x80000000));
+		static const __m128 SIGNMASK =
+			_mm_castsi128_ps(_mm_set1_epi32(0x80000000));
 		return _mm_xor_ps(v0, SIGNMASK);
 	}
 
@@ -13151,10 +13402,10 @@ namespace VectorMath
 #endif
 #endif
 	_declspec(align(16))
-	class SSEVec3
+		class SSEVec3
 	{
 	public:
-		__m128 x,y,z;
+		__m128 x, y, z;
 		SSEVec3()
 		{};
 		SSEVec3(__m128 x, __m128 y, __m128 z)
@@ -13223,7 +13474,7 @@ namespace VectorMath
 		}
 		inline SSEVec3 & operator -= (const SSEVec3 & vin)
 		{
-			x -= vin.x; y -= vin.y; z -= vin.z; 
+			x -= vin.x; y -= vin.y; z -= vin.z;
 			return *this;
 		}
 		inline SSEVec3 & operator *= (const SSEVec3 & vin)
@@ -13243,8 +13494,8 @@ namespace VectorMath
 		}
 		inline SSEVec3 & operator /= (float s)
 		{
-			float inv = 1.0f/s;
-			return (*this)*=_mm_set_ps1(inv);
+			float inv = 1.0f / s;
+			return (*this) *= _mm_set_ps1(inv);
 		}
 
 		inline static __m128 Dot(const SSEVec3 & v1, const SSEVec3 & v2)
@@ -13260,7 +13511,7 @@ namespace VectorMath
 	};
 
 	_declspec(align(16))
-	class SSEVec4
+		class SSEVec4
 	{
 	public:
 		__m128 x, y, z, w;
@@ -13370,7 +13621,7 @@ namespace VectorMath
 	};
 
 	_declspec(align(16))
-	class SSEMatrix4
+		class SSEMatrix4
 	{
 	public:
 		__m128 values[16];
@@ -13384,10 +13635,10 @@ namespace VectorMath
 		inline SSEVec3 Transform(SSEVec3 & v)
 		{
 			SSEVec3 rs;
-			rs.x = values[0]*v.x + values[4]*v.y + values[8]*v.z + values[12];
-			rs.y = values[1]*v.x + values[5]*v.y + values[9]*v.z + values[13];
-			rs.z = values[2]*v.x + values[6]*v.y + values[10]*v.z + values[14];
-			auto w = values[3]*v.x + values[7]*v.y + values[11]*v.z + values[15];
+			rs.x = values[0] * v.x + values[4] * v.y + values[8] * v.z + values[12];
+			rs.y = values[1] * v.x + values[5] * v.y + values[9] * v.z + values[13];
+			rs.z = values[2] * v.x + values[6] * v.y + values[10] * v.z + values[14];
+			auto w = values[3] * v.x + values[7] * v.y + values[11] * v.z + values[15];
 			w = _mm_set_ps1(1.0f) / w;
 			rs.x *= w;
 			rs.y *= w;
@@ -13397,9 +13648,9 @@ namespace VectorMath
 		inline SSEVec3 TransformNonPerspective(SSEVec3 & v)
 		{
 			SSEVec3 rs;
-			rs.x = values[0]*v.x + values[4]*v.y + values[8]*v.z + values[12];
-			rs.y = values[1]*v.x + values[5]*v.y + values[9]*v.z + values[13];
-			rs.z = values[2]*v.x + values[6]*v.y + values[10]*v.z + values[14];
+			rs.x = values[0] * v.x + values[4] * v.y + values[8] * v.z + values[12];
+			rs.y = values[1] * v.x + values[5] * v.y + values[9] * v.z + values[13];
+			rs.z = values[2] * v.x + values[6] * v.y + values[10] * v.z + values[14];
 			return rs;
 		}
 	};
@@ -13444,6 +13695,228 @@ namespace VectorMath
 			rs.z = pz;
 			rs.w = pw;
 			return rs;
+		}
+	};
+
+	class Quaternion
+	{
+	public:
+		float x, y, z, w;
+		Quaternion() = default;
+		Quaternion(float px, float py, float pz, float pw)
+		{
+			x = px; y = py; z = pz; w = pw;
+		}
+		Quaternion(const Vec4& v)
+		{
+			x = v.x; y = v.y; z = v.z; w = v.w;
+		}
+		Vec4 ToVec4() const
+		{
+			return Vec4::Create(x, y, z, w);
+		}
+		Quaternion operator * (const Quaternion & q) const
+		{
+			Quaternion rs;
+			rs.x = w*q.x + x*q.w + y*q.z - z*q.y;
+			rs.y = w*q.y + y*q.w + z*q.x - x*q.z;
+			rs.z = w*q.z + z*q.w + x*q.y - y*q.x;
+			rs.w = w*q.w - x*q.x - y*q.y - z*q.z;
+			return rs;
+		}
+		Quaternion operator + (const Quaternion & q) const
+		{
+			Quaternion rs;
+			rs.x = x + q.x;
+			rs.y = y + q.y;
+			rs.z = z + q.z;
+			rs.w = w + q.w;
+			return rs;
+		}
+		Quaternion operator * (float s) const
+		{
+			Quaternion rs;
+			rs.x = x * s;
+			rs.y = y * s;
+			rs.z = z * s;
+			rs.w = w * s;
+			return rs;
+		}
+		Quaternion operator *= (float s)
+		{
+			x = x * s;
+			y = y * s;
+			z = z * s;
+			w = w * s;
+			return *this;
+		}
+		Quaternion operator -() const
+		{
+			return Quaternion(-x, -y, -z, -w);
+		}
+		Quaternion Conjugate() const
+		{
+			return Quaternion(-x, -y, -z, w);
+		}
+		float Length() const
+		{
+			return sqrt(x*x + y*y + z*z + w*w);
+		}
+		float LengthSquared() const
+		{
+			return x*x + y*y + z*z + w*w;
+		}
+		Quaternion Inverse() const
+		{
+			auto rs = Conjugate();
+			rs *= (1.0f / LengthSquared());
+			return rs;
+		}
+		Vec3 Transform(const Vec3 &v) const
+		{
+			Quaternion V(v.x, v.y, v.z, 0.0f);
+			auto rs = *this * V * Conjugate();
+			return Vec3::Create(rs.x, rs.y, rs.z);
+		}
+		Vec4 ToAxisAngle() const
+		{
+			float theta = acos(w);
+			float invSinTheta = 1.0f / sin(theta);
+
+			Vec4 rs;
+			rs.x = x * invSinTheta;
+			rs.y = y * invSinTheta;
+			rs.z = z * invSinTheta;
+			rs.w = theta * 2.0f;
+			return rs;
+		}
+		Matrix3 ToMatrix3() const
+		{
+			Matrix3 rs;
+			rs.values[0] = 1.0f - 2.0f * (y*y + z*z);
+			rs.values[1] = 2.0f * (x*y + w*z);
+			rs.values[2] = 2.0f * (x*z - w*y);
+
+			rs.values[3] = 2.0f * (x*y - w*z);
+			rs.values[4] = 1.0f - 2.0f * (x*x + z*z);
+			rs.values[5] = 2.0f * (y*z + w*x);
+
+			rs.values[6] = 2.0f * (x*z + w*y);
+			rs.values[7] = 2.0f * (y*z - w*x);
+			rs.values[8] = 1.0f - 2.0f * (x*x + y*y);
+			return rs;
+		}
+		Matrix4 ToMatrix4() const
+		{
+			Matrix4 rs;
+			rs.values[0] = 1.0f - 2.0f * (y*y + z*z);
+			rs.values[1] = 2.0f * (x*y + w*z);
+			rs.values[2] = 2.0f * (x*z - w*y);
+			rs.values[3] = 0.0f;
+
+			rs.values[4] = 2.0f * (x*y - w*z);
+			rs.values[5] = 1.0f - 2.0f * (x*x + z*z);
+			rs.values[6] = 2.0f * (y*z + w*x);
+			rs.values[7] = 0.0f;
+
+			rs.values[8] = 2.0f * (x*z + w*y);
+			rs.values[9] = 2.0f * (y*z - w*x);
+			rs.values[10] = 1.0f - 2.0f * (x*x + y*y);
+			rs.values[11] = 0.0f;
+
+			rs.values[12] = 0.0f;
+			rs.values[13] = 0.0f;
+			rs.values[14] = 0.0f;
+			rs.values[15] = 1.0f;
+
+			return rs;
+		}
+		static inline Quaternion FromMatrix(const Matrix3 & a)
+		{
+			Quaternion q;
+			float trace = a.m[0][0] + a.m[1][1] + a.m[2][2]; // I removed + 1.0f; see discussion with Ethan
+			if (trace > 0)
+			{
+				float s = 0.5f / sqrtf(trace + 1.0f);
+				q.w = 0.25f / s;
+				q.x = (a.m[1][2] - a.m[2][1]) * s;
+				q.y = (a.m[2][0] - a.m[0][2]) * s;
+				q.z = (a.m[0][1] - a.m[1][0]) * s;
+			}
+			else
+			{
+				if (a.m[0][0] > a.m[1][1] && a.m[0][0] > a.m[2][2])
+				{
+					float s = 2.0f * sqrtf(1.0f + a.m[0][0] - a.m[1][1] - a.m[2][2]);
+					q.w = (a.m[1][2] - a.m[2][1]) / s;
+					q.x = 0.25f * s;
+					q.y = (a.m[0][1] + a.m[1][0]) / s;
+					q.z = (a.m[0][2] + a.m[2][0]) / s;
+				}
+				else if (a.m[1][1] > a.m[2][2])
+				{
+					float s = 2.0f * sqrtf(1.0f + a.m[1][1] - a.m[0][0] - a.m[2][2]);
+					q.w = (a.m[2][0] - a.m[0][2]) / s;
+					q.x = (a.m[0][1] + a.m[1][0]) / s;
+					q.y = 0.25f * s;
+					q.z = (a.m[1][2] + a.m[2][1]) / s;
+				}
+				else
+				{
+					float s = 2.0f * sqrtf(1.0f + a.m[2][2] - a.m[0][0] - a.m[1][1]);
+					q.w = (a.m[0][1] - a.m[1][0]) / s;
+					q.x = (a.m[0][2] + a.m[2][0]) / s;
+					q.y = (a.m[1][2] + a.m[2][1]) / s;
+					q.z = 0.25f * s;
+				}
+			}
+			return q * (1.0f / q.Length());
+		}
+		static inline Quaternion FromCoordinates(const Vec3 & axisX, const Vec3 & axisY, const Vec3 & axisZ)
+		{
+			Matrix3 a;
+			a.values[0] = axisX.x; a.values[3] = axisX.y, a.values[6] = axisX.z;
+			a.values[1] = axisY.x; a.values[4] = axisY.y, a.values[7] = axisY.z;
+			a.values[2] = axisZ.x; a.values[5] = axisZ.y, a.values[8] = axisZ.z;
+
+			return FromMatrix(a);
+		}
+		static inline Quaternion FromAxisAngle(const Vec3 & axis, float angle)
+		{
+			float cosAng = cos(angle * 0.5f);
+			float sinAng = sin(angle * 0.5f);
+			return Quaternion(axis.x *  sinAng, axis.y * sinAng, axis.z * sinAng, cosAng);
+		}
+		static inline float Dot(const Quaternion & q1, const Quaternion & q2)
+		{
+			return q1.x*q2.x + q1.y*q2.y + q1.z*q2.z + q1.w*q2.w;
+		}
+		static inline Quaternion Lerp(const Quaternion & q1, const Quaternion & q2, float t)
+		{
+			float invT = 1.0f - t;
+			return Quaternion(q1.x * invT + q2.x * t,
+				q1.y * invT + q2.y * t,
+				q1.z * invT + q2.z * t,
+				q1.w * invT + q2.w * t);
+		}
+		static inline Quaternion Slerp(const Quaternion & q1, const Quaternion & q2, float t)
+		{
+			Quaternion q3;
+			float dot = Quaternion::Dot(q1, q2);
+			if (dot < 0)
+			{
+				dot = -dot;
+				q3 = -q2;
+			}
+			else
+				q3 = q2;
+			if (dot < 0.95f)
+			{
+				float angle = acos(dot);
+				return (q1*sin(angle*(1 - t)) + q3*sin(angle*t)) * (1.0f / sin(angle));
+			}
+			else
+				return Lerp(q1, q3, t);
 		}
 	};
 }
@@ -33090,6 +33563,67 @@ void spDestroyCompilationResult(SpireCompilationResult * result)
 
 
 /***********************************************************************
+CORELIB\COMMANDLINEPARSER.CPP
+***********************************************************************/
+#ifndef SPIRE_NO_CORE_LIB
+
+namespace CoreLib
+{
+	namespace Text
+	{
+		CommandLineParser::CommandLineParser(const String & cmdLine)
+		{
+			stream = Split(cmdLine, L' ');
+		}
+
+		String CommandLineParser::GetFileName()
+		{
+			if (stream.Count())
+				return stream.First();
+			else
+				return "";
+		}
+
+		bool CommandLineParser::OptionExists(const String & opt)
+		{
+			for (auto & token : stream)
+			{
+				if (token.Equals(opt, false))
+				{
+					return true;
+				}
+			}
+			return false;
+		}
+
+		String CommandLineParser::GetOptionValue(const String & opt)
+		{
+			for (int i = 0; i < stream.Count(); i++)
+			{
+				if (stream[i].Equals(opt, false))
+				{
+					if (i < stream.Count() - 1)
+						return stream[i+1];
+					return "";
+				}
+			}
+			return "";
+		}
+
+		String CommandLineParser::GetToken(int id)
+		{
+			return stream[id];
+		}
+
+		int CommandLineParser::GetTokenCount()
+		{
+			return stream.Count();
+		}
+	}
+}
+#endif
+
+/***********************************************************************
 CORELIB\LIBIO.CPP
 ***********************************************************************/
 #ifndef SPIRE_NO_CORE_LIB
@@ -33317,14 +33851,39 @@ namespace CoreLib
 #endif
 		}
 
+		String String::FromWChar(const wchar_t ch)
+		{
+#ifdef _WIN32
+			return CoreLib::IO::Encoding::UTF16->ToString((const char*)&ch, (int)(sizeof(wchar_t)));
+#else
+			return CoreLib::IO::Encoding::UTF32->ToString((const char*)&ch, (int)(sizeof(wchar_t)));
+#endif
+		}
+
+		String String::FromUnicodePoint(unsigned int codePoint)
+		{
+			char buf[6];
+			int len = CoreLib::IO::EncodeUnicodePointToUTF8(buf, (int)codePoint);
+			buf[len] = 0;
+			return String(buf);
+		}
+
 		wchar_t * String::ToWString(int * len) const
 		{
 			if (!buffer)
+			{
+				if (len)
+					*len = 0;
 				return L"";
+			}
 			else
 			{
 				if (wcharBuffer)
+				{
+					if (len)
+						*len = (int)wcslen(wcharBuffer);
 					return wcharBuffer;
+				}
 				List<char> buf;
 				CoreLib::IO::Encoding::UTF16->GetBytes(buf, *this);
 				if (len)

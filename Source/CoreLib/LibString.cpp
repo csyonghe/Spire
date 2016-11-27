@@ -83,14 +83,39 @@ namespace CoreLib
 #endif
 		}
 
+		String String::FromWChar(const wchar_t ch)
+		{
+#ifdef _WIN32
+			return CoreLib::IO::Encoding::UTF16->ToString((const char*)&ch, (int)(sizeof(wchar_t)));
+#else
+			return CoreLib::IO::Encoding::UTF32->ToString((const char*)&ch, (int)(sizeof(wchar_t)));
+#endif
+		}
+
+		String String::FromUnicodePoint(unsigned int codePoint)
+		{
+			char buf[6];
+			int len = CoreLib::IO::EncodeUnicodePointToUTF8(buf, (int)codePoint);
+			buf[len] = 0;
+			return String(buf);
+		}
+
 		wchar_t * String::ToWString(int * len) const
 		{
 			if (!buffer)
+			{
+				if (len)
+					*len = 0;
 				return L"";
+			}
 			else
 			{
 				if (wcharBuffer)
+				{
+					if (len)
+						*len = (int)wcslen(wcharBuffer);
 					return wcharBuffer;
+				}
 				List<char> buf;
 				CoreLib::IO::Encoding::UTF16->GetBytes(buf, *this);
 				if (len)

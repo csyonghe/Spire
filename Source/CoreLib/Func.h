@@ -133,6 +133,14 @@ namespace CoreLib
 				funcPtr = new LambdaFuncPtr<TFuncObj, TResult, Arguments...>(func);
 				return *this;
 			}
+			bool operator == (const Func & f)
+			{
+				return *funcPtr == f.funcPtr.Ptr();
+			}
+			bool operator != (const Func & f)
+			{
+				return !(*this == f);
+			}
 			TResult operator()(Arguments... params)
 			{
 				return (*funcPtr)(params...);
