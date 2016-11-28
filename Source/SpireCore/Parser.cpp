@@ -29,7 +29,7 @@ namespace Spire
 			return tokens[pos++];
 		}
 
-		Token & Parser::ReadToken(TokenType type)
+		Token & Parser::ReadToken(CoreLib::Text::TokenType type)
 		{
 			if (pos >= tokens.Count())
 			{
@@ -60,7 +60,7 @@ namespace Spire
 			}
 		}
 
-		bool Parser::LookAheadToken(TokenType type, int offset)
+		bool Parser::LookAheadToken(CoreLib::Text::TokenType type, int offset)
 		{
 			if (pos + offset >= tokens.Count())
 			{
@@ -1054,7 +1054,7 @@ namespace Spire
 				return Associativity::Left;
 		}
 
-		int GetOpLevel(TokenType type)
+		int GetOpLevel(CoreLib::Text::TokenType type)
 		{
 			switch(type)
 			{

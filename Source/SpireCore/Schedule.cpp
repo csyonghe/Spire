@@ -28,7 +28,7 @@ namespace Spire
 				return tokens[pos++];
 			}
 
-			Token & ReadToken(TokenType type)
+			Token & ReadToken(CoreLib::Text::TokenType type)
 			{
 				if (pos >= tokens.Count())
 				{

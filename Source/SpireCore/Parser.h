@@ -103,9 +103,9 @@ namespace Spire
 			RefPtr<ProgramSyntaxNode> Parse();
 		private:
 			Token & ReadToken();
-			Token & ReadToken(TokenType type);
+			Token & ReadToken(CoreLib::Text::TokenType type);
 			Token & ReadToken(const char * string);
-			bool LookAheadToken(TokenType type, int offset = 0);
+			bool LookAheadToken(CoreLib::Text::TokenType type, int offset = 0);
 			bool LookAheadToken(const char * string, int offset = 0);
 			Token & ReadTypeKeyword();
 			VariableModifier ReadVariableModifier();

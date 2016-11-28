@@ -27,7 +27,7 @@ namespace CoreLib
 			template <typename T>
 			static TraitResultYes Check(D*, T) { return TraitResultYes(); }
 			static TraitResultNo Check(B*, int) { return TraitResultNo(); }
-			static constexpr bool Value = sizeof(Check(IsBaseOfTraitHost<B, D>(), int())) == sizeof(TraitResultYes);
+			enum { Value = sizeof(Check(IsBaseOfTraitHost<B, D>(), int())) == sizeof(TraitResultYes) };
 		};
 
 		template<bool B, class T = void>
@@ -41,7 +41,7 @@ namespace CoreLib
 		{
 			static TraitResultYes Use(B) {};
 			static TraitResultNo Use(...) {};
-			static constexpr bool Value = sizeof(Use(*(D*)(nullptr))) == sizeof(TraitResultYes);
+			enum { Value = sizeof(Use(*(D*)(nullptr))) == sizeof(TraitResultYes) };
 		};
 	}
 }
