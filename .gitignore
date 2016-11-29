@@ -10,3 +10,4 @@ LibraryRelease/CodePack.exe
 *.VC.opendb
 *.VC.db
 *.spire.actual
+LibraryRelease/Spire.cpp

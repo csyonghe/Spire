@@ -502,10 +502,10 @@ namespace CoreLib
 				_count = 0;
 				hashMap = 0;
 			}
-			template<typename... Args>
-			Dictionary(Args... args)
+			template<typename Arg, typename... Args>
+			Dictionary(Arg arg, Args... args)
 			{
-				Init(args...);
+				Init(arg, args...);
 			}
 			Dictionary(const Dictionary<TKey, TValue> & other)
 				: bucketSizeMinusOne(-1), _count(0), hashMap(0)
@@ -893,10 +893,10 @@ namespace CoreLib
 				_count = 0;
 				hashMap = 0;
 			}
-			template<typename... Args>
-			EnumerableDictionary(Args... args)
+			template<typename Arg, typename... Args>
+			EnumerableDictionary(Arg arg, Args... args)
 			{
-				Init(args...);
+				Init(arg, args...);
 			}
 			EnumerableDictionary(const EnumerableDictionary<TKey, TValue> & other)
 				: bucketSizeMinusOne(-1), _count(0), hashMap(0)
@@ -957,10 +957,10 @@ namespace CoreLib
 		public:
 			HashSetBase()
 			{}
-			template<typename... Args>
-			HashSetBase(Args... args)
+			template<typename Arg, typename... Args>
+			HashSetBase(Arg arg, Args... args)
 			{
-				Init(args...);
+				Init(arg, args...);
 			}
 			HashSetBase(const HashSetBase & set)
 			{
