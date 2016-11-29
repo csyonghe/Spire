@@ -1,4 +1,5 @@
 #ifndef GET_DEPENDENCY_VISITOR_H
+#define GET_DEPENDENCY_VISITOR_H
 
 #include "VariantIR.h"
 #include "Closure.h"
