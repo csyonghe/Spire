@@ -2,7 +2,7 @@
 #include "../CoreLib/LibIO.h"
 #include "../CoreLib/Tokenizer.h"
 #include "../SpireCore/StdInclude.h"
-#include "include/Spire.h"
+#include "../../Spire.h"
 #include "../SpireCore/TypeTranslation.h"
 
 using namespace CoreLib::Basic;
