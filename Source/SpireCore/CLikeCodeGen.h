@@ -120,7 +120,7 @@ namespace Spire
 			HashSet<String> intrinsicTextureFunctions;
 			ImportInstruction * currentImportInstr = nullptr;
 			bool useBindlessTexture = false;
-			ErrorWriter * errWriter;
+			DiagnosticSink * errWriter;
 
 			virtual OutputStrategy * CreateStandardOutputStrategy(ILWorld * world, String layoutPrefix) = 0;
 			virtual OutputStrategy * CreatePackedBufferOutputStrategy(ILWorld * world) = 0;
@@ -201,7 +201,7 @@ namespace Spire
 
 		public:
 			CLikeCodeGen();
-			virtual CompiledShaderSource GenerateShader(CompileResult & result, SymbolTable *, ILShader * shader, ErrorWriter * err) override;
+			virtual CompiledShaderSource GenerateShader(CompileResult & result, SymbolTable *, ILShader * shader, DiagnosticSink * err) override;
 			void GenerateStructs(StringBuilder & sb, ILProgram * program);
 			void GenerateReferencedFunctions(StringBuilder & sb, ILProgram * program, ArrayView<ILWorld*> worlds);
 			ExternComponentCodeGenInfo ExtractExternComponentInfo(const ILObjectDefinition & input);

@@ -74,7 +74,7 @@ namespace Spire
 			List<SyntaxNode *> loops;
 			SymbolTable * symbolTable;
 		public:
-			SemanticsVisitor(SymbolTable * symbols, ErrorWriter * pErr)
+			SemanticsVisitor(SymbolTable * symbols, DiagnosticSink * pErr)
 				:SyntaxVisitor(pErr), symbolTable(symbols)
 			{
 			}
@@ -444,7 +444,7 @@ namespace Spire
 				ShaderSymbol * currentShader = nullptr;
 				ShaderComponentSymbol * currentComp = nullptr;
 			public:
-				ShaderImportVisitor(ErrorWriter * writer, SymbolTable * symTable)
+				ShaderImportVisitor(DiagnosticSink * writer, SymbolTable * symTable)
 					: SyntaxVisitor(writer), symbolTable(symTable)
 				{}
 				virtual RefPtr<ShaderSyntaxNode> VisitShader(ShaderSyntaxNode * shader) override
@@ -565,7 +565,7 @@ namespace Spire
 					}
 				}
 				// add shader objects to symbol table
-				ShaderImportVisitor importVisitor(err, symbolTable);
+				ShaderImportVisitor importVisitor(sink, symbolTable);
 				shader->Accept(&importVisitor);
 				/* ************************************
 				***************************************
@@ -745,7 +745,7 @@ namespace Spire
 					if (compImpl->SyntaxNode->Parameters.Count())
 						Error(33032, "\'" + compImpl->SyntaxNode->Name.Content + "\': function redefinition.\nsee previous definition at " +
 							compSym->Implementations.Last()->SyntaxNode->Position.ToString(), compImpl->SyntaxNode.Ptr());
-					symbolTable->CheckComponentImplementationConsistency(err, compSym.Ptr(), compImpl.Ptr());
+					symbolTable->CheckComponentImplementationConsistency(sink, compSym.Ptr(), compImpl.Ptr());
 				}
 				if (compImpl->SyntaxNode->Parameters.Count())
 				{
@@ -817,7 +817,7 @@ namespace Spire
 				{
 					VisitShaderPass1(shader.Ptr());
 				}
-				if (err->GetErrorCount() != 0)
+				if (sink->GetErrorCount() != 0)
 					return programNode;
 				// shader dependency is discovered in pass 1, we can now sort the shaders
 				if (!symbolTable->SortShaders())
@@ -1305,9 +1305,10 @@ namespace Spire
 
 			RefPtr<ExpressionSyntaxNode> ResolveFunctionOverload(InvokeExpressionSyntaxNode * invoke, MemberExpressionSyntaxNode* memberExpr, List<RefPtr<ExpressionSyntaxNode>> & arguments)
 			{
-				err->PushState();
+                // TODO(tfoley): Figure out why we even need to do this here...
+                DiagnosticSink::State savedState = sink->saveState();
 				memberExpr->BaseExpression->Accept(this);
-				err->PopState();
+                sink->restoreState(savedState);
 				if (memberExpr->BaseExpression->Type->IsShader())
 				{
 					auto basicType = memberExpr->BaseExpression->Type->AsBasicType();
@@ -1886,7 +1887,7 @@ namespace Spire
 			SemanticsVisitor & operator = (const SemanticsVisitor &) = delete;
 		};
 
-		SyntaxVisitor * CreateSemanticsVisitor(SymbolTable * symbols, ErrorWriter * err)
+		SyntaxVisitor * CreateSemanticsVisitor(SymbolTable * symbols, DiagnosticSink * err)
 		{
 			return new SemanticsVisitor(symbols, err);
 		}

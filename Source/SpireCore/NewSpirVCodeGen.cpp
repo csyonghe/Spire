@@ -58,7 +58,7 @@ namespace Spire
 		class SpirVCodeGen : public CodeGenBackend
 		{
 		public:
-			virtual CompiledShaderSource GenerateShader(CompileResult & /*result*/, SymbolTable * /*symbols*/, ILShader * shader, ErrorWriter * /*err*/) override
+			virtual CompiledShaderSource GenerateShader(CompileResult & /*result*/, SymbolTable * /*symbols*/, ILShader * shader, DiagnosticSink * /*err*/) override
 			{
 				PrintILShader(shader);
 				system("pause");

@@ -213,36 +213,34 @@ namespace Spire
 
 		class CompileResult
 		{
-		private:
-			ErrorWriter errWriter;
 		public:
-			bool Success;
-			List<CompileError> ErrorList, WarningList;
+			DiagnosticSink sink;
 			String ScheduleFile;
 			RefPtr<ILProgram> Program;
 			List<ShaderChoice> Choices;
 			EnumerableDictionary<String, CompiledShaderSource> CompiledSource; // shader -> stage -> code
-			void PrintError(bool printWarning = false)
+			void PrintDiagnostics()
 			{
-				for (int i = 0; i < ErrorList.Count(); i++)
+				for (int i = 0; i < sink.diagnostics.Count(); i++)
 				{
-					fprintf(stderr, "%S(%d): error %d: %S\n", ErrorList[i].Position.FileName.ToWString(), ErrorList[i].Position.Line,
-						ErrorList[i].ErrorID, ErrorList[i].Message.ToWString());
+					fprintf(stderr, "%S(%d): %s %d: %S\n",
+                        sink.diagnostics[i].Position.FileName.ToWString(),
+                        sink.diagnostics[i].Position.Line,
+                        getSeverityName(sink.diagnostics[i].severity),
+						sink.diagnostics[i].ErrorID,
+                        sink.diagnostics[i].Message.ToWString());
 				}
-				if (printWarning)
-					for (int i = 0; i < WarningList.Count(); i++)
-					{
-						fprintf(stderr, "%S(%d): warning %d: %S\n", WarningList[i].Position.FileName.ToWString(),
-							WarningList[i].Position.Line, WarningList[i].ErrorID, WarningList[i].Message.ToWString());
-					}
 			}
 			CompileResult()
-				: errWriter(ErrorList, WarningList)
 			{}
-			ErrorWriter * GetErrorWriter()
+			DiagnosticSink * GetErrorWriter()
 			{
-				return &errWriter;
+				return &sink;
 			}
+            int GetErrorCount()
+            {
+                return sink.GetErrorCount();
+            }
 		};
 
 	}

@@ -8,12 +8,12 @@ namespace Spire
 		{
 			if (pos >= tokens.Count())
 			{
-				errors.Add(CompileError(String("\"") + string + String("\" expected but end of file encountered."), 20001, CodePosition(0, 0, 0, fileName)));
+				sink->Error(20001, String("\"") + string + String("\" expected but end of file encountered."), CodePosition(0, 0, 0, fileName));
 				throw 0;
 			}
 			else if (tokens[pos].Content != string)
 			{
-				errors.Add(CompileError(String("\"") + string + String("\" expected"), 20001, tokens[pos].Position));
+				sink->Error(20001, String("\"") + string + String("\" expected"), tokens[pos].Position);
 				throw 20001;
 			}
 			return tokens[pos++];
@@ -23,7 +23,7 @@ namespace Spire
 		{
 			if (pos >= tokens.Count())
 			{
-				errors.Add(CompileError(String(" Unexpected end of file."), 20001, CodePosition(0, 0, 0, fileName)));
+				sink->Error(20001, String(" Unexpected end of file."), CodePosition(0, 0, 0, fileName));
 				throw 0;
 			}
 			return tokens[pos++];
@@ -33,12 +33,12 @@ namespace Spire
 		{
 			if (pos >= tokens.Count())
 			{
-				errors.Add(CompileError(TokenTypeToString(type) + String(" expected but end of file encountered."), 20001, CodePosition(0, 0, 0, fileName)));
+				sink->Error(20001, TokenTypeToString(type) + String(" expected but end of file encountered."), CodePosition(0, 0, 0, fileName));
 				throw 0;
 			}
 			else if(tokens[pos].Type != type)
 			{
-				errors.Add(CompileError(TokenTypeToString(type) + String(" expected"), 20001, tokens[pos].Position));
+				sink->Error(20001, TokenTypeToString(type) + String(" expected"), tokens[pos].Position);
 				throw 20001;
 			}
 			return tokens[pos++];
@@ -48,7 +48,7 @@ namespace Spire
 		{
 			if (pos + offset >= tokens.Count())
 			{
-				errors.Add(CompileError(String("\'") + string + String("\' expected but end of file encountered."), 20001, CodePosition(0, 0, 0, fileName)));
+				sink->Error(20001, String("\'") + string + String("\' expected but end of file encountered."), CodePosition(0, 0, 0, fileName));
 				return false;
 			}
 			else
@@ -64,7 +64,7 @@ namespace Spire
 		{
 			if (pos + offset >= tokens.Count())
 			{
-				errors.Add(CompileError(TokenTypeToString(type) + String(" expected but end of file encountered."), 20001, CodePosition(0, 0, 0, fileName)));
+				sink->Error(20001, TokenTypeToString(type) + String(" expected but end of file encountered."), CodePosition(0, 0, 0, fileName));
 				return false;
 			}
 			else
@@ -80,12 +80,12 @@ namespace Spire
 		{
 			if (pos >= tokens.Count())
 			{
-				errors.Add(CompileError(String("type name expected but end of file encountered."), 20001, CodePosition(0, 0, 0, fileName)));
+				sink->Error(20001, String("type name expected but end of file encountered."), CodePosition(0, 0, 0, fileName));
 				throw 0;
 			}
 			if(!IsTypeKeyword())
 			{
-				errors.Add(CompileError(String("type name expected but '" + tokens[pos].Content + "' encountered."), 20001, tokens[pos].Position));
+				sink->Error(20001, String("type name expected but '" + tokens[pos].Content + "' encountered."), tokens[pos].Position);
 				throw 20001;
 			}
 			return tokens[pos++];
@@ -95,7 +95,7 @@ namespace Spire
 		{
 			if (pos >= tokens.Count())
 			{
-				errors.Add(CompileError(String("Unexpected end of file."), 20001, tokens[pos].Position));
+				sink->Error(20001, String("Unexpected end of file."), tokens[pos].Position);
 				throw 0;
 			}
 
@@ -159,7 +159,7 @@ namespace Spire
 						else
 						{
 							if (lastPosBeforeError == 0 && pos < tokens.Count())
-								errors.Add(CompileError("unexpected token \'" + tokens[pos].Content + "\'.", 20003, tokens[pos].Position));
+								sink->Error(20003, "unexpected token \'" + tokens[pos].Content + "\'.", tokens[pos].Position);
 							throw 0;
 						}
 					}
@@ -225,8 +225,8 @@ namespace Spire
 					else
 					{
 						if (lastErrorPos == 0 && pos < tokens.Count())
-							errors.Add(CompileError("unexpected token \'" + tokens[pos].Content + "\', only component definitions are allowed in a shader scope.", 
-								20004, tokens[pos].Position));
+							sink->Error(20004, "unexpected token \'" + tokens[pos].Content + "\', only component definitions are allowed in a shader scope.", 
+								tokens[pos].Position);
 						throw 0;
 					}
 				}
@@ -473,7 +473,7 @@ namespace Spire
 							arg->ArgumentName.Position = varExpr->Position;
 						}
 						else
-							errors.Add(CompileError("unexpected ':'.", 20011, pos < tokens.Count() ? tokens[pos].Position : CodePosition(0, 0, 0, fileName)));
+							sink->Error(20011, "unexpected ':'.", pos < tokens.Count() ? tokens[pos].Position : CodePosition(0, 0, 0, fileName));
 						ReadToken(":");
 						arg->Expression = ParseExpression();
 					}
@@ -588,7 +588,7 @@ namespace Spire
 					case TokenType::OpBitOr: case TokenType::OpInc: case TokenType::OpDec:
 						break;
 					default:
-						errors.Add(CompileError("invalid operator '" + name.Content + "'.", 20008, name.Position));
+						sink->Error(20008, "invalid operator '" + name.Content + "'.", name.Position);
 						break;
 					}
 				}
@@ -722,7 +722,7 @@ namespace Spire
 			}
 			else
 			{
-				errors.Add(CompileError(String("syntax error."), 20002, tokens[pos].Position));
+				sink->Error(20002, String("syntax error."), tokens[pos].Position);
 				throw 20002;
 			}
 			return statement;
@@ -1399,7 +1399,7 @@ namespace Spire
 				{
 					codePos = tokens[pos].Position;
 				}
-				errors.Add(CompileError(String("syntax error."), 20002, codePos));
+				sink->Error(20002, String("syntax error."), codePos);
 				throw 20005;
 			}
 			return rs;

@@ -1171,7 +1171,7 @@ namespace Spire
 		private:
 			CodeGenerator & operator = (const CodeGenerator & other) = delete;
 		public:
-			CodeGenerator(SymbolTable * symbols, ErrorWriter * pErr, CompileResult & _result)
+			CodeGenerator(SymbolTable * symbols, DiagnosticSink * pErr, CompileResult & _result)
 				: ICodeGenerator(pErr), symTable(symbols), result(_result)
 			{
 				result.Program = new ILProgram();

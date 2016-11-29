@@ -150,8 +150,8 @@ int wmain(int argc, wchar_t* argv[])
 		{
 			printf("internal compiler error: %S\n", e.Message.ToWString());
 		}
-		result.PrintError(true);
-		if (result.Success)
+		result.PrintDiagnostics();
+		if (result.GetErrorCount() == 0)
 			returnValue = 0;
 	}
 end:;

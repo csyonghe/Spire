@@ -101,29 +101,33 @@ HRESULT initialize( ID3D11Device* dxDevice )
     // Compile the constructed shader
     SpireCompilationResult* spireResult = spCompileShader(spireContext, spireShader);
 
-    // TODO(tfoley): handle any error messages that got reported...
-    static const int kMessageTypes[] = { SPIRE_ERROR, SPIRE_WARNING };
-    for(int ii = 0; ii < 2; ++ii)
+    // Inspect any error messages that got reported...
+    int diagnosticCount = spGetDiagnosticCount(spireResult);
+    for(int jj = 0; jj < diagnosticCount; ++jj)
     {
-        int messageType = kMessageTypes[ii];
-        int count = spGetMessageCount(spireResult, messageType);
-        for(int jj = 0; jj < count; ++jj)
+        SpireDiagnostic diagnostic;
+        spGetDiagnosticByIndex(spireResult, jj, &diagnostic);
+
+        static const char* kSeverityNames[] =
         {
-            SpireErrorMessage message;
-            spGetMessageContent(spireResult, messageType, jj, &message);
+            "note",
+            "warning",
+            "error",
+            "fatal error",
+            "internal error",
+        };
 
-            static const int kBufferSize = 1024;
-            char buffer[kBufferSize];
-            snprintf(buffer, kBufferSize, "%s(%d:%d): %s %d: %s\n",
-                message.FileName,
-                message.Line,
-                message.Col,
-                messageType == SPIRE_ERROR ? "error" : "warning",
-                message.ErrorId,
-                message.Message);
+        static const int kBufferSize = 1024;
+        char buffer[kBufferSize];
+        snprintf(buffer, kBufferSize, "%s(%d:%d): %s %d: %s\n",
+            diagnostic.FileName,
+            diagnostic.Line,
+            diagnostic.Col,
+            kSeverityNames[diagnostic.severity],
+            diagnostic.ErrorId,
+            diagnostic.Message);
 
-            OutputDebugStringA(buffer);
-        }
+        OutputDebugStringA(buffer);
     }
 
     //

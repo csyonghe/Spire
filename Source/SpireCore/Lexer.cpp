@@ -5,7 +5,7 @@ namespace Spire
 {
 	namespace Compiler
 	{
-		List<Token> Lexer::Parse(const String & fileName, const String & str, List<CompileError> & errorList)
+		List<Token> Lexer::Parse(const String & fileName, const String & str, DiagnosticSink * sink)
 		{
 			return CoreLib::Text::TokenizeText(fileName, str, [&](CoreLib::Text::TokenizeErrorType errType, CoreLib::Text::CodePosition pos)
 			{
@@ -13,10 +13,10 @@ namespace Spire
 				switch (errType)
 				{
 				case CoreLib::Text::TokenizeErrorType::InvalidCharacter:
-					errorList.Add(CompileError("Illegal character '\\x" + String((unsigned char)curChar, 16) + "'", 10000, pos));
+					sink->Error(10000, "Illegal character '\\x" + String((unsigned char)curChar, 16) + "'", pos);
 					break;
 				case CoreLib::Text::TokenizeErrorType::InvalidEscapeSequence:
-					errorList.Add(CompileError("Illegal character literial.", 10001, pos));
+					sink->Error(10001, "Illegal character literial.", pos);
 					break;
 				default:
 					break;

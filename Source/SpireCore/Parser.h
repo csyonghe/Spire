@@ -19,7 +19,7 @@ namespace Spire
 			int pos;
 			List<RefPtr<Scope>> scopeStack;
 			List<Token> & tokens;
-			List<CompileError> & errors;
+            DiagnosticSink * sink;
 			String fileName;
 			HashSet<String> typeNames;
 			HashSet<String> classNames;
@@ -49,8 +49,8 @@ namespace Spire
 				scopeStack.RemoveAt(scopeStack.Count() - 1);
 			}
 		public:
-			Parser(List<Token> & _tokens, List<CompileError> & _errors, String _fileName)
-				: pos(0), tokens(_tokens), errors(_errors), fileName(_fileName)
+			Parser(List<Token> & _tokens, DiagnosticSink * sink, String _fileName)
+				: pos(0), tokens(_tokens), sink(sink), fileName(_fileName)
 			{
 				typeNames.Add("int");
 				typeNames.Add("uint");

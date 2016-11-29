@@ -898,26 +898,26 @@ namespace Spire
 		class SyntaxVisitor : public Object
 		{
 		protected:
-			ErrorWriter * err = nullptr;
+			DiagnosticSink * sink = nullptr;
 			void Error(int id, const String & text, SyntaxNode * node)
 			{
-				err->Error(id, text, node->Position);
+				sink->Error(id, text, node->Position);
 			}
 			void Error(int id, const String & text, Token node)
 			{
-				err->Error(id, text, node.Position);
+				sink->Error(id, text, node.Position);
 			}
 			void Warning(int id, const String & text, SyntaxNode * node)
 			{
-				err->Warning(id, text, node->Position);
+				sink->Warning(id, text, node->Position);
 			}
 			void Warning(int id, const String & text, Token node)
 			{
-				err->Warning(id, text, node.Position);
+				sink->Warning(id, text, node.Position);
 			}
 		public:
-			SyntaxVisitor(ErrorWriter * pErr)
-				: err(pErr)
+			SyntaxVisitor(DiagnosticSink * sink)
+				: sink(sink)
 			{}
 			virtual RefPtr<ProgramSyntaxNode> VisitProgram(ProgramSyntaxNode* program)
 			{

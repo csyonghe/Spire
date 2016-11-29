@@ -6,9 +6,9 @@ namespace Spire
 {
 	namespace Compiler
 	{
-		RefPtr<ShaderClosure> CreateShaderClosure(ErrorWriter * err, SymbolTable * symTable, ShaderSymbol * shader);
-		void FlattenShaderClosure(ErrorWriter * err, SymbolTable * symTable, ShaderClosure * shader);
-		void InsertImplicitImportOperators(ErrorWriter * err, ShaderIR * shader);
+		RefPtr<ShaderClosure> CreateShaderClosure(DiagnosticSink * sink, SymbolTable * symTable, ShaderSymbol * shader);
+		void FlattenShaderClosure(DiagnosticSink * sink, SymbolTable * symTable, ShaderClosure * shader);
+		void InsertImplicitImportOperators(DiagnosticSink * sink, ShaderIR * shader);
 	}
 }
 

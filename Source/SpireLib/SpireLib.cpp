@@ -79,7 +79,7 @@ namespace SpireLib
 		options.SymbolToCompile = symbolName;
 		options.Mode = CompilerMode::ProduceShader;
 		auto shaderLibs = CompileShaderSourceFromFile(result, sourceFileName, options);
-		if (result.Success)
+		if (result.GetErrorCount() == 0)
 		{
 			for (auto & lib : shaderLibs)
 			{
@@ -90,7 +90,7 @@ namespace SpireLib
 				}
 			}
 		}
-		result.PrintError(true);
+		result.PrintDiagnostics();
 		return false;
 	}
 
@@ -100,7 +100,7 @@ namespace SpireLib
 	{
 		List<ShaderLibFile> resultFiles;
 		compiler->Compile(compileResult, units, options);
-		if (compileResult.Success)
+		if (compileResult.GetErrorCount() == 0)
 		{
 			if (options.Mode == CompilerMode::ProduceShader)
 			{
@@ -172,7 +172,7 @@ namespace SpireLib
 			}
 		}
 		units.Add(predefUnit);
-		if (compileResult.ErrorList.Count() == 0)
+		if (compileResult.GetErrorCount() == 0)
 			return CompileUnits(compileResult, compiler.Ptr(), units, options);
 		else
 			return List<ShaderLibFile>();
@@ -412,9 +412,9 @@ namespace SpireLib
 	class CompileResult
 	{
 	public:
-		bool Success = false;
-		CoreLib::List<CompileError> Errors, Warnings;
+		CoreLib::List<Diagnostic> Diagnostics;
 		CoreLib::EnumerableDictionary<String, CompiledShaderSource> Sources;
+        int errorCount = 0;
 	};
 
 	class ComponentMetaData
@@ -480,9 +480,8 @@ namespace SpireLib
 		{
 			Spire::Compiler::CompileResult result;
 			compiler->Compile(result, *compileContext, units, Options);
-			compileResult.Errors = _Move(result.ErrorList);
-			compileResult.Warnings = _Move(result.WarningList);
-			compileResult.Success = result.ErrorList.Count() == 0;
+            compileResult.Diagnostics = _Move(result.sink.diagnostics);
+			compileResult.errorCount = result.GetErrorCount();
 			for (auto & shader : compileContext->Symbols.Shaders)
 			{
 				if (!modules.ContainsKey(shader.Key))
@@ -579,8 +578,8 @@ namespace SpireLib
 					result.GetErrorWriter()->Error(1, "cannot open file '" + inputFileName + "'.", CodePosition(0, 0, 0, ""));
 				}
 			}
-			cresult.Errors.AddRange(result.ErrorList);
-			cresult.Warnings.AddRange(result.WarningList);
+			cresult.Diagnostics.AddRange(result.sink.diagnostics);
+            cresult.errorCount += result.GetErrorCount();
 		}
 		Shader * NewShader(CoreLib::String name)
 		{
@@ -595,23 +594,21 @@ namespace SpireLib
 			List<CompileUnit> userUnits;
 			HashSet<String> processedUserUnits = processedModuleUnits;
 			result = compileResult;
-			result.Errors = compileResult.Errors;
-			result.Warnings = compileResult.Warnings;
-			if (result.Errors.Count() == 0)
-			{
-				LoadModuleSource(userUnits, processedUserUnits, result, source, fileName);
-				if (result.Errors.Count() == 0)
-				{
-					Spire::Compiler::CompilationContext tmpCtx(*compileContext);
-					Spire::Compiler::CompileResult cresult;
-					compiler->Compile(cresult, tmpCtx, userUnits, Options);
-					result.Sources = cresult.CompiledSource;
-					result.Errors = _Move(cresult.ErrorList);
-					result.Warnings = _Move(cresult.WarningList);
-				}
-			}
-			result.Success = (result.Errors.Count() == 0);
-			return result.Success;
+            if (result.errorCount != 0)
+                return false;
+
+            LoadModuleSource(userUnits, processedUserUnits, result, source, fileName);
+            if (result.errorCount != 0)
+                return false;
+
+            Spire::Compiler::CompilationContext tmpCtx(*compileContext);
+			Spire::Compiler::CompileResult cresult;
+			compiler->Compile(cresult, tmpCtx, userUnits, Options);
+			result.Sources = cresult.CompiledSource;
+			result.Diagnostics = _Move(cresult.sink.diagnostics);
+            result.errorCount = cresult.GetErrorCount();
+
+            return result.errorCount == 0;
 		}
 	};
 }
@@ -798,31 +795,35 @@ SpireCompilationResult * spCompileShaderFromSource(SpireCompilationContext * ctx
 
 int spIsCompilationSucessful(SpireCompilationResult * result)
 {
-	return RS(result)->Success ? 1 : 0;
+    return RS(result)->errorCount == 0;
 }
 
-int spGetMessageCount(SpireCompilationResult * result, int messageType)
+int spGetDiagnosticCount(SpireCompilationResult * result)
 {
-	return messageType == SPIRE_ERROR ? RS(result)->Errors.Count() : RS(result)->Warnings.Count();
+    return RS(result)->Diagnostics.Count();
 }
 
-int spGetMessageContent(SpireCompilationResult * result, int messageType, int index, SpireErrorMessage * pMsg)
+int spGetDiagnosticByIndex(SpireCompilationResult * result, int index, SpireDiagnostic * outDiagnostic)
 {
-	auto * list = (messageType == SPIRE_ERROR) ? &(RS(result)->Errors) : (messageType == SPIRE_WARNING) ? &(RS(result)->Warnings) : nullptr;
-	if (list)
-	{
-		if (index >= 0 && index < list->Count())
-		{
-			auto & msg = (*list)[index];
-			pMsg->Message = msg.Message.Buffer();
-			pMsg->ErrorId = msg.ErrorID;
-			pMsg->FileName = msg.Position.FileName.Buffer();
-			pMsg->Line = msg.Position.Line;
-			pMsg->Col = msg.Position.Col;
-			return 1;
-		}
-	}
-	return SPIRE_ERROR_INVALID_PARAMETER;
+    if (!result)        return SPIRE_ERROR_INVALID_PARAMETER;
+    if (!outDiagnostic) return SPIRE_ERROR_INVALID_PARAMETER;
+    if (index < 0)      return SPIRE_ERROR_INVALID_PARAMETER;
+
+    auto & diagnostics = RS(result)->Diagnostics;
+    if(index >= diagnostics.Count())
+        return SPIRE_ERROR_INVALID_PARAMETER;
+
+	auto & msg = diagnostics[index];
+	outDiagnostic->Message = msg.Message.Buffer();
+	outDiagnostic->ErrorId = msg.ErrorID;
+	outDiagnostic->FileName = msg.Position.FileName.Buffer();
+	outDiagnostic->Line = msg.Position.Line;
+	outDiagnostic->Col = msg.Position.Col;
+    // Note: we rely here on the `SpireSeverity` and `Spire::Compiler::Severity`
+    // enums having the same members. Realistically, we should probably just
+    // use the external enum internally too.
+    outDiagnostic->severity = (SpireSeverity) msg.severity;
+	return 1;
 }
 
 int ReturnStr(const char * content, char * buffer, int bufferSize)
@@ -846,10 +847,8 @@ int spGetCompilerOutput(SpireCompilationResult * result, char * buffer, int buff
 {
 	StringBuilder sb;
 	auto rs = RS(result);
-	for (auto & x : rs->Errors)
-		sb << "error " << x.Message << ":" << x.Position.ToString() << ": " << x.Message << "\n";
-	for (auto & x : rs->Warnings)
-		sb << "error " << x.Message << ":" << x.Position.ToString() << ": " << x.Message << "\n";
+	for (auto & x : rs->Diagnostics)
+		sb << x.Position.ToString() << ": " << Spire::Compiler::getSeverityName(x.severity) << " " << x.ErrorID << ": " << x.Message << "\n";
 	auto str = sb.ProduceString();
 	return ReturnStr(str.Buffer(), buffer, bufferSize);
 }

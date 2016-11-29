@@ -787,7 +787,7 @@ namespace Spire
 			intrinsicTextureFunctions.Add("SampleGrad");
 		}
 
-		CompiledShaderSource CLikeCodeGen::GenerateShader(CompileResult & result, SymbolTable *, ILShader * shader, ErrorWriter * err)
+		CompiledShaderSource CLikeCodeGen::GenerateShader(CompileResult & result, SymbolTable *, ILShader * shader, DiagnosticSink * err)
 		{
 			this->errWriter = err;
 

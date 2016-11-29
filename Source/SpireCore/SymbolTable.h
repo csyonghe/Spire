@@ -199,7 +199,7 @@ namespace Spire
 			List<ShaderSymbol*> ShaderDependenceOrder;
 			bool SortShaders(); // return true if success, return false if dependency is cyclic
 			void EvalFunctionReferenceClosure();
-			bool CheckComponentImplementationConsistency(ErrorWriter * err, ShaderComponentSymbol * comp, ShaderComponentImplSymbol * impl);
+			bool CheckComponentImplementationConsistency(DiagnosticSink * sink, ShaderComponentSymbol * comp, ShaderComponentImplSymbol * impl);
 
 			bool IsWorldReachable(PipelineSymbol * pipe, EnumerableHashSet<String> & src, String targetWorld, RefPtr<ExpressionType> type);
 			bool IsWorldReachable(PipelineSymbol * pipe, String src, String targetWorld, RefPtr<ExpressionType> type);

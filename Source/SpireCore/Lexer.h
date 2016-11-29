@@ -13,7 +13,7 @@ namespace Spire
 		class Lexer
 		{
 		public:
-			List<Token> Parse(const String & fileName, const String & str, List<CompileError> & errorList);
+			List<Token> Parse(const String & fileName, const String & str, DiagnosticSink * sink);
 		};
 	}
 }

@@ -17,7 +17,7 @@ namespace Spire
 		class ICodeGenerator : public SyntaxVisitor
 		{
 		public:
-			ICodeGenerator(ErrorWriter * perr)
+			ICodeGenerator(DiagnosticSink * perr)
 				: SyntaxVisitor(perr)
 			{}
 			virtual void ProcessFunction(FunctionSyntaxNode * func) = 0;
@@ -25,7 +25,7 @@ namespace Spire
 			virtual void ProcessStruct(StructSyntaxNode * st) = 0;
 		};
 
-		SyntaxVisitor * CreateSemanticsVisitor(SymbolTable * symbols, ErrorWriter * err);
+		SyntaxVisitor * CreateSemanticsVisitor(SymbolTable * symbols, DiagnosticSink * err);
 		ICodeGenerator * CreateCodeGenerator(SymbolTable * symbols, CompileResult & result);
 	}
 }
