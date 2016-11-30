@@ -327,7 +327,7 @@ namespace Spire
 			return result;
 		}
 
-		bool SymbolTable::CheckComponentImplementationConsistency(ErrorWriter * err, ShaderComponentSymbol * comp, ShaderComponentImplSymbol * impl)
+		bool SymbolTable::CheckComponentImplementationConsistency(DiagnosticSink * err, ShaderComponentSymbol * comp, ShaderComponentImplSymbol * impl)
 		{
 			bool rs = true;
 			if (impl->SyntaxNode->Rate)

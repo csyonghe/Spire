@@ -6,7 +6,7 @@ namespace Spire
 {
 	namespace Compiler
 	{
-		void CheckComponentRedefinition(ErrorWriter * err, ShaderClosure * parent, ShaderClosure * child)
+		void CheckComponentRedefinition(DiagnosticSink * err, ShaderClosure * parent, ShaderClosure * child)
 		{
 			for (auto & comp : child->Components)
 			{
@@ -41,7 +41,7 @@ namespace Spire
 				}
 			}
 		}
-		RefPtr<ShaderClosure> CreateShaderClosure(ErrorWriter * err, SymbolTable * symTable, ShaderSymbol * shader, CodePosition usingPos, 
+		RefPtr<ShaderClosure> CreateShaderClosure(DiagnosticSink * err, SymbolTable * symTable, ShaderSymbol * shader, CodePosition usingPos, 
 			ShaderClosure * rootShader,
 			const EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>>& pRefMap)
 		{
@@ -170,7 +170,7 @@ namespace Spire
 			return rs;
 		}
 
-		RefPtr<ShaderClosure> CreateShaderClosure(ErrorWriter * err, SymbolTable * symTable, ShaderSymbol * shader)
+		RefPtr<ShaderClosure> CreateShaderClosure(DiagnosticSink * err, SymbolTable * symTable, ShaderSymbol * shader)
 		{
 			return CreateShaderClosure(err, symTable, shader, shader->SyntaxNode->Position, nullptr, EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>>());
 		}
@@ -286,7 +286,7 @@ namespace Spire
 		public:
 			ShaderComponentImplSymbol * currentImpl = nullptr;
 
-			ResolveDependencyVisitor(ErrorWriter * err, ShaderClosure * pRootShader, ShaderClosure * closure, ShaderComponentSymbol * comp)
+			ResolveDependencyVisitor(DiagnosticSink * err, ShaderClosure * pRootShader, ShaderClosure * closure, ShaderComponentSymbol * comp)
 				: SyntaxVisitor(err), shaderClosure(closure), rootShader(pRootShader), currentComponent(comp)
 			{}
 
@@ -379,7 +379,7 @@ namespace Spire
 			}
 		};
 
-		void ResolveReference(ErrorWriter * err, ShaderClosure * rootShader, ShaderClosure* shader)
+		void ResolveReference(DiagnosticSink * err, ShaderClosure * rootShader, ShaderClosure* shader)
 		{
 			for (auto & comp : shader->Components)
 			{
@@ -488,7 +488,7 @@ namespace Spire
 			return true;
 		}
 
-		void GatherComponents(ErrorWriter * err, ShaderClosure * closure, ShaderClosure * subClosure)
+		void GatherComponents(DiagnosticSink * err, ShaderClosure * closure, ShaderClosure * subClosure)
 		{
 			for (auto & comp : subClosure->Components)
 			{
@@ -558,7 +558,7 @@ namespace Spire
 			return isWFeasible;
 		}
 
-		void SolveWorldConstraints(ErrorWriter * err, SymbolTable * symTable, ShaderClosure * shader)
+		void SolveWorldConstraints(DiagnosticSink * err, SymbolTable * symTable, ShaderClosure * shader)
 		{
 			EnumerableHashSet<String> allWorlds;
 			for (auto w : shader->Pipeline->Worlds)
@@ -632,7 +632,7 @@ namespace Spire
 			}
 		}
 
-		bool CheckCircularReference(ErrorWriter * err, ShaderClosure * shader)
+		bool CheckCircularReference(DiagnosticSink * err, ShaderClosure * shader)
 		{
 			bool rs = false;
 			for (auto & comp : shader->AllComponents)
@@ -687,7 +687,7 @@ namespace Spire
 			}
 		}
 
-		void VerifyAndPropagateArgumentConstraints(ErrorWriter * err, SymbolTable * symTable, ShaderClosure * shader)
+		void VerifyAndPropagateArgumentConstraints(DiagnosticSink * err, SymbolTable * symTable, ShaderClosure * shader)
 		{
 			for (auto & map : shader->RefMap)
 			{
@@ -778,7 +778,7 @@ namespace Spire
 				shader->AllComponents.Remove(r.Key);
 		}
 
-		void PropagatePipelineRequirements(ErrorWriter * err, ShaderClosure * shader)
+		void PropagatePipelineRequirements(DiagnosticSink * err, ShaderClosure * shader)
 		{
 			for (auto & req : shader->Pipeline->Components)
 			{
@@ -820,7 +820,7 @@ namespace Spire
 			}
 		}
 	
-		void CheckPipelineShaderConsistency(ErrorWriter * err, ShaderClosure * shader)
+		void CheckPipelineShaderConsistency(DiagnosticSink * err, ShaderClosure * shader)
 		{
 			for (auto & comp : shader->Components)
 			{
@@ -894,7 +894,7 @@ namespace Spire
 				CheckPipelineShaderConsistency(err, subShader.Value.Ptr());
 		}
 
-		void FlattenShaderClosure(ErrorWriter * err, SymbolTable * symTable, ShaderClosure * shader)
+		void FlattenShaderClosure(DiagnosticSink * err, SymbolTable * symTable, ShaderClosure * shader)
 		{
 			// add input(extern) components from pipeline
 			AddPipelineComponents(shader);

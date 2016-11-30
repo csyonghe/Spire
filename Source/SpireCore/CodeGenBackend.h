@@ -12,7 +12,7 @@ namespace Spire
 		class CodeGenBackend : public CoreLib::Basic::Object
 		{
 		public:
-			virtual CompiledShaderSource GenerateShader(CompileResult & result, SymbolTable * symbols, ILShader * shader, ErrorWriter * err) = 0;
+			virtual CompiledShaderSource GenerateShader(CompileResult & result, SymbolTable * symbols, ILShader * shader, DiagnosticSink * err) = 0;
 		};
 
 		CodeGenBackend * CreateGLSLCodeGen();

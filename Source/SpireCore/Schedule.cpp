@@ -9,7 +9,7 @@ namespace Spire
 		class ScheduleParser
 		{
 		private:
-			List<CompileError>& errors;
+            DiagnosticSink * sink;
 			List<Token> tokens;
 			int pos;
 			String fileName;
@@ -17,12 +17,12 @@ namespace Spire
 			{
 				if (pos >= tokens.Count())
 				{
-					errors.Add(CompileError(String("\"") + string + String("\" expected but end of file encountered."), 0, CodePosition(0, 0, 0, fileName)));
+					sink->Error(0, String("\"") + string + String("\" expected but end of file encountered."), CodePosition(0, 0, 0, fileName));
 					throw 0;
 				}
 				else if (tokens[pos].Content != string)
 				{
-					errors.Add(CompileError(String("\"") + string + String("\" expected"), 0, tokens[pos].Position));
+					sink->Error(20001, String("\"") + string + String("\" expected"), tokens[pos].Position);
 					throw 20001;
 				}
 				return tokens[pos++];
@@ -32,12 +32,12 @@ namespace Spire
 			{
 				if (pos >= tokens.Count())
 				{
-					errors.Add(CompileError(TokenTypeToString(type) + String(" expected but end of file encountered."), 0, CodePosition(0, 0, 0, fileName)));
+					sink->Error(0, TokenTypeToString(type) + String(" expected but end of file encountered."), CodePosition(0, 0, 0, fileName));
 					throw 0;
 				}
 				else if (tokens[pos].Type != type)
 				{
-					errors.Add(CompileError(TokenTypeToString(type) + String(" expected"), 20001, tokens[pos].Position));
+					sink->Error(20001, TokenTypeToString(type) + String(" expected"), tokens[pos].Position);
 					throw 20001;
 				}
 				return tokens[pos++];
@@ -47,7 +47,7 @@ namespace Spire
 			{
 				if (pos >= tokens.Count())
 				{
-					errors.Add(CompileError(String("\'") + string + String("\' expected but end of file encountered."), 0, CodePosition(0, 0, 0, fileName)));
+					sink->Error(0, String("\'") + string + String("\' expected but end of file encountered."), CodePosition(0, 0, 0, fileName));
 					return false;
 				}
 				else
@@ -59,15 +59,15 @@ namespace Spire
 				}
 			}
 		public:
-			ScheduleParser(List<CompileError>& _errorList)
-				: errors(_errorList)
+			ScheduleParser(DiagnosticSink * sink)
+				: sink(sink)
 			{}
 			Schedule Parse(String source, String _fileName)
 			{
 				this->fileName = _fileName;
 				Schedule schedule;
 				Lexer lex;
-				tokens = lex.Parse(fileName, source, errors);
+				tokens = lex.Parse(fileName, source, sink);
 				pos = 0;
 				try
 				{
@@ -147,9 +147,9 @@ namespace Spire
 			}
 		};
 	
-		Schedule Schedule::Parse(String source, String fileName, List<CompileError>& errorList)
+		Schedule Schedule::Parse(String source, String fileName, DiagnosticSink * sink)
 		{
-			return ScheduleParser(errorList).Parse(source, fileName);
+			return ScheduleParser(sink).Parse(source, fileName);
 		}
 	}
 }

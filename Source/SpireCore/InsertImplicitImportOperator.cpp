@@ -17,7 +17,7 @@ namespace Spire
 			ComponentDefinitionIR * currentCompDef = nullptr;
 			EnumerableDictionary<String, RefPtr<ComponentDefinitionIR>> passThroughComponents;
 		public:
-			InsertImplicitImportOperatorVisitor(ShaderIR * ir, ErrorWriter* err)
+			InsertImplicitImportOperatorVisitor(ShaderIR * ir, DiagnosticSink* err)
 				: SyntaxVisitor(err), shaderIR(ir)
 			{}
 
@@ -165,7 +165,7 @@ namespace Spire
 				return import;
 			}
 		};
-		void InsertImplicitImportOperators(ErrorWriter * err, ShaderIR * shader)
+		void InsertImplicitImportOperators(DiagnosticSink * err, ShaderIR * shader)
 		{
 			InsertImplicitImportOperatorVisitor visitor(shader, err);
 			for (auto & comp : shader->Definitions)

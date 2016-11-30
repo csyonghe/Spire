@@ -226,17 +226,15 @@ namespace Spire
 		public:
 			virtual CompileUnit Parse(CompileResult & result, String source, String fileName) override
 			{
-				result.Success = false;
 				Lexer lexer;
-				auto tokens = lexer.Parse(fileName, source, result.ErrorList);
-				Parser parser(tokens, result.ErrorList, fileName);
+				auto tokens = lexer.Parse(fileName, source, result.GetErrorWriter());
+				Parser parser(tokens, result.GetErrorWriter(), fileName);
 				CompileUnit rs;
 				rs.SyntaxNode = parser.Parse();
 				return rs;
 			}
 			virtual void Compile(CompileResult & result, CompilationContext & context, List<CompileUnit> & units, const CompileOptions & options) override
 			{
-				result.Success = false;
 				RefPtr<ProgramSyntaxNode> programSyntaxNode = new ProgramSyntaxNode();
 				for (auto & unit : units)
 				{
@@ -250,10 +248,10 @@ namespace Spire
 				{
 					programSyntaxNode->Accept(visitor.Ptr());
 					visitor = nullptr;
-					if (result.ErrorList.Count() > 0)
+					if (result.GetErrorCount() > 0)
 						return;
 					symTable.EvalFunctionReferenceClosure();
-					if (result.ErrorList.Count() > 0)
+					if (result.GetErrorCount() > 0)
 						return;
 
 					for (auto & shader : symTable.ShaderDependenceOrder)
@@ -270,7 +268,7 @@ namespace Spire
 					
 					ResolveAttributes(&symTable);
 
-					if (result.ErrorList.Count() > 0)
+					if (result.GetErrorCount() > 0)
 						return;
 					CodeGenBackend * backend = nullptr;
 					switch(options.Target)
@@ -292,7 +290,7 @@ namespace Spire
 					Schedule schedule;
 					if (options.ScheduleSource != "")
 					{
-						schedule = Schedule::Parse(options.ScheduleSource, options.ScheduleFileName, result.ErrorList);
+						schedule = Schedule::Parse(options.ScheduleSource, options.ScheduleFileName, result.GetErrorWriter());
 					}
 					for (auto shader : shaderClosures)
 					{
@@ -302,7 +300,7 @@ namespace Spire
 					}
 					if (options.Mode == CompilerMode::ProduceShader)
 					{
-						if (result.ErrorList.Count() > 0)
+						if (result.GetErrorWriter()->GetErrorCount() > 0)
 							return;
 						// generate IL code
 						
@@ -323,13 +321,13 @@ namespace Spire
 						{
 							InsertImplicitImportOperators(result.GetErrorWriter(), shader.Value->IR.Ptr());
 						}
-						if (result.ErrorList.Count() > 0)
+						if (result.GetErrorCount() > 0)
 							return;
 						for (auto & shader : shaderClosures)
 						{
 							codeGen->ProcessShader(shader.Value->IR.Ptr());
 						}
-						if (result.ErrorList.Count() > 0)
+						if (result.GetErrorCount() > 0)
 							return;
 						// emit target code
 						EnumerableHashSet<String> symbolsToGen;
@@ -350,7 +348,6 @@ namespace Spire
 									return true;
 							return false;
 						};
-						ErrorWriter errWriter(result.ErrorList, result.WarningList);
 						for (auto & shader : result.Program->Shaders)
 						{
 							if ((options.SymbolToCompile.Length() == 0 && IsSymbolToGen(shader->Name))
@@ -358,10 +355,9 @@ namespace Spire
 							{
 								StringBuilder glslBuilder;
 								Dictionary<String, String> targetCode;
-								result.CompiledSource[shader->Name] = backend->GenerateShader(result, &symTable, shader.Ptr(), &errWriter);
+								result.CompiledSource[shader->Name] = backend->GenerateShader(result, &symTable, shader.Ptr(), result.GetErrorWriter());
 							}
 						}
-						result.Success = result.ErrorList.Count() == 0;
 					}
 					else if (options.Mode == CompilerMode::GenerateChoice)
 					{
@@ -408,7 +404,6 @@ namespace Spire
 						return;
 					}
 					context.Program = result.Program;
-					result.Success = true;
 				}
 				catch (int)
 				{
