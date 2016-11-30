@@ -2,7 +2,7 @@
 
 // In order to use the Spire API, we need to include its header
 
-#include "../../LibraryRelease/Spire.h"
+#include <Spire.h>
 
 // We will be rendering with Direct3D 11, so we need to include
 // the Windows and D3D11 headers
@@ -600,4 +600,4 @@ int WINAPI WinMain(
 // the (concatenated) Spire source code into our app.
 //
 
-#include "../../LibraryRelease/Spire.cpp"
+#include <SpireAllSource.h>
