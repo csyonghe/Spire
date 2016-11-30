@@ -117,6 +117,11 @@ enum
 	*/
 	struct SpireCompilationResult {};
 
+    /*!
+    @brief A collection of diagnostic messages output by the compiler.
+    */
+    typedef struct SpireDiagnosticSink SpireDiagnosticSink;
+
 	/*!
 	@brief Represents a diagnostic message from the compiler.
 	*/
@@ -201,13 +206,37 @@ enum
 	*/
 	SPIRE_API void spDestroyCompilationContext(SpireCompilationContext * ctx);
 
+    /*!
+    @brief Create a sink for diagnostic messages.
+    This sink can be used to capture diagnostic output from compilation operations, and
+    can then be used to iterate over the diagnostics produced.
+    @param ctx The compilation context.
+    */
+    SPIRE_API SpireDiagnosticSink* spCreateDiagnosticSink(SpireCompilationContext * ctx);
+
+    /*!
+    @brief Reset a diagnostic sink to its original state.
+    This clears out any diagnostic messages that have been written to the sink.
+    Re-using a single sink across multiple operations may be more efficeint than
+    creating and destroying a sink every time.
+    @param sink The diagnostic sink to reset.
+    */
+    SPIRE_API void spClearDiagnosticSink(SpireDiagnosticSink* sink);
+
+    /*!
+    @brief Destroy a diagnostic sink.
+    @param sink The diagnostic sink to destroy.
+    */
+    SPIRE_API void spDestroyDiagnosticSink(SpireDiagnosticSink* sink);
+
 	/*!
 	@brief Load and precompile spire modules from spire source file. Compilation status and error messages can be obtained via spIsCompilationSucessful(),
 	spGetDiagnosticCount() and spGetDiagnosticByIndex() functions.
 	@param ctx The compilation context.
 	@param fileName The filename of the spire source code.
+    @param sink The sink where diagnostic output should be sent, or NULL to ignore messages.
 	*/
-	SPIRE_API void spLoadModuleLibrary(SpireCompilationContext * ctx, const char * fileName);
+	SPIRE_API void spLoadModuleLibrary(SpireCompilationContext * ctx, const char * fileName, SpireDiagnosticSink* sink);
 
 	/*!
 	@brief Load and precompile spire modules from spire source code in memory. Compilation status and error messages can be obtained via spIsCompilationSucessful(),
@@ -215,8 +244,9 @@ enum
 	@param ctx The compilation context.
 	@param source The spire source code to precompile. All strings should be in UTF-8 encoding.
 	@param fileName The filename used to report error messages regarding to code in @p source.
+    @param sink The sink where diagnostic output should be sent, or NULL to ignore messages.
 	*/
-	SPIRE_API void spLoadModuleLibraryFromSource(SpireCompilationContext * ctx, const char * source, const char * fileName);
+	SPIRE_API void spLoadModuleLibraryFromSource(SpireCompilationContext * ctx, const char * source, const char * fileName, SpireDiagnosticSink* sink);
 
 	/*!
 	@brief Create a shader object that can be used to assemble a final shader from modules.
@@ -326,8 +356,9 @@ enum
 	@return The return value is a handle to a SpireCompilationResult object that contains error messages and compiled source code.
 	@note You are responsible for destorying a SpireCompilationResult object when it is no longer used. Destroying a SpireCompilationContext
 	does not automatically destroy SpireCompilationResult objects.
+    @param sink The sink where diagnostic output should be sent, or NULL to ignore messages.
 	*/
-	SPIRE_API SpireCompilationResult* spCompileShader(SpireCompilationContext * ctx, SpireShader * shader);
+	SPIRE_API SpireCompilationResult* spCompileShader(SpireCompilationContext * ctx, SpireShader * shader, SpireDiagnosticSink* sink);
 
 	/*!
 	@brief Compiles a shader object.
@@ -338,22 +369,23 @@ enum
 	@note You are responsible for destorying a SpireCompilationResult object when it is no longer used. Destroying a SpireCompilationContext
 	does not automatically destroy SpireCompilationResult objects.
 	@see spDestroyCompilationResult()
+    @param sink The sink where diagnostic output should be sent, or NULL to ignore messages.
 	*/
-	SPIRE_API SpireCompilationResult* spCompileShaderFromSource(SpireCompilationContext * ctx, const char * source, const char * fileName);
+	SPIRE_API SpireCompilationResult* spCompileShaderFromSource(SpireCompilationContext * ctx, const char * source, const char * fileName, SpireDiagnosticSink* sink);
 
 	/*!
-	@brief Checks if a compilation operation has succeeded.
-	@param result The SpireCompilationResult object returned by spCompileShader().
-	@return 1 if compilation is sucessful, 0 otherwise.
+	@brief Checks if any errors have been output to the diagnostic sink.
+    @param sink The SpireDiagnosticSink to be checked.
+    @return 1 if any errors have been output, 0 otherwise.
 	*/
-	SPIRE_API int spIsCompilationSucessful(SpireCompilationResult * result);
+	SPIRE_API int spDiagnosticSinkHasAnyErrors(SpireDiagnosticSink* sink);
 
 	/*!
 	@brief Retrieve the number of compiler diagnostics in a SpireCompilationResult object.
 	@param result A SpireCompilationResult object.
 	@return The number of diagnostics available.
 	*/
-	SPIRE_API int spGetDiagnosticCount(SpireCompilationResult * result);
+	SPIRE_API int spGetDiagnosticCount(SpireDiagnosticSink* sink);
 
 	/*!
 	@brief Retrieve the content of compiler diagnostics in a SpireCompilationResult object.
@@ -362,7 +394,7 @@ enum
 	@param pMsg A pointer to a SpireDiagnostic structure to receive the diagnostic.
 	@return 1 if successful. SPIRE_ERROR_INVALID_PARAMETER if any of the parameters is invalid.
 	*/
-	SPIRE_API int spGetDiagnosticByIndex(SpireCompilationResult * result, int index, SpireDiagnostic * pMsg);
+	SPIRE_API int spGetDiagnosticByIndex(SpireDiagnosticSink* sink, int index, SpireDiagnostic * pMsg);
 
 	/*!
 	@brief Get compiler output messages as a single string.
@@ -375,7 +407,7 @@ enum
 		- SPIRE_ERROR_INSUFFICIENT_BUFFER. if @p bufferSize is smaller than required buffer size.
 		- SPIRE_ERROR_INVALID_PARAMETER. if any of the parameters is invalid.
 	*/
-	SPIRE_API int spGetCompilerOutput(SpireCompilationResult * result, char * buffer, int bufferSize);
+	SPIRE_API int spGetDiagnosticOutput(SpireDiagnosticSink* sink, char * buffer, int bufferSize);
 
 	/*!
 	@brief Retrieve a list of shader names that has been compiled.

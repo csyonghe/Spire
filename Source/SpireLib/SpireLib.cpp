@@ -10,6 +10,12 @@ using namespace CoreLib::IO;
 using namespace CoreLib::Text;
 using namespace Spire::Compiler;
 
+struct SpireDiagnosticSink
+{
+    int errorCount;
+    CoreLib::List<Spire::Compiler::Diagnostic> diagnostics;
+};
+
 namespace SpireLib
 {
 	void ReadSource(EnumerableDictionary<String, StageSource> & sources, CoreLib::Text::TokenReader & parser, String src)
@@ -412,9 +418,7 @@ namespace SpireLib
 	class CompileResult
 	{
 	public:
-		CoreLib::List<Diagnostic> Diagnostics;
 		CoreLib::EnumerableDictionary<String, CompiledShaderSource> Sources;
-        int errorCount = 0;
 	};
 
 	class ComponentMetaData
@@ -454,7 +458,7 @@ namespace SpireLib
 		HashSet<String> processedModuleUnits;
 		RefPtr<ShaderCompiler> compiler;
 		RefPtr<ProgramSyntaxNode> programToCompile;
-		CompileResult compileResult;
+        int errorCount = 0;
 		EnumerableDictionary<String, ModuleMetaData> modules;
 	public:
 		CompileOptions Options;
@@ -463,7 +467,7 @@ namespace SpireLib
 		{
 			compiler = CreateShaderCompiler();
 			compileContext = new Spire::Compiler::CompilationContext();
-			LoadModuleSource(SpireStdLib::GetCode(), "stdlib");
+			LoadModuleSource(SpireStdLib::GetCode(), "stdlib", NULL);
 		}
 
 		~CompilationContext()
@@ -480,8 +484,6 @@ namespace SpireLib
 		{
 			Spire::Compiler::CompileResult result;
 			compiler->Compile(result, *compileContext, units, Options);
-            compileResult.Diagnostics = _Move(result.sink.diagnostics);
-			compileResult.errorCount = result.GetErrorCount();
 			for (auto & shader : compileContext->Symbols.Shaders)
 			{
 				if (!modules.ContainsKey(shader.Key))
@@ -521,15 +523,15 @@ namespace SpireLib
 			}
 		}
 
-		void LoadModuleSource(CoreLib::String src, CoreLib::String fileName)
+		void LoadModuleSource(CoreLib::String src, CoreLib::String fileName, SpireDiagnosticSink* sink)
 		{
 			List<CompileUnit> units;
-			LoadModuleSource(units, processedModuleUnits, compileResult, src, fileName);
+			LoadModuleSource(units, processedModuleUnits, src, fileName, sink);
 			moduleUnits.AddRange(units);
 			UpdateModuleLibrary(units);
 		}
 
-		void LoadModuleSource(List<CompileUnit> & units, HashSet<String> & processedUnits, CompileResult & cresult, CoreLib::String src, CoreLib::String fileName)
+		int LoadModuleSource(List<CompileUnit> & units, HashSet<String> & processedUnits, CoreLib::String src, CoreLib::String fileName, SpireDiagnosticSink* sink)
 		{
 			Spire::Compiler::CompileResult result;
 			List<String> unitsToInclude;
@@ -578,37 +580,43 @@ namespace SpireLib
 					result.GetErrorWriter()->Error(1, "cannot open file '" + inputFileName + "'.", CodePosition(0, 0, 0, ""));
 				}
 			}
-			cresult.Diagnostics.AddRange(result.sink.diagnostics);
-            cresult.errorCount += result.GetErrorCount();
+            if (sink)
+            {
+                sink->diagnostics.AddRange(result.sink.diagnostics);
+                sink->errorCount += result.GetErrorCount();
+            }
+            return result.GetErrorCount();
 		}
 		Shader * NewShader(CoreLib::String name)
 		{
 			return new Shader(name, true);
 		}
-		bool Compile(CompileResult & result, const Shader & shader)
+		bool Compile(CompileResult & result, const Shader & shader, SpireDiagnosticSink* sink)
 		{
-			return Compile(result, shader.GetSource(), shader.GetName());
+			return Compile(result, shader.GetSource(), shader.GetName(), sink);
 		}
-		bool Compile(CompileResult & result, CoreLib::String source, CoreLib::String fileName)
+		bool Compile(CompileResult & result, CoreLib::String source, CoreLib::String fileName, SpireDiagnosticSink* sink)
 		{
 			List<CompileUnit> userUnits;
 			HashSet<String> processedUserUnits = processedModuleUnits;
-			result = compileResult;
-            if (result.errorCount != 0)
+            if (errorCount != 0)
                 return false;
 
-            LoadModuleSource(userUnits, processedUserUnits, result, source, fileName);
-            if (result.errorCount != 0)
+            errorCount += LoadModuleSource(userUnits, processedUserUnits, source, fileName, sink);
+            if (errorCount != 0)
                 return false;
 
             Spire::Compiler::CompilationContext tmpCtx(*compileContext);
 			Spire::Compiler::CompileResult cresult;
 			compiler->Compile(cresult, tmpCtx, userUnits, Options);
 			result.Sources = cresult.CompiledSource;
-			result.Diagnostics = _Move(cresult.sink.diagnostics);
-            result.errorCount = cresult.GetErrorCount();
-
-            return result.errorCount == 0;
+            errorCount += cresult.GetErrorCount();
+            if (sink)
+            {
+                sink->diagnostics.AddRange(cresult.sink.diagnostics);
+                sink->errorCount += cresult.GetErrorCount();
+            }
+            return errorCount == 0;
 		}
 	};
 }
@@ -652,14 +660,38 @@ void spDestroyCompilationContext(SpireCompilationContext * ctx)
 	delete CTX(ctx);
 }
 
-void spLoadModuleLibrary(SpireCompilationContext * ctx, const char * fileName)
+// `SpireDiagnosticSink` implementation
+
+SpireDiagnosticSink* spCreateDiagnosticSink(SpireCompilationContext * /*ctx*/)
 {
-	CTX(ctx)->LoadModuleSource(File::ReadAllText(fileName), fileName);
+    SpireDiagnosticSink* sink = new SpireDiagnosticSink();
+    sink->errorCount = 0;
+    return sink;
 }
 
-void spLoadModuleLibraryFromSource(SpireCompilationContext * ctx, const char * source, const char * fileName)
+void spClearDiagnosticSink(SpireDiagnosticSink* sink)
 {
-	CTX(ctx)->LoadModuleSource(source, fileName);
+    if (!sink) return;
+
+    sink->errorCount = 0;
+    sink->diagnostics.Clear();
+}
+
+void spDestroyDiagnosticSink(SpireDiagnosticSink* sink)
+{
+    delete sink;
+}
+
+//
+
+void spLoadModuleLibrary(SpireCompilationContext * ctx, const char * fileName, SpireDiagnosticSink* sink)
+{
+	CTX(ctx)->LoadModuleSource(File::ReadAllText(fileName), fileName, sink);
+}
+
+void spLoadModuleLibraryFromSource(SpireCompilationContext * ctx, const char * source, const char * fileName, SpireDiagnosticSink* sink)
+{
+	CTX(ctx)->LoadModuleSource(source, fileName, sink);
 }
 
 SpireShader * spCreateShader(SpireCompilationContext * ctx, const char * name)
@@ -779,37 +811,38 @@ void spDestroyShader(SpireShader * shader)
 	delete SHADER(shader);
 }
 
-SpireCompilationResult * spCompileShader(SpireCompilationContext * ctx, SpireShader * shader)
+SpireCompilationResult * spCompileShader(SpireCompilationContext * ctx, SpireShader * shader, SpireDiagnosticSink* sink)
 {
 	SpireLib::CompileResult * rs = new SpireLib::CompileResult();
-	CTX(ctx)->Compile(*rs, *SHADER(shader));
+	CTX(ctx)->Compile(*rs, *SHADER(shader), sink);
 	return reinterpret_cast<SpireCompilationResult*>(rs);
 }
 
-SpireCompilationResult * spCompileShaderFromSource(SpireCompilationContext * ctx, const char * source, const char * fileName)
+SpireCompilationResult * spCompileShaderFromSource(SpireCompilationContext * ctx, const char * source, const char * fileName, SpireDiagnosticSink* sink)
 {
 	SpireLib::CompileResult * rs = new SpireLib::CompileResult();
-	CTX(ctx)->Compile(*rs, source, fileName);
+	CTX(ctx)->Compile(*rs, source, fileName, sink);
 	return reinterpret_cast<SpireCompilationResult*>(rs);
 }
 
-int spIsCompilationSucessful(SpireCompilationResult * result)
+int spDiagnosticSinkHasAnyErrors(SpireDiagnosticSink* sink)
 {
-    return RS(result)->errorCount == 0;
+    if (!sink) return false;
+    return sink->errorCount != 0;
 }
 
-int spGetDiagnosticCount(SpireCompilationResult * result)
+int spGetDiagnosticCount(SpireDiagnosticSink* sink)
 {
-    return RS(result)->Diagnostics.Count();
+    return sink->diagnostics.Count();
 }
 
-int spGetDiagnosticByIndex(SpireCompilationResult * result, int index, SpireDiagnostic * outDiagnostic)
+int spGetDiagnosticByIndex(SpireDiagnosticSink* sink, int index, SpireDiagnostic * outDiagnostic)
 {
-    if (!result)        return SPIRE_ERROR_INVALID_PARAMETER;
+    if (!sink)          return SPIRE_ERROR_INVALID_PARAMETER;
     if (!outDiagnostic) return SPIRE_ERROR_INVALID_PARAMETER;
     if (index < 0)      return SPIRE_ERROR_INVALID_PARAMETER;
 
-    auto & diagnostics = RS(result)->Diagnostics;
+    auto & diagnostics = sink->diagnostics;
     if(index >= diagnostics.Count())
         return SPIRE_ERROR_INVALID_PARAMETER;
 
@@ -843,11 +876,10 @@ int ReturnStr(const char * content, char * buffer, int bufferSize)
 		return len + 1;
 }
 
-int spGetCompilerOutput(SpireCompilationResult * result, char * buffer, int bufferSize)
+int spGetDiagnosticOutput(SpireDiagnosticSink* sink, char * buffer, int bufferSize)
 {
 	StringBuilder sb;
-	auto rs = RS(result);
-	for (auto & x : rs->Diagnostics)
+	for (auto & x : sink->diagnostics)
 		sb << x.Position.ToString() << ": " << Spire::Compiler::getSeverityName(x.severity) << " " << x.ErrorID << ": " << x.Message << "\n";
 	auto str = sb.ProduceString();
 	return ReturnStr(str.Buffer(), buffer, bufferSize);

@@ -60,6 +60,11 @@ ID3DBlob* compileHLSLShader(
     char const* source,
     char const* dxProfileName);
 
+// We use a utility routine to print out any diagnostic (error/warning) output
+// from the Spire compiler.
+void emitSpireDiagnostics(
+    SpireDiagnosticSink* sink);
+
 //
 // At initialization time, we are going to load and compile our Spire shader
 // code, and then create the D3D11 API objects we need for rendering.
@@ -74,11 +79,19 @@ HRESULT initialize( ID3D11Device* dxDevice )
     // can cache files to speed up compilation of many kernels.
     SpireCompilationContext* spireContext = spCreateCompilationContext(NULL);
 
+    // A diagnostic sink is used to collect output messages from the Spire
+    // compiler, so that we can easily iterate over them if an operation
+    // fails.
+    SpireDiagnosticSink* spireSink = spCreateDiagnosticSink(spireContext);
+
     // Instruct Spire to generate code as HLSL
     spSetCodeGenTarget(spireContext, SPIRE_HLSL);
 
     // Load a file of Spire source code, which defines our modules
-    spLoadModuleLibrary(spireContext, "hello.spire");
+    spLoadModuleLibrary(spireContext, "hello.spire", spireSink);
+
+    // Inspect any error messages that got reported...
+    emitSpireDiagnostics(spireSink);
 
     //
     // Once the source Spire has been loaded, we can assemble the modules
@@ -99,36 +112,10 @@ HRESULT initialize( ID3D11Device* dxDevice )
     spShaderAddModuleByName(spireShader, "HelloModule");
 
     // Compile the constructed shader
-    SpireCompilationResult* spireResult = spCompileShader(spireContext, spireShader);
+    SpireCompilationResult* spireResult = spCompileShader(spireContext, spireShader, spireSink);
 
     // Inspect any error messages that got reported...
-    int diagnosticCount = spGetDiagnosticCount(spireResult);
-    for(int jj = 0; jj < diagnosticCount; ++jj)
-    {
-        SpireDiagnostic diagnostic;
-        spGetDiagnosticByIndex(spireResult, jj, &diagnostic);
-
-        static const char* kSeverityNames[] =
-        {
-            "note",
-            "warning",
-            "error",
-            "fatal error",
-            "internal error",
-        };
-
-        static const int kBufferSize = 1024;
-        char buffer[kBufferSize];
-        snprintf(buffer, kBufferSize, "%s(%d:%d): %s %d: %s\n",
-            diagnostic.FileName,
-            diagnostic.Line,
-            diagnostic.Col,
-            kSeverityNames[diagnostic.severity],
-            diagnostic.ErrorId,
-            diagnostic.Message);
-
-        OutputDebugStringA(buffer);
-    }
+    emitSpireDiagnostics(spireSink);
 
     //
     // Once we've compiled things successfully, we can extract the HLSL kernel
@@ -228,6 +215,39 @@ HRESULT initialize( ID3D11Device* dxDevice )
     if(FAILED(hr)) return hr;
 
     return S_OK;
+}
+
+void emitSpireDiagnostics(
+    SpireDiagnosticSink* spireSink)
+{
+    int diagnosticCount = spGetDiagnosticCount(spireSink);
+    for(int jj = 0; jj < diagnosticCount; ++jj)
+    {
+        SpireDiagnostic diagnostic;
+        spGetDiagnosticByIndex(spireSink, jj, &diagnostic);
+
+        static const char* kSeverityNames[] =
+        {
+            "note",
+            "warning",
+            "error",
+            "fatal error",
+            "internal error",
+        };
+
+        static const int kBufferSize = 1024;
+        char buffer[kBufferSize];
+        snprintf(buffer, kBufferSize, "%s(%d:%d): %s %d: %s\n",
+            diagnostic.FileName,
+            diagnostic.Line,
+            diagnostic.Col,
+            kSeverityNames[diagnostic.severity],
+            diagnostic.ErrorId,
+            diagnostic.Message);
+
+        OutputDebugStringA(buffer);
+    }
+
 }
 
 void renderFrame(ID3D11DeviceContext* dxContext)
