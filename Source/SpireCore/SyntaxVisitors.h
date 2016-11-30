@@ -1,7 +1,7 @@
 #ifndef RASTER_RENDERER_SYNTAX_PRINTER_H
 #define RASTER_RENDERER_SYNTAX_PRINTER_H
 
-#include "CompileError.h"
+#include "Diagnostics.h"
 #include "Syntax.h"
 #include "IL.h"
 #include "SymbolTable.h"

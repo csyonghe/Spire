@@ -2,7 +2,7 @@
 #define BAKER_SL_COMPILED_PROGRAM_H
 
 #include "../CoreLib/Basic.h"
-#include "CompileError.h"
+#include "Diagnostics.h"
 #include "IL.h"
 #include "Syntax.h"
 
