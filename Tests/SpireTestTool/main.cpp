@@ -156,6 +156,7 @@ int main(
 	// TODO: add more directories to this list
 	// TODO: allow for a command-line argument to select a particular directory
 	runTestsInDirectory(&context, "Tests/FrontEnd/");
+	runTestsInDirectory(&context, "Tests/Diagnostics/");
 
 	if (!context.totalTestCount)
 	{
