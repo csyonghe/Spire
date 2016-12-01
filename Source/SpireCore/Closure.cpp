@@ -15,12 +15,16 @@ namespace Spire
 				if ((comp.Value->Implementations.First()->SyntaxNode->IsPublic ||
 					comp.Value->Implementations.First()->SyntaxNode->IsOutput))
 				{
-					if (parent->Components.TryGetValue(comp.Key, ccomp))
-						err->Error(33022, "\'" + comp.Key + "\' is already defined in current scope.\nsee previous definition at " + ccomp->Implementations.First()->SyntaxNode->Position.ToString(),
-							comp.Value->Implementations.First()->SyntaxNode->Position);
-					else if (parent->SubClosures.TryGetValue(comp.Key, su))
-						err->Error(33022, "\'" + comp.Key + "\' is already defined in current scope.\nsee previous definition at " + su->UsingPosition.ToString(),
-							comp.Value->Implementations.First()->SyntaxNode->Position);
+                    if (parent->Components.TryGetValue(comp.Key, ccomp))
+                    {
+						err->diagnose(comp.Value->Implementations.First()->SyntaxNode, Diagnostics::nameAlreadyDefinedInCurrentScope, comp.Key);
+                        err->diagnose(ccomp->Implementations.First()->SyntaxNode, Diagnostics::seePreviousDefinition);
+                    }
+                    else if (parent->SubClosures.TryGetValue(comp.Key, su))
+                    {
+						err->diagnose(comp.Value->Implementations.First()->SyntaxNode->Position, Diagnostics::nameAlreadyDefinedInCurrentScope, comp.Key);
+                        err->diagnose(su->UsingPosition, Diagnostics::seePreviousDefinition);
+                    }
 				}
 			}
 			for (auto & c : child->SubClosures)
@@ -29,12 +33,16 @@ namespace Spire
 				{
 					RefPtr<ShaderComponentSymbol> ccomp;
 					RefPtr<ShaderClosure> su;
-					if (parent->Components.TryGetValue(c.Key, ccomp))
-						err->Error(33022, "\'" + c.Key + "\' is already defined in current scope.\nsee previous definition at " + ccomp->Implementations.First()->SyntaxNode->Position.ToString(),
-							c.Value->UsingPosition);
-					else if (parent->SubClosures.TryGetValue(c.Key, su))
-						err->Error(33022, "\'" + c.Key + "\' is already defined in current scope.\nsee previous definition at " + su->UsingPosition.ToString(),
-							c.Value->UsingPosition);
+                    if (parent->Components.TryGetValue(c.Key, ccomp))
+                    {
+                        err->diagnose(c.Value->UsingPosition, Diagnostics::nameAlreadyDefinedInCurrentScope, c.Key);
+                        err->diagnose(ccomp->Implementations.First()->SyntaxNode, Diagnostics::seePreviousDefinition);
+                    }
+                    else if (parent->SubClosures.TryGetValue(c.Key, su))
+                    {
+                        err->diagnose(c.Value->UsingPosition, Diagnostics::nameAlreadyDefinedInCurrentScope, c.Key);
+                        err->diagnose(su->UsingPosition, Diagnostics::seePreviousDefinition);
+                    }
 					for (auto & sc : c.Value->SubClosures)
 						if (sc.Value->IsInPlace)
 							CheckComponentRedefinition(err, parent, sc.Value.Ptr());
@@ -59,10 +67,12 @@ namespace Spire
 					rootShader->Pipeline = shader->Pipeline;
 				else if (!rootShader->Pipeline->IsChildOf(shader->Pipeline))
 				{
-					StringBuilder sb;
-					sb << "pipeline '" << shader->Pipeline->SyntaxNode->Name.Content << "' targeted by module '" <<
-						shader->SyntaxNode->Name.Content << "' is incompatible with pipeline '" << rootShader->Pipeline->SyntaxNode->Name.Content << "' targeted by shader '" << rootShader->Name << "'.\nsee definition of shader '" << shader->SyntaxNode->Name.Content << "' at " << shader->SyntaxNode->Position.ToString();
-					err->Error(33041, sb.ProduceString(), shader->SyntaxNode->Position);
+                    err->diagnose(shader->SyntaxNode->Position, Diagnostics::pipelineOfModuleIncompatibleWithPipelineOfShader,
+                        shader->Pipeline->SyntaxNode->Name,
+                        shader->SyntaxNode->Name.Content,
+                        rootShader->Pipeline->SyntaxNode->Name.Content,
+                        rootShader->Name);
+                    err->diagnose(shader->SyntaxNode->Position, Diagnostics::seeDefinitionOfShader, shader->SyntaxNode->Name);
 				}
 			}
 			
@@ -143,28 +153,26 @@ namespace Spire
 				if (comp.Value->Implementations.First()->SyntaxNode->IsParam &&
 					!pRefMap.ContainsKey(comp.Key))
 				{
-					StringBuilder errMsg;
-					errMsg << "parameter '" << comp.Key << "' of module '" << shader->SyntaxNode->Name.Content << "' is unassigned.";
+                    err->diagnose(rs->UsingPosition, Diagnostics::parameterOfModuleIsUnassigned, comp.Key, shader->SyntaxNode->Name);
 					// try to provide more info on why it is unassigned
 					auto arg = rootShader->FindComponent(comp.Key, true, false);
-					if (!arg)
-						errMsg << " implicit parameter matching failed because shader '" << rootShader->Name << "' does not define component '" + comp.Key + "'.";
+                    if (!arg)
+                        err->diagnose(rootShader, Diagnostics::implicitParameterMatchingFailedBecauseShaderDoesNotDefineComponent,
+                            rootShader->Name,
+                            comp.Key);
 					else
 					{
 						if (comp.Value->Type->DataType->Equals(arg->Type->DataType.Ptr()))
 						{
-							errMsg << " implicit parameter matching failed because the component of the same name is not accessible from '" << shader->SyntaxNode->Name.Content << "'.\ncheck if you have declared necessary requirements and properly used the 'public' qualifier.";
+                            err->diagnose(rs->UsingPosition, Diagnostics::implicitParameterMatchingFailedBecauseNameNotAccessible, shader->SyntaxNode->Name);
 						}
 						else
 						{
-							errMsg << "implicit parameter matching failed because the component of the same name does not match parameter type '"
-								<< comp.Value->Type->DataType->ToString() << "'.";
+                            err->diagnose(rs->UsingPosition, Diagnostics::implicitParameterMatchingFailedBecauseTypeMismatch, comp.Value->Type->DataType);
 						}
-						errMsg << "\nsee requirement declaration at " << comp.Value->Implementations.First()->SyntaxNode->Position.ToString() << ".";
-						errMsg << "\nsee potential definition of component '" << comp.Key << "' at " << arg->Implementations.First()->SyntaxNode->Position.ToString()
-							<< ".\n";
+                        err->diagnose(comp.Value->Implementations.First()->SyntaxNode, Diagnostics::seeRequirementDeclaration);
+                        err->diagnose(arg->Implementations.First()->SyntaxNode, Diagnostics::seePotentialDefinitionOfComponent, comp.Key);
 					}
-					err->Error(33023,errMsg.ProduceString(), rs->UsingPosition);
 				}
 			}
 			return rs;
@@ -296,7 +304,7 @@ namespace Spire
 				import->Component->Accept(this);
 				if (!import->Component->Tags.ContainsKey("ComponentReference"))
 				{
-					Error(32047, "first argument of an import operator call does not resolve to a component.", import->Component.Ptr());
+					getSink()->diagnose(import->Component.Ptr(), Diagnostics::firstArgumentToImportNotComponent);
 				}
 				else
 				{
@@ -500,29 +508,27 @@ namespace Spire
 					if (IsInAbstractWorld(closure->Pipeline, comp.Value.Ptr()) &&
 						IsInAbstractWorld(closure->Pipeline, existingComp))
 					{
-						// silently ignore consistently defined global components (components in abstract worlds)
 						if (!IsConsistentGlobalComponentDefinition(comp.Value.Ptr(), existingComp))
 						{
-							err->Error(34025, "'" + existingComp->Name + "': global component conflicts with previous declaration.\nsee previous declaration at " + existingComp->Implementations.First()->SyntaxNode->Position.ToString(),
-								comp.Value->Implementations.First()->SyntaxNode->Position);
+                            err->diagnose(comp.Value->Implementations.First()->SyntaxNode, Diagnostics::globalComponentConflictWithPreviousDeclaration, existingComp->Name);
+                            err->diagnose(existingComp->Implementations.First()->SyntaxNode, Diagnostics::seePreviousDefinition);
 						}
 						else
 						{
-							err->Warning(34026, "'" + existingComp->Name + "': component is already defined when compiling shader '" + closure->Name + "'. use 'require' to declare it as a parameter. \nsee previous declaration at " + existingComp->Implementations.First()->SyntaxNode->Position.ToString(),
-								comp.Value->Implementations.First()->SyntaxNode->Position);
+    						// silently ignore consistently defined global components (components in abstract worlds)
+							err->diagnose(comp.Value->Implementations.First()->SyntaxNode, Diagnostics::componentIsAlreadyDefinedUseRequire, existingComp->Name, closure->Name);
+                            err->diagnose(existingComp->Implementations.First()->SyntaxNode, Diagnostics::seePreviousDefinition);
 						}
 					}
 					else if (comp.Value->Implementations.First()->SyntaxNode->Parameters.Count() == 0)
 					{
-						StringBuilder errBuilder;
-						errBuilder << "component named '" << comp.Value->UniqueKey << "\' is already defined when compiling '" << closure->Name << "'.";
+						err->diagnose(comp.Value->Implementations.First()->SyntaxNode, Diagnostics::componentAlreadyDefinedWhenCompiling, comp.Value->UniqueKey, closure->Name);
 						auto currentClosure = subClosure;
 						while (currentClosure != nullptr && currentClosure != closure)
 						{
-							errBuilder << "\nsee inclusion of '" << currentClosure->Name << "' at " << currentClosure->UsingPosition.ToString() << ".";
+                            err->diagnose(currentClosure->UsingPosition, Diagnostics::seeInclusionOf, currentClosure->Name);
 							currentClosure = currentClosure->Parent;
 						}
-						err->Error(34024, errBuilder.ProduceString(), comp.Value->Implementations.First()->SyntaxNode->Position);
 					}
 				}
 				closure->AllComponents[comp.Value->UniqueName] = comp.Value.Ptr();
@@ -579,9 +585,11 @@ namespace Spire
 						ShaderComponentSymbol* unaccessibleComp = nullptr;
 						if (!IsWorldFeasible(symTable, shader->Pipeline, impl.Ptr(), w, unaccessibleComp))
 						{
-							err->Error(33100, "'" + comp->Name + "' cannot be computed at '" + w + "' because the dependent component '" + unaccessibleComp->Name + "' is not accessible.\nsee definition of '"
-								+ unaccessibleComp->Name + "' at " + unaccessibleComp->Implementations.First()->SyntaxNode->Position.ToString(),
-								impl->ComponentReferencePositions[unaccessibleComp]());
+                            err->diagnose(impl->ComponentReferencePositions[unaccessibleComp](), Diagnostics::componentCantBeComputedAtWorldBecauseDependentNotAvailable,
+                                comp->Name,
+                                w,
+                                unaccessibleComp->Name);
+                            err->diagnose(unaccessibleComp->Implementations.First()->SyntaxNode, Diagnostics::seeDefinitionOf, unaccessibleComp->Name);
 						}
 						autoWorld.Remove(w);
 					}
@@ -656,7 +664,7 @@ namespace Spire
 								}
 								if (rcomp.Key == comp.Value)
 								{
-									err->Error(32013, "'" + rcomp.Key->Name + "': circular reference is not allowed.", impl->SyntaxNode->Position);
+									err->diagnose(impl->SyntaxNode->Position, Diagnostics::circularReferenceNotAllowed, rcomp.Key->Name);
 									rs = true;
 								}
 							}
@@ -701,9 +709,11 @@ namespace Spire
 						{
 							if (!symTable->IsWorldImplicitlyReachable(shader->Pipeline, arg->Type->FeasibleWorlds, w, requirement->Type->DataType))
 							{
-								err->Error(32015, "argument '" + arg->Name + "' is not available in world '" + w + "' as required by '" + shader->Name
-									+ "'.\nsee requirement declaration at " +
-									requirement->Implementations.First()->SyntaxNode->Position.ToString(), arg->Implementations.First()->SyntaxNode->Position);
+                                err->diagnose(arg->Implementations.First()->SyntaxNode->Position, Diagnostics::argumentNotAvilableInWorld,
+                                    arg->Name,
+                                    w,
+                                    shader->Name);
+                                err->diagnose(requirement->Implementations.First()->SyntaxNode->Position, Diagnostics::seeRequirementDeclaration);
 							}
 						}
 						PropagateArgumentConstraints(requirement.Ptr(), arg.Ptr());
@@ -790,33 +800,37 @@ namespace Spire
 					{
 						if (!comp->Type->DataType->Equals(req.Value->Type->DataType.Ptr()))
 						{
-							errMsg << "component '" << req.Key << "' has type '" << comp->Type->DataType->ToString() << "', but pipeline '"
-								<< shader->Pipeline->SyntaxNode->Name.Content << "' requires it to be '" << req.Value->Type->DataType->ToString() 
-								<< "'.\nsee pipeline requirement definition at " << req.Value->Implementations.First()->SyntaxNode->Position.ToString();
-							err->Error(32051, errMsg.ProduceString(), comp->Implementations.First()->SyntaxNode->Position);
+                            err->diagnose(comp->Implementations.First()->SyntaxNode, Diagnostics::componentTypeNotWhatPipelineRequires,
+                                req.Key,
+                                comp->Type->DataType,
+                                shader->Pipeline->SyntaxNode->Name.Content,
+                                req.Value->Type->DataType);
+                            err->diagnose(req.Value->Implementations.First()->SyntaxNode, Diagnostics::seePipelineRequirementDefinition);
 						}
 					}
 					else
 					{
-						errMsg << "shader '" << shader->Name << "' does not define '" << req.Key << "' as required by pipeline '"
-							<< shader->Pipeline->SyntaxNode->Name.Content << "''.\nsee pipeline requirement definition at "
-							<< req.Value->Implementations.First()->SyntaxNode->Position.ToString();
-						err->Error(32052, errMsg.ProduceString(), shader->Position);
+                        err->diagnose(shader->Position, Diagnostics::shaderDoesNotDefineComponentAsRequiredByPipeline,
+                            shader->Name,
+                            req.Key,
+                            shader->Pipeline->SyntaxNode->Name);
+                        err->diagnose(req.Value->Implementations.First()->SyntaxNode, Diagnostics::seePipelineRequirementDefinition);
 					}
 				}
 			}
 		}
 
-		void PrintModuleUsingStack(StringBuilder & sb, ShaderClosure * shader)
+		void diagnoseModuleUsingStack(DiagnosticSink* sink, ShaderClosure * shader)
 		{
 			if (shader->Parent)
 			{
-				sb << "see module '" + shader->Name << "' being used in '" + shader->Parent->Name << "' at " << shader->Position.ToString() << "\n";
-				PrintModuleUsingStack(sb, shader->Parent);
+                sink->diagnose(shader, Diagnostics::seeModuleBeingUsedIn, shader->Name, shader->Parent->Name);
+				diagnoseModuleUsingStack(sink, shader->Parent);
 			}
 			else
 			{
-				sb << "shader '" << shader->Name << "' is targeting pipeline '" << shader->Pipeline->SyntaxNode->Name.Content << "' at " << shader->Position.ToString() << "\nalso see pipeline definition at " << shader->Pipeline->SyntaxNode->Position.ToString();
+                sink->diagnose(shader, Diagnostics::noteShaderIsTargetingPipeine, shader->Name, shader->Pipeline->SyntaxNode->Name);
+                sink->diagnose(shader->Pipeline->SyntaxNode, Diagnostics::alsoSeePipelineDefinition);
 			}
 		}
 	
@@ -833,12 +847,11 @@ namespace Spire
 						for (auto & world : userSpecifiedWorlds)
 						{
 							{
-								StringBuilder sb;
-								sb << "\'" << world.World.Content << "' is not a defined world in '" <<
-									shader->Pipeline->SyntaxNode->Name.Content << "'.\n";
-								PrintModuleUsingStack(sb, shader);
-								if (!shader->Pipeline->WorldDependency.ContainsKey(world.World.Content))
-									err->Error(33012, sb.ProduceString(), world.World.Position);
+                                if (!shader->Pipeline->WorldDependency.ContainsKey(world.World.Content))
+                                {
+									err->diagnose(world.World.Position, Diagnostics::worldIsNotDefinedInPipeline, world.World, shader->Pipeline->SyntaxNode->Name);
+    								diagnoseModuleUsingStack(err, shader);
+                                }
 							}
 							WorldSymbol worldSym;
 							if (shader->Pipeline->Worlds.TryGetValue(world.World.Content, worldSym))
@@ -848,12 +861,8 @@ namespace Spire
 									inAbstractWorld = true;
 									if (userSpecifiedWorlds.Count() > 1)
 									{
-										StringBuilder sb;
-										sb << "abstract world cannot appear with other worlds.\n";
-										PrintModuleUsingStack(sb, shader);
-										err->Error(33013, sb.ProduceString(),
-											world.World.Position);
-										PrintModuleUsingStack(sb, shader);
+										err->diagnose(world.World.Position, Diagnostics::abstractWorldCannotAppearWithOthers);
+										diagnoseModuleUsingStack(err, shader);
 									}
 								}
 							}
@@ -862,8 +871,7 @@ namespace Spire
 					if (!inAbstractWorld && !impl->SyntaxNode->IsParam && !impl->SyntaxNode->IsInput
 						&& !impl->SyntaxNode->Expression && !impl->SyntaxNode->BlockStatement)
 					{
-						err->Error(33014, "non-abstract component must have an implementation.",
-							impl->SyntaxNode->Position);
+						err->diagnose(impl->SyntaxNode->Position, Diagnostics::nonAbstractComponentMustHaveImplementation);
 					}
 
 					bool isDefinedInAbstractWorld = false, isDefinedInNonAbstractWorld = false;
@@ -886,7 +894,7 @@ namespace Spire
 					if (impl->SyntaxNode->Expression || impl->SyntaxNode->BlockStatement)
 					{
 						if (isDefinedInAbstractWorld)
-							err->Error(33039, "'" + impl->SyntaxNode->Name.Content + "': no code allowed for component defined in input world.", impl->SyntaxNode->Position);
+							err->diagnose(impl->SyntaxNode->Position, Diagnostics::componentInInputWorldCantHaveCode, impl->SyntaxNode->Name);
 					}
 				}
 			}
@@ -920,9 +928,11 @@ namespace Spire
 				auto comp = shader->FindComponent(requirement.Key);
 				if (!comp)
 				{
-					err->Error(32014, "shader '" + shader->Name + "' does not provide '" + requirement.Key + "' as required by '" + shader->Pipeline->SyntaxNode->Name.Content
-						+ "'.\nsee requirement declaration at " +
-						requirement.Value->Implementations.First()->SyntaxNode->Position.ToString(), shader->Position);
+                    err->diagnose(shader->Position, Diagnostics::shaderDoesProvideRequirement,
+                        shader->Name,
+                        requirement.Key,
+                        shader->Pipeline->SyntaxNode->Name.Content);
+                    err->diagnose(requirement.Value->Implementations.First()->SyntaxNode, Diagnostics::seeRequirementDeclaration);
 				}
 				else
 				{
@@ -932,9 +942,11 @@ namespace Spire
 						{
 							if (!symTable->IsWorldImplicitlyReachable(shader->Pipeline, comp->Type->FeasibleWorlds, w, requirement.Value->Type->DataType))
 							{
-								err->Error(32015, "component '" + comp->Name + "' is not available in world '" + w + "' as required by '" + shader->Pipeline->SyntaxNode->Name.Content
-									+ "'.\nsee requirement declaration at " +
-									requirement.Value->Implementations.First()->SyntaxNode->Position.ToString(), comp->Implementations.First()->SyntaxNode->Position);
+                                err->diagnose(comp->Implementations.First()->SyntaxNode, Diagnostics::componentNotAvilableInWorld,
+                                    comp->Name,
+                                    w,
+                                    shader->Pipeline->SyntaxNode->Name);
+                                err->diagnose(requirement.Value->Implementations.First()->SyntaxNode, Diagnostics::seeRequirementDeclaration);
 							}
 						}
 					}

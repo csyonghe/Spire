@@ -180,13 +180,13 @@ namespace Spire
 						}
 						if (!matched)
 						{
-							Error(31040, "undefined type name: '" + typeNode->TypeName + "'.", typeNode);
+                            getSink()->diagnose(typeNode, Diagnostics::undefinedTypeName, typeNode->TypeName);
 							typeResult = ExpressionType::Error;
 						}
 					}
 					else
 					{
-						Error(31040, "undefined type name: '" + typeNode->TypeName + "'.", typeNode);
+                        getSink()->diagnose(typeNode, Diagnostics::undefinedTypeName, typeNode->TypeName);
 						typeResult = ExpressionType::Error;
 						return typeNode;
 					}
@@ -209,13 +209,15 @@ namespace Spire
 				typeNode->BaseType->Accept(this);
 				rs->BaseType = typeResult;
 				rs->GenericTypeName = typeNode->GenericTypeName;
-				if (rs->GenericTypeName != "PackedBuffer" &&
-					rs->GenericTypeName != "StructuredBuffer" &&
-					rs->GenericTypeName != "RWStructuredBuffer" &&
-					rs->GenericTypeName != "Uniform" &&
-					rs->GenericTypeName != "Patch" &&
-					rs->GenericTypeName != "PackedBuffer")
-					Error(30015, "'" + rs->GenericTypeName + "': undefined identifier.", typeNode);
+                if (rs->GenericTypeName != "PackedBuffer" &&
+                    rs->GenericTypeName != "StructuredBuffer" &&
+                    rs->GenericTypeName != "RWStructuredBuffer" &&
+                    rs->GenericTypeName != "Uniform" &&
+                    rs->GenericTypeName != "Patch" &&
+                    rs->GenericTypeName != "PackedBuffer")
+                {
+                    getSink()->diagnose(typeNode, Diagnostics::undefinedIdentifier, rs->GenericTypeName);
+                }
 				typeResult = rs;
 				return typeNode;
 			}
@@ -233,7 +235,7 @@ namespace Spire
 					}
 					else
 					{
-						Error(33010, "pipeline '" + pipeline->ParentPipeline.Content + "' is undefined.", pipeline->ParentPipeline);
+                        getSink()->diagnose(pipeline->ParentPipeline, Diagnostics::undefinedPipelineName, pipeline->ParentPipeline.Content);
 					}
 				}
 				currentPipeline = psymbol.Ptr();
@@ -250,7 +252,7 @@ namespace Spire
 					}
 					else
 					{
-						Error(33001, "world \'" + world->Name.Content + "\' is already defined.", world.Ptr());
+						getSink()->diagnose(world.Ptr(), Diagnostics::worldNameAlreadyDefined, world->Name.Content);
 					}
 				}
 				for (auto comp : pipeline->AbstractComponents)
@@ -259,9 +261,10 @@ namespace Spire
 					if (comp->IsParam || comp->IsInput || (comp->Rate && comp->Rate->Worlds.Count() == 1
 						&& psymbol->IsAbstractWorld(comp->Rate->Worlds.First().World.Content)))
 						AddNewComponentSymbol(psymbol->Components, psymbol->FunctionComponents, comp);
-					else
-						Error(33003, "cannot define components in a pipeline.",
-							comp.Ptr());
+                    else
+                    {
+						getSink()->diagnose(comp.Ptr(), Diagnostics::cannotDefineComponentsInAPipeline);
+                    }
 				}
 				for (auto & op : pipeline->ImportOperators)
 				{
@@ -271,19 +274,18 @@ namespace Spire
 				for (auto op : pipeline->ImportOperators)
 				{
 					if (!psymbol->WorldDependency.ContainsKey(op->DestWorld.Content))
-						Error(33004, "undefined world name '" + op->DestWorld.Content + "'.", op->DestWorld);
+						getSink()->diagnose(op->DestWorld, Diagnostics::undefinedWorldName, op->DestWorld.Content);
 					else
 					{
 						if (psymbol->Worlds[op->DestWorld.Content].GetValue().IsAbstract)
-							Error(33005, "abstract world cannot appear as target as an import operator.", op->DestWorld);
+							getSink()->diagnose(op->DestWorld, Diagnostics::abstractWorldAsTargetOfImport);
 						else if (!psymbol->WorldDependency.ContainsKey(op->SourceWorld.Content))
-							Error(33006, "undefined world name '" + op->SourceWorld.Content + "'.", op->SourceWorld);
+							getSink()->diagnose(op->SourceWorld, Diagnostics::undefinedWorldName2, op->SourceWorld.Content);
 						else
 						{
 							if (IsWorldDependent(psymbol.Ptr(), op->SourceWorld.Content, op->DestWorld.Content))
 							{
-								Error(33007, "import operator '" + op->Name.Content + "' creates a circular dependency between world '" + op->SourceWorld.Content + "' and '" + op->DestWorld.Content + "'",
-									op->Name);
+								getSink()->diagnose(op->Name, Diagnostics::importOperatorCircularity, op->Name.Content, op->SourceWorld.Content, op->DestWorld.Content);
 							}
 							else
 							{
@@ -326,7 +328,7 @@ namespace Spire
 					for (auto & para : op->Parameters)
 					{
 						if (paraNames.Contains(para->Name))
-							Error(30002, "parameter \'" + para->Name + "\' already defined.", para.Ptr());
+							getSink()->diagnose(para.Ptr(), Diagnostics::parameterAlreadyDefined, para->Name);
 						else
 							paraNames.Add(para->Name);
 						VariableEntry varEntry;
@@ -334,8 +336,10 @@ namespace Spire
 						para->Type = TranslateTypeNode(para->TypeNode);
 						varEntry.Type.DataType = para->Type;
 						op->Scope->Variables.AddIfNotExists(varEntry.Name, varEntry);
-						if (varEntry.Type.DataType->Equals(ExpressionType::Void.Ptr()))
-							Error(30016, "'void' can not be parameter type.", para.Ptr());
+                        if (varEntry.Type.DataType->Equals(ExpressionType::Void.Ptr()))
+                        {
+							getSink()->diagnose(para.Ptr(), Diagnostics::parameterCannotBeVoid);
+                        }
 					}
 					auto oldSymFuncs = symbolTable->Functions;
 					auto oldSymFuncOverloads = symbolTable->FunctionOverloads;
@@ -373,12 +377,12 @@ namespace Spire
 						{
 							if (namedArgumentAppeared)
 							{
-								Error(33030, "positional argument cannot appear after a named argument.", arg->Expression.Ptr());
+								getSink()->diagnose(arg->Expression.Ptr(), Diagnostics::positionArgumentAfterNamed);
 								break;
 							}
 							if (position >= paramList.Count())
 							{
-								Error(33031, "too many arguments.", arg->Expression.Ptr());
+								getSink()->diagnose(arg->Expression.Ptr(), Diagnostics::tooManyArguments);
 								break;
 							}
 							arg->ArgumentName.Content = paramList[position]->Name;
@@ -414,24 +418,24 @@ namespace Spire
 											varExpr->Variable = funcType->Component->Name;
 									}
 									else
-										Error(30052, "ordinary functions not allowed as argument to function-typed module parameter.", arg.Ptr());
+										getSink()->diagnose(arg.Ptr(), Diagnostics::ordinaryFunctionAsModuleArgument);
 								}
 								else
-									Error(30051, "invalid value for argument '" + arg->ArgumentName.Content, arg.Ptr());
+									getSink()->diagnose(arg.Ptr(), Diagnostics::invalidValueForArgument, arg->ArgumentName.Content);
 							}
 							else
 							{
 								arg->Accept(this);
 								if (!refComp->Type->DataType->Equals(arg->Expression->Type.Ptr()))
 								{
-									Error(33027, "argument type (" + arg->Expression->Type->ToString() + ") does not match parameter type (" + refComp->Type->DataType->ToString() + ")", arg->Expression.Ptr());
+									getSink()->diagnose(arg->Expression.Ptr(), Diagnostics::argumentTypeDoesNotMatchParameterType, arg->Expression->Type, refComp->Type->DataType);
 								}
 								if (!refComp->IsParam())
-									Error(33028, "'" + arg->ArgumentName.Content + "' is not a parameter of '" + import->ShaderName.Content + "'.", arg->ArgumentName);
+									getSink()->diagnose(arg->ArgumentName, Diagnostics::nameIsNotAParameterOfCallee, arg->ArgumentName.Content, import->ShaderName.Content);
 							}
 						}
 						else
-							Error(33028, "'" + arg->ArgumentName.Content + "' is not a parameter of '" + import->ShaderName.Content + "'.", arg->ArgumentName);
+							getSink()->diagnose(arg->ArgumentName, Diagnostics::nameIsNotAParameterOfCallee, arg->ArgumentName.Content, import->ShaderName.Content);
 					}
 				}
 				return import;
@@ -468,7 +472,7 @@ namespace Spire
 					if (comp->Expression || comp->BlockStatement)
 					{
 						if (compSym->IsParam())
-							Error(33040, "'require': cannot define computation on component requirements.", comp);
+							getSink()->diagnose(comp, Diagnostics::requireWithComputation);
 					}
 					currentComp = nullptr;
 					return comp;
@@ -478,7 +482,7 @@ namespace Spire
 					RefPtr<ShaderSymbol> refShader;
 					symbolTable->Shaders.TryGetValue(import->ShaderName.Content, refShader);
 					if (!refShader)
-						Error(33015, "undefined identifier \'" + import->ShaderName.Content + "\'.", import->ShaderName);
+						getSink()->diagnose(import->ShaderName, Diagnostics::undefinedIdentifier, import->ShaderName.Content);
 					currentShader->DependentShaders.Add(refShader.Ptr());
 					if (!currentComp)
 					{
@@ -494,13 +498,13 @@ namespace Spire
 							if (currentShader->ShaderObjects.ContainsKey(import->ObjectName.Content) ||
 								currentShader->Components.ContainsKey(import->ObjectName.Content))
 							{
-								Error(33018, "\'" + import->ShaderName.Content + "\' is already defined.", import->ShaderName);
+								getSink()->diagnose(import->ShaderName, Diagnostics::nameAlreadyDefined, import->ShaderName);
 							}
 							currentShader->ShaderObjects[import->ObjectName.Content] = su;
 						}
 					}
 					if (currentComp)
-						Error(33016, "'using': importing not allowed in component definition.", import->ShaderName);
+						getSink()->diagnose(import->ShaderName, Diagnostics::usingInComponentDefinition);
 					return import;
 				}
 			};
@@ -525,8 +529,7 @@ namespace Spire
 					{
 						// current compilation context has more than one pipeline defined,
 						// in which case we do not allow implicit pipeline specification
-						Error(33002, "explicit pipeline specification required for shader '" +
-							shader->Name.Content + "' because multiple pipelines are defined in current context.", curShader->Name);
+						getSink()->diagnose(curShader->Name, Diagnostics::explicitPipelineSpecificationRequiredForShader, shader->Name.Content);
 					}
 				}
 
@@ -538,7 +541,7 @@ namespace Spire
 						shaderSymbol->Pipeline = pipeline->Ptr();
 					else
 					{
-						Error(33010, "pipeline \'" + pipelineName + "' is not defined.", shader->Pipeline);
+						getSink()->diagnose(shader->Pipeline, Diagnostics::undefinedPipelineName, pipelineName);
 						throw 0;
 					}
 				}
@@ -556,7 +559,7 @@ namespace Spire
 							shaderSymbol->IsAbstract = true;
 							if (!shaderSymbol->SyntaxNode->IsModule)
 							{
-								Error(33009, "parameters can only be defined in modules.", shaderSymbol->SyntaxNode);
+								getSink()->diagnose(shaderSymbol->SyntaxNode, Diagnostics::parametersOnlyAllowedInModules);
 							}
 						}
 						for (auto & param : comp->Parameters)
@@ -580,7 +583,7 @@ namespace Spire
 							for (auto & world : userSpecifiedWorlds)
 							{
 								if (!shaderSymbol->Pipeline->WorldDependency.ContainsKey(world.World.Content))
-									Error(33012, "\'" + world.World.Content + "' is not a defined world in '" +
+									getSink()->diagnose(33012, "\'" + world.World.Content + "' is not a defined world in '" +
 										pipelineName + "'.", world.World);
 								WorldSymbol worldSym;
 
@@ -591,7 +594,7 @@ namespace Spire
 										inAbstractWorld = true;
 										if (userSpecifiedWorlds.Count() > 1)
 										{
-											Error(33013, "abstract world cannot appear with other worlds.",
+											getSink()->diagnose(33013, "abstract world cannot appear with other worlds.",
 												world.World);
 										}
 									}
@@ -601,7 +604,7 @@ namespace Spire
 						if (!inAbstractWorld && !impl->SyntaxNode->IsParam
 							&& !impl->SyntaxNode->Expression && !impl->SyntaxNode->BlockStatement)
 						{
-							Error(33014, "non-abstract component must have an implementation.",
+							getSink()->diagnose(33014, "non-abstract component must have an implementation.",
 								impl->SyntaxNode.Ptr());
 						}
 					}
@@ -672,8 +675,7 @@ namespace Spire
 					comp->Expression = comp->Expression->Accept(this).As<ExpressionSyntaxNode>();
 					if (!MatchType_ValueReceiver(compSym->Type->DataType.Ptr(), comp->Expression->Type.Ptr()) && 
 						!comp->Expression->Type->Equals(ExpressionType::Error.Ptr()))
-						Error(30019, "type mismatch \'" + comp->Expression->Type->ToString() + "\' and \'" +
-							currentComp->Type->DataType->ToString() + "\'", comp->Name);
+						getSink()->diagnose(comp->Name, Diagnostics::typeMismatch, comp->Expression->Type, currentComp->Type);
 				}
 				if (comp->BlockStatement)
 					comp->BlockStatement->Accept(this);
@@ -715,12 +717,10 @@ namespace Spire
 					}
 					else
 					{
-						Error(33019, "component \'" + compImpl->SyntaxNode->Name.Content + "\': definition marked as 'export' must have an explicitly specified world.",
-							compImpl->SyntaxNode.Ptr());
+						getSink()->diagnose(compImpl->SyntaxNode.Ptr(), Diagnostics::componentMarkedExportMustHaveWorld, compImpl->SyntaxNode->Name);
 					}
 					if (compImpl->SyntaxNode->Parameters.Count() > 0)
-						Error(33037, "component '" + compImpl->SyntaxNode->Name.Content + "\': definition marked as 'export' cannot have parameters.",
-							compImpl->SyntaxNode->Name);
+						getSink()->diagnose(compImpl->SyntaxNode->Name, Diagnostics::componetMarkedExportCannotHaveParameters, compImpl->SyntaxNode->Name);
 				}
 				auto compName = GetFullComponentName(comp.Ptr());
 				if (!components.TryGetValue(compName, compSym))
@@ -734,17 +734,20 @@ namespace Spire
 				else
 				{
 					if (comp->IsParam)
-						Error(33029, "\'" + compImpl->SyntaxNode->Name.Content + "\': requirement clash with previous definition.",
-							compImpl->SyntaxNode.Ptr());
+						getSink()->diagnose(compImpl->SyntaxNode.Ptr(), Diagnostics::requirementsClashWithPreviousDef, compImpl->SyntaxNode->Name.Content);
 					else
 					{
-						if (!compSym->Type->DataType->Equals(comp->Type.Ptr()))
-							Error(30035, "'" + comp->Name.Content + "': type of overloaded component mismatches previous definition.\nsee previous definition at " +
-								compSym->Implementations.First()->SyntaxNode->Position.ToString(), comp->Name);
+                        if (!compSym->Type->DataType->Equals(comp->Type.Ptr()))
+                        {
+							getSink()->diagnose(comp->Name, Diagnostics::componentOverloadTypeMismatch, comp->Name.Content);
+							getSink()->diagnose(compSym->Implementations.First()->SyntaxNode, Diagnostics::seePreviousDefinition);
+                        }
 					}
-					if (compImpl->SyntaxNode->Parameters.Count())
-						Error(33032, "\'" + compImpl->SyntaxNode->Name.Content + "\': function redefinition.\nsee previous definition at " +
-							compSym->Implementations.Last()->SyntaxNode->Position.ToString(), compImpl->SyntaxNode.Ptr());
+                    if (compImpl->SyntaxNode->Parameters.Count())
+                    {
+						getSink()->diagnose(compImpl->SyntaxNode.Ptr(), Diagnostics::functionRedefinition, compImpl->SyntaxNode->Name.Content);
+						getSink()->diagnose(compSym->Implementations.Last()->SyntaxNode, Diagnostics::seePreviousDefinition);
+                    }
 					symbolTable->CheckComponentImplementationConsistency(sink, compSym.Ptr(), compImpl.Ptr());
 				}
 				if (compImpl->SyntaxNode->Parameters.Count())
@@ -789,7 +792,7 @@ namespace Spire
 								argList << ", ";
 						}
 						argList << ")";
-						Error(30001, "\'" + func->Name + argList.ProduceString() + "\': function redefinition.", func.Ptr());
+						getSink()->diagnose(func, Diagnostics::functionRedefinitionWithArgList, func->Name, argList.ProduceString());
 					}
 					else
 						funcNames.Add(func->InternalName);
@@ -809,7 +812,7 @@ namespace Spire
 					shaderSym->SyntaxNode = shader.Ptr();
 					if (symbolTable->Shaders.ContainsKey(shader->Name.Content))
 					{
-						Error(33018, "shader '" + shader->Name.Content + "' has already been defined.", shader->Name);
+						getSink()->diagnose(shader->Name, Diagnostics::shaderAlreadyDefined, shader->Name);
 					}
 					symbolTable->Shaders[shader->Name.Content] = shaderSym;
 				}
@@ -828,7 +831,7 @@ namespace Spire
 					for (auto & shader : symbolTable->Shaders)
 						if (!sortedShaders.Contains(shader.Value.Ptr()))
 						{
-							Error(33011, "shader '" + shader.Key + "' involves circular reference.", shader.Value->SyntaxNode->Name);
+							getSink()->diagnose(shader.Value->SyntaxNode->Name, Diagnostics::shaderCircularity, shader.Key);
 						}
 				}
 
@@ -886,7 +889,7 @@ namespace Spire
 				for (auto & para : functionNode->Parameters)
 				{
 					if (paraNames.Contains(para->Name))
-						Error(30002, "parameter \'" + para->Name + "\' already defined.", para.Ptr());
+						getSink()->diagnose(para, Diagnostics::parameterAlreadyDefined, para->Name);
 					else
 						paraNames.Add(para->Name);
 					VariableEntry varEntry;
@@ -895,7 +898,7 @@ namespace Spire
 					varEntry.Type.DataType = para->Type;
 					functionNode->Scope->Variables.AddIfNotExists(varEntry.Name, varEntry);
 					if (varEntry.Type.DataType->Equals(ExpressionType::Void.Ptr()))
-						Error(30016, "'void' can not be parameter type.", para.Ptr());
+						getSink()->diagnose(para, Diagnostics::parameterCannotBeVoid);
 					internalName << "@" << varEntry.Type.DataType->ToString();
 				}
 				functionNode->InternalName = internalName.ProduceString();	
@@ -923,13 +926,13 @@ namespace Spire
 			virtual RefPtr<StatementSyntaxNode> VisitBreakStatement(BreakStatementSyntaxNode *stmt) override
 			{
 				if (!loops.Count())
-					Error(30003, "'break' must appear inside loop constructs.", stmt);
+					getSink()->diagnose(stmt, Diagnostics::breakOutsideLoop);
 				return stmt;
 			}
 			virtual RefPtr<StatementSyntaxNode> VisitContinueStatement(ContinueStatementSyntaxNode *stmt) override
 			{
 				if (!loops.Count())
-					Error(30004, "'continue' must appear inside loop constructs.", stmt);
+					getSink()->diagnose(stmt, Diagnostics::continueOutsideLoop);
 				return stmt;
 			}
 			virtual RefPtr<StatementSyntaxNode> VisitDoWhileStatement(DoWhileStatementSyntaxNode *stmt) override
@@ -937,10 +940,12 @@ namespace Spire
 				loops.Add(stmt);
 				if (stmt->Predicate != NULL)
 					stmt->Predicate = stmt->Predicate->Accept(this).As<ExpressionSyntaxNode>();
-				if (!stmt->Predicate->Type->Equals(ExpressionType::Error.Ptr()) && 
-					!stmt->Predicate->Type->Equals(ExpressionType::Int.Ptr()) &&
-					!stmt->Predicate->Type->Equals(ExpressionType::Bool.Ptr()))
-					Error(30005, "'while': expression must evaluate to int.", stmt);
+                if (!stmt->Predicate->Type->Equals(ExpressionType::Error.Ptr()) &&
+                    !stmt->Predicate->Type->Equals(ExpressionType::Int.Ptr()) &&
+                    !stmt->Predicate->Type->Equals(ExpressionType::Bool.Ptr()))
+                {
+					getSink()->diagnose(stmt, Diagnostics::whilePredicateTypeError);
+                }
 				stmt->Statement->Accept(this);
 
 				loops.RemoveAt(loops.Count() - 1);
@@ -971,7 +976,7 @@ namespace Spire
 						!stmt->PredicateExpression->Type->Equals(ExpressionType::Int.Ptr()) &&
 						!stmt->PredicateExpression->Type->Equals(ExpressionType::UInt.Ptr()))
 					{
-						Error(30028, "'for': predicate expression must evaluate to bool.", stmt->PredicateExpression.Ptr());
+						getSink()->diagnose(stmt->PredicateExpression.Ptr(), Diagnostics::forPredicateTypeError);
 					}
 				}
 				if (stmt->SideEffectExpression)
@@ -990,7 +995,7 @@ namespace Spire
 				if (!stmt->Predicate->Type->Equals(ExpressionType::Error.Ptr()) 
 					&& (!stmt->Predicate->Type->Equals(ExpressionType::Int.Ptr()) && 
 						!stmt->Predicate->Type->Equals(ExpressionType::Bool.Ptr())))
-					Error(30006, "'if': expression must evaluate to int.", stmt);
+					getSink()->diagnose(stmt, Diagnostics::ifPredicateTypeError);
 
 				if (stmt->PositiveStatement != NULL)
 					stmt->PositiveStatement->Accept(this);
@@ -1004,12 +1009,12 @@ namespace Spire
 				if (currentCompNode && currentCompNode->BlockStatement->Statements.Count() &&
 					stmt != currentCompNode->BlockStatement->Statements.Last().Ptr())
 				{
-					Error(30026, "'return' can only appear as the last statement in component definition.", stmt);
+					getSink()->diagnose(stmt, Diagnostics::returnInComponentMustComeLast);
 				}
 				if (!stmt->Expression)
 				{
 					if (function && !function->ReturnType->Equals(ExpressionType::Void.Ptr()))
-						Error(30006, "'return' should have an expression.", stmt);
+						getSink()->diagnose(stmt,  Diagnostics::returnNeedsExpression);
 				}
 				else
 				{
@@ -1017,18 +1022,13 @@ namespace Spire
 					if (!stmt->Expression->Type->Equals(ExpressionType::Error.Ptr()))
 					{
 						if (function && !MatchType_ValueReceiver(function->ReturnType.Ptr(), stmt->Expression->Type.Ptr()))
-							Error(30007, "expression type '" + stmt->Expression->Type->ToString()
-								+ "' does not match function's return type '"
-								+ function->ReturnType->ToString() + "'", stmt);
+							getSink()->diagnose(stmt, Diagnostics::functionReturnTypeMismatch, stmt->Expression->Type, function->ReturnType);
 						if (currentComp && !MatchType_ValueReceiver(currentComp->Type->DataType.Ptr(), stmt->Expression->Type.Ptr()))
 						{
-							Error(30007, "expression type '" + stmt->Expression->Type->ToString()
-								+ "' does not match component's type '"
-								+ currentComp->Type->DataType->ToString() + "'", stmt);
+							getSink()->diagnose(stmt, Diagnostics::componentReturnTypeMismatch, stmt->Expression->Type, currentComp->Type->DataType);
 						}
 						if (currentImportOperator && !MatchType_GenericType(currentImportOperator->TypeName.Content, stmt->Expression->Type.Ptr()))
-							Error(30020, "import operator should return '" + currentImportOperator->TypeName.Content
-								+ "', but the expression has type '" + stmt->Expression->Type->ToString() + "'. do you forget 'project'?", stmt);
+							getSink()->diagnose(stmt, Diagnostics::importOperatorReturnTypeMismatch, stmt->Expression->Type, currentImportOperator->TypeName);
 					}
 				}
 				return stmt;
@@ -1038,24 +1038,24 @@ namespace Spire
 				stmt->Type = TranslateTypeNode(stmt->TypeNode);
 				if (stmt->Type->IsTextureOrSampler() || stmt->Type->AsGenericType())
 				{
-					Error(30033, "cannot declare a local variable of this type.", stmt);
+					getSink()->diagnose(stmt, Diagnostics::invalidTypeForLocalVariable);
 				}
 				else if (stmt->Type->AsBasicType() && stmt->Type->AsBasicType()->RecordTypeName.Length())
 				{
-					Error(33034, "cannot declare a record-typed variable in an import operator.", stmt);
+					getSink()->diagnose(stmt, Diagnostics::recordTypeVariableInImportOperator);
 				}
 				for (auto & para : stmt->Variables)
 				{
 					VariableEntry varDeclr;
 					varDeclr.Name = para->Name;
 					if (stmt->Scope->Variables.ContainsKey(para->Name))
-						Error(30008, "variable " + para->Name + " already defined.", para.Ptr());
+						getSink()->diagnose(para, Diagnostics::variableNameAlreadyDefined, para->Name);
 
 					varDeclr.Type.DataType = stmt->Type;
 					if (varDeclr.Type.DataType->Equals(ExpressionType::Void.Ptr()))
-						Error(30009, "invalid type 'void'.", stmt);
+						getSink()->diagnose(stmt, Diagnostics::invalidTypeVoid);
 					if (varDeclr.Type.DataType->IsArray() && varDeclr.Type.DataType->AsArrayType()->ArrayLength <= 0)
-						Error(30025, "array size must be larger than zero.", stmt);
+						getSink()->diagnose(stmt, Diagnostics::invalidArraySize);
 
 					stmt->Scope->Variables.AddIfNotExists(para->Name, varDeclr);
 					if (para->Expression != NULL)
@@ -1064,8 +1064,7 @@ namespace Spire
 						if (!MatchType_ValueReceiver(varDeclr.Type.DataType.Ptr(), para->Expression->Type.Ptr())
 							&& !para->Expression->Type->Equals(ExpressionType::Error.Ptr()))
 						{
-							Error(30019, "type mismatch \'" + para->Expression->Type->ToString() + "\' and \'" +
-								varDeclr.Type.DataType->ToString() + "\'", para.Ptr());
+							getSink()->diagnose(para, Diagnostics::typeMismatch, para->Expression->Type, varDeclr.Type.DataType);
 						}
 					}
 				}
@@ -1078,7 +1077,7 @@ namespace Spire
 				if (!stmt->Predicate->Type->Equals(ExpressionType::Error.Ptr()) && 
 					!stmt->Predicate->Type->Equals(ExpressionType::Int.Ptr()) &&
 					!stmt->Predicate->Type->Equals(ExpressionType::Bool.Ptr()))
-					Error(30010, "'while': expression must evaluate to int.", stmt);
+					getSink()->diagnose(stmt, Diagnostics::whilePredicateTypeError2);
 
 				stmt->Statement->Accept(this);
 				loops.RemoveAt(loops.Count() - 1);
@@ -1100,7 +1099,7 @@ namespace Spire
 				{
 					if (!(leftType->AsBasicType() && leftType->AsBasicType()->IsLeftValue) &&
 						!leftType->Equals(ExpressionType::Error.Ptr()))
-						Error(30011, "left of '=' is not an l-value.", expr->LeftExpression.Ptr());
+						getSink()->diagnose(expr->LeftExpression.Ptr(), Diagnostics::assignNonLValue);
 					if (expr->Operator == Operator::AndAssign ||
 						expr->Operator == Operator::OrAssign ||
 						expr->Operator == Operator::XorAssign ||
@@ -1109,7 +1108,7 @@ namespace Spire
 					{
 						if (!(leftType->IsIntegral() && rightType->IsIntegral()))
 						{
-							Error(30041, "bit operation: operand must be integral type.", expr);
+							getSink()->diagnose(expr, Diagnostics::bitOperationNonIntegral);
 						}
 					}
 					expr->LeftExpression->Access = ExpressionAccess::Write;
@@ -1137,8 +1136,7 @@ namespace Spire
 					{
 						expr->Type = ExpressionType::Error;
 						if (!leftType->Equals(ExpressionType::Error.Ptr()) && !rightType->Equals(ExpressionType::Error.Ptr()))
-							Error(30012, "no overload found for operator " + OperatorToString(expr->Operator) + " (" + leftType->ToString() + ", "
-								+ rightType->ToString() + ").", expr);
+							getSink()->diagnose(expr, Diagnostics::noOverloadFoundForBinOperatorOnTypes, OperatorToString(expr->Operator), leftType, rightType);
 					}
 					else
 					{
@@ -1186,13 +1184,13 @@ namespace Spire
 					isValid = isValid || baseExprType->AsArrayType();
 					if (!isValid)
 					{
-						Error(30013, "'[]' can only index on arrays.", expr);
+						getSink()->diagnose(expr, Diagnostics::subscriptNonArray);
 						expr->Type = ExpressionType::Error;
 					}
 					if (!expr->IndexExpression->Type->Equals(ExpressionType::Int.Ptr()) && 
 						!expr->IndexExpression->Type->Equals(ExpressionType::UInt.Ptr()))
 					{
-						Error(30014, "index expression must evaluate to int.", expr);
+						getSink()->diagnose(expr, Diagnostics::subscriptIndexNonInteger);
 						expr->Type = ExpressionType::Error;
 					}
 				}
@@ -1360,15 +1358,13 @@ namespace Spire
 						// component with explicit import operator call must be qualified with explicit rate
 						if (!currentCompNode->Rate)
 						{
-							Error(33071, "cannot call an import operator from an auto-placed component '" + currentCompNode->Name.Content + "'. try qualify the component with explicit worlds.",
-								varExpr);
+							getSink()->diagnose(varExpr, Diagnostics::importOperatorCalledFromAutoPlacedComponent, currentCompNode->Name);
 							invoke->Type = ExpressionType::Error;
 							return invoke;
 						}
 						// for now we do not support calling import operator from a multi-world component definition
 						if (currentCompNode->Rate->Worlds.Count() > 1)
-							Error(33073, "cannot call an import operator from a multi-world component definition. consider qualify the component with only one explicit world.",
-								varExpr);
+							getSink()->diagnose(varExpr, Diagnostics::importOperatorCalledFromMultiWorldComponent);
 						auto validOverloads = From(*impOpList).Where([&](RefPtr<ImportOperatorDefSyntaxNode> imp) { return imp->DestWorld.Content == currentCompNode->Rate->Worlds.First().World.Content; }).ToList();
 						auto func = FindFunctionOverload(validOverloads, [](RefPtr<ImportOperatorDefSyntaxNode> imp)
 						{
@@ -1398,10 +1394,11 @@ namespace Spire
 								if (i != arguments.Count() - 1)
 									argList << ", ";
 							}
-							Error(33072, "'" + varExpr->Variable + "' is an import operator defined in pipeline '" + currentShader->Pipeline->SyntaxNode->Name.Content
-								+ "', but none of the import operator overloads converting to world '" + currentCompNode->Rate->Worlds.First().World.Content + "' matches argument list (" +
-								argList.ProduceString() + ").",
-								varExpr);
+							getSink()->diagnose(varExpr, Diagnostics::noApplicableImportOperator,
+                                varExpr->Variable,
+                                currentShader->Pipeline->SyntaxNode->Name,
+                                currentCompNode->Rate->Worlds.First().World,
+								argList.ProduceString());
 							invoke->Type = ExpressionType::Error;
 						}
 						return invoke;
@@ -1482,9 +1479,9 @@ namespace Spire
 							argList << ", ";
 					}
 					if (functionNameFound)
-						Error(30021, varExpr->Variable + ": no overload takes arguments (" + argList.ProduceString() + ")", varExpr);
+						getSink()->diagnose(varExpr, Diagnostics::noApplicationFunction, varExpr->Variable, argList.ProduceString());
 					else
-						Error(30015, "undefined identifier '" + varExpr->Variable + "'.", varExpr);
+						getSink()->diagnose(varExpr, Diagnostics::undefinedIdentifier2, varExpr->Variable);
 				}
 				return invoke;
 			}
@@ -1493,13 +1490,13 @@ namespace Spire
 			{
 				if (currentImportOperator == nullptr)
 				{
-					Error(30030, "'project': invalid use outside import operator.", project);
+					getSink()->diagnose(project, Diagnostics::projectionOutsideImportOperator);
 					return project;
 				}
 				project->BaseExpression->Accept(this);
 				auto baseType = project->BaseExpression->Type->AsBasicType();
 				if (!baseType || baseType->RecordTypeName != currentImportOperator->SourceWorld.Content)
-					Error(30031, "'project': expression must evaluate to record type '" + currentImportOperator->SourceWorld.Content + "'.", project);
+					getSink()->diagnose(project, Diagnostics::projectTypeMismatch, currentImportOperator->SourceWorld);
 				auto rsType = new BasicExpressionType(BaseType::Generic);
 				project->Type = rsType;
 				rsType->GenericTypeVar = currentImportOperator->TypeName.Content;
@@ -1518,7 +1515,7 @@ namespace Spire
 				}
 				else
 				{
-					Error(33070, "expression preceding parenthesis of apparent call must have function type.", expr->FunctionExpr.Ptr());
+					getSink()->diagnose(expr->FunctionExpr, Diagnostics::expectedFunction);
 					expr->Type = ExpressionType::Error;
 				}
 				return expr;
@@ -1554,8 +1551,7 @@ namespace Spire
 									if (i < expr->Arguments.Count() && expr->Arguments[i]->Type->AsBasicType() &&
 										!expr->Arguments[i]->Type->AsBasicType()->IsLeftValue)
 									{
-										Error(30047, "argument passed to parameter '" + (*params)[i]->Name + "' must be l-value.",
-											expr->Arguments[i].Ptr());
+										getSink()->diagnose(expr->Arguments[i], Diagnostics::argumentExpectedLValue, (*params)[i]->Name);
 									}
 								}
 							}
@@ -1647,7 +1643,7 @@ namespace Spire
 				{
 					expr->Type = ExpressionType::Error;
 					if (!expr->Expression->Type->Equals(ExpressionType::Error.Ptr()))
-						Error(30012, "no overload found for operator " + OperatorToString(expr->Operator) + " (" + expr->Expression->Type->ToString() + ").", expr);
+						getSink()->diagnose(expr, Diagnostics::noApplicationUnaryOperator, OperatorToString(expr->Operator), expr->Expression->Type);
 				}
 				else
 				{
@@ -1682,7 +1678,7 @@ namespace Spire
 						expr->Type = comp->Type->DataType;
 					}
 					else
-						Error(30015, "undefined identifier \'" + expr->Variable + "\'", expr);
+						getSink()->diagnose(expr, Diagnostics::undefinedIdentifier2, expr->Variable);
 				}
 				else if (currentShader)
 				{
@@ -1695,14 +1691,14 @@ namespace Spire
 					}
 					else if (compRef.Component)
 					{
-						Error(30017, "component \'" + expr->Variable + "\' is not accessible from shader '" + currentShader->SyntaxNode->Name.Content + "'.", expr);
+						getSink()->diagnose(expr, Diagnostics::componentNotAccessibleFromShader, expr->Variable, currentShader->SyntaxNode->Name);
 					}
 					else
-						Error(30015, "undefined identifier \'" + expr->Variable + "\'", expr);
+						getSink()->diagnose(expr, Diagnostics::undefinedIdentifier2, expr->Variable);
 					expr->Tags["ComponentReference"] = new ComponentReferenceObject(compRef.Component);
 				}
 				else
-					Error(30015, "undefined identifier \'" + expr->Variable + "\'", expr);
+					getSink()->diagnose(expr, Diagnostics::undefinedIdentifier2, expr->Variable);
 
 				if (expr->Type->IsGenericType("Uniform") || expr->Type->IsGenericType("Patch") || expr->Type->IsGenericType("StorageBuffer"))
 					expr->Type = expr->Type->AsGenericType()->BaseType;
@@ -1730,8 +1726,7 @@ namespace Spire
 					expr->Type = ExpressionType::Error;
 				if (expr->Type->Equals(ExpressionType::Error.Ptr()) && !expr->Expression->Type->Equals(ExpressionType::Error.Ptr()))
 				{
-					Error(30022, "invalid type cast between \"" + expr->Expression->Type->ToString() + "\" and \"" +
-						targetType->ToString() + "\".", expr);
+					getSink()->diagnose(expr, Diagnostics::invalidTypeCast, expr->Expression->Type, targetType->ToString());
 				}
 				return expr;
 			}
@@ -1742,13 +1737,13 @@ namespace Spire
 					&& !expr->SelectorExpr->Type->Equals(ExpressionType::Error.Ptr()))
 				{
 					expr->Type = ExpressionType::Error;
-					Error(30079, "selector must evaluate to bool.", expr);
+					getSink()->diagnose(expr, Diagnostics::selectPrdicateTypeMismatch);
 				}
 				expr->Expr0 = expr->Expr0->Accept(this).As<ExpressionSyntaxNode>();
 				expr->Expr1 = expr->Expr1->Accept(this).As<ExpressionSyntaxNode>();
 				if (!expr->Expr0->Type->Equals(expr->Expr1->Type.Ptr()))
 				{
-					Error(30080, "the two value expressions in a select clause must have same type.", expr);
+					getSink()->diagnose(expr, Diagnostics::selectValuesTypeMismatch);
 				}
 				expr->Type = expr->Expr0->Type;
 				return expr;
@@ -1864,8 +1859,7 @@ namespace Spire
 					if (id == -1)
 					{
 						expr->Type = ExpressionType::Error;
-						Error(30027, "\'" + expr->MemberName + "\' is not a member of \'" +
-							baseType->AsBasicType()->Struct->Name + "\'.", expr);
+						getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->MemberName, baseType->AsBasicType()->Struct);
 					}
 					else
 						expr->Type = baseType->AsBasicType()->Struct->SyntaxNode->Fields[id]->Type;
@@ -1879,8 +1873,7 @@ namespace Spire
 				if (!baseType->Equals(ExpressionType::Error.Ptr()) &&
 					expr->Type->Equals(ExpressionType::Error.Ptr()))
 				{
-					Error(30023, "\"" + baseType->ToString() + "\" does not have public member \"" +
-						expr->MemberName + "\".", expr);
+					getSink()->diagnose(expr, Diagnostics::typeHasNoPublicMemberOfName, baseType, expr->MemberName);
 				}
 				return expr;
 			}

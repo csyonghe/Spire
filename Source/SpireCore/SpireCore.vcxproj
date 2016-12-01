@@ -373,6 +373,7 @@
     <ClInclude Include="CodeGenBackend.h" />
     <ClInclude Include="CodeWriter.h" />
     <ClInclude Include="CompiledProgram.h" />
+    <ClInclude Include="DiagnosticDefs.h" />
     <ClInclude Include="Diagnostics.h" />
     <ClInclude Include="GetDependencyVisitor.h" />
     <ClInclude Include="Naming.h" />
@@ -396,6 +397,7 @@
     <ClCompile Include="CodeGenerator.cpp" />
     <ClCompile Include="CompiledProgram.cpp" />
     <ClCompile Include="ConstantPool.cpp" />
+    <ClCompile Include="Diagnostics.cpp" />
     <ClCompile Include="GetDependencyVisitor.cpp" />
     <ClCompile Include="GLSLCodeGen.cpp" />
     <ClCompile Include="HLSLCodeGen.cpp" />

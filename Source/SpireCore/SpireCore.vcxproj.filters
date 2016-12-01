@@ -72,6 +72,9 @@
     <ClInclude Include="Diagnostics.h">
       <Filter>Front End</Filter>
     </ClInclude>
+    <ClInclude Include="DiagnosticDefs.h">
+      <Filter>Front End</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Lexer.cpp">
@@ -144,6 +147,9 @@
       <Filter>Back End</Filter>
     </ClCompile>
     <ClCompile Include="GetDependencyVisitor.cpp">
+      <Filter>Front End</Filter>
+    </ClCompile>
+    <ClCompile Include="Diagnostics.cpp">
       <Filter>Front End</Filter>
     </ClCompile>
   </ItemGroup>

@@ -11,6 +11,7 @@
 #include "Source/SpireCore/CodeGenerator.cpp"
 #include "Source/SpireCore/CompiledProgram.cpp"
 #include "Source/SpireCore/ConstantPool.cpp"
+#include "Source/SpireCore/Diagnostics.cpp"
 #include "Source/SpireCore/GetDependencyVisitor.cpp"
 #include "Source/SpireCore/GLSLCodeGen.cpp"
 #include "Source/SpireCore/HLSLCodeGen.cpp"
