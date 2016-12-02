@@ -75,6 +75,9 @@
     <ClInclude Include="DiagnosticDefs.h">
       <Filter>Front End</Filter>
     </ClInclude>
+    <ClInclude Include="Preprocessor.h">
+      <Filter>Front End</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Lexer.cpp">
@@ -149,7 +152,11 @@
     <ClCompile Include="GetDependencyVisitor.cpp">
       <Filter>Front End</Filter>
     </ClCompile>
+<<<<<<< HEAD
     <ClCompile Include="Diagnostics.cpp">
+=======
+    <ClCompile Include="Preprocessor.cpp">
+>>>>>>> Initial work on a C-style preprocessor.
       <Filter>Front End</Filter>
     </ClCompile>
   </ItemGroup>

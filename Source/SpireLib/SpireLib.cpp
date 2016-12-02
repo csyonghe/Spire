@@ -4,6 +4,7 @@
 #include "../SpireCore/StdInclude.h"
 #include "../../Spire.h"
 #include "../SpireCore/TypeTranslation.h"
+#include "../SpireCore/Preprocessor.h"
 
 using namespace CoreLib::Basic;
 using namespace CoreLib::IO;
@@ -126,6 +127,42 @@ namespace SpireLib
 	List<ShaderLibFile> CompileShaderSource(Spire::Compiler::CompileResult & compileResult,
 		const CoreLib::String & src, const CoreLib::String & fileName, Spire::Compiler::CompileOptions & options)
 	{
+        struct IncludeHandlerImpl : IncludeHandler
+        {
+            List<String> searchDirs;
+
+            virtual bool TryToFindIncludeFile(
+                CoreLib::String const& pathToInclude,
+                CoreLib::String const& pathIncludedFrom,
+                CoreLib::String* outFoundPath,
+                CoreLib::String* outFoundSource) override
+            {
+                String path = Path::Combine(Path::GetDirectoryName(pathIncludedFrom), pathToInclude);
+                if (File::Exists(path))
+                {
+                    *outFoundPath = path;
+                    *outFoundSource = File::ReadAllText(path);
+                    return true;
+                }
+
+                for (auto & dir : searchDirs)
+                {
+                    path = Path::Combine(dir, pathToInclude);
+                    if (File::Exists(path))
+                    {
+                        *outFoundPath = path;
+                        *outFoundSource = File::ReadAllText(path);
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+        };
+
+        IncludeHandlerImpl includeHandler;
+        includeHandler.searchDirs = options.SearchDirectories;
+
 		Spire::Compiler::NamingCounter = 0;
 		RefPtr<ShaderCompiler> compiler = CreateShaderCompiler();
 		List<CompileUnit> units;
@@ -136,7 +173,7 @@ namespace SpireLib
 		auto searchDirs = options.SearchDirectories;
 		searchDirs.Add(Path::GetDirectoryName(fileName));
 		searchDirs.Reverse();
-		auto predefUnit = compiler->Parse(compileResult, SpireStdLib::GetCode(), "stdlib");
+		auto predefUnit = compiler->Parse(compileResult, SpireStdLib::GetCode(), "stdlib", &includeHandler);
 		for (int i = 0; i < unitsToInclude.Count(); i++)
 		{
 			auto inputFileName = unitsToInclude[i];
@@ -145,7 +182,7 @@ namespace SpireLib
 				String source = src;
 				if (i > 0)
 					source = File::ReadAllText(inputFileName);
-				auto unit = compiler->Parse(compileResult, source, inputFileName);
+				auto unit = compiler->Parse(compileResult, source, inputFileName, &includeHandler);
 				units.Add(unit);
 				if (unit.SyntaxNode)
 				{
@@ -460,6 +497,40 @@ namespace SpireLib
 		RefPtr<ProgramSyntaxNode> programToCompile;
         int errorCount = 0;
 		EnumerableDictionary<String, ModuleMetaData> modules;
+
+        struct IncludeHandlerImpl : IncludeHandler
+        {
+            List<String> searchDirs;
+
+            virtual bool TryToFindIncludeFile(
+                CoreLib::String const& pathToInclude,
+                CoreLib::String const& pathIncludedFrom,
+                CoreLib::String* outFoundPath,
+                CoreLib::String* outFoundSource) override
+            {
+                String path = Path::Combine(Path::GetDirectoryName(pathIncludedFrom), pathToInclude);
+                if (File::Exists(path))
+                {
+                    *outFoundPath = path;
+                    *outFoundSource = File::ReadAllText(path);
+                    return true;
+                }
+
+                for (auto & dir : searchDirs)
+                {
+                    path = Path::Combine(dir, pathToInclude);
+                    if (File::Exists(path))
+                    {
+                        *outFoundPath = path;
+                        *outFoundSource = File::ReadAllText(path);
+                        return true;
+                    }
+                }
+                return false;
+            }
+        };
+        IncludeHandlerImpl includeHandler;
+
 	public:
 		CompileOptions Options;
 
@@ -548,7 +619,7 @@ namespace SpireLib
 					String source = src;
 					if (i > 0)
 						source = File::ReadAllText(inputFileName);
-					auto unit = compiler->Parse(result, source, inputFileName);
+					auto unit = compiler->Parse(result, source, inputFileName, &includeHandler);
 					units.Add(unit);
 					if (unit.SyntaxNode)
 					{

@@ -34,6 +34,7 @@ DIAGNOSTIC(-1, Note, seeModuleBeingUsedIn, "see module '$0' being used in '$1'")
 DIAGNOSTIC(-1, Note, seePipelineRequirementDefinition, "see pipeline requirement definition")
 DIAGNOSTIC(-1, Note, seePotentialDefinitionOfComponent, "see potential definition of component '$0'")
 DIAGNOSTIC(-1, Note, seePreviousDefinition, "see previous definition")
+DIAGNOSTIC(-1, Note, seePreviousDefinitionOf, "see previous definition of '$0'")
 DIAGNOSTIC(-1, Note, seeRequirementDeclaration, "see requirement declaration")
 
 //
@@ -51,6 +52,44 @@ DIAGNOSTIC(    4, Error, cannotWriteOutputFile, "cannot write output file '$0'."
 
 DIAGNOSTIC(10000, Error, illegalCharacter, "Illegal character '\\x$0'");
 DIAGNOSTIC(10001, Error, illegalCharacterLiteral, "Illegal character literial.");
+
+//
+// 15xxx - Preprocessing
+//
+
+// 150xx - conditionals
+DIAGNOSTIC(15000, Error, endOfFileInPreprocessorConditional, "end of file encountered during preprocessor conditional")
+DIAGNOSTIC(15001, Error, directiveWithoutIf, "'$0' directive without '#if'")
+DIAGNOSTIC(15002, Error, directiveAfterElse , "'$0' directive without '#if'")
+DIAGNOSTIC(-1, Note, seeDirective, "see '$0' directive")
+
+// 151xx - directive parsing
+DIAGNOSTIC(15100, Error, expectedPreprocessorDirectiveName, "expected preprocessor directive name")
+DIAGNOSTIC(15101, Error, unknownPreprocessorDirective, "unknown preprocessor directive '$0'")
+DIAGNOSTIC(15102, Error, expectedTokenInPreprocessorDirective, "expected '$0' in '$1' directive")
+DIAGNOSTIC(15102, Error, expected2TokensInPreprocessorDirective, "expected '$0' or '$1' in '$2' directive")
+DIAGNOSTIC(15103, Error, unexpectedTokensAfterDirective, "unexpected tokens following '$0' directive")
+
+
+// 152xx - preprocessor expressions
+DIAGNOSTIC(15200, Error, expectedTokenInPreprocessorExpression, "expected '$0' in preprocessor expression");
+DIAGNOSTIC(15201, Error, syntaxErrorInPreprocessorExpression, "syntax error in preprocessor expression");
+DIAGNOSTIC(15202, Error, divideByZeroInPreprocessorExpression, "division by zero in preprocessor expression");
+DIAGNOSTIC(15203, Error, expectedTokenInDefinedExpression, "expected '$0' in 'defined' expression");
+DIAGNOSTIC(-1, Note, seeOpeningToken, "see opening '$0'")
+
+// 153xx - #include
+DIAGNOSTIC(15300, Error, includeFailed, "failed to find include file '$0'")
+DIAGNOSTIC(-1, Error, noIncludeHandlerSpecified, "no `#include` handler was specified")
+
+// 154xx - macros
+DIAGNOSTIC(15400, Warning, macroRedefinition, "redefinition of macro '$0'")
+DIAGNOSTIC(15401, Warning, macroNotDefined, "macro '$0' is not defined")
+
+
+// 159xx - user-defined error/warning
+DIAGNOSTIC(15900, Error,    userDefinedError,   "#error: $0")
+DIAGNOSTIC(15901, Warning,  userDefinedWarning, "#warning: $0")
 
 //
 // 2xxxx - Parsing
@@ -215,5 +254,6 @@ DIAGNOSTIC(51092, Error, stageDoesntHaveInputWorld, "'$0' doesn't appear to have
 // 99999 - Internal compiler errors, and not-yet-classified diagnostics.
 
 DIAGNOSTIC(99999, Internal, internalCompilerError, "internal compiler error")
+DIAGNOSTIC(99999, Internal, unimplemented, "unimplemented feature: $0")
 
 #undef DIAGNOSTIC

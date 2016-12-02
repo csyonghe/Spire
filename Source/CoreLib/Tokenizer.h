@@ -18,7 +18,7 @@ namespace CoreLib
 		inline bool IsLetter(char ch)
 		{
 			return ((ch >= 'a' && ch <= 'z') ||
-				(ch >= 'A' && ch <= 'Z') || ch == '_' || ch == '#');
+				(ch >= 'A' && ch <= 'Z') || ch == '_');
 		}
 
 		inline bool IsDigit(char ch)
@@ -32,7 +32,7 @@ namespace CoreLib
 				ch == '!' || ch == '^' || ch == '&' || ch == '(' || ch == ')' ||
 				ch == '=' || ch == '{' || ch == '}' || ch == '[' || ch == ']' ||
 				ch == '|' || ch == ';' || ch == ',' || ch == '.' || ch == '<' ||
-				ch == '>' || ch == '~' || ch == '@' || ch == ':' || ch == '?';
+                ch == '>' || ch == '~' || ch == '@' || ch == ':' || ch == '?' || ch == '#';
 		}
 
 		inline bool IsWhiteSpace(char ch)
@@ -74,6 +74,7 @@ namespace CoreLib
 
 		enum class TokenType
 		{
+            EndOfFile = -1,
 			// illegal
 			Unknown,
 			// identifier
@@ -88,10 +89,17 @@ namespace CoreLib
 			OpInc, OpDec, OpAddAssign, OpSubAssign, OpMulAssign, OpDivAssign, OpModAssign,
 			OpShlAssign, OpShrAssign, OpOrAssign, OpAndAssign, OpXorAssign,
 
-			QuestionMark, Colon, RightArrow, At,
+			QuestionMark, Colon, RightArrow, At, Pound,
 		};
 
 		String TokenTypeToString(TokenType type);
+
+        enum TokenFlag : unsigned int
+        {
+            AtStartOfLine   = 1 << 0,
+            AfterWhitespace = 1 << 1,
+        };
+        typedef unsigned int TokenFlags;
 
 		class Token
 		{
@@ -99,8 +107,10 @@ namespace CoreLib
 			TokenType Type = TokenType::Unknown;
 			String Content;
 			CodePosition Position;
+            TokenFlags flags = 0;
 			Token() = default;
-			Token(TokenType type, const String & content, int line, int col, int pos, String fileName)
+			Token(TokenType type, const String & content, int line, int col, int pos, String fileName, TokenFlags flags = 0)
+                : flags(flags)
 			{
 				Type = type;
 				Content = content;
