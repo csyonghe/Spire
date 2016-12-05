@@ -27,6 +27,13 @@ CoreLib::List<CoreLib::Text::Token> PreprocessSource(
     DiagnosticSink* sink,
     IncludeHandler* includeHandler);
 
+CoreLib::List<CoreLib::Text::Token> PreprocessSource(
+    CoreLib::String const& source,
+    CoreLib::String const& fileName,
+    DiagnosticSink* sink,
+    IncludeHandler* includeHandler,
+    CoreLib::Dictionary<CoreLib::String, CoreLib::String>  defines);
+
 }}
 
 #endif

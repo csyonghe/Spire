@@ -85,6 +85,9 @@ DIAGNOSTIC(-1, Error, noIncludeHandlerSpecified, "no `#include` handler was spec
 // 154xx - macros
 DIAGNOSTIC(15400, Warning, macroRedefinition, "redefinition of macro '$0'")
 DIAGNOSTIC(15401, Warning, macroNotDefined, "macro '$0' is not defined")
+DIAGNOSTIC(15403, Error, expectedTokenInMacroParameters, "expected '$0' in macro parameters")
+
+DIAGNOSTIC(15401, Warning, endOfInputInMacroInvocation, "end of input in macro arguments")
 
 
 // 159xx - user-defined error/warning

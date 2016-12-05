@@ -183,6 +183,13 @@ enum
 	SPIRE_API void spAddSearchPath(SpireCompilationContext * ctx, const char * searchDir);
 
 	/*!
+	@brief Add a macro definition to be used during preprocessing.
+	@param key The name of the macro to define.
+	@param value The value of the macro to define.
+	*/
+    SPIRE_API void spAddPreprocessorDefine(SpireCompilationContext * ctx, const char * key, const char * value);
+
+	/*!
 	@brief Sets a parameter used by the compiler back-end.
 	@param ctx The compilation context.
 	@param paramName The name of the parameter.

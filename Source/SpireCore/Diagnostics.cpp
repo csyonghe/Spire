@@ -84,7 +84,7 @@ static void formatDiagnosticMessage(StringBuilder& sb, char const* format, int a
             spanEnd++;
         }
 
-        sb.Append(spanBegin, (int)(spanEnd - spanBegin));
+        sb.Append(spanBegin, int(spanEnd - spanBegin));
         if (!*spanEnd)
             return;
 

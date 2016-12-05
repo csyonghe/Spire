@@ -241,7 +241,16 @@ namespace CoreLib
 					pos++;
 					break;
                 case '#':
-                    InsertToken(TokenType::Pound, "#");
+                    if (nextChar == '#')
+					{
+                        InsertToken(TokenType::PoundPound, "##");
+						pos += 2;
+					}
+					else
+					{
+                        InsertToken(TokenType::Pound, "#");
+						pos++;
+					}
 					pos++;
 					break;
 				case ':':
