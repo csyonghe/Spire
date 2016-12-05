@@ -167,14 +167,14 @@ namespace SpireLib
 						}
 						if (!found)
 						{
-							compileResult.GetErrorWriter()->Error(2, "cannot find file '" + inputFileName + "'.", inc.Position);
+                            compileResult.GetErrorWriter()->diagnose(inc.Position, Diagnostics::cannotFindFile, inputFileName);
 						}
 					}
 				}
 			}
 			catch (IOException)
 			{
-				compileResult.GetErrorWriter()->Error(1, "cannot open file '" + inputFileName + "'.", CodePosition(0, 0, 0, ""));
+                compileResult.GetErrorWriter()->diagnose(CodePosition(0, 0, 0, ""), Diagnostics::cannotOpenFile, inputFileName);
 			}
 		}
 		units.Add(predefUnit);
@@ -194,7 +194,7 @@ namespace SpireLib
 		}
 		catch (IOException)
 		{
-			compileResult.GetErrorWriter()->Error(1, "cannot open file '" + Path::GetFileName(sourceFileName) + "'.", CodePosition(0, 0, 0, ""));
+            compileResult.GetErrorWriter()->diagnose(CodePosition(0, 0, 0, ""), Diagnostics::cannotOpenFile, Path::GetFileName(sourceFileName));
 		}
 		return List<ShaderLibFile>();
 	}
@@ -570,14 +570,14 @@ namespace SpireLib
 							}
 							if (!found)
 							{
-								result.GetErrorWriter()->Error(2, "cannot find file '" + inputFileName + "'.", inc.Position);
+                                result.GetErrorWriter()->diagnose(inc.Position, Diagnostics::cannotFindFile, inputFileName);
 							}
 						}
 					}
 				}
 				catch (IOException)
 				{
-					result.GetErrorWriter()->Error(1, "cannot open file '" + inputFileName + "'.", CodePosition(0, 0, 0, ""));
+                    result.GetErrorWriter()->diagnose(CodePosition(0, 0, 0, ""), Diagnostics::cannotOpenFile, inputFileName);
 				}
 			}
             if (sink)
@@ -879,8 +879,15 @@ int ReturnStr(const char * content, char * buffer, int bufferSize)
 int spGetDiagnosticOutput(SpireDiagnosticSink* sink, char * buffer, int bufferSize)
 {
 	StringBuilder sb;
-	for (auto & x : sink->diagnostics)
-		sb << x.Position.ToString() << ": " << Spire::Compiler::getSeverityName(x.severity) << " " << x.ErrorID << ": " << x.Message << "\n";
+    for (auto & x : sink->diagnostics)
+    {
+        sb << x.Position.ToString() << ": " << Spire::Compiler::getSeverityName(x.severity);
+        if (x.ErrorID >= 0)
+        {
+            sb << " " << x.ErrorID;
+        }
+        sb << ": " << x.Message << "\n";
+    }
 	auto str = sb.ProduceString();
 	return ReturnStr(str.Buffer(), buffer, bufferSize);
 }

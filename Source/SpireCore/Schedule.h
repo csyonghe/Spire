@@ -2,7 +2,7 @@
 #define BAKER_SL_SCHEDULE_H
 
 #include "../CoreLib/Basic.h"
-#include "CompileError.h"
+#include "Diagnostics.h"
 #include "Syntax.h"
 
 namespace Spire

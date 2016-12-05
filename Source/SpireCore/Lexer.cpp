@@ -13,10 +13,10 @@ namespace Spire
 				switch (errType)
 				{
 				case CoreLib::Text::TokenizeErrorType::InvalidCharacter:
-					sink->Error(10000, "Illegal character '\\x" + String((unsigned char)curChar, 16) + "'", pos);
+					sink->diagnose(pos, Diagnostics::illegalCharacter, String((unsigned char)curChar, 16));
 					break;
 				case CoreLib::Text::TokenizeErrorType::InvalidEscapeSequence:
-					sink->Error(10001, "Illegal character literial.", pos);
+					sink->diagnose(pos, Diagnostics::illegalCharacterLiteral);
 					break;
 				default:
 					break;

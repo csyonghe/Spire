@@ -162,7 +162,7 @@ namespace Spire
 			void PrintDefaultCallInstrExpr(CodeGenContext & ctx, CallInstruction * instr, String const& name);
 
 		public:
-			void Error(int errId, String msg, CodePosition pos);
+            DiagnosticSink* getSink() { return this->errWriter; }
 			void PrintType(StringBuilder & sbCode, ILType* type);
 
 			void PrintDef(StringBuilder & sbCode, ILType* type, const String & name);

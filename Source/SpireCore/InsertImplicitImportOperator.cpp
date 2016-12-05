@@ -43,7 +43,7 @@ namespace Spire
 							refs << ", ";
 						count++;
 					}
-					Error(34062, "cyclic reference: " + refs.ProduceString(), currentCompDef->SyntaxNode.Ptr());
+					getSink()->diagnose(currentCompDef->SyntaxNode, Diagnostics::cylicReference, refs.ProduceString());
 					return nullptr;
 				}
 				visitedComponents.Add(componentUniqueName);
@@ -104,12 +104,9 @@ namespace Spire
 				}
 				else
 				{
-					StringBuilder sb;
 					auto targetComp = shaderIR->Shader->AllComponents[componentUniqueName]();
-					sb << "cannot find import operator to import component '" << targetComp->Name << "' to world '"
-						<< world << "' when compiling '" << currentCompDef->OriginalName << "'.\nsee definition of '" << targetComp->Name << "' at " <<
-						targetComp->Implementations.First()->SyntaxNode->Position.ToString() << ".";
-					Error(34064, sb.ProduceString(), currentCompDef->SyntaxNode.Ptr());
+                    getSink()->diagnose(currentCompDef->SyntaxNode, Diagnostics::noApplicableImplicitImportOperator, targetComp->Name, world, currentCompDef->OriginalName);
+                    getSink()->diagnose(targetComp->Implementations.First()->SyntaxNode, Diagnostics::seeDefinitionOf, targetComp->Name);
 					return currentCompDef;
 				}
 			}

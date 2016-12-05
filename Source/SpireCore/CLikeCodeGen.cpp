@@ -29,12 +29,6 @@ namespace Spire
 				return EscapeDoubleUnderscore(name + "_" + suffix);
 		}
 
-
-		void CLikeCodeGen::Error(int errId, String msg, CodePosition pos)
-		{
-			errWriter->Error(errId, msg, pos);
-		}
-
 		void CLikeCodeGen::PrintType(StringBuilder & sbCode, ILType* type)
 		{
 			PrintTypeName(sbCode, type);
@@ -803,7 +797,7 @@ namespace Spire
 				else if (stage.Value->StageType == "HullShader")
 					src = GenerateHullShader(result.Program.Ptr(), shader, stage.Value.Ptr());
 				else
-					errWriter->Error(50020, "Unknown stage type '" + stage.Value->StageType + "'.", stage.Value->Position);
+                    errWriter->diagnose(stage.Value->Position, Diagnostics::unknownStageType, stage.Value->StageType);
 				rs.Stages[stage.Key] = src;
 			}
 				
@@ -878,19 +872,19 @@ namespace Spire
 				}
 				if (auto arrType = dynamic_cast<ILArrayType*>(type))
 				{
-					if (info.DataStructure != ExternComponentCodeGenInfo::DataStructureType::StandardInput &&
-						info.DataStructure != ExternComponentCodeGenInfo::DataStructureType::UniformBuffer &&
-						info.DataStructure != ExternComponentCodeGenInfo::DataStructureType::Patch)
-						errWriter->Error(51090, "cannot generate code for extern component type '" + type->ToString() + "'.",
-							input.Position);
+                    if (info.DataStructure != ExternComponentCodeGenInfo::DataStructureType::StandardInput &&
+                        info.DataStructure != ExternComponentCodeGenInfo::DataStructureType::UniformBuffer &&
+                        info.DataStructure != ExternComponentCodeGenInfo::DataStructureType::Patch)
+                    {
+                        errWriter->diagnose(input.Position, Diagnostics::cannotGenerateCodeForExternComponentType, type);
+                    }
 					type = arrType->BaseType.Ptr();
 					info.IsArray = true;
 					info.ArrayLength = arrType->ArrayLength;
 				}
 				if (type != recType)
 				{
-					errWriter->Error(51090, "cannot generate code for extern component type '" + type->ToString() + "'.",
-						input.Position);
+                    errWriter->diagnose(input.Position, Diagnostics::cannotGenerateCodeForExternComponentType, type);
 				}
 			}
 			else
@@ -900,37 +894,37 @@ namespace Spire
 				{
 					info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::TessCoord;
 					if (!(input.Type->IsFloatVector() && input.Type->GetVectorSize() <= 3))
-						Error(50020, "TessCoord must have vec2 or vec3 type.", input.Position);
+                        getSink()->diagnose(input.Position, Diagnostics::invalidTessCoordType);
 				}
 				else if (input.Attributes.ContainsKey("FragCoord"))
 				{
 					info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::FragCoord;
 					if (!(input.Type->IsFloatVector() && input.Type->GetVectorSize() == 4))
-						Error(50020, "FragCoord must be a vec4.", input.Position);
+                        getSink()->diagnose(input.Position, Diagnostics::invalidFragCoordType);
 				}
 				else if (input.Attributes.ContainsKey("InvocationId"))
 				{
 					info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::InvocationId;
 					if (!input.Type->IsInt())
-						Error(50020, "InvocationId must have int type.", input.Position);
+                        getSink()->diagnose(input.Position, Diagnostics::invalidInvocationIdType);
 				}
 				else if (input.Attributes.ContainsKey("ThreadId"))
 				{
 					info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::InvocationId;
 					if (!input.Type->IsInt())
-						Error(50020, "ThreadId must have int type.", input.Position);
+                        getSink()->diagnose(input.Position, Diagnostics::invalidThreadIdType);
 				}
 				else if (input.Attributes.ContainsKey("PrimitiveId"))
 				{
 					info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::PrimitiveId;
 					if (!input.Type->IsInt())
-						Error(50020, "PrimitiveId must have int type.", input.Position);
+                        getSink()->diagnose(input.Position, Diagnostics::invalidPrimitiveIdType);
 				}
 				else if (input.Attributes.ContainsKey("PatchVertexCount"))
 				{
 					info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::PatchVertexCount;
 					if (!input.Type->IsInt())
-						Error(50020, "PatchVertexCount must have int type.", input.Position);
+                        getSink()->diagnose(input.Position, Diagnostics::invalidPatchVertexCountType);
 				}
 			}
 			return info;
@@ -1017,8 +1011,7 @@ namespace Spire
 					return;
 
 				default:
-					errWriter->Error(99999, "internal error: unexpected data structure for record type",
-							input.Position);
+                    SPIRE_INTERNAL_ERROR(getSink(), input.Position);
 					break;
 				}
 			}
@@ -1032,17 +1025,15 @@ namespace Spire
 				ILOperand * operand;
 				if (world->Components.TryGetValue(positionVar.Value, operand))
 				{
-					if(operand->Type->IsFloatVector() && operand->Type->GetVectorSize() == 4)
-					{
-						PrintRasterPositionOutputWrite(ctx, operand);
-					}
-					else
-						errWriter->Error(50040, "'" + positionVar.Value + "': component used as 'Position' output must be of vec4 type.",
-							positionVar.Position);
+                    if (operand->Type->IsFloatVector() && operand->Type->GetVectorSize() == 4)
+                    {
+                        PrintRasterPositionOutputWrite(ctx, operand);
+                    }
+                    else
+                        errWriter->diagnose(positionVar.Position, Diagnostics::componentHasInvalidTypeForPositionOutput, positionVar.Value);
 				}
 				else
-					errWriter->Error(50041, "'" + positionVar.Value + "': component not defined.",
-						positionVar.Position);
+					errWriter->diagnose(positionVar.Position, Diagnostics::componentNotDefined, positionVar.Value);
 			}
 		}
 
@@ -1053,7 +1044,7 @@ namespace Spire
 			if (stage->Attributes.TryGetValue("World", worldName))
 			{
 				if (!shader->Worlds.TryGetValue(worldName.Value, world))
-					errWriter->Error(50022, "world '" + worldName.Value + "' is not defined.", worldName.Position);
+					errWriter->diagnose(worldName.Position, Diagnostics::worldIsNotDefined, worldName.Value);
 			}
 			outputStrategy = CreateStandardOutputStrategy(world.Ptr(), "");
 			return GenerateSingleWorldShader(program, shader, stage);
@@ -1066,7 +1057,7 @@ namespace Spire
 			if (stage->Attributes.TryGetValue("World", worldName))
 			{
 				if (!shader->Worlds.TryGetValue(worldName.Value, world))
-					errWriter->Error(50022, "world '" + worldName.Value + "' is not defined.", worldName.Position);
+					errWriter->diagnose(worldName.Position, Diagnostics::worldIsNotDefined, worldName);
 			}
 			outputStrategy = CreatePackedBufferOutputStrategy(world.Ptr());
 			return GenerateSingleWorldShader(program, shader, stage);

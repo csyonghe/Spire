@@ -2,7 +2,7 @@
 #define RASTER_RENDERER_LEXER_H
 
 #include "../CoreLib/Basic.h"
-#include "CompileError.h"
+#include "Diagnostics.h"
 
 namespace Spire
 {

@@ -899,22 +899,7 @@ namespace Spire
 		{
 		protected:
 			DiagnosticSink * sink = nullptr;
-			void Error(int id, const String & text, SyntaxNode * node)
-			{
-				sink->Error(id, text, node->Position);
-			}
-			void Error(int id, const String & text, Token node)
-			{
-				sink->Error(id, text, node.Position);
-			}
-			void Warning(int id, const String & text, SyntaxNode * node)
-			{
-				sink->Warning(id, text, node->Position);
-			}
-			void Warning(int id, const String & text, Token node)
-			{
-				sink->Warning(id, text, node.Position);
-			}
+            DiagnosticSink* getSink() { return sink; }
 		public:
 			SyntaxVisitor(DiagnosticSink * sink)
 				: sink(sink)

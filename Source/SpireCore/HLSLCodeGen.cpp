@@ -352,8 +352,7 @@ namespace Spire
 					}
 					else
 					{
-						errWriter->Error(51091, "type '" + field.Value.Type->ToString() + "' cannot be placed in a texture.",
-							field.Value.Position);
+						errWriter->diagnose(field.Value.Position, Diagnostics::typeCannotBePlacedInATexture, field.Value.Type);
 					}
 				}
 			}
@@ -381,8 +380,8 @@ namespace Spire
 					sb << "[domain(\"" << ((val.Value == "quads") ? "quad" : "tri") << "\")]\n";
 				else
 					sb << "[domain(\"tri\")]\n";
-				if (val.Value != "triangles" && val.Value != "quads")
-					Error(50093, "'Domain' should be either 'triangles' or 'quads'.", val.Position);
+                if (val.Value != "triangles" && val.Value != "quads")
+                    getSink()->diagnose(val.Position, Diagnostics::invalidTessellationDomain);
 			}
 
 			void PrintHeaderBoilerplate(CodeGenContext& ctx)
@@ -439,10 +438,10 @@ namespace Spire
 				if (stage->Attributes.TryGetValue("World", worldName))
 				{
 					if (!shader->Worlds.TryGetValue(worldName.Value, world))
-						errWriter->Error(50022, "world '" + worldName.Value + "' is not defined.", worldName.Position);
+						errWriter->diagnose(worldName.Position, Diagnostics::worldIsNotDefined, worldName.Value);
 				}
 				else
-					errWriter->Error(50023, "'" + stage->StageType + "' should provide 'World' attribute.", stage->Position);
+					errWriter->diagnose(stage->Position, Diagnostics::stageShouldProvideWorldAttribute, stage->StageType);
 				if (!world)
 					return rs;
 				GenerateReferencedFunctions(ctx.GlobalHeader, program, MakeArrayView(world.Ptr()));
@@ -499,7 +498,7 @@ namespace Spire
 				}
 				if(!stageInputType)
 				{
-					errWriter->Error(99999, "'" + stage->StageType + "' doesn't appear to have any input world", stage->Position);
+					errWriter->diagnose(stage->Position, Diagnostics::stageDoesntHaveInputWorld, stage->StageType);
 				}
 		
 				// For a domain shader, we need to know how many corners the
@@ -511,7 +510,7 @@ namespace Spire
 				{
 					if (!stage->Attributes.TryGetValue("ControlPointCount", controlPointCount))
 					{
-						errWriter->Error(50052, "'DomainShader' requires attribute 'ControlPointCount'.", stage->Position);
+						errWriter->diagnose(stage->Position, Diagnostics::domainShaderRequiresControlPointCount);
 					}
 					StageAttribute val;
 					if(stage->Attributes.TryGetValue("Domain", val))
@@ -795,53 +794,53 @@ namespace Spire
 				RefPtr<ILWorld> patchWorld, controlPointWorld, cornerPointWorld;
 				if (!stage->Attributes.TryGetValue("PatchWorld", patchWorldName))
 				{
-					errWriter->Error(50052, "'HullShader' requires attribute 'PatchWorld'.", stage->Position);
+					errWriter->diagnose(stage->Position, Diagnostics::hullShaderRequiresPatchWorld);
 					return rs;
 				}
 				if (!shader->Worlds.TryGetValue(patchWorldName.Value, patchWorld))
-					errWriter->Error(50022, "world '" + patchWorldName.Value + "' is not defined.", patchWorldName.Position);
+					errWriter->diagnose(patchWorldName.Position, Diagnostics::worldIsNotDefined, patchWorldName.Value);
 				if (!stage->Attributes.TryGetValue("ControlPointWorld", controlPointWorldName))
 				{
-					errWriter->Error(50052, "'HullShader' requires attribute 'ControlPointWorld'.", stage->Position); 
+					errWriter->diagnose(stage->Position, Diagnostics::hullShaderRequiresControlPointWorld); 
 					return rs;
 				}
 				if (!shader->Worlds.TryGetValue(controlPointWorldName.Value, controlPointWorld))
-					errWriter->Error(50022, "world '" + controlPointWorldName.Value + "' is not defined.", controlPointWorldName.Position);
+					errWriter->diagnose(controlPointWorldName.Position, Diagnostics::worldIsNotDefined, controlPointWorldName.Value);
 				if (!stage->Attributes.TryGetValue("CornerPointWorld", cornerPointWorldName))
 				{
-					errWriter->Error(50052, "'HullShader' requires attribute 'CornerPointWorld'.", stage->Position);
+					errWriter->diagnose(stage->Position, Diagnostics::hullShaderRequiresCornerPointWorld);
 					return rs;
 				}
 				if (!shader->Worlds.TryGetValue(cornerPointWorldName.Value, cornerPointWorld))
-					errWriter->Error(50022, "world '" + cornerPointWorldName.Value + "' is not defined.", cornerPointWorldName.Position);
+					errWriter->diagnose(cornerPointWorldName.Position, Diagnostics::worldIsNotDefined, cornerPointWorldName.Value);
 				if (!stage->Attributes.TryGetValue("Domain", domain))
 				{
-					errWriter->Error(50052, "'HullShader' requires attribute 'Domain'.", stage->Position);
+					errWriter->diagnose(stage->Position, Diagnostics::hullShaderRequiresDomain);
 					return rs;
 				}
 				if (domain.Value != "triangles" && domain.Value != "quads")
 				{
-					errWriter->Error(50053, "'Domain' should be either 'triangles' or 'quads'.", domain.Position);
+					errWriter->diagnose(domain.Position, Diagnostics::invalidTessellationDomian);
 					return rs;
 				}
 				if (!stage->Attributes.TryGetValue("TessLevelOuter", outerLevel))
 				{
-					errWriter->Error(50052, "'HullShader' requires attribute 'TessLevelOuter'.", stage->Position);
+					errWriter->diagnose(stage->Position, Diagnostics::hullShaderRequiresTessLevelOuter);
 					return rs;
 				}
 				if (!stage->Attributes.TryGetValue("TessLevelInner", innerLevel))
 				{
-					errWriter->Error(50052, "'HullShader' requires attribute 'TessLevelInner'.", stage->Position);
+					errWriter->diagnose(stage->Position, Diagnostics::hullShaderRequiresTessLevelInner);
 					return rs;
 				}
 				if (!stage->Attributes.TryGetValue("InputControlPointCount", inputControlPointCount))
 				{
-					errWriter->Error(50052, "'HullShader' requires attribute 'InputControlPointCount'.", stage->Position);
+					errWriter->diagnose(stage->Position, Diagnostics::hullShaderRequiresInputControlPointCount);
 					return rs;
 				}
 				if (!stage->Attributes.TryGetValue("ControlPointCount", numControlPoints))
 				{
-					errWriter->Error(50052, "'HullShader' requires attribute 'ControlPointCount'.", stage->Position);
+					errWriter->diagnose(stage->Position, Diagnostics::hullShaderRequiresControlPointCount);
 					return rs;
 				}
 
@@ -853,13 +852,13 @@ namespace Spire
 				StageAttribute partitioning;
 				if(!stage->Attributes.TryGetValue("Partitioning", partitioning))
 				{
-					errWriter->Error(50052, "'HullShader' requires attribute 'Partitioning'.", stage->Position);
+					errWriter->diagnose(stage->Position, Diagnostics::hullShaderRequiresPartitioning);
 					return rs;
 				}
 				StageAttribute outputTopology;
 				if(!stage->Attributes.TryGetValue("OutputTopology", outputTopology))
 				{
-					errWriter->Error(50052, "'HullShader' requires attribute 'OutputTopology'.", stage->Position);
+					errWriter->diagnose(stage->Position, Diagnostics::hullShaderRequiresOutputTopology);
 					return rs;
 				}
 				// TODO(tfoley): Any reason to include an optional
@@ -1016,8 +1015,7 @@ namespace Spire
 
 				}
 				if (!found)
-					errWriter->Error(50041, "'" + outerLevel.Value + "': component not defined.",
-						outerLevel.Position);
+					errWriter->diagnose(outerLevel.Position, Diagnostics::componentNotDefined, outerLevel.Value);
 
 
 				found = false;
@@ -1037,8 +1035,7 @@ namespace Spire
 					}
 				}
 				if (!found)
-					errWriter->Error(50041, "'" + innerLevel.Value + "': component not defined.",
-						innerLevel.Position);
+					errWriter->diagnose(innerLevel.Position, Diagnostics::componentNotDefined, innerLevel.Value);
 
 				// Now surround the code with the boilerplate needed to
 				// make a real Hull Shader "patch constant function"
@@ -1105,7 +1102,7 @@ namespace Spire
 				}
 				else
 				{
-					errWriter->Error(50053, "'Domain' should be either 'triangles' or 'quads'.", domain.Position);
+					errWriter->diagnose(domain.Position, Diagnostics::invalidTessellationDomain);
 					return rs;
 				}
 				controlPointMain << "\")]\n";
@@ -1130,7 +1127,7 @@ namespace Spire
 				}
 				else
 				{
-					errWriter->Error(50053, "'Partitioning' must be one of: 'integer', 'pow2', 'fractional_even', or 'fractional_odd'.", partitioning.Position);
+					errWriter->diagnose(partitioning.Position, Diagnostics::invalidTessellationPartitioning);
 					return rs;
 				}
 				controlPointMain << "\")]\n";
@@ -1156,7 +1153,7 @@ namespace Spire
 				}
 				else
 				{
-					errWriter->Error(50053, "'OutputTopology' must be one of: 'point', 'line', 'triangle_cw', or 'triangle_ccw'.", partitioning.Position);
+					errWriter->diagnose(partitioning.Position, Diagnostics::invalidTessellationOutputTopology);
 					return rs;
 				}
 				controlPointMain << "\")]\n";
@@ -1314,8 +1311,7 @@ namespace Spire
 				}
 				else
 				{
-					codeGen->Error(50082, "importing type '" + typeName + "' from PackedBuffer is not supported by the GLSL backend.",
-						CodePosition());
+                    codeGen->getSink()->diagnose(CodePosition(), Diagnostics::importingFromPackedBufferUnsupported, typeName);
 				}
 				auto recType = world->OutputType.Ptr();
 				int recTypeSize = 0;

@@ -141,8 +141,7 @@ int wmain(int argc, wchar_t* argv[])
 				}
 				catch (Exception &)
 				{
-					result.GetErrorWriter()->Error(4, "cannot write output file \'" + Path::Combine(outputDir, f.MetaData.ShaderName + ".cse") + "\'.",
-						CodePosition(0, 0, 0, ""));
+					result.GetErrorWriter()->diagnose(CodePosition(0, 0, 0, ""), Diagnostics::cannotWriteOutputFile, Path::Combine(outputDir, f.MetaData.ShaderName + ".cse"));
 				}
 			}
 		}

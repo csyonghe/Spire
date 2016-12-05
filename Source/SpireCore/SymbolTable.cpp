@@ -337,7 +337,7 @@ namespace Spire
 					for (auto & w : cimpl->Worlds)
 						if (impl->Worlds.Contains(w) && impl->AlternateName == cimpl->AlternateName)
 						{
-							err->Error(33020, "\'" + comp->Name + "\' is already defined at '" + w + "\'.", impl->SyntaxNode->Position);
+                            err->diagnose(impl->SyntaxNode->Position, Diagnostics::componentIsAlreadyDefinedInThatWorld, comp->Name, w);
 							rs = false;
 						}
 				}
@@ -348,7 +348,7 @@ namespace Spire
 				{
 					if (cimpl->Worlds.Count() == 0 && impl->Worlds.Count() == 0 && impl->AlternateName == cimpl->AlternateName)
 					{
-						err->Error(33020, "\'" + comp->Name + "\' is already defined.", impl->SyntaxNode->Position);
+                        err->diagnose(impl->SyntaxNode->Position, Diagnostics::componentIsAlreadyDefined, comp->Name);
 						rs = false;
 					}
 				}
@@ -357,32 +357,49 @@ namespace Spire
 			{
 				if (impl->SyntaxNode->IsOutput != cimpl->SyntaxNode->IsOutput)
 				{
-					err->Error(33021, "\'" + comp->Name + "\': inconsistent signature.\nsee previous definition at " + cimpl->SyntaxNode->Position.ToString(), impl->SyntaxNode->Position);
+                    err->diagnose(impl->SyntaxNode->Position,
+                        Diagnostics::inconsistentSignatureForComponent,
+                        comp->Name);
+                    err->diagnose(cimpl->SyntaxNode->Position,
+                        Diagnostics::seePreviousDefinition);
 					rs = false;
 					break;
 				}
 				if (impl->SyntaxNode->IsParam != cimpl->SyntaxNode->IsParam)
 				{
-					err->Error(33021, "\'" + comp->Name + "\': inconsistent signature.\nsee previous definition at " + cimpl->SyntaxNode->Position.ToString(), impl->SyntaxNode->Position);
+                    err->diagnose(impl->SyntaxNode->Position,
+                        Diagnostics::inconsistentSignatureForComponent,
+                        comp->Name);
+                    err->diagnose(cimpl->SyntaxNode->Position,
+                        Diagnostics::seePreviousDefinition);
 					rs = false;
 					break;
 				}
 				if (impl->SyntaxNode->IsPublic != cimpl->SyntaxNode->IsPublic)
 				{
-					err->Error(33021, "\'" + comp->Name + "\': inconsistent signature.\nsee previous definition at " + cimpl->SyntaxNode->Position.ToString(), impl->SyntaxNode->Position);
+                    err->diagnose(impl->SyntaxNode->Position,
+                        Diagnostics::inconsistentSignatureForComponent,
+                        comp->Name);
+                    err->diagnose(cimpl->SyntaxNode->Position,
+                        Diagnostics::seePreviousDefinition);
 					rs = false;
 					break;
 				}
 				if (!impl->SyntaxNode->Type->Equals(cimpl->SyntaxNode->Type.Ptr()))
 				{
-					err->Error(33021, "\'" + comp->Name + "\': inconsistent signature.\nsee previous definition at " + cimpl->SyntaxNode->Position.ToString(), impl->SyntaxNode->Position);
+                    err->diagnose(impl->SyntaxNode->Position,
+                        Diagnostics::inconsistentSignatureForComponent,
+                        comp->Name);
+                    err->diagnose(cimpl->SyntaxNode->Position,
+                        Diagnostics::seePreviousDefinition);
 					rs = false;
 					break;
 				}
 			}
 			if (impl->SyntaxNode->IsParam && comp->Implementations.Count() != 0)
 			{
-				err->Error(33022, "\'" + comp->Name + "\': parameter name conflicts with existing definition.", impl->SyntaxNode->Position);
+                err->diagnose(impl->SyntaxNode->Position,
+                    Diagnostics::parameterNameConflictsWithExistingDefinition, comp->Name);
 				rs = false;
 			}
 			return rs;

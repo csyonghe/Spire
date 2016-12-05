@@ -1039,8 +1039,7 @@ namespace Spire
 				}
 				else
 				{
-					Error(40001, "Invalid type cast: \"" + expr->Expression->Type->ToString() + "\" to \"" +
-						expr->Type->ToString() + "\"", expr);
+					getSink()->diagnose(expr, Diagnostics::invalidTypeCast, expr->Expression->Type, expr->Type);
 				}
 				return expr;
 			}

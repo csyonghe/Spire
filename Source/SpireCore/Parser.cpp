@@ -8,12 +8,12 @@ namespace Spire
 		{
 			if (pos >= tokens.Count())
 			{
-				sink->Error(20001, String("\"") + string + String("\" expected but end of file encountered."), CodePosition(0, 0, 0, fileName));
+				sink->diagnose(CodePosition(0, 0, 0, fileName), Diagnostics::tokenNameExpectedButEOF2, string);
 				throw 0;
 			}
 			else if (tokens[pos].Content != string)
 			{
-				sink->Error(20001, String("\"") + string + String("\" expected"), tokens[pos].Position);
+				sink->diagnose(tokens[pos].Position, Diagnostics::tokenNameExpected, string);
 				throw 20001;
 			}
 			return tokens[pos++];
@@ -23,7 +23,7 @@ namespace Spire
 		{
 			if (pos >= tokens.Count())
 			{
-				sink->Error(20001, String(" Unexpected end of file."), CodePosition(0, 0, 0, fileName));
+				sink->diagnose(CodePosition(0, 0, 0, fileName), Diagnostics::unexpectedEOF);
 				throw 0;
 			}
 			return tokens[pos++];
@@ -33,12 +33,12 @@ namespace Spire
 		{
 			if (pos >= tokens.Count())
 			{
-				sink->Error(20001, TokenTypeToString(type) + String(" expected but end of file encountered."), CodePosition(0, 0, 0, fileName));
+				sink->diagnose(CodePosition(0, 0, 0, fileName), Diagnostics::tokenTypeExpectedButEOF2, type);
 				throw 0;
 			}
 			else if(tokens[pos].Type != type)
 			{
-				sink->Error(20001, TokenTypeToString(type) + String(" expected"), tokens[pos].Position);
+				sink->diagnose(tokens[pos].Position, Diagnostics::tokenTypeExpected, type);
 				throw 20001;
 			}
 			return tokens[pos++];
@@ -48,7 +48,7 @@ namespace Spire
 		{
 			if (pos + offset >= tokens.Count())
 			{
-				sink->Error(20001, String("\'") + string + String("\' expected but end of file encountered."), CodePosition(0, 0, 0, fileName));
+				sink->diagnose(CodePosition(0, 0, 0, fileName), Diagnostics::tokenNameExpectedButEOF2, string);
 				return false;
 			}
 			else
@@ -64,7 +64,7 @@ namespace Spire
 		{
 			if (pos + offset >= tokens.Count())
 			{
-				sink->Error(20001, TokenTypeToString(type) + String(" expected but end of file encountered."), CodePosition(0, 0, 0, fileName));
+				sink->diagnose(CodePosition(0, 0, 0, fileName), Diagnostics::tokenTypeExpectedButEOF2, type);
 				return false;
 			}
 			else
@@ -80,12 +80,12 @@ namespace Spire
 		{
 			if (pos >= tokens.Count())
 			{
-				sink->Error(20001, String("type name expected but end of file encountered."), CodePosition(0, 0, 0, fileName));
+				sink->diagnose(CodePosition(0, 0, 0, fileName), Diagnostics::typeNameExpectedButEOF);
 				throw 0;
 			}
 			if(!IsTypeKeyword())
 			{
-				sink->Error(20001, String("type name expected but '" + tokens[pos].Content + "' encountered."), tokens[pos].Position);
+				sink->diagnose(tokens[pos].Position, Diagnostics::typeNameExpectedBut, tokens[pos].Content);
 				throw 20001;
 			}
 			return tokens[pos++];
@@ -95,7 +95,7 @@ namespace Spire
 		{
 			if (pos >= tokens.Count())
 			{
-				sink->Error(20001, String("Unexpected end of file."), tokens[pos].Position);
+				sink->diagnose(tokens[pos].Position, Diagnostics::unexpectedEOF);
 				throw 0;
 			}
 
@@ -159,7 +159,7 @@ namespace Spire
 						else
 						{
 							if (lastPosBeforeError == 0 && pos < tokens.Count())
-								sink->Error(20003, "unexpected token \'" + tokens[pos].Content + "\'.", tokens[pos].Position);
+								sink->diagnose(tokens[pos].Position, Diagnostics::unexpectedToken, tokens[pos].Content);
 							throw 0;
 						}
 					}
@@ -225,8 +225,7 @@ namespace Spire
 					else
 					{
 						if (lastErrorPos == 0 && pos < tokens.Count())
-							sink->Error(20004, "unexpected token \'" + tokens[pos].Content + "\', only component definitions are allowed in a shader scope.", 
-								tokens[pos].Position);
+							sink->diagnose(tokens[pos].Position, Diagnostics::unexpectedTokenExpectedComponentDefinition, tokens[pos].Content);
 						throw 0;
 					}
 				}
@@ -473,7 +472,7 @@ namespace Spire
 							arg->ArgumentName.Position = varExpr->Position;
 						}
 						else
-							sink->Error(20011, "unexpected ':'.", pos < tokens.Count() ? tokens[pos].Position : CodePosition(0, 0, 0, fileName));
+							sink->diagnose(pos < tokens.Count() ? tokens[pos].Position : CodePosition(0, 0, 0, fileName), Diagnostics::unexpectedColon);
 						ReadToken(":");
 						arg->Expression = ParseExpression();
 					}
@@ -588,7 +587,7 @@ namespace Spire
 					case TokenType::OpBitOr: case TokenType::OpInc: case TokenType::OpDec:
 						break;
 					default:
-						sink->Error(20008, "invalid operator '" + name.Content + "'.", name.Position);
+						sink->diagnose(name.Position, Diagnostics::invalidOperator, name.Content);
 						break;
 					}
 				}
@@ -722,7 +721,7 @@ namespace Spire
 			}
 			else
 			{
-				sink->Error(20002, String("syntax error."), tokens[pos].Position);
+				sink->diagnose(tokens[pos].Position, Diagnostics::syntaxError);
 				throw 20002;
 			}
 			return statement;
@@ -1399,7 +1398,7 @@ namespace Spire
 				{
 					codePos = tokens[pos].Position;
 				}
-				sink->Error(20002, String("syntax error."), codePos);
+				sink->diagnose(codePos, Diagnostics::syntaxError);
 				throw 20005;
 			}
 			return rs;

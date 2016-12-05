@@ -17,12 +17,12 @@ namespace Spire
 			{
 				if (pos >= tokens.Count())
 				{
-					sink->Error(0, String("\"") + string + String("\" expected but end of file encountered."), CodePosition(0, 0, 0, fileName));
+					sink->diagnose(CodePosition(0, 0, 0, fileName), Diagnostics::tokenNameExpectedButEOF, string);
 					throw 0;
 				}
 				else if (tokens[pos].Content != string)
 				{
-					sink->Error(20001, String("\"") + string + String("\" expected"), tokens[pos].Position);
+					sink->diagnose(tokens[pos].Position, Diagnostics::tokenNameExpected, string);
 					throw 20001;
 				}
 				return tokens[pos++];
@@ -32,12 +32,12 @@ namespace Spire
 			{
 				if (pos >= tokens.Count())
 				{
-					sink->Error(0, TokenTypeToString(type) + String(" expected but end of file encountered."), CodePosition(0, 0, 0, fileName));
+					sink->diagnose(CodePosition(0, 0, 0, fileName), Diagnostics::tokenTypeExpectedButEOF, type);
 					throw 0;
 				}
 				else if (tokens[pos].Type != type)
 				{
-					sink->Error(20001, TokenTypeToString(type) + String(" expected"), tokens[pos].Position);
+					sink->diagnose(tokens[pos].Position, Diagnostics::tokenTypeExpected, type);
 					throw 20001;
 				}
 				return tokens[pos++];
@@ -47,7 +47,7 @@ namespace Spire
 			{
 				if (pos >= tokens.Count())
 				{
-					sink->Error(0, String("\'") + string + String("\' expected but end of file encountered."), CodePosition(0, 0, 0, fileName));
+					sink->diagnose(CodePosition(0, 0, 0, fileName), Diagnostics::tokenNameExpectedButEOF);
 					return false;
 				}
 				else

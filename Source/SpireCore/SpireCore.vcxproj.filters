@@ -9,9 +9,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="CompileError.h">
-      <Filter>Front End</Filter>
-    </ClInclude>
     <ClInclude Include="Lexer.h">
       <Filter>Front End</Filter>
     </ClInclude>
@@ -70,6 +67,12 @@
       <Filter>Back End</Filter>
     </ClInclude>
     <ClInclude Include="GetDependencyVisitor.h">
+      <Filter>Front End</Filter>
+    </ClInclude>
+    <ClInclude Include="Diagnostics.h">
+      <Filter>Front End</Filter>
+    </ClInclude>
+    <ClInclude Include="DiagnosticDefs.h">
       <Filter>Front End</Filter>
     </ClInclude>
   </ItemGroup>
@@ -144,6 +147,9 @@
       <Filter>Back End</Filter>
     </ClCompile>
     <ClCompile Include="GetDependencyVisitor.cpp">
+      <Filter>Front End</Filter>
+    </ClCompile>
+    <ClCompile Include="Diagnostics.cpp">
       <Filter>Front End</Filter>
     </ClCompile>
   </ItemGroup>

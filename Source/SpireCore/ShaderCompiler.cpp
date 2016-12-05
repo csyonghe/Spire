@@ -124,8 +124,7 @@ namespace Spire
 							}
 							else
 							{
-								cresult.GetErrorWriter()->Warning(33101, "'" + selectedDef->WorldName + "' is not a valid choice for '" + choice.Key
-									+ "'.", selectedDef.Ptr()->Position);
+                                cresult.GetErrorWriter()->diagnose(selectedDef.Ptr()->Position, Diagnostics::worldIsNotAValidChoiceForKey, selectedDef->WorldName, choice.Key);
 							}
 						}
 					}
@@ -187,8 +186,7 @@ namespace Spire
 					{
 						if (def->Dependency.Contains(def.Ptr()))
 						{
-							cresult.GetErrorWriter()->Error(33102, "component definition \'" + def->OriginalName + "\' involves circular reference.",
-								def->SyntaxNode->Position);
+                            cresult.GetErrorWriter()->diagnose(def->SyntaxNode->Position, Diagnostics::componentDefinitionCircularity, def->OriginalName);
 							return nullptr;
 						}
 					}
@@ -400,7 +398,7 @@ namespace Spire
 					}
 					else
 					{
-						result.GetErrorWriter()->Error(2, "unsupported compiler mode.", CodePosition());
+                        result.GetErrorWriter()->diagnose(CodePosition(), Diagnostics::unsupportedCompilerMode);
 						return;
 					}
 					context.Program = result.Program;
