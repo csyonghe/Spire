@@ -213,9 +213,13 @@ namespace Spire
 #ifdef _DEBUG
 #define SPIRE_INTERNAL_ERROR(sink, pos) \
     (sink)->diagnose(Spire::Compiler::CodePosition(__LINE__, 0, 0, __FILE__), Spire::Compiler::Diagnostics::internalCompilerError)
+#define SPIRE_UNIMPLEMENTED(sink, pos, what) \
+    (sink)->diagnose(Spire::Compiler::CodePosition(__LINE__, 0, 0, __FILE__), Spire::Compiler::Diagnostics::unimplemented, what)
 #else
 #define SPIRE_INTERNAL_ERROR(sink, pos) \
     (sink)->diagnose(pos, Spire::Compiler::Diagnostics::internalCompilerError)
+#define SPIRE_UNIMPLEMENTED(sink, pos, what) \
+    (sink)->diagnose(pos, Spire::Compiler::Diagnostics::unimplemented, what)
 #endif
 
 #endif

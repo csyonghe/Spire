@@ -22,6 +22,7 @@
 #include "Source/SpireCore/Naming.cpp"
 #include "Source/SpireCore/NewSpirVCodeGen.cpp"
 #include "Source/SpireCore/Parser.cpp"
+#include "Source/SpireCore/Preprocessor.cpp"
 #include "Source/SpireCore/Schedule.cpp"
 #include "Source/SpireCore/SemanticsVisitor.cpp"
 #include "Source/SpireCore/ShaderCompiler.cpp"

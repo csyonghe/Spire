@@ -223,7 +223,7 @@ __intrinsic trait IsTriviallyPassable(uvec2);
 __intrinsic trait IsTriviallyPassable(uvec3);
 __intrinsic trait IsTriviallyPassable(uvec4);
 __intrinsic trait IsTriviallyPassable(bool);
-#line_reset#
+#line default
 )";
 
 using namespace CoreLib::Basic;
