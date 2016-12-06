@@ -68,8 +68,8 @@ namespace CoreLib
 			friend class StringBuilder;
 		private:
 			RefPtr<char, RefPtrArrayDestructor> buffer;
-			wchar_t * wcharBuffer;
-			int length;
+			wchar_t * wcharBuffer = nullptr;
+			int length = 0;
 			void Free()
 			{
 				if (buffer)
@@ -92,7 +92,6 @@ namespace CoreLib
 			static String FromWChar(const wchar_t ch);
 			static String FromUnicodePoint(unsigned int codePoint);
 			String()
-				:buffer(0), wcharBuffer(0), length(0)
 			{
 			}
 			const char * begin() const
@@ -104,42 +103,36 @@ namespace CoreLib
 				return buffer.Ptr() + length;
 			}
 			String(int val, int radix = 10)
-				:buffer(0), wcharBuffer(0), length(0)
 			{
 				buffer = new char[33];
 				length = IntToAscii(buffer.Ptr(), val, radix);
 				ReverseInternalAscii(buffer.Ptr(), length);
 			}
 			String(unsigned int val, int radix = 10)
-				:buffer(0), wcharBuffer(0), length(0)
 			{
 				buffer = new char[33];
 				length = IntToAscii(buffer.Ptr(), val, radix);
 				ReverseInternalAscii(buffer.Ptr(), length);
 			}
 			String(long long val, int radix = 10)
-				:buffer(0), wcharBuffer(0), length(0)
 			{
 				buffer = new char[65];
 				length = IntToAscii(buffer.Ptr(), val, radix);
 				ReverseInternalAscii(buffer.Ptr(), length);
 			}
 			String(float val, const char * format = "%g")
-				:buffer(0), wcharBuffer(0), length(0)
 			{
 				buffer = new char[128];
 				sprintf_s(buffer.Ptr(), 128, format, val);
 				length = (int)strnlen_s(buffer.Ptr(), 128);
 			}
 			String(double val, const char * format = "%g")
-				:buffer(0), wcharBuffer(0), length(0)
 			{
 				buffer = new char[128];
 				sprintf_s(buffer.Ptr(), 128, format, val);
 				length = (int)strnlen_s(buffer.Ptr(), 128);
 			}
 			String(const char * str)
-				:buffer(0), wcharBuffer(0), length(0)
 			{
 				if (str)
 				{
@@ -149,7 +142,6 @@ namespace CoreLib
 				}
 			}
 			String(char chr)
-				:buffer(0), wcharBuffer(0), length(0)
 			{
 				if (chr)
 				{
@@ -160,12 +152,10 @@ namespace CoreLib
 				}
 			}
 			String(const String & str)
-				:buffer(0), wcharBuffer(0), length(0)
 			{				
 				this->operator=(str);
 			}
 			String(String&& other)
-				:buffer(0), wcharBuffer(0), length(0)
 			{
 				this->operator=(static_cast<String&&>(other));
 			}
