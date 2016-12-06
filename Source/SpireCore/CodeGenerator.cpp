@@ -198,12 +198,6 @@ namespace Spire
 							compiledWorld->OutputType->Members.AddIfNotExists(compDef.Name, compDef);
 						}
 					}
-
-					// sort components by dependency
-					DependencySort(components, [](ComponentDefinitionIR * def)
-					{
-						return def->Dependency;
-					});
 					// put the list in worldComps
 					worldComps[world.Key] = components;
 				}
@@ -212,7 +206,7 @@ namespace Spire
 				// create world input declarations base on input components
 				for (auto & world : compiledShader->Worlds)
 				{
-					auto components = worldComps[world.Key]();
+					auto &components = worldComps[world.Key]();
 					for (auto & comp : components)
 					{
 						if (comp->SyntaxNode->IsInput)
@@ -255,6 +249,16 @@ namespace Spire
 							recType->Members.AddIfNotExists(comp->UniqueName, entryDef);
 						}
 					}
+				}
+
+				// sort components by dependency
+				for (auto & world : compiledShader->Worlds)
+				{
+					auto &components = worldComps[world.Key]();
+					DependencySort(components, [](ComponentDefinitionIR * def)
+					{
+						return def->Dependency;
+					});
 				}
 			
 				// generate component functions
