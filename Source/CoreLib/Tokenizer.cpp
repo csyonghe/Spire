@@ -22,7 +22,7 @@ namespace CoreLib
 			None, Line, File
 		};
 
-		void ParseOperators(const String & str, List<Token> & tokens, int line, int col, String fileName)
+		void ParseOperators(const String & str, List<Token> & tokens, TokenFlags& tokenFlags, int line, int col, String fileName)
 		{
 			int pos = 0;
 			while (pos < str.Length())
@@ -32,7 +32,8 @@ namespace CoreLib
 				wchar_t nextNextChar = (pos < str.Length() - 2) ? str[pos + 2] : '\0';
 				auto InsertToken = [&](TokenType type, const String & ct)
 				{
-					tokens.Add(Token(type, ct, line, col + pos, pos, fileName));
+					tokens.Add(Token(type, ct, line, col + pos, pos, fileName, tokenFlags));
+                    tokenFlags = 0;
 				};
 				switch (curChar)
 				{
@@ -239,6 +240,10 @@ namespace CoreLib
 					InsertToken(TokenType::At, "@");
 					pos++;
 					break;
+                case '#':
+                    InsertToken(TokenType::Pound, "#");
+					pos++;
+					break;
 				case ':':
 					InsertToken(TokenType::Colon, ":");
 					pos++;
@@ -297,10 +302,12 @@ namespace CoreLib
 			int tokenLine, tokenCol;
 			List<Token> tokenList;
 			LexDerivative derivative = LexDerivative::None;
+            TokenFlags tokenFlags = TokenFlag::AtStartOfLine;
 			auto InsertToken = [&](TokenType type)
 			{
 				derivative = LexDerivative::None;
-				tokenList.Add(Token(type, tokenBuilder.ToString(), tokenLine, tokenCol, pos, file));
+				tokenList.Add(Token(type, tokenBuilder.ToString(), tokenLine, tokenCol, pos, file, tokenFlags));
+                tokenFlags = 0;
 				tokenBuilder.Clear();
 			};
 			auto ProcessTransferChar = [&](char nextChar)
@@ -374,8 +381,16 @@ namespace CoreLib
 						tokenLine = line;
 						tokenCol = col;
 					}
-					else if (curChar == ' ' || curChar == '\t' || curChar == '\r' || curChar == '\n' || curChar == -62 || curChar== -96) // -62/-96:non-break space
+                    else if (curChar == '\r' || curChar == '\n')
+                    {
+                        tokenFlags |= TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace;
+                        pos++;
+                    }
+					else if (curChar == ' ' || curChar == '\t' || curChar == -62 || curChar== -96) // -62/-96:non-break space
+                    {
+                        tokenFlags |= TokenFlag::AfterWhitespace;
 						pos++;
+                    }
 					else if (curChar == '/' && nextChar == '/')
 					{
 						state = State::SingleComment;
@@ -407,6 +422,7 @@ namespace CoreLib
 					else
 					{
 						auto tokenStr = tokenBuilder.ToString();
+#if 0
 						if (tokenStr == "#line_reset#")
 						{
 							line = 0;
@@ -426,6 +442,7 @@ namespace CoreLib
 							col = 0;
 						}
 						else
+#endif
 							InsertToken(TokenType::Identifier);
 						state = State::Start;
 					}
@@ -439,7 +456,7 @@ namespace CoreLib
 					else
 					{
 						//do token analyze
-						ParseOperators(tokenBuilder.ToString(), tokenList, tokenLine, tokenCol, file);
+						ParseOperators(tokenBuilder.ToString(), tokenList, tokenFlags, tokenLine, tokenCol, file);
 						tokenBuilder.Clear();
 						state = State::Start;
 					}

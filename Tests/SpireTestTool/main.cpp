@@ -157,6 +157,7 @@ int main(
 	// TODO: allow for a command-line argument to select a particular directory
 	runTestsInDirectory(&context, "Tests/FrontEnd/");
 	runTestsInDirectory(&context, "Tests/Diagnostics/");
+	runTestsInDirectory(&context, "Tests/Preprocessor/");
 
 	if (!context.totalTestCount)
 	{

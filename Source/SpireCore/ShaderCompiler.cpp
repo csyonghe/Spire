@@ -5,6 +5,7 @@
 #include "ShaderCompiler.h"
 #include "Lexer.h"
 #include "Parser.h"
+#include "Preprocessor.h"
 #include "SyntaxVisitors.h"
 #include "StdInclude.h"
 #include "Schedule.h"
@@ -222,10 +223,9 @@ namespace Spire
 				return result;
 			}
 		public:
-			virtual CompileUnit Parse(CompileResult & result, String source, String fileName) override
+			virtual CompileUnit Parse(CompileResult & result, String source, String fileName, IncludeHandler* includeHandler) override
 			{
-				Lexer lexer;
-				auto tokens = lexer.Parse(fileName, source, result.GetErrorWriter());
+                auto tokens = PreprocessSource(source, fileName, result.GetErrorWriter(), includeHandler);
 				Parser parser(tokens, result.GetErrorWriter(), fileName);
 				CompileUnit rs;
 				rs.SyntaxNode = parser.Parse();
