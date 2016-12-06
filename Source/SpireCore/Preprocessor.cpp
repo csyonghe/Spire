@@ -73,11 +73,8 @@ struct PreprocessorInputStream
     // Environment to use when looking up macros
     PreprocessorEnvironment*        environment;
 
-    // Pre-tokenized input for this stream
-    List<Token>*                    tokens;
-
-    // Index of the "current" token in the stream.
-    int                             tokenIndex;
+    // Reader for pre-tokenized input
+    TokenReader                     tokenReader;
 
     // Destructor is virtual so that we can clean up
     // after concrete subtypes.
@@ -87,7 +84,7 @@ struct PreprocessorInputStream
 struct SourceTextInputStream : PreprocessorInputStream
 {
     // The pre-tokenized input
-    List<Token>         lexedTokens;
+    TokenList           lexedTokens;
 };
 
 struct MacroExpansion : PreprocessorInputStream
@@ -127,7 +124,7 @@ struct PreprocessorMacro
     List<Token>                 params;
 
     // The tokens that make up the macro body
-    List<Token>                 tokens;
+    TokenList                   tokens;
 
     // The flavor of macro
     PreprocessorMacroFlavor     flavor;
@@ -183,7 +180,6 @@ static void  InitializeInputStream(Preprocessor* preprocessor, PreprocessorInput
     inputStream->parent = NULL;
     inputStream->conditional = NULL;
     inputStream->environment = &preprocessor->globalEnv;
-    inputStream->tokenIndex = 0;
 }
 
 // Destroy an input stream
@@ -202,7 +198,7 @@ static PreprocessorInputStream* CreateInputStreamForSource(Preprocessor* preproc
     // Use existing `Lexer` to generate a token stream.
     Lexer lexer;
     inputStream->lexedTokens = lexer.Parse(fileName, source, GetSink(preprocessor));
-    inputStream->tokens = &inputStream->lexedTokens;
+    inputStream->tokenReader = TokenReader(inputStream->lexedTokens);
 
     return inputStream;
 }
@@ -237,8 +233,27 @@ static void EndInputStream(Preprocessor* preprocessor, PreprocessorInputStream* 
     DestroyInputStream(preprocessor, inputStream);
 }
 
+// Consume one token from an input stream
+static Token AdvanceRawToken(PreprocessorInputStream* inputStream)
+{
+    return inputStream->tokenReader.AdvanceToken();
+}
+
+// Peek one token from an input stream
+static Token PeekRawToken(PreprocessorInputStream* inputStream)
+{
+    return inputStream->tokenReader.PeekToken();
+}
+
+// Peek one token type from an input stream
+static CoreLib::Text::TokenType PeekRawTokenType(PreprocessorInputStream* inputStream)
+{
+    return inputStream->tokenReader.PeekTokenType();
+}
+
+
 // Read one token in "raw" mode (meaning don't expand macros)
-static Token const& AdvanceRawToken(Preprocessor* preprocessor)
+static Token AdvanceRawToken(Preprocessor* preprocessor)
 {
     for (;;)
     {
@@ -251,26 +266,26 @@ static Token const& AdvanceRawToken(Preprocessor* preprocessor)
             return preprocessor->endOfFileToken;
         }
 
-        // The top-most input stream may be at its end, in which
-        // case we need to pop it from the stack and try again
-        List<Token> const& tokens = *inputStream->tokens;
-        int tokenIndex = inputStream->tokenIndex;
-        if (tokenIndex >= tokens.Count())
+        // The top-most input stream may be at its end
+        if (PeekRawTokenType(inputStream) == TokenType::EndOfFile)
         {
-            preprocessor->inputStream = inputStream->parent;
-            EndInputStream(preprocessor, inputStream);
-            continue;
+            // If there is another stream remaining, switch to it
+            if (inputStream->parent)
+            {
+                preprocessor->inputStream = inputStream->parent;
+                EndInputStream(preprocessor, inputStream);
+                continue;
+            }
         }
 
         // Everything worked, so read a token from the top-most stream
-        inputStream->tokenIndex = tokenIndex + 1;
-        return tokens[tokenIndex];
+        return AdvanceRawToken(inputStream);
     }
 }
 
 // Return the next token in "raw" mode, but don't advance the
 // current token state.
-static Token const& PeekRawToken(Preprocessor* preprocessor)
+static Token PeekRawToken(Preprocessor* preprocessor)
 {
     // We need to find the strema that `advanceRawToken` would read from.
     PreprocessorInputStream* inputStream = preprocessor->inputStream;
@@ -285,16 +300,17 @@ static Token const& PeekRawToken(Preprocessor* preprocessor)
         // The top-most input stream may be at its end, so
         // look one entry up the stack (don't actually pop
         // here, since we are just peeking)
-        List<Token> const& tokens = *inputStream->tokens;
-        int tokenIndex = inputStream->tokenIndex;
-        if (tokenIndex >= tokens.Count())
+        if (PeekRawTokenType(inputStream) == TokenType::EndOfFile)
         {
-            inputStream = inputStream->parent;
-            continue;
+            if (inputStream->parent)
+            {
+                inputStream = inputStream->parent;
+                continue;
+            }
         }
 
-        // Everything worked, so peek a token from the top-most stream
-        return tokens[tokenIndex];
+        // Everything worked, so the token we just peeked is fine.
+        return PeekRawToken(inputStream);
     }
 }
 
@@ -317,9 +333,9 @@ CoreLib::Text::TokenType PeekSecondRawTokenType(Preprocessor* preprocessor)
         // The top-most input stream may be at its end, so
         // look one entry up the stack (don't actually pop
         // here, since we are just peeking)
-        List<Token> const& tokens = *inputStream->tokens;
-        int tokenIndex = inputStream->tokenIndex;
-        if (tokenIndex >= tokens.Count())
+
+        TokenReader reader = inputStream->tokenReader;
+        if (reader.PeekTokenType() == TokenType::EndOfFile)
         {
             inputStream = inputStream->parent;
             continue;
@@ -328,8 +344,11 @@ CoreLib::Text::TokenType PeekSecondRawTokenType(Preprocessor* preprocessor)
         if (count)
         {
             count--;
-            tokenIndex++;
-            if (tokenIndex >= tokens.Count())
+
+            // Note: we are advancing our temporary
+            // copy of the token reader
+            reader.AdvanceToken();
+            if (reader.PeekTokenType() == TokenType::EndOfFile)
             {
                 inputStream = inputStream->parent;
                 continue;
@@ -337,7 +356,7 @@ CoreLib::Text::TokenType PeekSecondRawTokenType(Preprocessor* preprocessor)
         }
 
         // Everything worked, so peek a token from the top-most stream
-        return tokens[tokenIndex].Type;
+        return reader.PeekTokenType();
     }
 }
 
@@ -444,8 +463,7 @@ static void InitializeMacroExpansion(
     InitializeInputStream(preprocessor, expansion);
     expansion->environment = macro->environment;
     expansion->macro = macro;
-    expansion->tokens = &macro->tokens;
-    expansion->tokenIndex = 0;
+    expansion->tokenReader = TokenReader(macro->tokens);
 }
 
 static void PushMacroExpansion(
@@ -583,7 +601,7 @@ static void MaybeBeginMacroExpansion(
                         }
 
                         // Add the token and continue parsing.
-                        arg->tokens.Add(AdvanceRawToken(preprocessor));
+                        arg->tokens.mTokens.Add(AdvanceRawToken(preprocessor));
 
 
                     }
@@ -620,14 +638,14 @@ static void MaybeBeginMacroExpansion(
 }
 
 // Read one token with macro-expansion enabled.
-static Token const& AdvanceToken(Preprocessor* preprocessor)
+static Token AdvanceToken(Preprocessor* preprocessor)
 {
 top:
     // Check whether we need to macro expand at the cursor.
     MaybeBeginMacroExpansion(preprocessor);
 
     // Read a raw token (now that expansion has been triggered)
-    Token const& token = AdvanceRawToken(preprocessor);
+    Token token = AdvanceRawToken(preprocessor);
 
     // Check if we need to perform token pasting
     if (PeekRawTokenType(preprocessor) != TokenType::PoundPound)
@@ -658,7 +676,7 @@ top:
 
         // Now re-lex the input
         PreprocessorInputStream* inputStream = CreateInputStreamForSource(preprocessor, sb.ProduceString(), "token paste");
-        if (inputStream->tokens->Count() != 1)
+        if (inputStream->tokenReader.GetCount() != 1)
         {
             // We expect a token paste to produce a single token
             // TODO(tfoley): emit a diagnostic here
@@ -674,7 +692,7 @@ top:
 // Note that because triggering macro expansion may
 // involve changing the input-stream state, this
 // operation *can* have side effects.
-static Token const& PeekToken(Preprocessor* preprocessor)
+static Token PeekToken(Preprocessor* preprocessor)
 {
     // Check whether we need to macro expand at the cursor.
     MaybeBeginMacroExpansion(preprocessor);
@@ -762,7 +780,7 @@ static bool IsEndOfLine(PreprocessorDirectiveContext* context)
 }
 
 // Read one raw token in a directive, without going past the end of the line.
-static Token const& AdvanceRawToken(PreprocessorDirectiveContext* context)
+static Token AdvanceRawToken(PreprocessorDirectiveContext* context)
 {
     if (IsEndOfLine(context))
         return context->preprocessor->endOfFileToken;
@@ -770,7 +788,7 @@ static Token const& AdvanceRawToken(PreprocessorDirectiveContext* context)
 }
 
 // Peek one raw token in a directive, without going past the end of the line.
-static Token const& PeekRawToken(PreprocessorDirectiveContext* context)
+static Token PeekRawToken(PreprocessorDirectiveContext* context)
 {
     if (IsEndOfLine(context))
         return context->preprocessor->endOfFileToken;
@@ -786,7 +804,7 @@ static CoreLib::Text::TokenType PeekRawTokenType(PreprocessorDirectiveContext* c
 }
 
 // Read one token, with macro-expansion, without going past the end of the line.
-static Token const& AdvanceToken(PreprocessorDirectiveContext* context)
+static Token AdvanceToken(PreprocessorDirectiveContext* context)
 {
     if (IsEndOfLine(context))
         context->preprocessor->endOfFileToken;
@@ -794,7 +812,7 @@ static Token const& AdvanceToken(PreprocessorDirectiveContext* context)
 }
 
 // Peek one token, with macro-expansion, without going past the end of the line.
-static Token const& PeekToken(PreprocessorDirectiveContext* context)
+static Token PeekToken(PreprocessorDirectiveContext* context)
 {
     if (IsEndOfLine(context))
         context->preprocessor->endOfFileToken;
@@ -1421,9 +1439,9 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
     for(;;)
     {
         Token token = AdvanceRawToken(context);
+        macro->tokens.mTokens.Add(token);
         if (token.Type == TokenType::EndOfFile)
             break;
-        macro->tokens.Add(token);
     }
 }
 
@@ -1714,6 +1732,15 @@ PreprocessorEnvironment::~PreprocessorEnvironment()
 static void FinalizePreprocessor(
     Preprocessor*   preprocessor)
 {
+    // Clear out any waiting input streams
+    PreprocessorInputStream* input = preprocessor->inputStream;
+    while (input)
+    {
+        PreprocessorInputStream* parent = input->parent;
+        DestroyInputStream(preprocessor, input);
+        input = parent;
+    }
+
 #if 0
     // clean up any macros that were allocated
     for (auto pair : preprocessor->globalEnv.macros)
@@ -1748,25 +1775,27 @@ static void DefineMacro(
 }
 
 // read the entire input into tokens
-static CoreLib::List<CoreLib::Text::Token> ReadAllTokens(
+static TokenList ReadAllTokens(
     Preprocessor*   preprocessor)
 {
-    List<Token> tokens;
+    TokenList tokens;
     for (;;)
     {
         Token token = ReadToken(preprocessor);
-        // TODO(tfoley): should just include EOF token in output
+
+        tokens.mTokens.Add(token);
+
+        // Note: we include the EOF token in the list,
+        // since that is expected by the `TokenList` type.
         if (token.Type == TokenType::EndOfFile)
             break;
-
-        tokens.Add(token);
     }
     return tokens;
 }
 
 
 // Take a string of source code and preprocess it into a list of tokens.
-CoreLib::List<CoreLib::Text::Token> PreprocessSource(
+TokenList PreprocessSource(
     CoreLib::String const& source,
     CoreLib::String const& fileName,
     DiagnosticSink* sink,
@@ -1780,14 +1809,14 @@ CoreLib::List<CoreLib::Text::Token> PreprocessSource(
     // create an initial input stream based on the provided buffer
     preprocessor.inputStream = CreateInputStreamForSource(&preprocessor, source, fileName);
 
-    List<Token> tokens = ReadAllTokens(&preprocessor);
+    TokenList tokens = ReadAllTokens(&preprocessor);
 
     FinalizePreprocessor(&preprocessor);
 
     return tokens;
 }
 
-CoreLib::List<CoreLib::Text::Token> PreprocessSource(
+TokenList PreprocessSource(
     CoreLib::String const& source,
     CoreLib::String const& fileName,
     DiagnosticSink* sink,
@@ -1806,7 +1835,7 @@ CoreLib::List<CoreLib::Text::Token> PreprocessSource(
     // create an initial input stream based on the provided buffer
     preprocessor.inputStream = CreateInputStreamForSource(&preprocessor, source, fileName);
 
-    List<Token> tokens = ReadAllTokens(&preprocessor);
+    TokenList tokens = ReadAllTokens(&preprocessor);
 
     FinalizePreprocessor(&preprocessor);
 

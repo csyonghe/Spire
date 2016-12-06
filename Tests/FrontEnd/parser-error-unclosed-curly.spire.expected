@@ -1,11 +1,6 @@
 result code = -1
 standard error = {
 Tests/FrontEnd/parser-error-unclosed-curly.spire(0): error 20001: '}' expected but end of file encountered.
-Tests/FrontEnd/parser-error-unclosed-curly.spire(0): error 20001: "inline" expected but end of file encountered.
-Tests/FrontEnd/parser-error-unclosed-curly.spire(0): error 20001: "public" expected but end of file encountered.
-Tests/FrontEnd/parser-error-unclosed-curly.spire(0): error 20001: "out" expected but end of file encountered.
-Tests/FrontEnd/parser-error-unclosed-curly.spire(0): error 20001: "@" expected but end of file encountered.
 }
 standard output = {
-internal compiler error: Operator[]: Index out of Range.
 }

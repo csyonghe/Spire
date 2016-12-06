@@ -4,56 +4,185 @@ namespace Spire
 {
 	namespace Compiler
 	{
-		Token & Parser::ReadToken(const char * string)
+		const int MaxExprLevel = 12;
+
+		// TODO: implement two pass parsing for file reference and struct type recognition
+
+		class Parser
 		{
-			if (pos >= tokens.Count())
+		private:
+			int anonymousParamCounter = 0;
+			List<RefPtr<Scope>> scopeStack;
+            TokenReader tokenReader;
+            DiagnosticSink * sink;
+			String fileName;
+			HashSet<String> typeNames;
+			HashSet<String> classNames;
+			bool isInImportOperator = false;
+			void FillPosition(SyntaxNode * node)
 			{
-				sink->diagnose(CodePosition(0, 0, 0, fileName), Diagnostics::tokenNameExpectedButEOF2, string);
+				node->Position = tokenReader.PeekLoc();
+				node->Scope = scopeStack.Last();
+			}
+			void PushScope()
+			{
+				scopeStack.Add(new Scope());
+				if (scopeStack.Count() > 1)
+					scopeStack.Last()->Parent = scopeStack[scopeStack.Count() - 2].Ptr();
+			}
+			void PopScope()
+			{
+				scopeStack.Last() = 0;
+				scopeStack.RemoveAt(scopeStack.Count() - 1);
+			}
+		public:
+			Parser(TokenSpan const& _tokens, DiagnosticSink * sink, String _fileName)
+				: tokenReader(_tokens), sink(sink), fileName(_fileName)
+			{
+				typeNames.Add("int");
+				typeNames.Add("uint");
+				typeNames.Add("bool");
+				typeNames.Add("float");
+				typeNames.Add("half");
+				typeNames.Add("void");
+				typeNames.Add("ivec2");
+				typeNames.Add("ivec3");
+				typeNames.Add("ivec4");
+				typeNames.Add("uvec2");
+				typeNames.Add("uvec3");
+				typeNames.Add("uvec4");
+				typeNames.Add("vec2");
+				typeNames.Add("vec3");
+				typeNames.Add("vec4");
+				typeNames.Add("mat3");
+				typeNames.Add("mat4");
+				typeNames.Add("mat4x4");
+				typeNames.Add("mat3x3");
+				typeNames.Add("int2");
+				typeNames.Add("int3");
+				typeNames.Add("int4");
+				typeNames.Add("uint2");
+				typeNames.Add("uint3");
+				typeNames.Add("uint4");
+				typeNames.Add("float2");
+				typeNames.Add("float3");
+				typeNames.Add("float4");
+				typeNames.Add("half2");
+				typeNames.Add("half3");
+				typeNames.Add("half4");
+				typeNames.Add("float3x3");
+				typeNames.Add("float4x4");
+				typeNames.Add("half3x3");
+				typeNames.Add("half4x4");
+				typeNames.Add("Texture2D");
+				typeNames.Add("texture");
+				typeNames.Add("Texture");
+				typeNames.Add("sampler");
+				typeNames.Add("SamplerState");
+				typeNames.Add("sampler_state");
+				typeNames.Add("Uniform");
+				typeNames.Add("StructuredBuffer");
+				typeNames.Add("RWStructuredBuffer");
+				typeNames.Add("PackedBuffer");
+				typeNames.Add("StorageBuffer");
+				typeNames.Add("Patch");
+			}
+			RefPtr<ProgramSyntaxNode> Parse();
+		private:
+			Token ReadToken();
+			Token ReadToken(CoreLib::Text::TokenType type);
+			Token ReadToken(const char * string);
+			bool LookAheadToken(CoreLib::Text::TokenType type, int offset = 0);
+			bool LookAheadToken(const char * string, int offset = 0);
+			Token ReadTypeKeyword();
+			VariableModifier ReadVariableModifier();
+			bool IsTypeKeyword();
+			EnumerableDictionary<String, String>	ParseAttribute();
+			RefPtr<ProgramSyntaxNode>				ParseProgram();
+			RefPtr<ShaderSyntaxNode>				ParseShader();
+			RefPtr<PipelineSyntaxNode>				ParsePipeline();
+			RefPtr<StageSyntaxNode>					ParseStage();
+			RefPtr<ComponentSyntaxNode>				ParseComponent();
+			RefPtr<WorldSyntaxNode>					ParseWorld();
+			RefPtr<RateSyntaxNode>					ParseRate();
+			RefPtr<ImportSyntaxNode>				ParseImport();
+			RefPtr<ImportStatementSyntaxNode>		ParseImportStatement();
+			RefPtr<ImportOperatorDefSyntaxNode>		ParseImportOperator();
+			RefPtr<FunctionSyntaxNode>				ParseFunction(bool parseBody = true);
+			RefPtr<StructSyntaxNode>				ParseStruct();
+			RefPtr<StatementSyntaxNode>				ParseStatement();
+			RefPtr<BlockStatementSyntaxNode>		ParseBlockStatement();
+			RefPtr<VarDeclrStatementSyntaxNode>		ParseVarDeclrStatement();
+			RefPtr<IfStatementSyntaxNode>			ParseIfStatement();
+			RefPtr<ForStatementSyntaxNode>			ParseForStatement();
+			RefPtr<WhileStatementSyntaxNode>		ParseWhileStatement();
+			RefPtr<DoWhileStatementSyntaxNode>		ParseDoWhileStatement();
+			RefPtr<BreakStatementSyntaxNode>		ParseBreakStatement();
+			RefPtr<ContinueStatementSyntaxNode>		ParseContinueStatement();
+			RefPtr<ReturnStatementSyntaxNode>		ParseReturnStatement();
+			RefPtr<ExpressionStatementSyntaxNode>	ParseExpressionStatement();
+			RefPtr<ExpressionSyntaxNode>			ParseExpression(int level = 0);
+			RefPtr<ExpressionSyntaxNode>			ParseLeafExpression();
+			RefPtr<ParameterSyntaxNode>				ParseParameter();
+			RefPtr<TypeSyntaxNode>					ParseType();
+
+			Parser & operator = (const Parser &) = delete;
+		};
+
+		Token Parser::ReadToken(const char * string)
+		{
+			if (tokenReader.PeekTokenType() == TokenType::EndOfFile)
+			{
+				sink->diagnose(tokenReader.PeekLoc(), Diagnostics::tokenNameExpectedButEOF2, string);
 				throw 0;
 			}
-			else if (tokens[pos].Content != string)
+			else if (tokenReader.PeekToken().Content != string)
 			{
-				sink->diagnose(tokens[pos].Position, Diagnostics::tokenNameExpected, string);
+				sink->diagnose(tokenReader.PeekLoc(), Diagnostics::tokenNameExpected, string);
 				throw 20001;
 			}
-			return tokens[pos++];
+			return tokenReader.AdvanceToken();
 		}
 
-		Token & Parser::ReadToken()
+		Token Parser::ReadToken()
 		{
-			if (pos >= tokens.Count())
+			if (tokenReader.PeekTokenType() == TokenType::EndOfFile)
 			{
-				sink->diagnose(CodePosition(0, 0, 0, fileName), Diagnostics::unexpectedEOF);
+				sink->diagnose(tokenReader.PeekLoc(), Diagnostics::unexpectedEOF);
 				throw 0;
 			}
-			return tokens[pos++];
+			return tokenReader.AdvanceToken();
 		}
 
-		Token & Parser::ReadToken(CoreLib::Text::TokenType type)
+		Token Parser::ReadToken(CoreLib::Text::TokenType type)
 		{
-			if (pos >= tokens.Count())
+			if (tokenReader.PeekTokenType() == TokenType::EndOfFile)
 			{
-				sink->diagnose(CodePosition(0, 0, 0, fileName), Diagnostics::tokenTypeExpectedButEOF2, type);
+				sink->diagnose(tokenReader.PeekLoc(), Diagnostics::tokenTypeExpectedButEOF2, type);
 				throw 0;
 			}
-			else if(tokens[pos].Type != type)
+			else if(tokenReader.PeekTokenType() != type)
 			{
-				sink->diagnose(tokens[pos].Position, Diagnostics::tokenTypeExpected, type);
+				sink->diagnose(tokenReader.PeekLoc(), Diagnostics::tokenTypeExpected, type);
 				throw 20001;
 			}
-			return tokens[pos++];
+			return tokenReader.AdvanceToken();
 		}
 
 		bool Parser::LookAheadToken(const char * string, int offset)
 		{
-			if (pos + offset >= tokens.Count())
+            TokenReader r = tokenReader;
+            for (int ii = 0; ii < offset; ++ii)
+                r.AdvanceToken();
+
+			if (r.PeekTokenType() == TokenType::EndOfFile)
 			{
-				sink->diagnose(CodePosition(0, 0, 0, fileName), Diagnostics::tokenNameExpectedButEOF2, string);
+				sink->diagnose(tokenReader.PeekLoc(), Diagnostics::tokenNameExpectedButEOF2, string);
 				return false;
 			}
 			else
 			{
-				if (tokens[pos + offset].Content == string)
+				if (r.PeekToken().Content == string)
 					return true;
 				else
 					return false;
@@ -62,44 +191,48 @@ namespace Spire
 
 		bool Parser::LookAheadToken(CoreLib::Text::TokenType type, int offset)
 		{
-			if (pos + offset >= tokens.Count())
+            TokenReader r = tokenReader;
+            for (int ii = 0; ii < offset; ++ii)
+                r.AdvanceToken();
+
+			if (r.PeekTokenType() == TokenType::EndOfFile)
 			{
-				sink->diagnose(CodePosition(0, 0, 0, fileName), Diagnostics::tokenTypeExpectedButEOF2, type);
+				sink->diagnose(tokenReader.PeekLoc(), Diagnostics::tokenTypeExpectedButEOF2, type);
 				return false;
 			}
 			else
 			{
-				if(tokens[pos + offset].Type == type)
+				if(r.PeekTokenType() == type)
 					return true;
 				else
 					return false;
 			}
 		}
 
-		Token & Parser::ReadTypeKeyword()
+		Token Parser::ReadTypeKeyword()
 		{
-			if (pos >= tokens.Count())
+			if (tokenReader.PeekTokenType() == TokenType::EndOfFile)
 			{
-				sink->diagnose(CodePosition(0, 0, 0, fileName), Diagnostics::typeNameExpectedButEOF);
+				sink->diagnose(tokenReader.PeekLoc(), Diagnostics::typeNameExpectedButEOF);
 				throw 0;
 			}
 			if(!IsTypeKeyword())
 			{
-				sink->diagnose(tokens[pos].Position, Diagnostics::typeNameExpectedBut, tokens[pos].Content);
+				sink->diagnose(tokenReader.PeekLoc(), Diagnostics::typeNameExpectedBut, tokenReader.PeekTokenType());
 				throw 20001;
 			}
-			return tokens[pos++];
+			return tokenReader.AdvanceToken();
 		}
 
 		bool Parser::IsTypeKeyword()
 		{
-			if (pos >= tokens.Count())
+			if (tokenReader.PeekTokenType() == TokenType::EndOfFile)
 			{
-				sink->diagnose(tokens[pos].Position, Diagnostics::unexpectedEOF);
+				sink->diagnose(tokenReader.PeekLoc(), Diagnostics::unexpectedEOF);
 				throw 0;
 			}
 
-			return typeNames.Contains(tokens[pos].Content);
+			return typeNames.Contains(tokenReader.PeekToken().Content);
 		}
 
 		RefPtr<ProgramSyntaxNode> Parser::Parse()
@@ -134,8 +267,8 @@ namespace Spire
 			program->Scope = scopeStack.Last();
 			try
 			{
-				int lastPosBeforeError = 0;
-				while (pos < tokens.Count())
+                Token* lastPosBeforeError = NULL;
+				while (!tokenReader.IsAtEnd())
 				{
 					try
 					{
@@ -158,16 +291,18 @@ namespace Spire
 							ReadToken(TokenType::Semicolon);
 						else
 						{
-							if (lastPosBeforeError == 0 && pos < tokens.Count())
-								sink->diagnose(tokens[pos].Position, Diagnostics::unexpectedToken, tokens[pos].Content);
+							if (!lastPosBeforeError)
+								sink->diagnose(tokenReader.PeekLoc(), Diagnostics::unexpectedToken, tokenReader.PeekTokenType());
 							throw 0;
 						}
 					}
 					catch (int)
 					{
-						if (pos == lastPosBeforeError)
-							pos++;
-						lastPosBeforeError = pos;
+                        // TODO(tfoley): add proper error recovery strategy here.
+
+						if (tokenReader.mCursor == lastPosBeforeError)
+							tokenReader.AdvanceToken();
+						lastPosBeforeError = tokenReader.mCursor;
 					}
 				}
 			}
@@ -203,8 +338,8 @@ namespace Spire
 			}
 			
 			ReadToken(TokenType::LBrace);
-			int lastErrorPos = 0;
-			while (!LookAheadToken(TokenType::RBrace))
+			Token* lastErrorPos = 0;
+			while (!tokenReader.IsAtEnd() && !LookAheadToken(TokenType::RBrace))
 			{
 				try
 				{
@@ -224,16 +359,16 @@ namespace Spire
 					}
 					else
 					{
-						if (lastErrorPos == 0 && pos < tokens.Count())
-							sink->diagnose(tokens[pos].Position, Diagnostics::unexpectedTokenExpectedComponentDefinition, tokens[pos].Content);
+						if (!lastErrorPos)
+							sink->diagnose(tokenReader.PeekLoc(), Diagnostics::unexpectedTokenExpectedComponentDefinition, tokenReader.PeekTokenType());
 						throw 0;
 					}
 				}
 				catch (int)
 				{
-					if (pos == lastErrorPos)
-						pos++;
-					lastErrorPos = pos;
+					if (tokenReader.mCursor == lastErrorPos)
+						tokenReader.AdvanceToken();
+					lastErrorPos = tokenReader.mCursor;
 				}
 			}
 			ReadToken(TokenType::RBrace);
@@ -472,7 +607,7 @@ namespace Spire
 							arg->ArgumentName.Position = varExpr->Position;
 						}
 						else
-							sink->diagnose(pos < tokens.Count() ? tokens[pos].Position : CodePosition(0, 0, 0, fileName), Diagnostics::unexpectedColon);
+							sink->diagnose(tokenReader.PeekLoc(), Diagnostics::unexpectedColon);
 						ReadToken(":");
 						arg->Expression = ParseExpression();
 					}
@@ -552,12 +687,12 @@ namespace Spire
 			{
 				function->HasSideEffect = false;
 				function->IsExtern = true;
-				pos++;
+                tokenReader.AdvanceToken();
 			}
 			else if (LookAheadToken("extern"))
 			{
 				function->IsExtern = true;
-				pos++;
+                tokenReader.AdvanceToken();
 			}
 			else
 				function->IsExtern = false;
@@ -565,7 +700,7 @@ namespace Spire
 			if (LookAheadToken("inline"))
 			{
 				function->IsInline = true;
-				pos++;
+                tokenReader.AdvanceToken();
 			}
 			
 			PushScope();
@@ -597,7 +732,7 @@ namespace Spire
 				}
 				function->Name = name.Content;
 				ReadToken(TokenType::LParent);
-				while(pos < tokens.Count() && tokens[pos].Type != TokenType::RParent)
+				while(!tokenReader.IsAtEnd() && tokenReader.PeekTokenType() != TokenType::RParent)
 				{
 					function->Parameters.Add(ParseParameter());
 					if (LookAheadToken(TokenType::Comma))
@@ -611,9 +746,9 @@ namespace Spire
 			{
 				if (e == 0)
 					return function;
-				while (pos < tokens.Count() && tokens[pos].Type != TokenType::LBrace)
+				while (!tokenReader.IsAtEnd() && tokenReader.PeekTokenType() != TokenType::LBrace)
 				{
-					pos++;
+                    tokenReader.AdvanceToken();
 				}
 			}
 			if (parseBody)
@@ -639,7 +774,7 @@ namespace Spire
 				rs->IsIntrinsic = true;
 			}
 			ReadToken("{");
-			while (!LookAheadToken("}") && pos < tokens.Count())
+			while (!LookAheadToken("}") && !tokenReader.IsAtEnd())
 			{
 				RefPtr<TypeSyntaxNode> type = ParseType();
 				do
@@ -652,7 +787,7 @@ namespace Spire
 					if (!LookAheadToken(TokenType::Comma))
 						break;
 					ReadToken(TokenType::Comma);
-				} while (pos < tokens.Count());
+				} while (!tokenReader.IsAtEnd());
 				ReadToken(TokenType::Semicolon);
 			}
 			ReadToken("}");
@@ -691,7 +826,7 @@ namespace Spire
 			}
 			else if (LookAheadToken(TokenType::Identifier))
 			{
-				int startPos = pos;
+				Token* startPos = tokenReader.mCursor;
 				bool isVarDeclr = false;
 				try
 				{
@@ -699,7 +834,7 @@ namespace Spire
 					if (LookAheadToken(TokenType::Identifier))
 					{
 						type = nullptr;
-						pos = startPos;
+						tokenReader.mCursor = startPos;
 						statement = ParseVarDeclrStatement();
 						isVarDeclr = true;
 					}
@@ -709,7 +844,7 @@ namespace Spire
 				}
 				if (!isVarDeclr)
 				{
-					pos = startPos;
+                    tokenReader.mCursor = startPos;
 					statement = ParseExpressionStatement();
 				}
 			}
@@ -721,7 +856,7 @@ namespace Spire
 			}
 			else
 			{
-				sink->diagnose(tokens[pos].Position, Diagnostics::syntaxError);
+				sink->diagnose(tokenReader.PeekLoc(), Diagnostics::syntaxError);
 				throw 20002;
 			}
 			return statement;
@@ -732,12 +867,12 @@ namespace Spire
 			RefPtr<BlockStatementSyntaxNode> blockStatement = new BlockStatementSyntaxNode();
 			PushScope();
 			ReadToken(TokenType::LBrace);
-			if(pos < tokens.Count())
+			if(!tokenReader.IsAtEnd())
 			{
 				FillPosition(blockStatement.Ptr());
 			}
-			int lastErrorPos = 0;
-			while (pos < tokens.Count() && !LookAheadToken(TokenType::RBrace))
+			Token* lastErrorPos = 0;
+			while (!tokenReader.IsAtEnd() && !LookAheadToken(TokenType::RBrace))
 			{
 				try
 				{
@@ -745,9 +880,9 @@ namespace Spire
 				}
 				catch (int)
 				{
-					if (pos == lastErrorPos)
-						pos++;
-					lastErrorPos = pos;
+					if (tokenReader.mCursor == lastErrorPos)
+						tokenReader.AdvanceToken();
+					lastErrorPos = tokenReader.mCursor;
 				}
 			}
 			ReadToken(TokenType::RBrace);
@@ -757,7 +892,7 @@ namespace Spire
 
 		VariableModifier Parser::ReadVariableModifier()
 		{
-			auto & token = ReadToken(TokenType::Identifier);
+			auto token = ReadToken(TokenType::Identifier);
 			if (token.Content == "in")
 				return VariableModifier::In;
 			else if (token.Content == "out")
@@ -781,9 +916,8 @@ namespace Spire
 		{
 			RefPtr<VarDeclrStatementSyntaxNode>varDeclrStatement = new VarDeclrStatementSyntaxNode();
 		
-			if (pos < tokens.Count())
-				FillPosition(varDeclrStatement.Ptr());
-			while (pos < tokens.Count())
+			FillPosition(varDeclrStatement.Ptr());
+			while (!tokenReader.IsAtEnd())
 			{
 				if (LookAheadToken("layout"))
 				{
@@ -810,11 +944,11 @@ namespace Spire
 					break;
 			}
 			varDeclrStatement->TypeNode = ParseType();
-			while (pos < tokens.Count())
+			while (!tokenReader.IsAtEnd())
 			{
 				RefPtr<Variable> var = new Variable();
 				FillPosition(var.Ptr());
-				Token & name = ReadToken(TokenType::Identifier);
+				Token name = ReadToken(TokenType::Identifier);
 				var->Name = name.Content;
 				if (LookAheadToken(TokenType::OpAssign))
 				{
@@ -990,7 +1124,7 @@ namespace Spire
 			parameter->TypeNode = ParseType();
 			if (LookAheadToken(TokenType::Identifier))
 			{
-				Token & name = ReadToken(TokenType::Identifier);
+				Token name = ReadToken(TokenType::Identifier);
 				parameter->Name = name.Content;
 			}
 			else
@@ -1204,12 +1338,12 @@ namespace Spire
 				if (GetAssociativityFromLevel(level) == Associativity::Left)
 				{
 					auto left = ParseExpression(level + 1);
-					while (pos < tokens.Count() && GetOpLevel(tokens[pos].Type) == level)
+					while (GetOpLevel(tokenReader.PeekTokenType()) == level)
 					{
 						RefPtr<BinaryExpressionSyntaxNode> tmp = new BinaryExpressionSyntaxNode();
 						tmp->LeftExpression = left;
 						FillPosition(tmp.Ptr());
-						Token & opToken = ReadToken(tokens[pos].Type);
+						Token opToken = tokenReader.AdvanceToken();
 						tmp->Operator = GetOpFromToken(opToken);
 						tmp->RightExpression = ParseExpression(level + 1);
 						left = tmp;
@@ -1219,12 +1353,12 @@ namespace Spire
 				else
 				{
 					auto left = ParseExpression(level + 1);
-					if (pos < tokens.Count() && GetOpLevel(tokens[pos].Type) == level)
+					if (GetOpLevel(tokenReader.PeekTokenType()) == level)
 					{
 						RefPtr<BinaryExpressionSyntaxNode> tmp = new BinaryExpressionSyntaxNode();
 						tmp->LeftExpression = left;
 						FillPosition(tmp.Ptr());
-						Token & opToken = ReadToken(tokens[pos].Type);
+						Token opToken = tokenReader.AdvanceToken();
 						tmp->Operator = GetOpFromToken(opToken);
 						tmp->RightExpression = ParseExpression(level);
 						left = tmp;
@@ -1254,7 +1388,7 @@ namespace Spire
 				LookAheadToken(TokenType::OpSub))
 			{
 				RefPtr<UnaryExpressionSyntaxNode> unaryExpr = new UnaryExpressionSyntaxNode();
-				Token & token = tokens[pos++];
+				Token token = tokenReader.AdvanceToken();
 				FillPosition(unaryExpr.Ptr());
 				unaryExpr->Operator = GetOpFromToken(token);
 				if (unaryExpr->Operator == Operator::PostInc)
@@ -1273,7 +1407,7 @@ namespace Spire
 			{
 				ReadToken(TokenType::LParent);
 				RefPtr<ExpressionSyntaxNode> expr;
-				if (IsTypeKeyword() && pos + 1 < tokens.Count() && tokens[pos+1].Type == TokenType::RParent)
+				if (IsTypeKeyword() && LookAheadToken(TokenType::RParent, 1))
 				{
 					RefPtr<TypeCastExpressionSyntaxNode> tcexpr = new TypeCastExpressionSyntaxNode();
 					FillPosition(tcexpr.Ptr());
@@ -1293,7 +1427,7 @@ namespace Spire
 				LookAheadToken(TokenType::DoubleLiterial))
 			{
 				RefPtr<ConstantExpressionSyntaxNode> constExpr = new ConstantExpressionSyntaxNode();
-				auto token = tokens[pos++];
+				auto token = tokenReader.AdvanceToken();
 				FillPosition(constExpr.Ptr());
 				if (token.Type == TokenType::IntLiterial)
 				{
@@ -1310,7 +1444,7 @@ namespace Spire
 			else if (LookAheadToken("true") || LookAheadToken("false"))
 			{
 				RefPtr<ConstantExpressionSyntaxNode> constExpr = new ConstantExpressionSyntaxNode();
-				auto token = tokens[pos++];
+				auto token = tokenReader.AdvanceToken();
 				FillPosition(constExpr.Ptr());
 				constExpr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Bool;
 				constExpr->IntValue = token.Content == "true" ? 1 : 0;
@@ -1320,12 +1454,12 @@ namespace Spire
 			{
 				RefPtr<VarExpressionSyntaxNode> varExpr = new VarExpressionSyntaxNode();
 				FillPosition(varExpr.Ptr());
-				auto & token = ReadToken(TokenType::Identifier);
+				auto token = ReadToken(TokenType::Identifier);
 				varExpr->Variable = token.Content;
 				rs = varExpr;
 			}
 
-			while (pos < tokens.Count() &&
+			while (!tokenReader.IsAtEnd() &&
 				(LookAheadToken(TokenType::OpInc) ||
 				LookAheadToken(TokenType::OpDec) ||
 				LookAheadToken(TokenType::Dot) ||
@@ -1366,7 +1500,7 @@ namespace Spire
 					invokeExpr->FunctionExpr = rs;
 					FillPosition(invokeExpr.Ptr());
 					ReadToken(TokenType::LParent);
-					while (pos < tokens.Count())
+					while (!tokenReader.IsAtEnd())
 					{
 						if (!LookAheadToken(TokenType::RParent))
 							invokeExpr->Arguments.Add(ParseExpression());
@@ -1394,14 +1528,24 @@ namespace Spire
 			if (!rs)
 			{
 				CodePosition codePos;
-				if (pos < tokens.Count())
+				if (!tokenReader.IsAtEnd())
 				{
-					codePos = tokens[pos].Position;
+					codePos = tokenReader.PeekLoc();
 				}
 				sink->diagnose(codePos, Diagnostics::syntaxError);
 				throw 20005;
 			}
 			return rs;
 		}
+
+        RefPtr<ProgramSyntaxNode> ParseProgram(
+            TokenSpan const&    tokens,
+            DiagnosticSink*     sink,
+            String const&       fileName)
+        {
+            Parser parser(tokens, sink, fileName);
+            return parser.Parse();
+        }
+
 	}
 }

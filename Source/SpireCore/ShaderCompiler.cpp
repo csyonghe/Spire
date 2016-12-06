@@ -226,9 +226,8 @@ namespace Spire
 			virtual CompileUnit Parse(CompileResult & result, String source, String fileName, IncludeHandler* includeHandler, Dictionary<String,String> const& preprocesorDefinitions) override
 			{
                 auto tokens = PreprocessSource(source, fileName, result.GetErrorWriter(), includeHandler, preprocesorDefinitions);
-				Parser parser(tokens, result.GetErrorWriter(), fileName);
 				CompileUnit rs;
-				rs.SyntaxNode = parser.Parse();
+                rs.SyntaxNode = ParseProgram(tokens, result.GetErrorWriter(), fileName);
 				return rs;
 			}
 			virtual void Compile(CompileResult & result, CompilationContext & context, List<CompileUnit> & units, const CompileOptions & options) override
