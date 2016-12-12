@@ -143,9 +143,6 @@
     <ClCompile Include="Naming.cpp">
       <Filter>Front End</Filter>
     </ClCompile>
-    <ClCompile Include="TypeTranslation.cpp">
-      <Filter>Front End</Filter>
-    </ClCompile>
     <ClCompile Include="HLSLCodeGen.cpp">
       <Filter>Back End</Filter>
     </ClCompile>
@@ -159,9 +156,12 @@
       <Filter>Front End</Filter>
     </ClCompile>
     <ClCompile Include="Preprocessor.cpp">
+<<<<<<< HEAD
       <Filter>Front End</Filter>
     </ClCompile>
     <ClCompile Include="TypeLayout.cpp">
+=======
+>>>>>>> Move `TypeTranslation` into `CodeGenerator`
       <Filter>Front End</Filter>
     </ClCompile>
   </ItemGroup>

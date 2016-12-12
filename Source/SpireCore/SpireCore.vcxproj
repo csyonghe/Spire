@@ -430,7 +430,6 @@
     <ClCompile Include="StdInclude.cpp" />
     <ClCompile Include="Syntax.cpp" />
     <ClCompile Include="TypeLayout.cpp" />
-    <ClCompile Include="TypeTranslation.cpp" />
     <ClCompile Include="VariantIR.cpp" />
   </ItemGroup>
   <ItemGroup>
