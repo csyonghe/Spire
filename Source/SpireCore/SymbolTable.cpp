@@ -500,6 +500,14 @@ namespace Spire
 			}).ToList();
 		}
 
+        Decl* SymbolTable::LookUp(String const& name)
+        {
+            Decl* decl = nullptr;
+            if (globalDecls.TryGetValue(name, decl))
+                return decl;
+            return nullptr;
+        }
+
 		int UniqueIdGenerator::currentGUID = 0;
 		void UniqueIdGenerator::Clear()
 		{

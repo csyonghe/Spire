@@ -99,9 +99,9 @@ namespace Spire
 			return (BaseType)(((int)type) & (~15));
 		}
 
+        class Decl;
 		class SymbolTable;
 		class ShaderSymbol;
-		class StructSymbol;
 		class ShaderClosure;
 		class StructSyntaxNode;
 		class ShaderComponentSymbol;
@@ -158,7 +158,7 @@ namespace Spire
 			ShaderClosure * ShaderClosure = nullptr;
 			FunctionSymbol * Func = nullptr;
 			ShaderComponentSymbol * Component = nullptr;
-			StructSymbol * Struct = nullptr;
+            StructSyntaxNode* structDecl = nullptr;
 			String RecordTypeName, GenericTypeVar;
 
 			BasicExpressionType()
@@ -396,11 +396,16 @@ namespace Spire
 			}
 		};
 
-		class StructSyntaxNode : public SyntaxNode
+        class Decl : public SyntaxNode
+        {
+        public:
+			Token Name;
+        };
+
+		class StructSyntaxNode : public Decl
 		{
 		public:
 			List<RefPtr<StructField>> Fields;
-			Token Name;
 			bool IsIntrinsic = false;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			int FindField(String name)

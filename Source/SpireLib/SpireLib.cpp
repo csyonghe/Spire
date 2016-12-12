@@ -4,7 +4,6 @@
 #include "../SpireCore/StdInclude.h"
 #include "../../Spire.h"
 #include "../SpireCore/TypeLayout.h"
-#include "../SpireCore/TypeTranslation.h"
 #include "../SpireCore/Preprocessor.h"
 
 using namespace CoreLib::Basic;
@@ -462,7 +461,7 @@ namespace SpireLib
 	class ComponentMetaData
 	{
 	public:
-		RefPtr<ILType> Type;
+        RefPtr<ExpressionType> Type;
 		String TypeName;
 		String Register;
 		String Name;
@@ -566,7 +565,7 @@ namespace SpireLib
 					{
 						ComponentMetaData compMeta;
 						compMeta.Name = comp.Key;
-						compMeta.Type = TranslateExpressionType(comp.Value->Type->DataType);
+                        compMeta.Type = comp.Value->Type->DataType;
 						compMeta.TypeName = compMeta.Type->ToString();
 						for (auto & impl : comp.Value->Implementations)
 						{
@@ -846,23 +845,16 @@ SpireComponentInfoCollection * spModuleGetComponentsByWorld(SpireModule * module
 	if (auto components = moduleNode->ComponentsByWorld.TryGetValue(worldNameStr))
 	{
 		// compute layout
-		int offset = 0;
-		for (auto & comp : *components)
-		{
-			int alignment = GetTypeAlignment(comp.Type.Ptr(), layoutRule);
-			if (layout == SPIRE_LAYOUT_PACKED)
-				alignment = 0;
-			else if (layout == SPIRE_LAYOUT_UNIFORM)
-			{
-				if (comp.Type->IsScalar() || comp.Type->IsVector() && comp.Type->GetVectorSize() < 4)
-					alignment = 16;
-			}
-			offset = RoundToAlignment(offset, alignment);
-			comp.Offset = offset;
-			comp.Alignment = alignment;
-			offset += GetTypeSize(comp.Type.Ptr(), layoutRule);
-		}
-		return reinterpret_cast<SpireComponentInfoCollection*>(components);
+        LayoutRulesImpl* layoutRules = GetLayoutRulesImpl(layoutRule);
+        LayoutInfo layoutInfo = layoutRules->BeginStructLayout();
+        for (auto & comp : *components)
+        {
+            LayoutInfo fieldInfo = GetLayout(comp.Type.Ptr(), layoutRules);
+            size_t offset = layoutRules->AddStructField(&layoutInfo, fieldInfo);
+            comp.Offset = offset;
+            comp.Alignment = fieldInfo.alignment;
+        }
+        layoutRules->EndStructLayout(&layoutInfo);
 	}
 	return 0;
 }

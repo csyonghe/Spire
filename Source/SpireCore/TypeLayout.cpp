@@ -18,29 +18,6 @@ static size_t RoundUpToPowerOfTwo( size_t value )
     return result;
 }
 
-struct LayoutRulesImpl
-{
-    // Get size and alignment for a single value of base type.
-    virtual LayoutInfo GetScalarLayout(BaseType baseType) = 0;
-    virtual LayoutInfo GetScalarLayout(ILBaseType baseType) = 0;
-
-    // Get size and alignment for an array of elements
-    virtual LayoutInfo GetArrayLayout(LayoutInfo elementInfo, size_t elementCount) = 0;
-
-    // Get layout for a vector or matrix type
-    virtual LayoutInfo GetVectorLayout(LayoutInfo elementInfo, size_t elementCount) = 0;
-    virtual LayoutInfo GetMatrixLayout(LayoutInfo elementInfo, size_t rowCount, size_t columnCount) = 0;
-
-    // Begin doing layout on a `struct` type
-    virtual LayoutInfo BeginStructLayout() = 0;
-
-    // Add a field to a `struct` type, and return the offset for the field
-    virtual size_t AddStructField(LayoutInfo* ioStructInfo, LayoutInfo fieldInfo) = 0;
-
-    // End layout for a struct, and finalize its size/alignment.
-    virtual void EndStructLayout(LayoutInfo* ioStructInfo) = 0;
-};
-
 struct DefaultLayoutRulesImpl : LayoutRulesImpl
 {
     // Get size and alignment for a single value of base type.
@@ -193,7 +170,7 @@ Std140LayoutRulesImpl kStd140LayoutRulesImpl;
 Std430LayoutRulesImpl kStd430LayoutRulesImpl;
 PackedLayoutRulesImpl kPackedLayoutRulesImpl;
 
-static LayoutRulesImpl* GetLayoutRulesImpl(LayoutRule rule)
+LayoutRulesImpl* GetLayoutRulesImpl(LayoutRule rule)
 {
     switch (rule)
     {
@@ -205,15 +182,15 @@ static LayoutRulesImpl* GetLayoutRulesImpl(LayoutRule rule)
     }
 }
 
-static LayoutInfo GetLayout(ExpressionType* type, LayoutRulesImpl* rules)
+LayoutInfo GetLayout(ExpressionType* type, LayoutRulesImpl* rules)
 {
     if (auto basicType = dynamic_cast<BasicExpressionType*>(type))
     {
-        if (auto structSym = basicType->Struct)
+        if (auto structDecl = basicType->structDecl)
         {
             LayoutInfo info = rules->BeginStructLayout();
 
-            for (auto field : structSym->SyntaxNode->Fields)
+            for (auto field : structDecl->Fields)
             {
                 rules->AddStructField(&info,
                     GetLayout(field->Type.Ptr(), rules));
@@ -244,7 +221,7 @@ static LayoutInfo GetLayout(ExpressionType* type, LayoutRulesImpl* rules)
     }
 }
 
-static LayoutInfo GetLayout(ILType* type, LayoutRulesImpl* rules)
+LayoutInfo GetLayout(ILType* type, LayoutRulesImpl* rules)
 {
     if (auto basicType = dynamic_cast<ILBasicType*>(type))
     {

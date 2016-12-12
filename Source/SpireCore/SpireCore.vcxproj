@@ -390,7 +390,6 @@
     <ClInclude Include="Syntax.h" />
     <ClInclude Include="SyntaxVisitors.h" />
     <ClInclude Include="TypeLayout.h" />
-    <ClInclude Include="TypeTranslation.h" />
     <ClInclude Include="VariantIR.h" />
   </ItemGroup>
   <ItemGroup>
