@@ -586,36 +586,6 @@ namespace Spire
 				return true;
 			return false;
 		}
-		void Align(int & ptr, int alignment)
-		{
-			if (ptr % alignment != 0)
-			{
-				ptr = (ptr / alignment + 1) * alignment;
-			}
-		}
-		int ILStructType::GetSize(LayoutRule rule)
-		{
-			int rs = 0;
-			for (auto & m : Members)
-			{
-				int size = m.Type->GetSize(rule);
-				int alignment = m.Type->GetAlignment(rule);
-				Align(rs, alignment);
-				rs += size;
-			}
-			return rs;
-		}
-		int ILStructType::GetAlignment(LayoutRule rule)
-		{
-			int rs = 1;
-			for (auto & m : Members)
-			{
-				int alignment = m.Type->GetAlignment(rule);
-				rs = Math::Max(rs, alignment);
-			}
-			return rs;
-		}
-
 		ILType * ILRecordType::Clone()
 		{
 			auto rs = new ILRecordType(*this);
@@ -641,14 +611,6 @@ namespace Spire
 				return TypeName == recType->TypeName;
 			else
 				return false;
-		}
-		int ILRecordType::GetSize(LayoutRule /*rule*/)
-		{
-			return 0;
-		}
-		int ILRecordType::GetAlignment(LayoutRule /*rule*/)
-		{
-			return 0;
 		}
 		void DiscardInstruction::Accept(InstructionVisitor * visitor)
 		{

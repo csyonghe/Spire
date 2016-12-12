@@ -11,10 +11,6 @@ namespace Spire
 		using CoreLib::Text::CodePosition;
 
 		using namespace CoreLib::Basic;
-		enum class LayoutRule
-		{
-			Std140, Std430, Packed
-		};
 		enum ILBaseType
 		{
 			Void = 0,
@@ -63,8 +59,6 @@ namespace Spire
 			virtual ILType * Clone() = 0;
 			virtual String ToString() = 0;
 			virtual bool Equals(ILType* type) = 0;
-			virtual int GetSize(LayoutRule rule = LayoutRule::Std430) = 0;
-			virtual int GetAlignment(LayoutRule rule = LayoutRule::Std430) = 0;
 		};
 
 		RefPtr<ILType> TypeFromString(CoreLib::Text::TokenReader & parser);
@@ -86,8 +80,6 @@ namespace Spire
 			virtual ILType * Clone() override;
 			virtual String ToString() override;
 			virtual bool Equals(ILType* type) override;
-			virtual int GetSize(LayoutRule rule) override;
-			virtual int GetAlignment(LayoutRule rule) override;
 		};
 
 		class ILBasicType : public ILType
@@ -173,79 +165,6 @@ namespace Spire
 				else
 					return "?unknown";
 			}
-			virtual int GetAlignment(LayoutRule rule) override
-			{
-				if (rule == LayoutRule::Packed)
-					return 0;
-				switch (Type)
-				{
-				case ILBaseType::Int:
-					return 4;
-				case ILBaseType::UInt:
-					return 4;
-				case ILBaseType::Int2:
-				case ILBaseType::UInt2:
-					return 8;
-				case ILBaseType::Int3:
-				case ILBaseType::UInt3:
-					return 16;
-				case ILBaseType::Int4:
-				case ILBaseType::UInt4:
-					return 16;
-				case ILBaseType::Float:
-					return 4;
-				case ILBaseType::Float2:
-					return 8;
-				case  ILBaseType::Float3:
-					return 16;
-				case ILBaseType::Float4:
-					return 16;
-				case ILBaseType::Float3x3:
-					return 16;
-				case  ILBaseType::Float4x4:
-					return 16;
-				case ILBaseType::Texture2D:
-					return 8;
-				case ILBaseType::TextureCube:
-					return 8;
-				case ILBaseType::Texture2DArray:
-					return 8;
-				default:
-					return 0;
-				}
-			}
-			virtual int GetSize(LayoutRule /*rule*/) override
-			{
-				switch (Type)
-				{
-				case ILBaseType::Float:
-				case ILBaseType::Int:
-				case ILBaseType::UInt:
-					return 4;
-				case ILBaseType::Float2:
-				case ILBaseType::Int2:
-				case ILBaseType::UInt2:
-					return 8;
-				case ILBaseType::Int3:
-				case ILBaseType::Float3:
-				case ILBaseType::UInt3:
-					return 12;
-				case ILBaseType::Int4:
-				case ILBaseType::Float4:
-				case ILBaseType::UInt4:
-					return 16;
-				case ILBaseType::Float3x3:
-					return 48;
-				case ILBaseType::Float4x4:
-					return 64;
-				case ILBaseType::Texture2D:
-				case ILBaseType::TextureCube:
-				case ILBaseType::Texture2DArray:
-					return 8;
-				default:
-					return 0;
-				}
-			}
 		};
 
 		class ILArrayType : public ILType
@@ -274,20 +193,6 @@ namespace Spire
 				else
 					return BaseType->ToString() + "[]";
 			}
-			virtual int GetSize(LayoutRule layoutRule) override
-			{
-				return BaseType->GetSize(layoutRule) * ArrayLength;
-			}
-			virtual int GetAlignment(LayoutRule layoutRule) override
-			{
-				int baseAlignment = BaseType->GetAlignment(layoutRule);
-				if (layoutRule == LayoutRule::Std140)
-				{
-					if (baseAlignment < 16)
-						return 16;
-				}
-				return baseAlignment;
-			}
 		};
 
 		class ILGenericType : public ILType
@@ -313,14 +218,6 @@ namespace Spire
 			{
 				return GenericTypeName + "<" + BaseType->ToString() + ">";
 			}
-			virtual int GetSize(LayoutRule rule) override
-			{
-				return BaseType->GetSize(rule);
-			}
-			virtual int GetAlignment(LayoutRule rule) override
-			{
-				return BaseType->GetAlignment(rule);
-			}
 		};
 
 		class ILStructType : public ILType
@@ -338,8 +235,6 @@ namespace Spire
 			virtual ILType * Clone() override;
 			virtual String ToString() override;
 			virtual bool Equals(ILType * type) override;
-			virtual int GetSize(LayoutRule rule) override;
-			virtual int GetAlignment(LayoutRule rule) override;
 		};
 
 		class ILOperand;

@@ -78,6 +78,9 @@
     <ClInclude Include="Preprocessor.h">
       <Filter>Front End</Filter>
     </ClInclude>
+    <ClInclude Include="TypeLayout.h">
+      <Filter>Front End</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Lexer.cpp">
@@ -156,6 +159,9 @@
       <Filter>Front End</Filter>
     </ClCompile>
     <ClCompile Include="Preprocessor.cpp">
+      <Filter>Front End</Filter>
+    </ClCompile>
+    <ClCompile Include="TypeLayout.cpp">
       <Filter>Front End</Filter>
     </ClCompile>
   </ItemGroup>

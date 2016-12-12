@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="DebugClang|Win32">
@@ -389,6 +389,7 @@
     <ClInclude Include="StdInclude.h" />
     <ClInclude Include="Syntax.h" />
     <ClInclude Include="SyntaxVisitors.h" />
+    <ClInclude Include="TypeLayout.h" />
     <ClInclude Include="TypeTranslation.h" />
     <ClInclude Include="VariantIR.h" />
   </ItemGroup>
@@ -428,6 +429,7 @@
     <ClCompile Include="SymbolTable.cpp" />
     <ClCompile Include="StdInclude.cpp" />
     <ClCompile Include="Syntax.cpp" />
+    <ClCompile Include="TypeLayout.cpp" />
     <ClCompile Include="TypeTranslation.cpp" />
     <ClCompile Include="VariantIR.cpp" />
   </ItemGroup>

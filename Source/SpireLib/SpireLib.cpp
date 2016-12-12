@@ -3,6 +3,7 @@
 #include "../CoreLib/Tokenizer.h"
 #include "../SpireCore/StdInclude.h"
 #include "../../Spire.h"
+#include "../SpireCore/TypeLayout.h"
 #include "../SpireCore/TypeTranslation.h"
 #include "../SpireCore/Preprocessor.h"
 
@@ -817,7 +818,7 @@ int spComponentInfoCollectionGetComponent(SpireComponentInfoCollection * collect
 	result->Name = (*list)[index].Name.Buffer();
 	result->Alignment = (*list)[index].Alignment;
 	result->Offset = (*list)[index].Offset;
-	result->Size = (*list)[index].Type->GetSize();
+	result->Size = GetTypeSize((*list)[index].Type.Ptr());
 	result->Register = (*list)[index].Register.Buffer();
 	result->TypeName = (*list)[index].TypeName.Buffer();
 	return 0;
@@ -848,7 +849,7 @@ SpireComponentInfoCollection * spModuleGetComponentsByWorld(SpireModule * module
 		int offset = 0;
 		for (auto & comp : *components)
 		{
-			int alignment = comp.Type->GetAlignment(layoutRule);
+			int alignment = GetTypeAlignment(comp.Type.Ptr(), layoutRule);
 			if (layout == SPIRE_LAYOUT_PACKED)
 				alignment = 0;
 			else if (layout == SPIRE_LAYOUT_UNIFORM)
@@ -859,7 +860,7 @@ SpireComponentInfoCollection * spModuleGetComponentsByWorld(SpireModule * module
 			offset = RoundToAlignment(offset, alignment);
 			comp.Offset = offset;
 			comp.Alignment = alignment;
-			offset += comp.Type->GetSize(layoutRule);
+			offset += GetTypeSize(comp.Type.Ptr(), layoutRule);
 		}
 		return reinterpret_cast<SpireComponentInfoCollection*>(components);
 	}
@@ -879,8 +880,8 @@ int spModuleGetRequiredComponents(SpireModule * module, SpireComponentInfo * buf
 	{
 		buffer[ptr].Name = comp.Name.Buffer();
 		buffer[ptr].TypeName = comp.TypeName.Buffer();
-		buffer[ptr].Alignment = comp.Type->GetAlignment();
-		buffer[ptr].Size = comp.Type->GetSize();
+		buffer[ptr].Alignment = GetTypeAlignment(comp.Type.Ptr());
+		buffer[ptr].Size = GetTypeSize(comp.Type.Ptr());
 		buffer[ptr].Offset = comp.Offset;
 		ptr++;
 	}
