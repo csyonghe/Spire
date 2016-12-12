@@ -4,6 +4,7 @@
 
 #include "../CoreLib/Basic.h"
 #include "../CoreLib/Tokenizer.h"
+#include "../SpireCore/Lexer.h"
 
 namespace Spire{ namespace Compiler {
 
@@ -21,11 +22,18 @@ struct IncludeHandler
 };
 
 // Take a string of source code and preprocess it into a list of tokens.
-CoreLib::List<CoreLib::Text::Token> PreprocessSource(
+TokenList PreprocessSource(
     CoreLib::String const& source,
     CoreLib::String const& fileName,
     DiagnosticSink* sink,
     IncludeHandler* includeHandler);
+
+TokenList PreprocessSource(
+    CoreLib::String const& source,
+    CoreLib::String const& fileName,
+    DiagnosticSink* sink,
+    IncludeHandler* includeHandler,
+    CoreLib::Dictionary<CoreLib::String, CoreLib::String>  defines);
 
 }}
 

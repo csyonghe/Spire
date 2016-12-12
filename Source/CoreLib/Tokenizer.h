@@ -89,7 +89,7 @@ namespace CoreLib
 			OpInc, OpDec, OpAddAssign, OpSubAssign, OpMulAssign, OpDivAssign, OpModAssign,
 			OpShlAssign, OpShrAssign, OpOrAssign, OpAndAssign, OpXorAssign,
 
-			QuestionMark, Colon, RightArrow, At, Pound,
+			QuestionMark, Colon, RightArrow, At, Pound, PoundPound,
 		};
 
 		String TokenTypeToString(TokenType type);

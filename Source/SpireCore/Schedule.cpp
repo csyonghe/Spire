@@ -10,49 +10,51 @@ namespace Spire
 		{
 		private:
             DiagnosticSink * sink;
-			List<Token> tokens;
-			int pos;
-			String fileName;
-			Token & ReadToken(const char * string)
+			TokenList tokens;
+            TokenReader reader;
+            String fileName;
+			Token ReadToken(const char * string)
 			{
-				if (pos >= tokens.Count())
+				if (reader.PeekTokenType() == TokenType::EndOfFile)
 				{
-					sink->diagnose(CodePosition(0, 0, 0, fileName), Diagnostics::tokenNameExpectedButEOF, string);
+					sink->diagnose(reader.PeekLoc(), Diagnostics::tokenNameExpectedButEOF, string);
 					throw 0;
 				}
-				else if (tokens[pos].Content != string)
+				else if (reader.PeekToken().Content != string)
 				{
-					sink->diagnose(tokens[pos].Position, Diagnostics::tokenNameExpected, string);
+					sink->diagnose(reader.PeekLoc(), Diagnostics::tokenNameExpected, string);
 					throw 20001;
 				}
-				return tokens[pos++];
+				return reader.AdvanceToken();
 			}
 
-			Token & ReadToken(CoreLib::Text::TokenType type)
+			Token ReadToken(CoreLib::Text::TokenType type)
 			{
-				if (pos >= tokens.Count())
+				if (reader.PeekTokenType() == TokenType::EndOfFile)
 				{
-					sink->diagnose(CodePosition(0, 0, 0, fileName), Diagnostics::tokenTypeExpectedButEOF, type);
+					sink->diagnose(reader.PeekLoc(), Diagnostics::tokenTypeExpectedButEOF, type);
 					throw 0;
 				}
-				else if (tokens[pos].Type != type)
+				else if (reader.PeekTokenType() != type)
 				{
-					sink->diagnose(tokens[pos].Position, Diagnostics::tokenTypeExpected, type);
+					sink->diagnose(reader.PeekLoc(), Diagnostics::tokenTypeExpected, type);
 					throw 20001;
 				}
-				return tokens[pos++];
+				return reader.AdvanceToken();
 			}
 
 			bool LookAheadToken(const char * string)
 			{
-				if (pos >= tokens.Count())
+				if (reader.PeekTokenType() == TokenType::EndOfFile)
 				{
-					sink->diagnose(CodePosition(0, 0, 0, fileName), Diagnostics::tokenNameExpectedButEOF);
+                    // TODO(tfoley): this error condition seems wrong
+                    // it shouldn't be an error to see EOF as out *lookahead*
+					sink->diagnose(reader.PeekLoc(), Diagnostics::tokenNameExpectedButEOF);
 					return false;
 				}
 				else
 				{
-					if (tokens[pos].Content == string)
+					if (reader.PeekToken().Content == string)
 						return true;
 					else
 						return false;
@@ -68,10 +70,9 @@ namespace Spire
 				Schedule schedule;
 				Lexer lex;
 				tokens = lex.Parse(fileName, source, sink);
-				pos = 0;
 				try
 				{
-					while (pos < tokens.Count())
+					while (reader.PeekTokenType() != TokenType::EndOfFile)
 					{
 						if (LookAheadToken("attrib"))
 						{
@@ -86,7 +87,7 @@ namespace Spire
 							}
 							ReadToken(TokenType::OpAssign);
 
-							while (pos < tokens.Count())
+							while (reader.PeekTokenType() != TokenType::EndOfFile)
 							{
 								auto name = ReadToken(TokenType::Identifier).Content;
 								String value;
@@ -114,7 +115,7 @@ namespace Spire
 							}
 							ReadToken(TokenType::OpAssign);
 							List<RefPtr<ChoiceValueSyntaxNode>> worlds;
-							while (pos < tokens.Count())
+							while (reader.PeekTokenType() != TokenType::EndOfFile)
 							{
 								auto & token = ReadToken(TokenType::StringLiterial);
 								RefPtr<ChoiceValueSyntaxNode> choiceValue = new ChoiceValueSyntaxNode();

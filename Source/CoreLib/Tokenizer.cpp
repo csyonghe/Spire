@@ -241,7 +241,16 @@ namespace CoreLib
 					pos++;
 					break;
                 case '#':
-                    InsertToken(TokenType::Pound, "#");
+                    if (nextChar == '#')
+					{
+                        InsertToken(TokenType::PoundPound, "##");
+						pos += 2;
+					}
+					else
+					{
+                        InsertToken(TokenType::Pound, "#");
+						pos++;
+					}
 					pos++;
 					break;
 				case ':':
@@ -705,18 +714,20 @@ namespace CoreLib
 		{
 			switch (type)
 			{
+			case TokenType::EndOfFile:
+				return "end of file";
 			case TokenType::Unknown:
 				return "UnknownToken";
 			case TokenType::Identifier:
-				return "Identifier";
+				return "identifier";
 			case TokenType::IntLiterial:
-				return "Int Literia";
+				return "integer literal";
 			case TokenType::DoubleLiterial:
-				return "Double Literia";
+				return "floating-point literal";
 			case TokenType::StringLiterial:
-				return "String Literia";
+				return "string literal";
 			case TokenType::CharLiterial:
-				return "CharLiteria";
+				return "character literal";
 			case TokenType::QuestionMark:
 				return "'?'";
 			case TokenType::Colon:
@@ -793,6 +804,10 @@ namespace CoreLib
 				return "'++'";
 			case TokenType::OpDec:
 				return "'--'";
+			case TokenType::Pound:
+				return "'#'";
+			case TokenType::PoundPound:
+				return "'##'";
 			default:
 				return "";
 			}

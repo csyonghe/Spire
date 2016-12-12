@@ -173,7 +173,7 @@ namespace SpireLib
 		auto searchDirs = options.SearchDirectories;
 		searchDirs.Add(Path::GetDirectoryName(fileName));
 		searchDirs.Reverse();
-		auto predefUnit = compiler->Parse(compileResult, SpireStdLib::GetCode(), "stdlib", &includeHandler);
+		auto predefUnit = compiler->Parse(compileResult, SpireStdLib::GetCode(), "stdlib", &includeHandler, options.PreprocessorDefinitions);
 		for (int i = 0; i < unitsToInclude.Count(); i++)
 		{
 			auto inputFileName = unitsToInclude[i];
@@ -182,7 +182,7 @@ namespace SpireLib
 				String source = src;
 				if (i > 0)
 					source = File::ReadAllText(inputFileName);
-				auto unit = compiler->Parse(compileResult, source, inputFileName, &includeHandler);
+				auto unit = compiler->Parse(compileResult, source, inputFileName, &includeHandler, options.PreprocessorDefinitions);
 				units.Add(unit);
 				if (unit.SyntaxNode)
 				{
@@ -619,7 +619,7 @@ namespace SpireLib
 					String source = src;
 					if (i > 0)
 						source = File::ReadAllText(inputFileName);
-					auto unit = compiler->Parse(result, source, inputFileName, &includeHandler);
+					auto unit = compiler->Parse(result, source, inputFileName, &includeHandler, Options.PreprocessorDefinitions);
 					units.Add(unit);
 					if (unit.SyntaxNode)
 					{
@@ -714,6 +714,11 @@ void spSetCodeGenTarget(SpireCompilationContext * ctx, int target)
 void spAddSearchPath(SpireCompilationContext * ctx, const char * searchDir)
 {
 	CTX(ctx)->Options.SearchDirectories.Add(searchDir);
+}
+
+void spAddPreprocessorDefine(SpireCompilationContext * ctx, const char * key, const char * value)
+{
+    CTX(ctx)->Options.PreprocessorDefinitions[key] = value;
 }
 
 void spSetBackendParameter(SpireCompilationContext * ctx, const char * paramName, const char * value)

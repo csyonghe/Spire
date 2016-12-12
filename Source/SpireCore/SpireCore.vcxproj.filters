@@ -152,11 +152,10 @@
     <ClCompile Include="GetDependencyVisitor.cpp">
       <Filter>Front End</Filter>
     </ClCompile>
-<<<<<<< HEAD
     <ClCompile Include="Diagnostics.cpp">
-=======
+      <Filter>Front End</Filter>
+    </ClCompile>
     <ClCompile Include="Preprocessor.cpp">
->>>>>>> Initial work on a C-style preprocessor.
       <Filter>Front End</Filter>
     </ClCompile>
   </ItemGroup>

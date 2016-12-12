@@ -20,7 +20,7 @@ namespace Spire{ namespace Compiler {
 
 // State of a preprocessor conditional, which can change when
 // we encounter directives like `#elif` or `#endif`
-enum PreprocessorConditionalState
+enum class PreprocessorConditionalState
 {
     Before, // We have not yet seen a branch with a `true` condition.
     During, // We are inside the branch with a `true` condition.
@@ -44,17 +44,22 @@ struct PreprocessorConditional
     PreprocessorConditionalState    state;
 };
 
+struct PreprocessorMacro;
+
+struct PreprocessorEnvironment
+{
+    // The "outer" environment, to be used if lookup in this env fails
+    PreprocessorEnvironment*                parent = NULL;
+
+    // Macros defined in this environment
+    Dictionary<String, PreprocessorMacro*>  macros;
+
+    ~PreprocessorEnvironment();
+};
+
 // Input tokens can either come from source text, or from macro expansion.
 // In general, input streams can be nested, so we have to keep a conceptual
 // stack of input.
-
-// An enumeration for the diferent types of token input streams.
-enum PreprocessorInputStreamFlavor
-{
-    SourceText,
-    ObjectLikeMacro,
-    FunctionLikeMacro,
-};
 
 // A stream of input tokens to be consumed
 struct PreprocessorInputStream
@@ -65,24 +70,70 @@ struct PreprocessorInputStream
     // The deepest preprocessor conditional active for this stream.
     PreprocessorConditional*        conditional;
 
-    // Pre-tokenized input for this stream
-    List<Token>                     tokens;
+    // Environment to use when looking up macros
+    PreprocessorEnvironment*        environment;
 
-    // Index of the "current" token in the stream.
-    int                             tokenIndex;
+    // Reader for pre-tokenized input
+    TokenReader                     tokenReader;
 
-    // The flavor of input stream (e.g., `SourceText`)
-    PreprocessorInputStreamFlavor   flavor;
+    // Destructor is virtual so that we can clean up
+    // after concrete subtypes.
+    virtual ~PreprocessorInputStream() = default;
+};
+
+struct SourceTextInputStream : PreprocessorInputStream
+{
+    // The pre-tokenized input
+    TokenList           lexedTokens;
+};
+
+struct MacroExpansion : PreprocessorInputStream
+{
+    // The macro we will expand
+    PreprocessorMacro*  macro;
+};
+
+struct ObjectLikeMacroExpansion : MacroExpansion
+{
+};
+
+struct FunctionLikeMacroExpansion : MacroExpansion
+{
+    // Environment for macro arguments
+    PreprocessorEnvironment     argumentEnvironment;
+};
+
+// An enumeration for the diferent types of macros
+enum class PreprocessorMacroFlavor
+{
+    ObjectLike,
+    FunctionArg,
+    FunctionLike,
 };
 
 // In the current design (which we may want to re-consider),
 // a macro is a specialized flavor of input stream, that
 // captures the token list in its expansion, and then
 // can be "played back."
-struct PreprocessorMacro : PreprocessorInputStream
+struct PreprocessorMacro
 {
     // The name under which the macro was `#define`d
-    Token nameToken;
+    Token                       nameToken;
+
+    // Parameters of the macro, in case of a function-like macro
+    List<Token>                 params;
+
+    // The tokens that make up the macro body
+    TokenList                   tokens;
+
+    // The flavor of macro
+    PreprocessorMacroFlavor     flavor;
+
+    // The environment in which this macro needs to be expanded.
+    // For ordinary macros this will be the global environment,
+    // while for function-like macro arguments, it will be
+    // the environment of the macro invocation.
+    PreprocessorEnvironment*    environment;
 };
 
 // State of the preprocessor
@@ -99,7 +150,7 @@ struct Preprocessor
     PreprocessorInputStream*                inputStream;
 
     // Currently-defined macros
-    Dictionary<String, PreprocessorMacro*>  macros;
+    PreprocessorEnvironment                 globalEnv;
 
     // A pre-allocated token that can be returned to
     // represent end-of-input situations.
@@ -117,27 +168,47 @@ static DiagnosticSink* GetSink(Preprocessor* preprocessor)
 //
 
 static void DestroyConditional(PreprocessorConditional* conditional);
+static void DestroyMacro(Preprocessor* preprocessor, PreprocessorMacro* macro);
 
 //
 // Basic Input Handling
 //
 
+// Create a fresh input stream
+static void  InitializeInputStream(Preprocessor* preprocessor, PreprocessorInputStream* inputStream)
+{
+    inputStream->parent = NULL;
+    inputStream->conditional = NULL;
+    inputStream->environment = &preprocessor->globalEnv;
+}
+
+// Destroy an input stream
+static void DestroyInputStream(Preprocessor* /*preprocessor*/, PreprocessorInputStream* inputStream)
+{
+    delete inputStream;
+}
+
 // Create an input stream to represent a pre-tokenized input file.
 // TODO(tfoley): pre-tokenizing files isn't going to work in the long run.
 static PreprocessorInputStream* CreateInputStreamForSource(Preprocessor* preprocessor, CoreLib::String const& source, CoreLib::String const& fileName)
 {
-    Lexer lexer;
-
-    PreprocessorInputStream* inputStream = new PreprocessorInputStream();
+    SourceTextInputStream* inputStream = new SourceTextInputStream();
+    InitializeInputStream(preprocessor, inputStream);
 
     // Use existing `Lexer` to generate a token stream.
-    inputStream->tokens = lexer.Parse(fileName, source, GetSink(preprocessor));
-    inputStream->parent = NULL;
-    inputStream->conditional = NULL;
-    inputStream->tokenIndex = 0;
-    inputStream->flavor = PreprocessorInputStreamFlavor::SourceText;
+    Lexer lexer;
+    inputStream->lexedTokens = lexer.Parse(fileName, source, GetSink(preprocessor));
+    inputStream->tokenReader = TokenReader(inputStream->lexedTokens);
 
     return inputStream;
+}
+
+
+
+static void PushInputStream(Preprocessor* preprocessor, PreprocessorInputStream* inputStream)
+{
+    inputStream->parent = preprocessor->inputStream;
+    preprocessor->inputStream = inputStream;
 }
 
 // Called when we reach the end of an input stream.
@@ -159,22 +230,30 @@ static void EndInputStream(Preprocessor* preprocessor, PreprocessorInputStream* 
         }
     }
 
-    switch (inputStream->flavor)
-    {
-    case PreprocessorInputStreamFlavor::SourceText:
-        delete inputStream;
-        break;
-
-    case PreprocessorInputStreamFlavor::ObjectLikeMacro:
-    case PreprocessorInputStreamFlavor::FunctionLikeMacro :
-        // don't delete a macro, just make it non-busy
-        inputStream->parent = NULL;
-        break;
-    }
+    DestroyInputStream(preprocessor, inputStream);
 }
 
+// Consume one token from an input stream
+static Token AdvanceRawToken(PreprocessorInputStream* inputStream)
+{
+    return inputStream->tokenReader.AdvanceToken();
+}
+
+// Peek one token from an input stream
+static Token PeekRawToken(PreprocessorInputStream* inputStream)
+{
+    return inputStream->tokenReader.PeekToken();
+}
+
+// Peek one token type from an input stream
+static CoreLib::Text::TokenType PeekRawTokenType(PreprocessorInputStream* inputStream)
+{
+    return inputStream->tokenReader.PeekTokenType();
+}
+
+
 // Read one token in "raw" mode (meaning don't expand macros)
-static Token const& AdvanceRawToken(Preprocessor* preprocessor)
+static Token AdvanceRawToken(Preprocessor* preprocessor)
 {
     for (;;)
     {
@@ -187,25 +266,26 @@ static Token const& AdvanceRawToken(Preprocessor* preprocessor)
             return preprocessor->endOfFileToken;
         }
 
-        // The top-most input stream may be at its end, in which
-        // case we need to pop it from the stack and try again
-        int tokenIndex = inputStream->tokenIndex;
-        if (tokenIndex >= inputStream->tokens.Count())
+        // The top-most input stream may be at its end
+        if (PeekRawTokenType(inputStream) == TokenType::EndOfFile)
         {
-            preprocessor->inputStream = inputStream->parent;
-            EndInputStream(preprocessor, inputStream);
-            continue;
+            // If there is another stream remaining, switch to it
+            if (inputStream->parent)
+            {
+                preprocessor->inputStream = inputStream->parent;
+                EndInputStream(preprocessor, inputStream);
+                continue;
+            }
         }
 
         // Everything worked, so read a token from the top-most stream
-        inputStream->tokenIndex = tokenIndex + 1;
-        return inputStream->tokens[tokenIndex];
+        return AdvanceRawToken(inputStream);
     }
 }
 
 // Return the next token in "raw" mode, but don't advance the
 // current token state.
-static Token const& PeekRawToken(Preprocessor* preprocessor)
+static Token PeekRawToken(Preprocessor* preprocessor)
 {
     // We need to find the strema that `advanceRawToken` would read from.
     PreprocessorInputStream* inputStream = preprocessor->inputStream;
@@ -220,17 +300,66 @@ static Token const& PeekRawToken(Preprocessor* preprocessor)
         // The top-most input stream may be at its end, so
         // look one entry up the stack (don't actually pop
         // here, since we are just peeking)
-        int tokenIndex = inputStream->tokenIndex;
-        if (tokenIndex >= inputStream->tokens.Count())
+        if (PeekRawTokenType(inputStream) == TokenType::EndOfFile)
+        {
+            if (inputStream->parent)
+            {
+                inputStream = inputStream->parent;
+                continue;
+            }
+        }
+
+        // Everything worked, so the token we just peeked is fine.
+        return PeekRawToken(inputStream);
+    }
+}
+
+// Without advancing preprocessor state, look *two* raw tokens ahead
+// (This is only needed in order to determine when we are possibly
+// expanding a function-style macro)
+CoreLib::Text::TokenType PeekSecondRawTokenType(Preprocessor* preprocessor)
+{
+    // We need to find the strema that `advanceRawToken` would read from.
+    PreprocessorInputStream* inputStream = preprocessor->inputStream;
+    int count = 1;
+    for (;;)
+    {
+        if (!inputStream)
+        {
+            // No more input streams left to read
+            return TokenType::EndOfFile;
+        }
+
+        // The top-most input stream may be at its end, so
+        // look one entry up the stack (don't actually pop
+        // here, since we are just peeking)
+
+        TokenReader reader = inputStream->tokenReader;
+        if (reader.PeekTokenType() == TokenType::EndOfFile)
         {
             inputStream = inputStream->parent;
             continue;
         }
 
+        if (count)
+        {
+            count--;
+
+            // Note: we are advancing our temporary
+            // copy of the token reader
+            reader.AdvanceToken();
+            if (reader.PeekTokenType() == TokenType::EndOfFile)
+            {
+                inputStream = inputStream->parent;
+                continue;
+            }
+        }
+
         // Everything worked, so peek a token from the top-most stream
-        return inputStream->tokens[tokenIndex];
+        return reader.PeekTokenType();
     }
 }
+
 
 // Get the location of the current (raw) token
 static CodePosition PeekLoc(Preprocessor* preprocessor)
@@ -249,13 +378,14 @@ static CoreLib::Text::TokenType PeekRawTokenType(Preprocessor* preprocessor)
 //
 
 // Create a macro
-static PreprocessorMacro* CreateMacro(Preprocessor* /*preprocessor*/)
+static PreprocessorMacro* CreateMacro(Preprocessor* preprocessor)
 {
     // TODO(tfoley): Allocate these more intelligently.
     // For example, consider pooling them on the preprocessor.
 
     PreprocessorMacro* macro = new PreprocessorMacro();
-    macro->flavor = PreprocessorInputStreamFlavor::ObjectLikeMacro;
+    macro->flavor = PreprocessorMacroFlavor::ObjectLike;
+    macro->environment = &preprocessor->globalEnv;
     return macro;
 }
 
@@ -267,27 +397,81 @@ static void DestroyMacro(Preprocessor* /*preprocessor*/, PreprocessorMacro* macr
 
 
 // Find the currently-defined macro of the given name, or return NULL
+static PreprocessorMacro* LookupMacro(PreprocessorEnvironment* environment, String const& name)
+{
+    for(PreprocessorEnvironment* e = environment; e; e = e->parent)
+    {
+        PreprocessorMacro* macro = NULL;
+        if (e->macros.TryGetValue(name, macro))
+            return macro;
+    }
+
+    return NULL;
+}
+
+static PreprocessorEnvironment* GetCurrentEnvironment(Preprocessor* preprocessor)
+{
+    PreprocessorInputStream* inputStream = preprocessor->inputStream;
+    return inputStream ? inputStream->environment : &preprocessor->globalEnv;
+}
+
 static PreprocessorMacro* LookupMacro(Preprocessor* preprocessor, String const& name)
 {
-    PreprocessorMacro* macro = NULL;
-    if (preprocessor->macros.TryGetValue(name, macro))
-        return macro;
-    return NULL;
+    return LookupMacro(GetCurrentEnvironment(preprocessor), name);
 }
 
 // A macro is "busy" if it is currently being used for expansion.
 // A macro cannot be expanded again while busy, to avoid infinite recursion.
-static bool IsMacroBusy(PreprocessorMacro* macro)
+static bool IsMacroBusy(PreprocessorMacro* /*macro*/)
 {
-    // We implement the "busy" state by simply checking if the
-    // macro is currently on the stack of input streams (which
-    // would mean if has a non-`NULL` parent).
-    return macro->parent != NULL;
+    // TODO: need to implement this correctly
+    //
+    // The challenge here is that we are implementing expansion
+    // for argumenst to function-like macros in a "lazy" fashion.
+    //
+    // The letter of the spec is that we should macro expand
+    // each argument *before* substitution, and then go and
+    // macro-expand the substituted body. This means that we
+    // can invoke a macro as part of an argument to an
+    // invocation of the same macro:
+    //
+    //     FOO( 1, FOO(22), 333 );
+    //
+    // In our implementation, the "inner" invocation of `FOO`
+    // gets expanded at the point where it gets referenced
+    // in the body of the "outer" invocation of `FOO`.
+    // Doing things this way leads to greatly simplified
+    // code for handling expansion.
+    //
+    // A proper implementation of `IsMacroBusy` needs to
+    // take context into account, so that it bans recursive
+    // use of a macro when it occurs (indirectly) through
+    // the *body* of the expansion, but not when it occcurs
+    // only through an *argument*.
+    return false;
 }
 
 //
 // Reading Tokens With Expansion
 //
+
+static void InitializeMacroExpansion(
+    Preprocessor*       preprocessor,
+    MacroExpansion*     expansion,
+    PreprocessorMacro*  macro)
+{
+    InitializeInputStream(preprocessor, expansion);
+    expansion->environment = macro->environment;
+    expansion->macro = macro;
+    expansion->tokenReader = TokenReader(macro->tokens);
+}
+
+static void PushMacroExpansion(
+    Preprocessor*   preprocessor,
+    MacroExpansion* expansion)
+{
+    PushInputStream(preprocessor, expansion);
+}
 
 // Check whether the current token on the given input stream should be
 // treated as a macro invocation, and if so set up state for expanding
@@ -319,29 +503,188 @@ static void MaybeBeginMacroExpansion(
         if (IsMacroBusy(macro))
             return;
 
-        // TODO: handle expansion for function-like macros
+        // A function-style macro invocation should only match
+        // if the token *after* the identifier is `(`. This
+        // requires more lookahead than we usually have/need
+        if (macro->flavor == PreprocessorMacroFlavor::FunctionLike)
+        {
+            if(PeekSecondRawTokenType(preprocessor) != TokenType::LParent)
+                return;
 
-        // Consume the token that triggered macro expansion
-        AdvanceRawToken(preprocessor);
+            // Consume the token that triggered macro expansion
+            AdvanceRawToken(preprocessor);
 
-        macro->tokenIndex = 0;
-        macro->parent = preprocessor->inputStream;
-        preprocessor->inputStream = macro;
+            // Consume the opening `(`
+            Token leftParen = AdvanceRawToken(preprocessor);
+
+            FunctionLikeMacroExpansion* expansion = new FunctionLikeMacroExpansion();
+            InitializeMacroExpansion(preprocessor, expansion, macro);
+            expansion->argumentEnvironment.parent = &preprocessor->globalEnv;
+            expansion->environment = &expansion->argumentEnvironment;
+
+            // Try to read any arguments present.
+            int paramCount = macro->params.Count();
+            int argIndex = 0;
+
+            switch (PeekRawTokenType(preprocessor))
+            {
+            case TokenType::EndOfFile:
+            case TokenType::RParent:
+                // No arguments.
+                break;
+
+            default:
+                // At least one argument
+                while(argIndex < paramCount)
+                {
+                    // Read an argument
+
+                    // Create the argument, represented as a special flavor of macro
+                    PreprocessorMacro* arg = CreateMacro(preprocessor);
+                    arg->flavor = PreprocessorMacroFlavor::FunctionArg;
+                    arg->environment = GetCurrentEnvironment(preprocessor);
+
+                    // Associate the new macro with its parameter name
+                    Token paramToken = macro->params[argIndex];
+                    String const& paramName = paramToken.Content;
+                    arg->nameToken = paramToken;
+                    expansion->argumentEnvironment.macros[paramName] = arg;
+                    argIndex++;
+
+                    // Read tokens for the argument
+
+                    // We track the nesting depth, since we don't break
+                    // arguments on a `,` nested in balanced parentheses
+                    //
+                    int nesting = 0;
+                    for (;;)
+                    {
+                        switch (PeekRawTokenType(preprocessor))
+                        {
+                        case TokenType::EndOfFile:
+                            // if we reach the end of the file,
+                            // then we have an error, and need to
+                            // bail out
+                            goto doneWithAllArguments;
+
+                        case TokenType::RParent:
+                            // If we see a right paren when we aren't nested
+                            // then we are at the end of an argument
+                            if (nesting == 0)
+                            {
+                                goto doneWithAllArguments;
+                            }
+                            // Otherwise we decrease our nesting depth, add
+                            // the token, and keep going
+                            nesting--;
+                            break;
+
+                        case TokenType::Comma:
+                            // If we see a comma when we aren't nested
+                            // then we are at the end of an argument
+                            if (nesting == 0)
+                            {
+                                AdvanceRawToken(preprocessor);
+                                goto doneWithArgument;
+                            }
+                            // Otherwise we add it as a normal token
+                            break;
+
+                        case TokenType::LParent:
+                            // If we see a left paren then we need to
+                            // increase our tracking of nesting
+                            nesting++;
+                            break;
+
+                        default:
+                            break;
+                        }
+
+                        // Add the token and continue parsing.
+                        arg->tokens.mTokens.Add(AdvanceRawToken(preprocessor));
+
+
+                    }
+                doneWithArgument: {}
+                    // We've parsed an argument and should move onto
+                    // the next one.
+                }
+                break;
+            }
+        doneWithAllArguments:
+            // TODO: handle possible varargs
+
+            int argCount = argIndex;
+            if (argCount != paramCount)
+            {
+                // TODO: diagnose
+                throw 99;
+            }
+
+            // We are ready to expand.
+            PushMacroExpansion(preprocessor, expansion);
+        }
+        else
+        {
+            // Consume the token that triggered macro expansion
+            AdvanceRawToken(preprocessor);
+
+            // Object-like macros are the easy case.
+            ObjectLikeMacroExpansion* expansion = new ObjectLikeMacroExpansion();
+            InitializeMacroExpansion(preprocessor, expansion, macro);
+            PushMacroExpansion(preprocessor, expansion);
+        }
     }
 }
 
 // Read one token with macro-expansion enabled.
-static Token const& AdvanceToken(Preprocessor* preprocessor)
+static Token AdvanceToken(Preprocessor* preprocessor)
 {
+top:
     // Check whether we need to macro expand at the cursor.
     MaybeBeginMacroExpansion(preprocessor);
 
     // Read a raw token (now that expansion has been triggered)
-    return AdvanceRawToken(preprocessor);
+    Token token = AdvanceRawToken(preprocessor);
 
-    // TODO: handle token pasting here, since we have just
-    // read a token, and can now peek to see if the next
-    // raw token is `##`.
+    // Check if we need to perform token pasting
+    if (PeekRawTokenType(preprocessor) != TokenType::PoundPound)
+    {
+        // If we aren't token pasting, then we are done
+        return token;
+    }
+    else
+    {
+        // We are pasting tokens, which could get messy
+
+        StringBuilder sb;
+        sb << token.Content;
+
+        while (PeekRawTokenType(preprocessor) == TokenType::PoundPound)
+        {
+            // Consume the `##`
+            AdvanceRawToken(preprocessor);
+
+            // Possibly macro-expand the next token
+            MaybeBeginMacroExpansion(preprocessor);
+
+            // Read the next raw token (now that expansion has been triggered)
+            Token nextToken = AdvanceRawToken(preprocessor);
+
+            sb << nextToken.Content;
+        }
+
+        // Now re-lex the input
+        PreprocessorInputStream* inputStream = CreateInputStreamForSource(preprocessor, sb.ProduceString(), "token paste");
+        if (inputStream->tokenReader.GetCount() != 1)
+        {
+            // We expect a token paste to produce a single token
+            // TODO(tfoley): emit a diagnostic here
+        }
+
+        PushInputStream(preprocessor, inputStream);
+        goto top;
+    }
 }
 
 // Read one token with macro-expansion enabled.
@@ -349,7 +692,7 @@ static Token const& AdvanceToken(Preprocessor* preprocessor)
 // Note that because triggering macro expansion may
 // involve changing the input-stream state, this
 // operation *can* have side effects.
-static Token const& PeekToken(Preprocessor* preprocessor)
+static Token PeekToken(Preprocessor* preprocessor)
 {
     // Check whether we need to macro expand at the cursor.
     MaybeBeginMacroExpansion(preprocessor);
@@ -437,7 +780,7 @@ static bool IsEndOfLine(PreprocessorDirectiveContext* context)
 }
 
 // Read one raw token in a directive, without going past the end of the line.
-static Token const& AdvanceRawToken(PreprocessorDirectiveContext* context)
+static Token AdvanceRawToken(PreprocessorDirectiveContext* context)
 {
     if (IsEndOfLine(context))
         return context->preprocessor->endOfFileToken;
@@ -445,7 +788,7 @@ static Token const& AdvanceRawToken(PreprocessorDirectiveContext* context)
 }
 
 // Peek one raw token in a directive, without going past the end of the line.
-static Token const& PeekRawToken(PreprocessorDirectiveContext* context)
+static Token PeekRawToken(PreprocessorDirectiveContext* context)
 {
     if (IsEndOfLine(context))
         return context->preprocessor->endOfFileToken;
@@ -461,7 +804,7 @@ static CoreLib::Text::TokenType PeekRawTokenType(PreprocessorDirectiveContext* c
 }
 
 // Read one token, with macro-expansion, without going past the end of the line.
-static Token const& AdvanceToken(PreprocessorDirectiveContext* context)
+static Token AdvanceToken(PreprocessorDirectiveContext* context)
 {
     if (IsEndOfLine(context))
         context->preprocessor->endOfFileToken;
@@ -469,7 +812,7 @@ static Token const& AdvanceToken(PreprocessorDirectiveContext* context)
 }
 
 // Peek one token, with macro-expansion, without going past the end of the line.
-static Token const& PeekToken(PreprocessorDirectiveContext* context)
+static Token PeekToken(PreprocessorDirectiveContext* context)
 {
     if (IsEndOfLine(context))
         context->preprocessor->endOfFileToken;
@@ -654,11 +997,11 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(PreprocessorD
             {
                 // handle `defined(someName)`
 
-                // Expect a `(`
+                // Possibly parse a `(`
                 Token leftParen;
-                if (!ExpectRaw(context, TokenType::LParent, Diagnostics::expectedTokenInDefinedExpression, &leftParen))
+                if (PeekRawTokenType(context) == TokenType::LParent)
                 {
-                    return 0;
+                    leftParen = AdvanceRawToken(context);
                 }
 
                 // Expect an identifier
@@ -669,11 +1012,14 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(PreprocessorD
                 }
                 String name = nameToken.Content;
 
-                // Expect a `)`
-                if(!ExpectRaw(context, TokenType::RParent, Diagnostics::expectedTokenInDefinedExpression))
+                // If we saw an opening `(`, then expect one to close
+                if (leftParen.Type != TokenType::Unknown)
                 {
-                    GetSink(context)->diagnose(leftParen.Position, Diagnostics::seeOpeningToken, leftParen);
-                    return 0;
+                    if(!ExpectRaw(context, TokenType::RParent, Diagnostics::expectedTokenInDefinedExpression))
+                    {
+                        GetSink(context)->diagnose(leftParen.Position, Diagnostics::seeOpeningToken, leftParen);
+                        return 0;
+                    }
                 }
 
                 return LookupMacro(context, name) != NULL;
@@ -1036,7 +1382,7 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
     PreprocessorMacro* macro = CreateMacro(context->preprocessor);
     macro->nameToken = nameToken;
 
-    PreprocessorMacro* oldMacro = LookupMacro(context, name);
+    PreprocessorMacro* oldMacro = LookupMacro(&context->preprocessor->globalEnv, name);
     if (oldMacro)
     {
         GetSink(context)->diagnose(nameToken.Position, Diagnostics::macroRedefinition, name);
@@ -1044,15 +1390,48 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
 
         DestroyMacro(context->preprocessor, oldMacro);
     }
-    context->preprocessor->macros[name] = macro;
+    context->preprocessor->globalEnv.macros[name] = macro;
 
+    // If macro name is immediately followed (with no space) by `(`,
+    // then we have a function-like macro
     if (PeekRawTokenType(context) == TokenType::LParent)
     {
         if (!(PeekRawToken(context).flags & TokenFlag::AfterWhitespace))
         {
-            // function-style macro
-            SPIRE_UNIMPLEMENTED(GetSink(context), GetDirectiveLoc(context), "function-style macros");
-            return;
+            // This is a function-like macro, so we need to remember that
+            // and start capturing parameters
+            macro->flavor = PreprocessorMacroFlavor::FunctionLike;
+
+            Token const& leftParen = AdvanceRawToken(context);
+
+            // If there are any parameters, parse them
+            if (PeekRawTokenType(context) != TokenType::RParent)
+            {
+                for (;;)
+                {
+                    // TODO: handle elipsis (`...`) for varags
+
+                    // A macro parameter name should be a raw identifier
+                    Token paramToken;
+                    if (!ExpectRaw(context, TokenType::Identifier, Diagnostics::expectedTokenInMacroParameters, &paramToken))
+                        break;
+
+                    // TODO(tfoley): some validation on parameter name.
+                    // Certain names (e.g., `defined` and `__VA_ARGS__`
+                    // are not allowed to be used as macros or parameters).
+
+                    // Add the parameter to the macro being deifned
+                    macro->params.Add(paramToken);
+
+                    // If we see `)` then we are done with arguments
+                    if (PeekRawTokenType(context) == TokenType::RParent)
+                        break;
+
+                    ExpectRaw(context, TokenType::Comma, Diagnostics::expectedTokenInMacroParameters);
+                }
+            }
+
+            ExpectRaw(context, TokenType::RParent, Diagnostics::expectedTokenInMacroParameters);
         }
     }
 
@@ -1060,9 +1439,9 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
     for(;;)
     {
         Token token = AdvanceRawToken(context);
+        macro->tokens.mTokens.Add(token);
         if (token.Type == TokenType::EndOfFile)
             break;
-        macro->tokens.Add(token);
     }
 }
 
@@ -1074,11 +1453,12 @@ static void HandleUndefDirective(PreprocessorDirectiveContext* context)
         return;
     String name = nameToken.Content;
 
-    PreprocessorMacro* macro = LookupMacro(context, name);
+    PreprocessorEnvironment* env = &context->preprocessor->globalEnv;
+    PreprocessorMacro* macro = LookupMacro(env, name);
     if (macro != NULL)
     {
         // name was defined, so remove it
-        context->preprocessor->macros.Remove(name);
+        env->macros.Remove(name);
 
         DestroyMacro(context->preprocessor, macro);
     }
@@ -1165,6 +1545,14 @@ static void HandlePragmaDirective(PreprocessorDirectiveContext* context)
     SkipToEndOfLine(context);
 }
 
+// Handle a `#version` directive
+static void HandleVersionDirective(PreprocessorDirectiveContext* context)
+{
+    // TODO(tfoley): parse enough of this to spit it out again later?
+    SkipToEndOfLine(context);
+}
+
+
 // Callback interface used by preprocessor directives
 typedef void (*PreprocessorDirectiveCallback)(PreprocessorDirectiveContext* context);
 
@@ -1192,20 +1580,21 @@ struct PreprocessorDirective
 // their own directives as desired.
 static const PreprocessorDirective kDirectives[] =
 {
-    { "if",         &HandleIfDirective,        ProcessWhenSkipping },
-    { "ifdef",      &HandleIfDefDirective,     ProcessWhenSkipping },
-    { "ifndef",     &HandleIfNDefDirective,    ProcessWhenSkipping },
-    { "else",       &HandleElseDirective,      ProcessWhenSkipping },
-    { "elif",       &HandleElifDirective,      ProcessWhenSkipping },
-    { "endif",      &HandleEndIfDirective,     ProcessWhenSkipping },
+    { "if",         &HandleIfDirective,         ProcessWhenSkipping },
+    { "ifdef",      &HandleIfDefDirective,      ProcessWhenSkipping },
+    { "ifndef",     &HandleIfNDefDirective,     ProcessWhenSkipping },
+    { "else",       &HandleElseDirective,       ProcessWhenSkipping },
+    { "elif",       &HandleElifDirective,       ProcessWhenSkipping },
+    { "endif",      &HandleEndIfDirective,      ProcessWhenSkipping },
 
-    { "include",    &HandleIncludeDirective,   0 },
-    { "define",     &HandleDefineDirective,    0 },
-    { "undef",      &HandleUndefDirective,     0 },
-    { "warning",    &HandleWarningDirective,   0 },
-    { "error",      &HandleErrorDirective,     0 },
-    { "line",       &HandleLineDirective,      0 },
-    { "pragma",     &HandlePragmaDirective,    0 },
+    { "include",    &HandleIncludeDirective,    0 },
+    { "define",     &HandleDefineDirective,     0 },
+    { "undef",      &HandleUndefDirective,      0 },
+    { "warning",    &HandleWarningDirective,    0 },
+    { "error",      &HandleErrorDirective,      0 },
+    { "line",       &HandleLineDirective,       0 },
+    { "pragma",     &HandlePragmaDirective,     0 },
+    { "version",    &HandleVersionDirective,    0 },
     { NULL, NULL },
 };
 
@@ -1319,38 +1708,156 @@ static Token ReadToken(Preprocessor* preprocessor)
     }
 }
 
+// intialize a preprocessor context, using the given sink for errros
+static void InitializePreprocessor(
+    Preprocessor*   preprocessor,
+    DiagnosticSink* sink)
+{
+    preprocessor->sink = sink;
+    preprocessor->includeHandler = NULL;
+    preprocessor->endOfFileToken.Type = TokenType::EndOfFile;
+    preprocessor->endOfFileToken.flags = TokenFlag::AtStartOfLine;
+}
+
+// clean up after an environment
+PreprocessorEnvironment::~PreprocessorEnvironment()
+{
+    for (auto pair : this->macros)
+    {
+        DestroyMacro(NULL, pair.Value);
+    }
+}
+
+// finalize a preprocessor and free any memory still in use
+static void FinalizePreprocessor(
+    Preprocessor*   preprocessor)
+{
+    // Clear out any waiting input streams
+    PreprocessorInputStream* input = preprocessor->inputStream;
+    while (input)
+    {
+        PreprocessorInputStream* parent = input->parent;
+        DestroyInputStream(preprocessor, input);
+        input = parent;
+    }
+
+#if 0
+    // clean up any macros that were allocated
+    for (auto pair : preprocessor->globalEnv.macros)
+    {
+        DestroyMacro(preprocessor, pair.Value);
+    }
+#endif
+}
+
+// Add a simple macro definition from a string (e.g., for a
+// `-D` option passed on the command line
+static void DefineMacro(
+    Preprocessor*   preprocessor,
+    String const&   key,
+    String const&   value)
+{
+    String fileName = "command line";
+    PreprocessorMacro* macro = CreateMacro(preprocessor);
+
+    // Use existing `Lexer` to generate a token stream.
+    Lexer lexer;
+    macro->tokens = lexer.Parse(fileName, value, GetSink(preprocessor));
+    macro->nameToken = Token(TokenType::Identifier, key, 0, 0, 0, fileName);
+
+    PreprocessorMacro* oldMacro = NULL;
+    if (preprocessor->globalEnv.macros.TryGetValue(key, oldMacro))
+    {
+        DestroyMacro(preprocessor, oldMacro);
+    }
+
+    preprocessor->globalEnv.macros[key] = macro;
+}
+
+// read the entire input into tokens
+static TokenList ReadAllTokens(
+    Preprocessor*   preprocessor)
+{
+    TokenList tokens;
+    for (;;)
+    {
+        Token token = ReadToken(preprocessor);
+
+        tokens.mTokens.Add(token);
+
+        // Note: we include the EOF token in the list,
+        // since that is expected by the `TokenList` type.
+        if (token.Type == TokenType::EndOfFile)
+            break;
+    }
+    return tokens;
+}
+
+
 // Take a string of source code and preprocess it into a list of tokens.
-CoreLib::List<CoreLib::Text::Token> PreprocessSource(
+TokenList PreprocessSource(
     CoreLib::String const& source,
     CoreLib::String const& fileName,
     DiagnosticSink* sink,
     IncludeHandler* includeHandler)
 {
     Preprocessor preprocessor;
-    preprocessor.sink = sink;
+    InitializePreprocessor(&preprocessor, sink);
+
     preprocessor.includeHandler = includeHandler;
-    preprocessor.endOfFileToken.Type = TokenType::EndOfFile;
-    preprocessor.endOfFileToken.flags = TokenFlag::AtStartOfLine;
 
     // create an initial input stream based on the provided buffer
     preprocessor.inputStream = CreateInputStreamForSource(&preprocessor, source, fileName);
 
-    List<Token> tokens;
-    for (;;)
-    {
-        Token token = ReadToken(&preprocessor);
-        // TODO(tfoley): should just include EOF token in output
-        if (token.Type == TokenType::EndOfFile)
-            break;
+    TokenList tokens = ReadAllTokens(&preprocessor);
 
-        tokens.Add(token);
+    FinalizePreprocessor(&preprocessor);
+
+    return tokens;
+}
+
+TokenList PreprocessSource(
+    CoreLib::String const& source,
+    CoreLib::String const& fileName,
+    DiagnosticSink* sink,
+    IncludeHandler* includeHandler,
+    CoreLib::Dictionary<CoreLib::String, CoreLib::String>  defines)
+{
+    Preprocessor preprocessor;
+    InitializePreprocessor(&preprocessor, sink);
+
+    preprocessor.includeHandler = includeHandler;
+    for (auto p : defines)
+    {
+        DefineMacro(&preprocessor, p.Key, p.Value);
     }
 
-    // clean up any macros that were allocated
-    for (auto pair : preprocessor.macros)
+    // create an initial input stream based on the provided buffer
+    preprocessor.inputStream = CreateInputStreamForSource(&preprocessor, source, fileName);
+
+    TokenList tokens = ReadAllTokens(&preprocessor);
+
+    FinalizePreprocessor(&preprocessor);
+
+    // debugging: build the pre-processed source back together
+#if 0
+    StringBuilder sb;
+    for (auto t : tokens)
     {
-        DestroyMacro(&preprocessor, pair.Value);
+        if (t.flags & TokenFlag::AtStartOfLine)
+        {
+            sb << "\n";
+        }
+        else if (t.flags & TokenFlag::AfterWhitespace)
+        {
+            sb << " ";
+        }
+        
+        sb << t.Content;
     }
+
+    String s = sb.ProduceString();
+#endif
 
     return tokens;
 }
