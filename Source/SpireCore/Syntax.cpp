@@ -262,10 +262,7 @@ namespace Spire
 		VarDeclrStatementSyntaxNode * VarDeclrStatementSyntaxNode::Clone(CloneContext & ctx)
 		{
 			auto rs = CloneSyntaxNodeFields(new VarDeclrStatementSyntaxNode(*this), ctx);
-			rs->TypeNode = TypeNode->Clone(ctx);
-			rs->Variables.Clear();
-			for (auto & var : Variables)
-				rs->Variables.Add(var->Clone(ctx));
+            rs->decl = rs->decl->Clone(ctx);
 			return rs;
 		}
 		RefPtr<SyntaxNode> Variable::Accept(SyntaxVisitor * visitor)
@@ -502,6 +499,20 @@ namespace Spire
 			rs->Import = Import->Clone(ctx);
 			return rs;
 		}
+
+        RefPtr<SyntaxNode> MultiDecl::Accept(SyntaxVisitor * visitor)
+        {
+            return visitor->VisitMultiDecl(this);
+        }
+
+        MultiDecl * MultiDecl::Clone(CloneContext & ctx)
+        {
+            auto rs = CloneSyntaxNodeFields(new MultiDecl(*this), ctx);
+            for (auto& d : rs->decls)
+                d = d->Clone(ctx);
+            return rs;
+        }
+
 		RefPtr<SyntaxNode> StructField::Accept(SyntaxVisitor * visitor)
 		{
 			return visitor->VisitStructField(this);

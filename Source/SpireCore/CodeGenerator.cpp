@@ -739,21 +739,20 @@ namespace Spire
 				codeWriter.Discard();
 				return stmt;
 			}
-			virtual RefPtr<StatementSyntaxNode> VisitVarDeclrStatement(VarDeclrStatementSyntaxNode* stmt) override
+
+            RefPtr<Variable> VisitDeclrVariable(Variable* varDecl)
 			{
-				for (auto & v : stmt->Variables)
+				AllocVarInstruction * varOp = AllocVar(varDecl->Type.Ptr());
+				varOp->Name = EscapeDoubleUnderscore(varDecl->Name.Content);
+				variables.Add(varDecl->Name.Content, varOp);
+				if (varDecl->Expr)
 				{
-					AllocVarInstruction * varOp = AllocVar(stmt->Type.Ptr());
-					varOp->Name = EscapeDoubleUnderscore(v->Name.Content);
-					variables.Add(v->Name.Content, varOp);
-					if (v->Expr)
-					{
-						v->Expr->Accept(this);
-						Assign(varOp, PopStack());
-					}
+					varDecl->Expr->Accept(this);
+					Assign(varOp, PopStack());
 				}
-				return stmt;
+				return varDecl;
 			}
+
 			virtual RefPtr<StatementSyntaxNode> VisitExpressionStatement(ExpressionStatementSyntaxNode* stmt) override
 			{
 				stmt->Expression->Accept(this);

@@ -10,7 +10,7 @@ namespace Spire
 
 		class Parser
 		{
-		private:
+        public:
 			int anonymousParamCounter = 0;
 			List<RefPtr<Scope>> scopeStack;
             TokenReader tokenReader;
@@ -35,7 +35,6 @@ namespace Spire
 				scopeStack.Last() = 0;
 				scopeStack.RemoveAt(scopeStack.Count() - 1);
 			}
-		public:
 			Parser(TokenSpan const& _tokens, DiagnosticSink * sink, String _fileName)
 				: tokenReader(_tokens), sink(sink), fileName(_fileName)
 			{
@@ -94,7 +93,7 @@ namespace Spire
 				typeNames.Add("Patch");
 			}
 			RefPtr<ProgramSyntaxNode> Parse();
-		private:
+
 			Token ReadToken();
 			Token ReadToken(CoreLib::Text::TokenType type);
 			Token ReadToken(const char * string);
@@ -918,58 +917,69 @@ namespace Spire
 			return VariableModifier::None; 
 		}
 
+        static RefPtr<Decl> ParseLocalVarDecls(Parser* parser)
+        {
+            // TODO(tfoley): it is wasteful to allocate this if
+            // it won't always be needed/used
+            RefPtr<MultiDecl> multiDecl = new MultiDecl();
+		
+			parser->FillPosition(multiDecl.Ptr());
+			while (!parser->tokenReader.IsAtEnd())
+			{
+				if (parser->LookAheadToken("layout"))
+				{
+					parser->ReadToken("layout");
+					parser->ReadToken(TokenType::LParent);
+					StringBuilder layoutSB;
+					while (!parser->LookAheadToken(TokenType::RParent))
+					{
+						layoutSB.Append(parser->ReadToken(TokenType::Identifier).Content);
+						if (parser->LookAheadToken(TokenType::OpAssign))
+						{
+							layoutSB.Append(parser->ReadToken(TokenType::OpAssign).Content);
+							layoutSB.Append(parser->ReadToken(TokenType::IntLiterial).Content);
+						}
+						if (!parser->LookAheadToken(TokenType::Comma))
+							break;
+						else
+							layoutSB.Append(", ");
+					}
+					parser->ReadToken(TokenType::RParent);
+					multiDecl->LayoutString = layoutSB.ProduceString();
+				}
+				else
+					break;
+			}
+			multiDecl->TypeNode = parser->ParseType();
+			while (!parser->tokenReader.IsAtEnd())
+			{
+				RefPtr<Variable> var = new Variable();
+				parser->FillPosition(var.Ptr());
+				Token name = parser->ReadToken(TokenType::Identifier);
+				var->Name = name;
+				if (parser->LookAheadToken(TokenType::OpAssign))
+				{
+					parser->ReadToken(TokenType::OpAssign);
+					var->Expr = parser->ParseExpression();
+				}
+
+				multiDecl->decls.Add(var);
+				if (parser->LookAheadToken(TokenType::Comma))
+					parser->ReadToken(TokenType::Comma);
+				else
+					break;
+			}
+			parser->ReadToken(TokenType::Semicolon);
+			
+			return multiDecl;
+        }
+
 		RefPtr<VarDeclrStatementSyntaxNode> Parser::ParseVarDeclrStatement()
 		{
 			RefPtr<VarDeclrStatementSyntaxNode>varDeclrStatement = new VarDeclrStatementSyntaxNode();
 		
 			FillPosition(varDeclrStatement.Ptr());
-			while (!tokenReader.IsAtEnd())
-			{
-				if (LookAheadToken("layout"))
-				{
-					ReadToken("layout");
-					ReadToken(TokenType::LParent);
-					StringBuilder layoutSB;
-					while (!LookAheadToken(TokenType::RParent))
-					{
-						layoutSB.Append(ReadToken(TokenType::Identifier).Content);
-						if (LookAheadToken(TokenType::OpAssign))
-						{
-							layoutSB.Append(ReadToken(TokenType::OpAssign).Content);
-							layoutSB.Append(ReadToken(TokenType::IntLiterial).Content);
-						}
-						if (!LookAheadToken(TokenType::Comma))
-							break;
-						else
-							layoutSB.Append(", ");
-					}
-					ReadToken(TokenType::RParent);
-					varDeclrStatement->LayoutString = layoutSB.ProduceString();
-				}
-				else
-					break;
-			}
-			varDeclrStatement->TypeNode = ParseType();
-			while (!tokenReader.IsAtEnd())
-			{
-				RefPtr<Variable> var = new Variable();
-				FillPosition(var.Ptr());
-				Token name = ReadToken(TokenType::Identifier);
-				var->Name = name;
-				if (LookAheadToken(TokenType::OpAssign))
-				{
-					ReadToken(TokenType::OpAssign);
-					var->Expr = ParseExpression();
-				}
-
-				varDeclrStatement->Variables.Add(var);
-				if (LookAheadToken(TokenType::Comma))
-					ReadToken(TokenType::Comma);
-				else
-					break;
-			}
-			ReadToken(TokenType::Semicolon);
-			
+            varDeclrStatement->decl = ParseLocalVarDecls(this);
 			return varDeclrStatement;
 		}
 

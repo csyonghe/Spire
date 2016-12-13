@@ -1026,43 +1026,56 @@ namespace Spire
 				}
 				return stmt;
 			}
-			virtual RefPtr<StatementSyntaxNode> VisitVarDeclrStatement(VarDeclrStatementSyntaxNode *stmt) override
-			{
-				stmt->Type = TranslateTypeNode(stmt->TypeNode);
-				if (stmt->Type->IsTextureOrSampler() || stmt->Type->AsGenericType())
-				{
-					getSink()->diagnose(stmt, Diagnostics::invalidTypeForLocalVariable);
-				}
-				else if (stmt->Type->AsBasicType() && stmt->Type->AsBasicType()->RecordTypeName.Length())
-				{
-					getSink()->diagnose(stmt, Diagnostics::recordTypeVariableInImportOperator);
-				}
-				for (auto & para : stmt->Variables)
-				{
-					VariableEntry varDeclr;
-					varDeclr.Name = para->Name.Content;
-					if (stmt->Scope->Variables.ContainsKey(para->Name.Content))
-						getSink()->diagnose(para, Diagnostics::variableNameAlreadyDefined, para->Name);
 
-					varDeclr.Type.DataType = stmt->Type;
-					if (varDeclr.Type.DataType->Equals(ExpressionType::Void.Ptr()))
-						getSink()->diagnose(stmt, Diagnostics::invalidTypeVoid);
-					if (varDeclr.Type.DataType->IsArray() && varDeclr.Type.DataType->AsArrayType()->ArrayLength <= 0)
-						getSink()->diagnose(stmt, Diagnostics::invalidArraySize);
+            RefPtr<ExpressionType> currentMultiDeclTypeSpec;
+            RefPtr<MultiDecl> VisitMultiDecl(MultiDecl* decl)
+            {
+                RefPtr<ExpressionType> type = TranslateTypeNode(decl->TypeNode);
+                currentMultiDeclTypeSpec = type;
 
-					stmt->Scope->Variables.AddIfNotExists(para->Name.Content, varDeclr);
-					if (para->Expr != NULL)
+				if (type->IsTextureOrSampler() || type->AsGenericType())
+				{
+					getSink()->diagnose(decl->TypeNode, Diagnostics::invalidTypeForLocalVariable);
+				}
+				else if (type->AsBasicType() && type->AsBasicType()->RecordTypeName.Length())
+				{
+					getSink()->diagnose(decl->TypeNode, Diagnostics::recordTypeVariableInImportOperator);
+				}
+                for (auto d : decl->decls)
+                {
+                    d->Accept(this).As<Decl>();
+                }
+                currentMultiDeclTypeSpec = nullptr;
+                return decl;
+            }
+
+            virtual RefPtr<Variable> VisitDeclrVariable(Variable* varDecl)
+            {
+				VariableEntry varDeclr;
+				varDeclr.Name = varDecl->Name.Content;
+				if (varDecl->Scope->Variables.ContainsKey(varDecl->Name.Content))
+					getSink()->diagnose(varDecl, Diagnostics::variableNameAlreadyDefined, varDecl->Name);
+
+                varDecl->Type = currentMultiDeclTypeSpec;
+				varDeclr.Type.DataType = varDecl->Type;
+				if (varDeclr.Type.DataType->Equals(ExpressionType::Void.Ptr()))
+					getSink()->diagnose(varDecl, Diagnostics::invalidTypeVoid);
+				if (varDeclr.Type.DataType->IsArray() && varDeclr.Type.DataType->AsArrayType()->ArrayLength <= 0)
+					getSink()->diagnose(varDecl, Diagnostics::invalidArraySize);
+
+				varDecl->Scope->Variables.AddIfNotExists(varDecl->Name.Content, varDeclr);
+				if (varDecl->Expr != NULL)
+				{
+					varDecl->Expr = varDecl->Expr->Accept(this).As<ExpressionSyntaxNode>();
+					if (!MatchType_ValueReceiver(varDeclr.Type.DataType.Ptr(), varDecl->Expr->Type.Ptr())
+						&& !varDecl->Expr->Type->Equals(ExpressionType::Error.Ptr()))
 					{
-						para->Expr = para->Expr->Accept(this).As<ExpressionSyntaxNode>();
-						if (!MatchType_ValueReceiver(varDeclr.Type.DataType.Ptr(), para->Expr->Type.Ptr())
-							&& !para->Expr->Type->Equals(ExpressionType::Error.Ptr()))
-						{
-							getSink()->diagnose(para, Diagnostics::typeMismatch, para->Expr->Type, varDeclr.Type.DataType);
-						}
+						getSink()->diagnose(varDecl, Diagnostics::typeMismatch, varDecl->Expr->Type, varDeclr.Type.DataType);
 					}
 				}
-				return stmt;
-			}
+                return varDecl;
+            }
+
 			virtual RefPtr<StatementSyntaxNode> VisitWhileStatement(WhileStatementSyntaxNode *stmt) override
 			{
 				loops.Add(stmt);
