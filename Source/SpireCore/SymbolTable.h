@@ -47,7 +47,6 @@ namespace Spire
 			String Name, UniqueName, UniqueKey;
 			List<String> ChoiceNames;
 			EnumerableDictionary<ShaderComponentSymbol *, EnumerableHashSet<RefPtr<ImportExpressionSyntaxNode>>> DependentComponents;
-			EnumerableHashSet<ShaderComponentSymbol *>UserComponents;
 			List<RefPtr<ShaderComponentImplSymbol>> Implementations;
 			RefPtr<Type> Type;
 			bool IsParam()

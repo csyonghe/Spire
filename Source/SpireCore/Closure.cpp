@@ -196,7 +196,6 @@ namespace Spire
 				{
 					auto oldComp = shaderClosure->AllComponents[refComp->Content]();
 					auto newComp = shaderClosure->AllComponents[targetComp]();
-					newComp->UserComponents.Add(currentComponent);
 					if (auto * importOps = currentComponent->DependentComponents.TryGetValue(newComp))
 						importOps->Add(currentImport);
 					else
@@ -271,7 +270,6 @@ namespace Spire
 			void AddReference(ShaderComponentSymbol * referee, ImportExpressionSyntaxNode * importOp, CodePosition pos)
 			{
 				rootShader->AllComponents.TryGetValue(referee->UniqueName, referee);
-				referee->UserComponents.Add(currentComponent);
 				if (auto * importOps = currentComponent->DependentComponents.TryGetValue(referee))
 					importOps->Add(importOp);
 				else
@@ -429,10 +427,6 @@ namespace Spire
 					replaceVisitor.currentImpl = impl.Ptr();
 					impl->SyntaxNode->Accept(&replaceVisitor);
 				}
-			}
-			for (auto & rep : replacements)
-			{
-				shader->AllComponents[rep.Key]()->UserComponents.Clear();
 			}
 		}
 
