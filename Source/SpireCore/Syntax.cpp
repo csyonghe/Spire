@@ -6,14 +6,19 @@ namespace Spire
 {
 	namespace Compiler
 	{
-		bool Scope::FindVariable(const String & name, VariableEntry & variable)
-		{
-			if (Variables.TryGetValue(name, variable))
-				return true;
-			if (Parent)
-				return Parent->FindVariable(name, variable);
-			return false;
-		}
+    Decl* Scope::LookUp(String const& name)
+    {
+        Scope* scope = this;
+        while (scope)
+        {
+            Decl* decl = nullptr;
+            if (scope->decls.TryGetValue(name, decl))
+                return decl;
+
+            scope = scope->Parent;
+        }
+        return nullptr;
+    }
 
 		bool BasicExpressionType::Equals(const ExpressionType * type) const
 		{

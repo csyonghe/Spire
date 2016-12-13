@@ -276,21 +276,12 @@ namespace Spire
 			EnumerableHashSet<String> PinnedWorlds; 
 		};
 
-
-		class VariableEntry
-		{
-		public:
-			String Name;
-			Type Type;
-			bool IsComponent = false;
-		};
-
 		class Scope
 		{
 		public:
 			Scope * Parent;
-			Dictionary<String, VariableEntry> Variables;
-			bool FindVariable(const String & name, VariableEntry & variable);
+            Dictionary<String, Decl*> decls;
+            Decl* LookUp(String const& name);
 			Scope()
 				: Parent(0)
 			{}

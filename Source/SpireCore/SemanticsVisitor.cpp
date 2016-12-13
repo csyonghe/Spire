@@ -338,12 +338,9 @@ namespace Spire
 							getSink()->diagnose(para.Ptr(), Diagnostics::parameterAlreadyDefined, para->Name);
 						else
 							paraNames.Add(para->Name.Content);
-						VariableEntry varEntry;
-						varEntry.Name = para->Name.Content;
 						para->Type = TranslateTypeNode(para->TypeNode);
-						varEntry.Type.DataType = para->Type;
-						op->Scope->Variables.AddIfNotExists(varEntry.Name, varEntry);
-                        if (varEntry.Type.DataType->Equals(ExpressionType::Void.Ptr()))
+                        op->Scope->decls.AddIfNotExists(para->Name.Content, para.Ptr());
+                        if (para->Type->Equals(ExpressionType::Void.Ptr()))
                         {
 							getSink()->diagnose(para.Ptr(), Diagnostics::parameterCannotBeVoid);
                         }
@@ -671,11 +668,7 @@ namespace Spire
 				for (auto & param : comp->Parameters)
 				{
 					param->Accept(this);
-					VariableEntry varEntry;
-					varEntry.IsComponent = false;
-					varEntry.Name = param->Name.Content;
-					varEntry.Type.DataType = param->Type;
-					comp->Scope->Variables.Add(param->Name.Content, varEntry);
+                    comp->Scope->decls.Add(param->Name.Content, param.Ptr());
 				}
 				if (comp->Expression)
 				{
@@ -885,14 +878,11 @@ namespace Spire
 						getSink()->diagnose(para, Diagnostics::parameterAlreadyDefined, para->Name);
 					else
 						paraNames.Add(para->Name.Content);
-					VariableEntry varEntry;
-					varEntry.Name = para->Name.Content;
 					para->Type = TranslateTypeNode(para->TypeNode);
-					varEntry.Type.DataType = para->Type;
-					functionNode->Scope->Variables.AddIfNotExists(varEntry.Name, varEntry);
-					if (varEntry.Type.DataType->Equals(ExpressionType::Void.Ptr()))
+					functionNode->Scope->decls.AddIfNotExists(para->Name.Content, para.Ptr());
+					if (para->Type->Equals(ExpressionType::Void.Ptr()))
 						getSink()->diagnose(para, Diagnostics::parameterCannotBeVoid);
-					internalName << "@" << varEntry.Type.DataType->ToString();
+					internalName << "@" << para->Type->ToString();
 				}
 				functionNode->InternalName = internalName.ProduceString();	
 				RefPtr<FunctionSymbol> symbol = new FunctionSymbol();
@@ -1040,26 +1030,23 @@ namespace Spire
 
             virtual RefPtr<Variable> VisitDeclrVariable(Variable* varDecl)
             {
-				VariableEntry varDeclr;
-				varDeclr.Name = varDecl->Name.Content;
-				if (varDecl->Scope->Variables.ContainsKey(varDecl->Name.Content))
+				if (varDecl->Scope->decls.ContainsKey(varDecl->Name.Content))
 					getSink()->diagnose(varDecl, Diagnostics::variableNameAlreadyDefined, varDecl->Name);
 
                 varDecl->Type = currentMultiDeclTypeSpec;
-				varDeclr.Type.DataType = varDecl->Type;
-				if (varDeclr.Type.DataType->Equals(ExpressionType::Void.Ptr()))
+				if (varDecl->Type->Equals(ExpressionType::Void.Ptr()))
 					getSink()->diagnose(varDecl, Diagnostics::invalidTypeVoid);
-				if (varDeclr.Type.DataType->IsArray() && varDeclr.Type.DataType->AsArrayType()->ArrayLength <= 0)
+				if (varDecl->Type->IsArray() && varDecl->Type->AsArrayType()->ArrayLength <= 0)
 					getSink()->diagnose(varDecl, Diagnostics::invalidArraySize);
 
-				varDecl->Scope->Variables.AddIfNotExists(varDecl->Name.Content, varDeclr);
+				varDecl->Scope->decls.AddIfNotExists(varDecl->Name.Content, varDecl);
 				if (varDecl->Expr != NULL)
 				{
 					varDecl->Expr = varDecl->Expr->Accept(this).As<ExpressionSyntaxNode>();
-					if (!MatchType_ValueReceiver(varDeclr.Type.DataType.Ptr(), varDecl->Expr->Type.Ptr())
+					if (!MatchType_ValueReceiver(varDecl->Type.Ptr(), varDecl->Expr->Type.Ptr())
 						&& !varDecl->Expr->Type->Equals(ExpressionType::Error.Ptr()))
 					{
-						getSink()->diagnose(varDecl, Diagnostics::typeMismatch, varDecl->Expr->Type, varDeclr.Type.DataType);
+						getSink()->diagnose(varDecl, Diagnostics::typeMismatch, varDecl->Expr->Type, varDecl->Type);
 					}
 				}
                 return varDecl;
@@ -1648,14 +1635,15 @@ namespace Spire
 			}
 			virtual RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode *expr) override
 			{
-				VariableEntry variable;
 				ShaderUsing shaderObj;
 				expr->Type = ExpressionType::Error;
-				if (expr->Scope->FindVariable(expr->Variable, variable))
+                auto decl = expr->Scope->LookUp(expr->Variable);
+                auto varDecl = dynamic_cast<VarDeclBase*>(decl);
+                if(varDecl)
 				{
-					expr->Type = variable.Type.DataType->Clone();
-					if (auto basicType = expr->Type->AsBasicType())
-						basicType->IsLeftValue = !variable.IsComponent;
+					expr->Type = varDecl->Type;
+                    if (auto basicType = expr->Type->AsBasicType())
+                        basicType->IsLeftValue = !(dynamic_cast<ComponentSyntaxNode*>(varDecl));
 				}
 				else if (currentShader && currentShader->ShaderObjects.TryGetValue(expr->Variable, shaderObj))
 				{
