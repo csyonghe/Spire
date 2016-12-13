@@ -332,12 +332,12 @@ namespace Spire
 					HashSet<String> paraNames;
 					for (auto & para : op->Parameters)
 					{
-						if (paraNames.Contains(para->Name))
+						if (paraNames.Contains(para->Name.Content))
 							getSink()->diagnose(para.Ptr(), Diagnostics::parameterAlreadyDefined, para->Name);
 						else
-							paraNames.Add(para->Name);
+							paraNames.Add(para->Name.Content);
 						VariableEntry varEntry;
-						varEntry.Name = para->Name;
+						varEntry.Name = para->Name.Content;
 						para->Type = TranslateTypeNode(para->TypeNode);
 						varEntry.Type.DataType = para->Type;
 						op->Scope->Variables.AddIfNotExists(varEntry.Name, varEntry);
@@ -671,9 +671,9 @@ namespace Spire
 					param->Accept(this);
 					VariableEntry varEntry;
 					varEntry.IsComponent = false;
-					varEntry.Name = param->Name;
+					varEntry.Name = param->Name.Content;
 					varEntry.Type.DataType = param->Type;
-					comp->Scope->Variables.Add(param->Name, varEntry);
+					comp->Scope->Variables.Add(param->Name.Content, varEntry);
 				}
 				if (comp->Expression)
 				{
@@ -879,12 +879,12 @@ namespace Spire
 				HashSet<String> paraNames;
 				for (auto & para : functionNode->Parameters)
 				{
-					if (paraNames.Contains(para->Name))
+					if (paraNames.Contains(para->Name.Content))
 						getSink()->diagnose(para, Diagnostics::parameterAlreadyDefined, para->Name);
 					else
-						paraNames.Add(para->Name);
+						paraNames.Add(para->Name.Content);
 					VariableEntry varEntry;
-					varEntry.Name = para->Name;
+					varEntry.Name = para->Name.Content;
 					para->Type = TranslateTypeNode(para->TypeNode);
 					varEntry.Type.DataType = para->Type;
 					functionNode->Scope->Variables.AddIfNotExists(varEntry.Name, varEntry);
@@ -1038,8 +1038,8 @@ namespace Spire
 				for (auto & para : stmt->Variables)
 				{
 					VariableEntry varDeclr;
-					varDeclr.Name = para->Name;
-					if (stmt->Scope->Variables.ContainsKey(para->Name))
+					varDeclr.Name = para->Name.Content;
+					if (stmt->Scope->Variables.ContainsKey(para->Name.Content))
 						getSink()->diagnose(para, Diagnostics::variableNameAlreadyDefined, para->Name);
 
 					varDeclr.Type.DataType = stmt->Type;
@@ -1048,14 +1048,14 @@ namespace Spire
 					if (varDeclr.Type.DataType->IsArray() && varDeclr.Type.DataType->AsArrayType()->ArrayLength <= 0)
 						getSink()->diagnose(stmt, Diagnostics::invalidArraySize);
 
-					stmt->Scope->Variables.AddIfNotExists(para->Name, varDeclr);
-					if (para->Expression != NULL)
+					stmt->Scope->Variables.AddIfNotExists(para->Name.Content, varDeclr);
+					if (para->Expr != NULL)
 					{
-						para->Expression = para->Expression->Accept(this).As<ExpressionSyntaxNode>();
-						if (!MatchType_ValueReceiver(varDeclr.Type.DataType.Ptr(), para->Expression->Type.Ptr())
-							&& !para->Expression->Type->Equals(ExpressionType::Error.Ptr()))
+						para->Expr = para->Expr->Accept(this).As<ExpressionSyntaxNode>();
+						if (!MatchType_ValueReceiver(varDeclr.Type.DataType.Ptr(), para->Expr->Type.Ptr())
+							&& !para->Expr->Type->Equals(ExpressionType::Error.Ptr()))
 						{
-							getSink()->diagnose(para, Diagnostics::typeMismatch, para->Expression->Type, varDeclr.Type.DataType);
+							getSink()->diagnose(para, Diagnostics::typeMismatch, para->Expr->Type, varDeclr.Type.DataType);
 						}
 					}
 				}

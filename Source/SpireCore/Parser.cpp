@@ -949,11 +949,11 @@ namespace Spire
 				RefPtr<Variable> var = new Variable();
 				FillPosition(var.Ptr());
 				Token name = ReadToken(TokenType::Identifier);
-				var->Name = name.Content;
+				var->Name = name;
 				if (LookAheadToken(TokenType::OpAssign))
 				{
 					ReadToken(TokenType::OpAssign);
-					var->Expression = ParseExpression();
+					var->Expr = ParseExpression();
 				}
 
 				varDeclrStatement->Variables.Add(var);
@@ -1125,10 +1125,10 @@ namespace Spire
 			if (LookAheadToken(TokenType::Identifier))
 			{
 				Token name = ReadToken(TokenType::Identifier);
-				parameter->Name = name.Content;
+				parameter->Name = name;
 			}
 			else
-				parameter->Name = "_anonymousParam" + String(anonymousParamCounter++);
+				parameter->Name.Content = "_anonymousParam" + String(anonymousParamCounter++);
 			FillPosition(parameter.Ptr());
 			return parameter;
 		}

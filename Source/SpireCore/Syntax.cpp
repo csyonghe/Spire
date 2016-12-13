@@ -275,8 +275,8 @@ namespace Spire
 		Variable * Variable::Clone(CloneContext & ctx)
 		{
 			auto rs = CloneSyntaxNodeFields(new Variable(*this), ctx);
-			if (Expression)
-				rs->Expression = Expression->Clone(ctx);
+			if (Expr)
+				rs->Expr = Expr->Clone(ctx);
 			return rs;
 		}
 		RefPtr<SyntaxNode> WhileStatementSyntaxNode::Accept(SyntaxVisitor * visitor)

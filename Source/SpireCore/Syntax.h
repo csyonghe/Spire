@@ -379,12 +379,72 @@ namespace Spire
 			}
 		};
 
-		class StructField : public SyntaxNode
+        class ContainerDecl;
+
+        class Decl : public SyntaxNode
+        {
+        public:
+            ContainerDecl*  ParentDecl;
+			Token Name;
+			virtual Decl * Clone(CloneContext & ctx) = 0;
+        };
+
+
+        		enum class ExpressionAccess
+		{
+			Read, Write
+		};
+
+		class ExpressionSyntaxNode : public SyntaxNode
 		{
 		public:
-			RefPtr<TypeSyntaxNode> TypeNode;
 			RefPtr<ExpressionType> Type;
-			Token Name;
+			ExpressionAccess Access;
+			ExpressionSyntaxNode()
+			{
+				Access = ExpressionAccess::Read;
+			}
+			ExpressionSyntaxNode(const ExpressionSyntaxNode & expr) = default;
+			virtual ExpressionSyntaxNode* Clone(CloneContext & ctx) = 0;
+		};
+
+
+        //
+        // Declarations
+        //
+
+        // Base class for all variable-like declarations
+        class VarDeclBase : public Decl
+        {
+        public:
+            // Resolved type of the variable
+			RefPtr<ExpressionType> Type;
+
+            // Initializer expression (optional)
+			RefPtr<ExpressionSyntaxNode> Expr;
+        };
+
+        // A compound declaration that might declare multiple things,
+        // using C-style declarator syntax
+        class MultiDecl : public Decl
+        {
+        public:
+            // The type specifier that all the declarations share
+			RefPtr<TypeSyntaxNode> TypeNode;
+        };
+
+        // A single variable declaration
+        class SingleVarDecl : public VarDeclBase
+        {
+        public:
+			RefPtr<TypeSyntaxNode> TypeNode;
+        };
+
+        // A field of a `struct` type
+		class StructField :
+            public SingleVarDecl // TODO(tfoley): should really allow `MultiDecl` inside a `struct`
+		{
+		public:
 			StructField()
 			{}
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
@@ -396,15 +456,6 @@ namespace Spire
 			}
 		};
 
-        class ContainerDecl;
-
-        class Decl : public SyntaxNode
-        {
-        public:
-            ContainerDecl*  ParentDecl;
-			Token Name;
-			virtual Decl * Clone(CloneContext & ctx) = 0;
-        };
 
 		class StructSyntaxNode : public Decl
 		{
@@ -431,23 +482,7 @@ namespace Spire
 			}
 		};
 
-		enum class ExpressionAccess
-		{
-			Read, Write
-		};
 
-		class ExpressionSyntaxNode : public SyntaxNode
-		{
-		public:
-			RefPtr<ExpressionType> Type;
-			ExpressionAccess Access;
-			ExpressionSyntaxNode()
-			{
-				Access = ExpressionAccess::Read;
-			}
-			ExpressionSyntaxNode(const ExpressionSyntaxNode & expr) = default;
-			virtual ExpressionSyntaxNode* Clone(CloneContext & ctx) = 0;
-		};
 
 		class StatementSyntaxNode : public SyntaxNode
 		{
@@ -468,14 +503,10 @@ namespace Spire
 			In, Out, InOut, Uniform
 		};
 
-		class ParameterSyntaxNode : public SyntaxNode
+		class ParameterSyntaxNode : public SingleVarDecl
 		{
 		public:
 			ParameterQualifier Qualifier = ParameterQualifier::In;
-			RefPtr<TypeSyntaxNode> TypeNode;
-			RefPtr<ExpressionType> Type;
-			String Name;
-			RefPtr<ExpressionSyntaxNode> Expr;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ParameterSyntaxNode * Clone(CloneContext & ctx) override;
 		};
@@ -663,10 +694,8 @@ namespace Spire
 			virtual DiscardStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		struct Variable : public SyntaxNode
+		struct Variable : public VarDeclBase
 		{
-			String Name;
-			RefPtr<ExpressionSyntaxNode> Expression;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual Variable * Clone(CloneContext & ctx) override;
 		};
@@ -1197,8 +1226,8 @@ namespace Spire
 
 			virtual RefPtr<Variable> VisitDeclrVariable(Variable* dclr)
 			{
-				if (dclr->Expression)
-					dclr->Expression = dclr->Expression->Accept(this).As<ExpressionSyntaxNode>();
+				if (dclr->Expr)
+					dclr->Expr = dclr->Expr->Accept(this).As<ExpressionSyntaxNode>();
 				return dclr;
 			}
 			virtual RefPtr<ImportSyntaxNode> VisitImport(ImportSyntaxNode* imp)

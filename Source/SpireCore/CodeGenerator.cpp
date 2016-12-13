@@ -303,11 +303,11 @@ namespace Spire
 						for (auto & param : comp->SyntaxNode->Parameters)
 						{
 							auto paramType = TranslateExpressionType(param->Type, &genericTypeMappings);
-							String paramName = EscapeDoubleUnderscore("p" + String(id) + "_" + param->Name);
+							String paramName = EscapeDoubleUnderscore("p" + String(id) + "_" + param->Name.Content);
 							func->Parameters.Add(paramName, ILParameter(paramType, param->Qualifier));
 							auto argInstr = codeWriter.FetchArg(paramType, id + 1);
 							argInstr->Name = paramName;
-							variables.Add(param->Name, argInstr);
+							variables.Add(param->Name.Content, argInstr);
 							id++;
 						}
 						if (comp->SyntaxNode->Expression)
@@ -443,10 +443,10 @@ namespace Spire
 				int id = 0;
 				for (auto &param : function->Parameters)
 				{
-					func->Parameters.Add(param->Name, ILParameter(TranslateExpressionType(param->Type), param->Qualifier));
+					func->Parameters.Add(param->Name.Content, ILParameter(TranslateExpressionType(param->Type), param->Qualifier));
 					auto op = FetchArg(param->Type.Ptr(), ++id);
-					op->Name = EscapeDoubleUnderscore(String("p_") + param->Name);
-					variables.Add(param->Name, op);
+					op->Name = EscapeDoubleUnderscore(String("p_") + param->Name.Content);
+					variables.Add(param->Name.Content, op);
 				}
 				function->Body->Accept(this);
 				func->Code = codeWriter.PopNode();
@@ -633,11 +633,11 @@ namespace Spire
 				for (auto & v : stmt->Variables)
 				{
 					AllocVarInstruction * varOp = AllocVar(stmt->Type.Ptr());
-					varOp->Name = EscapeDoubleUnderscore(v->Name);
-					variables.Add(v->Name, varOp);
-					if (v->Expression)
+					varOp->Name = EscapeDoubleUnderscore(v->Name.Content);
+					variables.Add(v->Name.Content, varOp);
+					if (v->Expr)
 					{
-						v->Expression->Accept(this);
+						v->Expr->Accept(this);
 						Assign(varOp, PopStack());
 					}
 				}
@@ -859,7 +859,7 @@ namespace Spire
 					expr->Arguments[i]->Accept(this);
 					auto argOp = PopStack();
 					arguments.Add(argOp);
-					variables.Add(expr->ImportOperatorDef->Parameters[i]->Name, argOp);
+					variables.Add(expr->ImportOperatorDef->Parameters[i]->Name.Content, argOp);
 				}
 				currentImport = expr;
 				auto oldTypeMapping = genericTypeMappings.TryGetValue(expr->ImportOperatorDef->TypeName.Content);
