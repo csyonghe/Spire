@@ -22,9 +22,11 @@ namespace Spire
 			Float = 32, Float2 = 33, Float3 = 34, Float4 = 35,
 			Float3x3 = 40, Float4x4 = 47,
 			Texture2D = 48,
-			TextureShadow = 49,
-			TextureCube = 50,
-			TextureCubeShadow = 51,
+			TextureCube = 49,
+			Texture2DArray = 50,
+			Texture2DShadow = 51,
+			TextureCubeShadow = 52,
+			Texture2DArrayShadow = 53,
 			Bool = 128, Bool2 = 129, Bool3 = 130, Bool4 = 131,
 			UInt = 512, UInt2 = 513, UInt3 = 514, UInt4 = 515,
 			SamplerState = 4096,
@@ -148,10 +150,14 @@ namespace Spire
 					return "sampler2D";
 				else if (Type == ILBaseType::TextureCube)
 					return "samplerCube";
+				else if (Type == ILBaseType::Texture2DArray)
+					return "sampler2DArray";
+				else if (Type == ILBaseType::Texture2DShadow)
+					return "sampler2DShadow";
 				else if (Type == ILBaseType::TextureCubeShadow)
 					return "samplerCubeShadow";
-				else if (Type == ILBaseType::TextureShadow)
-					return "sampler2DShadow";
+				else if (Type == ILBaseType::Texture2DArrayShadow)
+					return "sampler2DArrayShadow";
 				else if (Type == ILBaseType::Bool)
 					return "bool";
 				else if (Type == ILBaseType::Bool2)
@@ -202,9 +208,7 @@ namespace Spire
 					return 8;
 				case ILBaseType::TextureCube:
 					return 8;
-				case ILBaseType::TextureCubeShadow:
-					return 8;
-				case ILBaseType::TextureShadow:
+				case ILBaseType::Texture2DArray:
 					return 8;
 				default:
 					return 0;
@@ -236,8 +240,7 @@ namespace Spire
 					return 64;
 				case ILBaseType::Texture2D:
 				case ILBaseType::TextureCube:
-				case ILBaseType::TextureCubeShadow:
-				case ILBaseType::TextureShadow:
+				case ILBaseType::Texture2DArray:
 					return 8;
 				default:
 					return 0;

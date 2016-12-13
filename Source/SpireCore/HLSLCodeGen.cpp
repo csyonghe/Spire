@@ -145,6 +145,13 @@ namespace Spire
 
 					{ "mat3", "float3x3" },
 					{ "mat4", "float4x4" },
+
+					{ "sampler2D", "Texture2D" },
+					{ "sampler2DArray", "Texture2DArray" },
+					{ "samplerCube", "TextureCube" },
+					{ "sampler2DShadow", "Texture2D" },
+					{ "sampler2DArrayShadow", "Texture2DArray" },
+					{ "samplerCubeShadow", "TextureCube" },
 				};
 
 				for(auto remap : kNameRemaps)

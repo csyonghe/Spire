@@ -529,12 +529,29 @@ namespace Spire
 		{
 			return (BaseType == Compiler::BaseType::Int || BaseType == Compiler::BaseType::UInt || BaseType == Compiler::BaseType::Bool);
 		}
+		bool ExpressionType::IsTexture() const
+		{
+			auto basicType = AsBasicType();
+			if (basicType)
+				return basicType->BaseType == BaseType::Texture2D ||
+				basicType->BaseType == BaseType::TextureCube ||
+				basicType->BaseType == BaseType::Texture2DArray ||
+				basicType->BaseType == BaseType::Texture2DShadow ||
+				basicType->BaseType == BaseType::TextureCubeShadow ||
+				basicType->BaseType == BaseType::Texture2DArrayShadow;
+			return false;
+		}
 		bool ExpressionType::IsTextureOrSampler() const
 		{
 			auto basicType = AsBasicType();
 			if (basicType)
 				return basicType->BaseType == BaseType::Texture2D ||
-					basicType->BaseType == BaseType::TextureCube;
+					basicType->BaseType == BaseType::TextureCube ||
+					basicType->BaseType == BaseType::Texture2DArray ||
+					basicType->BaseType == BaseType::Texture2DShadow ||
+					basicType->BaseType == BaseType::TextureCubeShadow ||
+					basicType->BaseType == BaseType::Texture2DArrayShadow ||
+					basicType->BaseType == BaseType::SamplerState;
 			return false;
 		}
 		bool ExpressionType::IsStruct() const

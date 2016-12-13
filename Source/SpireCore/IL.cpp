@@ -40,14 +40,18 @@ namespace Spire
 				return new ILBasicType(ILBaseType::Int3);
 			if (parser.LookAhead("ivec4"))
 				return new ILBasicType(ILBaseType::Int4);
-			if (parser.LookAhead("sampler2D"))
+			if (parser.LookAhead("sampler2D") || parser.LookAhead("Texture2D"))
 				return new ILBasicType(ILBaseType::Texture2D);
-			if (parser.LookAhead("sampler2DShadow"))
-				return new ILBasicType(ILBaseType::TextureShadow);
-			if (parser.LookAhead("samplerCube"))
+			if (parser.LookAhead("samplerCube") || parser.LookAhead("TextureCube"))
 				return new ILBasicType(ILBaseType::TextureCube);
-			if (parser.LookAhead("samplerCubeShadow"))
+			if (parser.LookAhead("sampler2DArray") || parser.LookAhead("Texture2DArray"))
+				return new ILBasicType(ILBaseType::Texture2DArray);
+			if (parser.LookAhead("sampler2DShadow") || parser.LookAhead("Texture2DShadow"))
+				return new ILBasicType(ILBaseType::Texture2DShadow);
+			if (parser.LookAhead("samplerCubeShadow") || parser.LookAhead("TextureCubeShadow"))
 				return new ILBasicType(ILBaseType::TextureCubeShadow);
+			if (parser.LookAhead("sampler2DArrayShadow") || parser.LookAhead("Texture2DArrayShadow"))
+				return new ILBasicType(ILBaseType::Texture2DArrayShadow);
 			if (parser.LookAhead("bool"))
 				return new ILBasicType(ILBaseType::Bool);
 			return nullptr;
@@ -113,9 +117,13 @@ namespace Spire
 				return 8;
 			else if (type == ILBaseType::TextureCube)
 				return 8;
+			else if (type == ILBaseType::Texture2DArray)
+				return 8;
+			else if (type == ILBaseType::Texture2DShadow)
+				return 8;
 			else if (type == ILBaseType::TextureCubeShadow)
 				return 8;
-			else if (type == ILBaseType::TextureShadow)
+			else if (type == ILBaseType::Texture2DArrayShadow)
 				return 8;
 			else if (type == ILBaseType::Bool)
 				return 4;
@@ -229,7 +237,7 @@ namespace Spire
 		{
 			auto basicType = dynamic_cast<ILBasicType*>(this);
 			if (basicType)
-				return basicType->Type == ILBaseType::Texture2D || basicType->Type == ILBaseType::TextureCube;
+				return basicType->Type == ILBaseType::Texture2D || basicType->Type == ILBaseType::TextureCube || basicType->Type == ILBaseType::Texture2DArray;
 			else
 				return false;
 		}
@@ -238,8 +246,8 @@ namespace Spire
 		{
 			auto basicType = dynamic_cast<ILBasicType*>(this);
 			if (basicType)
-				return basicType->Type == ILBaseType::Texture2D || basicType->Type == ILBaseType::TextureCube || basicType->Type == ILBaseType::TextureCubeShadow ||
-				basicType->Type == ILBaseType::TextureShadow;
+				return basicType->Type == ILBaseType::Texture2D || basicType->Type == ILBaseType::TextureCube || basicType->Type == ILBaseType::Texture2DArray ||
+				basicType->Type == ILBaseType::Texture2DShadow || basicType->Type == ILBaseType::TextureCubeShadow || basicType->Type == ILBaseType::Texture2DArrayShadow;
 			else
 				return false;
 		}

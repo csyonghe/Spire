@@ -700,7 +700,7 @@ namespace Spire
 				if (auto ifInstr = instr.As<IfInstruction>())
 				{
 					context.Body << "if (bool(";
-					PrintOp(context, ifInstr->Operand.Ptr(), true);
+					PrintOp(context, ifInstr->Operand.Ptr());
 					context.Body << "))\n{\n";
 					GenerateCode(context, ifInstr->TrueCode.Ptr());
 					context.Body << "}\n";
@@ -731,13 +731,13 @@ namespace Spire
 					context.Body << "do\n{\n";
 					GenerateCode(context, doInstr->BodyCode.Ptr());
 					context.Body << "} while (bool(";
-					PrintOp(context, doInstr->ConditionCode->GetLastInstruction()->As<ReturnInstruction>()->Operand.Ptr(), true);
+					PrintOp(context, doInstr->ConditionCode->GetLastInstruction()->As<ReturnInstruction>()->Operand.Ptr());
 					context.Body << "));\n";
 				}
 				else if (auto whileInstr = instr.As<WhileInstruction>())
 				{
 					context.Body << "while (bool(";
-					PrintOp(context, whileInstr->ConditionCode->GetLastInstruction()->As<ReturnInstruction>()->Operand.Ptr(), true);
+					PrintOp(context, whileInstr->ConditionCode->GetLastInstruction()->As<ReturnInstruction>()->Operand.Ptr());
 					context.Body << "))\n{\n";
 					GenerateCode(context, whileInstr->BodyCode.Ptr());
 					context.Body << "}\n";
@@ -779,6 +779,7 @@ namespace Spire
 			intrinsicTextureFunctions.Add("Sample");
 			intrinsicTextureFunctions.Add("SampleBias");
 			intrinsicTextureFunctions.Add("SampleGrad");
+			intrinsicTextureFunctions.Add("SampleCmp");
 		}
 
 		CompiledShaderSource CLikeCodeGen::GenerateShader(CompileResult & result, SymbolTable *, ILShader * shader, DiagnosticSink * err)

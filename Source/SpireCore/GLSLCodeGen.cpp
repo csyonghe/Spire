@@ -303,6 +303,33 @@ namespace Spire
 						ctx.Body << ")";
 					}
 				}
+				else if (instr->Function == "SampleCmp")
+				{
+					if (instr->Arguments.Count() == 5)
+						ctx.Body << "textureOffset(";
+					else
+						ctx.Body << "texture(";
+					PrintOp(ctx, instr->Arguments[0].Ptr());
+					ctx.Body << ", ";
+					auto baseType = dynamic_cast<ILBasicType*>(instr->Arguments[0]->Type.Ptr());
+					if (baseType)
+					{
+						if (baseType->Type == ILBaseType::Texture2DShadow)
+							ctx.Body << "vec3(";
+						else if (baseType->Type == ILBaseType::TextureCubeShadow || baseType->Type == ILBaseType::Texture2DArrayShadow)
+							ctx.Body << "vec4(";
+						PrintOp(ctx, instr->Arguments[2].Ptr());
+						ctx.Body << ", ";
+						PrintOp(ctx, instr->Arguments[3].Ptr());
+						ctx.Body << ")";
+						if (instr->Arguments.Count() == 5)
+						{
+							ctx.Body << ", ";
+							PrintOp(ctx, instr->Arguments[4].Ptr());
+						}
+					}
+					ctx.Body << ")";
+				}
 				else
 					throw NotImplementedException("CodeGen for texture function '" + instr->Function + "' is not implemented.");
 			}
@@ -333,7 +360,9 @@ namespace Spire
 					if (field.Value.Type.As<ILGenericType>()) // ArrayBuffer etc. goes to separate declaration outside the block
 						continue;
 					String declName = field.Key;
-					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
+					PrintType(sb.GlobalHeader, field.Value.Type.Ptr());
+					
+					sb.GlobalHeader << " " << declName;
 					itemsDeclaredInBlock++;
 					if (info.IsArray)
 					{
@@ -448,7 +477,9 @@ namespace Spire
 				{
 					if(field.Value.Type->IsFloat() || field.Value.Type->IsFloatVector() && !field.Value.Type->IsFloatMatrix())
 					{
-						sb.GlobalHeader << "layout(binding = " << sb.TextureBindingsAllocator << ") uniform sampler2D " << field.Key << ";\n";
+						sb.GlobalHeader << "layout(binding = " << sb.TextureBindingsAllocator << ") uniform ";
+						sb.GlobalHeader << "sampler2D ";
+						sb.GlobalHeader<< field.Key << ";\n";
 						sb.TextureBindingsAllocator++;
 					}
 					else

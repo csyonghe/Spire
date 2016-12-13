@@ -34,7 +34,11 @@ namespace Spire
 			Bool = 128, Bool2 = 129, Bool3 = 130, Bool4 = 131,
 			Float3x3 = 40, Float4x4 = 47,
 			Texture2D = 48,
-			TextureCube = 50,
+			TextureCube = 49,
+			Texture2DArray = 50,
+			Texture2DShadow = 51,
+			TextureCubeShadow = 52,
+			Texture2DArrayShadow = 53,
 			SamplerState = 4096,
 			Function = 64,
 			Shader = 256,
@@ -136,6 +140,7 @@ namespace Spire
 			virtual GenericExpressionType * AsGenericType() const = 0;
 			virtual ExpressionType * Clone() = 0;
 			bool IsTextureOrSampler() const;
+			bool IsTexture() const;
 			bool IsStruct() const;
 			bool IsShader() const;
 			static void Init();
