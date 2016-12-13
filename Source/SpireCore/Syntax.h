@@ -760,12 +760,17 @@ namespace Spire
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override { return this; }
 			virtual StageSyntaxNode * Clone(CloneContext & ctx) override;
 		};
+
+        // Shared functionality for "shader class"-like declarations
+        class ShaderDeclBase : public Decl
+        {
+        public:
+			Token ParentPipelineName;
+        };
 		
-		class PipelineSyntaxNode : public SyntaxNode
+		class PipelineSyntaxNode : public ShaderDeclBase
 		{
 		public:
-			Token Name;
-			Token ParentPipeline;
 			List<RefPtr<WorldSyntaxNode>> Worlds;
 			List<RefPtr<ImportOperatorDefSyntaxNode>> ImportOperators;
 			List<RefPtr<StageSyntaxNode>> Stages;
@@ -796,11 +801,9 @@ namespace Spire
 
 		};
 
-		class ShaderSyntaxNode : public SyntaxNode
+		class ShaderSyntaxNode : public ShaderDeclBase
 		{
 		public:
-			Token Name;
-			Token Pipeline;
 			List<RefPtr<ShaderMemberNode>> Members;
 			bool IsModule = false;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;

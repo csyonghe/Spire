@@ -330,7 +330,7 @@ namespace Spire
 				if (LookAheadToken(":"))
 				{
 					ReadToken(":");
-					shader->Pipeline = ReadToken(TokenType::Identifier);
+					shader->ParentPipelineName = ReadToken(TokenType::Identifier);
 				}
 			}
 			catch (int)
@@ -387,7 +387,7 @@ namespace Spire
 			if (LookAheadToken(TokenType::Colon))
 			{
 				ReadToken(TokenType::Colon);
-				pipeline->ParentPipeline = ReadToken(TokenType::Identifier);
+				pipeline->ParentPipelineName = ReadToken(TokenType::Identifier);
 			}
 			ReadToken(TokenType::LBrace);
 			while (!LookAheadToken(TokenType::RBrace))

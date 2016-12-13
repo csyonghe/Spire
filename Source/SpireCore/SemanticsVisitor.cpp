@@ -234,16 +234,16 @@ namespace Spire
 			{
 				RefPtr<PipelineSymbol> psymbol = new PipelineSymbol();
 				psymbol->SyntaxNode = pipeline;
-				if (pipeline->ParentPipeline.Content.Length())
+				if (pipeline->ParentPipelineName.Content.Length())
 				{
 					RefPtr<PipelineSymbol> parentPipeline;
-					if (symbolTable->Pipelines.TryGetValue(pipeline->ParentPipeline.Content, parentPipeline))
+					if (symbolTable->Pipelines.TryGetValue(pipeline->ParentPipelineName.Content, parentPipeline))
 					{
 						psymbol->ParentPipeline = parentPipeline.Ptr();
 					}
 					else
 					{
-                        getSink()->diagnose(pipeline->ParentPipeline, Diagnostics::undefinedPipelineName, pipeline->ParentPipeline.Content);
+                        getSink()->diagnose(pipeline->ParentPipelineName, Diagnostics::undefinedPipelineName, pipeline->ParentPipelineName.Content);
 					}
 				}
 				currentPipeline = psymbol.Ptr();
@@ -523,12 +523,12 @@ namespace Spire
 				auto & shaderSymbol = symbolTable->Shaders[curShader->Name.Content].GetValue();
 				this->currentShader = shaderSymbol.Ptr();
 				
-				if (shader->Pipeline.Content.Length() == 0) // implicit pipeline
+				if (shader->ParentPipelineName.Content.Length() == 0) // implicit pipeline
 				{
 					if (program->Pipelines.Count() == 1)
 					{
-						shader->Pipeline = shader->Name; // get line and col from shader name
-						shader->Pipeline.Content = program->Pipelines.First()->Name.Content;
+						shader->ParentPipelineName = shader->Name; // get line and col from shader name
+						shader->ParentPipelineName.Content = program->Pipelines.First()->Name.Content;
 					}
 					else if (!shader->IsModule)
 					{
@@ -538,7 +538,7 @@ namespace Spire
 					}
 				}
 
-				auto pipelineName = shader->Pipeline.Content;
+				auto pipelineName = shader->ParentPipelineName.Content;
 				if (pipelineName.Length())
 				{
 					auto pipeline = symbolTable->Pipelines.TryGetValue(pipelineName);
@@ -546,7 +546,7 @@ namespace Spire
 						shaderSymbol->ParentPipeline = pipeline->Ptr();
 					else
 					{
-						getSink()->diagnose(shader->Pipeline, Diagnostics::undefinedPipelineName, pipelineName);
+						getSink()->diagnose(shader->ParentPipelineName, Diagnostics::undefinedPipelineName, pipelineName);
 						throw 0;
 					}
 				}
