@@ -348,13 +348,13 @@ namespace Spire
 						|| LookAheadToken("[") || LookAheadToken("require") || LookAheadToken("extern"))
 					{
 						auto comp = ParseComponent();
-						comp->ParentModuleName = shader->Name;
+						comp->ParentDecl = shader.Ptr();
 						shader->Members.Add(comp);
 					}
 					else if (LookAheadToken("using") || (LookAheadToken("public") && LookAheadToken("using", 1)))
 					{
 						auto imp = ParseImport();
-						imp->ParentModuleName = shader->Name;
+						imp->ParentDecl = shader.Ptr();
 						shader->Members.Add(imp);
 					}
 					else

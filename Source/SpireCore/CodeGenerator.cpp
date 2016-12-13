@@ -113,7 +113,7 @@ namespace Spire
 			String GetComponentFunctionName(ComponentSyntaxNode * comp)
 			{
 				StringBuilder nameSb;
-				nameSb << comp->ParentModuleName.Content << "." << comp->Name.Content;
+				nameSb << comp->ParentDecl->Name.Content << "." << comp->Name.Content;
 				StringBuilder finalNameSb;
 				for (auto ch : nameSb.ProduceString())
 				{

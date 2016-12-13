@@ -396,9 +396,12 @@ namespace Spire
 			}
 		};
 
+        class ContainerDecl;
+
         class Decl : public SyntaxNode
         {
         public:
+            ContainerDecl*  ParentDecl;
 			Token Name;
 			virtual Decl * Clone(CloneContext & ctx) = 0;
         };
@@ -719,14 +722,7 @@ namespace Spire
 			virtual RateSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class ShaderMemberNode : public Decl
-		{
-		public:
-			Token ParentModuleName;
-			virtual ShaderMemberNode * Clone(CloneContext & ctx) = 0;
-		};
-
-		class ComponentSyntaxNode : public ShaderMemberNode
+		class ComponentSyntaxNode : public Decl
 		{
 		public:
 			bool IsOutput = false, IsPublic = false, IsInline = false, IsParam = false, IsInput = false;
@@ -877,7 +873,7 @@ namespace Spire
 			virtual ImportArgumentSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class ImportSyntaxNode : public ShaderMemberNode
+		class ImportSyntaxNode : public Decl
 		{
 		public:
 			bool IsInplace = false;
@@ -1016,7 +1012,7 @@ namespace Spire
 			virtual RefPtr<ShaderSyntaxNode> VisitShader(ShaderSyntaxNode * shader)
 			{
 				for (auto & comp : shader->Members)
-					comp = comp->Accept(this).As<ShaderMemberNode>();
+					comp = comp->Accept(this).As<Decl>();
 				return shader;
 			}
 			virtual RefPtr<ComponentSyntaxNode> VisitComponent(ComponentSyntaxNode * comp);
