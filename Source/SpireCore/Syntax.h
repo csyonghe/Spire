@@ -663,22 +663,6 @@ namespace Spire
 			virtual DiscardStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class VariableDeclr
-		{
-		public:
-			RefPtr<ExpressionType> Type;
-			String Name;
-
-			bool operator ==(const VariableDeclr & var)
-			{
-				return Name == var.Name;
-			}
-			bool operator ==(const String & name)
-			{
-				return name == Name;
-			}
-		};
-
 		struct Variable : public SyntaxNode
 		{
 			String Name;
