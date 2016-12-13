@@ -592,7 +592,7 @@ int WINAPI WinMain(
         {
             if (message.message == WM_QUIT)
             {
-                return message.wParam;
+                return (int)message.wParam;
             }
 
             TranslateMessage(&message);

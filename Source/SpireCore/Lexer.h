@@ -30,7 +30,7 @@ namespace Spire
             Token* begin() const { return mBegin; }
             Token* end  () const { return mEnd  ; }
 
-            int GetCount() { return mEnd - mBegin; }
+            int GetCount() { return (int)(mEnd - mBegin); }
 
             Token* mBegin;
             Token* mEnd;
@@ -55,7 +55,7 @@ namespace Spire
 
             Token AdvanceToken();
 
-            int GetCount() { return mEnd - mCursor; }
+            int GetCount() { return (int)(mEnd - mCursor); }
 
             Token* mCursor;
             Token* mEnd;

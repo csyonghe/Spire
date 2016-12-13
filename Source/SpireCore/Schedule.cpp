@@ -117,7 +117,7 @@ namespace Spire
 							List<RefPtr<ChoiceValueSyntaxNode>> worlds;
 							while (reader.PeekTokenType() != TokenType::EndOfFile)
 							{
-								auto & token = ReadToken(TokenType::StringLiterial);
+								auto token = ReadToken(TokenType::StringLiterial);
 								RefPtr<ChoiceValueSyntaxNode> choiceValue = new ChoiceValueSyntaxNode();
 								choiceValue->Position = token.Position;
 								int splitterPos = token.Content.IndexOf(':');
