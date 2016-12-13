@@ -1009,28 +1009,19 @@ namespace Spire
 			ReadToken(TokenType::LParent);
 			if (IsTypeKeyword())
 			{
-				stmt->TypeDef = ParseType();
-				stmt->IterationVariable = ReadToken(TokenType::Identifier);
-				ReadToken(TokenType::OpAssign);
-				stmt->InitialExpression = ParseExpression();
-				RefPtr<BinaryExpressionSyntaxNode> assignment = new BinaryExpressionSyntaxNode();
-				assignment->Operator = Operator::Assign;
-				FillPosition(assignment.Ptr());
-				assignment->Position = stmt->IterationVariable.Position;
-				RefPtr<VarExpressionSyntaxNode> varExpr = new VarExpressionSyntaxNode();
-				FillPosition(varExpr.Ptr());
-				varExpr->Position = stmt->IterationVariable.Position;
-				varExpr->Variable = stmt->IterationVariable.Content;
-				assignment->LeftExpression = varExpr;
-				assignment->RightExpression = stmt->InitialExpression;
-				stmt->InitialExpression = assignment;
+                stmt->InitialStatement = ParseVarDeclrStatement();
 			}
 			else
 			{
-				if (!LookAheadToken(TokenType::Semicolon))
-					stmt->InitialExpression = ParseExpression();
+                if (!LookAheadToken(TokenType::Semicolon))
+                {
+					stmt->InitialStatement = ParseExpressionStatement();
+                }
+                else
+                {
+			        ReadToken(TokenType::Semicolon);
+                }
 			}
-			ReadToken(TokenType::Semicolon);
 			if (!LookAheadToken(TokenType::Semicolon))
 				stmt->PredicateExpression = ParseExpression();
 			ReadToken(TokenType::Semicolon);

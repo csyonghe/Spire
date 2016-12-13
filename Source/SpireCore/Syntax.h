@@ -955,11 +955,8 @@ namespace Spire
 		class ForStatementSyntaxNode : public StatementSyntaxNode
 		{
 		public:
-			RefPtr<TypeSyntaxNode> TypeDef;
-			RefPtr<ExpressionType> IterationVariableType;
-			Token IterationVariable;
-
-			RefPtr<ExpressionSyntaxNode> InitialExpression, SideEffectExpression, PredicateExpression;
+			RefPtr<StatementSyntaxNode> InitialStatement;
+			RefPtr<ExpressionSyntaxNode> SideEffectExpression, PredicateExpression;
 			RefPtr<StatementSyntaxNode> Statement;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ForStatementSyntaxNode * Clone(CloneContext & ctx) override;
@@ -1090,8 +1087,8 @@ namespace Spire
 			}
 			virtual RefPtr<StatementSyntaxNode> VisitForStatement(ForStatementSyntaxNode* stmt)
 			{
-				if (stmt->InitialExpression)
-					stmt->InitialExpression = stmt->InitialExpression->Accept(this).As<ExpressionSyntaxNode>();
+				if (stmt->InitialStatement)
+					stmt->InitialStatement = stmt->InitialStatement->Accept(this).As<StatementSyntaxNode>();
 				if (stmt->PredicateExpression)
 					stmt->PredicateExpression = stmt->PredicateExpression->Accept(this).As<ExpressionSyntaxNode>();
 				if (stmt->SideEffectExpression)

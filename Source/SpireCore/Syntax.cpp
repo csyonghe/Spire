@@ -217,16 +217,14 @@ namespace Spire
 		ForStatementSyntaxNode * ForStatementSyntaxNode::Clone(CloneContext & ctx)
 		{
 			auto rs = CloneSyntaxNodeFields(new ForStatementSyntaxNode(*this), ctx);
-			if (InitialExpression)
-				rs->InitialExpression = InitialExpression->Clone(ctx);
+			if (InitialStatement)
+				rs->InitialStatement = InitialStatement->Clone(ctx);
 			if (SideEffectExpression)
 				rs->SideEffectExpression = SideEffectExpression->Clone(ctx);
 			if (PredicateExpression)
 				rs->PredicateExpression = PredicateExpression->Clone(ctx);
 			if (Statement)
 				rs->Statement = Statement->Clone(ctx);
-			if (rs->TypeDef)
-				rs->TypeDef = TypeDef->Clone(ctx);
 			return rs;
 		}
 		RefPtr<SyntaxNode> IfStatementSyntaxNode::Accept(SyntaxVisitor * visitor)

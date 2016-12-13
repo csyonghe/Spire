@@ -947,20 +947,9 @@ namespace Spire
 			virtual RefPtr<StatementSyntaxNode> VisitForStatement(ForStatementSyntaxNode *stmt) override
 			{
 				loops.Add(stmt);
-				VariableEntry iterVar;
-				if (stmt->TypeDef != nullptr)
+				if (stmt->InitialStatement)
 				{
-					stmt->IterationVariableType = TranslateTypeNode(stmt->TypeDef);
-					VariableEntry varEntry;
-					varEntry.IsComponent = false;
-					varEntry.Name = stmt->IterationVariable.Content;
-					varEntry.Type.DataType = stmt->IterationVariableType;
-					stmt->Scope->Variables.AddIfNotExists(stmt->IterationVariable.Content, varEntry);
-				}
-				
-				if (stmt->InitialExpression)
-				{
-					stmt->InitialExpression = stmt->InitialExpression->Accept(this).As<ExpressionSyntaxNode>();
+					stmt->InitialStatement = stmt->InitialStatement->Accept(this).As<StatementSyntaxNode>();
 				}
 				if (stmt->PredicateExpression)
 				{

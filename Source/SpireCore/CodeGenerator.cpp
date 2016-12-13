@@ -606,23 +606,11 @@ namespace Spire
 			{
 				RefPtr<ForInstruction> instr = new ForInstruction();
 				variables.PushScope();
-				if (stmt->TypeDef)
-				{
-					AllocVarInstruction * varOp = AllocVar(stmt->IterationVariableType.Ptr());
-					varOp->Name = EscapeDoubleUnderscore(stmt->IterationVariable.Content);
-					variables.Add(stmt->IterationVariable.Content, varOp);
-				}
-				ILOperand * iterVar = nullptr;
-				if (stmt->IterationVariable.Content.Length() && !variables.TryGetValue(stmt->IterationVariable.Content, iterVar))
-					throw InvalidProgramException("Iteration variable not found in variables dictionary. This should have been checked by semantics analyzer.");
-				if (stmt->InitialExpression)
-				{
-					codeWriter.PushNode();
-					stmt->InitialExpression->Accept(this);
-					PopStack();
-					instr->InitialCode = codeWriter.PopNode();
-				}
-
+                if (auto initStmt = stmt->InitialStatement.Ptr())
+                {
+                    // TODO(tfoley): any of this push-pop malarky needed here?
+                    initStmt->Accept(this);
+                }
 				if (stmt->PredicateExpression)
 				{
 					codeWriter.PushNode();
