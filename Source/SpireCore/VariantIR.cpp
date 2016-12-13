@@ -29,7 +29,7 @@ namespace Spire
 					}
 				}
 			};
-			for (auto & impOp : Shader->Pipeline->SyntaxNode->ImportOperators)
+			for (auto & impOp : Shader->Pipeline->SyntaxNode->GetImportOperators())
 				for (auto & ref : impOp->Usings)
 					MarkUsing(ref, impOp->DestWorld.Content);
 			for (auto & req : Shader->Pipeline->Components)

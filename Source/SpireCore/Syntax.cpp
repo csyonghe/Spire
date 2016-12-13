@@ -461,15 +461,9 @@ namespace Spire
 		PipelineSyntaxNode * PipelineSyntaxNode::Clone(CloneContext & ctx)
 		{
 			auto rs = CloneSyntaxNodeFields(new PipelineSyntaxNode(*this), ctx);
-			rs->Worlds.Clear();
-			for (auto & w : Worlds)
-				rs->Worlds.Add(w->Clone(ctx));
-			rs->ImportOperators.Clear();
-			for (auto & imp : ImportOperators)
-				rs->ImportOperators.Add(imp->Clone(ctx));
-			rs->AbstractComponents.Clear();
-			for (auto & comp : AbstractComponents)
-				rs->AbstractComponents.Add(comp->Clone(ctx));
+			rs->Members.Clear();
+			for (auto & m : Members)
+				rs->Members.Add(m->Clone(ctx));
 			return rs;
 		}
 		ChoiceValueSyntaxNode * ChoiceValueSyntaxNode::Clone(CloneContext & ctx)

@@ -93,7 +93,7 @@ namespace Spire
 			}
 			void TranslateStages(ILShader * compiledShader, PipelineSyntaxNode * pipeline)
 			{
-				for (auto & stage : pipeline->Stages)
+				for (auto & stage : pipeline->GetStages())
 				{
 					RefPtr<ILStage> ilStage = new ILStage();
 					ilStage->Position = stage->Position;

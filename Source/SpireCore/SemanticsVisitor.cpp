@@ -248,7 +248,7 @@ namespace Spire
 				}
 				currentPipeline = psymbol.Ptr();
 				symbolTable->Pipelines.Add(pipeline->Name.Content, psymbol);
-				for (auto world : pipeline->Worlds)
+				for (auto world : pipeline->GetWorlds())
 				{
 					if (!psymbol->Worlds.ContainsKey(world->Name.Content))
 					{
@@ -260,7 +260,7 @@ namespace Spire
 						getSink()->diagnose(world.Ptr(), Diagnostics::worldNameAlreadyDefined, world->Name.Content);
 					}
 				}
-				for (auto comp : pipeline->AbstractComponents)
+				for (auto comp : pipeline->GetAbstractComponents())
 				{
 					comp->Type = TranslateTypeNode(comp->TypeNode);
 					if (comp->IsParam || comp->IsInput || (comp->Rate && comp->Rate->Worlds.Count() == 1
@@ -271,12 +271,12 @@ namespace Spire
 						getSink()->diagnose(comp.Ptr(), Diagnostics::cannotDefineComponentsInAPipeline);
                     }
 				}
-				for (auto & op : pipeline->ImportOperators)
+				for (auto & op : pipeline->GetImportOperators())
 				{
 					psymbol->AddImportOperator(op);
 				}
 				// add initial world dependency edges
-				for (auto op : pipeline->ImportOperators)
+				for (auto op : pipeline->GetImportOperators())
 				{
 					if (!psymbol->WorldDependency.ContainsKey(op->DestWorld.Content))
 						getSink()->diagnose(op->DestWorld, Diagnostics::undefinedWorldName, op->DestWorld.Content);
@@ -305,7 +305,7 @@ namespace Spire
 				while (changed)
 				{
 					changed = false;
-					for (auto world : pipeline->Worlds)
+					for (auto world : pipeline->GetWorlds())
 					{
 						EnumerableHashSet<String> & dependentWorlds = psymbol->WorldDependency[world->Name.Content].GetValue();
 						List<String> loopRange;
@@ -326,7 +326,7 @@ namespace Spire
 					}
 				}
 
-				for (auto & op : pipeline->ImportOperators)
+				for (auto & op : pipeline->GetImportOperators())
 				{
 					currentImportOperator = op.Ptr();
 					HashSet<String> paraNames;

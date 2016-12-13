@@ -116,7 +116,7 @@ namespace Spire
 				for (auto & p : paths)
 				{
 					String world0 = p.Nodes.Last().TargetWorld;
-					for (auto op : SyntaxNode->ImportOperators)
+					for (auto op : SyntaxNode->GetImportOperators())
 					{
 						if (op->SourceWorld.Content == world0)
 						{

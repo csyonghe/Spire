@@ -397,23 +397,23 @@ namespace Spire
 				{
 					auto w = ParseWorld();
 					w->LayoutAttributes = attribs;
-					pipeline->Worlds.Add(w);
+					pipeline->Members.Add(w);
 				}
 				else if (LookAheadToken("import"))
 				{
 					auto op = ParseImportOperator();
 					op->LayoutAttributes = attribs;
-					pipeline->ImportOperators.Add(op);
+					pipeline->Members.Add(op);
 				}
 				else if (LookAheadToken("stage"))
 				{
-					pipeline->Stages.Add(ParseStage());
+					pipeline->Members.Add(ParseStage());
 				}
 				else
 				{
 					auto comp = ParseComponent();
 					comp->LayoutAttributes = attribs;
-					pipeline->AbstractComponents.Add(comp);
+					pipeline->Members.Add(comp);
 				}
 			}
 			ReadToken(TokenType::RBrace);

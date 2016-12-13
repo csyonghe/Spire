@@ -625,7 +625,7 @@ namespace Spire
 					compSym->Type->ConstrainedWorlds = _Move(newWorlds);
 				}
 			};
-			for (auto impOp : shader->Pipeline->SyntaxNode->ImportOperators)
+			for (auto impOp : shader->Pipeline->SyntaxNode->GetImportOperators())
 			{
 				for (auto comp : impOp->Usings)
 				{

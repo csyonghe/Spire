@@ -499,7 +499,7 @@ namespace Spire
 			virtual FunctionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class ImportOperatorDefSyntaxNode : public SyntaxNode
+		class ImportOperatorDefSyntaxNode : public Decl
 		{
 		public:
 			Token Name;
@@ -733,7 +733,7 @@ namespace Spire
 			RefPtr<TypeSyntaxNode> TypeNode;
 			RefPtr<ExpressionType> Type;
 			RefPtr<RateSyntaxNode> Rate;
-			Token Name, AlternateName;
+			Token AlternateName;
 			EnumerableDictionary<String, String> LayoutAttributes;
 			RefPtr<BlockStatementSyntaxNode> BlockStatement;
 			RefPtr<ExpressionSyntaxNode> Expression;
@@ -742,31 +742,99 @@ namespace Spire
 			virtual ComponentSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class WorldSyntaxNode : public SyntaxNode
+		class WorldSyntaxNode : public Decl
 		{
 		public:
 			bool IsAbstract = false;
-			Token Name;
 			EnumerableDictionary<String, String> LayoutAttributes;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override { return this; }
 			virtual WorldSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class StageSyntaxNode : public SyntaxNode
+		class StageSyntaxNode : public Decl
 		{
 		public:
-			Token Name;
 			Token StageType;
 			EnumerableDictionary<String, Token> Attributes;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override { return this; }
 			virtual StageSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
+        template<typename T>
+        struct FilteredMemberList
+        {
+            typedef RefPtr<Decl> Element;
+
+            FilteredMemberList()
+                : mBegin(NULL)
+                , mEnd(NULL)
+            {}
+
+            explicit FilteredMemberList(
+                List<Element> const& list)
+                : mBegin(Adjust(list.begin(), list.end()))
+                , mEnd(list.end())
+            {}
+
+            struct Iterator
+            {
+                Element* mCursor;
+                Element* mEnd;
+
+                bool operator!=(Iterator const& other)
+                {
+                    return mCursor != other.mCursor;
+                }
+
+                void operator++()
+                {
+                    mCursor = Adjust(mCursor + 1, mEnd);
+                }
+
+                RefPtr<T>& operator*()
+                {
+                    return *(RefPtr<T>*)mCursor;
+                }
+            };
+
+            Iterator begin()
+            {
+                Iterator iter = { mBegin, mEnd };
+                return iter;
+            }
+
+            Iterator end()
+            {
+                Iterator iter = { mEnd, mEnd };
+                return iter;
+            }
+
+            static Element* Adjust(Element* cursor, Element* end)
+            {
+                while (cursor != end)
+                {
+                    if ((*cursor).As<T>())
+                        return cursor;
+                    cursor++;
+                }
+                return cursor;
+            }
+
+            Element* mBegin;
+            Element* mEnd;
+        };
+
         // A "container" decl is a parent to other declarations
         class ContainerDecl : public Decl
         {
         public:
             List<RefPtr<Decl>> Members;
+
+            template<typename T>
+            FilteredMemberList<T> GetMembersOfType()
+            {
+                return FilteredMemberList<T>(Members);
+            }
         };
 
         // Shared functionality for "shader class"-like declarations
@@ -779,10 +847,23 @@ namespace Spire
 		class PipelineSyntaxNode : public ShaderDeclBase
 		{
 		public:
-			List<RefPtr<WorldSyntaxNode>> Worlds;
-			List<RefPtr<ImportOperatorDefSyntaxNode>> ImportOperators;
-			List<RefPtr<StageSyntaxNode>> Stages;
-			List<RefPtr<ComponentSyntaxNode>> AbstractComponents;
+            // Access members of specific types
+            FilteredMemberList<WorldSyntaxNode> GetWorlds()
+            {
+                return GetMembersOfType<WorldSyntaxNode>();
+            }
+            FilteredMemberList<ImportOperatorDefSyntaxNode> GetImportOperators()
+            {
+                return GetMembersOfType<ImportOperatorDefSyntaxNode>();
+            }
+            FilteredMemberList<StageSyntaxNode> GetStages()
+            {
+                return GetMembersOfType<StageSyntaxNode>();
+            }
+            FilteredMemberList<ComponentSyntaxNode> GetAbstractComponents()
+            {
+                return GetMembersOfType<ComponentSyntaxNode>();
+            }
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override { return this; }
 			virtual PipelineSyntaxNode * Clone(CloneContext & ctx) override;
 		};
@@ -1108,10 +1189,8 @@ namespace Spire
 			}
 			virtual RefPtr<PipelineSyntaxNode> VisitPipeline(PipelineSyntaxNode * pipe)
 			{
-				for (auto & comp : pipe->AbstractComponents)
-					comp = comp->Accept(this).As<ComponentSyntaxNode>();
-				for (auto & imp : pipe->ImportOperators)
-					imp = imp->Accept(this).As<ImportOperatorDefSyntaxNode>();
+				for (auto & comp : pipe->Members)
+					comp = comp->Accept(this).As<Decl>();
 				return pipe;
 			}
 			virtual RefPtr<ImportOperatorDefSyntaxNode> VisitImportOperatorDef(ImportOperatorDefSyntaxNode * imp)
