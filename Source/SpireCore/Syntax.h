@@ -400,6 +400,7 @@ namespace Spire
         {
         public:
 			Token Name;
+			virtual Decl * Clone(CloneContext & ctx) = 0;
         };
 
 		class StructSyntaxNode : public Decl
@@ -718,7 +719,7 @@ namespace Spire
 			virtual RateSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class ShaderMemberNode : public SyntaxNode
+		class ShaderMemberNode : public Decl
 		{
 		public:
 			Token ParentModuleName;
@@ -761,8 +762,15 @@ namespace Spire
 			virtual StageSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
+        // A "container" decl is a parent to other declarations
+        class ContainerDecl : public Decl
+        {
+        public:
+            List<RefPtr<Decl>> Members;
+        };
+
         // Shared functionality for "shader class"-like declarations
-        class ShaderDeclBase : public Decl
+        class ShaderDeclBase : public ContainerDecl
         {
         public:
 			Token ParentPipelineName;
@@ -804,7 +812,6 @@ namespace Spire
 		class ShaderSyntaxNode : public ShaderDeclBase
 		{
 		public:
-			List<RefPtr<ShaderMemberNode>> Members;
 			bool IsModule = false;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ShaderSyntaxNode * Clone(CloneContext & ctx) override;
