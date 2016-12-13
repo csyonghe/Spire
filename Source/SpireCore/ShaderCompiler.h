@@ -16,6 +16,7 @@ namespace Spire
 
 		enum class CompilerMode
 		{
+			ProduceLibrary,
 			ProduceShader,
 			GenerateChoice
 		};
