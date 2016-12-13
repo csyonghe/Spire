@@ -66,13 +66,6 @@ namespace Spire
 				this->Name = other.Name;
 			}
 		};
-		
-		class WorldSymbol
-		{
-		public:
-			bool IsAbstract = false;
-			WorldSyntaxNode * SyntaxNode = nullptr;
-		};
 
 		class PipelineSymbol;
 		class ShaderClosure;
@@ -166,7 +159,7 @@ namespace Spire
 			EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>> Components;
 			EnumerableDictionary<String, List<RefPtr<ShaderComponentSymbol>>> FunctionComponents;
 			EnumerableDictionary<String, EnumerableHashSet<String>> WorldDependency;
-			EnumerableDictionary<String, WorldSymbol> Worlds;
+            EnumerableDictionary<String, WorldSyntaxNode*> Worlds;
 			bool IsAbstractWorld(String world);
 			bool IsChildOf(PipelineSymbol * parentPipeline);
 			

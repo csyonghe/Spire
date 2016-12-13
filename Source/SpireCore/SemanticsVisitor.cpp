@@ -250,12 +250,9 @@ namespace Spire
 				symbolTable->Pipelines.Add(pipeline->Name.Content, psymbol);
 				for (auto world : pipeline->Worlds)
 				{
-					WorldSymbol worldSym;
-					worldSym.IsAbstract = world->IsAbstract;
-					worldSym.SyntaxNode = world.Ptr();
 					if (!psymbol->Worlds.ContainsKey(world->Name.Content))
 					{
-						psymbol->Worlds.Add(world->Name.Content, worldSym);
+						psymbol->Worlds.Add(world->Name.Content, world.Ptr());
 						psymbol->WorldDependency.Add(world->Name.Content, EnumerableHashSet<String>());
 					}
 					else
@@ -285,7 +282,7 @@ namespace Spire
 						getSink()->diagnose(op->DestWorld, Diagnostics::undefinedWorldName, op->DestWorld.Content);
 					else
 					{
-						if (psymbol->Worlds[op->DestWorld.Content].GetValue().IsAbstract)
+						if (psymbol->Worlds[op->DestWorld.Content].GetValue()->IsAbstract)
 							getSink()->diagnose(op->DestWorld, Diagnostics::abstractWorldAsTargetOfImport);
 						else if (!psymbol->WorldDependency.ContainsKey(op->SourceWorld.Content))
 							getSink()->diagnose(op->SourceWorld, Diagnostics::undefinedWorldName2, op->SourceWorld.Content);

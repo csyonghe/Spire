@@ -140,9 +140,9 @@ namespace Spire
 
 		bool PipelineSymbol::IsAbstractWorld(String world)
 		{
-			WorldSymbol ws;
-			if (Worlds.TryGetValue(world, ws))
-				return ws.IsAbstract;
+			WorldSyntaxNode* worldDecl;
+			if (Worlds.TryGetValue(world, worldDecl))
+				return worldDecl->IsAbstract;
 			return false;
 		}
 

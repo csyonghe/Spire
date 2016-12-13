@@ -853,10 +853,10 @@ namespace Spire
     								diagnoseModuleUsingStack(err, shader);
                                 }
 							}
-							WorldSymbol worldSym;
-							if (shader->Pipeline->Worlds.TryGetValue(world.World.Content, worldSym))
+							WorldSyntaxNode* worldDecl;
+							if (shader->Pipeline->Worlds.TryGetValue(world.World.Content, worldDecl))
 							{
-								if (worldSym.IsAbstract)
+								if (worldDecl->IsAbstract)
 								{
 									inAbstractWorld = true;
 									if (userSpecifiedWorlds.Count() > 1)
@@ -882,7 +882,7 @@ namespace Spire
 							auto world = shader->Pipeline->Worlds.TryGetValue(w.World.Content);
 							if (world)
 							{
-								if (world->IsAbstract)
+								if ((*world)->IsAbstract)
 									isDefinedInAbstractWorld = true;
 								else
 									isDefinedInNonAbstractWorld = true;

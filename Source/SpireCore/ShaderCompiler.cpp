@@ -159,7 +159,7 @@ namespace Spire
 							def->Type = comp.Value->Type->DataType;
 							def->IsEntryPoint = (impl->ExportWorlds.Contains(w) ||
 								(shader->Pipeline->IsAbstractWorld(w) &&
-								(impl->SyntaxNode->LayoutAttributes.ContainsKey("Pinned") || shader->Pipeline->Worlds[w]().SyntaxNode->LayoutAttributes.ContainsKey("Pinned"))));
+								(impl->SyntaxNode->LayoutAttributes.ContainsKey("Pinned") || shader->Pipeline->Worlds[w]()->LayoutAttributes.ContainsKey("Pinned"))));
 							CloneContext cloneCtx;
 							def->SyntaxNode = impl->SyntaxNode->Clone(cloneCtx);
 							def->World = w;

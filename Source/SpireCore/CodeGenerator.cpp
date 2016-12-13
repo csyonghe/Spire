@@ -162,11 +162,11 @@ namespace Spire
 					genericTypeMappings[world.Key] = recordType;
 					w->Name = world.Key;
 					w->OutputType = recordType;
-					w->Attributes = world.Value.SyntaxNode->LayoutAttributes;
+					w->Attributes = world.Value->LayoutAttributes;
 					w->Shader = compiledShader.Ptr();
-					w->IsAbstract = world.Value.IsAbstract;
+					w->IsAbstract = world.Value->IsAbstract;
 					auto impOps = pipeline->GetImportOperatorsFromSourceWorld(world.Key);
-					w->Position = world.Value.SyntaxNode->Position;
+					w->Position = world.Value->Position;
 					compiledShader->Worlds[world.Key] = w;
 				}
 
@@ -185,7 +185,7 @@ namespace Spire
 							components.Add(compDef.Ptr());
 
 					// for abstract world, fill in record type now
-					if (world.Value.IsAbstract)
+					if (world.Value->IsAbstract)
 					{
 						auto compiledWorld = compiledShader->Worlds[world.Key]();
 						for (auto & comp : components)
@@ -327,7 +327,7 @@ namespace Spire
 				
 				for (auto & world : pipeline->Worlds)
 				{
-					if (world.Value.IsAbstract)
+					if (world.Value->IsAbstract)
 						continue;
 					NamingCounter = 0;
 
