@@ -13,8 +13,8 @@ using namespace Spire::Compiler;
 
 struct SpireDiagnosticSink
 {
-    int errorCount;
-    CoreLib::List<Spire::Compiler::Diagnostic> diagnostics;
+	int errorCount;
+	CoreLib::List<Spire::Compiler::Diagnostic> diagnostics;
 };
 
 namespace SpireLib
@@ -127,41 +127,41 @@ namespace SpireLib
 	List<ShaderLibFile> CompileShaderSource(Spire::Compiler::CompileResult & compileResult,
 		const CoreLib::String & src, const CoreLib::String & fileName, Spire::Compiler::CompileOptions & options)
 	{
-        struct IncludeHandlerImpl : IncludeHandler
-        {
-            List<String> searchDirs;
+		struct IncludeHandlerImpl : IncludeHandler
+		{
+			List<String> searchDirs;
 
-            virtual bool TryToFindIncludeFile(
-                CoreLib::String const& pathToInclude,
-                CoreLib::String const& pathIncludedFrom,
-                CoreLib::String* outFoundPath,
-                CoreLib::String* outFoundSource) override
-            {
-                String path = Path::Combine(Path::GetDirectoryName(pathIncludedFrom), pathToInclude);
-                if (File::Exists(path))
-                {
-                    *outFoundPath = path;
-                    *outFoundSource = File::ReadAllText(path);
-                    return true;
-                }
+			virtual bool TryToFindIncludeFile(
+				CoreLib::String const& pathToInclude,
+				CoreLib::String const& pathIncludedFrom,
+				CoreLib::String* outFoundPath,
+				CoreLib::String* outFoundSource) override
+			{
+				String path = Path::Combine(Path::GetDirectoryName(pathIncludedFrom), pathToInclude);
+				if (File::Exists(path))
+				{
+					*outFoundPath = path;
+					*outFoundSource = File::ReadAllText(path);
+					return true;
+				}
 
-                for (auto & dir : searchDirs)
-                {
-                    path = Path::Combine(dir, pathToInclude);
-                    if (File::Exists(path))
-                    {
-                        *outFoundPath = path;
-                        *outFoundSource = File::ReadAllText(path);
-                        return true;
-                    }
-                }
-                return false;
-            }
+				for (auto & dir : searchDirs)
+				{
+					path = Path::Combine(dir, pathToInclude);
+					if (File::Exists(path))
+					{
+						*outFoundPath = path;
+						*outFoundSource = File::ReadAllText(path);
+						return true;
+					}
+				}
+				return false;
+			}
 
-        };
+		};
 
-        IncludeHandlerImpl includeHandler;
-        includeHandler.searchDirs = options.SearchDirectories;
+		IncludeHandlerImpl includeHandler;
+		includeHandler.searchDirs = options.SearchDirectories;
 
 		Spire::Compiler::NamingCounter = 0;
 		RefPtr<ShaderCompiler> compiler = CreateShaderCompiler();
@@ -204,14 +204,14 @@ namespace SpireLib
 						}
 						if (!found)
 						{
-                            compileResult.GetErrorWriter()->diagnose(inc.Position, Diagnostics::cannotFindFile, inputFileName);
+							compileResult.GetErrorWriter()->diagnose(inc.Position, Diagnostics::cannotFindFile, inputFileName);
 						}
 					}
 				}
 			}
 			catch (IOException)
 			{
-                compileResult.GetErrorWriter()->diagnose(CodePosition(0, 0, 0, ""), Diagnostics::cannotOpenFile, inputFileName);
+				compileResult.GetErrorWriter()->diagnose(CodePosition(0, 0, 0, ""), Diagnostics::cannotOpenFile, inputFileName);
 			}
 		}
 		units.Add(predefUnit);
@@ -219,7 +219,7 @@ namespace SpireLib
 			return CompileUnits(compileResult, compiler.Ptr(), units, options);
 		else
 			return List<ShaderLibFile>();
-	}                                                                                             
+	}
 
 	List<ShaderLibFile> CompileShaderSourceFromFile(Spire::Compiler::CompileResult & compileResult,
 		const CoreLib::Basic::String & sourceFileName,
@@ -231,7 +231,7 @@ namespace SpireLib
 		}
 		catch (IOException)
 		{
-            compileResult.GetErrorWriter()->diagnose(CodePosition(0, 0, 0, ""), Diagnostics::cannotOpenFile, Path::GetFileName(sourceFileName));
+			compileResult.GetErrorWriter()->diagnose(CodePosition(0, 0, 0, ""), Diagnostics::cannotOpenFile, Path::GetFileName(sourceFileName));
 		}
 		return List<ShaderLibFile>();
 	}
@@ -484,7 +484,7 @@ namespace SpireLib
 		EnumerableDictionary<String, List<ComponentMetaData>> ComponentsByWorld;
 		EnumerableHashSet<ComponentMetaData> Requirements;
 	};
-	
+
 	class CompilationContext
 	{
 	private:
@@ -495,41 +495,41 @@ namespace SpireLib
 		HashSet<String> processedModuleUnits;
 		RefPtr<ShaderCompiler> compiler;
 		RefPtr<ProgramSyntaxNode> programToCompile;
-        int errorCount = 0;
+		int errorCount = 0;
 		EnumerableDictionary<String, ModuleMetaData> modules;
 
-        struct IncludeHandlerImpl : IncludeHandler
-        {
-            List<String> searchDirs;
+		struct IncludeHandlerImpl : IncludeHandler
+		{
+			List<String> searchDirs;
 
-            virtual bool TryToFindIncludeFile(
-                CoreLib::String const& pathToInclude,
-                CoreLib::String const& pathIncludedFrom,
-                CoreLib::String* outFoundPath,
-                CoreLib::String* outFoundSource) override
-            {
-                String path = Path::Combine(Path::GetDirectoryName(pathIncludedFrom), pathToInclude);
-                if (File::Exists(path))
-                {
-                    *outFoundPath = path;
-                    *outFoundSource = File::ReadAllText(path);
-                    return true;
-                }
+			virtual bool TryToFindIncludeFile(
+				CoreLib::String const& pathToInclude,
+				CoreLib::String const& pathIncludedFrom,
+				CoreLib::String* outFoundPath,
+				CoreLib::String* outFoundSource) override
+			{
+				String path = Path::Combine(Path::GetDirectoryName(pathIncludedFrom), pathToInclude);
+				if (File::Exists(path))
+				{
+					*outFoundPath = path;
+					*outFoundSource = File::ReadAllText(path);
+					return true;
+				}
 
-                for (auto & dir : searchDirs)
-                {
-                    path = Path::Combine(dir, pathToInclude);
-                    if (File::Exists(path))
-                    {
-                        *outFoundPath = path;
-                        *outFoundSource = File::ReadAllText(path);
-                        return true;
-                    }
-                }
-                return false;
-            }
-        };
-        IncludeHandlerImpl includeHandler;
+				for (auto & dir : searchDirs)
+				{
+					path = Path::Combine(dir, pathToInclude);
+					if (File::Exists(path))
+					{
+						*outFoundPath = path;
+						*outFoundSource = File::ReadAllText(path);
+						return true;
+					}
+				}
+				return false;
+			}
+		};
+		IncludeHandlerImpl includeHandler;
 
 	public:
 		CompileOptions Options;
@@ -551,7 +551,7 @@ namespace SpireLib
 			return modules.TryGetValue(moduleName);
 		}
 
-		void UpdateModuleLibrary(List<CompileUnit> & units)
+		void UpdateModuleLibrary(List<CompileUnit> & units, SpireDiagnosticSink * sink)
 		{
 			Spire::Compiler::CompileResult result;
 			compiler->Compile(result, *compileContext, units, Options);
@@ -592,6 +592,11 @@ namespace SpireLib
 					modules.Add(shader.Key, _Move(meta));
 				}
 			}
+			if (sink)
+			{
+				sink->diagnostics.AddRange(result.sink.diagnostics);
+				sink->errorCount += result.GetErrorCount();
+			}
 		}
 
 		void LoadModuleSource(CoreLib::String src, CoreLib::String fileName, SpireDiagnosticSink* sink)
@@ -599,7 +604,7 @@ namespace SpireLib
 			List<CompileUnit> units;
 			LoadModuleSource(units, processedModuleUnits, src, fileName, sink);
 			moduleUnits.AddRange(units);
-			UpdateModuleLibrary(units);
+			UpdateModuleLibrary(units, sink);
 		}
 
 		int LoadModuleSource(List<CompileUnit> & units, HashSet<String> & processedUnits, CoreLib::String src, CoreLib::String fileName, SpireDiagnosticSink* sink)
@@ -641,22 +646,22 @@ namespace SpireLib
 							}
 							if (!found)
 							{
-                                result.GetErrorWriter()->diagnose(inc.Position, Diagnostics::cannotFindFile, inputFileName);
+								result.GetErrorWriter()->diagnose(inc.Position, Diagnostics::cannotFindFile, inputFileName);
 							}
 						}
 					}
 				}
 				catch (IOException)
 				{
-                    result.GetErrorWriter()->diagnose(CodePosition(0, 0, 0, ""), Diagnostics::cannotOpenFile, inputFileName);
+					result.GetErrorWriter()->diagnose(CodePosition(0, 0, 0, ""), Diagnostics::cannotOpenFile, inputFileName);
 				}
 			}
-            if (sink)
-            {
-                sink->diagnostics.AddRange(result.sink.diagnostics);
-                sink->errorCount += result.GetErrorCount();
-            }
-            return result.GetErrorCount();
+			if (sink)
+			{
+				sink->diagnostics.AddRange(result.sink.diagnostics);
+				sink->errorCount += result.GetErrorCount();
+			}
+			return result.GetErrorCount();
 		}
 		Shader * NewShader(CoreLib::String name)
 		{
@@ -670,24 +675,24 @@ namespace SpireLib
 		{
 			List<CompileUnit> userUnits;
 			HashSet<String> processedUserUnits = processedModuleUnits;
-            if (errorCount != 0)
-                return false;
+			if (errorCount != 0)
+				return false;
 
-            errorCount += LoadModuleSource(userUnits, processedUserUnits, source, fileName, sink);
-            if (errorCount != 0)
-                return false;
+			errorCount += LoadModuleSource(userUnits, processedUserUnits, source, fileName, sink);
+			if (errorCount != 0)
+				return false;
 
-            Spire::Compiler::CompilationContext tmpCtx(*compileContext);
+			Spire::Compiler::CompilationContext tmpCtx(*compileContext);
 			Spire::Compiler::CompileResult cresult;
 			compiler->Compile(cresult, tmpCtx, userUnits, Options);
 			result.Sources = cresult.CompiledSource;
-            errorCount += cresult.GetErrorCount();
-            if (sink)
-            {
-                sink->diagnostics.AddRange(cresult.sink.diagnostics);
-                sink->errorCount += cresult.GetErrorCount();
-            }
-            return errorCount == 0;
+			errorCount += cresult.GetErrorCount();
+			if (sink)
+			{
+				sink->diagnostics.AddRange(cresult.sink.diagnostics);
+				sink->errorCount += cresult.GetErrorCount();
+			}
+			return errorCount == 0;
 		}
 	};
 }
@@ -703,7 +708,7 @@ using namespace SpireLib;
 
 SpireCompilationContext * spCreateCompilationContext(const char * cacheDir)
 {
-	return reinterpret_cast<SpireCompilationContext *>(new SpireLib::CompilationContext((cacheDir?true:false), cacheDir));
+	return reinterpret_cast<SpireCompilationContext *>(new SpireLib::CompilationContext((cacheDir ? true : false), cacheDir));
 }
 
 void spSetCodeGenTarget(SpireCompilationContext * ctx, int target)
@@ -718,7 +723,7 @@ void spAddSearchPath(SpireCompilationContext * ctx, const char * searchDir)
 
 void spAddPreprocessorDefine(SpireCompilationContext * ctx, const char * key, const char * value)
 {
-    CTX(ctx)->Options.PreprocessorDefinitions[key] = value;
+	CTX(ctx)->Options.PreprocessorDefinitions[key] = value;
 }
 
 void spSetBackendParameter(SpireCompilationContext * ctx, const char * paramName, const char * value)
@@ -740,22 +745,22 @@ void spDestroyCompilationContext(SpireCompilationContext * ctx)
 
 SpireDiagnosticSink* spCreateDiagnosticSink(SpireCompilationContext * /*ctx*/)
 {
-    SpireDiagnosticSink* sink = new SpireDiagnosticSink();
-    sink->errorCount = 0;
-    return sink;
+	SpireDiagnosticSink* sink = new SpireDiagnosticSink();
+	sink->errorCount = 0;
+	return sink;
 }
 
 void spClearDiagnosticSink(SpireDiagnosticSink* sink)
 {
-    if (!sink) return;
+	if (!sink) return;
 
-    sink->errorCount = 0;
-    sink->diagnostics.Clear();
+	sink->errorCount = 0;
+	sink->diagnostics.Clear();
 }
 
 void spDestroyDiagnosticSink(SpireDiagnosticSink* sink)
 {
-    delete sink;
+	delete sink;
 }
 
 //
@@ -903,24 +908,24 @@ SpireCompilationResult * spCompileShaderFromSource(SpireCompilationContext * ctx
 
 int spDiagnosticSinkHasAnyErrors(SpireDiagnosticSink* sink)
 {
-    if (!sink) return false;
-    return sink->errorCount != 0;
+	if (!sink) return false;
+	return sink->errorCount != 0;
 }
 
 int spGetDiagnosticCount(SpireDiagnosticSink* sink)
 {
-    return sink->diagnostics.Count();
+	return sink->diagnostics.Count();
 }
 
 int spGetDiagnosticByIndex(SpireDiagnosticSink* sink, int index, SpireDiagnostic * outDiagnostic)
 {
-    if (!sink)          return SPIRE_ERROR_INVALID_PARAMETER;
-    if (!outDiagnostic) return SPIRE_ERROR_INVALID_PARAMETER;
-    if (index < 0)      return SPIRE_ERROR_INVALID_PARAMETER;
+	if (!sink)          return SPIRE_ERROR_INVALID_PARAMETER;
+	if (!outDiagnostic) return SPIRE_ERROR_INVALID_PARAMETER;
+	if (index < 0)      return SPIRE_ERROR_INVALID_PARAMETER;
 
-    auto & diagnostics = sink->diagnostics;
-    if(index >= diagnostics.Count())
-        return SPIRE_ERROR_INVALID_PARAMETER;
+	auto & diagnostics = sink->diagnostics;
+	if (index >= diagnostics.Count())
+		return SPIRE_ERROR_INVALID_PARAMETER;
 
 	auto & msg = diagnostics[index];
 	outDiagnostic->Message = msg.Message.Buffer();
@@ -928,10 +933,10 @@ int spGetDiagnosticByIndex(SpireDiagnosticSink* sink, int index, SpireDiagnostic
 	outDiagnostic->FileName = msg.Position.FileName.Buffer();
 	outDiagnostic->Line = msg.Position.Line;
 	outDiagnostic->Col = msg.Position.Col;
-    // Note: we rely here on the `SpireSeverity` and `Spire::Compiler::Severity`
-    // enums having the same members. Realistically, we should probably just
-    // use the external enum internally too.
-    outDiagnostic->severity = (SpireSeverity) msg.severity;
+	// Note: we rely here on the `SpireSeverity` and `Spire::Compiler::Severity`
+	// enums having the same members. Realistically, we should probably just
+	// use the external enum internally too.
+	outDiagnostic->severity = (SpireSeverity)msg.severity;
 	return 1;
 }
 
@@ -955,15 +960,15 @@ int ReturnStr(const char * content, char * buffer, int bufferSize)
 int spGetDiagnosticOutput(SpireDiagnosticSink* sink, char * buffer, int bufferSize)
 {
 	StringBuilder sb;
-    for (auto & x : sink->diagnostics)
-    {
-        sb << x.Position.ToString() << ": " << Spire::Compiler::getSeverityName(x.severity);
-        if (x.ErrorID >= 0)
-        {
-            sb << " " << x.ErrorID;
-        }
-        sb << ": " << x.Message << "\n";
-    }
+	for (auto & x : sink->diagnostics)
+	{
+		sb << x.Position.ToString() << ": " << Spire::Compiler::getSeverityName(x.severity);
+		if (x.ErrorID >= 0)
+		{
+			sb << " " << x.ErrorID;
+		}
+		sb << ": " << x.Message << "\n";
+	}
 	auto str = sb.ProduceString();
 	return ReturnStr(str.Buffer(), buffer, bufferSize);
 }
@@ -1045,5 +1050,3 @@ void spDestroyCompilationResult(SpireCompilationResult * result)
 {
 	delete RS(result);
 }
-
-
