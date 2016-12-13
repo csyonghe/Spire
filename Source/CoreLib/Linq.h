@@ -310,11 +310,11 @@ namespace CoreLib
 						return false;
 				}
 			};
-			auto begin()->Enumerator<decltype(func(ConstructT<T>())), decltype(func(ConstructT<T>()).begin())> const
+			auto begin() const ->Enumerator<decltype(func(ConstructT<T>())), decltype(func(ConstructT<T>()).begin())>
 			{
 				return Enumerator<decltype(func(ConstructT<T>())), decltype(func(ConstructT<T>()).begin())>(items.begin(), items.end(), func);
 			}
-			auto end()->Enumerator<decltype(func(ConstructT<T>())), decltype(func(ConstructT<T>()).begin())> const
+			auto end() const ->Enumerator<decltype(func(ConstructT<T>())), decltype(func(ConstructT<T>()).begin())>
 			{
 				return Enumerator<decltype(func(ConstructT<T>())), decltype(func(ConstructT<T>()).begin())>(items.end(), items.end(), func);
 			}
@@ -348,11 +348,11 @@ namespace CoreLib
 		private:
 			TQueryable items;
 		public:
-			auto begin() -> decltype(items.begin()) const
+			auto begin() const -> decltype(items.begin())
 			{
 				return items.begin();
 			}
-			auto end() -> decltype(items.end()) const
+			auto end() const -> decltype(items.end())
 			{
 				return items.end();
 			}
@@ -379,13 +379,13 @@ namespace CoreLib
 			}
 
 			template<typename TFunc>
-			auto SelectMany(const TFunc & f) ->Queryable<SelectManyQuery<TQueryable, TEnumerator, T, TFunc>, typename EnumeratorType<SelectManyQuery<TQueryable, TEnumerator, T, TFunc>>::Type, typename ExtractItemType<decltype(f(ConstructT<T>()))>::Type> const
+			auto SelectMany(const TFunc & f) const ->Queryable<SelectManyQuery<TQueryable, TEnumerator, T, TFunc>, typename EnumeratorType<SelectManyQuery<TQueryable, TEnumerator, T, TFunc>>::Type, typename ExtractItemType<decltype(f(ConstructT<T>()))>::Type>
 			{
 				return Queryable<SelectManyQuery<TQueryable, TEnumerator, T, TFunc>, typename EnumeratorType<SelectManyQuery<TQueryable, TEnumerator, T, TFunc>>::Type, typename ExtractItemType<decltype(f(ConstructT<T>()))>::Type>(SelectManyQuery<TQueryable, TEnumerator, T, TFunc>(items, f));
 			}
 
 			template<typename TAggregateResult, typename TFunc>
-			auto Aggregate(const TAggregateResult & initial, const TFunc & f) -> decltype(f(initial, *items.begin())) const
+			auto Aggregate(const TAggregateResult & initial, const TFunc & f) const -> decltype(f(initial, *items.begin()))
 			{
 				TAggregateResult rs = initial;
 				for (auto && x : items)
@@ -429,7 +429,7 @@ namespace CoreLib
 			}
 
 			template <typename TFunc>
-			auto Sum(const TFunc & selector) -> decltype(selector(ConstructT<T>())) const
+			auto Sum(const TFunc & selector) const -> decltype(selector(ConstructT<T>()))
 			{
 				decltype(selector(ConstructT<T>())) rs(0);
 				for (auto && x : items)
@@ -501,11 +501,11 @@ namespace CoreLib
 		struct LinkedListView
 		{
 			typename LinkedList<T>::Iterator start, last;
-			typename LinkedList<T>::Iterator begin()
+			typename LinkedList<T>::Iterator begin() const
 			{
 				return start;
 			}
-			typename LinkedList<T>::Iterator end()
+			typename LinkedList<T>::Iterator end() const
 			{
 				return last;
 			}
@@ -524,11 +524,11 @@ namespace CoreLib
 		struct EnumerableDictView
 		{
 			typename EnumerableDictionary<TKey, TValue>::Iterator start, last;
-			typename EnumerableDictionary<TKey, TValue>::Iterator begin()
+			typename EnumerableDictionary<TKey, TValue>::Iterator begin() const
 			{
 				return start;
 			}
-			typename EnumerableDictionary<TKey, TValue>::Iterator end()
+			typename EnumerableDictionary<TKey, TValue>::Iterator end() const
 			{
 				return last;
 			}
@@ -547,11 +547,11 @@ namespace CoreLib
 		struct EnumerableHashSetView
 		{
 			typename HashSetBase<TKey, EnumerableDictionary<TKey, _DummyClass>>::Iterator start, last;
-			typename EnumerableHashSet<TKey>::Iterator begin()
+			typename EnumerableHashSet<TKey>::Iterator begin() const
 			{
 				return start;
 			}
-			typename EnumerableHashSet<TKey>::Iterator end()
+			typename EnumerableHashSet<TKey>::Iterator end() const
 			{
 				return last;
 			}

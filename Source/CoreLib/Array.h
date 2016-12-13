@@ -13,7 +13,7 @@ namespace CoreLib
 		{
 		private:
 			T _buffer[size];
-			int _count;
+			int _count = 0;
 		public:
 			T* begin() const
 			{
@@ -24,10 +24,6 @@ namespace CoreLib
 				return (T*)_buffer+_count;
 			}
 		public:
-			Array()
-			{
-				_count = 0;
-			}
 			inline int GetCapacity() const
 			{
 				return size;
@@ -111,6 +107,31 @@ namespace CoreLib
 				return ArrayView<T>((T*)_buffer + start, count);
 			}
 		};
+
+		template<typename T, typename ...TArgs>
+		struct FirstType
+		{
+			typedef T type;
+		};
+
+
+		template<typename T, int size>
+		void InsertArray(Array<T, size> &) {}
+
+		template<typename T, typename ...TArgs, int size>
+		void InsertArray(Array<T, size> & arr, const T & val, TArgs... args)
+		{
+			arr.Add(val);
+			InsertArray(arr, args...);
+		}
+
+		template<typename ...TArgs>
+		auto MakeArray(TArgs ...args)
+		{
+			Array<typename FirstType<TArgs...>::type, sizeof...(args)> rs;
+			InsertArray(rs, args...);
+			return rs;
+		}
 	}
 }
 

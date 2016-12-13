@@ -388,9 +388,14 @@ namespace CoreLib
 			void FastRemove(const T & val)
 			{
 				int idx = IndexOf(val);
-				if (idx != -1 && _count-1 != idx)
+				FastRemoveAt(idx);
+			}
+
+			void FastRemoveAt(int idx)
+			{
+				if (idx != -1 && _count - 1 != idx)
 				{
-					buffer[idx] = _Move(buffer[_count-1]);
+					buffer[idx] = _Move(buffer[_count - 1]);
 				}
 				_count--;
 			}
