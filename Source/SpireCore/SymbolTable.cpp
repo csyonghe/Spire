@@ -315,7 +315,7 @@ namespace Spire
 						result = rresult;
 				}
 			}
-			if (Pipeline && Pipeline->Components.TryGetValue(compName, refComp))
+			if (ParentPipeline && ParentPipeline->Components.TryGetValue(compName, refComp))
 			{
 				if (!refComp->IsParam())
 				{

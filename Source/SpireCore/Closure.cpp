@@ -57,18 +57,18 @@ namespace Spire
 			if (rootShader == nullptr)
 			{
 				rootShader = rs.Ptr();
-				rootShader->Pipeline = shader->Pipeline;
+				rootShader->Pipeline = shader->ParentPipeline;
 			}
 			rs->Name = shader->SyntaxNode->Name.Content;
 			rs->RefMap = pRefMap;
-			if (shader->Pipeline && rootShader->Pipeline)
+			if (shader->ParentPipeline && rootShader->Pipeline)
 			{
-				if (shader->Pipeline->IsChildOf(rootShader->Pipeline))
-					rootShader->Pipeline = shader->Pipeline;
-				else if (!rootShader->Pipeline->IsChildOf(shader->Pipeline))
+				if (shader->ParentPipeline->IsChildOf(rootShader->Pipeline))
+					rootShader->Pipeline = shader->ParentPipeline;
+				else if (!rootShader->Pipeline->IsChildOf(shader->ParentPipeline))
 				{
                     err->diagnose(shader->SyntaxNode->Position, Diagnostics::pipelineOfModuleIncompatibleWithPipelineOfShader,
-                        shader->Pipeline->SyntaxNode->Name,
+                        shader->ParentPipeline->SyntaxNode->Name,
                         shader->SyntaxNode->Name.Content,
                         rootShader->Pipeline->SyntaxNode->Name.Content,
                         rootShader->Name);

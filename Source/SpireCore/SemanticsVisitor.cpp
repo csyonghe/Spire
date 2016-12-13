@@ -165,7 +165,7 @@ namespace Spire
                     }
 					else if (currentPipeline || currentShader)
 					{
-						PipelineSymbol * pipe = currentPipeline ? currentPipeline : currentShader->Pipeline;
+						PipelineSymbol * pipe = currentPipeline ? currentPipeline : currentShader->ParentPipeline;
 						bool matched = false;
 						if (pipe)
 						{
@@ -543,7 +543,7 @@ namespace Spire
 				{
 					auto pipeline = symbolTable->Pipelines.TryGetValue(pipelineName);
 					if (pipeline)
-						shaderSymbol->Pipeline = pipeline->Ptr();
+						shaderSymbol->ParentPipeline = pipeline->Ptr();
 					else
 					{
 						getSink()->diagnose(shader->Pipeline, Diagnostics::undefinedPipelineName, pipelineName);
@@ -1342,9 +1342,9 @@ namespace Spire
 					}
 				}
 				// check if this is an import operator call
-				if (currentShader && currentCompNode && arguments.Count() > 0 && currentShader->Pipeline)
+				if (currentShader && currentCompNode && arguments.Count() > 0 && currentShader->ParentPipeline)
 				{
-					if (auto impOpList = currentShader->Pipeline->ImportOperators.TryGetValue(varExpr->Variable))
+					if (auto impOpList = currentShader->ParentPipeline->ImportOperators.TryGetValue(varExpr->Variable))
 					{
 						// component with explicit import operator call must be qualified with explicit rate
 						if (!currentCompNode->Rate)
@@ -1387,7 +1387,7 @@ namespace Spire
 							}
 							getSink()->diagnose(varExpr, Diagnostics::noApplicableImportOperator,
                                 varExpr->Variable,
-                                currentShader->Pipeline->SyntaxNode->Name,
+                                currentShader->ParentPipeline->SyntaxNode->Name,
                                 currentCompNode->Rate->Worlds.First().World,
 								argList.ProduceString());
 							invoke->Type = ExpressionType::Error;
