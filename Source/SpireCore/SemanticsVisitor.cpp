@@ -338,12 +338,9 @@ namespace Spire
 							getSink()->diagnose(para.Ptr(), Diagnostics::parameterAlreadyDefined, para->Name);
 						else
 							paraNames.Add(para->Name.Content);
-						VariableEntry varEntry;
-						varEntry.Name = para->Name.Content;
 						para->Type = TranslateTypeNode(para->TypeNode);
-						varEntry.Type.DataType = para->Type;
-						op->Scope->Variables.AddIfNotExists(varEntry.Name, varEntry);
-                        if (varEntry.Type.DataType->Equals(ExpressionType::Void.Ptr()))
+                        op->Scope->decls.AddIfNotExists(para->Name.Content, para.Ptr());
+                        if (para->Type->Equals(ExpressionType::Void.Ptr()))
                         {
 							getSink()->diagnose(para.Ptr(), Diagnostics::parameterCannotBeVoid);
                         }
@@ -671,11 +668,7 @@ namespace Spire
 				for (auto & param : comp->Parameters)
 				{
 					param->Accept(this);
-					VariableEntry varEntry;
-					varEntry.IsComponent = false;
-					varEntry.Name = param->Name.Content;
-					varEntry.Type.DataType = param->Type;
-					comp->Scope->Variables.Add(param->Name.Content, varEntry);
+                    comp->Scope->decls.Add(param->Name.Content, param.Ptr());
 				}
 				if (comp->Expression)
 				{
@@ -885,14 +878,11 @@ namespace Spire
 						getSink()->diagnose(para, Diagnostics::parameterAlreadyDefined, para->Name);
 					else
 						paraNames.Add(para->Name.Content);
-					VariableEntry varEntry;
-					varEntry.Name = para->Name.Content;
 					para->Type = TranslateTypeNode(para->TypeNode);
-					varEntry.Type.DataType = para->Type;
-					functionNode->Scope->Variables.AddIfNotExists(varEntry.Name, varEntry);
-					if (varEntry.Type.DataType->Equals(ExpressionType::Void.Ptr()))
+					functionNode->Scope->decls.AddIfNotExists(para->Name.Content, para.Ptr());
+					if (para->Type->Equals(ExpressionType::Void.Ptr()))
 						getSink()->diagnose(para, Diagnostics::parameterCannotBeVoid);
-					internalName << "@" << varEntry.Type.DataType->ToString();
+					internalName << "@" << para->Type->ToString();
 				}
 				functionNode->InternalName = internalName.ProduceString();	
 				RefPtr<FunctionSymbol> symbol = new FunctionSymbol();
@@ -947,20 +937,9 @@ namespace Spire
 			virtual RefPtr<StatementSyntaxNode> VisitForStatement(ForStatementSyntaxNode *stmt) override
 			{
 				loops.Add(stmt);
-				VariableEntry iterVar;
-				if (stmt->TypeDef != nullptr)
+				if (stmt->InitialStatement)
 				{
-					stmt->IterationVariableType = TranslateTypeNode(stmt->TypeDef);
-					VariableEntry varEntry;
-					varEntry.IsComponent = false;
-					varEntry.Name = stmt->IterationVariable.Content;
-					varEntry.Type.DataType = stmt->IterationVariableType;
-					stmt->Scope->Variables.AddIfNotExists(stmt->IterationVariable.Content, varEntry);
-				}
-				
-				if (stmt->InitialExpression)
-				{
-					stmt->InitialExpression = stmt->InitialExpression->Accept(this).As<ExpressionSyntaxNode>();
+					stmt->InitialStatement = stmt->InitialStatement->Accept(this).As<StatementSyntaxNode>();
 				}
 				if (stmt->PredicateExpression)
 				{
@@ -1026,43 +1005,53 @@ namespace Spire
 				}
 				return stmt;
 			}
-			virtual RefPtr<StatementSyntaxNode> VisitVarDeclrStatement(VarDeclrStatementSyntaxNode *stmt) override
-			{
-				stmt->Type = TranslateTypeNode(stmt->TypeNode);
-				if (stmt->Type->IsTextureOrSampler() || stmt->Type->AsGenericType())
-				{
-					getSink()->diagnose(stmt, Diagnostics::invalidTypeForLocalVariable);
-				}
-				else if (stmt->Type->AsBasicType() && stmt->Type->AsBasicType()->RecordTypeName.Length())
-				{
-					getSink()->diagnose(stmt, Diagnostics::recordTypeVariableInImportOperator);
-				}
-				for (auto & para : stmt->Variables)
-				{
-					VariableEntry varDeclr;
-					varDeclr.Name = para->Name.Content;
-					if (stmt->Scope->Variables.ContainsKey(para->Name.Content))
-						getSink()->diagnose(para, Diagnostics::variableNameAlreadyDefined, para->Name);
 
-					varDeclr.Type.DataType = stmt->Type;
-					if (varDeclr.Type.DataType->Equals(ExpressionType::Void.Ptr()))
-						getSink()->diagnose(stmt, Diagnostics::invalidTypeVoid);
-					if (varDeclr.Type.DataType->IsArray() && varDeclr.Type.DataType->AsArrayType()->ArrayLength <= 0)
-						getSink()->diagnose(stmt, Diagnostics::invalidArraySize);
+            RefPtr<ExpressionType> currentMultiDeclTypeSpec;
+            RefPtr<MultiDecl> VisitMultiDecl(MultiDecl* decl)
+            {
+                RefPtr<ExpressionType> type = TranslateTypeNode(decl->TypeNode);
+                currentMultiDeclTypeSpec = type;
 
-					stmt->Scope->Variables.AddIfNotExists(para->Name.Content, varDeclr);
-					if (para->Expr != NULL)
+				if (type->IsTextureOrSampler() || type->AsGenericType())
+				{
+					getSink()->diagnose(decl->TypeNode, Diagnostics::invalidTypeForLocalVariable);
+				}
+				else if (type->AsBasicType() && type->AsBasicType()->RecordTypeName.Length())
+				{
+					getSink()->diagnose(decl->TypeNode, Diagnostics::recordTypeVariableInImportOperator);
+				}
+                for (auto d : decl->decls)
+                {
+                    d->Accept(this).As<Decl>();
+                }
+                currentMultiDeclTypeSpec = nullptr;
+                return decl;
+            }
+
+            virtual RefPtr<Variable> VisitDeclrVariable(Variable* varDecl)
+            {
+				if (varDecl->Scope->decls.ContainsKey(varDecl->Name.Content))
+					getSink()->diagnose(varDecl, Diagnostics::variableNameAlreadyDefined, varDecl->Name);
+
+                varDecl->Type = currentMultiDeclTypeSpec;
+				if (varDecl->Type->Equals(ExpressionType::Void.Ptr()))
+					getSink()->diagnose(varDecl, Diagnostics::invalidTypeVoid);
+				if (varDecl->Type->IsArray() && varDecl->Type->AsArrayType()->ArrayLength <= 0)
+					getSink()->diagnose(varDecl, Diagnostics::invalidArraySize);
+
+				varDecl->Scope->decls.AddIfNotExists(varDecl->Name.Content, varDecl);
+				if (varDecl->Expr != NULL)
+				{
+					varDecl->Expr = varDecl->Expr->Accept(this).As<ExpressionSyntaxNode>();
+					if (!MatchType_ValueReceiver(varDecl->Type.Ptr(), varDecl->Expr->Type.Ptr())
+						&& !varDecl->Expr->Type->Equals(ExpressionType::Error.Ptr()))
 					{
-						para->Expr = para->Expr->Accept(this).As<ExpressionSyntaxNode>();
-						if (!MatchType_ValueReceiver(varDeclr.Type.DataType.Ptr(), para->Expr->Type.Ptr())
-							&& !para->Expr->Type->Equals(ExpressionType::Error.Ptr()))
-						{
-							getSink()->diagnose(para, Diagnostics::typeMismatch, para->Expr->Type, varDeclr.Type.DataType);
-						}
+						getSink()->diagnose(varDecl, Diagnostics::typeMismatch, varDecl->Expr->Type, varDecl->Type);
 					}
 				}
-				return stmt;
-			}
+                return varDecl;
+            }
+
 			virtual RefPtr<StatementSyntaxNode> VisitWhileStatement(WhileStatementSyntaxNode *stmt) override
 			{
 				loops.Add(stmt);
@@ -1646,14 +1635,15 @@ namespace Spire
 			}
 			virtual RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode *expr) override
 			{
-				VariableEntry variable;
 				ShaderUsing shaderObj;
 				expr->Type = ExpressionType::Error;
-				if (expr->Scope->FindVariable(expr->Variable, variable))
+                auto decl = expr->Scope->LookUp(expr->Variable);
+                auto varDecl = dynamic_cast<VarDeclBase*>(decl);
+                if(varDecl)
 				{
-					expr->Type = variable.Type.DataType->Clone();
-					if (auto basicType = expr->Type->AsBasicType())
-						basicType->IsLeftValue = !variable.IsComponent;
+					expr->Type = varDecl->Type;
+                    if (auto basicType = expr->Type->AsBasicType())
+                        basicType->IsLeftValue = !(dynamic_cast<ComponentSyntaxNode*>(varDecl));
 				}
 				else if (currentShader && currentShader->ShaderObjects.TryGetValue(expr->Variable, shaderObj))
 				{

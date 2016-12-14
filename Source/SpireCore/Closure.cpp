@@ -317,39 +317,41 @@ namespace Spire
 
 			RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode * var) override
 			{
-				VariableEntry varEntry;
-				if (!var->Scope->FindVariable(var->Variable, varEntry))
+                if (auto decl = var->Scope->LookUp(var->Variable))
+                {
+                    // TODO(tfoley): wire up the variable to the declaration
+                    return var;
+                }
+                // Otherwise look in other places...
+				if (var->Type->AsBasicType() && var->Type->AsBasicType()->Component)
 				{
-					if (var->Type->AsBasicType() && var->Type->AsBasicType()->Component)
-					{
-						if (auto comp = shaderClosure->FindComponent(var->Type->AsBasicType()->Component->Name))
-						{
-							if (comp->Implementations.First()->SyntaxNode->IsParam)
-								shaderClosure->RefMap.TryGetValue(comp->Name, comp);
-							var->Tags["ComponentReference"] = new StringObject(comp->UniqueName);
-							AddReference(comp.Ptr(), currentImport, var->Position);
-						}
-						else
-							throw InvalidProgramException("cannot resolve reference.");
-					}
-					if (auto comp = shaderClosure->FindComponent(var->Variable))
+					if (auto comp = shaderClosure->FindComponent(var->Type->AsBasicType()->Component->Name))
 					{
 						if (comp->Implementations.First()->SyntaxNode->IsParam)
-							shaderClosure->RefMap.TryGetValue(var->Variable, comp);
+							shaderClosure->RefMap.TryGetValue(comp->Name, comp);
 						var->Tags["ComponentReference"] = new StringObject(comp->UniqueName);
-
 						AddReference(comp.Ptr(), currentImport, var->Position);
 					}
-					else if (auto closure = shaderClosure->FindClosure(var->Variable))
-					{
-						ShaderSymbol * originalShader = nullptr;
-						if (var->Type->AsBasicType())
-							originalShader = var->Type->AsBasicType()->Shader;
-						var->Type = new BasicExpressionType(originalShader, closure.Ptr());
-					}
-					else if (!(var->Type->AsBasicType() && var->Type->AsBasicType()->BaseType == BaseType::Function))
+					else
 						throw InvalidProgramException("cannot resolve reference.");
 				}
+				if (auto comp = shaderClosure->FindComponent(var->Variable))
+				{
+					if (comp->Implementations.First()->SyntaxNode->IsParam)
+						shaderClosure->RefMap.TryGetValue(var->Variable, comp);
+					var->Tags["ComponentReference"] = new StringObject(comp->UniqueName);
+
+					AddReference(comp.Ptr(), currentImport, var->Position);
+				}
+				else if (auto closure = shaderClosure->FindClosure(var->Variable))
+				{
+					ShaderSymbol * originalShader = nullptr;
+					if (var->Type->AsBasicType())
+						originalShader = var->Type->AsBasicType()->Shader;
+					var->Type = new BasicExpressionType(originalShader, closure.Ptr());
+				}
+				else if (!(var->Type->AsBasicType() && var->Type->AsBasicType()->BaseType == BaseType::Function))
+					throw InvalidProgramException("cannot resolve reference.");
 				return var;
 			}
 

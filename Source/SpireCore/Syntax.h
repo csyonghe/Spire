@@ -276,21 +276,12 @@ namespace Spire
 			EnumerableHashSet<String> PinnedWorlds; 
 		};
 
-
-		class VariableEntry
-		{
-		public:
-			String Name;
-			Type Type;
-			bool IsComponent = false;
-		};
-
 		class Scope
 		{
 		public:
 			Scope * Parent;
-			Dictionary<String, VariableEntry> Variables;
-			bool FindVariable(const String & name, VariableEntry & variable);
+            Dictionary<String, Decl*> decls;
+            Decl* LookUp(String const& name);
 			Scope()
 				: Parent(0)
 			{}
@@ -425,6 +416,13 @@ namespace Spire
 			RefPtr<ExpressionSyntaxNode> Expr;
         };
 
+        // A single variable declaration
+        class SingleVarDecl : public VarDeclBase
+        {
+        public:
+			RefPtr<TypeSyntaxNode> TypeNode;
+        };
+
         // A compound declaration that might declare multiple things,
         // using C-style declarator syntax
         class MultiDecl : public Decl
@@ -432,14 +430,17 @@ namespace Spire
         public:
             // The type specifier that all the declarations share
 			RefPtr<TypeSyntaxNode> TypeNode;
+
+            // The actual decls
+            List<RefPtr<Decl>> decls;
+
+            // Layout information (shared across the whole decl)
+			String LayoutString;
+
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+            virtual MultiDecl * Clone(CloneContext & ctx) override;
         };
 
-        // A single variable declaration
-        class SingleVarDecl : public VarDeclBase
-        {
-        public:
-			RefPtr<TypeSyntaxNode> TypeNode;
-        };
 
         // A field of a `struct` type
 		class StructField :
@@ -704,10 +705,7 @@ namespace Spire
 		class VarDeclrStatementSyntaxNode : public StatementSyntaxNode
 		{
 		public:
-			RefPtr<TypeSyntaxNode> TypeNode;
-			RefPtr<ExpressionType> Type;
-			String LayoutString;
-			List<RefPtr<Variable>> Variables;
+            RefPtr<Decl> decl;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual VarDeclrStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
@@ -948,11 +946,8 @@ namespace Spire
 		class ForStatementSyntaxNode : public StatementSyntaxNode
 		{
 		public:
-			RefPtr<TypeSyntaxNode> TypeDef;
-			RefPtr<ExpressionType> IterationVariableType;
-			Token IterationVariable;
-
-			RefPtr<ExpressionSyntaxNode> InitialExpression, SideEffectExpression, PredicateExpression;
+			RefPtr<StatementSyntaxNode> InitialStatement;
+			RefPtr<ExpressionSyntaxNode> SideEffectExpression, PredicateExpression;
 			RefPtr<StatementSyntaxNode> Statement;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ForStatementSyntaxNode * Clone(CloneContext & ctx) override;
@@ -1083,8 +1078,8 @@ namespace Spire
 			}
 			virtual RefPtr<StatementSyntaxNode> VisitForStatement(ForStatementSyntaxNode* stmt)
 			{
-				if (stmt->InitialExpression)
-					stmt->InitialExpression = stmt->InitialExpression->Accept(this).As<ExpressionSyntaxNode>();
+				if (stmt->InitialStatement)
+					stmt->InitialStatement = stmt->InitialStatement->Accept(this).As<StatementSyntaxNode>();
 				if (stmt->PredicateExpression)
 					stmt->PredicateExpression = stmt->PredicateExpression->Accept(this).As<ExpressionSyntaxNode>();
 				if (stmt->SideEffectExpression)
@@ -1111,8 +1106,7 @@ namespace Spire
 			}
 			virtual RefPtr<StatementSyntaxNode> VisitVarDeclrStatement(VarDeclrStatementSyntaxNode* stmt)
 			{
-				for (auto & var : stmt->Variables)
-					var = var->Accept(this).As<Variable>();
+                stmt->decl = stmt->decl->Accept(this).As<Decl>();
 				return stmt;
 			}
 			virtual RefPtr<StatementSyntaxNode> VisitWhileStatement(WhileStatementSyntaxNode* stmt)
@@ -1224,6 +1218,16 @@ namespace Spire
 			{
 				return type;
 			}
+
+            virtual RefPtr<MultiDecl> VisitMultiDecl(MultiDecl* decl)
+            {
+                decl->TypeNode = decl->TypeNode->Accept(this).As<TypeSyntaxNode>();
+                for (auto& d : decl->decls)
+                {
+                    d = d->Accept(this).As<Decl>();
+                }
+                return decl;
+            }
 
 			virtual RefPtr<Variable> VisitDeclrVariable(Variable* dclr)
 			{

@@ -6,14 +6,19 @@ namespace Spire
 {
 	namespace Compiler
 	{
-		bool Scope::FindVariable(const String & name, VariableEntry & variable)
-		{
-			if (Variables.TryGetValue(name, variable))
-				return true;
-			if (Parent)
-				return Parent->FindVariable(name, variable);
-			return false;
-		}
+    Decl* Scope::LookUp(String const& name)
+    {
+        Scope* scope = this;
+        while (scope)
+        {
+            Decl* decl = nullptr;
+            if (scope->decls.TryGetValue(name, decl))
+                return decl;
+
+            scope = scope->Parent;
+        }
+        return nullptr;
+    }
 
 		bool BasicExpressionType::Equals(const ExpressionType * type) const
 		{
@@ -217,16 +222,14 @@ namespace Spire
 		ForStatementSyntaxNode * ForStatementSyntaxNode::Clone(CloneContext & ctx)
 		{
 			auto rs = CloneSyntaxNodeFields(new ForStatementSyntaxNode(*this), ctx);
-			if (InitialExpression)
-				rs->InitialExpression = InitialExpression->Clone(ctx);
+			if (InitialStatement)
+				rs->InitialStatement = InitialStatement->Clone(ctx);
 			if (SideEffectExpression)
 				rs->SideEffectExpression = SideEffectExpression->Clone(ctx);
 			if (PredicateExpression)
 				rs->PredicateExpression = PredicateExpression->Clone(ctx);
 			if (Statement)
 				rs->Statement = Statement->Clone(ctx);
-			if (rs->TypeDef)
-				rs->TypeDef = TypeDef->Clone(ctx);
 			return rs;
 		}
 		RefPtr<SyntaxNode> IfStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
@@ -262,10 +265,7 @@ namespace Spire
 		VarDeclrStatementSyntaxNode * VarDeclrStatementSyntaxNode::Clone(CloneContext & ctx)
 		{
 			auto rs = CloneSyntaxNodeFields(new VarDeclrStatementSyntaxNode(*this), ctx);
-			rs->TypeNode = TypeNode->Clone(ctx);
-			rs->Variables.Clear();
-			for (auto & var : Variables)
-				rs->Variables.Add(var->Clone(ctx));
+            rs->decl = rs->decl->Clone(ctx);
 			return rs;
 		}
 		RefPtr<SyntaxNode> Variable::Accept(SyntaxVisitor * visitor)
@@ -502,6 +502,20 @@ namespace Spire
 			rs->Import = Import->Clone(ctx);
 			return rs;
 		}
+
+        RefPtr<SyntaxNode> MultiDecl::Accept(SyntaxVisitor * visitor)
+        {
+            return visitor->VisitMultiDecl(this);
+        }
+
+        MultiDecl * MultiDecl::Clone(CloneContext & ctx)
+        {
+            auto rs = CloneSyntaxNodeFields(new MultiDecl(*this), ctx);
+            for (auto& d : rs->decls)
+                d = d->Clone(ctx);
+            return rs;
+        }
+
 		RefPtr<SyntaxNode> StructField::Accept(SyntaxVisitor * visitor)
 		{
 			return visitor->VisitStructField(this);
