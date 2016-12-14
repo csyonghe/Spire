@@ -3,7 +3,7 @@
 #include "../CoreLib/Tokenizer.h"
 #include "../SpireCore/StdInclude.h"
 #include "../../Spire.h"
-#include "../SpireCore/TypeTranslation.h"
+#include "../SpireCore/TypeLayout.h"
 #include "../SpireCore/Preprocessor.h"
 
 using namespace CoreLib::Basic;
@@ -461,7 +461,7 @@ namespace SpireLib
 	class ComponentMetaData
 	{
 	public:
-		RefPtr<ILType> Type;
+        RefPtr<ExpressionType> Type;
 		String TypeName;
 		String Register;
 		String Name;
@@ -565,7 +565,7 @@ namespace SpireLib
 					{
 						ComponentMetaData compMeta;
 						compMeta.Name = comp.Key;
-						compMeta.Type = TranslateExpressionType(comp.Value->Type->DataType);
+                        compMeta.Type = comp.Value->Type->DataType;
 						compMeta.TypeName = compMeta.Type->ToString();
 						for (auto & impl : comp.Value->Implementations)
 						{
@@ -817,7 +817,7 @@ int spComponentInfoCollectionGetComponent(SpireComponentInfoCollection * collect
 	result->Name = (*list)[index].Name.Buffer();
 	result->Alignment = (*list)[index].Alignment;
 	result->Offset = (*list)[index].Offset;
-	result->Size = (*list)[index].Type->GetSize();
+	result->Size = GetTypeSize((*list)[index].Type.Ptr());
 	result->Register = (*list)[index].Register.Buffer();
 	result->TypeName = (*list)[index].TypeName.Buffer();
 	return 0;
@@ -845,23 +845,16 @@ SpireComponentInfoCollection * spModuleGetComponentsByWorld(SpireModule * module
 	if (auto components = moduleNode->ComponentsByWorld.TryGetValue(worldNameStr))
 	{
 		// compute layout
-		int offset = 0;
-		for (auto & comp : *components)
-		{
-			int alignment = comp.Type->GetAlignment(layoutRule);
-			if (layout == SPIRE_LAYOUT_PACKED)
-				alignment = 0;
-			else if (layout == SPIRE_LAYOUT_UNIFORM)
-			{
-				if (comp.Type->IsScalar() || comp.Type->IsVector() && comp.Type->GetVectorSize() < 4)
-					alignment = 16;
-			}
-			offset = RoundToAlignment(offset, alignment);
-			comp.Offset = offset;
-			comp.Alignment = alignment;
-			offset += comp.Type->GetSize(layoutRule);
-		}
-		return reinterpret_cast<SpireComponentInfoCollection*>(components);
+        LayoutRulesImpl* layoutRules = GetLayoutRulesImpl(layoutRule);
+        LayoutInfo layoutInfo = layoutRules->BeginStructLayout();
+        for (auto & comp : *components)
+        {
+            LayoutInfo fieldInfo = GetLayout(comp.Type.Ptr(), layoutRules);
+            size_t offset = layoutRules->AddStructField(&layoutInfo, fieldInfo);
+            comp.Offset = offset;
+            comp.Alignment = fieldInfo.alignment;
+        }
+        layoutRules->EndStructLayout(&layoutInfo);
 	}
 	return 0;
 }
@@ -879,8 +872,8 @@ int spModuleGetRequiredComponents(SpireModule * module, SpireComponentInfo * buf
 	{
 		buffer[ptr].Name = comp.Name.Buffer();
 		buffer[ptr].TypeName = comp.TypeName.Buffer();
-		buffer[ptr].Alignment = comp.Type->GetAlignment();
-		buffer[ptr].Size = comp.Type->GetSize();
+		buffer[ptr].Alignment = GetTypeAlignment(comp.Type.Ptr());
+		buffer[ptr].Size = GetTypeSize(comp.Type.Ptr());
 		buffer[ptr].Offset = comp.Offset;
 		ptr++;
 	}

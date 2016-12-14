@@ -25,9 +25,9 @@ void printDiagnosticArg(StringBuilder& sb, CoreLib::Basic::String const& str)
     sb << str;
 }
 
-void printDiagnosticArg(StringBuilder& sb, StructSymbol* sym)
+void printDiagnosticArg(StringBuilder& sb, Decl* decl)
 {
-    sb << sym->Name;
+    sb << decl->Name.Content;
 }
 
 void printDiagnosticArg(StringBuilder& sb, Type* type)

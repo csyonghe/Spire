@@ -68,7 +68,7 @@ namespace Spire
 			}
 		};
 
-        class StructSymbol;
+        class Decl;
         class Type;
         class ExpressionType;
         class ILType;
@@ -77,7 +77,7 @@ namespace Spire
         void printDiagnosticArg(StringBuilder& sb, char const* str);
 		void printDiagnosticArg(StringBuilder& sb, int val);
         void printDiagnosticArg(StringBuilder& sb, CoreLib::Basic::String const& str);
-        void printDiagnosticArg(StringBuilder& sb, StructSymbol* sym);
+        void printDiagnosticArg(StringBuilder& sb, Decl* decl);
         void printDiagnosticArg(StringBuilder& sb, Type* type);
         void printDiagnosticArg(StringBuilder& sb, ExpressionType* type);
         void printDiagnosticArg(StringBuilder& sb, ILType* type);

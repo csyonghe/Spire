@@ -178,14 +178,6 @@ namespace Spire
 
 		class CompileResult;
 
-		class StructSymbol
-		{
-		public:
-			String Name;
-			RefPtr<StructSyntaxNode> SyntaxNode;
-			RefPtr<ILStructType> Type;
-		};
-
 		class SymbolTable
 		{
 		private:
@@ -195,7 +187,7 @@ namespace Spire
 			EnumerableDictionary<String, RefPtr<FunctionSymbol>> Functions; // indexed by internal name
 			EnumerableDictionary<String, RefPtr<ShaderSymbol>> Shaders;
 			EnumerableDictionary<String, RefPtr<PipelineSymbol>> Pipelines;
-			EnumerableDictionary<String, RefPtr<StructSymbol>> Structs;
+			EnumerableDictionary<String, Decl*> globalDecls;
 			List<ShaderSymbol*> ShaderDependenceOrder;
 			bool SortShaders(); // return true if success, return false if dependency is cyclic
 			void EvalFunctionReferenceClosure();
@@ -206,6 +198,8 @@ namespace Spire
 			bool IsWorldImplicitlyReachable(PipelineSymbol * pipe, EnumerableHashSet<String> & src, String targetWorld, RefPtr<ExpressionType> type);
 			bool IsWorldImplicitlyReachable(PipelineSymbol * pipe, String src, String targetWorld, RefPtr<ExpressionType> type);
 			List<ImportPath> FindImplicitImportOperatorChain(PipelineSymbol * pipe, String worldSrc, String worldDest, RefPtr<ExpressionType> type);
+
+            Decl* LookUp(String const& name);
 		};
 
 		class UniqueIdGenerator

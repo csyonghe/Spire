@@ -11,10 +11,6 @@ namespace Spire
 		using CoreLib::Text::CodePosition;
 
 		using namespace CoreLib::Basic;
-		enum class LayoutRule
-		{
-			Std140, Std430, Packed
-		};
 		enum ILBaseType
 		{
 			Void = 0,
@@ -72,8 +68,6 @@ namespace Spire
 			virtual ILType * Clone() = 0;
 			virtual String ToString() = 0;
 			virtual bool Equals(ILType* type) = 0;
-			virtual int GetSize(LayoutRule rule = LayoutRule::Std430) = 0;
-			virtual int GetAlignment(LayoutRule rule = LayoutRule::Std430) = 0;
 		};
 
 		RefPtr<ILType> TypeFromString(CoreLib::Text::TokenReader & parser);
@@ -96,6 +90,7 @@ namespace Spire
 			virtual ILType * Clone() override;
 			virtual String ToString() override;
 			virtual bool Equals(ILType* type) override;
+
 			virtual int GetSize(LayoutRule rule) override;
 			virtual int GetAlignment(LayoutRule rule) override;
 			virtual BindableResourceType GetBindableResourceType() override
@@ -170,7 +165,7 @@ namespace Spire
 				else if (Type == ILBaseType::Float)
 					return "float";
 				else if (Type == ILBaseType::Float2)
-					return "vec2";
+        return "vec2";
 				else if (Type == ILBaseType::Float3)
 					return "vec3";
 				else if (Type == ILBaseType::Float4)
@@ -208,6 +203,7 @@ namespace Spire
 				else
 					return "?unknown";
 			}
+
 			virtual int GetAlignment(LayoutRule rule) override
 			{
 				if (rule == LayoutRule::Packed)
@@ -392,6 +388,7 @@ namespace Spire
 			virtual ILType * Clone() override;
 			virtual String ToString() override;
 			virtual bool Equals(ILType * type) override;
+
 			virtual int GetSize(LayoutRule rule) override;
 			virtual int GetAlignment(LayoutRule rule) override;
 			virtual BindableResourceType GetBindableResourceType() override

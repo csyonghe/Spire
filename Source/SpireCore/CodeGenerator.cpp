@@ -3,7 +3,6 @@
 #include "CodeWriter.h"
 #include "StringObject.h"
 #include "Naming.h"
-#include "TypeTranslation.h"
 #include "../CoreLib/Tokenizer.h"
 #include <assert.h>
 
@@ -49,6 +48,7 @@ namespace Spire
 			CodeWriter codeWriter;
 			ScopeDictionary<String, ILOperand*> variables;
 			Dictionary<String, RefPtr<ILType>> genericTypeMappings;
+            Dictionary<StructSyntaxNode*, RefPtr<ILStructType>> structTypes;
 
 			void PushStack(ILOperand * op)
 			{
@@ -129,7 +129,7 @@ namespace Spire
 		public:
 			virtual RefPtr<StructSyntaxNode> VisitStruct(StructSyntaxNode * st) override
 			{
-				result.Program->Structs.Add(symTable->Structs[st->Name.Content]()->Type);
+                TranslateStructType(st, &genericTypeMappings);
 				return st;
 			}
 			virtual void ProcessFunction(FunctionSyntaxNode * func) override
@@ -1056,7 +1056,7 @@ namespace Spire
 					}
 					else if (expr->BaseExpression->Type->IsStruct())
 					{
-						int id = expr->BaseExpression->Type->AsBasicType()->Struct->SyntaxNode->FindField(expr->MemberName);
+						int id = expr->BaseExpression->Type->AsBasicType()->structDecl->FindField(expr->MemberName);
 						GenerateIndexExpression(base, result.Program->ConstantPool->CreateConstant(id),
 							expr->Access == ExpressionAccess::Read);
 					}
@@ -1291,6 +1291,86 @@ namespace Spire
 				result.Program = new ILProgram();
 				codeWriter.SetConstantPool(result.Program->ConstantPool.Ptr());
 			}
+
+        private:
+            RefPtr<ILStructType> TranslateStructType(StructSyntaxNode* structDecl, Dictionary<String, RefPtr<ILType>> * genericTypeMappings = nullptr)
+            {
+                RefPtr<ILStructType> ilStructType;
+
+                if (structTypes.TryGetValue(structDecl, ilStructType))
+                {
+                    return ilStructType;
+                }
+
+                ilStructType = new ILStructType();
+                ilStructType->TypeName = structDecl->Name.Content;
+                ilStructType->IsIntrinsic = structDecl->IsIntrinsic;
+
+
+                for (auto field : structDecl->Fields)
+                {
+                    ILStructType::ILStructField ilField;
+                    ilField.FieldName = field->Name.Content;
+                    ilField.Type = TranslateExpressionType(field->Type.Ptr());
+                    ilStructType->Members.Add(ilField);
+                }
+
+                structTypes.Add(structDecl, ilStructType);
+                return ilStructType;
+            }
+
+		    RefPtr<ILType> TranslateExpressionType(ExpressionType * type, Dictionary<String, RefPtr<ILType>> * genericTypeMappings = nullptr)
+		    {
+			    RefPtr<ILType> resultType = 0;
+			    if (auto basicType = type->AsBasicType())
+			    {
+				    if (basicType->BaseType == BaseType::Struct)
+				    {
+                        resultType = TranslateStructType(basicType->structDecl, genericTypeMappings);
+				    }
+				    else if (basicType->BaseType == BaseType::Record)
+				    {
+					    if (genericTypeMappings)
+						    return (*genericTypeMappings)[basicType->RecordTypeName]();
+					    else
+						    throw InvalidProgramException("unexpected record type.");
+				    }
+				    else if (basicType->BaseType == BaseType::Generic)
+				    {
+					    if (genericTypeMappings)
+						    return (*genericTypeMappings)[basicType->GenericTypeVar]();
+					    else
+						    throw InvalidProgramException("unexpected generic type.");
+				    }
+				    else
+				    {
+					    auto base = new ILBasicType();
+					    base->Type = (ILBaseType)basicType->BaseType;
+					    resultType = base;
+				    }
+			    }
+			    else if (auto arrType = type->AsArrayType())
+			    {
+				    auto nArrType = new ILArrayType();
+				    nArrType->BaseType = TranslateExpressionType(arrType->BaseType.Ptr(), genericTypeMappings);
+				    nArrType->ArrayLength = arrType->ArrayLength;
+				    resultType = nArrType;
+			    }
+			    else if (auto genType = type->AsGenericType())
+			    {
+				    auto gType = new ILGenericType();
+				    gType->GenericTypeName = genType->GenericTypeName;
+				    gType->BaseType = TranslateExpressionType(genType->BaseType.Ptr(), genericTypeMappings);
+				    resultType = gType;
+			    }
+			    return resultType;
+		    }
+
+		    RefPtr<ILType> TranslateExpressionType(const RefPtr<ExpressionType> & type, Dictionary<String, RefPtr<ILType>> * genericTypeMappings = nullptr)
+		    {
+			    return TranslateExpressionType(type.Ptr(), genericTypeMappings);
+		    }
+
 		};
 
 		ICodeGenerator * CreateCodeGenerator(SymbolTable * symbols, CompileResult & result)

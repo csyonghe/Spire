@@ -1,6 +1,4 @@
 #include "SyntaxVisitors.h"
-#include "IL.h"
-#include "TypeTranslation.h"
 
 namespace Spire
 {
@@ -160,11 +158,13 @@ namespace Spire
 				else
 				{
 					expType->BaseType = BaseType::Struct;
-					RefPtr<StructSymbol> ssym;
-					if (symbolTable->Structs.TryGetValue(typeNode->TypeName, ssym))
-					{
-						expType->Struct = ssym.Ptr();
-					}
+                    if (auto decl = symbolTable->LookUp(typeNode->TypeName))
+                    {
+                        if (auto structDecl = dynamic_cast<StructSyntaxNode*>(decl))
+                        {
+                            expType->structDecl = structDecl;
+                        }
+                    }
 					else if (currentPipeline || currentShader)
 					{
 						PipelineSymbol * pipe = currentPipeline ? currentPipeline : currentShader->Pipeline;
@@ -780,11 +780,7 @@ namespace Spire
 				this->function = nullptr;
 				for (auto & s : program->Structs)
 				{
-					RefPtr<StructSymbol> ssym = new StructSymbol();
-					ssym->Name = s->Name.Content;
-					ssym->SyntaxNode = s;
-					ssym->Type = new ILStructType();
-					symbolTable->Structs.Add(s->Name.Content, ssym);
+                    symbolTable->globalDecls.Add(s->Name.Content, s.Ptr());
 				}
 				for (auto & s : program->Structs)
 					VisitStruct(s.Ptr());
@@ -858,20 +854,10 @@ namespace Spire
 
 			virtual RefPtr<StructSyntaxNode> VisitStruct(StructSyntaxNode * structNode) override
 			{
-				RefPtr<StructSymbol> st;
-				if (symbolTable->Structs.TryGetValue(structNode->Name.Content, st))
-				{
-					st->Type->TypeName = structNode->Name.Content;
-					st->Type->IsIntrinsic = structNode->IsIntrinsic;
-					for (auto node : structNode->Fields)
-					{
-						node->Type = TranslateTypeNode(node->TypeNode);
-						ILStructType::ILStructField f;
-						f.FieldName = node->Name.Content;
-						f.Type = TranslateExpressionType(node->Type.Ptr());
-						st->Type->Members.Add(f);
-					}
-				}
+                for (auto field : structNode->Fields)
+                {
+                    field->Type = TranslateTypeNode(field->TypeNode);
+                }
 				return structNode;
 			}
 
@@ -1865,14 +1851,14 @@ namespace Spire
 				}
 				else if (baseType->IsStruct())
 				{
-					int id = baseType->AsBasicType()->Struct->SyntaxNode->FindField(expr->MemberName);
+					int id = baseType->AsBasicType()->structDecl->FindField(expr->MemberName);
 					if (id == -1)
 					{
 						expr->Type = ExpressionType::Error;
-						getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->MemberName, baseType->AsBasicType()->Struct);
+						getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->MemberName, baseType->AsBasicType()->structDecl);
 					}
 					else
-						expr->Type = baseType->AsBasicType()->Struct->SyntaxNode->Fields[id]->Type;
+						expr->Type = baseType->AsBasicType()->structDecl->Fields[id]->Type;
 					if (auto bt = expr->Type->AsBasicType())
 					{
 						bt->IsLeftValue = baseType->AsBasicType()->IsLeftValue;

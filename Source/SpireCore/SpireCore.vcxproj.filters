@@ -60,9 +60,6 @@
     <ClInclude Include="Naming.h">
       <Filter>Front End</Filter>
     </ClInclude>
-    <ClInclude Include="TypeTranslation.h">
-      <Filter>Front End</Filter>
-    </ClInclude>
     <ClInclude Include="CLikeCodeGen.h">
       <Filter>Back End</Filter>
     </ClInclude>
@@ -76,6 +73,9 @@
       <Filter>Front End</Filter>
     </ClInclude>
     <ClInclude Include="Preprocessor.h">
+      <Filter>Front End</Filter>
+    </ClInclude>
+    <ClInclude Include="TypeLayout.h">
       <Filter>Front End</Filter>
     </ClInclude>
   </ItemGroup>
@@ -140,9 +140,6 @@
     <ClCompile Include="Naming.cpp">
       <Filter>Front End</Filter>
     </ClCompile>
-    <ClCompile Include="TypeTranslation.cpp">
-      <Filter>Front End</Filter>
-    </ClCompile>
     <ClCompile Include="HLSLCodeGen.cpp">
       <Filter>Back End</Filter>
     </ClCompile>
@@ -156,6 +153,9 @@
       <Filter>Front End</Filter>
     </ClCompile>
     <ClCompile Include="Preprocessor.cpp">
+      <Filter>Front End</Filter>
+    </ClCompile>
+    <ClCompile Include="TypeLayout.cpp">
       <Filter>Front End</Filter>
     </ClCompile>
   </ItemGroup>

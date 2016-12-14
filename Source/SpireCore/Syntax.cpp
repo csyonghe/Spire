@@ -23,7 +23,7 @@ namespace Spire
 			return (basicType->BaseType == BaseType &&
 				basicType->Func == Func &&
 				basicType->Shader == Shader &&
-				basicType->Struct == Struct &&
+				basicType->structDecl == structDecl &&
 				basicType->RecordTypeName == RecordTypeName);
 		}
 
@@ -560,7 +560,7 @@ namespace Spire
 		{
 			auto basicType = AsBasicType();
 			if (basicType)
-				return basicType->Struct != nullptr;
+				return basicType->structDecl != nullptr;
 			return false;
 		}
 		bool ExpressionType::IsShader() const
