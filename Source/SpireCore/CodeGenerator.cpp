@@ -214,7 +214,7 @@ namespace Spire
 				// first pass: process components with user defined binding slots
 				for (auto & world : pipeline->Worlds)
 				{
-					if (world.Value.IsAbstract)
+					if (world.Value->IsAbstract)
 					{
 						auto compiledWorld = compiledShader->Worlds[world.Key]();
 						for (auto & compDefPair : compiledWorld->OutputType->Members)
@@ -265,7 +265,7 @@ namespace Spire
 				// second pass: assign bindings slots for rest of resource components
 				for (auto & world : pipeline->Worlds)
 				{
-					if (world.Value.IsAbstract)
+					if (world.Value->IsAbstract)
 					{
 						auto compiledWorld = compiledShader->Worlds[world.Key]();
 						for (auto & compDefPair : compiledWorld->OutputType->Members)
