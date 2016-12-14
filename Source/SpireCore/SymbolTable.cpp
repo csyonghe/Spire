@@ -116,7 +116,7 @@ namespace Spire
 				for (auto & p : paths)
 				{
 					String world0 = p.Nodes.Last().TargetWorld;
-					for (auto op : SyntaxNode->ImportOperators)
+					for (auto op : SyntaxNode->GetImportOperators())
 					{
 						if (op->SourceWorld.Content == world0)
 						{
@@ -140,9 +140,9 @@ namespace Spire
 
 		bool PipelineSymbol::IsAbstractWorld(String world)
 		{
-			WorldSymbol ws;
-			if (Worlds.TryGetValue(world, ws))
-				return ws.IsAbstract;
+			WorldSyntaxNode* worldDecl;
+			if (Worlds.TryGetValue(world, worldDecl))
+				return worldDecl->IsAbstract;
 			return false;
 		}
 
@@ -315,7 +315,7 @@ namespace Spire
 						result = rresult;
 				}
 			}
-			if (Pipeline && Pipeline->Components.TryGetValue(compName, refComp))
+			if (ParentPipeline && ParentPipeline->Components.TryGetValue(compName, refComp))
 			{
 				if (!refComp->IsParam())
 				{

@@ -167,7 +167,7 @@ namespace Spire
                     }
 					else if (currentPipeline || currentShader)
 					{
-						PipelineSymbol * pipe = currentPipeline ? currentPipeline : currentShader->Pipeline;
+						PipelineSymbol * pipe = currentPipeline ? currentPipeline : currentShader->ParentPipeline;
 						bool matched = false;
 						if (pipe)
 						{
@@ -236,28 +236,25 @@ namespace Spire
 			{
 				RefPtr<PipelineSymbol> psymbol = new PipelineSymbol();
 				psymbol->SyntaxNode = pipeline;
-				if (pipeline->ParentPipeline.Content.Length())
+				if (pipeline->ParentPipelineName.Content.Length())
 				{
 					RefPtr<PipelineSymbol> parentPipeline;
-					if (symbolTable->Pipelines.TryGetValue(pipeline->ParentPipeline.Content, parentPipeline))
+					if (symbolTable->Pipelines.TryGetValue(pipeline->ParentPipelineName.Content, parentPipeline))
 					{
 						psymbol->ParentPipeline = parentPipeline.Ptr();
 					}
 					else
 					{
-                        getSink()->diagnose(pipeline->ParentPipeline, Diagnostics::undefinedPipelineName, pipeline->ParentPipeline.Content);
+                        getSink()->diagnose(pipeline->ParentPipelineName, Diagnostics::undefinedPipelineName, pipeline->ParentPipelineName.Content);
 					}
 				}
 				currentPipeline = psymbol.Ptr();
 				symbolTable->Pipelines.Add(pipeline->Name.Content, psymbol);
-				for (auto world : pipeline->Worlds)
+				for (auto world : pipeline->GetWorlds())
 				{
-					WorldSymbol worldSym;
-					worldSym.IsAbstract = world->IsAbstract;
-					worldSym.SyntaxNode = world.Ptr();
 					if (!psymbol->Worlds.ContainsKey(world->Name.Content))
 					{
-						psymbol->Worlds.Add(world->Name.Content, worldSym);
+						psymbol->Worlds.Add(world->Name.Content, world.Ptr());
 						psymbol->WorldDependency.Add(world->Name.Content, EnumerableHashSet<String>());
 					}
 					else
@@ -265,7 +262,7 @@ namespace Spire
 						getSink()->diagnose(world.Ptr(), Diagnostics::worldNameAlreadyDefined, world->Name.Content);
 					}
 				}
-				for (auto comp : pipeline->AbstractComponents)
+				for (auto comp : pipeline->GetAbstractComponents())
 				{
 					comp->Type = TranslateTypeNode(comp->TypeNode);
 					if (comp->IsParam || comp->IsInput || (comp->Rate && comp->Rate->Worlds.Count() == 1
@@ -276,18 +273,18 @@ namespace Spire
 						getSink()->diagnose(comp.Ptr(), Diagnostics::cannotDefineComponentsInAPipeline);
                     }
 				}
-				for (auto & op : pipeline->ImportOperators)
+				for (auto & op : pipeline->GetImportOperators())
 				{
 					psymbol->AddImportOperator(op);
 				}
 				// add initial world dependency edges
-				for (auto op : pipeline->ImportOperators)
+				for (auto op : pipeline->GetImportOperators())
 				{
 					if (!psymbol->WorldDependency.ContainsKey(op->DestWorld.Content))
 						getSink()->diagnose(op->DestWorld, Diagnostics::undefinedWorldName, op->DestWorld.Content);
 					else
 					{
-						if (psymbol->Worlds[op->DestWorld.Content].GetValue().IsAbstract)
+						if (psymbol->Worlds[op->DestWorld.Content].GetValue()->IsAbstract)
 							getSink()->diagnose(op->DestWorld, Diagnostics::abstractWorldAsTargetOfImport);
 						else if (!psymbol->WorldDependency.ContainsKey(op->SourceWorld.Content))
 							getSink()->diagnose(op->SourceWorld, Diagnostics::undefinedWorldName2, op->SourceWorld.Content);
@@ -310,7 +307,7 @@ namespace Spire
 				while (changed)
 				{
 					changed = false;
-					for (auto world : pipeline->Worlds)
+					for (auto world : pipeline->GetWorlds())
 					{
 						EnumerableHashSet<String> & dependentWorlds = psymbol->WorldDependency[world->Name.Content].GetValue();
 						List<String> loopRange;
@@ -331,18 +328,18 @@ namespace Spire
 					}
 				}
 
-				for (auto & op : pipeline->ImportOperators)
+				for (auto & op : pipeline->GetImportOperators())
 				{
 					currentImportOperator = op.Ptr();
 					HashSet<String> paraNames;
 					for (auto & para : op->Parameters)
 					{
-						if (paraNames.Contains(para->Name))
+						if (paraNames.Contains(para->Name.Content))
 							getSink()->diagnose(para.Ptr(), Diagnostics::parameterAlreadyDefined, para->Name);
 						else
-							paraNames.Add(para->Name);
+							paraNames.Add(para->Name.Content);
 						VariableEntry varEntry;
-						varEntry.Name = para->Name;
+						varEntry.Name = para->Name.Content;
 						para->Type = TranslateTypeNode(para->TypeNode);
 						varEntry.Type.DataType = para->Type;
 						op->Scope->Variables.AddIfNotExists(varEntry.Name, varEntry);
@@ -528,12 +525,12 @@ namespace Spire
 				auto & shaderSymbol = symbolTable->Shaders[curShader->Name.Content].GetValue();
 				this->currentShader = shaderSymbol.Ptr();
 				
-				if (shader->Pipeline.Content.Length() == 0) // implicit pipeline
+				if (shader->ParentPipelineName.Content.Length() == 0) // implicit pipeline
 				{
 					if (program->Pipelines.Count() == 1)
 					{
-						shader->Pipeline = shader->Name; // get line and col from shader name
-						shader->Pipeline.Content = program->Pipelines.First()->Name.Content;
+						shader->ParentPipelineName = shader->Name; // get line and col from shader name
+						shader->ParentPipelineName.Content = program->Pipelines.First()->Name.Content;
 					}
 					else if (!shader->IsModule)
 					{
@@ -543,15 +540,15 @@ namespace Spire
 					}
 				}
 
-				auto pipelineName = shader->Pipeline.Content;
+				auto pipelineName = shader->ParentPipelineName.Content;
 				if (pipelineName.Length())
 				{
 					auto pipeline = symbolTable->Pipelines.TryGetValue(pipelineName);
 					if (pipeline)
-						shaderSymbol->Pipeline = pipeline->Ptr();
+						shaderSymbol->ParentPipeline = pipeline->Ptr();
 					else
 					{
-						getSink()->diagnose(shader->Pipeline, Diagnostics::undefinedPipelineName, pipelineName);
+						getSink()->diagnose(shader->ParentPipelineName, Diagnostics::undefinedPipelineName, pipelineName);
 						throw 0;
 					}
 				}
@@ -676,9 +673,9 @@ namespace Spire
 					param->Accept(this);
 					VariableEntry varEntry;
 					varEntry.IsComponent = false;
-					varEntry.Name = param->Name;
+					varEntry.Name = param->Name.Content;
 					varEntry.Type.DataType = param->Type;
-					comp->Scope->Variables.Add(param->Name, varEntry);
+					comp->Scope->Variables.Add(param->Name.Content, varEntry);
 				}
 				if (comp->Expression)
 				{
@@ -884,12 +881,12 @@ namespace Spire
 				HashSet<String> paraNames;
 				for (auto & para : functionNode->Parameters)
 				{
-					if (paraNames.Contains(para->Name))
+					if (paraNames.Contains(para->Name.Content))
 						getSink()->diagnose(para, Diagnostics::parameterAlreadyDefined, para->Name);
 					else
-						paraNames.Add(para->Name);
+						paraNames.Add(para->Name.Content);
 					VariableEntry varEntry;
-					varEntry.Name = para->Name;
+					varEntry.Name = para->Name.Content;
 					para->Type = TranslateTypeNode(para->TypeNode);
 					varEntry.Type.DataType = para->Type;
 					functionNode->Scope->Variables.AddIfNotExists(varEntry.Name, varEntry);
@@ -1043,8 +1040,8 @@ namespace Spire
 				for (auto & para : stmt->Variables)
 				{
 					VariableEntry varDeclr;
-					varDeclr.Name = para->Name;
-					if (stmt->Scope->Variables.ContainsKey(para->Name))
+					varDeclr.Name = para->Name.Content;
+					if (stmt->Scope->Variables.ContainsKey(para->Name.Content))
 						getSink()->diagnose(para, Diagnostics::variableNameAlreadyDefined, para->Name);
 
 					varDeclr.Type.DataType = stmt->Type;
@@ -1053,14 +1050,14 @@ namespace Spire
 					if (varDeclr.Type.DataType->IsArray() && varDeclr.Type.DataType->AsArrayType()->ArrayLength <= 0)
 						getSink()->diagnose(stmt, Diagnostics::invalidArraySize);
 
-					stmt->Scope->Variables.AddIfNotExists(para->Name, varDeclr);
-					if (para->Expression != NULL)
+					stmt->Scope->Variables.AddIfNotExists(para->Name.Content, varDeclr);
+					if (para->Expr != NULL)
 					{
-						para->Expression = para->Expression->Accept(this).As<ExpressionSyntaxNode>();
-						if (!MatchType_ValueReceiver(varDeclr.Type.DataType.Ptr(), para->Expression->Type.Ptr())
-							&& !para->Expression->Type->Equals(ExpressionType::Error.Ptr()))
+						para->Expr = para->Expr->Accept(this).As<ExpressionSyntaxNode>();
+						if (!MatchType_ValueReceiver(varDeclr.Type.DataType.Ptr(), para->Expr->Type.Ptr())
+							&& !para->Expr->Type->Equals(ExpressionType::Error.Ptr()))
 						{
-							getSink()->diagnose(para, Diagnostics::typeMismatch, para->Expression->Type, varDeclr.Type.DataType);
+							getSink()->diagnose(para, Diagnostics::typeMismatch, para->Expr->Type, varDeclr.Type.DataType);
 						}
 					}
 				}
@@ -1347,9 +1344,9 @@ namespace Spire
 					}
 				}
 				// check if this is an import operator call
-				if (currentShader && currentCompNode && arguments.Count() > 0 && currentShader->Pipeline)
+				if (currentShader && currentCompNode && arguments.Count() > 0 && currentShader->ParentPipeline)
 				{
-					if (auto impOpList = currentShader->Pipeline->ImportOperators.TryGetValue(varExpr->Variable))
+					if (auto impOpList = currentShader->ParentPipeline->ImportOperators.TryGetValue(varExpr->Variable))
 					{
 						// component with explicit import operator call must be qualified with explicit rate
 						if (!currentCompNode->Rate)
@@ -1392,7 +1389,7 @@ namespace Spire
 							}
 							getSink()->diagnose(varExpr, Diagnostics::noApplicableImportOperator,
                                 varExpr->Variable,
-                                currentShader->Pipeline->SyntaxNode->Name,
+                                currentShader->ParentPipeline->SyntaxNode->Name,
                                 currentCompNode->Rate->Worlds.First().World,
 								argList.ProduceString());
 							invoke->Type = ExpressionType::Error;

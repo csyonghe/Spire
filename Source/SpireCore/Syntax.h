@@ -380,12 +380,72 @@ namespace Spire
 			}
 		};
 
-		class StructField : public SyntaxNode
+        class ContainerDecl;
+
+        class Decl : public SyntaxNode
+        {
+        public:
+            ContainerDecl*  ParentDecl;
+			Token Name;
+			virtual Decl * Clone(CloneContext & ctx) = 0;
+        };
+
+
+        		enum class ExpressionAccess
+		{
+			Read, Write
+		};
+
+		class ExpressionSyntaxNode : public SyntaxNode
 		{
 		public:
-			RefPtr<TypeSyntaxNode> TypeNode;
 			RefPtr<ExpressionType> Type;
-			Token Name;
+			ExpressionAccess Access;
+			ExpressionSyntaxNode()
+			{
+				Access = ExpressionAccess::Read;
+			}
+			ExpressionSyntaxNode(const ExpressionSyntaxNode & expr) = default;
+			virtual ExpressionSyntaxNode* Clone(CloneContext & ctx) = 0;
+		};
+
+
+        //
+        // Declarations
+        //
+
+        // Base class for all variable-like declarations
+        class VarDeclBase : public Decl
+        {
+        public:
+            // Resolved type of the variable
+			RefPtr<ExpressionType> Type;
+
+            // Initializer expression (optional)
+			RefPtr<ExpressionSyntaxNode> Expr;
+        };
+
+        // A compound declaration that might declare multiple things,
+        // using C-style declarator syntax
+        class MultiDecl : public Decl
+        {
+        public:
+            // The type specifier that all the declarations share
+			RefPtr<TypeSyntaxNode> TypeNode;
+        };
+
+        // A single variable declaration
+        class SingleVarDecl : public VarDeclBase
+        {
+        public:
+			RefPtr<TypeSyntaxNode> TypeNode;
+        };
+
+        // A field of a `struct` type
+		class StructField :
+            public SingleVarDecl // TODO(tfoley): should really allow `MultiDecl` inside a `struct`
+		{
+		public:
 			StructField()
 			{}
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
@@ -397,11 +457,6 @@ namespace Spire
 			}
 		};
 
-        class Decl : public SyntaxNode
-        {
-        public:
-			Token Name;
-        };
 
 		class StructSyntaxNode : public Decl
 		{
@@ -428,23 +483,7 @@ namespace Spire
 			}
 		};
 
-		enum class ExpressionAccess
-		{
-			Read, Write
-		};
 
-		class ExpressionSyntaxNode : public SyntaxNode
-		{
-		public:
-			RefPtr<ExpressionType> Type;
-			ExpressionAccess Access;
-			ExpressionSyntaxNode()
-			{
-				Access = ExpressionAccess::Read;
-			}
-			ExpressionSyntaxNode(const ExpressionSyntaxNode & expr) = default;
-			virtual ExpressionSyntaxNode* Clone(CloneContext & ctx) = 0;
-		};
 
 		class StatementSyntaxNode : public SyntaxNode
 		{
@@ -465,14 +504,10 @@ namespace Spire
 			In, Out, InOut, Uniform
 		};
 
-		class ParameterSyntaxNode : public SyntaxNode
+		class ParameterSyntaxNode : public SingleVarDecl
 		{
 		public:
 			ParameterQualifier Qualifier = ParameterQualifier::In;
-			RefPtr<TypeSyntaxNode> TypeNode;
-			RefPtr<ExpressionType> Type;
-			String Name;
-			RefPtr<ExpressionSyntaxNode> Expr;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ParameterSyntaxNode * Clone(CloneContext & ctx) override;
 		};
@@ -499,7 +534,7 @@ namespace Spire
 			virtual FunctionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class ImportOperatorDefSyntaxNode : public SyntaxNode
+		class ImportOperatorDefSyntaxNode : public Decl
 		{
 		public:
 			Token Name;
@@ -660,26 +695,8 @@ namespace Spire
 			virtual DiscardStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class VariableDeclr
+		struct Variable : public VarDeclBase
 		{
-		public:
-			RefPtr<ExpressionType> Type;
-			String Name;
-
-			bool operator ==(const VariableDeclr & var)
-			{
-				return Name == var.Name;
-			}
-			bool operator ==(const String & name)
-			{
-				return name == Name;
-			}
-		};
-
-		struct Variable : public SyntaxNode
-		{
-			String Name;
-			RefPtr<ExpressionSyntaxNode> Expression;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual Variable * Clone(CloneContext & ctx) override;
 		};
@@ -719,21 +736,14 @@ namespace Spire
 			virtual RateSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class ShaderMemberNode : public SyntaxNode
-		{
-		public:
-			Token ParentModuleName;
-			virtual ShaderMemberNode * Clone(CloneContext & ctx) = 0;
-		};
-
-		class ComponentSyntaxNode : public ShaderMemberNode
+		class ComponentSyntaxNode : public Decl
 		{
 		public:
 			bool IsOutput = false, IsPublic = false, IsInline = false, IsParam = false, IsInput = false;
 			RefPtr<TypeSyntaxNode> TypeNode;
 			RefPtr<ExpressionType> Type;
 			RefPtr<RateSyntaxNode> Rate;
-			Token Name, AlternateName;
+			Token AlternateName;
 			EnumerableDictionary<String, String> LayoutAttributes;
 			RefPtr<BlockStatementSyntaxNode> BlockStatement;
 			RefPtr<ExpressionSyntaxNode> Expression;
@@ -742,35 +752,128 @@ namespace Spire
 			virtual ComponentSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class WorldSyntaxNode : public SyntaxNode
+		class WorldSyntaxNode : public Decl
 		{
 		public:
 			bool IsAbstract = false;
-			Token Name;
 			EnumerableDictionary<String, String> LayoutAttributes;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override { return this; }
 			virtual WorldSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class StageSyntaxNode : public SyntaxNode
+		class StageSyntaxNode : public Decl
 		{
 		public:
-			Token Name;
 			Token StageType;
 			EnumerableDictionary<String, Token> Attributes;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override { return this; }
 			virtual StageSyntaxNode * Clone(CloneContext & ctx) override;
 		};
+
+        template<typename T>
+        struct FilteredMemberList
+        {
+            typedef RefPtr<Decl> Element;
+
+            FilteredMemberList()
+                : mBegin(NULL)
+                , mEnd(NULL)
+            {}
+
+            explicit FilteredMemberList(
+                List<Element> const& list)
+                : mBegin(Adjust(list.begin(), list.end()))
+                , mEnd(list.end())
+            {}
+
+            struct Iterator
+            {
+                Element* mCursor;
+                Element* mEnd;
+
+                bool operator!=(Iterator const& other)
+                {
+                    return mCursor != other.mCursor;
+                }
+
+                void operator++()
+                {
+                    mCursor = Adjust(mCursor + 1, mEnd);
+                }
+
+                RefPtr<T>& operator*()
+                {
+                    return *(RefPtr<T>*)mCursor;
+                }
+            };
+
+            Iterator begin()
+            {
+                Iterator iter = { mBegin, mEnd };
+                return iter;
+            }
+
+            Iterator end()
+            {
+                Iterator iter = { mEnd, mEnd };
+                return iter;
+            }
+
+            static Element* Adjust(Element* cursor, Element* end)
+            {
+                while (cursor != end)
+                {
+                    if ((*cursor).As<T>())
+                        return cursor;
+                    cursor++;
+                }
+                return cursor;
+            }
+
+            Element* mBegin;
+            Element* mEnd;
+        };
+
+        // A "container" decl is a parent to other declarations
+        class ContainerDecl : public Decl
+        {
+        public:
+            List<RefPtr<Decl>> Members;
+
+            template<typename T>
+            FilteredMemberList<T> GetMembersOfType()
+            {
+                return FilteredMemberList<T>(Members);
+            }
+        };
+
+        // Shared functionality for "shader class"-like declarations
+        class ShaderDeclBase : public ContainerDecl
+        {
+        public:
+			Token ParentPipelineName;
+        };
 		
-		class PipelineSyntaxNode : public SyntaxNode
+		class PipelineSyntaxNode : public ShaderDeclBase
 		{
 		public:
-			Token Name;
-			Token ParentPipeline;
-			List<RefPtr<WorldSyntaxNode>> Worlds;
-			List<RefPtr<ImportOperatorDefSyntaxNode>> ImportOperators;
-			List<RefPtr<StageSyntaxNode>> Stages;
-			List<RefPtr<ComponentSyntaxNode>> AbstractComponents;
+            // Access members of specific types
+            FilteredMemberList<WorldSyntaxNode> GetWorlds()
+            {
+                return GetMembersOfType<WorldSyntaxNode>();
+            }
+            FilteredMemberList<ImportOperatorDefSyntaxNode> GetImportOperators()
+            {
+                return GetMembersOfType<ImportOperatorDefSyntaxNode>();
+            }
+            FilteredMemberList<StageSyntaxNode> GetStages()
+            {
+                return GetMembersOfType<StageSyntaxNode>();
+            }
+            FilteredMemberList<ComponentSyntaxNode> GetAbstractComponents()
+            {
+                return GetMembersOfType<ComponentSyntaxNode>();
+            }
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override { return this; }
 			virtual PipelineSyntaxNode * Clone(CloneContext & ctx) override;
 		};
@@ -784,7 +887,7 @@ namespace Spire
 			virtual ImportArgumentSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class ImportSyntaxNode : public ShaderMemberNode
+		class ImportSyntaxNode : public Decl
 		{
 		public:
 			bool IsInplace = false;
@@ -797,12 +900,9 @@ namespace Spire
 
 		};
 
-		class ShaderSyntaxNode : public SyntaxNode
+		class ShaderSyntaxNode : public ShaderDeclBase
 		{
 		public:
-			Token Name;
-			Token Pipeline;
-			List<RefPtr<ShaderMemberNode>> Members;
 			bool IsModule = false;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ShaderSyntaxNode * Clone(CloneContext & ctx) override;
@@ -926,7 +1026,7 @@ namespace Spire
 			virtual RefPtr<ShaderSyntaxNode> VisitShader(ShaderSyntaxNode * shader)
 			{
 				for (auto & comp : shader->Members)
-					comp = comp->Accept(this).As<ShaderMemberNode>();
+					comp = comp->Accept(this).As<Decl>();
 				return shader;
 			}
 			virtual RefPtr<ComponentSyntaxNode> VisitComponent(ComponentSyntaxNode * comp);
@@ -1099,10 +1199,8 @@ namespace Spire
 			}
 			virtual RefPtr<PipelineSyntaxNode> VisitPipeline(PipelineSyntaxNode * pipe)
 			{
-				for (auto & comp : pipe->AbstractComponents)
-					comp = comp->Accept(this).As<ComponentSyntaxNode>();
-				for (auto & imp : pipe->ImportOperators)
-					imp = imp->Accept(this).As<ImportOperatorDefSyntaxNode>();
+				for (auto & comp : pipe->Members)
+					comp = comp->Accept(this).As<Decl>();
 				return pipe;
 			}
 			virtual RefPtr<ImportOperatorDefSyntaxNode> VisitImportOperatorDef(ImportOperatorDefSyntaxNode * imp)
@@ -1129,8 +1227,8 @@ namespace Spire
 
 			virtual RefPtr<Variable> VisitDeclrVariable(Variable* dclr)
 			{
-				if (dclr->Expression)
-					dclr->Expression = dclr->Expression->Accept(this).As<ExpressionSyntaxNode>();
+				if (dclr->Expr)
+					dclr->Expr = dclr->Expr->Accept(this).As<ExpressionSyntaxNode>();
 				return dclr;
 			}
 			virtual RefPtr<ImportSyntaxNode> VisitImport(ImportSyntaxNode* imp)

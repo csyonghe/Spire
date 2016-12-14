@@ -57,18 +57,18 @@ namespace Spire
 			if (rootShader == nullptr)
 			{
 				rootShader = rs.Ptr();
-				rootShader->Pipeline = shader->Pipeline;
+				rootShader->Pipeline = shader->ParentPipeline;
 			}
 			rs->Name = shader->SyntaxNode->Name.Content;
 			rs->RefMap = pRefMap;
-			if (shader->Pipeline && rootShader->Pipeline)
+			if (shader->ParentPipeline && rootShader->Pipeline)
 			{
-				if (shader->Pipeline->IsChildOf(rootShader->Pipeline))
-					rootShader->Pipeline = shader->Pipeline;
-				else if (!rootShader->Pipeline->IsChildOf(shader->Pipeline))
+				if (shader->ParentPipeline->IsChildOf(rootShader->Pipeline))
+					rootShader->Pipeline = shader->ParentPipeline;
+				else if (!rootShader->Pipeline->IsChildOf(shader->ParentPipeline))
 				{
                     err->diagnose(shader->SyntaxNode->Position, Diagnostics::pipelineOfModuleIncompatibleWithPipelineOfShader,
-                        shader->Pipeline->SyntaxNode->Name,
+                        shader->ParentPipeline->SyntaxNode->Name,
                         shader->SyntaxNode->Name.Content,
                         rootShader->Pipeline->SyntaxNode->Name.Content,
                         rootShader->Name);
@@ -196,7 +196,6 @@ namespace Spire
 				{
 					auto oldComp = shaderClosure->AllComponents[refComp->Content]();
 					auto newComp = shaderClosure->AllComponents[targetComp]();
-					newComp->UserComponents.Add(currentComponent);
 					if (auto * importOps = currentComponent->DependentComponents.TryGetValue(newComp))
 						importOps->Add(currentImport);
 					else
@@ -271,7 +270,6 @@ namespace Spire
 			void AddReference(ShaderComponentSymbol * referee, ImportExpressionSyntaxNode * importOp, CodePosition pos)
 			{
 				rootShader->AllComponents.TryGetValue(referee->UniqueName, referee);
-				referee->UserComponents.Add(currentComponent);
 				if (auto * importOps = currentComponent->DependentComponents.TryGetValue(referee))
 					importOps->Add(importOp);
 				else
@@ -429,10 +427,6 @@ namespace Spire
 					replaceVisitor.currentImpl = impl.Ptr();
 					impl->SyntaxNode->Accept(&replaceVisitor);
 				}
-			}
-			for (auto & rep : replacements)
-			{
-				shader->AllComponents[rep.Key]()->UserComponents.Clear();
 			}
 		}
 
@@ -631,7 +625,7 @@ namespace Spire
 					compSym->Type->ConstrainedWorlds = _Move(newWorlds);
 				}
 			};
-			for (auto impOp : shader->Pipeline->SyntaxNode->ImportOperators)
+			for (auto impOp : shader->Pipeline->SyntaxNode->GetImportOperators())
 			{
 				for (auto comp : impOp->Usings)
 				{
@@ -853,10 +847,10 @@ namespace Spire
     								diagnoseModuleUsingStack(err, shader);
                                 }
 							}
-							WorldSymbol worldSym;
-							if (shader->Pipeline->Worlds.TryGetValue(world.World.Content, worldSym))
+							WorldSyntaxNode* worldDecl;
+							if (shader->Pipeline->Worlds.TryGetValue(world.World.Content, worldDecl))
 							{
-								if (worldSym.IsAbstract)
+								if (worldDecl->IsAbstract)
 								{
 									inAbstractWorld = true;
 									if (userSpecifiedWorlds.Count() > 1)
@@ -882,7 +876,7 @@ namespace Spire
 							auto world = shader->Pipeline->Worlds.TryGetValue(w.World.Content);
 							if (world)
 							{
-								if (world->IsAbstract)
+								if ((*world)->IsAbstract)
 									isDefinedInAbstractWorld = true;
 								else
 									isDefinedInNonAbstractWorld = true;

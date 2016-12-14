@@ -336,7 +336,7 @@ namespace Spire
 				if (LookAheadToken(":"))
 				{
 					ReadToken(":");
-					shader->Pipeline = ReadToken(TokenType::Identifier);
+					shader->ParentPipelineName = ReadToken(TokenType::Identifier);
 				}
 			}
 			catch (int)
@@ -354,13 +354,13 @@ namespace Spire
 						|| LookAheadToken("[") || LookAheadToken("require") || LookAheadToken("extern"))
 					{
 						auto comp = ParseComponent();
-						comp->ParentModuleName = shader->Name;
+						comp->ParentDecl = shader.Ptr();
 						shader->Members.Add(comp);
 					}
 					else if (LookAheadToken("using") || (LookAheadToken("public") && LookAheadToken("using", 1)))
 					{
 						auto imp = ParseImport();
-						imp->ParentModuleName = shader->Name;
+						imp->ParentDecl = shader.Ptr();
 						shader->Members.Add(imp);
 					}
 					else
@@ -393,7 +393,7 @@ namespace Spire
 			if (LookAheadToken(TokenType::Colon))
 			{
 				ReadToken(TokenType::Colon);
-				pipeline->ParentPipeline = ReadToken(TokenType::Identifier);
+				pipeline->ParentPipelineName = ReadToken(TokenType::Identifier);
 			}
 			ReadToken(TokenType::LBrace);
 			while (!LookAheadToken(TokenType::RBrace))
@@ -403,23 +403,23 @@ namespace Spire
 				{
 					auto w = ParseWorld();
 					w->LayoutAttributes = attribs;
-					pipeline->Worlds.Add(w);
+					pipeline->Members.Add(w);
 				}
 				else if (LookAheadToken("import"))
 				{
 					auto op = ParseImportOperator();
 					op->LayoutAttributes = attribs;
-					pipeline->ImportOperators.Add(op);
+					pipeline->Members.Add(op);
 				}
 				else if (LookAheadToken("stage"))
 				{
-					pipeline->Stages.Add(ParseStage());
+					pipeline->Members.Add(ParseStage());
 				}
 				else
 				{
 					auto comp = ParseComponent();
 					comp->LayoutAttributes = attribs;
-					pipeline->AbstractComponents.Add(comp);
+					pipeline->Members.Add(comp);
 				}
 			}
 			ReadToken(TokenType::RBrace);
@@ -955,11 +955,11 @@ namespace Spire
 				RefPtr<Variable> var = new Variable();
 				FillPosition(var.Ptr());
 				Token name = ReadToken(TokenType::Identifier);
-				var->Name = name.Content;
+				var->Name = name;
 				if (LookAheadToken(TokenType::OpAssign))
 				{
 					ReadToken(TokenType::OpAssign);
-					var->Expression = ParseExpression();
+					var->Expr = ParseExpression();
 				}
 
 				varDeclrStatement->Variables.Add(var);
@@ -1131,10 +1131,10 @@ namespace Spire
 			if (LookAheadToken(TokenType::Identifier))
 			{
 				Token name = ReadToken(TokenType::Identifier);
-				parameter->Name = name.Content;
+				parameter->Name = name;
 			}
 			else
-				parameter->Name = "_anonymousParam" + String(anonymousParamCounter++);
+				parameter->Name.Content = "_anonymousParam" + String(anonymousParamCounter++);
 			FillPosition(parameter.Ptr());
 			return parameter;
 		}
