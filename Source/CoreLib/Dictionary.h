@@ -1063,11 +1063,11 @@ namespace CoreLib
 		public:
 			T & First() const
 			{
-				return dict.First().Key;
+				return this->dict.First().Key;
 			}
 			T & Last() const
 			{
-				return dict.Last().Key;
+				return this->dict.Last().Key;
 			}
 		};
 	}

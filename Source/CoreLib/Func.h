@@ -159,7 +159,7 @@ namespace CoreLib
 			Procedure(){}
 			Procedure(const Procedure & proc)
 			{
-				funcPtr = proc;
+				funcPtr = proc.funcPtr;
 			}
 			Procedure(typename CdeclFuncPtr<void, Arguments...>::FuncType func)
 			{

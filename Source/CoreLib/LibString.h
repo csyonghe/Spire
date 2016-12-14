@@ -273,7 +273,7 @@ namespace CoreLib
 				return res;
 			}
 
-			char * Buffer() const
+			const char * Buffer() const
 			{
 				if (buffer)
 					return buffer.Ptr();
@@ -281,7 +281,7 @@ namespace CoreLib
 					return "";
 			}
 
-			wchar_t * ToWString(int * len = 0) const;
+			const wchar_t * ToWString(int * len = 0) const;
 
 			bool Equals(const String & str, bool caseSensitive = true)
 			{
