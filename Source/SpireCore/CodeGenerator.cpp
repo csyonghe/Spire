@@ -11,6 +11,8 @@ namespace Spire
 {
 	namespace Compiler
 	{
+		const int MaxBindingValue = 128;
+
 		template<typename Func>
 		class ImportNodeVisitor : public SyntaxVisitor
 		{
@@ -151,6 +153,7 @@ namespace Spire
 
 				genericTypeMappings.Clear();
 
+				
 				// pass 1: iterating all worlds
 				// create ILWorld and ILRecordType objects for all worlds
 
@@ -195,11 +198,119 @@ namespace Spire
 							compDef.Name = comp->UniqueName;
 							compDef.Type = TranslateExpressionType(comp->Type.Ptr(), &genericTypeMappings);
 							compDef.Position = comp->SyntaxNode->Position;
+							compDef.Binding = -1;
+							
 							compiledWorld->OutputType->Members.AddIfNotExists(compDef.Name, compDef);
 						}
 					}
 					// put the list in worldComps
 					worldComps[world.Key] = components;
+				}
+
+				// allocate binding slots for shader resources (textures, buffers, samplers etc.)
+
+				Dictionary<int, ILObjectDefinition*> usedTextureBindings, usedBufferBindings, usedSamplerBindings, usedStorageBufferBindings;
+				int textureBindingAllcator = 0, samplerBindingAllocator = 0, storageBufferBindingAllocator = 0, bufferBindingAllocator = 0;
+				// first pass: process components with user defined binding slots
+				for (auto & world : pipeline->Worlds)
+				{
+					if (world.Value.IsAbstract)
+					{
+						auto compiledWorld = compiledShader->Worlds[world.Key]();
+						for (auto & compDefPair : compiledWorld->OutputType->Members)
+						{
+							auto & compDef = compDefPair.Value;
+							auto bindableResType = compDef.Type->GetBindableResourceType();
+							if (bindableResType != BindableResourceType::NonBindable)
+							{
+								Dictionary<int, ILObjectDefinition*> * bindingRegistry = nullptr;
+								switch (bindableResType)
+								{
+								case BindableResourceType::Texture:
+									bindingRegistry = &usedTextureBindings;
+									break;
+								case BindableResourceType::Sampler:
+									bindingRegistry = &usedSamplerBindings;
+									break;
+								case BindableResourceType::Buffer:
+									bindingRegistry = &usedBufferBindings;
+									break;
+								case BindableResourceType::StorageBuffer:
+									bindingRegistry = &usedStorageBufferBindings;
+									break;
+								}
+
+								String bindingValStr;
+								if (compDef.Attributes.TryGetValue("Binding", bindingValStr))
+								{
+									int bindingVal = StringToInt(bindingValStr);
+
+									ILObjectDefinition * otherComp = nullptr;
+									if (bindingRegistry->TryGetValue(bindingVal, otherComp))
+									{
+										getSink()->diagnose(compDef.Position, Diagnostics::bindingAlreadyOccupied, bindingVal, otherComp->Name);
+										getSink()->diagnose(otherComp->Position, Diagnostics::seeDefinitionOf, otherComp->Name);
+									}
+									if (bindingVal < 0 || bindingVal >= MaxBindingValue)
+									{
+										getSink()->diagnose(compDef.Position, Diagnostics::invalidBindingValue, bindingVal);
+									}
+									(*bindingRegistry)[bindingVal] = &compDef;
+									compDef.Binding = bindingVal;
+								}
+							}
+						}
+					}
+				}
+				// second pass: assign bindings slots for rest of resource components
+				for (auto & world : pipeline->Worlds)
+				{
+					if (world.Value.IsAbstract)
+					{
+						auto compiledWorld = compiledShader->Worlds[world.Key]();
+						for (auto & compDefPair : compiledWorld->OutputType->Members)
+						{
+							auto & compDef = compDefPair.Value;
+							auto bindableResType = compDef.Type->GetBindableResourceType();
+							if (bindableResType != BindableResourceType::NonBindable)
+							{
+								Dictionary<int, ILObjectDefinition*> * bindingRegistry = nullptr;
+								if (compDef.Binding != -1)
+									continue;
+								int * bindingAllocator = nullptr;
+								switch (bindableResType)
+								{
+								case BindableResourceType::Texture:
+									bindingRegistry = &usedTextureBindings;
+									bindingAllocator = &textureBindingAllcator;
+									break;
+								case BindableResourceType::Sampler:
+									bindingRegistry = &usedSamplerBindings;
+									bindingAllocator = &samplerBindingAllocator;
+									break;
+								case BindableResourceType::Buffer:
+									bindingRegistry = &usedBufferBindings;
+									bindingAllocator = &bufferBindingAllocator;
+									break;
+								case BindableResourceType::StorageBuffer:
+									bindingRegistry = &usedStorageBufferBindings;
+									bindingAllocator = &storageBufferBindingAllocator;
+									break;
+								}
+								while (bindingRegistry->ContainsKey(*bindingAllocator))
+								{
+									(*bindingAllocator)++;
+								}
+								compDef.Binding = *bindingAllocator;
+								(*bindingAllocator)++;
+								int maxBinding = GetMaxResourceBindings(bindableResType);
+								if (compDef.Binding > maxBinding)
+								{
+									getSink()->diagnose(compDef.Position, Diagnostics::bindingExceedsLimit, compDef.Binding, compDef.Name);
+								}
+							}
+						}
+					}
 				}
 
 				// now we need to deal with import operators

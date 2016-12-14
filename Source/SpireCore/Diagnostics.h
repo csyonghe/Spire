@@ -75,6 +75,7 @@ namespace Spire
         class StageAttribute;
 
         void printDiagnosticArg(StringBuilder& sb, char const* str);
+		void printDiagnosticArg(StringBuilder& sb, int val);
         void printDiagnosticArg(StringBuilder& sb, CoreLib::Basic::String const& str);
         void printDiagnosticArg(StringBuilder& sb, StructSymbol* sym);
         void printDiagnosticArg(StringBuilder& sb, Type* type);

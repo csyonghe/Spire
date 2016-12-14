@@ -83,6 +83,22 @@ namespace Spire
 				return offset + (alignment - remainder);
 		}
 
+		int GetMaxResourceBindings(BindableResourceType type)
+		{
+			switch (type)
+			{
+			case BindableResourceType::Texture:
+				return 32;
+			case BindableResourceType::Sampler:
+				return 32;
+			case BindableResourceType::Buffer:
+				return 16;
+			case BindableResourceType::StorageBuffer:
+				return 16;
+			}
+			return 0;
+		}
+
 		int SizeofBaseType(ILBaseType type)
 		{
 			if (type == ILBaseType::Int)
@@ -237,7 +253,8 @@ namespace Spire
 		{
 			auto basicType = dynamic_cast<ILBasicType*>(this);
 			if (basicType)
-				return basicType->Type == ILBaseType::Texture2D || basicType->Type == ILBaseType::TextureCube || basicType->Type == ILBaseType::Texture2DArray;
+				return basicType->Type == ILBaseType::Texture2D || basicType->Type == ILBaseType::TextureCube || basicType->Type == ILBaseType::Texture2DArray ||
+				basicType->Type == ILBaseType::Texture3D;
 			else
 				return false;
 		}
@@ -247,7 +264,8 @@ namespace Spire
 			auto basicType = dynamic_cast<ILBasicType*>(this);
 			if (basicType)
 				return basicType->Type == ILBaseType::Texture2D || basicType->Type == ILBaseType::TextureCube || basicType->Type == ILBaseType::Texture2DArray ||
-				basicType->Type == ILBaseType::Texture2DShadow || basicType->Type == ILBaseType::TextureCubeShadow || basicType->Type == ILBaseType::Texture2DArrayShadow;
+				basicType->Type == ILBaseType::Texture2DShadow || basicType->Type == ILBaseType::TextureCubeShadow || basicType->Type == ILBaseType::Texture2DArrayShadow ||
+				basicType->Type == ILBaseType::Texture3D;
 			else
 				return false;
 		}

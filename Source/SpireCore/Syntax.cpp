@@ -538,7 +538,8 @@ namespace Spire
 				basicType->BaseType == BaseType::Texture2DArray ||
 				basicType->BaseType == BaseType::Texture2DShadow ||
 				basicType->BaseType == BaseType::TextureCubeShadow ||
-				basicType->BaseType == BaseType::Texture2DArrayShadow;
+				basicType->BaseType == BaseType::Texture2DArrayShadow ||
+				basicType->BaseType == BaseType::Texture3D;
 			return false;
 		}
 		bool ExpressionType::IsTextureOrSampler() const
@@ -551,6 +552,7 @@ namespace Spire
 					basicType->BaseType == BaseType::Texture2DShadow ||
 					basicType->BaseType == BaseType::TextureCubeShadow ||
 					basicType->BaseType == BaseType::Texture2DArrayShadow ||
+					basicType->BaseType == BaseType::Texture3D ||
 					basicType->BaseType == BaseType::SamplerState;
 			return false;
 		}

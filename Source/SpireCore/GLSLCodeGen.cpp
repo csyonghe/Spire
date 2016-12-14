@@ -355,7 +355,7 @@ namespace Spire
 				{
 					if (!useBindlessTexture && field.Value.Type->IsTexture())
 						continue;
-					if (field.Value.Type->IsSamplerState())
+					if (field.Value.Type->GetBindableResourceType() != BindableResourceType::NonBindable)
 						continue;
 					if (field.Value.Type.As<ILGenericType>()) // ArrayBuffer etc. goes to separate declaration outside the block
 						continue;
@@ -383,43 +383,33 @@ namespace Spire
 				{
 					sb.GlobalHeader << "} blk" << input.Name << ";\n";
 				}
-				if (!useBindlessTexture)
-				{
-					for (auto & field : recType->Members)
-					{
-						//if (field.Value.Type->IsSamplerState())
-							//continue;
-						if (field.Value.Type->IsTexture())
-						{
-							if (field.Value.Attributes.ContainsKey("Binding"))
-								sb.GlobalHeader << "layout(binding = " << field.Value.Attributes["Binding"]() << ") ";
-							else
-							{
-								sb.GlobalHeader << "layout(binding = " << sb.TextureBindingsAllocator << ") ";
-								sb.TextureBindingsAllocator++;
-							}
-							sb.GlobalHeader << "uniform ";
-							PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), field.Key);
-							sb.GlobalHeader << ";\n";
-						}
-					}
-				}
+			
 				for (auto & field : recType->Members)
 				{
-					auto genType = field.Value.Type.As<ILGenericType>();
-					if (!genType)
+					auto bindableType = field.Value.Type->GetBindableResourceType();
+					if (bindableType == BindableResourceType::NonBindable || bindableType == BindableResourceType::Sampler)
 						continue;
-					if (genType->GenericTypeName == "StructuredBuffer" || genType->GenericTypeName == "RWStructuredBuffer")
+					if (bindableType == BindableResourceType::Texture && useBindlessTexture)
+						continue;
+					if (bindableType == BindableResourceType::Texture)
 					{
-						if (field.Value.Attributes.ContainsKey("Binding"))
-							sb.GlobalHeader << "layout(std430, binding = " << field.Value.Attributes["Binding"]() << ") ";
-						else
-							sb.GlobalHeader << "layout(std430) ";
+						sb.GlobalHeader << "layout(binding = " << field.Value.Binding << ") uniform ";
+						PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), field.Key);
+						sb.GlobalHeader << ";\n";
+					}
+					else if (bindableType == BindableResourceType::StorageBuffer)
+					{
+						auto genType = field.Value.Type.As<ILGenericType>();
+						if (!genType)
+							continue;
 
+						sb.GlobalHeader << "layout(std430, binding = " << field.Value.Attributes["Binding"]() << ") ";
 						sb.GlobalHeader << "buffer buf" << field.Key << "\n{\n";
 						PrintType(sb.GlobalHeader, genType->BaseType.Ptr());
 						sb.GlobalHeader << " " << field.Key << "[];\n};\n";
 					}
+					else
+						throw NotImplementedException();
 				}
 			}
 
@@ -477,10 +467,8 @@ namespace Spire
 				{
 					if(field.Value.Type->IsFloat() || field.Value.Type->IsFloatVector() && !field.Value.Type->IsFloatMatrix())
 					{
-						sb.GlobalHeader << "layout(binding = " << sb.TextureBindingsAllocator << ") uniform ";
-						sb.GlobalHeader << "sampler2D ";
+						sb.GlobalHeader << "uniform sampler2D ";
 						sb.GlobalHeader<< field.Key << ";\n";
-						sb.TextureBindingsAllocator++;
 					}
 					else
 					{

@@ -27,6 +27,7 @@ namespace Spire
 			Texture2DShadow = 51,
 			TextureCubeShadow = 52,
 			Texture2DArrayShadow = 53,
+			Texture3D = 54,
 			Bool = 128, Bool2 = 129, Bool3 = 130, Bool4 = 131,
 			UInt = 512, UInt2 = 513, UInt3 = 514, UInt4 = 515,
 			SamplerState = 4096,
@@ -34,6 +35,13 @@ namespace Spire
 		int SizeofBaseType(ILBaseType type);
 		int RoundToAlignment(int offset, int alignment);
 		extern int NamingCounter;
+
+		enum class BindableResourceType
+		{
+			NonBindable, Texture, Sampler, Buffer, StorageBuffer
+		};
+		int GetMaxResourceBindings(BindableResourceType type);
+
 		class ILType : public RefObject
 		{
 		public:
@@ -60,6 +68,7 @@ namespace Spire
 			bool IsSamplerState();
 			bool IsNonShadowTexture();
 			int GetVectorSize();
+			virtual BindableResourceType GetBindableResourceType() = 0;
 			virtual ILType * Clone() = 0;
 			virtual String ToString() = 0;
 			virtual bool Equals(ILType* type) = 0;
@@ -76,6 +85,7 @@ namespace Spire
 			String Name;
 			EnumerableDictionary<String, String> Attributes;
 			CodePosition Position;
+			int Binding = -1;
 		};
 
 		class ILRecordType : public ILType
@@ -88,6 +98,10 @@ namespace Spire
 			virtual bool Equals(ILType* type) override;
 			virtual int GetSize(LayoutRule rule) override;
 			virtual int GetAlignment(LayoutRule rule) override;
+			virtual BindableResourceType GetBindableResourceType() override
+			{
+				return BindableResourceType::NonBindable;
+			}
 		};
 
 		class ILBasicType : public ILType
@@ -108,6 +122,25 @@ namespace Spire
 				if (!btype)
 					return false;
 				return Type == btype->Type;
+			}
+
+			virtual BindableResourceType GetBindableResourceType() override
+			{
+				switch (Type)
+				{
+				case ILBaseType::Texture2D:
+				case ILBaseType::TextureCube:
+				case ILBaseType::Texture2DArray:
+				case ILBaseType::Texture2DShadow:
+				case ILBaseType::TextureCubeShadow:
+				case ILBaseType::Texture2DArrayShadow:
+				case ILBaseType::Texture3D:
+					return BindableResourceType::Texture;
+				case ILBaseType::SamplerState:
+					return BindableResourceType::Sampler;
+				default:
+					return BindableResourceType::NonBindable;
+				}
 			}
 
 			virtual ILType * Clone() override
@@ -158,6 +191,8 @@ namespace Spire
 					return "samplerCubeShadow";
 				else if (Type == ILBaseType::Texture2DArrayShadow)
 					return "sampler2DArrayShadow";
+				else if (Type == ILBaseType::Texture3D)
+					return "sampler3D";
 				else if (Type == ILBaseType::Bool)
 					return "bool";
 				else if (Type == ILBaseType::Bool2)
@@ -205,10 +240,12 @@ namespace Spire
 				case  ILBaseType::Float4x4:
 					return 16;
 				case ILBaseType::Texture2D:
-					return 8;
 				case ILBaseType::TextureCube:
-					return 8;
 				case ILBaseType::Texture2DArray:
+				case ILBaseType::Texture2DShadow:
+				case ILBaseType::TextureCubeShadow:
+				case ILBaseType::Texture2DArrayShadow:
+				case ILBaseType::Texture3D:
 					return 8;
 				default:
 					return 0;
@@ -241,6 +278,10 @@ namespace Spire
 				case ILBaseType::Texture2D:
 				case ILBaseType::TextureCube:
 				case ILBaseType::Texture2DArray:
+				case ILBaseType::Texture2DShadow:
+				case ILBaseType::TextureCubeShadow:
+				case ILBaseType::Texture2DArrayShadow:
+				case ILBaseType::Texture3D:
 					return 8;
 				default:
 					return 0;
@@ -288,6 +329,10 @@ namespace Spire
 				}
 				return baseAlignment;
 			}
+			virtual BindableResourceType GetBindableResourceType() override
+			{
+				return BindableResourceType::NonBindable;
+			}
 		};
 
 		class ILGenericType : public ILType
@@ -321,6 +366,15 @@ namespace Spire
 			{
 				return BaseType->GetAlignment(rule);
 			}
+			virtual BindableResourceType GetBindableResourceType() override
+			{
+				if (GenericTypeName == "StructuredBuffer" || GenericTypeName == "RWStructuredBuffer")
+					return BindableResourceType::StorageBuffer;
+				else if (GenericTypeName == "Buffer" || GenericTypeName == "RWBuffer" || GenericTypeName == "ByteAddressBuffer" ||
+					GenericTypeName == "RWByteAddressBuffer")
+					return BindableResourceType::Buffer;
+				return BindableResourceType::NonBindable;
+			}
 		};
 
 		class ILStructType : public ILType
@@ -340,6 +394,10 @@ namespace Spire
 			virtual bool Equals(ILType * type) override;
 			virtual int GetSize(LayoutRule rule) override;
 			virtual int GetAlignment(LayoutRule rule) override;
+			virtual BindableResourceType GetBindableResourceType() override
+			{
+				return BindableResourceType::NonBindable;
+			}
 		};
 
 		class ILOperand;

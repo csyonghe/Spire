@@ -51,7 +51,6 @@ namespace Spire
 			Dictionary<ILOperand*, String> VarName;
 			CompileResult * Result = nullptr;
 			HashSet<String> UsedVarNames;
-			int TextureBindingsAllocator = 0;
 			int BufferAllocator = 0;
 			StringBuilder Body, Header, GlobalHeader;
 			List<ILType*> Arguments;
