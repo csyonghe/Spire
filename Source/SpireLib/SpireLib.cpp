@@ -1005,7 +1005,7 @@ int spGetCompiledShaderStageNames(SpireCompilationResult * result, const char * 
 	}
 }
 
-const char * spGetShaderStageSource(SpireCompilationResult * result, const char * shaderName, const char * stage, int * length)
+char * spGetShaderStageSource(SpireCompilationResult * result, const char * shaderName, const char * stage, int * length)
 {
 	auto rs = RS(result);
 	CompiledShaderSource * src = nullptr;
@@ -1026,7 +1026,7 @@ const char * spGetShaderStageSource(SpireCompilationResult * result, const char 
 			{
 				if (length)
 					*length = state->MainCode.Length() + 1;
-				return state->MainCode.Buffer();
+				return (char*) state->MainCode.Buffer();
 			}
 			else
 			{

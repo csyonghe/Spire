@@ -91,8 +91,6 @@ namespace Spire
 			virtual String ToString() override;
 			virtual bool Equals(ILType* type) override;
 
-			virtual int GetSize(LayoutRule rule) override;
-			virtual int GetAlignment(LayoutRule rule) override;
 			virtual BindableResourceType GetBindableResourceType() override
 			{
 				return BindableResourceType::NonBindable;
@@ -203,86 +201,6 @@ namespace Spire
 				else
 					return "?unknown";
 			}
-
-			virtual int GetAlignment(LayoutRule rule) override
-			{
-				if (rule == LayoutRule::Packed)
-					return 0;
-				switch (Type)
-				{
-				case ILBaseType::Int:
-					return 4;
-				case ILBaseType::UInt:
-					return 4;
-				case ILBaseType::Int2:
-				case ILBaseType::UInt2:
-					return 8;
-				case ILBaseType::Int3:
-				case ILBaseType::UInt3:
-					return 16;
-				case ILBaseType::Int4:
-				case ILBaseType::UInt4:
-					return 16;
-				case ILBaseType::Float:
-					return 4;
-				case ILBaseType::Float2:
-					return 8;
-				case  ILBaseType::Float3:
-					return 16;
-				case ILBaseType::Float4:
-					return 16;
-				case ILBaseType::Float3x3:
-					return 16;
-				case  ILBaseType::Float4x4:
-					return 16;
-				case ILBaseType::Texture2D:
-				case ILBaseType::TextureCube:
-				case ILBaseType::Texture2DArray:
-				case ILBaseType::Texture2DShadow:
-				case ILBaseType::TextureCubeShadow:
-				case ILBaseType::Texture2DArrayShadow:
-				case ILBaseType::Texture3D:
-					return 8;
-				default:
-					return 0;
-				}
-			}
-			virtual int GetSize(LayoutRule /*rule*/) override
-			{
-				switch (Type)
-				{
-				case ILBaseType::Float:
-				case ILBaseType::Int:
-				case ILBaseType::UInt:
-					return 4;
-				case ILBaseType::Float2:
-				case ILBaseType::Int2:
-				case ILBaseType::UInt2:
-					return 8;
-				case ILBaseType::Int3:
-				case ILBaseType::Float3:
-				case ILBaseType::UInt3:
-					return 12;
-				case ILBaseType::Int4:
-				case ILBaseType::Float4:
-				case ILBaseType::UInt4:
-					return 16;
-				case ILBaseType::Float3x3:
-					return 48;
-				case ILBaseType::Float4x4:
-					return 64;
-				case ILBaseType::Texture2D:
-				case ILBaseType::TextureCube:
-				case ILBaseType::Texture2DArray:
-				case ILBaseType::Texture2DShadow:
-				case ILBaseType::TextureCubeShadow:
-				case ILBaseType::Texture2DArrayShadow:
-				case ILBaseType::Texture3D:
-					return 8;
-				default:
-					return 0;
-				}
-			}
 		};
 
 		class ILArrayType : public ILType
@@ -310,20 +228,6 @@ namespace Spire
 					return BaseType->ToString() + "[" + String(ArrayLength) + "]";
 				else
 					return BaseType->ToString() + "[]";
-			}
-			virtual int GetSize(LayoutRule layoutRule) override
-			{
-				return BaseType->GetSize(layoutRule) * ArrayLength;
-			}
-			virtual int GetAlignment(LayoutRule layoutRule) override
-			{
-				int baseAlignment = BaseType->GetAlignment(layoutRule);
-				if (layoutRule == LayoutRule::Std140)
-				{
-					if (baseAlignment < 16)
-						return 16;
-				}
-				return baseAlignment;
 			}
 			virtual BindableResourceType GetBindableResourceType() override
 			{
@@ -354,14 +258,6 @@ namespace Spire
 			{
 				return GenericTypeName + "<" + BaseType->ToString() + ">";
 			}
-			virtual int GetSize(LayoutRule rule) override
-			{
-				return BaseType->GetSize(rule);
-			}
-			virtual int GetAlignment(LayoutRule rule) override
-			{
-				return BaseType->GetAlignment(rule);
-			}
 			virtual BindableResourceType GetBindableResourceType() override
 			{
 				if (GenericTypeName == "StructuredBuffer" || GenericTypeName == "RWStructuredBuffer")
@@ -389,8 +285,6 @@ namespace Spire
 			virtual String ToString() override;
 			virtual bool Equals(ILType * type) override;
 
-			virtual int GetSize(LayoutRule rule) override;
-			virtual int GetAlignment(LayoutRule rule) override;
 			virtual BindableResourceType GetBindableResourceType() override
 			{
 				return BindableResourceType::NonBindable;
