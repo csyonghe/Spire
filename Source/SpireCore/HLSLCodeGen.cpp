@@ -241,6 +241,14 @@ namespace Spire
 
 					{ "mat3", "float3x3" },
 					{ "mat4", "float4x4" },
+
+					{ "sampler2D", "Texture2D" },
+					{ "sampler2DArray", "Texture2DArray" },
+					{ "samplerCube", "TextureCube" },
+					{ "sampler2DShadow", "Texture2D" },
+					{ "sampler2DArrayShadow", "Texture2DArray" },
+					{ "samplerCubeShadow", "TextureCube" },
+					{ "sampler3D", "Texture3D" }
 				};
 
 				String typeName = type->ToString();
@@ -282,7 +290,8 @@ namespace Spire
 				int index = 0;
 				for (auto & field : recType->Members)
 				{
-					if (field.Value.Type->IsTexture())
+					auto bindableResType = field.Value.Type->GetBindableResourceType();
+					if (bindableResType != BindableResourceType::NonBindable)
 						continue;
 					String declName = field.Key;
 					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
@@ -310,19 +319,29 @@ namespace Spire
 
 				for (auto & field : recType->Members)
 				{
-					if (field.Value.Type->IsTexture())
+					auto bindableResType = field.Value.Type->GetBindableResourceType();
+					if (bindableResType == BindableResourceType::NonBindable)
+						continue;
+					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), field.Key);
+					sb.GlobalHeader << ": register(";
+					switch (bindableResType)
 					{
-						if (field.Value.Attributes.ContainsKey("Binding"))
-							sb.GlobalHeader << "layout(binding = " << field.Value.Attributes["Binding"]() << ") ";
-						else
-						{
-							sb.GlobalHeader << "layout(binding = " << sb.TextureBindingsAllocator << ") ";
-							sb.TextureBindingsAllocator++;
-						}
-						sb.GlobalHeader << "uniform ";
-						PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), field.Key);
-						sb.GlobalHeader << ";\n";
+					case BindableResourceType::Texture:
+						sb.GlobalHeader << "t";
+						break;
+					case BindableResourceType::Sampler:
+						sb.GlobalHeader << "s";
+						break;
+					case BindableResourceType::StorageBuffer:
+						sb.GlobalHeader << "u";
+						break;
+					case BindableResourceType::Buffer:
+						sb.GlobalHeader << "c";
+						break;
+					default:
+						throw NotImplementedException();
 					}
+					sb.GlobalHeader << field.Value.Binding << ");\n";
 				}
 			}
 
@@ -347,7 +366,7 @@ namespace Spire
 					if(field.Value.Type->IsFloat() || field.Value.Type->IsFloatVector() && !field.Value.Type->IsFloatMatrix())
 					{
 						// TODO(tfoley): texture binding allocation needs to be per-stage in D3D11, but should be global for D3D12
-						int slotIndex = sb.TextureBindingsAllocator++;
+						int slotIndex = field.Value.Binding;
 
 						sb.GlobalHeader << "Texture2D " << field.Key;
 						sb.GlobalHeader << " : register(t" << slotIndex << ")";

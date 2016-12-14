@@ -216,6 +216,12 @@ DIAGNOSTIC(34062, Error, cylicReference, "cyclic reference: $0");
 DIAGNOSTIC(34064, Error, noApplicableImplicitImportOperator, "cannot find import operator to import component '$0' to world '$1' when compiling '$2'.")
 
 //
+// 4xxxx - IL code generation.
+//
+DIAGNOSTIC(40001, Error, bindingAlreadyOccupied, "resource binding location '$0' is already occupied by component '$1'.")
+DIAGNOSTIC(40002, Error, invalidBindingValue, "binding location '$0' is out of valid range.")
+DIAGNOSTIC(40003, Error, bindingExceedsLimit, "binding location '$0' assigned to component '$1' exceeds maximum limit.")
+//
 // 5xxxx - Target code generation.
 //
 

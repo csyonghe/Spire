@@ -116,7 +116,7 @@ namespace CoreLib
 			}
 			handle = _wfsopen(fileName.ToWString(), mode, shFlag);
 #else
-			handle = fopen(fileName.ToMultiByteString(), modeMBCS);
+			handle = fopen(fileName.Buffer(), modeMBCS);
 #endif
 			if (!handle)
 			{

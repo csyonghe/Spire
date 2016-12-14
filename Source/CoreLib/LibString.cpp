@@ -100,7 +100,7 @@ namespace CoreLib
 			return String(buf);
 		}
 
-		wchar_t * String::ToWString(int * len) const
+		const wchar_t * String::ToWString(int * len) const
 		{
 			if (!buffer)
 			{

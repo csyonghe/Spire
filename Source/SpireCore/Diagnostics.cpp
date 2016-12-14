@@ -15,6 +15,11 @@ void printDiagnosticArg(StringBuilder& sb, char const* str)
     sb << str;
 }
 
+void printDiagnosticArg(StringBuilder& sb, int str)
+{
+	sb << str;
+}
+
 void printDiagnosticArg(StringBuilder& sb, CoreLib::Basic::String const& str)
 {
     sb << str;

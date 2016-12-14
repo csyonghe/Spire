@@ -1005,7 +1005,7 @@ int spGetCompiledShaderStageNames(SpireCompilationResult * result, const char * 
 	}
 }
 
-char * spGetShaderStageSource(SpireCompilationResult * result, const char * shaderName, const char * stage, int * length)
+const char * spGetShaderStageSource(SpireCompilationResult * result, const char * shaderName, const char * stage, int * length)
 {
 	auto rs = RS(result);
 	CompiledShaderSource * src = nullptr;
