@@ -134,18 +134,9 @@ namespace Spire
 		ProgramSyntaxNode * ProgramSyntaxNode::Clone(CloneContext & ctx)
 		{
 			auto rs = CloneSyntaxNodeFields(new ProgramSyntaxNode(*this), ctx);
-			rs->Structs.Clear();
-			for (auto & x : Structs)
-				rs->Structs.Add(x->Clone(ctx));
-			rs->Functions.Clear();
-			for (auto & x : Functions)
-				rs->Functions.Add(x->Clone(ctx));
-			rs->Pipelines.Clear();
-			for (auto & x : Pipelines)
-				rs->Pipelines.Add(x->Clone(ctx));
-			rs->Shaders.Clear();
-			for (auto & x : Shaders)
-				rs->Shaders.Add(x->Clone(ctx));
+			rs->Members.Clear();
+			for (auto & m : Members)
+				rs->Members.Add(m->Clone(ctx));
 			return rs;
 		}
 		RefPtr<SyntaxNode> FunctionSyntaxNode::Accept(SyntaxVisitor * visitor)

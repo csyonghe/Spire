@@ -524,10 +524,10 @@ namespace Spire
 				
 				if (shader->ParentPipelineName.Content.Length() == 0) // implicit pipeline
 				{
-					if (program->Pipelines.Count() == 1)
+					if (program->GetPipelines().Count() == 1)
 					{
 						shader->ParentPipelineName = shader->Name; // get line and col from shader name
-						shader->ParentPipelineName.Content = program->Pipelines.First()->Name.Content;
+						shader->ParentPipelineName.Content = program->GetPipelines().First()->Name.Content;
 					}
 					else if (!shader->IsModule)
 					{
@@ -768,13 +768,13 @@ namespace Spire
 				HashSet<String> funcNames;
 				this->program = programNode;
 				this->function = nullptr;
-				for (auto & s : program->Structs)
+				for (auto & s : program->GetStructs())
 				{
                     symbolTable->globalDecls.Add(s->Name.Content, s.Ptr());
 				}
-				for (auto & s : program->Structs)
+				for (auto & s : program->GetStructs())
 					VisitStruct(s.Ptr());
-				for (auto & func : program->Functions)
+				for (auto & func : program->GetFunctions())
 				{
 					VisitFunctionDeclaration(func.Ptr());
 					if (funcNames.Contains(func->InternalName))
@@ -793,16 +793,16 @@ namespace Spire
 					else
 						funcNames.Add(func->InternalName);
 				}
-				for (auto & func : program->Functions)
+				for (auto & func : program->GetFunctions())
 				{
 					func->Accept(this);
 				}
-				for (auto & pipeline : program->Pipelines)
+				for (auto & pipeline : program->GetPipelines())
 				{
 					VisitPipeline(pipeline.Ptr());
 				}
 				// build initial symbol table for shaders
-				for (auto & shader : program->Shaders)
+				for (auto & shader : program->GetShaders())
 				{
 					RefPtr<ShaderSymbol> shaderSym = new ShaderSymbol();
 					shaderSym->SyntaxNode = shader.Ptr();
@@ -812,7 +812,7 @@ namespace Spire
 					}
 					symbolTable->Shaders[shader->Name.Content] = shaderSym;
 				}
-				for (auto & shader : program->Shaders)
+				for (auto & shader : program->GetShaders())
 				{
 					VisitShaderPass1(shader.Ptr());
 				}

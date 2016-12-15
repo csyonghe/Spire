@@ -441,6 +441,20 @@ namespace Spire
                 return cursor;
             }
 
+            // TODO(tfoley): It is ugly to have these.
+            // We should probably fix the call sites instead.
+            RefPtr<T>& First() { return *begin(); }
+            int Count()
+            {
+                int count = 0;
+                for (auto iter : (*this))
+                {
+                    (void)iter;
+                    count++;
+                }
+                return count;
+            }
+
             Element* mBegin;
             Element* mEnd;
         };
@@ -921,20 +935,31 @@ namespace Spire
 			virtual ShaderSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class ProgramSyntaxNode : public SyntaxNode
+		class ProgramSyntaxNode : public ContainerDecl
 		{
 		public:
+            // TODO(tfoley): `using` should be a declaration, even at top level
 			List<Token> Usings;
-			List<RefPtr<FunctionSyntaxNode>> Functions;
-			List<RefPtr<PipelineSyntaxNode>> Pipelines;
-			List<RefPtr<ShaderSyntaxNode>> Shaders;
-			List<RefPtr<StructSyntaxNode>> Structs;
+            // Access members of specific types
+            FilteredMemberList<FunctionSyntaxNode> GetFunctions()
+            {
+                return GetMembersOfType<FunctionSyntaxNode>();
+            }
+            FilteredMemberList<PipelineSyntaxNode> GetPipelines()
+            {
+                return GetMembersOfType<PipelineSyntaxNode>();
+            }
+            FilteredMemberList<ShaderSyntaxNode> GetShaders()
+            {
+                return GetMembersOfType<ShaderSyntaxNode>();
+            }
+            FilteredMemberList<StructSyntaxNode> GetStructs()
+            {
+                return GetMembersOfType<StructSyntaxNode>();
+            }
 			void Include(ProgramSyntaxNode * other)
 			{
-				Functions.AddRange(other->Functions);
-				Pipelines.AddRange(other->Pipelines);
-				Shaders.AddRange(other->Shaders);
-				Structs.AddRange(other->Structs);
+                Members.AddRange(other->Members);
 			}
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ProgramSyntaxNode * Clone(CloneContext & ctx) override;
@@ -1027,10 +1052,8 @@ namespace Spire
 			{}
 			virtual RefPtr<ProgramSyntaxNode> VisitProgram(ProgramSyntaxNode* program)
 			{
-				for (auto & f : program->Functions)
-					f = f->Accept(this).As<FunctionSyntaxNode>();
-				for (auto & shader : program->Shaders)
-					shader = shader->Accept(this).As<ShaderSyntaxNode>();
+				for (auto & m : program->Members)
+					m = m->Accept(this).As<Decl>();
 				return program;
 			}
 			virtual RefPtr<ShaderSyntaxNode> VisitShader(ShaderSyntaxNode * shader)

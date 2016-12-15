@@ -309,10 +309,10 @@ namespace Spire
 							result.Program->Structs = context.Program->Structs;
 							result.Program->ConstantPool = context.Program->ConstantPool;
 						}
-						for (auto & s : programSyntaxNode->Structs)
+						for (auto & s : programSyntaxNode->GetStructs())
 							codeGen->ProcessStruct(s.Ptr());
 
-						for (auto & func : programSyntaxNode->Functions)
+						for (auto & func : programSyntaxNode->GetFunctions())
 							codeGen->ProcessFunction(func.Ptr());
 						for (auto & shader : shaderClosures)
 						{
@@ -330,10 +330,10 @@ namespace Spire
 						EnumerableHashSet<String> symbolsToGen;
 						for (auto & unit : units)
 						{
-							for (auto & shader : unit.SyntaxNode->Shaders)
+							for (auto & shader : unit.SyntaxNode->GetShaders())
 								if (!shader->IsModule)
 									symbolsToGen.Add(shader->Name.Content);
-							for (auto & func : unit.SyntaxNode->Functions)
+							for (auto & func : unit.SyntaxNode->GetFunctions())
 								symbolsToGen.Add(func->Name.Content);
 						}
 						auto IsSymbolToGen = [&](String & shaderName)
