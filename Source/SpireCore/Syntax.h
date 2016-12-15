@@ -381,8 +381,84 @@ namespace Spire
 			virtual Decl * Clone(CloneContext & ctx) = 0;
         };
 
+                template<typename T>
+        struct FilteredMemberList
+        {
+            typedef RefPtr<Decl> Element;
 
-        		enum class ExpressionAccess
+            FilteredMemberList()
+                : mBegin(NULL)
+                , mEnd(NULL)
+            {}
+
+            explicit FilteredMemberList(
+                List<Element> const& list)
+                : mBegin(Adjust(list.begin(), list.end()))
+                , mEnd(list.end())
+            {}
+
+            struct Iterator
+            {
+                Element* mCursor;
+                Element* mEnd;
+
+                bool operator!=(Iterator const& other)
+                {
+                    return mCursor != other.mCursor;
+                }
+
+                void operator++()
+                {
+                    mCursor = Adjust(mCursor + 1, mEnd);
+                }
+
+                RefPtr<T>& operator*()
+                {
+                    return *(RefPtr<T>*)mCursor;
+                }
+            };
+
+            Iterator begin()
+            {
+                Iterator iter = { mBegin, mEnd };
+                return iter;
+            }
+
+            Iterator end()
+            {
+                Iterator iter = { mEnd, mEnd };
+                return iter;
+            }
+
+            static Element* Adjust(Element* cursor, Element* end)
+            {
+                while (cursor != end)
+                {
+                    if ((*cursor).As<T>())
+                        return cursor;
+                    cursor++;
+                }
+                return cursor;
+            }
+
+            Element* mBegin;
+            Element* mEnd;
+        };
+
+        // A "container" decl is a parent to other declarations
+        class ContainerDecl : public Decl
+        {
+        public:
+            List<RefPtr<Decl>> Members;
+
+            template<typename T>
+            FilteredMemberList<T> GetMembersOfType()
+            {
+                return FilteredMemberList<T>(Members);
+            }
+        };
+
+		enum class ExpressionAccess
 		{
 			Read, Write
 		};
@@ -769,83 +845,6 @@ namespace Spire
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override { return this; }
 			virtual StageSyntaxNode * Clone(CloneContext & ctx) override;
 		};
-
-        template<typename T>
-        struct FilteredMemberList
-        {
-            typedef RefPtr<Decl> Element;
-
-            FilteredMemberList()
-                : mBegin(NULL)
-                , mEnd(NULL)
-            {}
-
-            explicit FilteredMemberList(
-                List<Element> const& list)
-                : mBegin(Adjust(list.begin(), list.end()))
-                , mEnd(list.end())
-            {}
-
-            struct Iterator
-            {
-                Element* mCursor;
-                Element* mEnd;
-
-                bool operator!=(Iterator const& other)
-                {
-                    return mCursor != other.mCursor;
-                }
-
-                void operator++()
-                {
-                    mCursor = Adjust(mCursor + 1, mEnd);
-                }
-
-                RefPtr<T>& operator*()
-                {
-                    return *(RefPtr<T>*)mCursor;
-                }
-            };
-
-            Iterator begin()
-            {
-                Iterator iter = { mBegin, mEnd };
-                return iter;
-            }
-
-            Iterator end()
-            {
-                Iterator iter = { mEnd, mEnd };
-                return iter;
-            }
-
-            static Element* Adjust(Element* cursor, Element* end)
-            {
-                while (cursor != end)
-                {
-                    if ((*cursor).As<T>())
-                        return cursor;
-                    cursor++;
-                }
-                return cursor;
-            }
-
-            Element* mBegin;
-            Element* mEnd;
-        };
-
-        // A "container" decl is a parent to other declarations
-        class ContainerDecl : public Decl
-        {
-        public:
-            List<RefPtr<Decl>> Members;
-
-            template<typename T>
-            FilteredMemberList<T> GetMembersOfType()
-            {
-                return FilteredMemberList<T>(Members);
-            }
-        };
 
         // Shared functionality for "shader class"-like declarations
         class ShaderDeclBase : public ContainerDecl
