@@ -129,7 +129,8 @@ namespace Spire
 		public:
 			virtual RefPtr<StructSyntaxNode> VisitStruct(StructSyntaxNode * st) override
 			{
-                TranslateStructType(st, &genericTypeMappings);
+                RefPtr<ILStructType> structType = TranslateStructType(st, &genericTypeMappings);
+                result.Program->Structs.Add(structType);
 				return st;
 			}
 			virtual void ProcessFunction(FunctionSyntaxNode * func) override
