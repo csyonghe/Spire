@@ -82,13 +82,13 @@ DIAGNOSTIC(-1, Note, seeOpeningToken, "see opening '$0'")
 DIAGNOSTIC(15300, Error, includeFailed, "failed to find include file '$0'")
 DIAGNOSTIC(-1, Error, noIncludeHandlerSpecified, "no `#include` handler was specified")
 
-// 154xx - macros
+// 154xx - macro definition
 DIAGNOSTIC(15400, Warning, macroRedefinition, "redefinition of macro '$0'")
 DIAGNOSTIC(15401, Warning, macroNotDefined, "macro '$0' is not defined")
 DIAGNOSTIC(15403, Error, expectedTokenInMacroParameters, "expected '$0' in macro parameters")
 
-DIAGNOSTIC(15401, Warning, endOfInputInMacroInvocation, "end of input in macro arguments")
-
+// 155xx - macro expansion
+DIAGNOSTIC(15500, Warning, expectedTokenInMacroArguments, "expected '$0' in macro invocation")
 
 // 159xx - user-defined error/warning
 DIAGNOSTIC(15900, Error,    userDefinedError,   "#error: $0")

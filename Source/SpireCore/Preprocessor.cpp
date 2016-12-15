@@ -473,6 +473,15 @@ static void PushMacroExpansion(
     PushInputStream(preprocessor, expansion);
 }
 
+static void AddEndOfStreamToken(
+    Preprocessor*       preprocessor,
+    PreprocessorMacro*  macro)
+{
+    Token token = PeekRawToken(preprocessor);
+    token.Type = TokenType::EndOfFile;
+    macro->tokens.mTokens.Add(token);
+}
+
 // Check whether the current token on the given input stream should be
 // treated as a macro invocation, and if so set up state for expanding
 // that macro.
@@ -565,6 +574,7 @@ static void MaybeBeginMacroExpansion(
                             // if we reach the end of the file,
                             // then we have an error, and need to
                             // bail out
+                            AddEndOfStreamToken(preprocessor, arg);
                             goto doneWithAllArguments;
 
                         case TokenType::RParent:
@@ -572,6 +582,7 @@ static void MaybeBeginMacroExpansion(
                             // then we are at the end of an argument
                             if (nesting == 0)
                             {
+                                AddEndOfStreamToken(preprocessor, arg);
                                 goto doneWithAllArguments;
                             }
                             // Otherwise we decrease our nesting depth, add
@@ -584,6 +595,7 @@ static void MaybeBeginMacroExpansion(
                             // then we are at the end of an argument
                             if (nesting == 0)
                             {
+                                AddEndOfStreamToken(preprocessor, arg);
                                 AdvanceRawToken(preprocessor);
                                 goto doneWithArgument;
                             }
@@ -602,8 +614,6 @@ static void MaybeBeginMacroExpansion(
 
                         // Add the token and continue parsing.
                         arg->tokens.mTokens.Add(AdvanceRawToken(preprocessor));
-
-
                     }
                 doneWithArgument: {}
                     // We've parsed an argument and should move onto
@@ -613,6 +623,16 @@ static void MaybeBeginMacroExpansion(
             }
         doneWithAllArguments:
             // TODO: handle possible varargs
+
+            // Expect closing right paren
+            if (PeekRawTokenType(preprocessor) == TokenType::RParent)
+            {
+                AdvanceRawToken(preprocessor);
+            }
+            else
+            {
+                GetSink(preprocessor)->diagnose(PeekLoc(preprocessor), Diagnostics::expectedTokenInMacroArguments, TokenType::RParent, PeekRawTokenType(preprocessor));
+            }
 
             int argCount = argIndex;
             if (argCount != paramCount)
@@ -1402,7 +1422,7 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
             // and start capturing parameters
             macro->flavor = PreprocessorMacroFlavor::FunctionLike;
 
-            Token const& leftParen = AdvanceRawToken(context);
+            AdvanceRawToken(context);
 
             // If there are any parameters, parse them
             if (PeekRawTokenType(context) != TokenType::RParent)
