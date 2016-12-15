@@ -870,7 +870,7 @@ namespace Spire
 				auto returnType = TranslateTypeNode(functionNode->ReturnTypeNode);
 				functionNode->ReturnType = returnType;
 				StringBuilder internalName;
-				internalName << functionNode->Name;
+				internalName << functionNode->Name.Content;
 				HashSet<String> paraNames;
 				for (auto & para : functionNode->Parameters)
 				{
@@ -888,11 +888,11 @@ namespace Spire
 				RefPtr<FunctionSymbol> symbol = new FunctionSymbol();
 				symbol->SyntaxNode = functionNode;
 				symbolTable->Functions[functionNode->InternalName] = symbol;
-				auto overloadList = symbolTable->FunctionOverloads.TryGetValue(functionNode->Name);
+				auto overloadList = symbolTable->FunctionOverloads.TryGetValue(functionNode->Name.Content);
 				if (!overloadList)
 				{
-					symbolTable->FunctionOverloads[functionNode->Name] = List<RefPtr<FunctionSymbol>>();
-					overloadList = symbolTable->FunctionOverloads.TryGetValue(functionNode->Name);
+					symbolTable->FunctionOverloads[functionNode->Name.Content] = List<RefPtr<FunctionSymbol>>();
+					overloadList = symbolTable->FunctionOverloads.TryGetValue(functionNode->Name.Content);
 				}
 				overloadList->Add(symbol);
 				this->function = NULL;

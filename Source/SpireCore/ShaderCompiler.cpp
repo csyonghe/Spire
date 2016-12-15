@@ -334,7 +334,7 @@ namespace Spire
 								if (!shader->IsModule)
 									symbolsToGen.Add(shader->Name.Content);
 							for (auto & func : unit.SyntaxNode->Functions)
-								symbolsToGen.Add(func->Name);
+								symbolsToGen.Add(func->Name.Content);
 						}
 						auto IsSymbolToGen = [&](String & shaderName)
 						{

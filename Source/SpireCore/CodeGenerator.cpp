@@ -1062,7 +1062,7 @@ namespace Spire
 				{
 					if (basicType->Func)
 					{
-						funcName = basicType->Func->SyntaxNode->IsExtern ? basicType->Func->SyntaxNode->Name : basicType->Func->SyntaxNode->InternalName;
+						funcName = basicType->Func->SyntaxNode->IsExtern ? basicType->Func->SyntaxNode->Name.Content : basicType->Func->SyntaxNode->InternalName;
 						for (auto & param : basicType->Func->SyntaxNode->Parameters)
 						{
 							if (param->Qualifier == ParameterQualifier::Out || param->Qualifier == ParameterQualifier::InOut)

@@ -513,14 +513,19 @@ namespace Spire
 			virtual ParameterSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class FunctionSyntaxNode : public SyntaxNode
-		{
-		public:
-			String Name, InternalName;
-			RefPtr<ExpressionType> ReturnType;
-			RefPtr<TypeSyntaxNode> ReturnTypeNode;
+        class FunctionDeclBase : public Decl
+        {
+        public:
 			List<RefPtr<ParameterSyntaxNode>> Parameters;
 			RefPtr<BlockStatementSyntaxNode> Body;
+        };
+
+		class FunctionSyntaxNode : public FunctionDeclBase
+		{
+		public:
+			String InternalName;
+			RefPtr<ExpressionType> ReturnType;
+			RefPtr<TypeSyntaxNode> ReturnTypeNode;
 			bool IsInline;
 			bool IsExtern;
 			bool HasSideEffect;
@@ -535,13 +540,10 @@ namespace Spire
 			virtual FunctionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class ImportOperatorDefSyntaxNode : public Decl
+		class ImportOperatorDefSyntaxNode : public FunctionDeclBase
 		{
 		public:
-			Token Name;
 			Token SourceWorld, DestWorld;
-			List<RefPtr<ParameterSyntaxNode>> Parameters;
-			RefPtr<BlockStatementSyntaxNode> Body;
 			EnumerableDictionary<String, String> LayoutAttributes;
 			Token TypeName;
 			List<RefPtr<FunctionSyntaxNode>> Requirements;

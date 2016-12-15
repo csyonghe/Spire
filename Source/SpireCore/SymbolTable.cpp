@@ -435,7 +435,7 @@ namespace Spire
 				auto typeStr = type->ToString();
 				auto retType = PrintType(req->ReturnType, typeStr);
 				StringBuilder sbInternalName;
-				sbInternalName << req->Name;
+				sbInternalName << req->Name.Content;
 				for (auto & op : req->Parameters)
 				{
 					sbInternalName << "@" << PrintType(op->Type, typeStr);

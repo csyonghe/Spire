@@ -735,7 +735,7 @@ namespace Spire
 				{
 					name = ReadToken(TokenType::Identifier);
 				}
-				function->Name = name.Content;
+				function->Name = name;
 				ReadToken(TokenType::LParent);
 				while(!tokenReader.IsAtEnd() && tokenReader.PeekTokenType() != TokenType::RParent)
 				{
