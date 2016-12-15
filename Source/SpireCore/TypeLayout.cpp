@@ -9,6 +9,15 @@
 namespace Spire {
 namespace Compiler {
 
+size_t RoundToAlignment(size_t offset, size_t alignment)
+{
+	size_t remainder = offset % alignment;
+	if (remainder == 0)
+		return offset;
+	else
+		return offset + (alignment - remainder);
+}
+
 static size_t RoundUpToPowerOfTwo( size_t value )
 {
     // TODO(tfoley): I know this isn't a fast approach

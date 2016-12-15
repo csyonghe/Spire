@@ -126,7 +126,7 @@ namespace CoreLib
 		}
 
 		template<typename ...TArgs>
-		auto MakeArray(TArgs ...args)
+		auto MakeArray(TArgs ...args) -> Array<typename FirstType<TArgs...>::type, sizeof...(args)>
 		{
 			Array<typename FirstType<TArgs...>::type, sizeof...(args)> rs;
 			InsertArray(rs, args...);
