@@ -844,7 +844,7 @@ namespace Spire
 
 			virtual RefPtr<StructSyntaxNode> VisitStruct(StructSyntaxNode * structNode) override
 			{
-                for (auto field : structNode->Fields)
+                for (auto field : structNode->GetFields())
                 {
                     field->Type = TranslateTypeNode(field->TypeNode);
                 }
@@ -1838,14 +1838,14 @@ namespace Spire
 				}
 				else if (baseType->IsStruct())
 				{
-					int id = baseType->AsBasicType()->structDecl->FindField(expr->MemberName);
-					if (id == -1)
+					StructField* field = baseType->AsBasicType()->structDecl->FindField(expr->MemberName);
+					if (!field)
 					{
 						expr->Type = ExpressionType::Error;
 						getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->MemberName, baseType->AsBasicType()->structDecl);
 					}
 					else
-						expr->Type = baseType->AsBasicType()->structDecl->Fields[id]->Type;
+						expr->Type = field->Type;
 					if (auto bt = expr->Type->AsBasicType())
 					{
 						bt->IsLeftValue = baseType->AsBasicType()->IsLeftValue;

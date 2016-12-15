@@ -535,27 +535,41 @@ namespace Spire
 		};
 
 
-		class StructSyntaxNode : public Decl
+		class StructSyntaxNode : public ContainerDecl
 		{
 		public:
-			List<RefPtr<StructField>> Fields;
+            FilteredMemberList<StructField> GetFields()
+            {
+                return GetMembersOfType<StructField>();
+            }
 			bool IsIntrinsic = false;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-			int FindField(String name)
+			StructField* FindField(String name)
 			{
-				for (int i = 0; i < Fields.Count(); i++)
-				{
-					if (Fields[i]->Name.Content == name)
-						return i;
-				}
-				return -1;
+                for (auto field : GetFields())
+                {
+                    if (field->Name.Content == name)
+                        return field.Ptr();
+                }
+                return nullptr;
+			}
+			int FindFieldIndex(String name)
+			{
+                int index = 0;
+                for (auto field : GetFields())
+                {
+                    if (field->Name.Content == name)
+                        return index;
+                    index++;
+                }
+                return -1;
 			}
 			virtual StructSyntaxNode * Clone(CloneContext & ctx) override
 			{
 				auto rs = CloneSyntaxNodeFields(new StructSyntaxNode(*this), ctx);
-				rs->Fields.Clear();
-				for (auto & f : Fields)
-					rs->Fields.Add(f->Clone(ctx));
+				rs->Members.Clear();
+				for (auto & m : Members)
+					rs->Members.Add(m->Clone(ctx));
 				return rs;
 			}
 		};
@@ -1037,8 +1051,8 @@ namespace Spire
 			}
 			virtual RefPtr<StructSyntaxNode> VisitStruct(StructSyntaxNode * s)
 			{
-				for (auto & f : s->Fields)
-					f = f->Accept(this).As<StructField>();
+				for (auto & f : s->Members)
+					f = f->Accept(this).As<Decl>();
 				return s;
 			}
 			virtual RefPtr<StatementSyntaxNode> VisitDiscardStatement(DiscardStatementSyntaxNode * stmt)

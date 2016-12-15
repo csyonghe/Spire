@@ -788,7 +788,7 @@ namespace Spire
 					FillPosition(field.Ptr());
 					field->TypeNode = type;
 					field->Name = ReadToken(TokenType::Identifier);
-					rs->Fields.Add(field);
+					rs->Members.Add(field);
 					if (!LookAheadToken(TokenType::Comma))
 						break;
 					ReadToken(TokenType::Comma);
