@@ -817,7 +817,7 @@ int spComponentInfoCollectionGetComponent(SpireComponentInfoCollection * collect
 	result->Name = (*list)[index].Name.Buffer();
 	result->Alignment = (*list)[index].Alignment;
 	result->Offset = (*list)[index].Offset;
-	result->Size = GetTypeSize((*list)[index].Type.Ptr());
+	result->Size = (int) GetTypeSize((*list)[index].Type.Ptr());
 	result->Register = (*list)[index].Register.Buffer();
 	result->TypeName = (*list)[index].TypeName.Buffer();
 	return 0;
@@ -851,8 +851,8 @@ SpireComponentInfoCollection * spModuleGetComponentsByWorld(SpireModule * module
         {
             LayoutInfo fieldInfo = GetLayout(comp.Type.Ptr(), layoutRules);
             size_t offset = layoutRules->AddStructField(&layoutInfo, fieldInfo);
-            comp.Offset = offset;
-            comp.Alignment = fieldInfo.alignment;
+            comp.Offset = (int) offset;
+            comp.Alignment = (int) fieldInfo.alignment;
         }
         layoutRules->EndStructLayout(&layoutInfo);
 	}
@@ -872,8 +872,8 @@ int spModuleGetRequiredComponents(SpireModule * module, SpireComponentInfo * buf
 	{
 		buffer[ptr].Name = comp.Name.Buffer();
 		buffer[ptr].TypeName = comp.TypeName.Buffer();
-		buffer[ptr].Alignment = GetTypeAlignment(comp.Type.Ptr());
-		buffer[ptr].Size = GetTypeSize(comp.Type.Ptr());
+		buffer[ptr].Alignment = (int) GetTypeAlignment(comp.Type.Ptr());
+		buffer[ptr].Size = (int) GetTypeSize(comp.Type.Ptr());
 		buffer[ptr].Offset = comp.Offset;
 		ptr++;
 	}

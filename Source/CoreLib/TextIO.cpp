@@ -1,6 +1,12 @@
 #include "TextIO.h"
 #ifdef _WIN32
+#define NOMINMAX
+#define VC_EXTRALEAN
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#undef NOMINMAX
+#undef VC_EXTRALEAN
+#undef WIN32_LEAN_AND_MEAN
 #define CONVERT_END_OF_LINE
 #endif
 
