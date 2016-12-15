@@ -164,6 +164,18 @@ namespace Spire
                         {
                             expType->structDecl = structDecl;
                         }
+                        else if (auto typeDefDecl = dynamic_cast<TypeDefDecl*>(decl))
+                        {
+                            RefPtr<NamedExpressionType> namedType = new NamedExpressionType();
+                            namedType->decl = typeDefDecl;
+
+                            typeResult = namedType;
+                            return typeNode;
+                        }
+                        else
+                        {
+                            getSink()->diagnose(typeNode, Diagnostics::undefinedTypeName, typeNode->TypeName);
+                        }
                     }
 					else if (currentPipeline || currentShader)
 					{
@@ -768,10 +780,12 @@ namespace Spire
 				HashSet<String> funcNames;
 				this->program = programNode;
 				this->function = nullptr;
-				for (auto & s : program->GetStructs())
+				for (auto & s : program->Members)
 				{
-                    symbolTable->globalDecls.Add(s->Name.Content, s.Ptr());
+                    symbolTable->globalDecls.AddIfNotExists(s->Name.Content, s.Ptr());
 				}
+				for (auto & s : program->GetTypeDefs())
+					VisitTypeDefDecl(s.Ptr());
 				for (auto & s : program->GetStructs())
 					VisitStruct(s.Ptr());
 				for (auto & func : program->GetFunctions())
@@ -850,6 +864,12 @@ namespace Spire
                 }
 				return structNode;
 			}
+
+            virtual RefPtr<TypeDefDecl> VisitTypeDefDecl(TypeDefDecl* decl) override
+            {
+                decl->Type = TranslateTypeNode(decl->TypeNode);
+                return decl;
+            }
 
 			virtual RefPtr<FunctionSyntaxNode> VisitFunction(FunctionSyntaxNode *functionNode) override
 			{

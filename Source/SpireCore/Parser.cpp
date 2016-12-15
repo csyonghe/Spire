@@ -264,6 +264,23 @@ namespace Spire
 			return rs;
 		}
 
+        static RefPtr<TypeDefDecl> ParseTypeDef(Parser* parser)
+        {
+            // Consume the `typedef` keyword
+            parser->ReadToken("typedef");
+
+            // TODO(tfoley): parse an actual declarator
+            auto type = parser->ParseType();
+
+            auto nameToken = parser->ReadToken(TokenType::Identifier);
+
+            RefPtr<TypeDefDecl> typeDefDecl = new TypeDefDecl();
+            typeDefDecl->Name = nameToken;
+            typeDefDecl->TypeNode = type;
+
+            return typeDefDecl;
+        }
+
 		RefPtr<ProgramSyntaxNode> Parser::ParseProgram()
 		{
 			scopeStack.Add(new Scope());
@@ -283,6 +300,8 @@ namespace Spire
 							program->Members.Add(ParsePipeline());
 						else if (LookAheadToken("struct"))
 							program->Members.Add(ParseStruct());
+						else if (LookAheadToken("typedef"))
+							program->Members.Add(ParseTypeDef(this));
 						else if (LookAheadToken("using"))
 						{
 							ReadToken("using");
