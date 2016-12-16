@@ -113,7 +113,7 @@ namespace Spire
         class TypeDefDecl;
         class NamedExpressionType;
 
-		class ExpressionType : public Object
+		class ExpressionType : public RefObject
 		{
 		public:
 			static RefPtr<ExpressionType> Bool;
@@ -131,6 +131,9 @@ namespace Spire
 			static RefPtr<ExpressionType> Float4;
 			static RefPtr<ExpressionType> Void;
 			static RefPtr<ExpressionType> Error;
+            // Note: just exists to make sure we can clean up
+            // canonical types we create along the way
+            static List<RefPtr<ExpressionType>> sCanonicalTypes;
 		public:
 			virtual String ToString() const = 0;
 			virtual ExpressionType * Clone() = 0;
