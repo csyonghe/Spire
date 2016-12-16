@@ -264,6 +264,23 @@ namespace Spire
 			return rs;
 		}
 
+        static RefPtr<TypeDefDecl> ParseTypeDef(Parser* parser)
+        {
+            // Consume the `typedef` keyword
+            parser->ReadToken("typedef");
+
+            // TODO(tfoley): parse an actual declarator
+            auto type = parser->ParseType();
+
+            auto nameToken = parser->ReadToken(TokenType::Identifier);
+
+            RefPtr<TypeDefDecl> typeDefDecl = new TypeDefDecl();
+            typeDefDecl->Name = nameToken;
+            typeDefDecl->TypeNode = type;
+
+            return typeDefDecl;
+        }
+
 		RefPtr<ProgramSyntaxNode> Parser::ParseProgram()
 		{
 			scopeStack.Add(new Scope());
@@ -278,11 +295,13 @@ namespace Spire
 					try
 					{
 						if (LookAheadToken("shader") || LookAheadToken("module"))
-							program->Shaders.Add(ParseShader());
+							program->Members.Add(ParseShader());
 						else if (LookAheadToken("pipeline"))
-							program->Pipelines.Add(ParsePipeline());
+							program->Members.Add(ParsePipeline());
 						else if (LookAheadToken("struct"))
-							program->Structs.Add(ParseStruct());
+							program->Members.Add(ParseStruct());
+						else if (LookAheadToken("typedef"))
+							program->Members.Add(ParseTypeDef(this));
 						else if (LookAheadToken("using"))
 						{
 							ReadToken("using");
@@ -291,7 +310,7 @@ namespace Spire
 						}
 						else if (IsTypeKeyword() || LookAheadToken("inline") || LookAheadToken("extern")
 							|| LookAheadToken("__intrinsic") || LookAheadToken(TokenType::Identifier))
-							program->Functions.Add(ParseFunction());
+							program->Members.Add(ParseFunction());
 						else if (LookAheadToken(TokenType::Semicolon))
 							ReadToken(TokenType::Semicolon);
 						else
@@ -735,7 +754,7 @@ namespace Spire
 				{
 					name = ReadToken(TokenType::Identifier);
 				}
-				function->Name = name.Content;
+				function->Name = name;
 				ReadToken(TokenType::LParent);
 				while(!tokenReader.IsAtEnd() && tokenReader.PeekTokenType() != TokenType::RParent)
 				{
@@ -788,7 +807,7 @@ namespace Spire
 					FillPosition(field.Ptr());
 					field->TypeNode = type;
 					field->Name = ReadToken(TokenType::Identifier);
-					rs->Fields.Add(field);
+					rs->Members.Add(field);
 					if (!LookAheadToken(TokenType::Comma))
 						break;
 					ReadToken(TokenType::Comma);

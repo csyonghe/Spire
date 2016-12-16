@@ -1044,7 +1044,7 @@ namespace Spire
 					}
 					else if (expr->BaseExpression->Type->IsStruct())
 					{
-						int id = expr->BaseExpression->Type->AsBasicType()->structDecl->FindField(expr->MemberName);
+						int id = expr->BaseExpression->Type->AsBasicType()->structDecl->FindFieldIndex(expr->MemberName);
 						GenerateIndexExpression(base, result.Program->ConstantPool->CreateConstant(id),
 							expr->Access == ExpressionAccess::Read);
 					}
@@ -1062,7 +1062,7 @@ namespace Spire
 				{
 					if (basicType->Func)
 					{
-						funcName = basicType->Func->SyntaxNode->IsExtern ? basicType->Func->SyntaxNode->Name : basicType->Func->SyntaxNode->InternalName;
+						funcName = basicType->Func->SyntaxNode->IsExtern ? basicType->Func->SyntaxNode->Name.Content : basicType->Func->SyntaxNode->InternalName;
 						for (auto & param : basicType->Func->SyntaxNode->Parameters)
 						{
 							if (param->Qualifier == ParameterQualifier::Out || param->Qualifier == ParameterQualifier::InOut)
@@ -1295,7 +1295,7 @@ namespace Spire
                 ilStructType->IsIntrinsic = structDecl->IsIntrinsic;
 
 
-                for (auto field : structDecl->Fields)
+                for (auto field : structDecl->GetFields())
                 {
                     ILStructType::ILStructField ilField;
                     ilField.FieldName = field->Name.Content;

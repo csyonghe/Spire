@@ -164,6 +164,18 @@ namespace Spire
                         {
                             expType->structDecl = structDecl;
                         }
+                        else if (auto typeDefDecl = dynamic_cast<TypeDefDecl*>(decl))
+                        {
+                            RefPtr<NamedExpressionType> namedType = new NamedExpressionType();
+                            namedType->decl = typeDefDecl;
+
+                            typeResult = namedType;
+                            return typeNode;
+                        }
+                        else
+                        {
+                            getSink()->diagnose(typeNode, Diagnostics::undefinedTypeName, typeNode->TypeName);
+                        }
                     }
 					else if (currentPipeline || currentShader)
 					{
@@ -524,10 +536,10 @@ namespace Spire
 				
 				if (shader->ParentPipelineName.Content.Length() == 0) // implicit pipeline
 				{
-					if (program->Pipelines.Count() == 1)
+					if (program->GetPipelines().Count() == 1)
 					{
 						shader->ParentPipelineName = shader->Name; // get line and col from shader name
-						shader->ParentPipelineName.Content = program->Pipelines.First()->Name.Content;
+						shader->ParentPipelineName.Content = program->GetPipelines().First()->Name.Content;
 					}
 					else if (!shader->IsModule)
 					{
@@ -768,13 +780,15 @@ namespace Spire
 				HashSet<String> funcNames;
 				this->program = programNode;
 				this->function = nullptr;
-				for (auto & s : program->Structs)
+				for (auto & s : program->Members)
 				{
-                    symbolTable->globalDecls.Add(s->Name.Content, s.Ptr());
+                    symbolTable->globalDecls.AddIfNotExists(s->Name.Content, s.Ptr());
 				}
-				for (auto & s : program->Structs)
+				for (auto & s : program->GetTypeDefs())
+					VisitTypeDefDecl(s.Ptr());
+				for (auto & s : program->GetStructs())
 					VisitStruct(s.Ptr());
-				for (auto & func : program->Functions)
+				for (auto & func : program->GetFunctions())
 				{
 					VisitFunctionDeclaration(func.Ptr());
 					if (funcNames.Contains(func->InternalName))
@@ -793,16 +807,16 @@ namespace Spire
 					else
 						funcNames.Add(func->InternalName);
 				}
-				for (auto & func : program->Functions)
+				for (auto & func : program->GetFunctions())
 				{
 					func->Accept(this);
 				}
-				for (auto & pipeline : program->Pipelines)
+				for (auto & pipeline : program->GetPipelines())
 				{
 					VisitPipeline(pipeline.Ptr());
 				}
 				// build initial symbol table for shaders
-				for (auto & shader : program->Shaders)
+				for (auto & shader : program->GetShaders())
 				{
 					RefPtr<ShaderSymbol> shaderSym = new ShaderSymbol();
 					shaderSym->SyntaxNode = shader.Ptr();
@@ -812,7 +826,7 @@ namespace Spire
 					}
 					symbolTable->Shaders[shader->Name.Content] = shaderSym;
 				}
-				for (auto & shader : program->Shaders)
+				for (auto & shader : program->GetShaders())
 				{
 					VisitShaderPass1(shader.Ptr());
 				}
@@ -844,12 +858,18 @@ namespace Spire
 
 			virtual RefPtr<StructSyntaxNode> VisitStruct(StructSyntaxNode * structNode) override
 			{
-                for (auto field : structNode->Fields)
+                for (auto field : structNode->GetFields())
                 {
                     field->Type = TranslateTypeNode(field->TypeNode);
                 }
 				return structNode;
 			}
+
+            virtual RefPtr<TypeDefDecl> VisitTypeDefDecl(TypeDefDecl* decl) override
+            {
+                decl->Type = TranslateTypeNode(decl->TypeNode);
+                return decl;
+            }
 
 			virtual RefPtr<FunctionSyntaxNode> VisitFunction(FunctionSyntaxNode *functionNode) override
 			{
@@ -870,7 +890,7 @@ namespace Spire
 				auto returnType = TranslateTypeNode(functionNode->ReturnTypeNode);
 				functionNode->ReturnType = returnType;
 				StringBuilder internalName;
-				internalName << functionNode->Name;
+				internalName << functionNode->Name.Content;
 				HashSet<String> paraNames;
 				for (auto & para : functionNode->Parameters)
 				{
@@ -888,11 +908,11 @@ namespace Spire
 				RefPtr<FunctionSymbol> symbol = new FunctionSymbol();
 				symbol->SyntaxNode = functionNode;
 				symbolTable->Functions[functionNode->InternalName] = symbol;
-				auto overloadList = symbolTable->FunctionOverloads.TryGetValue(functionNode->Name);
+				auto overloadList = symbolTable->FunctionOverloads.TryGetValue(functionNode->Name.Content);
 				if (!overloadList)
 				{
-					symbolTable->FunctionOverloads[functionNode->Name] = List<RefPtr<FunctionSymbol>>();
-					overloadList = symbolTable->FunctionOverloads.TryGetValue(functionNode->Name);
+					symbolTable->FunctionOverloads[functionNode->Name.Content] = List<RefPtr<FunctionSymbol>>();
+					overloadList = symbolTable->FunctionOverloads.TryGetValue(functionNode->Name.Content);
 				}
 				overloadList->Add(symbol);
 				this->function = NULL;
@@ -1838,14 +1858,14 @@ namespace Spire
 				}
 				else if (baseType->IsStruct())
 				{
-					int id = baseType->AsBasicType()->structDecl->FindField(expr->MemberName);
-					if (id == -1)
+					StructField* field = baseType->AsBasicType()->structDecl->FindField(expr->MemberName);
+					if (!field)
 					{
 						expr->Type = ExpressionType::Error;
 						getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->MemberName, baseType->AsBasicType()->structDecl);
 					}
 					else
-						expr->Type = baseType->AsBasicType()->structDecl->Fields[id]->Type;
+						expr->Type = field->Type;
 					if (auto bt = expr->Type->AsBasicType())
 					{
 						bt->IsLeftValue = baseType->AsBasicType()->IsLeftValue;

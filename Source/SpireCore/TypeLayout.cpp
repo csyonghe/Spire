@@ -199,7 +199,7 @@ LayoutInfo GetLayout(ExpressionType* type, LayoutRulesImpl* rules)
         {
             LayoutInfo info = rules->BeginStructLayout();
 
-            for (auto field : structDecl->Fields)
+            for (auto field : structDecl->GetFields())
             {
                 rules->AddStructField(&info,
                     GetLayout(field->Type.Ptr(), rules));

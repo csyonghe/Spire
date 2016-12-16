@@ -110,6 +110,8 @@ namespace Spire
 		class BasicExpressionType;
 		class ArrayExpressionType;
 		class GenericExpressionType;
+        class TypeDefDecl;
+        class NamedExpressionType;
 
 		class ExpressionType : public Object
 		{
@@ -131,21 +133,38 @@ namespace Spire
 			static RefPtr<ExpressionType> Error;
 		public:
 			virtual String ToString() const = 0;
-			virtual bool IsIntegral() const = 0;
-			virtual bool Equals(const ExpressionType * type) const = 0;
-			virtual bool IsVectorType() const = 0;
-			virtual bool IsArray() const = 0;
-			virtual bool IsGenericType(String typeName) const = 0;
-			virtual BasicExpressionType * AsBasicType() const = 0;
-			virtual ArrayExpressionType * AsArrayType() const = 0;
-			virtual GenericExpressionType * AsGenericType() const = 0;
 			virtual ExpressionType * Clone() = 0;
+
+            bool IsIntegral() const;
+            bool Equals(const ExpressionType * type) const;
+            bool IsVectorType() const;
+            bool IsArray() const;
+            bool IsGenericType(String typeName) const;
+            BasicExpressionType * AsBasicType() const;
+            ArrayExpressionType * AsArrayType() const;
+            GenericExpressionType * AsGenericType() const;
+            NamedExpressionType* AsNamedType() const;
+
 			bool IsTextureOrSampler() const;
 			bool IsTexture() const;
 			bool IsStruct() const;
 			bool IsShader() const;
 			static void Init();
 			static void Finalize();
+            ExpressionType* GetCanonicalType() const;
+        protected:
+            virtual bool IsIntegralImpl() const { return false; }
+			virtual bool EqualsImpl(const ExpressionType * type) const = 0;
+			virtual bool IsVectorTypeImpl() const { return false; }
+			virtual bool IsArrayImpl() const { return false; }
+			virtual bool IsGenericTypeImpl(String typeName) const { return nullptr; }
+			virtual BasicExpressionType * AsBasicTypeImpl() const { return nullptr; }
+			virtual ArrayExpressionType * AsArrayTypeImpl() const { return nullptr; }
+			virtual GenericExpressionType * AsGenericTypeImpl() const { return nullptr; }
+			virtual NamedExpressionType * AsNamedTypeImpl() const { return nullptr; }
+
+            virtual ExpressionType* CreateCanonicalType() = 0;
+            ExpressionType* canonicalType = nullptr;
 		};
 
 		class BasicExpressionType : public ExpressionType
@@ -182,28 +201,17 @@ namespace Spire
 				this->ShaderClosure = closure;
 				this->Shader = shaderSym;
 			}
-			virtual bool IsIntegral() const override;
-			virtual bool Equals(const ExpressionType * type) const override;
-			virtual bool IsVectorType() const override;
-			virtual bool IsArray() const override;
 			virtual CoreLib::Basic::String ToString() const override;
 			virtual ExpressionType * Clone() override;
-			virtual bool IsGenericType(String typeName) const override
-			{
-				return false;
-			}
-			virtual BasicExpressionType * AsBasicType() const override
+        protected:
+			virtual bool IsIntegralImpl() const override;
+			virtual bool EqualsImpl(const ExpressionType * type) const override;
+			virtual bool IsVectorTypeImpl() const override;
+			virtual BasicExpressionType * AsBasicTypeImpl() const override
 			{
 				return const_cast<BasicExpressionType*>(this);
 			}
-			virtual ArrayExpressionType * AsArrayType() const override
-			{
-				return nullptr;
-			}
-			virtual GenericExpressionType * AsGenericType() const override
-			{
-				return nullptr;
-			}
+            virtual ExpressionType* CreateCanonicalType() override;
 		};
 
 		class ArrayExpressionType : public ExpressionType
@@ -211,29 +219,16 @@ namespace Spire
 		public:
 			RefPtr<ExpressionType> BaseType;
 			int ArrayLength = 0;
-			virtual bool IsIntegral() const override;
-			virtual bool IsArray() const override;
-
-			virtual bool Equals(const ExpressionType * type) const override;
-			virtual bool IsVectorType() const override;
 			virtual CoreLib::Basic::String ToString() const override;
 			virtual ExpressionType * Clone() override;
-			virtual bool IsGenericType(String typeName) const override
-			{
-				return false;
-			}
-			virtual BasicExpressionType * AsBasicType() const override
-			{
-				return nullptr;
-			}
-			virtual ArrayExpressionType * AsArrayType() const override
+        protected:
+			virtual bool IsArrayImpl() const override;
+			virtual bool EqualsImpl(const ExpressionType * type) const override;
+			virtual ArrayExpressionType * AsArrayTypeImpl() const override
 			{
 				return const_cast<ArrayExpressionType*>(this);
 			}
-			virtual GenericExpressionType * AsGenericType() const override
-			{
-				return nullptr;
-			}
+            virtual ExpressionType* CreateCanonicalType() override;
 		};
 
 		class GenericExpressionType : public ExpressionType
@@ -241,30 +236,35 @@ namespace Spire
 		public:
 			RefPtr<ExpressionType> BaseType;
 			String GenericTypeName;
-			virtual bool IsIntegral() const override;
-			virtual bool IsArray() const override;
-
-			virtual bool Equals(const ExpressionType * type) const override;
-			virtual bool IsVectorType() const override;
 			virtual CoreLib::Basic::String ToString() const override;
 			virtual ExpressionType * Clone() override;
-			virtual bool IsGenericType(String typeName) const override
+        protected:
+			virtual bool EqualsImpl(const ExpressionType * type) const override;
+			virtual bool IsGenericTypeImpl(String typeName) const override
 			{
 				return GenericTypeName == typeName;
 			}
-			virtual BasicExpressionType * AsBasicType() const override
-			{
-				return nullptr;
-			}
-			virtual ArrayExpressionType * AsArrayType() const override
-			{
-				return nullptr;
-			}
-			virtual GenericExpressionType * AsGenericType() const override
+			virtual GenericExpressionType * AsGenericTypeImpl() const override
 			{
 				return const_cast<GenericExpressionType*>(this);
 			}
+            virtual ExpressionType* CreateCanonicalType() override;
 		};
+
+        class NamedExpressionType : public ExpressionType
+        {
+        public:
+            TypeDefDecl* decl;
+
+            virtual String ToString() const override;
+            virtual ExpressionType * Clone() override;
+
+        protected:
+            virtual bool EqualsImpl(const ExpressionType * type) const override;
+            virtual NamedExpressionType * AsNamedTypeImpl() const override;
+            virtual ExpressionType* CreateCanonicalType() override;
+        };
+
 		
 		class Type
 		{
@@ -381,8 +381,98 @@ namespace Spire
 			virtual Decl * Clone(CloneContext & ctx) = 0;
         };
 
+                template<typename T>
+        struct FilteredMemberList
+        {
+            typedef RefPtr<Decl> Element;
 
-        		enum class ExpressionAccess
+            FilteredMemberList()
+                : mBegin(NULL)
+                , mEnd(NULL)
+            {}
+
+            explicit FilteredMemberList(
+                List<Element> const& list)
+                : mBegin(Adjust(list.begin(), list.end()))
+                , mEnd(list.end())
+            {}
+
+            struct Iterator
+            {
+                Element* mCursor;
+                Element* mEnd;
+
+                bool operator!=(Iterator const& other)
+                {
+                    return mCursor != other.mCursor;
+                }
+
+                void operator++()
+                {
+                    mCursor = Adjust(mCursor + 1, mEnd);
+                }
+
+                RefPtr<T>& operator*()
+                {
+                    return *(RefPtr<T>*)mCursor;
+                }
+            };
+
+            Iterator begin()
+            {
+                Iterator iter = { mBegin, mEnd };
+                return iter;
+            }
+
+            Iterator end()
+            {
+                Iterator iter = { mEnd, mEnd };
+                return iter;
+            }
+
+            static Element* Adjust(Element* cursor, Element* end)
+            {
+                while (cursor != end)
+                {
+                    if ((*cursor).As<T>())
+                        return cursor;
+                    cursor++;
+                }
+                return cursor;
+            }
+
+            // TODO(tfoley): It is ugly to have these.
+            // We should probably fix the call sites instead.
+            RefPtr<T>& First() { return *begin(); }
+            int Count()
+            {
+                int count = 0;
+                for (auto iter : (*this))
+                {
+                    (void)iter;
+                    count++;
+                }
+                return count;
+            }
+
+            Element* mBegin;
+            Element* mEnd;
+        };
+
+        // A "container" decl is a parent to other declarations
+        class ContainerDecl : public Decl
+        {
+        public:
+            List<RefPtr<Decl>> Members;
+
+            template<typename T>
+            FilteredMemberList<T> GetMembersOfType()
+            {
+                return FilteredMemberList<T>(Members);
+            }
+        };
+
+		enum class ExpressionAccess
 		{
 			Read, Write
 		};
@@ -459,32 +549,55 @@ namespace Spire
 		};
 
 
-		class StructSyntaxNode : public Decl
+		class StructSyntaxNode : public ContainerDecl
 		{
 		public:
-			List<RefPtr<StructField>> Fields;
+            FilteredMemberList<StructField> GetFields()
+            {
+                return GetMembersOfType<StructField>();
+            }
 			bool IsIntrinsic = false;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-			int FindField(String name)
+			StructField* FindField(String name)
 			{
-				for (int i = 0; i < Fields.Count(); i++)
-				{
-					if (Fields[i]->Name.Content == name)
-						return i;
-				}
-				return -1;
+                for (auto field : GetFields())
+                {
+                    if (field->Name.Content == name)
+                        return field.Ptr();
+                }
+                return nullptr;
+			}
+			int FindFieldIndex(String name)
+			{
+                int index = 0;
+                for (auto field : GetFields())
+                {
+                    if (field->Name.Content == name)
+                        return index;
+                    index++;
+                }
+                return -1;
 			}
 			virtual StructSyntaxNode * Clone(CloneContext & ctx) override
 			{
 				auto rs = CloneSyntaxNodeFields(new StructSyntaxNode(*this), ctx);
-				rs->Fields.Clear();
-				for (auto & f : Fields)
-					rs->Fields.Add(f->Clone(ctx));
+				rs->Members.Clear();
+				for (auto & m : Members)
+					rs->Members.Add(m->Clone(ctx));
 				return rs;
 			}
 		};
 
+        // A `typedef` declaration
+        class TypeDefDecl : public Decl
+        {
+        public:
+            RefPtr<TypeSyntaxNode> TypeNode;
+            RefPtr<ExpressionType> Type;
 
+            virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+            virtual TypeDefDecl * Clone(CloneContext & ctx) override;
+        };
 
 		class StatementSyntaxNode : public SyntaxNode
 		{
@@ -513,14 +626,19 @@ namespace Spire
 			virtual ParameterSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class FunctionSyntaxNode : public SyntaxNode
-		{
-		public:
-			String Name, InternalName;
-			RefPtr<ExpressionType> ReturnType;
-			RefPtr<TypeSyntaxNode> ReturnTypeNode;
+        class FunctionDeclBase : public Decl
+        {
+        public:
 			List<RefPtr<ParameterSyntaxNode>> Parameters;
 			RefPtr<BlockStatementSyntaxNode> Body;
+        };
+
+		class FunctionSyntaxNode : public FunctionDeclBase
+		{
+		public:
+			String InternalName;
+			RefPtr<ExpressionType> ReturnType;
+			RefPtr<TypeSyntaxNode> ReturnTypeNode;
 			bool IsInline;
 			bool IsExtern;
 			bool HasSideEffect;
@@ -535,13 +653,10 @@ namespace Spire
 			virtual FunctionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class ImportOperatorDefSyntaxNode : public Decl
+		class ImportOperatorDefSyntaxNode : public FunctionDeclBase
 		{
 		public:
-			Token Name;
 			Token SourceWorld, DestWorld;
-			List<RefPtr<ParameterSyntaxNode>> Parameters;
-			RefPtr<BlockStatementSyntaxNode> Body;
 			EnumerableDictionary<String, String> LayoutAttributes;
 			Token TypeName;
 			List<RefPtr<FunctionSyntaxNode>> Requirements;
@@ -768,83 +883,6 @@ namespace Spire
 			virtual StageSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-        template<typename T>
-        struct FilteredMemberList
-        {
-            typedef RefPtr<Decl> Element;
-
-            FilteredMemberList()
-                : mBegin(NULL)
-                , mEnd(NULL)
-            {}
-
-            explicit FilteredMemberList(
-                List<Element> const& list)
-                : mBegin(Adjust(list.begin(), list.end()))
-                , mEnd(list.end())
-            {}
-
-            struct Iterator
-            {
-                Element* mCursor;
-                Element* mEnd;
-
-                bool operator!=(Iterator const& other)
-                {
-                    return mCursor != other.mCursor;
-                }
-
-                void operator++()
-                {
-                    mCursor = Adjust(mCursor + 1, mEnd);
-                }
-
-                RefPtr<T>& operator*()
-                {
-                    return *(RefPtr<T>*)mCursor;
-                }
-            };
-
-            Iterator begin()
-            {
-                Iterator iter = { mBegin, mEnd };
-                return iter;
-            }
-
-            Iterator end()
-            {
-                Iterator iter = { mEnd, mEnd };
-                return iter;
-            }
-
-            static Element* Adjust(Element* cursor, Element* end)
-            {
-                while (cursor != end)
-                {
-                    if ((*cursor).As<T>())
-                        return cursor;
-                    cursor++;
-                }
-                return cursor;
-            }
-
-            Element* mBegin;
-            Element* mEnd;
-        };
-
-        // A "container" decl is a parent to other declarations
-        class ContainerDecl : public Decl
-        {
-        public:
-            List<RefPtr<Decl>> Members;
-
-            template<typename T>
-            FilteredMemberList<T> GetMembersOfType()
-            {
-                return FilteredMemberList<T>(Members);
-            }
-        };
-
         // Shared functionality for "shader class"-like declarations
         class ShaderDeclBase : public ContainerDecl
         {
@@ -906,20 +944,35 @@ namespace Spire
 			virtual ShaderSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class ProgramSyntaxNode : public SyntaxNode
+		class ProgramSyntaxNode : public ContainerDecl
 		{
 		public:
+            // TODO(tfoley): `using` should be a declaration, even at top level
 			List<Token> Usings;
-			List<RefPtr<FunctionSyntaxNode>> Functions;
-			List<RefPtr<PipelineSyntaxNode>> Pipelines;
-			List<RefPtr<ShaderSyntaxNode>> Shaders;
-			List<RefPtr<StructSyntaxNode>> Structs;
+            // Access members of specific types
+            FilteredMemberList<FunctionSyntaxNode> GetFunctions()
+            {
+                return GetMembersOfType<FunctionSyntaxNode>();
+            }
+            FilteredMemberList<PipelineSyntaxNode> GetPipelines()
+            {
+                return GetMembersOfType<PipelineSyntaxNode>();
+            }
+            FilteredMemberList<ShaderSyntaxNode> GetShaders()
+            {
+                return GetMembersOfType<ShaderSyntaxNode>();
+            }
+            FilteredMemberList<StructSyntaxNode> GetStructs()
+            {
+                return GetMembersOfType<StructSyntaxNode>();
+            }
+            FilteredMemberList<TypeDefDecl> GetTypeDefs()
+            {
+                return GetMembersOfType<TypeDefDecl>();
+            }
 			void Include(ProgramSyntaxNode * other)
 			{
-				Functions.AddRange(other->Functions);
-				Pipelines.AddRange(other->Pipelines);
-				Shaders.AddRange(other->Shaders);
-				Structs.AddRange(other->Structs);
+                Members.AddRange(other->Members);
 			}
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ProgramSyntaxNode * Clone(CloneContext & ctx) override;
@@ -1012,10 +1065,8 @@ namespace Spire
 			{}
 			virtual RefPtr<ProgramSyntaxNode> VisitProgram(ProgramSyntaxNode* program)
 			{
-				for (auto & f : program->Functions)
-					f = f->Accept(this).As<FunctionSyntaxNode>();
-				for (auto & shader : program->Shaders)
-					shader = shader->Accept(this).As<ShaderSyntaxNode>();
+				for (auto & m : program->Members)
+					m = m->Accept(this).As<Decl>();
 				return program;
 			}
 			virtual RefPtr<ShaderSyntaxNode> VisitShader(ShaderSyntaxNode * shader)
@@ -1036,9 +1087,14 @@ namespace Spire
 			}
 			virtual RefPtr<StructSyntaxNode> VisitStruct(StructSyntaxNode * s)
 			{
-				for (auto & f : s->Fields)
-					f = f->Accept(this).As<StructField>();
+				for (auto & f : s->Members)
+					f = f->Accept(this).As<Decl>();
 				return s;
+			}
+			virtual RefPtr<TypeDefDecl> VisitTypeDefDecl(TypeDefDecl* decl)
+			{
+                decl->TypeNode = decl->TypeNode->Accept(this).As<TypeSyntaxNode>();
+				return decl;
 			}
 			virtual RefPtr<StatementSyntaxNode> VisitDiscardStatement(DiscardStatementSyntaxNode * stmt)
 			{

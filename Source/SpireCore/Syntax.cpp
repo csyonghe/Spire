@@ -2,6 +2,8 @@
 #include "SyntaxVisitors.h"
 #include "SymbolTable.h"
 
+#include <assert.h>
+
 namespace Spire
 {
 	namespace Compiler
@@ -20,7 +22,7 @@ namespace Spire
         return nullptr;
     }
 
-		bool BasicExpressionType::Equals(const ExpressionType * type) const
+		bool BasicExpressionType::EqualsImpl(const ExpressionType * type) const
 		{
 			auto basicType = dynamic_cast<const BasicExpressionType*>(type);
 			if (basicType == nullptr)
@@ -32,14 +34,15 @@ namespace Spire
 				basicType->RecordTypeName == RecordTypeName);
 		}
 
-		bool BasicExpressionType::IsVectorType() const
+        ExpressionType* BasicExpressionType::CreateCanonicalType()
+        {
+            // A basic type is already canonical, in our setup
+            return this;
+        }
+
+		bool BasicExpressionType::IsVectorTypeImpl() const
 		{
 			return IsVector(BaseType);
-		}
-
-		bool BasicExpressionType::IsArray() const
-		{
-			return false;
 		}
 
 		CoreLib::Basic::String BasicExpressionType::ToString() const
@@ -134,18 +137,9 @@ namespace Spire
 		ProgramSyntaxNode * ProgramSyntaxNode::Clone(CloneContext & ctx)
 		{
 			auto rs = CloneSyntaxNodeFields(new ProgramSyntaxNode(*this), ctx);
-			rs->Structs.Clear();
-			for (auto & x : Structs)
-				rs->Structs.Add(x->Clone(ctx));
-			rs->Functions.Clear();
-			for (auto & x : Functions)
-				rs->Functions.Add(x->Clone(ctx));
-			rs->Pipelines.Clear();
-			for (auto & x : Pipelines)
-				rs->Pipelines.Add(x->Clone(ctx));
-			rs->Shaders.Clear();
-			for (auto & x : Shaders)
-				rs->Shaders.Add(x->Clone(ctx));
+			rs->Members.Clear();
+			for (auto & m : Members)
+				rs->Members.Add(m->Clone(ctx));
 			return rs;
 		}
 		RefPtr<SyntaxNode> FunctionSyntaxNode::Accept(SyntaxVisitor * visitor)
@@ -524,6 +518,17 @@ namespace Spire
 		{
 			return visitor->VisitStruct(this);
 		}
+
+        RefPtr<SyntaxNode> TypeDefDecl::Accept(SyntaxVisitor * visitor)
+        {
+            return visitor->VisitTypeDefDecl(this);
+        }
+        TypeDefDecl* TypeDefDecl::Clone(CloneContext & ctx)
+        {
+            auto result = CloneSyntaxNodeFields(new TypeDefDecl(*this), ctx);
+            return result;
+        }
+
 		RefPtr<SyntaxNode> DiscardStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
 			return visitor->VisitDiscardStatement(this);
@@ -533,10 +538,68 @@ namespace Spire
 			auto rs = CloneSyntaxNodeFields(new DiscardStatementSyntaxNode(*this), ctx);
 			return rs;
 		}
-		bool BasicExpressionType::IsIntegral() const
+		bool BasicExpressionType::IsIntegralImpl() const
 		{
 			return (BaseType == Compiler::BaseType::Int || BaseType == Compiler::BaseType::UInt || BaseType == Compiler::BaseType::Bool);
 		}
+
+
+        bool ExpressionType::IsIntegral() const
+        {
+            return GetCanonicalType()->IsIntegralImpl();
+        }
+
+        bool ExpressionType::Equals(const ExpressionType * type) const
+        {
+            return GetCanonicalType()->EqualsImpl(type->GetCanonicalType());
+        }
+
+        bool ExpressionType::IsVectorType() const
+        {
+            return GetCanonicalType()->IsVectorTypeImpl();
+        }
+
+        bool ExpressionType::IsArray() const
+        {
+            return GetCanonicalType()->IsArrayImpl();
+        }
+
+        bool ExpressionType::IsGenericType(String typeName) const
+        {
+            return GetCanonicalType()->IsGenericTypeImpl(typeName);
+        }
+
+        BasicExpressionType * ExpressionType::AsBasicType() const
+        {
+            return GetCanonicalType()->AsBasicTypeImpl();
+        }
+
+        ArrayExpressionType * ExpressionType::AsArrayType() const
+        {
+            return GetCanonicalType()->AsArrayTypeImpl();
+        }
+
+        GenericExpressionType * ExpressionType::AsGenericType() const
+        {
+            return GetCanonicalType()->AsGenericTypeImpl();
+        }
+
+        NamedExpressionType* ExpressionType::AsNamedType() const
+        {
+            return AsNamedTypeImpl();
+        }
+
+        ExpressionType* ExpressionType::GetCanonicalType() const
+        {
+            ExpressionType* et = const_cast<ExpressionType*>(this);
+            if (!et->canonicalType)
+            {
+                // TODO(tfoley): worry about thread safety here?
+                et->canonicalType = et->CreateCanonicalType();
+            }
+            return et->canonicalType;
+        }
+
 		bool ExpressionType::IsTexture() const
 		{
 			auto basicType = AsBasicType();
@@ -631,25 +694,25 @@ namespace Spire
 			Void = nullptr;
 			Error = nullptr;
 		}
-		bool ArrayExpressionType::IsIntegral() const
-		{
-			return false;
-		}
-		bool ArrayExpressionType::IsArray() const
+		bool ArrayExpressionType::IsArrayImpl() const
 		{
 			return true;
 		}
-		bool ArrayExpressionType::Equals(const ExpressionType * type) const
+		bool ArrayExpressionType::EqualsImpl(const ExpressionType * type) const
 		{
-			auto arrType = dynamic_cast<const ArrayExpressionType*>(type);
+			auto arrType = type->AsArrayType();
 			if (!arrType)
 				return false;
 			return (ArrayLength == arrType->ArrayLength && BaseType->Equals(arrType->BaseType.Ptr()));
 		}
-		bool ArrayExpressionType::IsVectorType() const
-		{
-			return false;
-		}
+        ExpressionType* ArrayExpressionType::CreateCanonicalType()
+        {
+            auto canonicalBaseType = BaseType->GetCanonicalType();
+            auto canonicalArrayType = new ArrayExpressionType();
+            canonicalArrayType->BaseType = canonicalBaseType;
+            canonicalArrayType->ArrayLength = ArrayLength;
+            return canonicalArrayType;
+        }
 		CoreLib::Basic::String ArrayExpressionType::ToString() const
 		{
 			if (ArrayLength > 0)
@@ -671,25 +734,21 @@ namespace Spire
 		{
 			return visitor->VisitGenericType(this);
 		}
-		bool GenericExpressionType::IsIntegral() const
+		bool GenericExpressionType::EqualsImpl(const ExpressionType * type) const
 		{
-			return false;
-		}
-		bool GenericExpressionType::IsArray() const
-		{
-			return false;
-		}
-		bool GenericExpressionType::Equals(const ExpressionType * type) const
-		{
-			if (auto gtype = dynamic_cast<const GenericExpressionType*>(type))
+			if (auto gtype = type->AsGenericType())
 				return GenericTypeName == gtype->GenericTypeName && gtype->BaseType->Equals(BaseType.Ptr());
 			
 			return false;
 		}
-		bool GenericExpressionType::IsVectorType() const
-		{
-			return false;
-		}
+        ExpressionType* GenericExpressionType::CreateCanonicalType()
+        {
+            auto canonicalBaseType = BaseType->GetCanonicalType();
+            auto canonicalGenericType = new GenericExpressionType();
+            canonicalGenericType->BaseType = canonicalBaseType;
+            canonicalGenericType->GenericTypeName = GenericTypeName;
+            return canonicalGenericType;
+        }
 		CoreLib::Basic::String GenericExpressionType::ToString() const
 		{
 			return GenericTypeName + "<" + BaseType->ToString() + ">";
@@ -700,6 +759,37 @@ namespace Spire
 			rs->BaseType = BaseType->Clone();
 			return rs;
 		}
+
+        // NamedExpressionType
+
+        String NamedExpressionType::ToString() const
+        {
+            return decl->Name.Content;
+        }
+
+        ExpressionType * NamedExpressionType::Clone()
+        {
+            NamedExpressionType* result = new NamedExpressionType();
+            result->decl = decl;
+            return result;
+        }
+
+        bool NamedExpressionType::EqualsImpl(const ExpressionType * /*type*/) const
+        {
+            assert(!"unreachable");
+            return false;
+        }
+
+        NamedExpressionType * NamedExpressionType::AsNamedTypeImpl() const
+        {
+            return const_cast<NamedExpressionType*>(this);
+        }
+
+        ExpressionType* NamedExpressionType::CreateCanonicalType()
+        {
+            return decl->Type->GetCanonicalType();
+        }
+
 		RefPtr<SyntaxNode> ImportExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
 			return visitor->VisitImportExpression(this);
