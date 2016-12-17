@@ -543,7 +543,6 @@ namespace Spire
 			return (BaseType == Compiler::BaseType::Int || BaseType == Compiler::BaseType::UInt || BaseType == Compiler::BaseType::Bool);
 		}
 
-
         bool ExpressionType::IsIntegral() const
         {
             return GetCanonicalType()->IsIntegralImpl();
@@ -657,6 +656,7 @@ namespace Spire
 		RefPtr<ExpressionType> ExpressionType::Float4;
 		RefPtr<ExpressionType> ExpressionType::Void;
 		RefPtr<ExpressionType> ExpressionType::Error;
+        List<RefPtr<ExpressionType>> ExpressionType::sCanonicalTypes;
 
 		void ExpressionType::Init()
 		{
@@ -693,6 +693,8 @@ namespace Spire
 			Float4 = nullptr;
 			Void = nullptr;
 			Error = nullptr;
+            // Note(tfoley): This seems to be just about the only way to clear out a List<T>
+            sCanonicalTypes = List<RefPtr<ExpressionType>>();
 		}
 		bool ArrayExpressionType::IsArrayImpl() const
 		{
@@ -709,6 +711,7 @@ namespace Spire
         {
             auto canonicalBaseType = BaseType->GetCanonicalType();
             auto canonicalArrayType = new ArrayExpressionType();
+            sCanonicalTypes.Add(canonicalArrayType);
             canonicalArrayType->BaseType = canonicalBaseType;
             canonicalArrayType->ArrayLength = ArrayLength;
             return canonicalArrayType;
@@ -745,6 +748,7 @@ namespace Spire
         {
             auto canonicalBaseType = BaseType->GetCanonicalType();
             auto canonicalGenericType = new GenericExpressionType();
+            sCanonicalTypes.Add(canonicalGenericType);
             canonicalGenericType->BaseType = canonicalBaseType;
             canonicalGenericType->GenericTypeName = GenericTypeName;
             return canonicalGenericType;
