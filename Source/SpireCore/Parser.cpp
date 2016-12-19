@@ -106,9 +106,7 @@ namespace Spire
 			bool LookAheadToken(CoreLib::Text::TokenType type, int offset = 0);
 			bool LookAheadToken(const char * string, int offset = 0);
 			Token ReadTypeKeyword();
-			VariableModifier ReadVariableModifier();
 			bool IsTypeKeyword();
-			EnumerableDictionary<String, Token>		ParseAttribute();
 			RefPtr<ProgramSyntaxNode>				ParseProgram();
 			RefPtr<ShaderSyntaxNode>				ParseShader();
 			RefPtr<PipelineSyntaxNode>				ParsePipeline();
@@ -505,25 +503,6 @@ namespace Spire
 			return ParseProgram();
 		}
 
-		EnumerableDictionary<String, Token> Parser::ParseAttribute()
-		{
-			EnumerableDictionary<String, Token> rs;
-			while (LookAheadToken(TokenType::LBracket))
-			{
-				ReadToken(TokenType::LBracket);
-				auto name = ReadToken(TokenType::Identifier).Content;
-				Token value;
-				if (LookAheadToken(TokenType::Colon))
-				{
-					ReadToken(TokenType::Colon);
-					value = ReadToken(TokenType::StringLiterial);
-				}
-				rs[name] = value;
-				ReadToken(TokenType::RBracket);
-			}
-			return rs;
-		}
-
         RefPtr<TypeDefDecl> ParseTypeDef(Parser* parser)
         {
             // Consume the `typedef` keyword
@@ -637,6 +616,122 @@ namespace Spire
 			return shader;
 		}
 
+        static Modifiers ParseModifiers(Parser* parser)
+        {
+            Modifiers modifiers;
+            RefPtr<Modifier>* modifierLink = &modifiers.first;
+            for (;;)
+            {
+                if (AdvanceIf(parser, "in"))
+                {
+                    modifiers.flags |= ModifierFlag::In;
+                }
+                else if (AdvanceIf(parser, "input"))
+                {
+                    modifiers.flags |= ModifierFlag::Input;
+                }
+                else if (AdvanceIf(parser, "out"))
+                {
+                    modifiers.flags |= ModifierFlag::Out;
+                }
+                else if (AdvanceIf(parser, "uniform"))
+                {
+                    modifiers.flags |= ModifierFlag::Uniform;
+                }
+                else if (AdvanceIf(parser, "parameter"))
+                {
+                    modifiers.flags |= ModifierFlag::Parameter;
+                }
+                else if (AdvanceIf(parser, "const"))
+                {
+                    modifiers.flags |= ModifierFlag::Const;
+                }
+                else if (AdvanceIf(parser, "centroid"))
+                {
+                    modifiers.flags |= ModifierFlag::Centroid;
+                }
+                else if (AdvanceIf(parser, "instance"))
+                {
+                    modifiers.flags |= ModifierFlag::Instance;
+                }
+                else if (AdvanceIf(parser, "__builtin"))
+                {
+                    modifiers.flags |= ModifierFlag::Builtin;
+                }
+                else if (AdvanceIf(parser, "layout"))
+				{
+					parser->ReadToken(TokenType::LParent);
+					StringBuilder layoutSB;
+					while (!AdvanceIfMatch(parser, TokenType::RParent))
+					{
+						layoutSB.Append(parser->ReadToken(TokenType::Identifier).Content);
+						if (parser->LookAheadToken(TokenType::OpAssign))
+						{
+							layoutSB.Append(parser->ReadToken(TokenType::OpAssign).Content);
+							layoutSB.Append(parser->ReadToken(TokenType::IntLiterial).Content);
+						}
+						if (AdvanceIf(parser, TokenType::RParent))
+							break;
+						parser->ReadToken(TokenType::Comma);
+						layoutSB.Append(", ");
+					}
+
+                    RefPtr<LayoutModifier> modifier = new LayoutModifier();
+                    modifier->LayoutString = layoutSB.ProduceString();
+
+                    *modifierLink = modifier;
+                    modifierLink = &modifier->next;
+				}
+                else if (AdvanceIf(parser, "inline"))
+				{
+					modifiers.flags |= ModifierFlag::Inline;
+				}
+				else if (AdvanceIf(parser, "public"))
+				{
+					modifiers.flags |= ModifierFlag::Public;
+				}
+				else if (AdvanceIf(parser, "require"))
+				{
+					modifiers.flags |= ModifierFlag::Require;
+				}
+				else if (AdvanceIf(parser, "param"))
+				{
+					modifiers.flags |= ModifierFlag::Param;
+				}
+				else if (AdvanceIf(parser, "extern"))
+				{
+					modifiers.flags |= ModifierFlag::Extern;
+				}
+                else if (AdvanceIf(parser, TokenType::LBracket))
+                {
+                    auto name = parser->ReadToken(TokenType::Identifier).Content;
+                    String value;
+                    if (AdvanceIf(parser, TokenType::Colon))
+                    {
+                        value = parser->ReadToken(TokenType::StringLiterial).Content;
+                    }
+                    parser->ReadToken(TokenType::RBracket);
+
+                    RefPtr<SimpleAttribute> modifier = new SimpleAttribute();
+                    modifier->Key = name;
+                    modifier->Value = value;
+
+                    *modifierLink = modifier;
+                    modifierLink = &modifier->next;
+                }
+                else if (AdvanceIf(parser, "__intrinsic"))
+                {
+                    modifiers.flags |= ModifierFlag::Intrinsic;
+                }
+                else
+                {
+                    // Done with modifier list
+                    return modifiers;
+                }
+            }
+        }
+
+
 		RefPtr<PipelineSyntaxNode> Parser::ParsePipeline()
 		{
 			RefPtr<PipelineSyntaxNode> pipeline = new PipelineSyntaxNode();
@@ -651,16 +746,17 @@ namespace Spire
 			ReadToken(TokenType::LBrace);
 			while (!AdvanceIfMatch(this, TokenType::RBrace))
 			{
-				auto attribs = ParseAttribute();
-				bool isStage = false;
+                auto modifiers = ParseModifiers(this);
 				if (LookAheadToken("input") || LookAheadToken("world"))
 				{
 					auto w = ParseWorld();
+					w->modifiers = modifiers;
 					pipeline->Members.Add(w);
 				}
 				else if (LookAheadToken("import"))
 				{
 					auto op = ParseImportOperator();
+					op->modifiers = modifiers;
 					pipeline->Members.Add(op);
 				}
 				else if (LookAheadToken("stage"))
@@ -671,6 +767,7 @@ namespace Spire
 				else
 				{
 					auto comp = ParseComponent();
+					comp->modifiers = modifiers;
 					pipeline->Members.Add(comp);
 				}
 				if (!isStage) // stage's attributes are part of stage syntax
@@ -708,37 +805,7 @@ namespace Spire
 		{
 			RefPtr<ComponentSyntaxNode> component = new ComponentSyntaxNode();
 			PushScope();
-			while (LookAheadToken("inline") || LookAheadToken("out") || LookAheadToken("require") || LookAheadToken("public") ||
-				LookAheadToken("extern") || LookAheadToken("param"))
-			{
-				if (AdvanceIf(this, "inline"))
-				{
-					component->IsInline = true;
-				}
-				else if (AdvanceIf(this, "out"))
-				{
-					component->IsOutput = true;
-				}
-				else if (AdvanceIf(this, "public"))
-				{
-					component->IsPublic = true;
-				}
-				else if (AdvanceIf(this, "require"))
-				{
-					component->IsRequire = true;
-				}
-				else if (AdvanceIf(this, "param"))
-				{
-					component->IsParam = true;
-					component->IsPublic = true;
-				}
-				else if (AdvanceIf(this, "extern"))
-				{
-					component->IsInput = true;
-				}
-				else
-					break;
-			}
+            component->modifiers = ParseModifiers(this);
 			if (LookAheadToken(TokenType::At))
 				component->Rate = ParseRate();
 			component->TypeNode = ParseType();
@@ -776,7 +843,7 @@ namespace Spire
 		RefPtr<WorldSyntaxNode> Parser::ParseWorld()
 		{
 			RefPtr<WorldSyntaxNode> world = new WorldSyntaxNode();
-			world->IsAbstract = AdvanceIf(this, "input");
+            world->modifiers = ParseModifiers(this);
 			ReadToken("world");
 			FillPosition(world.Ptr());
 			world->Name = ReadToken(TokenType::Identifier);
@@ -818,10 +885,7 @@ namespace Spire
 		RefPtr<ImportSyntaxNode> Parser::ParseImport()
 		{
 			RefPtr<ImportSyntaxNode> rs = new ImportSyntaxNode();
-			if (AdvanceIf(this, "public"))
-			{
-				rs->IsPublic = true;
-			}
+            rs->modifiers = ParseModifiers(this);
 			ReadToken("using");
 			rs->IsInplace = !LookAheadToken(TokenType::OpAssign, 1);
 			if (!rs->IsInplace)
@@ -921,25 +985,7 @@ namespace Spire
 		{
 			anonymousParamCounter = 0;
 			RefPtr<FunctionSyntaxNode> function = new FunctionSyntaxNode();
-			if (LookAheadToken("__intrinsic"))
-			{
-				function->HasSideEffect = false;
-				function->IsExtern = true;
-                tokenReader.AdvanceToken();
-			}
-			else if (LookAheadToken("extern"))
-			{
-				function->IsExtern = true;
-                tokenReader.AdvanceToken();
-			}
-			else
-				function->IsExtern = false;
-			function->IsInline = true;
-			if (LookAheadToken("inline"))
-			{
-				function->IsInline = true;
-                tokenReader.AdvanceToken();
-			}
+            function->modifiers = ParseModifiers(this);
 			
 			PushScope();
 			function->ReturnTypeNode = ParseType();
@@ -977,7 +1023,7 @@ namespace Spire
 			}
 			if (parseBody)
 			{
-				if (!function->IsExtern)
+				if (!function->IsExtern())
 					function->Body = ParseBlockStatement();
 				else
 					ReadToken(TokenType::Semicolon);
@@ -1101,28 +1147,6 @@ namespace Spire
 			return blockStatement;
 		}
 
-		VariableModifier Parser::ReadVariableModifier()
-		{
-			auto token = ReadToken(TokenType::Identifier);
-			if (token.Content == "in")
-				return VariableModifier::In;
-			else if (token.Content == "out")
-				return VariableModifier::Out;
-			else if (token.Content == "uniform")
-				return VariableModifier::Uniform;
-			else if (token.Content == "parameter")
-				return VariableModifier::Parameter;
-			else if (token.Content == "const")
-				return VariableModifier::Const;
-			else if (token.Content == "centroid")
-				return VariableModifier::Centroid;
-			else if (token.Content == "instance")
-				return VariableModifier::Instance;
-			else if (token.Content == "__builtin")
-				return VariableModifier::Builtin;
-			return VariableModifier::None; 
-		}
-
         static RefPtr<Decl> ParseLocalVarDecls(Parser* parser)
         {
             // TODO(tfoley): it is wasteful to allocate this if
@@ -1130,32 +1154,8 @@ namespace Spire
             RefPtr<MultiDecl> multiDecl = new MultiDecl();
 		
 			parser->FillPosition(multiDecl.Ptr());
-			while (!parser->tokenReader.IsAtEnd())
-			{
-				if (parser->LookAheadToken("layout"))
-				{
-					parser->ReadToken("layout");
-					parser->ReadToken(TokenType::LParent);
-					StringBuilder layoutSB;
-					while (!parser->LookAheadToken(TokenType::RParent))
-					{
-						layoutSB.Append(parser->ReadToken(TokenType::Identifier).Content);
-						if (parser->LookAheadToken(TokenType::OpAssign))
-						{
-							layoutSB.Append(parser->ReadToken(TokenType::OpAssign).Content);
-							layoutSB.Append(parser->ReadToken(TokenType::IntLiterial).Content);
-						}
-						if (!parser->LookAheadToken(TokenType::Comma))
-							break;
-						else
-							layoutSB.Append(", ");
-					}
-					parser->ReadToken(TokenType::RParent);
-					multiDecl->LayoutString = layoutSB.ProduceString();
-				}
-				else
-					break;
-			}
+
+            multiDecl->modifiers = ParseModifiers(parser);
 			multiDecl->TypeNode = parser->ParseType();
 			while (!parser->tokenReader.IsAtEnd())
 			{
@@ -1312,28 +1312,7 @@ namespace Spire
 		RefPtr<ParameterSyntaxNode> Parser::ParseParameter()
 		{
 			RefPtr<ParameterSyntaxNode> parameter = new ParameterSyntaxNode();
-			if (LookAheadToken("in"))
-			{
-				parameter->Qualifier = ParameterQualifier::In;
-				ReadToken("in");
-			}
-			else if (LookAheadToken("inout"))
-			{
-				parameter->Qualifier = ParameterQualifier::InOut;
-				ReadToken("inout");
-			}
-			else if (LookAheadToken("out"))
-			{
-				parameter->Qualifier = ParameterQualifier::Out;
-				ReadToken("out");
-			}
-			else if (LookAheadToken("uniform"))
-			{
-				parameter->Qualifier = ParameterQualifier::Uniform;
-				ReadToken("uniform");
-				if (LookAheadToken("in"))
-					ReadToken("in");
-			}
+            parameter->modifiers = ParseModifiers(this);
 			parameter->TypeNode = ParseType();
 			if (LookAheadToken(TokenType::Identifier))
 			{

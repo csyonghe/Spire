@@ -52,7 +52,7 @@ namespace Spire
 			bool IsRequire()
 			{
 				for (auto & impl : Implementations)
-					if (impl->SyntaxNode->IsRequire)
+					if (impl->SyntaxNode->IsRequire())
 						return true;
 				return false;
 			}

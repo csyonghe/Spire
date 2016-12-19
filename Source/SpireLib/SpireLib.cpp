@@ -547,7 +547,7 @@ namespace SpireLib
 						if (comp.Value->Implementations.Count() != 1)
 							continue;
 						auto impl = comp.Value->Implementations.First();
-						if (!impl->SyntaxNode->IsRequire && !impl->SyntaxNode->IsParam)
+						if (!impl->SyntaxNode->IsRequire() && !impl->SyntaxNode->IsParam())
 							continue;
 						ComponentMetaData compMeta;
 						compMeta.Name = comp.Key;
@@ -561,7 +561,7 @@ namespace SpireLib
 							compMeta.Offset = offset;
 							offset += compMeta.Size;
 						}
-						if (impl->SyntaxNode->IsRequire)
+						if (impl->SyntaxNode->IsRequire())
 							meta.Requirements.Add(compMeta);
 						else
 							meta.Parameters.Add(compMeta);
