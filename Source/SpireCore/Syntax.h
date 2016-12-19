@@ -50,42 +50,6 @@ namespace Spire
 			Error = 16384,
 		};
 
-		inline const char * BaseTypeToString(BaseType t)
-		{
-			switch (t)
-			{
-			case BaseType::Void:
-				return "void";
-			case BaseType::Bool:
-			case BaseType::Int:
-				return "int";
-			case BaseType::Int2:
-				return "int2";
-			case BaseType::Int3:
-				return "int3";
-			case BaseType::Int4:
-				return "int4";
-			case BaseType::Float:
-				return "float";
-			case BaseType::Float2:
-				return "float2";
-			case BaseType::Float3:
-				return "float3";
-			case BaseType::Float4:
-				return "float4";
-			case BaseType::Float3x3:
-				return "float3x3";
-			case BaseType::Float4x4:
-				return "float4x4";
-			case BaseType::Texture2D:
-				return "sampler2D";
-			case BaseType::TextureCube:
-				return "samplerCube";
-			default:
-				return "<err-type>";
-			}
-		}
-
 		inline bool IsVector(BaseType type)
 		{
 			return (((int)type) & 15) != 0;

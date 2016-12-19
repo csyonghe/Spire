@@ -122,6 +122,9 @@ namespace Spire
 			case Compiler::BaseType::Texture2D:
 				res.Append("sampler2D");
 				break;
+			case Compiler::BaseType::Texture2DShadow:
+				res.Append("sampler2DShadow");
+				break;
 			case Compiler::BaseType::Texture3D:
 				res.Append("sampler3D");
 				break;
@@ -142,6 +145,9 @@ namespace Spire
 				break;
 			case Compiler::BaseType::Record:
 				res.Append(RecordTypeName);
+				break;
+			case Compiler::BaseType::SamplerState:
+				res.Append("SamplerState");
 				break;
 			case Compiler::BaseType::Error:
 				res.Append("<errtype>");
