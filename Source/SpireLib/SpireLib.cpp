@@ -17,6 +17,13 @@ struct SpireDiagnosticSink
 	CoreLib::List<Spire::Compiler::Diagnostic> diagnostics;
 };
 
+struct SpireParameterSet
+{
+	ILModuleParameterSet * paramSet = nullptr;
+	int bindingSlotCount = 0;
+	List<SpireResourceBindingInfo> bindings;
+};
+
 namespace SpireLib
 {
 	void ReadSource(EnumerableDictionary<String, StageSource> & sources, CoreLib::Text::TokenReader & parser, String src)
@@ -246,7 +253,8 @@ namespace SpireLib
 		writer << "name " << MetaData.ShaderName << EndLine;
 		for (auto & ublock : MetaData.ParameterSets)
 		{
-			writer << "paramset \"" << ublock.Key << "\" size " << ublock.Value->BufferSize << "\n{\n";
+			writer << "paramset \"" << ublock.Key << "\" size " << ublock.Value->BufferSize 
+				<< " binding " << ublock.Value->DescriptorSetId << "\n{\n";
 			for (auto & entry : ublock.Value->Parameters)
 			{
 				writer << entry.Value->Name << "(\"" << entry.Key << "\") : ";
@@ -334,6 +342,11 @@ namespace SpireLib
 					parser.ReadToken();
 					paramSet->BufferSize = parser.ReadInt();
 				}
+				if (parser.LookAhead("binding"))
+				{
+					parser.ReadToken();
+					paramSet->DescriptorSetId = parser.ReadInt();
+				}
 				parser.Read("{");
 				while (!parser.LookAhead("}"))
 				{
@@ -417,6 +430,8 @@ namespace SpireLib
 	{
 	public:
 		CoreLib::EnumerableDictionary<String, CompiledShaderSource> Sources;
+		CoreLib::EnumerableDictionary<String, List<SpireParameterSet>> ParamSets;
+
 	};
 
 	class ComponentMetaData
@@ -424,10 +439,10 @@ namespace SpireLib
 	public:
         RefPtr<ExpressionType> Type;
 		String TypeName;
-		String Register;
 		String Name;
 		int Offset = 0;
 		int Alignment = 0;
+		int Size = 0;
 		int GetHashCode()
 		{
 			return Name.GetHashCode();
@@ -442,8 +457,8 @@ namespace SpireLib
 	{
 	public:
 		String Name;
-		EnumerableDictionary<String, List<ComponentMetaData>> ComponentsByWorld;
-		EnumerableHashSet<ComponentMetaData> Requirements;
+		List<ComponentMetaData> Parameters;
+		List<ComponentMetaData> Requirements;
 	};
 
 	class CompilationContext
@@ -522,32 +537,28 @@ namespace SpireLib
 				{
 					ModuleMetaData meta;
 					meta.Name = shader.Key;
+					int offset = 0;
 					for (auto & comp : shader.Value->Components)
 					{
+						if (comp.Value->Implementations.Count() != 1)
+							continue;
 						ComponentMetaData compMeta;
 						compMeta.Name = comp.Key;
                         compMeta.Type = comp.Value->Type->DataType;
 						compMeta.TypeName = compMeta.Type->ToString();
-						for (auto & impl : comp.Value->Implementations)
+						compMeta.Alignment = (int)GetTypeAlignment(compMeta.Type.Ptr(), LayoutRule::Std140);
+						compMeta.Size = (int)GetTypeSize(compMeta.Type.Ptr(), LayoutRule::Std140);
+						offset = RoundToAlignment(offset, compMeta.Alignment);
+						compMeta.Offset = offset;
+						offset += compMeta.Size;
+						auto impl = comp.Value->Implementations.First();
+						if (impl->SyntaxNode->IsRequire)
 						{
-							impl->SyntaxNode->LayoutAttributes.TryGetValue("Binding", compMeta.Register);
-							if (impl->SyntaxNode->IsRequire)
-							{
-								meta.Requirements.Add(compMeta);
-							}
-							else
-							{
-								for (auto & world : impl->Worlds)
-								{
-									auto list = meta.ComponentsByWorld.TryGetValue(world);
-									if (!list)
-									{
-										meta.ComponentsByWorld[world] = List<ComponentMetaData>();
-										list = meta.ComponentsByWorld.TryGetValue(world);
-									}
-									list->Add(compMeta);
-								}
-							}
+							meta.Requirements.Add(compMeta);
+						}
+						else
+						{
+							meta.Parameters.Add(compMeta);
 						}
 					}
 					modules.Add(shader.Key, _Move(meta));
@@ -652,6 +663,32 @@ namespace SpireLib
 			{
 				sink->diagnostics.AddRange(cresult.sink.diagnostics);
 				sink->errorCount += cresult.GetErrorCount();
+			}
+			if (errorCount == 0)
+			{
+				for (auto shader : result.Sources)
+				{
+					List<SpireParameterSet> paramSets;
+					for (auto & pset : shader.Value.MetaData.ParameterSets)
+					{
+						SpireParameterSet set;
+						set.paramSet = pset.Value.Ptr();
+						for (auto & item : pset.Value->Parameters)
+						{
+							auto resType = item.Value->Type->GetBindableResourceType();
+							if (resType != BindableResourceType::NonBindable)
+							{
+								SpireResourceBindingInfo info;
+								info.Type = (SpireBindableResourceType)resType;
+								info.NumLegacyBindingPoints = item.Value->BindingPoints.Count();
+								info.LegacyBindingPoints = item.Value->BindingPoints.Buffer();
+								info.Name = item.Value->Name.Buffer();
+							}
+						}
+						paramSets.Add(_Move(set));
+					}
+					result.ParamSets[shader.Key] = _Move(paramSets);
+				}
 			}
 			return errorCount == 0;
 		}
@@ -768,55 +805,27 @@ const char * spGetModuleName(SpireModule * module)
 	return moduleNode->Name.Buffer();
 }
 
-int spComponentInfoCollectionGetComponent(SpireComponentInfoCollection * collection, int index, SpireComponentInfo * result)
-{
-	auto list = reinterpret_cast<List<ComponentMetaData>*>(collection);
-	if (!list)
-		return SPIRE_ERROR_INVALID_PARAMETER;
-	if (index < 0 || index >= list->Count())
-		return SPIRE_ERROR_INVALID_PARAMETER;
-	result->Name = (*list)[index].Name.Buffer();
-	result->Alignment = (*list)[index].Alignment;
-	result->Offset = (*list)[index].Offset;
-	result->Size = (int) GetTypeSize((*list)[index].Type.Ptr());
-	result->Register = (*list)[index].Register.Buffer();
-	result->TypeName = (*list)[index].TypeName.Buffer();
-	return 0;
-}
-
-int spComponentInfoCollectionGetCount(SpireComponentInfoCollection * collection)
-{
-	auto list = reinterpret_cast<List<ComponentMetaData>*>(collection);
-	if (!list)
-		return SPIRE_ERROR_INVALID_PARAMETER;
-	return list->Count();
-}
-
-SpireComponentInfoCollection * spModuleGetComponentsByWorld(SpireModule * module, const char * worldName, int layout)
+int spModuleGetParameterCount(SpireModule * module)
 {
 	auto moduleNode = MODULE(module);
-	String worldNameStr = worldName;
-	Spire::Compiler::LayoutRule layoutRule;
-	if (layout == SPIRE_LAYOUT_PACKED)
-		layoutRule = LayoutRule::Packed;
-	else if (layout == SPIRE_LAYOUT_UNIFORM)
-		layoutRule = LayoutRule::Std140;
-	else
-		layoutRule = LayoutRule::Std430;
-	if (auto components = moduleNode->ComponentsByWorld.TryGetValue(worldNameStr))
-	{
-		// compute layout
-        LayoutRulesImpl* layoutRules = GetLayoutRulesImpl(layoutRule);
-        LayoutInfo layoutInfo = layoutRules->BeginStructLayout();
-        for (auto & comp : *components)
-        {
-            LayoutInfo fieldInfo = GetLayout(comp.Type.Ptr(), layoutRules);
-            size_t offset = layoutRules->AddStructField(&layoutInfo, fieldInfo);
-            comp.Offset = (int) offset;
-            comp.Alignment = (int) fieldInfo.alignment;
-        }
-        layoutRules->EndStructLayout(&layoutInfo);
-	}
+	return moduleNode->Parameters.Count();
+}
+int spModuleGetParameterBufferSize(SpireModule * module)
+{
+	auto moduleNode = MODULE(module);
+	return moduleNode->Parameters.Last().Offset + moduleNode->Parameters.Last().Size;
+}
+
+int spModuleGetParameter(SpireModule * module, int index, SpireComponentInfo * result)
+{
+	auto moduleNode = MODULE(module);
+	auto & param = moduleNode->Parameters[index];
+	result->TypeName = param.TypeName.Buffer();
+	result->Size = param.Size;
+	result->Offset = param.Offset;
+	result->Alignment = param.Alignment;
+	result->Name = param.Name.Buffer();
+	result->BindableResourceType = (int)param.Type->GetBindableResourceType();
 	return 0;
 }
 
@@ -966,7 +975,7 @@ int spGetCompiledShaderStageNames(SpireCompilationResult * result, const char * 
 	}
 }
 
-char * spGetShaderStageSource(SpireCompilationResult * result, const char * shaderName, const char * stage, int * length)
+const char * spGetShaderStageSource(SpireCompilationResult * result, const char * shaderName, const char * stage, int * length)
 {
 	auto rs = RS(result);
 	CompiledShaderSource * src = nullptr;
@@ -987,19 +996,73 @@ char * spGetShaderStageSource(SpireCompilationResult * result, const char * shad
 			{
 				if (length)
 					*length = state->MainCode.Length() + 1;
-				return (char*) state->MainCode.Buffer();
+				return state->MainCode.Buffer();
 			}
 			else
 			{
 				if (length)
 					*length = state->BinaryCode.Count();
-				return (char*)state->BinaryCode.Buffer();
+				return (const char*)state->BinaryCode.Buffer();
 			}
 		}
 	}
 	return nullptr;
 }
 
+int spGetShaderParameterSetCount(SpireCompilationResult * result, const char * shaderName)
+{
+	auto rs = RS(result);
+	CompiledShaderSource * src = nullptr;
+	if (shaderName == nullptr)
+	{
+		if (rs->Sources.Count())
+			src = &rs->Sources.First().Value;
+	}
+	else
+	{
+		src = rs->Sources.TryGetValue(shaderName);
+	}
+	if (src)
+	{
+		return src->MetaData.ParameterSets.Count();
+	}
+	return 0;
+}
+SpireParameterSet * spGetShaderParameterSet(SpireCompilationResult * result, const char * shaderName, int index)
+{
+	auto rs = RS(result);
+	List<SpireParameterSet> * sets = nullptr;
+	if (shaderName == nullptr)
+	{
+		if (rs->ParamSets.Count())
+			sets = &rs->ParamSets.First().Value;
+	}
+	else
+	{
+		sets = rs->ParamSets.TryGetValue(shaderName);
+	}
+	if (sets)
+	{
+		return &(*sets)[index];
+	}
+	return nullptr;
+}
+const char * spParameterSetGetBindingName(SpireParameterSet * set)
+{
+	return set->paramSet->BindingName.Buffer();
+}
+int spParameterSetGetBindingIndex(SpireParameterSet * set)
+{
+	return set->paramSet->DescriptorSetId;
+}
+int spParameterSetGetBindingSlotCount(SpireParameterSet * set)
+{
+	return set->bindings.Count();
+}
+SpireResourceBindingInfo * spParameterSetGetBindingSlot(SpireParameterSet * set, int index)
+{
+	return &set->bindings[index];
+}
 void spDestroyCompilationResult(SpireCompilationResult * result)
 {
 	delete RS(result);

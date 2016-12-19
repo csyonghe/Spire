@@ -162,7 +162,7 @@ namespace Spire
 						parent = parent->Parent;
 					}
 					StringBuilder sbBindingName;
-					for (int i = namePath.Count() - 1; i >= 1; i--)
+					for (int i = namePath.Count() - 2; i >= 0; i--)
 					{
 						sbBindingName << namePath[i];
 						if (i > 0)
