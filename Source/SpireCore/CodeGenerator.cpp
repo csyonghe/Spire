@@ -185,7 +185,7 @@ namespace Spire
 				// first pass: add components to module layout definition, and assign them user-defined binding slots (if any).
 				for (auto def : shader->Definitions)
 				{
-					if (def->SyntaxNode->IsParam)
+					if (def->SyntaxNode->IsParam())
 					{
 						auto module = compiledShader->ModuleParamSets[def->ModuleInstance->BindingName]().Ptr();
 						RefPtr<ILModuleParameterInstance> param = new ILModuleParameterInstance();
@@ -222,7 +222,7 @@ namespace Spire
 							}
 
 							String bindingValStr;
-							if (def->SyntaxNode->LayoutAttributes.TryGetValue("Binding", bindingValStr))
+							if (def->SyntaxNode->FindSimpleAttribute("Binding", bindingValStr))
 							{
 								int bindingVal = StringToInt(bindingValStr);
 
@@ -247,7 +247,7 @@ namespace Spire
 				// second pass: assign binding slots for rest of resource components whose binding is not explicitly specified by user
 				for (auto def : shader->Definitions)
 				{
-					if (def->SyntaxNode->IsParam)
+					if (def->SyntaxNode->IsParam())
 					{
 						auto module = compiledShader->ModuleParamSets[def->ModuleInstance->BindingName]().Ptr();
 						auto & param = **module->Parameters.TryGetValue(def->UniqueName);
@@ -294,6 +294,26 @@ namespace Spire
 				}
 			}
 
+            ParameterQualifier GetParamQualifier(ParameterSyntaxNode* paramDecl)
+            {
+                if (paramDecl->modifiers.flags && ModifierFlag::InOut)
+                    return ParameterQualifier::InOut;
+                else if (paramDecl->modifiers.flags && ModifierFlag::Out)
+                    return ParameterQualifier::Out;
+                else
+                    return ParameterQualifier::In;
+            }
+
+            EnumerableDictionary<String, String> CopyLayoutAttributes(Decl* decl)
+            {
+                EnumerableDictionary<String, String> attrs;
+                for (auto attr : decl->GetLayoutAttributes())
+                {
+                    attrs[attr->Key] = attr->Value;
+                }
+                return attrs;
+            }
+
 			virtual void ProcessShader(ShaderIR * shader) override
 			{
 				currentShader = shader;
@@ -320,9 +340,9 @@ namespace Spire
 					genericTypeMappings[world.Key] = recordType;
 					w->Name = world.Key;
 					w->OutputType = recordType;
-					w->Attributes = world.Value->LayoutAttributes;
+					w->Attributes = CopyLayoutAttributes(world.Value);
 					w->Shader = compiledShader.Ptr();
-					w->IsAbstract = world.Value->IsAbstract;
+					w->IsAbstract = world.Value->IsAbstract();
 					auto impOps = pipeline->GetImportOperatorsFromSourceWorld(world.Key);
 					w->Position = world.Value->Position;
 					compiledShader->Worlds[world.Key] = w;
@@ -342,13 +362,13 @@ namespace Spire
 						if (compDef->World == world)
 							components.Add(compDef.Ptr());
 					// for abstract world, fill in record type now
-					if (world != "<uniform>" && pipeline->Worlds[world]()->IsAbstract)
+					if (world != "<uniform>" && pipeline->Worlds[world]()->IsAbstract())
 					{
 						auto compiledWorld = compiledShader->Worlds[world]();
 						for (auto & comp : components)
 						{
 							ILObjectDefinition compDef;
-							compDef.Attributes = comp->SyntaxNode->LayoutAttributes;
+							compDef.Attributes = CopyLayoutAttributes(comp->SyntaxNode.Ptr());
 							compDef.Name = comp->UniqueName;
 							compDef.Type = TranslateExpressionType(comp->Type.Ptr());
 							compDef.Position = comp->SyntaxNode->Position;
@@ -368,13 +388,13 @@ namespace Spire
 					auto &components = worldComps[world.Key]();
 					for (auto & comp : components)
 					{
-						if (comp->SyntaxNode->IsInput)
+						if (comp->SyntaxNode->IsInput())
 						{
 							ILObjectDefinition def;
 							def.Name = comp->UniqueName;
 							def.Type = TranslateExpressionType(comp->Type.Ptr());
 							def.Position = comp->SyntaxNode->Position;
-							def.Attributes = comp->SyntaxNode->LayoutAttributes;
+							def.Attributes = CopyLayoutAttributes(comp->SyntaxNode.Ptr());
 							world.Value->Inputs.Add(def);
 						}
 					}
@@ -390,18 +410,18 @@ namespace Spire
 						{
 							auto recType = genericTypeMappings[importExpr->ImportOperatorDef->SourceWorld.Content]().As<ILRecordType>();
 							ILObjectDefinition entryDef;
-							entryDef.Attributes = comp->SyntaxNode->LayoutAttributes;
+							entryDef.Attributes = CopyLayoutAttributes(comp->SyntaxNode.Ptr());
 							entryDef.Name = importExpr->ComponentUniqueName;
 							entryDef.Type = TranslateExpressionType(importExpr->Type.Ptr());
 							entryDef.Position = importExpr->Position;
 							recType->Members.AddIfNotExists(importExpr->ComponentUniqueName, entryDef);
 						});
 						// if comp is output, add comp to its world's record type
-						if (comp->SyntaxNode->IsOutput)
+						if (comp->SyntaxNode->IsOutput())
 						{
 							auto recType = genericTypeMappings[comp->World]().As<ILRecordType>();
 							ILObjectDefinition entryDef;
-							entryDef.Attributes = comp->SyntaxNode->LayoutAttributes;
+							entryDef.Attributes = CopyLayoutAttributes(comp->SyntaxNode.Ptr());
 							entryDef.Name = comp->UniqueName;
 							entryDef.Type = TranslateExpressionType(comp->Type.Ptr());
 							entryDef.Position = comp->SyntaxNode->Position;
@@ -463,7 +483,7 @@ namespace Spire
 						{
 							auto paramType = TranslateExpressionType(param->Type);
 							String paramName = EscapeDoubleUnderscore("p" + String(id) + "_" + param->Name.Content);
-							func->Parameters.Add(paramName, ILParameter(paramType, param->Qualifier));
+							func->Parameters.Add(paramName, ILParameter(paramType, GetParamQualifier(param.Ptr())));
 							auto argInstr = codeWriter.FetchArg(paramType, id + 1);
 							argInstr->Name = paramName;
 							variables.Add(param->Name.Content, argInstr);
@@ -494,7 +514,7 @@ namespace Spire
 				}
 				for (auto & world : pipeline->Worlds)
 				{
-					if (world.Value->IsAbstract)
+					if (world.Value->IsAbstract())
 						continue;
 					NamingCounter = 0;
 
@@ -556,14 +576,14 @@ namespace Spire
 				String varName = EscapeDoubleUnderscore(currentComponent->OriginalName);
 				RefPtr<ILType> type = TranslateExpressionType(currentComponent->Type);
 
-				if (comp->SyntaxNode->IsInput)
+				if (comp->SyntaxNode->IsInput())
 				{
 					auto loadInput = new LoadInputInstruction(type.Ptr(), comp->UniqueName);
 					codeWriter.Insert(loadInput);
 					variables.Add(currentComponent->UniqueName, loadInput);
 					return;
 				}
-				else if (comp->SyntaxNode->IsParam)
+				else if (comp->SyntaxNode->IsParam())
 				{
 					auto moduleInst = compiledShader->ModuleParamSets[comp->ModuleInstance->BindingName]();
 					auto param = moduleInst->Parameters[comp->UniqueName]().Ptr();
@@ -607,7 +627,7 @@ namespace Spire
 			}
 			virtual RefPtr<FunctionSyntaxNode> VisitFunction(FunctionSyntaxNode* function) override
 			{
-				if (function->IsExtern)
+				if (function->IsExtern())
 					return function;
 				RefPtr<ILFunction> func = new ILFunction();
 				result.Program->Functions.Add(function->InternalName, func);
@@ -618,7 +638,7 @@ namespace Spire
 				int id = 0;
 				for (auto &param : function->Parameters)
 				{
-					func->Parameters.Add(param->Name.Content, ILParameter(TranslateExpressionType(param->Type), param->Qualifier));
+					func->Parameters.Add(param->Name.Content, ILParameter(TranslateExpressionType(param->Type), GetParamQualifier(param.Ptr())));
 					auto op = FetchArg(param->Type.Ptr(), ++id);
 					op->Name = EscapeDoubleUnderscore(String("p_") + param->Name.Content);
 					variables.Add(param->Name.Content, op);
@@ -1125,10 +1145,10 @@ namespace Spire
 				{
 					if (basicType->Func)
 					{
-						funcName = basicType->Func->SyntaxNode->IsExtern ? basicType->Func->SyntaxNode->Name.Content : basicType->Func->SyntaxNode->InternalName;
+						funcName = basicType->Func->SyntaxNode->IsExtern() ? basicType->Func->SyntaxNode->Name.Content : basicType->Func->SyntaxNode->InternalName;
 						for (auto & param : basicType->Func->SyntaxNode->Parameters)
 						{
-							if (param->Qualifier == ParameterQualifier::Out || param->Qualifier == ParameterQualifier::InOut)
+							if (param->HasModifier(ModifierFlag::Out))
 							{
 								hasSideEffect = true;
 								break;
@@ -1142,7 +1162,7 @@ namespace Spire
 						funcName = GetComponentFunctionName(funcComp->SyntaxNode.Ptr());
 						for (auto & param : funcComp->SyntaxNode->Parameters)
 						{
-							if (param->Qualifier == ParameterQualifier::Out || param->Qualifier == ParameterQualifier::InOut)
+							if (param->HasModifier(ModifierFlag::Out))
 							{
 								hasSideEffect = true;
 								break;

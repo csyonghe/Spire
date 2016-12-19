@@ -13,18 +13,180 @@ namespace Spire
 		class SyntaxVisitor;
 		class FunctionSyntaxNode;
 
-		enum class VariableModifier
-		{
-			None = 0,
-			Uniform = 1,
-			Out = 2,
-			In = 4,
-			Centroid = 128,
-			Const = 16,
-			Instance = 1024,
-			Builtin = 256,
-			Parameter = 513
-		};
+        // We use a unified representation for modifiers on all declarations.
+        // (Eventually this will also apply to statements that support attributes)
+        //
+        // The parser allows any set of modifiers on any declaration, and we leave
+        // it to later phases of analysis to reject inappropriate uses.
+        // TODO: implement rejection properly.
+        //
+        // Some common modifiers (thos represented by single keywords) are
+        // specified via a simple set of flags.
+        // TODO: consider using a real AST even for these, so we can give good
+        // error messages on confliction modifiers.
+        typedef unsigned int ModifierFlags;
+        enum ModifierFlag : ModifierFlags
+        {
+            None        = 0,
+            Uniform     = 1 << 0,
+            Out         = 1 << 1,
+            In          = 1 << 2,
+            Centroid    = 1 << 3,
+            Const       = 1 << 4,
+            Instance    = 1 << 5,
+            Builtin     = 1 << 6,
+            Parameter   = (1 << 7) | ModifierFlag::Uniform,
+
+            Inline      = 1 << 8,
+            Public      = 1 << 9,
+            Require     = 1 << 10,
+            Param       = (1 << 11) | ModifierFlag::Public,
+            Extern      = 1 << 12,
+            Input       = 1 << 13,
+            Intrinsic   = (1 << 14) | ModifierFlag::Extern,
+
+
+            // TODO(tfoley): This should probably be its own flag
+            InOut       = ModifierFlag::In | ModifierFlag::Out,
+        };
+        //
+        // Other modifiers may have more elaborate data, and so
+        // are represented as heap-allocated objects, in a linked
+        // list.
+        //
+        class Modifier : public RefObject
+        {
+        public:
+            RefPtr<Modifier> next;
+        };
+
+        // A `layout` modifier
+        class LayoutModifier : public Modifier
+        {
+        public:
+            String LayoutString;
+        };
+
+        // An attribute of the form `[Name]` or `[Name: Value]`
+        class SimpleAttribute : public Modifier
+        {
+        public:
+            String Key;
+            String Value;
+        };
+
+        // A set of modifiers attached to a syntax node
+        struct Modifiers
+        {
+            // The first modifier in the linked list of heap-allocated modifiers
+            RefPtr<Modifier> first;
+
+            // The bit-flags for the common modifiers
+            ModifierFlags flags = ModifierFlag::None;
+        };
+
+        // Helper class for iterating over a list of heap-allocated modifiers
+        struct ModifierList
+        {
+            struct Iterator
+            {
+                Modifier* current;
+
+                Modifier* operator*()
+                {
+                    return current;
+                }
+
+                void operator++()
+                {
+                    current = current->next.Ptr();
+                }
+
+                bool operator!=(Iterator other)
+                {
+                    return current != other.current;
+                };
+
+                Iterator()
+                    : current(nullptr)
+                {}
+
+                Iterator(Modifier* modifier)
+                    : current(modifier)
+                {}
+            };
+
+            ModifierList()
+                : modifiers(nullptr)
+            {}
+
+            ModifierList(Modifier* modifiers)
+                : modifiers(modifiers)
+            {}
+
+            Iterator begin() { return Iterator(modifiers); }
+            Iterator end() { return Iterator(nullptr); }
+
+            Modifier* modifiers;
+        };
+
+        // Helper class for iterating over heap-allocated modifiers
+        // of a specific type.
+        template<typename T>
+        struct FilteredModifierList
+        {
+            struct Iterator
+            {
+                Modifier* current;
+
+                T* operator*()
+                {
+                    return (T*) current;
+                }
+
+                void operator++()
+                {
+                    current = Adjust(current->next.Ptr());
+                }
+
+                bool operator!=(Iterator other)
+                {
+                    return current != other.current;
+                };
+
+                Iterator()
+                    : current(nullptr)
+                {}
+
+                Iterator(Modifier* modifier)
+                    : current(modifier)
+                {}
+            };
+
+            FilteredModifierList()
+                : modifiers(nullptr)
+            {}
+
+            FilteredModifierList(Modifier* modifiers)
+                : modifiers(Adjust(modifiers))
+            {}
+
+            Iterator begin() { return Iterator(modifiers); }
+            Iterator end() { return Iterator(nullptr); }
+
+            static Modifier* Adjust(Modifier* modifier)
+            {
+                Modifier* m = modifier;
+                for (;;)
+                {
+                    if (!m) return m;
+                    if (dynamic_cast<T*>(m)) return m;
+                    m = m->next.Ptr();
+                }
+            }
+
+            Modifier* modifiers;
+        };
 
 		enum class BaseType
 		{
@@ -350,6 +512,18 @@ namespace Spire
         public:
             ContainerDecl*  ParentDecl;
 			Token Name;
+            Modifiers modifiers;
+
+            bool HasModifier(ModifierFlags flags) { return (modifiers.flags & flags) == flags; }
+
+            template<typename T>
+            FilteredModifierList<T> GetModifiersOfType() { return FilteredModifierList<T>(modifiers.first.Ptr()); }
+
+            FilteredModifierList<SimpleAttribute> GetLayoutAttributes() { return GetModifiersOfType<SimpleAttribute>(); }
+
+            bool FindSimpleAttribute(String const& key, String& outValue);
+            bool HasSimpleAttribute(String const& key);
+
 			virtual Decl * Clone(CloneContext & ctx) = 0;
         };
 
@@ -496,9 +670,6 @@ namespace Spire
             // The actual decls
             List<RefPtr<Decl>> decls;
 
-            // Layout information (shared across the whole decl)
-			String LayoutString;
-
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
             virtual MultiDecl * Clone(CloneContext & ctx) override;
         };
@@ -585,6 +756,7 @@ namespace Spire
 			virtual BlockStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
+        // TODO(tfoley): Only used by IL at this point
 		enum class ParameterQualifier
 		{
 			In, Out, InOut, Uniform
@@ -593,7 +765,6 @@ namespace Spire
 		class ParameterSyntaxNode : public SingleVarDecl
 		{
 		public:
-			ParameterQualifier Qualifier = ParameterQualifier::In;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ParameterSyntaxNode * Clone(CloneContext & ctx) override;
 		};
@@ -611,15 +782,12 @@ namespace Spire
 			String InternalName;
 			RefPtr<ExpressionType> ReturnType;
 			RefPtr<TypeSyntaxNode> ReturnTypeNode;
-			bool IsInline;
-			bool IsExtern;
-			bool HasSideEffect;
+            bool IsInline() { return HasModifier(ModifierFlag::Inline); }
+            bool IsExtern() { return HasModifier(ModifierFlag::Extern); }
+            bool HasSideEffect() { return !HasModifier(ModifierFlag::Intrinsic); }
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			FunctionSyntaxNode()
 			{
-				IsInline = false;
-				IsExtern = false;
-				HasSideEffect = true;
 			}
 
 			virtual FunctionSyntaxNode * Clone(CloneContext & ctx) override;
@@ -629,7 +797,6 @@ namespace Spire
 		{
 		public:
 			Token SourceWorld, DestWorld;
-			EnumerableDictionary<String, String> LayoutAttributes;
 			Token TypeName;
 			List<RefPtr<FunctionSyntaxNode>> Requirements;
 			List<String> Usings;
@@ -824,12 +991,16 @@ namespace Spire
 		class ComponentSyntaxNode : public Decl
 		{
 		public:
-			bool IsOutput = false, IsPublic = false, IsInline = false, IsRequire = false, IsInput = false, IsParam = false;
+            bool IsOutput()     { return HasModifier(ModifierFlag::Out); }
+            bool IsPublic()     { return HasModifier(ModifierFlag::Public); }
+            bool IsInline()     { return HasModifier(ModifierFlag::Inline) || (Parameters.Count() != 0); }
+            bool IsRequire()    { return HasModifier(ModifierFlag::Require); }
+            bool IsInput()      { return HasModifier(ModifierFlag::Extern); }
+            bool IsParam()      { return HasModifier(ModifierFlag::Param); }
 			RefPtr<TypeSyntaxNode> TypeNode;
 			RefPtr<ExpressionType> Type;
 			RefPtr<RateSyntaxNode> Rate;
 			Token AlternateName;
-			EnumerableDictionary<String, String> LayoutAttributes;
 			RefPtr<BlockStatementSyntaxNode> BlockStatement;
 			RefPtr<ExpressionSyntaxNode> Expression;
 			List<RefPtr<ParameterSyntaxNode>> Parameters;
@@ -840,8 +1011,7 @@ namespace Spire
 		class WorldSyntaxNode : public Decl
 		{
 		public:
-			bool IsAbstract = false;
-			EnumerableDictionary<String, String> LayoutAttributes;
+            bool IsAbstract() { return HasModifier(ModifierFlag::Input); }
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override { return this; }
 			virtual WorldSyntaxNode * Clone(CloneContext & ctx) override;
 		};
@@ -899,7 +1069,7 @@ namespace Spire
 		{
 		public:
 			bool IsInplace = false;
-			bool IsPublic = false;
+            bool IsPublic() { return HasModifier(ModifierFlag::Public); }
 			Token ShaderName;
 			Token ObjectName;
 			List<RefPtr<ImportArgumentSyntaxNode>> Arguments;
