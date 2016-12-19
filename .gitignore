@@ -15,3 +15,4 @@ LibraryRelease/Spire.cpp
 Debug/
 Release/
 x64/
+*.TMP

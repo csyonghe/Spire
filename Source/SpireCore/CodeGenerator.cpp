@@ -321,6 +321,7 @@ namespace Spire
 					w->OutputType = recordType;
 					w->Attributes = world.Value->LayoutAttributes;
 					w->Shader = compiledShader.Ptr();
+					w->IsAbstract = world.Value->IsAbstract;
 					auto impOps = pipeline->GetImportOperatorsFromSourceWorld(world.Key);
 					w->Position = world.Value->Position;
 					compiledShader->Worlds[world.Key] = w;
@@ -339,6 +340,22 @@ namespace Spire
 					for (auto & compDef : shader->Definitions)
 						if (compDef->World == world)
 							components.Add(compDef.Ptr());
+					// for abstract world, fill in record type now
+					if (world != "<uniform>" && pipeline->Worlds[world]()->IsAbstract)
+					{
+						auto compiledWorld = compiledShader->Worlds[world]();
+						for (auto & comp : components)
+						{
+							ILObjectDefinition compDef;
+							compDef.Attributes = comp->SyntaxNode->LayoutAttributes;
+							compDef.Name = comp->UniqueName;
+							compDef.Type = TranslateExpressionType(comp->Type.Ptr());
+							compDef.Position = comp->SyntaxNode->Position;
+							compDef.Binding = -1;
+
+							compiledWorld->OutputType->Members.AddIfNotExists(compDef.Name, compDef);
+						}
+					}
 					// put the list in worldComps
 					worldComps[world] = components;
 				}
@@ -465,9 +482,19 @@ namespace Spire
 					}
 					currentComponent = nullptr;
 				}
-				
+				variables.PushScope();
+				// push parameter components to variables table
+				if (auto paramComps = worldComps.TryGetValue("<uniform>"))
+				{
+					for (auto & comp : *paramComps)
+					{
+						variables.Add(comp->UniqueName, compiledShader->ModuleParamSets[comp->ModuleInstance->BindingName]()->Parameters[comp->UniqueName]().Ptr());
+					}
+				}
 				for (auto & world : pipeline->Worlds)
 				{
+					if (world.Value->IsAbstract)
+						continue;
 					NamingCounter = 0;
 
 					auto & components = worldComps[world.Key].GetValue();
@@ -495,6 +522,7 @@ namespace Spire
 					EvalReferencedFunctionClosure(compiledWorld);
 					currentWorld = nullptr;
 				}
+				variables.PopScope();
 				currentShader = nullptr;
 			}
 
@@ -562,7 +590,16 @@ namespace Spire
 					componentVar = returnRegister;
 				}
 
-				componentVar->Name = varName;
+				/*if (!currentComponent->Type->IsTexture() && !currentComponent->Type->IsArray())
+				{
+					auto vartype = TranslateExpressionType(currentComponent->Type.Ptr(), &recordTypes);
+					auto var = codeWriter.AllocVar(vartype, result.Program->ConstantPool->CreateConstant(1));
+					var->Name = varName;
+					codeWriter.Store(var, componentVar);
+					componentVar = var;
+				}
+				else*/
+					componentVar->Name = varName;
 				currentWorld->Components[currentComponent->UniqueName] = componentVar;
 				variables.Add(currentComponent->UniqueName, componentVar);
 				currentComponent = nullptr;

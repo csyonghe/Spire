@@ -52,7 +52,7 @@ namespace Spire
 				ComponentDefinitionIR * referencedDef = nullptr;
 				for (auto & compDef : shaderIR->DefinitionsByComponent[componentUniqueName]())
 				{
-					if (compDef.Value->World == world)
+					if (compDef.Value->World == world || compDef.Value->World == "<uniform>")
 						return compDef.Value;
 				}
 				for (auto & compDef : shaderIR->DefinitionsByComponent[componentUniqueName]())
