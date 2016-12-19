@@ -786,6 +786,12 @@ namespace Spire
 			intrinsicTextureFunctions.Add("SampleCmp");
 		}
 
+		void CLikeCodeGen::GenerateShaderMetaData(ShaderMetaData & result, ILProgram* /*program*/, ILShader * shader, DiagnosticSink * /*err*/)
+		{
+			result.ShaderName = shader->Name;
+			result.ParameterSets = shader->ModuleParamSets;
+		}
+
 		CompiledShaderSource CLikeCodeGen::GenerateShader(CompileResult & result, SymbolTable *, ILShader * shader, DiagnosticSink * err)
 		{
 			this->errWriter = err;
@@ -806,8 +812,7 @@ namespace Spire
 				rs.Stages[stage.Key] = src;
 			}
 				
-			// TODO: fill metadatas
-			rs.MetaData.ShaderName = shader->Name;
+			GenerateShaderMetaData(rs.MetaData, result.Program.Ptr(), shader, err);
 				
 			return rs;
 		}

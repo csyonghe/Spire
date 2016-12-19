@@ -196,7 +196,7 @@ namespace Spire
 						// if this parameter is ordinary-value typed, assign it a buffer range
 						if (resType == BindableResourceType::NonBindable)
 						{
-							param->BindingPoint = -1;
+							param->BindingPoints.Clear();
 							param->BufferOffset = (int)RoundToAlignment(module->BufferSize, (int)GetTypeAlignment(param->Type.Ptr(), LayoutRule::Std140));
 							module->BufferSize = param->BufferOffset + (int)GetTypeSize(param->Type.Ptr(), LayoutRule::Std140);
 						}
@@ -237,7 +237,8 @@ namespace Spire
 									getSink()->diagnose(def->SyntaxNode->Position, Diagnostics::invalidBindingValue, bindingVal);
 								}
 								(*bindingRegistry)[bindingVal] = def.Ptr();
-								param->BindingPoint = bindingVal;
+								param->BindingPoints.Clear();
+								param->BindingPoints.Add(bindingVal);
 							}
 						}
 						module->Parameters.Add(def->UniqueName, param);
@@ -254,7 +255,7 @@ namespace Spire
 						if (bindableResType != BindableResourceType::NonBindable)
 						{
 							Dictionary<int, ComponentDefinitionIR*> * bindingRegistry = nullptr;
-							if (param.BindingPoint != -1)
+							if (param.BindingPoints.Count())
 								continue;
 							int * bindingAllocator = nullptr;
 							switch (bindableResType)
@@ -280,14 +281,14 @@ namespace Spire
 							{
 								(*bindingAllocator)++;
 							}
-							param.BindingPoint = *bindingAllocator;
-							(*bindingAllocator)++;
+							param.BindingPoints.Add(*bindingAllocator);
 							int maxBinding = GetMaxResourceBindings(bindableResType);
-							if (param.BindingPoint > maxBinding)
+							if (*bindingAllocator > maxBinding)
 							{
-								getSink()->diagnose(def->SyntaxNode->Position, Diagnostics::bindingExceedsLimit, param.BindingPoint, def->SyntaxNode->Name);
+								getSink()->diagnose(def->SyntaxNode->Position, Diagnostics::bindingExceedsLimit, *bindingAllocator, def->SyntaxNode->Name);
 								getSink()->diagnose(def->SyntaxNode->Position, Diagnostics::seeModuleBeingUsedIn, def->ModuleInstance->SyntaxNode->Name, def->ModuleInstance->BindingName);
 							}
+							(*bindingAllocator)++;
 						}
 					}
 				}

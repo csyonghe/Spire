@@ -244,33 +244,25 @@ namespace SpireLib
 	{
 		StringBuilder writer;
 		writer << "name " << MetaData.ShaderName << EndLine;
-		for (auto & stage : MetaData.Stages)
+		for (auto & ublock : MetaData.ParameterSets)
 		{
-			writer << "stage " << stage.Key << EndLine << "{" << EndLine;
-			writer << "target " << stage.Value.TargetName << EndLine;
-			for (auto & blk : stage.Value.InputBlocks)
+			writer << "paramset \"" << ublock.Key << "\" size " << ublock.Value->BufferSize << "\n{\n";
+			for (auto & entry : ublock.Value->Parameters)
 			{
-				writer << "in " << blk << ";\n";
-			}
-			writer << "out " << stage.Value.OutputBlock << ";\n";
-			for (auto & comp : stage.Value.Components)
-				writer << "comp " << comp << ";\n";
-			writer << "}" << EndLine;
-		}
-		for (auto & ublock : MetaData.InterfaceBlocks)
-		{
-			writer << "interface " << ublock.Key << " size " << ublock.Value.Size << "\n{\n";
-			for (auto & entry : ublock.Value.Entries)
-			{
-				writer << entry.Type->ToString() << " " << entry.Name << " : " << entry.Offset << "," << entry.Size;
-				if (entry.Attributes.Count())
+				writer << entry.Value->Name << "(\"" << entry.Key << "\") : ";
+				entry.Value->Type->Serialize(writer);
+				writer << " at ";
+				if (entry.Value->BindingPoints.Count())
 				{
-					writer << "\n{\n";
-					for (auto & attrib : entry.Attributes)
-					{
-						writer << attrib.Key << " : " << CoreLib::Text::EscapeStringLiteral(attrib.Value) << ";\n";
-					}
-					writer << "}";
+					writer << "binding(";
+					for (auto binding : entry.Value->BindingPoints)
+						writer << binding << " ";
+					writer << ")";
+				}
+				else
+				{
+					writer << "buffer(" << entry.Value->BufferOffset << ", "
+						<< (int)GetTypeSize(entry.Value->Type.Ptr(), LayoutRule::Std140) << ")";
 				}
 				writer << ";\n";
 			}
@@ -306,7 +298,7 @@ namespace SpireLib
 	void ShaderLibFile::Clear()
 	{
 		Sources.Clear();
-		MetaData.Stages.Clear();
+		MetaData.ParameterSets.Clear();
 		Sources.Clear();
 	}
 
@@ -333,75 +325,44 @@ namespace SpireLib
 				ReadSource(Sources, parser, src);
 				parser.Read("}");
 			}
-
-			else if (fieldName == "stage")
+			else if (fieldName == "paramset")
 			{
-				StageMetaData stage;
-				stage.Name = parser.ReadWord();
+				RefPtr<ILModuleParameterSet> paramSet = new ILModuleParameterSet();
+				paramSet->BindingName = parser.ReadStringLiteral();
+				if (parser.LookAhead("size"))
+				{
+					parser.ReadToken();
+					paramSet->BufferSize = parser.ReadInt();
+				}
 				parser.Read("{");
 				while (!parser.LookAhead("}"))
 				{
-					auto subFieldName = parser.ReadWord();
-					if (subFieldName == "target")
-						stage.TargetName = parser.ReadWord();
-					else if (subFieldName == "in")
+					RefPtr<ILModuleParameterInstance> inst = new ILModuleParameterInstance();
+					inst->Name = parser.ReadWord();
+					parser.Read("(");
+					auto key = parser.ReadStringLiteral();
+					parser.Read(")");
+					inst->Type = ILType::Deserialize(parser);
+					parser.Read("at");
+					if (parser.LookAhead("binding"))
 					{
-						stage.InputBlocks.Add(parser.ReadWord());
-						parser.Read(";");
+						parser.ReadToken();
+						parser.Read("(");
+						while (!parser.LookAhead(")"))
+							inst->BindingPoints.Add(parser.ReadInt());
+						parser.Read(")");
 					}
-					else if (subFieldName == "out")
+					else
 					{
-						stage.OutputBlock = parser.ReadWord();
-						parser.Read(";");
+						parser.Read("buffer");
+						parser.Read("(");
+						inst->BufferOffset = parser.ReadInt();
+						parser.Read(")");
 					}
-					else if (subFieldName == "comp")
-					{
-						auto compName = parser.ReadWord();
-						parser.Read(";");
-						stage.Components.Add(compName);
-					}
+					paramSet->Parameters.Add(key, inst);
 				}
 				parser.Read("}");
-				MetaData.Stages[stage.Name] = stage;
-			}
-			else if (fieldName == "interface")
-			{
-				InterfaceBlockMetaData block;
-				if (!parser.LookAhead("{") && !parser.LookAhead("size"))
-					block.Name = parser.ReadWord();
-				if (parser.LookAhead("size"))
-				{
-					parser.ReadWord();
-					block.Size = parser.ReadInt();
-				}
-				parser.Read("{");
-				while (!parser.LookAhead("}") && !parser.IsEnd())
-				{
-					InterfaceBlockEntry entry;
-					entry.Type = TypeFromString(parser);
-					entry.Name = parser.ReadWord();
-					parser.Read(":");
-					entry.Offset = parser.ReadInt();
-					parser.Read(",");
-					entry.Size = parser.ReadInt();
-					if (parser.LookAhead("{"))
-					{
-						parser.Read("{");
-						while (!parser.LookAhead("}") && !parser.IsEnd())
-						{
-							auto attribName = parser.ReadWord();
-							parser.Read(":");
-							auto attribValue = parser.ReadStringLiteral();
-							parser.Read(";");
-							entry.Attributes[attribName] = attribValue;
-						}
-						parser.Read("}");
-					}
-					parser.Read(";");
-					block.Entries.Add(entry);
-				}
-				parser.Read("}");
-				MetaData.InterfaceBlocks[block.Name] = block;
+				MetaData.ParameterSets.Add(paramSet->BindingName, paramSet);
 			}
 		}
 	}

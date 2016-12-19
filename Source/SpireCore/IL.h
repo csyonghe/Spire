@@ -68,9 +68,9 @@ namespace Spire
 			virtual ILType * Clone() = 0;
 			virtual String ToString() = 0;
 			virtual bool Equals(ILType* type) = 0;
+			virtual void Serialize(StringBuilder & sb) = 0;
+			static RefPtr<ILType> Deserialize(CoreLib::Text::TokenReader & reader);
 		};
-
-		RefPtr<ILType> TypeFromString(CoreLib::Text::TokenReader & parser);
 
 		class ILObjectDefinition
 		{
@@ -90,7 +90,10 @@ namespace Spire
 			virtual ILType * Clone() override;
 			virtual String ToString() override;
 			virtual bool Equals(ILType* type) override;
-
+			virtual void Serialize(StringBuilder & sb) override
+			{
+				sb << "record " << TypeName;
+			}
 			virtual BindableResourceType GetBindableResourceType() override
 			{
 				return BindableResourceType::NonBindable;
@@ -142,6 +145,10 @@ namespace Spire
 				rs->Type = Type;
 				return rs;
 			}
+			virtual void Serialize(StringBuilder & sb) override
+			{
+				sb << "basic " << ToString();
+			}
 			virtual String ToString() override
 			{
 				if (Type == ILBaseType::Int)
@@ -163,7 +170,7 @@ namespace Spire
 				else if (Type == ILBaseType::Float)
 					return "float";
 				else if (Type == ILBaseType::Float2)
-        return "vec2";
+					return "vec2";
 				else if (Type == ILBaseType::Float3)
 					return "vec3";
 				else if (Type == ILBaseType::Float4)
@@ -222,6 +229,12 @@ namespace Spire
 				rs->ArrayLength = ArrayLength;
 				return rs;
 			}
+			virtual void Serialize(StringBuilder & sb) override
+			{
+				sb << "array(";
+				BaseType->Serialize(sb);
+				sb << ", " << ArrayLength << ")";
+			}
 			virtual String ToString() override
 			{
 				if (ArrayLength > 0)
@@ -258,6 +271,12 @@ namespace Spire
 			{
 				return GenericTypeName + "<" + BaseType->ToString() + ">";
 			}
+			virtual void Serialize(StringBuilder & sb) override
+			{
+				sb << "generic " << GenericTypeName << "(";
+				BaseType->Serialize(sb);
+				sb << ")";
+			}
 			virtual BindableResourceType GetBindableResourceType() override
 			{
 				if (GenericTypeName == "StructuredBuffer" || GenericTypeName == "RWStructuredBuffer")
@@ -284,7 +303,17 @@ namespace Spire
 			virtual ILType * Clone() override;
 			virtual String ToString() override;
 			virtual bool Equals(ILType * type) override;
-
+			virtual void Serialize(StringBuilder & sb) override
+			{
+				sb << "struct " << TypeName << "(";
+				for (auto & member : Members)
+				{
+					sb << member.FieldName << ":";
+					member.Type->Serialize(sb);
+					sb << "; ";
+				}
+				sb << ")";
+			}
 			virtual BindableResourceType GetBindableResourceType() override
 			{
 				return BindableResourceType::NonBindable;
@@ -407,6 +436,7 @@ namespace Spire
 			UserReferenceSet Users;
 			String Attribute;
 			void * Tag;
+			CodePosition Position;
 			union VMFields
 			{
 				void * VMData;

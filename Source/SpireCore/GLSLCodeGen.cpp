@@ -2,7 +2,7 @@
 #include "../CoreLib/Tokenizer.h"
 #include "Syntax.h"
 #include "Naming.h"
-
+#include "SamplerUsageAnalysis.h"
 #include <cassert>
 
 using namespace CoreLib::Basic;
@@ -460,7 +460,7 @@ namespace Spire
 					}
 					for (auto param : module.Value->Parameters)
 					{
-						if (param.Value->BindingPoint != -1)
+						if (param.Value->BindingPoints.Count())
 						{
 							auto bindableType = param.Value->Type->GetBindableResourceType();
 							switch (bindableType)
@@ -471,7 +471,7 @@ namespace Spire
 								if (!genType)
 									continue;
 								String bufName = EscapeCodeName(param.Key);
-								ctx.GlobalHeader << "layout(std430, binding = " << param.Value->BindingPoint << ") ";
+								ctx.GlobalHeader << "layout(std430, binding = " << param.Value->BindingPoints.First() << ") ";
 								ctx.GlobalHeader << "buffer buf" << bufName << "\n{\n";
 								PrintType(ctx.GlobalHeader, genType->BaseType.Ptr());
 								ctx.GlobalHeader << " " << bufName << "[];\n};\n";
@@ -479,7 +479,7 @@ namespace Spire
 							}
 							case BindableResourceType::Texture:
 							{
-								ctx.GlobalHeader << "layout(binding = " << param.Value->BindingPoint << ") ";
+								ctx.GlobalHeader << "layout(binding = " << param.Value->BindingPoints.First() << ") ";
 								PrintType(ctx.GlobalHeader, param.Value->Type.Ptr());
 								ctx.GlobalHeader << " " << EscapeCodeName(module.Value->BindingName + "_" + param.Value->Name) << ";\n";
 								break;
@@ -491,6 +491,24 @@ namespace Spire
 					}
 				}
 			}
+
+			virtual void GenerateShaderMetaData(ShaderMetaData & result, ILProgram* program, ILShader* shader, DiagnosticSink* err) override
+			{
+				EnumerableDictionary<ILModuleParameterInstance*, List<ILModuleParameterInstance*>> samplerTextures;
+				for (auto & w : shader->Worlds)
+				{
+					if (w.Value->Code)
+						AnalyzeSamplerUsage(samplerTextures, program, w.Value->Code.Ptr(), err);
+				}
+				for (auto & sampler : samplerTextures)
+				{
+					sampler.Key->BindingPoints.Clear();
+					for (auto & tex : sampler.Value)
+						sampler.Key->BindingPoints.AddRange(tex->BindingPoints);
+				}
+				CLikeCodeGen::GenerateShaderMetaData(result, program, shader, err);
+			}
+
 			StageSource GenerateSingleWorldShader(ILProgram * program, ILShader * shader, ILStage * stage) override
 			{
 				useBindlessTexture = stage->Attributes.ContainsKey("BindlessTexture");

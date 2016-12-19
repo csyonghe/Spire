@@ -162,12 +162,15 @@ namespace Spire
 						parent = parent->Parent;
 					}
 					StringBuilder sbBindingName;
-					for (int i = namePath.Count() - 1; i >= 0; i--)
+					for (int i = namePath.Count() - 1; i >= 1; i--)
 					{
 						sbBindingName << namePath[i];
 						if (i > 0)
 							sbBindingName << ".";
 					}
+					// if this is the root module, its binding name is module name.
+					if (namePath.Count() == 1)
+						sbBindingName << namePath[0];
 					inst = new ModuleInstanceIR();
 					inst->SyntaxNode = closure->ModuleSyntaxNode;
 					result->ModuleInstances.Add(inst);

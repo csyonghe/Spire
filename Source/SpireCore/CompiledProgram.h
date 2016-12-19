@@ -74,7 +74,7 @@ namespace Spire
 		public:
 			ILModuleParameterSet * Module = nullptr;
 			int BufferOffset = -1;
-			int BindingPoint = -1; // for legacy API
+			List<int> BindingPoints; // for legacy API, usually one item. Samplers may have multiple binding points in OpenGL.
 			virtual String ToString()
 			{
 				return "moduleParam<" + Name + ">";
@@ -169,54 +169,11 @@ namespace Spire
 			List<ShaderChoiceValue> Options;
 		};
 
-
-		class InterfaceMetaData
-		{
-		public:
-			CoreLib::Basic::String Name;
-			RefPtr<Spire::Compiler::ILType> Type;
-			EnumerableDictionary<String, String> Attributes;
-
-			int GetHashCode()
-			{
-				return Name.GetHashCode();
-			}
-			bool operator == (const InterfaceMetaData & other)
-			{
-				return Name == other.Name;
-			}
-		};
-
-		class StageMetaData
-		{
-		public:
-			CoreLib::Basic::String Name;
-			CoreLib::Basic::String TargetName;
-			CoreLib::Basic::String OutputBlock;
-			CoreLib::Basic::List<CoreLib::Basic::String> InputBlocks;
-			CoreLib::Basic::List<CoreLib::Basic::String> Components;
-		};
-
-		class InterfaceBlockEntry : public InterfaceMetaData
-		{
-		public:
-			int Offset = 0, Size = 0;
-		};
-		class InterfaceBlockMetaData
-		{
-		public:
-			String Name;
-			int Size = 0;
-			EnumerableHashSet<InterfaceBlockEntry> Entries;
-			EnumerableDictionary<String, String> Attributes;
-			EnumerableHashSet<String> UserWorlds;
-		};
 		class ShaderMetaData
 		{
 		public:
 			CoreLib::String ShaderName;
-			CoreLib::EnumerableDictionary<CoreLib::String, StageMetaData> Stages;
-			EnumerableDictionary<String, InterfaceBlockMetaData> InterfaceBlocks;
+			CoreLib::EnumerableDictionary<CoreLib::String, CoreLib::RefPtr<ILModuleParameterSet>> ParameterSets; // bindingName->DescSet
 		};
 
 		class StageSource

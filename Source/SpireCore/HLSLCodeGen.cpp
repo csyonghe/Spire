@@ -289,25 +289,29 @@ namespace Spire
 						if (bindableResType == BindableResourceType::NonBindable)
 							continue;
 						PrintDef(sb.GlobalHeader, field.Value->Type.Ptr(), EscapeCodeName(moduleName + "_" + field.Key));
-						sb.GlobalHeader << ": register(";
-						switch (bindableResType)
+						if (field.Value->BindingPoints.Count())
 						{
-						case BindableResourceType::Texture:
-							sb.GlobalHeader << "t";
-							break;
-						case BindableResourceType::Sampler:
-							sb.GlobalHeader << "s";
-							break;
-						case BindableResourceType::StorageBuffer:
-							sb.GlobalHeader << "u";
-							break;
-						case BindableResourceType::Buffer:
-							sb.GlobalHeader << "c";
-							break;
-						default:
-							throw NotImplementedException();
+							sb.GlobalHeader << ": register(";
+							switch (bindableResType)
+							{
+							case BindableResourceType::Texture:
+								sb.GlobalHeader << "t";
+								break;
+							case BindableResourceType::Sampler:
+								sb.GlobalHeader << "s";
+								break;
+							case BindableResourceType::StorageBuffer:
+								sb.GlobalHeader << "u";
+								break;
+							case BindableResourceType::Buffer:
+								sb.GlobalHeader << "c";
+								break;
+							default:
+								throw NotImplementedException();
+							}
+							sb.GlobalHeader << field.Value->BindingPoints.First() << ")";
 						}
-						sb.GlobalHeader << field.Value->BindingPoint << ");\n";
+						sb.GlobalHeader << ";\n";
 					}
 				}
 				

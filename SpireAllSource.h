@@ -33,5 +33,6 @@
 #include "Source/SpireCore/SymbolTable.cpp"
 #include "Source/SpireCore/Syntax.cpp"
 #include "Source/SpireCore/TypeLayout.cpp"
+#include "Source/SpireCore/SamplerUsageAnalysis.cpp"
 #include "Source/SpireCore/VariantIR.cpp"
 #include "Source/SpireLib/SpireLib.cpp"
