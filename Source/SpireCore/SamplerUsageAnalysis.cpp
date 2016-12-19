@@ -18,8 +18,7 @@ namespace Spire
 				auto call = dynamic_cast<CallInstruction*>(&instr);
 				if (call)
 				{
-					if (call->Function.StartsWith("Sample") || call->Function.StartsWith("SampleCmp") ||
-						call->Function.StartsWith("SampleGrad") || call->Function.StartsWith("SampleBias"))
+					if (call->Function.StartsWith("Sample") && !program->Functions.ContainsKey(call->Function))
 					{
 						auto textureOp = call->Arguments[0].Ptr();
 						auto samplerOp = call->Arguments[1].Ptr();
