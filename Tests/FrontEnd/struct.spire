@@ -22,12 +22,12 @@ Foo makeFoo(float x, float y)
 shader Test : StandardPipeline
 {
 	// Uniform of struct type
-	@MaterialUniform Foo foo1;
+	param Foo foo1;
 
     @MeshVertex vec3 position;
     @MeshVertex vec3 color;
 
-    @ModelInstance mat4 modelViewProjection;
+    param mat4 modelViewProjection;
 
     public vec4 projCoord = modelViewProjection * vec4(position, 1.0);
 
