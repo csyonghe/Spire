@@ -72,7 +72,9 @@ namespace Spire
         {
         public:
             String Key;
-            String Value;
+            Token Value;
+
+            String const& GetValue() const { return Value.Content; }
         };
 
         // A set of modifiers attached to a syntax node
@@ -410,10 +412,10 @@ namespace Spire
 			EnumerableHashSet<String> PinnedWorlds; 
 		};
 
-		class Scope
+		class Scope : public RefObject
 		{
 		public:
-			Scope * Parent;
+			RefPtr<Scope> Parent;
             Dictionary<String, Decl*> decls;
             Decl* LookUp(String const& name);
 			Scope()
@@ -443,7 +445,7 @@ namespace Spire
 						target->Scope = new Spire::Compiler::Scope(*this->Scope);
 						ctx.ScopeTranslateTable[this->Scope.Ptr()] = target->Scope;
 						RefPtr<Spire::Compiler::Scope> parentScope;
-						if (ctx.ScopeTranslateTable.TryGetValue(target->Scope->Parent, parentScope))
+						if (ctx.ScopeTranslateTable.TryGetValue(target->Scope->Parent.Ptr(), parentScope))
 							target->Scope->Parent = parentScope.Ptr();
 					}
 					
@@ -521,6 +523,7 @@ namespace Spire
 
             FilteredModifierList<SimpleAttribute> GetLayoutAttributes() { return GetModifiersOfType<SimpleAttribute>(); }
 
+            bool FindSimpleAttribute(String const& key, Token& outValue);
             bool FindSimpleAttribute(String const& key, String& outValue);
             bool HasSimpleAttribute(String const& key);
 
@@ -1065,12 +1068,23 @@ namespace Spire
 			virtual ShaderSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
+        class UsingFileDecl : public Decl
+        {
+        public:
+            Token fileName;
+
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual UsingFileDecl * Clone(CloneContext & ctx) override;
+        };
+
 		class ProgramSyntaxNode : public ContainerDecl
 		{
 		public:
-            // TODO(tfoley): `using` should be a declaration, even at top level
-			List<Token> Usings;
             // Access members of specific types
+            FilteredMemberList<UsingFileDecl> GetUsings()
+            {
+                return GetMembersOfType<UsingFileDecl>();
+            }
             FilteredMemberList<FunctionSyntaxNode> GetFunctions()
             {
                 return GetMembersOfType<FunctionSyntaxNode>();
@@ -1196,6 +1210,12 @@ namespace Spire
 					comp = comp->Accept(this).As<Decl>();
 				return shader;
 			}
+
+            virtual RefPtr<UsingFileDecl> VisitUsingFileDecl(UsingFileDecl * decl)
+            {
+                return decl;
+            }
+
 			virtual RefPtr<ComponentSyntaxNode> VisitComponent(ComponentSyntaxNode * comp);
 			virtual RefPtr<FunctionSyntaxNode> VisitFunction(FunctionSyntaxNode* func)
 			{
