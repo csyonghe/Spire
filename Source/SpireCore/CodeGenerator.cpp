@@ -155,7 +155,7 @@ namespace Spire
 					set->BindingName = module->BindingName;
 					compiledShader->ModuleParamSets[module->BindingName] = set;
 					Token bindingValStr;
-					if (module->SyntaxNode->Attributes.TryGetValue("Binding", bindingValStr))
+					if (module->SyntaxNode->FindSimpleAttribute("Binding", bindingValStr))
 					{
 						int bindingVal = StringToInt(bindingValStr.Content);
 						set->DescriptorSetId = bindingVal;
@@ -309,7 +309,7 @@ namespace Spire
                 EnumerableDictionary<String, String> attrs;
                 for (auto attr : decl->GetLayoutAttributes())
                 {
-                    attrs[attr->Key] = attr->Value;
+                    attrs[attr->Key] = attr->Value.Content;
                 }
                 return attrs;
             }

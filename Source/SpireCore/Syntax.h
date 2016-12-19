@@ -72,7 +72,9 @@ namespace Spire
         {
         public:
             String Key;
-            String Value;
+            Token Value;
+
+            String const& GetValue() const { return Value.Content; }
         };
 
         // A set of modifiers attached to a syntax node
@@ -521,6 +523,7 @@ namespace Spire
 
             FilteredModifierList<SimpleAttribute> GetLayoutAttributes() { return GetModifiersOfType<SimpleAttribute>(); }
 
+            bool FindSimpleAttribute(String const& key, Token& outValue);
             bool FindSimpleAttribute(String const& key, String& outValue);
             bool HasSimpleAttribute(String const& key);
 
@@ -1060,17 +1063,27 @@ namespace Spire
 		{
 		public:
 			bool IsModule = false;
-			EnumerableDictionary<String, Token> Attributes;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ShaderSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
+        class UsingFileDecl : public Decl
+        {
+        public:
+            Token fileName;
+
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual UsingFileDecl * Clone(CloneContext & ctx) override;
+        };
+
 		class ProgramSyntaxNode : public ContainerDecl
 		{
 		public:
-            // TODO(tfoley): `using` should be a declaration, even at top level
-			List<Token> Usings;
             // Access members of specific types
+            FilteredMemberList<UsingFileDecl> GetUsings()
+            {
+                return GetMembersOfType<UsingFileDecl>();
+            }
             FilteredMemberList<FunctionSyntaxNode> GetFunctions()
             {
                 return GetMembersOfType<FunctionSyntaxNode>();
@@ -1196,6 +1209,12 @@ namespace Spire
 					comp = comp->Accept(this).As<Decl>();
 				return shader;
 			}
+
+            virtual RefPtr<UsingFileDecl> VisitUsingFileDecl(UsingFileDecl * decl)
+            {
+                return decl;
+            }
+
 			virtual RefPtr<ComponentSyntaxNode> VisitComponent(ComponentSyntaxNode * comp);
 			virtual RefPtr<FunctionSyntaxNode> VisitFunction(FunctionSyntaxNode* func)
 			{

@@ -45,9 +45,9 @@ namespace Spire
 							{
 								try
 								{
-									if (attrib->Value.StartsWith("%"))
+									if (attrib->GetValue().StartsWith("%"))
 									{
-										CoreLib::Text::TokenReader parser(attrib->Value.SubString(1, attrib->Value.Length() - 1));
+										CoreLib::Text::TokenReader parser(attrib->GetValue().SubString(1, attrib->GetValue().Length() - 1));
 										auto compName = parser.ReadWord();
 										parser.Read(".");
 										auto compAttrib = parser.ReadWord();
@@ -56,7 +56,7 @@ namespace Spire
 										{
 											for (auto & timpl : compSym->Implementations)
 											{
-												String attribValue;
+												Token attribValue;
 												if (timpl->SyntaxNode->FindSimpleAttribute(compAttrib, attribValue))
 													attrib->Value = attribValue;
 											}
@@ -142,7 +142,7 @@ namespace Spire
                             {
                                 auto modifier = new SimpleAttribute();
                                 modifier->Key = attrib.Key;
-                                modifier->Value = attrib.Value;
+                                modifier->Value.Content = attrib.Value;
 
                                 modifier->next = impl->SyntaxNode->modifiers.first;
                                 impl->SyntaxNode->modifiers.first = modifier;
