@@ -215,7 +215,7 @@ DIAGNOSTIC(34025, Error, globalComponentConflictWithPreviousDeclaration, "'$0': 
 DIAGNOSTIC(34026, Warning, componentIsAlreadyDefinedUseRequire, "'$0': component is already defined when compiling shader '$1'. use 'require' to declare it as a parameter.")
 DIAGNOSTIC(34062, Error, cylicReference, "cyclic reference: $0");
 DIAGNOSTIC(34064, Error, noApplicableImplicitImportOperator, "cannot find import operator to import component '$0' to world '$1' when compiling '$2'.")
-DIAGNOSTIC(34065, Error, resourceTypeMustBeParam, "'$0': resource typed component must be declared as 'param'.");
+DIAGNOSTIC(34065, Error, resourceTypeMustBeParamOrRequire, "'$0': resource typed component must be declared as 'param' or 'require'.");
 //
 // 4xxxx - IL code generation.
 //

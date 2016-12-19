@@ -155,7 +155,7 @@ namespace Spire
 			default:
 				break;
 			}
-			return res.ToString();
+			return res.ProduceString();
 		}
 
 		ExpressionType * BasicExpressionType::Clone()
