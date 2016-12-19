@@ -59,6 +59,7 @@ namespace Spire
 				rootShader = rs.Ptr();
 				rootShader->Pipeline = shader->ParentPipeline;
 			}
+			rs->ModuleSyntaxNode = shader->SyntaxNode;
 			rs->Name = shader->SyntaxNode->Name.Content;
 			rs->RefMap = pRefMap;
 			if (shader->ParentPipeline && rootShader->Pipeline)
@@ -112,7 +113,7 @@ namespace Spire
 						// fill in automatic arguments
 						for (auto & param : shaderSym->Components)
 						{
-							if (param.Value->IsParam() && !refMap.ContainsKey(param.Key))
+							if (param.Value->IsRequire() && !refMap.ContainsKey(param.Key))
 							{
 								auto arg = rs->FindComponent(param.Key);
 								if (arg && arg->Type->DataType->Equals(param.Value->Type->DataType.Ptr()))
@@ -150,7 +151,7 @@ namespace Spire
 			// check for unassigned arguments
 			for (auto & comp : shader->Components)
 			{
-				if (comp.Value->Implementations.First()->SyntaxNode->IsParam &&
+				if (comp.Value->Implementations.First()->SyntaxNode->IsRequire &&
 					!pRefMap.ContainsKey(comp.Key))
 				{
                     err->diagnose(rs->UsingPosition, Diagnostics::parameterOfModuleIsUnassigned, comp.Key, shader->SyntaxNode->Name);
@@ -194,8 +195,8 @@ namespace Spire
 				String targetComp;
 				if (replacements.TryGetValue(refComp->Content, targetComp))
 				{
-					auto oldComp = shaderClosure->AllComponents[refComp->Content]();
-					auto newComp = shaderClosure->AllComponents[targetComp]();
+					auto oldComp = shaderClosure->AllComponents[refComp->Content]().Symbol;
+					auto newComp = shaderClosure->AllComponents[targetComp]().Symbol;
 					if (auto * importOps = currentComponent->DependentComponents.TryGetValue(newComp))
 						importOps->Add(currentImport);
 					else
@@ -269,7 +270,9 @@ namespace Spire
 			ImportExpressionSyntaxNode * currentImport = nullptr;
 			void AddReference(ShaderComponentSymbol * referee, ImportExpressionSyntaxNode * importOp, CodePosition pos)
 			{
-				rootShader->AllComponents.TryGetValue(referee->UniqueName, referee);
+				ComponentInstance referedCompInst;
+				if (rootShader->AllComponents.TryGetValue(referee->UniqueName, referedCompInst))
+					referee = referedCompInst.Symbol;
 				if (auto * importOps = currentComponent->DependentComponents.TryGetValue(referee))
 					importOps->Add(importOp);
 				else
@@ -327,7 +330,7 @@ namespace Spire
 				{
 					if (auto comp = shaderClosure->FindComponent(var->Type->AsBasicType()->Component->Name))
 					{
-						if (comp->Implementations.First()->SyntaxNode->IsParam)
+						if (comp->Implementations.First()->SyntaxNode->IsRequire)
 							shaderClosure->RefMap.TryGetValue(comp->Name, comp);
 						var->Tags["ComponentReference"] = new StringObject(comp->UniqueName);
 						AddReference(comp.Ptr(), currentImport, var->Position);
@@ -337,7 +340,7 @@ namespace Spire
 				}
 				if (auto comp = shaderClosure->FindComponent(var->Variable))
 				{
-					if (comp->Implementations.First()->SyntaxNode->IsParam)
+					if (comp->Implementations.First()->SyntaxNode->IsRequire)
 						shaderClosure->RefMap.TryGetValue(var->Variable, comp);
 					var->Tags["ComponentReference"] = new StringObject(comp->UniqueName);
 
@@ -411,7 +414,7 @@ namespace Spire
 				{
 				}
 				if (newName != map.Value->UniqueName)
-					map.Value = root->AllComponents[newName]();
+					map.Value = root->AllComponents[newName]().Symbol;
 			}
 			for (auto & subclosure : shader->SubClosures)
 				ReplaceRefMapReference(root, subclosure.Value.Ptr(), replacements);
@@ -423,8 +426,8 @@ namespace Spire
 			ReplaceRefMapReference(shader, shader, replacements);
 			for (auto & comp : shader->AllComponents)
 			{
-				ReplaceReferenceVisitor replaceVisitor(shader, comp.Value, replacements);
-				for (auto & impl : comp.Value->Implementations)
+				ReplaceReferenceVisitor replaceVisitor(shader, comp.Value.Symbol, replacements);
+				for (auto & impl : comp.Value.Symbol->Implementations)
 				{
 					replaceVisitor.currentImpl = impl.Ptr();
 					impl->SyntaxNode->Accept(&replaceVisitor);
@@ -447,7 +450,7 @@ namespace Spire
 
 		bool IsInAbstractWorld(PipelineSymbol * pipeline, ShaderComponentSymbol* comp)
 		{
-			return comp->Implementations.First()->Worlds.Count() && !comp->Implementations.First()->SyntaxNode->IsParam &&
+			return comp->Implementations.First()->Worlds.Count() && !comp->Implementations.First()->SyntaxNode->IsRequire &&
 				pipeline->IsAbstractWorld(comp->Implementations.First()->Worlds.First());
 		}
 
@@ -497,10 +500,12 @@ namespace Spire
 			for (auto & comp : subClosure->Components)
 			{
 				ShaderComponentSymbol* existingComp = nullptr;
-				if (comp.Value->IsParam())
+				if (comp.Value->IsRequire())
 					continue;
-				if (closure->AllComponents.TryGetValue(comp.Value->UniqueName, existingComp))
+				ComponentInstance existingCompInst;
+				if (closure->AllComponents.TryGetValue(comp.Value->UniqueName, existingCompInst))
 				{
+					existingComp = existingCompInst.Symbol;
 					if (IsInAbstractWorld(closure->Pipeline, comp.Value.Ptr()) &&
 						IsInAbstractWorld(closure->Pipeline, existingComp))
 					{
@@ -527,7 +532,7 @@ namespace Spire
 						}
 					}
 				}
-				closure->AllComponents[comp.Value->UniqueName] = comp.Value.Ptr();
+				closure->AllComponents[comp.Value->UniqueName] = ComponentInstance(subClosure, comp.Value.Ptr());
 			}
 			for (auto & sc : subClosure->SubClosures)
 				GatherComponents(err, closure, sc.Value.Ptr());
@@ -535,6 +540,9 @@ namespace Spire
 
 		bool IsWorldFeasible(SymbolTable * symTable, PipelineSymbol * pipeline, ShaderComponentImplSymbol * impl, String world, ShaderComponentSymbol*& unaccessibleComp)
 		{
+			// shader parameter (uniform values) are available to all worlds
+			if (impl->SyntaxNode->IsParam)
+				return true;
 			bool isWFeasible = true;
 			for (auto & dcomp : impl->DependentComponents)
 			{
@@ -569,7 +577,8 @@ namespace Spire
 			auto depOrder = shader->GetDependencyOrder();
 			for (auto & comp : depOrder)
 			{
-				Dictionary<String, EnumerableHashSet<String>> autoWorlds;
+				// automatically deduced overloadable worlds for a component definition without explicit rate qualifier
+				Dictionary<String, EnumerableHashSet<String>> autoWorlds; // keyed on alternate name 
 				comp->Type->FeasibleWorlds.Clear();
 				for (auto & impl : comp->Implementations)
 				{
@@ -587,15 +596,17 @@ namespace Spire
                                 unaccessibleComp->Name);
                             err->diagnose(unaccessibleComp->Implementations.First()->SyntaxNode, Diagnostics::seeDefinitionOf, unaccessibleComp->Name);
 						}
+						// if a world is explicitly stated in any of the component defintions, remove it from autoWorld
 						autoWorld.Remove(w);
 					}
 				}
 				for (auto & impl : comp->Implementations)
 				{
-					if (impl->Worlds.Count() == 0)
+					if (impl->Worlds.Count() == 0) // if this component definition is not qualified with a world
 					{
 						EnumerableHashSet<String> deducedWorlds = autoWorlds[impl->AlternateName]();
 						EnumerableHashSet<String> feasibleWorlds;
+						// the auto-deduced world for this definition is all feasible worlds in autoWorld.
 						for (auto & w : deducedWorlds)
 						{
 							ShaderComponentSymbol* unaccessibleComp = nullptr;
@@ -641,12 +652,12 @@ namespace Spire
 			bool rs = false;
 			for (auto & comp : shader->AllComponents)
 			{
-				for (auto & impl : comp.Value->Implementations)
+				for (auto & impl : comp.Value.Symbol->Implementations)
 				{
 					// check circular references
 					HashSet<ShaderComponentSymbol*> set;
 					List<ShaderComponentSymbol*> referredComponents;
-					referredComponents.Add(comp.Value);
+					referredComponents.Add(comp.Value.Symbol);
 					for (int i = 0; i < referredComponents.Count(); i++)
 					{
 						auto xcomp = referredComponents[i];
@@ -658,7 +669,7 @@ namespace Spire
 								{
 									referredComponents.Add(rcomp.Key);
 								}
-								if (rcomp.Key == comp.Value)
+								if (rcomp.Key == comp.Value.Symbol)
 								{
 									err->diagnose(impl->SyntaxNode->Position, Diagnostics::circularReferenceNotAllowed, rcomp.Key->Name);
 									rs = true;
@@ -697,7 +708,7 @@ namespace Spire
 			{
 				auto & arg = map.Value;
 				RefPtr<ShaderComponentSymbol> requirement;
-				if (shader->Components.TryGetValue(map.Key, requirement) && requirement->IsParam())
+				if (shader->Components.TryGetValue(map.Key, requirement) && requirement->IsRequire())
 				{
 					if (requirement->Implementations.First()->SyntaxNode->Rate)
 					{
@@ -724,7 +735,7 @@ namespace Spire
 		{
 			for (auto & comp : shader->Pipeline->Components)
 			{
-				if (!comp.Value->IsParam())
+				if (!comp.Value->IsRequire())
 					shader->Components.AddIfNotExists(comp.Key, new ShaderComponentSymbol(*comp.Value));
 			}
 		}
@@ -752,12 +763,12 @@ namespace Spire
 				if (shader->Pipeline->Components.ContainsKey(comp.Key))
 					continue;
 
-				if (comp.Value->Implementations.Count() == 1 &&
-					comp.Value->Implementations.First()->SyntaxNode->Expression &&
-					!comp.Value->Implementations.First()->SyntaxNode->IsOutput)
+				if (comp.Value.Symbol->Implementations.Count() == 1 &&
+					comp.Value.Symbol->Implementations.First()->SyntaxNode->Expression &&
+					!comp.Value.Symbol->Implementations.First()->SyntaxNode->IsOutput)
 				{
 					RefPtr<Object> compRef;
-					if (comp.Value->Implementations.First()->SyntaxNode->Expression->Tags.TryGetValue("ComponentReference", compRef))
+					if (comp.Value.Symbol->Implementations.First()->SyntaxNode->Expression->Tags.TryGetValue("ComponentReference", compRef))
 					{
 						compSub[comp.Key] = compRef.As<StringObject>()->Content;
 					}
@@ -788,17 +799,18 @@ namespace Spire
 		{
 			for (auto & req : shader->Pipeline->Components)
 			{
-				if (req.Value->IsParam())
+				if (req.Value->IsRequire())
 				{
-					ShaderComponentSymbol * comp;
+					ComponentInstance comp;
+					
 					StringBuilder errMsg;
 					if (shader->AllComponents.TryGetValue(req.Key, comp))
 					{
-						if (!comp->Type->DataType->Equals(req.Value->Type->DataType.Ptr()))
+						if (!comp.Symbol->Type->DataType->Equals(req.Value->Type->DataType.Ptr()))
 						{
-                            err->diagnose(comp->Implementations.First()->SyntaxNode, Diagnostics::componentTypeNotWhatPipelineRequires,
+                            err->diagnose(comp.Symbol->Implementations.First()->SyntaxNode, Diagnostics::componentTypeNotWhatPipelineRequires,
                                 req.Key,
-                                comp->Type->DataType,
+								comp.Symbol->Type->DataType,
                                 shader->Pipeline->SyntaxNode->Name.Content,
                                 req.Value->Type->DataType);
                             err->diagnose(req.Value->Implementations.First()->SyntaxNode, Diagnostics::seePipelineRequirementDefinition);
@@ -864,7 +876,7 @@ namespace Spire
 							}
 						}
 					}
-					if (!inAbstractWorld && !impl->SyntaxNode->IsParam && !impl->SyntaxNode->IsInput
+					if (!inAbstractWorld && !impl->SyntaxNode->IsRequire && !impl->SyntaxNode->IsInput
 						&& !impl->SyntaxNode->Expression && !impl->SyntaxNode->BlockStatement)
 					{
 						err->diagnose(impl->SyntaxNode->Position, Diagnostics::nonAbstractComponentMustHaveImplementation);
@@ -919,7 +931,7 @@ namespace Spire
 			// check pipeline constraints
 			for (auto & requirement : shader->Pipeline->Components)
 			{
-				if (!requirement.Value->IsParam())
+				if (!requirement.Value->IsRequire())
 					continue;
 				auto comp = shader->FindComponent(requirement.Key);
 				if (!comp)

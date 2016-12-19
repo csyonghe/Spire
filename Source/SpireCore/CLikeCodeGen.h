@@ -28,7 +28,7 @@ namespace Spire
 		public:
 			enum class DataStructureType
 			{
-				StandardInput, UniformBuffer, ArrayBuffer, PackedBuffer, Texture, Patch
+				StandardInput, Patch
 			};
 			enum class SystemVarType
 			{
@@ -126,10 +126,6 @@ namespace Spire
 			virtual OutputStrategy * CreateArrayOutputStrategy(ILWorld * world, bool pIsPatch, int pArraySize, String arrayIndex) = 0;
 
 			// Hooks for declaring an input record based on the storage mode used (uniform, SSBO, etc.)
-			virtual void DeclareUniformBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) = 0;
-			virtual void DeclareArrayBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) = 0;
-			virtual void DeclarePackedBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) = 0;
-			virtual void DeclareTextureInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) = 0;
 			virtual void DeclareStandardInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) = 0;
 			virtual void DeclarePatchInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) = 0;
 
@@ -137,11 +133,9 @@ namespace Spire
 			virtual StageSource GenerateSingleWorldShader(ILProgram * program, ILShader * shader, ILStage * stage) = 0;
 			virtual StageSource GenerateHullShader(ILProgram * program, ILShader * shader, ILStage * stage) = 0;
 
+			virtual void PrintParameterReference(StringBuilder& sb, ILModuleParameterInstance * param) = 0;
+
 			// Print a reference to some entity that is input to a kernel
-			virtual void PrintUniformBufferInputReference(StringBuilder& sb, String inputName, String componentName) = 0;
-			virtual void PrintStorageBufferInputReference(StringBuilder& sb, String inputName, String componentName) = 0;
-			virtual void PrintArrayBufferInputReference(StringBuilder& sb, String inputName, String componentName) = 0;
-			virtual void PrintPackedBufferInputReference(StringBuilder& sb, String inputName, String componentName) = 0;
 			virtual void PrintStandardInputReference(StringBuilder& sb, ILRecordType* recType, String inputName, String componentName) = 0;
 			virtual void PrintStandardArrayInputReference(StringBuilder& sb, ILRecordType* recType, String inputName, String componentName) = 0;
 			virtual void PrintPatchInputReference(StringBuilder& sb, ILRecordType* recType, String inputName, String componentName) = 0;
@@ -166,9 +160,8 @@ namespace Spire
 
 			void PrintDef(StringBuilder & sbCode, ILType* type, const String & name);
 
-			String GetFunctionCallName(String name);
-
 			String GetFuncOriginalName(const String & name);
+			String EscapeCodeName(const String & name);
 
 			virtual void PrintOp(CodeGenContext & ctx, ILOperand * op, bool forceExpression = false);
 			void PrintBinaryInstrExpr(CodeGenContext & ctx, BinaryInstruction * instr);

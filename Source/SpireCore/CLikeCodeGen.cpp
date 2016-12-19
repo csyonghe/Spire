@@ -42,23 +42,7 @@ namespace Spire
 			if (name.Length() == 0)
 				throw InvalidProgramException("unnamed instruction.");
 		}
-
-		String CLikeCodeGen::GetFunctionCallName(String name)
-		{
-			StringBuilder rs;
-			for (int i = 0; i < name.Length(); i++)
-			{
-				if ((name[i] >= 'a' && name[i] <= 'z') || (name[i] >= 'A' && name[i] <= 'Z') || 
-					name[i] == '_' || (name[i] >= '0' && name[i] <= '9'))
-				{
-					rs << name[i];
-				}
-				else if (i != name.Length() - 1)
-					rs << '_';
-			}
-			return rs.ProduceString();
-		}
-
+		
 		String CLikeCodeGen::GetFuncOriginalName(const String & name)
 		{
 			String originalName;
@@ -70,6 +54,22 @@ namespace Spire
 			else
 				originalName = name;
 			return originalName;
+		}
+
+		String CLikeCodeGen::EscapeCodeName(const String & name)
+		{
+			StringBuilder rs;
+			for (int i = 0; i < name.Length(); i++)
+			{
+				if ((name[i] >= 'a' && name[i] <= 'z') || (name[i] >= 'A' && name[i] <= 'Z') ||
+					name[i] == '_' || (name[i] >= '0' && name[i] <= '9'))
+				{
+					rs << name[i];
+				}
+				else if (i != name.Length() - 1)
+					rs << '_';
+			}
+			return EscapeDoubleUnderscore(rs.ProduceString());
 		}
 
 		void CLikeCodeGen::PrintOp(CodeGenContext & ctx, ILOperand * op, bool forceExpression)
@@ -152,6 +152,10 @@ namespace Spire
 					else
 						ctx.Body << instr->Name;
 				}
+			}
+			else if (auto param = dynamic_cast<ILModuleParameterInstance*>(op))
+			{
+				PrintParameterReference(ctx.Body, param);
 			}
 			else
 				throw InvalidOperationException("Unsupported operand type.");
@@ -859,22 +863,15 @@ namespace Spire
 			{
 				if (auto genType = dynamic_cast<ILGenericType*>(type))
 				{
-					type = genType->BaseType.Ptr();
-					if (genType->GenericTypeName == "Uniform")
-						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::UniformBuffer;
-					else if (genType->GenericTypeName == "Patch")
+					if (genType->GenericTypeName == "Patch")
+					{
+						type = genType->BaseType.Ptr();
 						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::Patch;
-					else if (genType->GenericTypeName == "Texture")
-						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::Texture;
-					else if (genType->GenericTypeName == "PackedBuffer")
-						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::PackedBuffer;
-					else if (genType->GenericTypeName == "StructuredBuffer" || genType->GenericTypeName == "RWStructuredBuffer")
-						info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::ArrayBuffer;
+					}
 				}
 				if (auto arrType = dynamic_cast<ILArrayType*>(type))
 				{
                     if (info.DataStructure != ExternComponentCodeGenInfo::DataStructureType::StandardInput &&
-                        info.DataStructure != ExternComponentCodeGenInfo::DataStructureType::UniformBuffer &&
                         info.DataStructure != ExternComponentCodeGenInfo::DataStructureType::Patch)
                     {
                         errWriter->diagnose(input.Position, Diagnostics::cannotGenerateCodeForExternComponentType, type);
@@ -936,19 +933,7 @@ namespace Spire
 			auto info = extCompInfo[input]();
 
 			// TODO(tfoley): Is there any reason why this isn't just a `switch`?
-			if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer)
-			{
-				PrintUniformBufferInputReference(sb, input, currentImportInstr->ComponentName);
-			}
-			else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::ArrayBuffer)
-			{
-				PrintArrayBufferInputReference(sb, input, currentImportInstr->ComponentName);
-			}
-			else if (info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::PackedBuffer)
-			{
-				PrintPackedBufferInputReference(sb, input, currentImportInstr->ComponentName);
-			}
-			else if (auto recType = ExtractRecordType(info.Type.Ptr()))
+			if (auto recType = ExtractRecordType(info.Type.Ptr()))
 			{
 				// TODO(tfoley): hoist this logic up to the top-level if chain?
 				if(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput)
@@ -987,22 +972,6 @@ namespace Spire
 			{
 				switch(info.DataStructure)
 				{
-				case ExternComponentCodeGenInfo::DataStructureType::UniformBuffer:
-					DeclareUniformBuffer(sb, input, isVertexShader);
-					return;
-
-				case ExternComponentCodeGenInfo::DataStructureType::ArrayBuffer:
-					DeclareArrayBuffer(sb, input, isVertexShader);
-					return;
-
-				case ExternComponentCodeGenInfo::DataStructureType::PackedBuffer:
-					DeclarePackedBuffer(sb, input, isVertexShader);
-					return;
-
-				case ExternComponentCodeGenInfo::DataStructureType::Texture:
-					DeclareTextureInputRecord(sb, input, isVertexShader);
-					return;
-
 				case ExternComponentCodeGenInfo::DataStructureType::StandardInput:
 					DeclareStandardInputRecord(sb, input, isVertexShader);
 					return;

@@ -317,7 +317,7 @@ namespace Spire
 			}
 			if (ParentPipeline && ParentPipeline->Components.TryGetValue(compName, refComp))
 			{
-				if (!refComp->IsParam())
+				if (!refComp->IsRequire())
 				{
 					result.Component = refComp.Ptr();
 					return result;
@@ -365,7 +365,7 @@ namespace Spire
 					rs = false;
 					break;
 				}
-				if (impl->SyntaxNode->IsParam != cimpl->SyntaxNode->IsParam)
+				if (impl->SyntaxNode->IsRequire != cimpl->SyntaxNode->IsRequire)
 				{
                     err->diagnose(impl->SyntaxNode->Position,
                         Diagnostics::inconsistentSignatureForComponent,
@@ -396,7 +396,7 @@ namespace Spire
 					break;
 				}
 			}
-			if (impl->SyntaxNode->IsParam && comp->Implementations.Count() != 0)
+			if (impl->SyntaxNode->IsRequire && comp->Implementations.Count() != 0)
 			{
                 err->diagnose(impl->SyntaxNode->Position,
                     Diagnostics::parameterNameConflictsWithExistingDefinition, comp->Name);
@@ -522,14 +522,14 @@ namespace Spire
 			RefPtr<ShaderComponentSymbol> rs;
 			if (RefMap.TryGetValue(name, rs))
 			{
-				if (includeParams || !rs->IsParam())
+				if (includeParams || !rs->IsRequire())
 					return rs;
 				else
 					return nullptr;
 			}
 			if (Components.TryGetValue(name, rs))
 			{
-				if (includeParams || !rs->IsParam())
+				if (includeParams || !rs->IsRequire())
 					return rs;
 				else
 					return nullptr;
@@ -578,7 +578,7 @@ namespace Spire
 		{
 			List<ShaderComponentSymbol*> comps;
 			for (auto & comp : AllComponents)
-				comps.Add(comp.Value);
+				comps.Add(comp.Value.Symbol);
 			comps.Sort([&](ShaderComponentSymbol*c0, ShaderComponentSymbol*c1)
 			{
 				return c0->Implementations.First()->SyntaxNode->Position < c1->Implementations.First()->SyntaxNode->Position;

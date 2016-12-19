@@ -294,8 +294,19 @@ namespace Spire
 				{
 					try
 					{
+						EnumerableDictionary<String, Token> attributes;
+						while (LookAheadToken(TokenType::LBracket))
+						{
+							ReadToken(TokenType::LBracket);
+							attributes[ReadToken(TokenType::Identifier).Content] = ReadToken();
+							ReadToken(TokenType::RBracket);
+						}
 						if (LookAheadToken("shader") || LookAheadToken("module"))
-							program->Members.Add(ParseShader());
+						{
+							auto shader = ParseShader();
+							shader->Attributes = _Move(attributes);
+							program->Members.Add(shader);
+						}
 						else if (LookAheadToken("pipeline"))
 							program->Members.Add(ParsePipeline());
 						else if (LookAheadToken("struct"))
@@ -369,7 +380,7 @@ namespace Spire
 				{
 					if (LookAheadToken("inline") || (LookAheadToken("public") && !LookAheadToken("using", 1)) ||
 						LookAheadToken("out") || LookAheadToken("@") || IsTypeKeyword()
-						|| LookAheadToken("[") || LookAheadToken("require") || LookAheadToken("extern"))
+						|| LookAheadToken("[") || LookAheadToken("require") || LookAheadToken("extern") || LookAheadToken("param"))
 					{
 						auto comp = ParseComponent();
 						comp->ParentDecl = shader.Ptr();
@@ -476,7 +487,7 @@ namespace Spire
 			PushScope();
 			component->LayoutAttributes = ParseAttribute();
 			while (LookAheadToken("inline") || LookAheadToken("out") || LookAheadToken("require") || LookAheadToken("public") ||
-				LookAheadToken("extern"))
+				LookAheadToken("extern") || LookAheadToken("param"))
 			{
 				if (LookAheadToken("inline"))
 				{
@@ -495,8 +506,14 @@ namespace Spire
 				}
 				else if (LookAheadToken("require"))
 				{
-					component->IsParam = true;
+					component->IsRequire = true;
 					ReadToken("require");
+				}
+				else if (LookAheadToken("param"))
+				{
+					component->IsParam = true;
+					component->IsPublic = true;
+					ReadToken("param");
 				}
 				else if (LookAheadToken("extern"))
 				{

@@ -384,7 +384,7 @@ namespace Spire
 			virtual Decl * Clone(CloneContext & ctx) = 0;
         };
 
-                template<typename T>
+        template<typename T>
         struct FilteredMemberList
         {
             typedef RefPtr<Decl> Element;
@@ -855,7 +855,7 @@ namespace Spire
 		class ComponentSyntaxNode : public Decl
 		{
 		public:
-			bool IsOutput = false, IsPublic = false, IsInline = false, IsParam = false, IsInput = false;
+			bool IsOutput = false, IsPublic = false, IsInline = false, IsRequire = false, IsInput = false, IsParam = false;
 			RefPtr<TypeSyntaxNode> TypeNode;
 			RefPtr<ExpressionType> Type;
 			RefPtr<RateSyntaxNode> Rate;
@@ -943,6 +943,7 @@ namespace Spire
 		{
 		public:
 			bool IsModule = false;
+			EnumerableDictionary<String, Token> Attributes;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ShaderSyntaxNode * Clone(CloneContext & ctx) override;
 		};

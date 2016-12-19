@@ -35,30 +35,7 @@ namespace Spire
 				PrintOp(ctx, operand);
 				ctx.Body << ";\n";
 			}
-
-			void PrintUniformBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
-			{
-				if ((!currentImportInstr->Type->IsTexture() || useBindlessTexture) && !currentImportInstr->Type.As<ILGenericType>())
-					sb << "blk" << inputName << "." << componentName;
-				else
-					sb << componentName;
-			}
-
-			void PrintStorageBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
-			{
-				sb << "blk" << inputName << "." << componentName;
-			}
-
-			void PrintArrayBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
-			{
-				sb << "blk" << inputName << ".content";
-			}
-
-			void PrintPackedBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
-			{
-				sb << "blk" << inputName << ".content";
-			}
-
+			
 			void PrintStandardInputReference(StringBuilder& sb, ILRecordType* recType, String inputName, String componentName) override
 			{
 				String declName = componentName;
@@ -334,149 +311,6 @@ namespace Spire
 					throw NotImplementedException("CodeGen for texture function '" + instr->Function + "' is not implemented.");
 			}
 
-			void DeclareUniformBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool /*isVertexShader*/) override
-			{
-				auto info = ExtractExternComponentInfo(input);
-				extCompInfo[input.Name] = info;
-				auto recType = ExtractRecordType(input.Type.Ptr());
-				assert(recType);
-				assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer);
-
-				int declarationStart = sb.GlobalHeader.Length();
-				int itemsDeclaredInBlock = 0;
-
-				sb.GlobalHeader << "layout(std140";
-				if (info.Binding != -1)
-					sb.GlobalHeader << ", binding = " << info.Binding;
-				sb.GlobalHeader << ") uniform " << input.Name << "\n{\n";
-
-				int index = 0;
-				for (auto & field : recType->Members)
-				{
-					if (!useBindlessTexture && field.Value.Type->IsTexture())
-						continue;
-					if (field.Value.Type->GetBindableResourceType() != BindableResourceType::NonBindable)
-						continue;
-					if (field.Value.Type.As<ILGenericType>()) // ArrayBuffer etc. goes to separate declaration outside the block
-						continue;
-					String declName = field.Key;
-					PrintType(sb.GlobalHeader, field.Value.Type.Ptr());
-					
-					sb.GlobalHeader << " " << declName;
-					itemsDeclaredInBlock++;
-					if (info.IsArray)
-					{
-						sb.GlobalHeader << "[";
-						if (info.ArrayLength)
-							sb.GlobalHeader << String(info.ArrayLength);
-						sb.GlobalHeader << "]";
-					}
-					sb.GlobalHeader << ";\n";
-
-					index++;
-				}
-				if (itemsDeclaredInBlock == 0)
-				{
-					sb.GlobalHeader.Remove(declarationStart, sb.GlobalHeader.Length() - declarationStart);
-				}
-				else
-				{
-					sb.GlobalHeader << "} blk" << input.Name << ";\n";
-				}
-			
-				for (auto & field : recType->Members)
-				{
-					auto bindableType = field.Value.Type->GetBindableResourceType();
-					if (bindableType == BindableResourceType::NonBindable || bindableType == BindableResourceType::Sampler)
-						continue;
-					if (bindableType == BindableResourceType::Texture && useBindlessTexture)
-						continue;
-					if (bindableType == BindableResourceType::Texture)
-					{
-						sb.GlobalHeader << "layout(binding = " << field.Value.Binding << ") uniform ";
-						PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), field.Key);
-						sb.GlobalHeader << ";\n";
-					}
-					else if (bindableType == BindableResourceType::StorageBuffer)
-					{
-						auto genType = field.Value.Type.As<ILGenericType>();
-						if (!genType)
-							continue;
-
-						sb.GlobalHeader << "layout(std430, binding = " << field.Value.Attributes["Binding"]() << ") ";
-						sb.GlobalHeader << "buffer buf" << field.Key << "\n{\n";
-						PrintType(sb.GlobalHeader, genType->BaseType.Ptr());
-						sb.GlobalHeader << " " << field.Key << "[];\n};\n";
-					}
-					else
-						throw NotImplementedException();
-				}
-			}
-
-			void DeclareArrayBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool /*isVertexShader*/) override
-			{
-				auto info = ExtractExternComponentInfo(input);
-				extCompInfo[input.Name] = info;
-				auto recType = ExtractRecordType(input.Type.Ptr());
-				assert(recType);
-				assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::ArrayBuffer);
-
-				int itemsDeclaredInBlock = 0;
-				sb.GlobalHeader << "struct T" << input.Name << "\n{\n";
-					
-				int index = 0;
-				for (auto & field : recType->Members)
-				{
-					if (field.Value.Type->IsSamplerState())
-						continue;
-					String declName = field.Key;
-					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
-					itemsDeclaredInBlock++;
-					sb.GlobalHeader << ";\n";
-					index++;
-				}
-
-				sb.GlobalHeader << "};\nlayout(std430";
-				if (info.Binding != -1)
-					sb.GlobalHeader << ", binding = " << info.Binding;
-				sb.GlobalHeader  << ") buffer " << input.Name << "\n{\nT" << input.Name << " content[];\n} blk" << input.Name << ";\n";
-			}
-
-			void DeclarePackedBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool /*isVertexShader*/) override
-			{
-				auto info = ExtractExternComponentInfo(input);
-				extCompInfo[input.Name] = info;
-				auto recType = ExtractRecordType(input.Type.Ptr());
-				assert(recType);
-				assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::PackedBuffer);
-
-				sb.GlobalHeader << "layout(std430";
-				if (info.Binding != -1)
-					sb.GlobalHeader << ", binding = " << info.Binding;
-				sb.GlobalHeader << ") uniform " << input.Name << "\n{\nfloat content[];\n} blk" << input.Name << ";\n";
-			}
-
-			void DeclareTextureInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool /*isVertexShader*/) override
-			{
-				auto info = ExtractExternComponentInfo(input);
-				auto recType = ExtractRecordType(input.Type.Ptr());
-				assert(recType);
-				assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Texture);
-
-				for(auto & field : recType->Members)
-				{
-					if(field.Value.Type->IsFloat() || field.Value.Type->IsFloatVector() && !field.Value.Type->IsFloatMatrix())
-					{
-						sb.GlobalHeader << "uniform sampler2D ";
-						sb.GlobalHeader<< field.Key << ";\n";
-					}
-					else
-					{
-						errWriter->diagnose(field.Value.Position, Diagnostics::typeCannotBePlacedInATexture, field.Value.Type);
-					}
-				}
-			}
-
 			void DeclareStandardInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) override
 			{
 				auto info = ExtractExternComponentInfo(input);
@@ -585,16 +419,91 @@ namespace Spire
 				}
 				ctx.GlobalHeader << ") in;\n";
 			}
+			virtual void PrintParameterReference(StringBuilder& sb, ILModuleParameterInstance * param) override
+			{
+				if (param->Type->GetBindableResourceType() == BindableResourceType::NonBindable)
+				{
+					auto bufferName = EscapeCodeName(param->Module->BindingName);
+					sb << bufferName << "." << param->Name;
+				}
+				else
+				{
+					sb << EscapeCodeName(param->Module->BindingName + "_" + param->Name);
+				}
+			}
+			void GenerateShaderParameterDefinition(CodeGenContext & ctx, ILShader * shader)
+			{
+				for (auto module : shader->ModuleParamSets)
+				{
+					// generate uniform buffer declaration
+					auto bufferName = EscapeCodeName(module.Value->BindingName);
+					bool containsOrdinaryParams = false;
+					for (auto param : module.Value->Parameters)
+						if (param.Value->BufferOffset != -1)
+						{
+							containsOrdinaryParams = true;
+							break;
+						}
+					if (containsOrdinaryParams)
+					{
+						ctx.GlobalHeader << "layout(binding = " << module.Value->DescriptorSetId << ", std140) ";
+						ctx.GlobalHeader << "uniform buf" << bufferName << "\n{\n";
+						for (auto param : module.Value->Parameters)
+						{
+							if (param.Value->BufferOffset != -1)
+							{
+								PrintType(ctx.GlobalHeader, param.Value->Type.Ptr());
+								ctx.GlobalHeader << " " << param.Value->Name << ";\n";
+							}
+						}
+						ctx.GlobalHeader << "} " << bufferName << ";\n";
+					}
+					for (auto param : module.Value->Parameters)
+					{
+						if (param.Value->BindingPoint != -1)
+						{
+							auto bindableType = param.Value->Type->GetBindableResourceType();
+							switch (bindableType)
+							{
+							case BindableResourceType::StorageBuffer:
+							{
+								auto genType = param.Value->Type.As<ILGenericType>();
+								if (!genType)
+									continue;
+								String bufName = EscapeCodeName(param.Key);
+								ctx.GlobalHeader << "layout(std430, binding = " << param.Value->BindingPoint << ") ";
+								ctx.GlobalHeader << "buffer buf" << bufName << "\n{\n";
+								PrintType(ctx.GlobalHeader, genType->BaseType.Ptr());
+								ctx.GlobalHeader << " " << bufName << "[];\n};\n";
+								break;
+							}
+							case BindableResourceType::Texture:
+							{
+								ctx.GlobalHeader << "layout(binding = " << param.Value->BindingPoint << ") ";
+								PrintType(ctx.GlobalHeader, param.Value->Type.Ptr());
+								ctx.GlobalHeader << " " << EscapeCodeName(module.Value->BindingName + "_" + param.Value->Name) << ";\n";
+								break;
+							}
+							default:
+								continue;
+							}
+						}
+					}
+				}
+			}
 			StageSource GenerateSingleWorldShader(ILProgram * program, ILShader * shader, ILStage * stage) override
 			{
 				useBindlessTexture = stage->Attributes.ContainsKey("BindlessTexture");
 				StageSource rs;
 				CodeGenContext ctx;
 				GenerateHeader(ctx.GlobalHeader, stage);
+
 				if (stage->StageType == "DomainShader")
 					GenerateDomainShaderProlog(ctx, stage);
 
 				GenerateStructs(ctx.GlobalHeader, program);
+				GenerateShaderParameterDefinition(ctx, shader);
+
 				StageAttribute worldName;
 				RefPtr<ILWorld> world = nullptr;
 				if (stage->Attributes.TryGetValue("World", worldName))
@@ -691,6 +600,7 @@ namespace Spire
 				GenerateHeader(ctx.GlobalHeader, stage);
 				ctx.GlobalHeader << "layout(vertices = " << numControlPoints.Value << ") out;\n";
 				GenerateStructs(ctx.GlobalHeader, program);
+				GenerateShaderParameterDefinition(ctx, shader);
 				GenerateReferencedFunctions(ctx.GlobalHeader, program, worlds.GetArrayView());
 				extCompInfo.Clear();
 

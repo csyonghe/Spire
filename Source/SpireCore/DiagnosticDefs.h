@@ -218,9 +218,10 @@ DIAGNOSTIC(34064, Error, noApplicableImplicitImportOperator, "cannot find import
 //
 // 4xxxx - IL code generation.
 //
-DIAGNOSTIC(40001, Error, bindingAlreadyOccupied, "resource binding location '$0' is already occupied by component '$1'.")
+DIAGNOSTIC(40001, Error, bindingAlreadyOccupiedByComponent, "resource binding location '$0' is already occupied by component '$1'.")
 DIAGNOSTIC(40002, Error, invalidBindingValue, "binding location '$0' is out of valid range.")
 DIAGNOSTIC(40003, Error, bindingExceedsLimit, "binding location '$0' assigned to component '$1' exceeds maximum limit.")
+DIAGNOSTIC(40004, Error, bindingAlreadyOccupiedByModule, "DescriptorSet ID '$0' is already occupied by module instance '$1'.")
 //
 // 5xxxx - Target code generation.
 //

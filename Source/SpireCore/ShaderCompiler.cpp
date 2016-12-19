@@ -101,8 +101,8 @@ namespace Spire
 				Dictionary<String, ShaderComponentSymbol*> choiceComps;
 				for (auto & comp : shader->AllComponents)
 				{
-					for (auto & choiceName : comp.Value->ChoiceNames)
-						choiceComps[choiceName] = comp.Value;
+					for (auto & choiceName : comp.Value.Symbol->ChoiceNames)
+						choiceComps[choiceName] = comp.Value.Symbol;
 				}
 				HashSet<ShaderComponentImplSymbol*> pinnedImpl;
 				for (auto & choice : schedule.Choices)
@@ -144,33 +144,80 @@ namespace Spire
 					}
 				}
 				// generate definitions
+				Dictionary<ShaderClosure*, ModuleInstanceIR*> moduleInstanceMap;
+				auto createModuleInstance = [&](ShaderClosure * closure)
+				{
+					ModuleInstanceIR * inst;
+					if (moduleInstanceMap.TryGetValue(closure, inst))
+						return inst;
+					List<String> namePath;
+					
+					auto parent = closure;
+					while (parent)
+					{
+						if (parent->Name.Length())
+							namePath.Add(parent->Name);
+						else
+							namePath.Add(parent->ModuleSyntaxNode->Name.Content);
+						parent = parent->Parent;
+					}
+					StringBuilder sbBindingName;
+					for (int i = namePath.Count() - 1; i >= 0; i--)
+					{
+						sbBindingName << namePath[i];
+						if (i > 0)
+							sbBindingName << ".";
+					}
+					inst = new ModuleInstanceIR();
+					inst->SyntaxNode = closure->ModuleSyntaxNode;
+					result->ModuleInstances.Add(inst);
+					inst->BindingName = sbBindingName.ProduceString();
+					moduleInstanceMap[closure] = inst;
+					return inst;
+				};
 				for (auto & comp : shader->AllComponents)
 				{
 					EnumerableDictionary<String, ComponentDefinitionIR*> defs;
 					Dictionary<String, ShaderComponentImplSymbol*> impls;
-					for (auto & impl : comp.Value->Implementations)
+					for (auto & impl : comp.Value.Symbol->Implementations)
 					{
-						for (auto & w : impl->Worlds)
+						auto createComponentDef = [&](const String & w)
 						{
 							RefPtr<ComponentDefinitionIR> def = new ComponentDefinitionIR();
-							def->OriginalName = comp.Value->Name;
-							def->UniqueKey = comp.Value->UniqueKey;
-							def->UniqueName = comp.Value->UniqueName;
-							def->Type = comp.Value->Type->DataType;
-							def->IsEntryPoint = (impl->ExportWorlds.Contains(w) ||
+							def->OriginalName = comp.Value.Symbol->Name;
+							def->UniqueKey = comp.Value.Symbol->UniqueKey;
+							def->UniqueName = comp.Value.Symbol->UniqueName;
+							def->Type = comp.Value.Symbol->Type->DataType;
+							def->IsEntryPoint = (impl->ExportWorlds.Contains(w) || impl->SyntaxNode->IsParam ||
 								(shader->Pipeline->IsAbstractWorld(w) &&
 								(impl->SyntaxNode->LayoutAttributes.ContainsKey("Pinned") || shader->Pipeline->Worlds[w]()->LayoutAttributes.ContainsKey("Pinned"))));
 							CloneContext cloneCtx;
 							def->SyntaxNode = impl->SyntaxNode->Clone(cloneCtx);
 							def->World = w;
+							def->ModuleInstance = createModuleInstance(comp.Value.Closure);
+							return def;
+						};
+						// parameter component will only have one defintion that is shared by all worlds
+						if (impl->SyntaxNode->IsParam)
+						{
+							auto def = createComponentDef("<uniform>");
 							result->Definitions.Add(def);
-							bool existingDefIsPinned = false;
-							if (defs.ContainsKey(w))
-								existingDefIsPinned = pinnedImpl.Contains(impls[w]());
-							if (!existingDefIsPinned)
+							defs["<uniform>"] = def.Ptr();
+						}
+						else
+						{
+							for (auto & w : impl->Worlds)
 							{
-								defs[w] = def.Ptr();
-								impls[w] = impl.Ptr();
+								auto def = createComponentDef(w);
+								result->Definitions.Add(def);
+								bool existingDefIsPinned = false;
+								if (defs.ContainsKey(w))
+									existingDefIsPinned = pinnedImpl.Contains(impls[w]());
+								if (!existingDefIsPinned)
+								{
+									defs[w] = def.Ptr();
+									impls[w] = impl.Ptr();
+								}
 							}
 						}
 					}
@@ -366,15 +413,15 @@ namespace Spire
 								for (auto & comp : shader.Value->AllComponents)
 								{
 									ShaderChoice choice;
-									if (comp.Value->ChoiceNames.Count() == 0)
+									if (comp.Value.Symbol->ChoiceNames.Count() == 0)
 										continue;
-									if (comp.Value->IsParam())
+									if (comp.Value.Symbol->IsRequire())
 										continue;
-									choice.ChoiceName = comp.Value->ChoiceNames.First();
-									for (auto & impl : comp.Value->Implementations)
+									choice.ChoiceName = comp.Value.Symbol->ChoiceNames.First();
+									for (auto & impl : comp.Value.Symbol->Implementations)
 									{
 										for (auto w : impl->Worlds)
-											if (comp.Value->Type->ConstrainedWorlds.Contains(w))
+											if (comp.Value.Symbol->Type->ConstrainedWorlds.Contains(w))
 												choice.Options.Add(ShaderChoiceValue(w, impl->AlternateName));
 									}
 									if (auto defs = shader.Value->IR->DefinitionsByComponent.TryGetValue(comp.Key))

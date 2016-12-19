@@ -277,7 +277,7 @@ namespace Spire
 				for (auto comp : pipeline->GetAbstractComponents())
 				{
 					comp->Type = TranslateTypeNode(comp->TypeNode);
-					if (comp->IsParam || comp->IsInput || (comp->Rate && comp->Rate->Worlds.Count() == 1
+					if (comp->IsRequire || comp->IsInput || (comp->Rate && comp->Rate->Worlds.Count() == 1
 						&& psymbol->IsAbstractWorld(comp->Rate->Worlds.First().World.Content)))
 						AddNewComponentSymbol(psymbol->Components, psymbol->FunctionComponents, comp);
                     else
@@ -381,7 +381,7 @@ namespace Spire
 					// type check
 					List<ShaderComponentSymbol*> paramList;
 					for (auto & comp : refShader->Components)
-						if (comp.Value->IsParam())
+						if (comp.Value->IsRequire())
 							paramList.Add(comp.Value.Ptr());
 					int position = 0;
 					bool namedArgumentAppeared = false;
@@ -446,7 +446,7 @@ namespace Spire
 								{
 									getSink()->diagnose(arg->Expression.Ptr(), Diagnostics::argumentTypeDoesNotMatchParameterType, arg->Expression->Type, refComp->Type->DataType);
 								}
-								if (!refComp->IsParam())
+								if (!refComp->IsRequire())
 									getSink()->diagnose(arg->ArgumentName, Diagnostics::nameIsNotAParameterOfCallee, arg->ArgumentName.Content, import->ShaderName.Content);
 							}
 						}
@@ -487,7 +487,7 @@ namespace Spire
 					}
 					if (comp->Expression || comp->BlockStatement)
 					{
-						if (compSym->IsParam())
+						if (compSym->IsRequire())
 							getSink()->diagnose(comp, Diagnostics::requireWithComputation);
 					}
 					currentComp = nullptr;
@@ -570,7 +570,7 @@ namespace Spire
 					if (auto comp = dynamic_cast<ComponentSyntaxNode*>(mbr.Ptr()))
 					{
 						comp->Type = TranslateTypeNode(comp->TypeNode);
-						if (comp->IsParam)
+						if (comp->IsRequire)
 						{
 							shaderSymbol->IsAbstract = true;
 							if (!shaderSymbol->SyntaxNode->IsModule)
@@ -617,7 +617,7 @@ namespace Spire
 								}
 							}
 						}
-						if (!inAbstractWorld && !impl->SyntaxNode->IsParam
+						if (!inAbstractWorld && !impl->SyntaxNode->IsRequire
 							&& !impl->SyntaxNode->Expression && !impl->SyntaxNode->BlockStatement)
 						{
 							getSink()->diagnose(33014, "non-abstract component must have an implementation.",
@@ -745,7 +745,7 @@ namespace Spire
 				}
 				else
 				{
-					if (comp->IsParam)
+					if (comp->IsRequire)
 						getSink()->diagnose(compImpl->SyntaxNode.Ptr(), Diagnostics::requirementsClashWithPreviousDef, compImpl->SyntaxNode->Name.Content);
 					else
 					{

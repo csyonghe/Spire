@@ -570,7 +570,7 @@ namespace SpireLib
 						for (auto & impl : comp.Value->Implementations)
 						{
 							impl->SyntaxNode->LayoutAttributes.TryGetValue("Binding", compMeta.Register);
-							if (impl->SyntaxNode->IsParam)
+							if (impl->SyntaxNode->IsRequire)
 							{
 								meta.Requirements.Add(compMeta);
 							}

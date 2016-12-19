@@ -49,10 +49,10 @@ namespace Spire
 			EnumerableDictionary<ShaderComponentSymbol *, EnumerableHashSet<RefPtr<ImportExpressionSyntaxNode>>> DependentComponents;
 			List<RefPtr<ShaderComponentImplSymbol>> Implementations;
 			RefPtr<Type> Type;
-			bool IsParam()
+			bool IsRequire()
 			{
 				for (auto & impl : Implementations)
-					if (impl->SyntaxNode->IsParam)
+					if (impl->SyntaxNode->IsRequire)
 						return true;
 				return false;
 			}
@@ -110,10 +110,26 @@ namespace Spire
 			ComponentReference ResolveComponentReference(String compName, bool topLevel = true);
 		};
 
+		class ShaderClosure;
+
+		class ComponentInstance
+		{
+		public:
+			ShaderComponentSymbol * Symbol = nullptr;
+			ShaderClosure * Closure = nullptr;
+			ComponentInstance() = default;
+			ComponentInstance(ShaderClosure * closure, ShaderComponentSymbol * comp)
+			{
+				Closure = closure;
+				Symbol = comp;
+			}
+		};
+
 		class ShaderClosure : public Object
 		{
 		public:
 			ShaderClosure * Parent = nullptr;
+			ShaderSyntaxNode * ModuleSyntaxNode = nullptr;
 			CodePosition Position;
 			PipelineSymbol * Pipeline = nullptr;
 			bool IsInPlace = false;
@@ -122,7 +138,7 @@ namespace Spire
 			CodePosition UsingPosition;
 			EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>> RefMap;
 			EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>> Components;
-			EnumerableDictionary<String, ShaderComponentSymbol *> AllComponents;
+			EnumerableDictionary<String, ComponentInstance> AllComponents;
 			EnumerableDictionary<String, RefPtr<ShaderClosure>> SubClosures;
 			RefPtr<ShaderComponentSymbol> FindComponent(String name, bool findInPrivate = false, bool includeParams = true);
 			RefPtr<ShaderClosure> FindClosure(String name);

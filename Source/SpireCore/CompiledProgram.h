@@ -67,11 +67,35 @@ namespace Spire
 			EnumerableDictionary<String, StageAttribute> Attributes;
 		};
 
+		class ILModuleParameterSet;
+
+		class ILModuleParameterInstance : public ILOperand
+		{
+		public:
+			ILModuleParameterSet * Module = nullptr;
+			int BufferOffset = -1;
+			int BindingPoint = -1; // for legacy API
+			virtual String ToString()
+			{
+				return "moduleParam<" + Name + ">";
+			}
+		};
+
+		class ILModuleParameterSet
+		{
+		public:
+			int BufferSize = 0;
+			String BindingName;
+			int DescriptorSetId = -1;
+			EnumerableDictionary<String, RefPtr<ILModuleParameterInstance>> Parameters;
+		};
+
 		class ILShader
 		{
 		public:
 			CodePosition Position;
 			String Name;
+			EnumerableDictionary<String, RefPtr<ILModuleParameterSet>> ModuleParamSets;
 			EnumerableDictionary<String, RefPtr<ILWorld>> Worlds;
 			EnumerableDictionary<String, RefPtr<ILStage>> Stages;
 		};

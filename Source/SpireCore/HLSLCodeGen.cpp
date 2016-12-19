@@ -40,30 +40,7 @@ namespace Spire
 				PrintOp(ctx, op0);
 				ctx.Body << ")";
 			}
-
-			void PrintUniformBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
-			{
-				if (!currentImportInstr->Type->IsTexture() || useBindlessTexture)
-					sb << "blk" << inputName;
-				else
-					sb << componentName;
-			}
-
-			void PrintStorageBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
-			{
-				sb << componentName;
-			}
-
-			void PrintArrayBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
-			{
-				sb << "blk" << inputName << ".content";
-			}
-
-			void PrintPackedBufferInputReference(StringBuilder& sb, String inputName, String componentName) override
-			{
-				sb << "blk" << inputName << ".content";
-			}
-
+			
 			void PrintStandardInputReference(StringBuilder& sb, ILRecordType* /*recType*/, String inputName, String componentName) override
 			{
 				sb << "stage_input/*standard*/";
@@ -267,119 +244,85 @@ namespace Spire
 				sb << type->ToString();
 			}
 
-			void DeclareUniformBuffer(CodeGenContext & sb, const ILObjectDefinition & input, bool /*isVertexShader*/) override
+			void GenerateShaderParameterDefinition(CodeGenContext & sb, ILShader * shader)
 			{
-				auto info = ExtractExternComponentInfo(input);
-				extCompInfo[input.Name] = info;
-				auto recType = ExtractRecordType(input.Type.Ptr());
-				assert(recType);
-				assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::UniformBuffer);
-
-				int declarationStart = sb.GlobalHeader.Length();
-				int itemsDeclaredInBlock = 0;
-
-				sb.GlobalHeader << "cbuffer " << input.Name;
-				if (info.Binding != -1)
-					sb.GlobalHeader << " : register(b" << info.Binding << ")";
-				sb.GlobalHeader << "\n{\n";
-
-				// We declare an inline struct inside the `cbuffer` to ensure that
-				// the members have an appropriate prefix on their name.
-				sb.GlobalHeader << "struct {\n";
-
-				int index = 0;
-				for (auto & field : recType->Members)
+				for (auto module : shader->ModuleParamSets)
 				{
-					auto bindableResType = field.Value.Type->GetBindableResourceType();
-					if (bindableResType != BindableResourceType::NonBindable)
-						continue;
-					String declName = field.Key;
-					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
-					itemsDeclaredInBlock++;
-					if (info.IsArray)
+					// TODO: this generates D3D11 style binding, should update to generate D3D12 root signature declaration
+					auto moduleName = EscapeCodeName(module.Value->BindingName);
+					
+					int declarationStart = sb.GlobalHeader.Length();
+					int itemsDeclaredInBlock = 0;
+
+					sb.GlobalHeader << "cbuffer buf" << moduleName;
+					if (module.Value->DescriptorSetId != -1)
+						sb.GlobalHeader << " : register(b" << module.Value->DescriptorSetId << ")";
+					sb.GlobalHeader << "\n{\n";
+
+					// We declare an inline struct inside the `cbuffer` to ensure that
+					// the members have an appropriate prefix on their name.
+					sb.GlobalHeader << "struct {\n";
+
+					int index = 0;
+					for (auto & field : module.Value->Parameters)
 					{
-						sb.GlobalHeader << "[";
-						if (info.ArrayLength)
-							sb.GlobalHeader << String(info.ArrayLength);
-						sb.GlobalHeader << "]";
-					}
-					sb.GlobalHeader << ";\n";
-
-					index++;
-				}
-
-				if (itemsDeclaredInBlock == 0)
-				{
-					sb.GlobalHeader.Remove(declarationStart, sb.GlobalHeader.Length() - declarationStart);
-					return;
-				}
-
-				sb.GlobalHeader << "} blk" << input.Name << ";\n";
-				sb.GlobalHeader << "};\n";
-
-				for (auto & field : recType->Members)
-				{
-					auto bindableResType = field.Value.Type->GetBindableResourceType();
-					if (bindableResType == BindableResourceType::NonBindable)
-						continue;
-					PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), field.Key);
-					sb.GlobalHeader << ": register(";
-					switch (bindableResType)
-					{
-					case BindableResourceType::Texture:
-						sb.GlobalHeader << "t";
-						break;
-					case BindableResourceType::Sampler:
-						sb.GlobalHeader << "s";
-						break;
-					case BindableResourceType::StorageBuffer:
-						sb.GlobalHeader << "u";
-						break;
-					case BindableResourceType::Buffer:
-						sb.GlobalHeader << "c";
-						break;
-					default:
-						throw NotImplementedException();
-					}
-					sb.GlobalHeader << field.Value.Binding << ");\n";
-				}
-			}
-
-			void DeclareArrayBuffer(CodeGenContext & /*sb*/, const ILObjectDefinition & /*input*/, bool /*isVertexShader*/) override
-			{
-
-			}
-			void DeclarePackedBuffer(CodeGenContext & /*sb*/, const ILObjectDefinition & /*input*/, bool /*isVertexShader*/) override
-			{
-
-			}
-
-			void DeclareTextureInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool /*isVertexShader*/) override
-			{
-				auto info = ExtractExternComponentInfo(input);
-				auto recType = ExtractRecordType(input.Type.Ptr());
-				assert(recType);
-				assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Texture);
-
-				for(auto & field : recType->Members)
-				{
-					if(field.Value.Type->IsFloat() || field.Value.Type->IsFloatVector() && !field.Value.Type->IsFloatMatrix())
-					{
-						// TODO(tfoley): texture binding allocation needs to be per-stage in D3D11, but should be global for D3D12
-						int slotIndex = field.Value.Binding;
-
-						sb.GlobalHeader << "Texture2D " << field.Key;
-						sb.GlobalHeader << " : register(t" << slotIndex << ")";
+						auto bindableResType = field.Value->Type->GetBindableResourceType();
+						if (bindableResType != BindableResourceType::NonBindable)
+							continue;
+						String declName = field.Key;
+						PrintDef(sb.GlobalHeader, field.Value->Type.Ptr(), declName);
+						itemsDeclaredInBlock++;
 						sb.GlobalHeader << ";\n";
+						index++;
+					}
 
-						sb.GlobalHeader << "SamplerState " << field.Key << "_sampler";
-						sb.GlobalHeader << " : register(s" << slotIndex << ")";
-						sb.GlobalHeader << ";\n";
-					}
-					else
+					sb.GlobalHeader << "} " << moduleName << ";\n";
+					sb.GlobalHeader << "};\n";
+
+					if (itemsDeclaredInBlock == 0)
 					{
-						errWriter->diagnose(field.Value.Position, Diagnostics::typeCannotBePlacedInATexture, field.Value.Type);
+						sb.GlobalHeader.Remove(declarationStart, sb.GlobalHeader.Length() - declarationStart);
 					}
+					for (auto & field : module.Value->Parameters)
+					{
+						auto bindableResType = field.Value->Type->GetBindableResourceType();
+						if (bindableResType == BindableResourceType::NonBindable)
+							continue;
+						PrintDef(sb.GlobalHeader, field.Value->Type.Ptr(), EscapeCodeName(moduleName + "_" + field.Key));
+						sb.GlobalHeader << ": register(";
+						switch (bindableResType)
+						{
+						case BindableResourceType::Texture:
+							sb.GlobalHeader << "t";
+							break;
+						case BindableResourceType::Sampler:
+							sb.GlobalHeader << "s";
+							break;
+						case BindableResourceType::StorageBuffer:
+							sb.GlobalHeader << "u";
+							break;
+						case BindableResourceType::Buffer:
+							sb.GlobalHeader << "c";
+							break;
+						default:
+							throw NotImplementedException();
+						}
+						sb.GlobalHeader << field.Value->BindingPoint << ");\n";
+					}
+				}
+				
+			}
+
+			virtual void PrintParameterReference(StringBuilder& sb, ILModuleParameterInstance * param) override
+			{
+				if (param->Type->GetBindableResourceType() == BindableResourceType::NonBindable)
+				{
+					auto bufferName = EscapeCodeName(param->Module->BindingName);
+					sb << bufferName << "." << param->Name;
+				}
+				else
+				{
+					sb << EscapeCodeName(param->Module->BindingName + "_" + param->Name);
 				}
 			}
 
@@ -459,6 +402,8 @@ namespace Spire
 				PrintHeaderBoilerplate(ctx);
 
 				GenerateStructs(ctx.GlobalHeader, program);
+				GenerateShaderParameterDefinition(ctx, shader);
+
 				StageAttribute worldName;
 				RefPtr<ILWorld> world = nullptr;
 				if (stage->Attributes.TryGetValue("World", worldName))
@@ -907,6 +852,7 @@ namespace Spire
 
 
 				GenerateStructs(ctx.GlobalHeader, program);
+				GenerateShaderParameterDefinition(ctx, shader);
 				GenerateReferencedFunctions(ctx.GlobalHeader, program, worlds.GetArrayView());
 
 				// As in the single-world case, we need to emit declarations

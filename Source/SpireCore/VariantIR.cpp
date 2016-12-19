@@ -33,7 +33,7 @@ namespace Spire
 				for (auto & ref : impOp->Usings)
 					MarkUsing(ref, impOp->DestWorld.Content);
 			for (auto & req : Shader->Pipeline->Components)
-				if (req.Value->IsParam())
+				if (req.Value->IsRequire())
 				{
 					for (auto & impl : req.Value->Implementations)
 					{
@@ -145,6 +145,7 @@ namespace Spire
 					depWorlds.Add(dep.SourceWorld);
 					for (auto & w : Shader->Pipeline->WorldDependency[dep.SourceWorld]())
 						depWorlds.Add(w);
+					depWorlds.Add("<uniform>");
 					for (int pass = 0; pass < 2; pass++)
 					{
 						// in the first pass, examine the pinned definitions only
@@ -152,7 +153,7 @@ namespace Spire
 						for (auto & depWorld : depWorlds)
 						{
 							auto refComp = Shader->AllComponents[dep.Dependency.ReferencedComponent]();
-							bool isPinned = refComp->Type->PinnedWorlds.Contains(depWorld);
+							bool isPinned = refComp.Symbol->Type->PinnedWorlds.Contains(depWorld);
 							if ((pass == 0 && !isPinned) || (pass == 1 && isPinned)) continue;
 							ComponentDefinitionIR * depDef;
 							if (depDefs.TryGetValue(depWorld, depDef))
@@ -164,11 +165,11 @@ namespace Spire
 								{
 									for (auto & importUsing : importOp->Usings)
 									{
-										ShaderComponentSymbol* refComp;
+										ComponentInstance refComp;
 										if (!Shader->AllComponents.TryGetValue(importUsing, refComp))
 											throw InvalidProgramException("import operator dependency not exists.");
 										ReferenceWorkItem workItem;
-										workItem.Dependency = ComponentDependency(refComp->UniqueName, nullptr);
+										workItem.Dependency = ComponentDependency(refComp.Symbol->UniqueName, nullptr);
 										workItem.SourceWorld = importOp->SourceWorld.Content;
 										workList.Add(workItem);
 									}
@@ -177,9 +178,9 @@ namespace Spire
 								{
 									processImportOperatorUsings(dep.Dependency.ImportOperator);
 								}
-								if (depWorld != dep.SourceWorld)
+								if (depWorld != dep.SourceWorld && depWorld != "<uniform>")
 								{
-									auto importPath = SymbolTable->FindImplicitImportOperatorChain(Shader->Pipeline, depWorld, dep.SourceWorld, refComp->Type->DataType);
+									auto importPath = SymbolTable->FindImplicitImportOperatorChain(Shader->Pipeline, depWorld, dep.SourceWorld, refComp.Symbol->Type->DataType);
 									if (importPath.Count() == 0)
 										continue;
 									processImportOperatorUsings(importPath.First().Nodes.Last().ImportOperator);
