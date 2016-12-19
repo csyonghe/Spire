@@ -11,3 +11,7 @@ LibraryRelease/CodePack.exe
 *.VC.db
 *.spire.actual
 LibraryRelease/Spire.cpp
+*.sdf
+Debug/
+Release/
+x64/
