@@ -3,6 +3,7 @@
 
 #include "../CoreLib/Basic.h"
 #include "Lexer.h"
+#include "IL.h"
 
 namespace Spire
 {
@@ -131,23 +132,22 @@ namespace Spire
 			static RefPtr<ExpressionType> Float4;
 			static RefPtr<ExpressionType> Void;
 			static RefPtr<ExpressionType> Error;
-            // Note: just exists to make sure we can clean up
-            // canonical types we create along the way
-            static List<RefPtr<ExpressionType>> sCanonicalTypes;
+			// Note: just exists to make sure we can clean up
+			// canonical types we create along the way
+			static List<RefPtr<ExpressionType>> sCanonicalTypes;
 		public:
 			virtual String ToString() const = 0;
 			virtual ExpressionType * Clone() = 0;
 
-            bool IsIntegral() const;
-            bool Equals(const ExpressionType * type) const;
-            bool IsVectorType() const;
-            bool IsArray() const;
-            bool IsGenericType(String typeName) const;
-            BasicExpressionType * AsBasicType() const;
-            ArrayExpressionType * AsArrayType() const;
-            GenericExpressionType * AsGenericType() const;
-            NamedExpressionType* AsNamedType() const;
-
+			bool IsIntegral() const;
+			bool Equals(const ExpressionType * type) const;
+			bool IsVectorType() const;
+			bool IsArray() const;
+			bool IsGenericType(String typeName) const;
+			BasicExpressionType * AsBasicType() const;
+			ArrayExpressionType * AsArrayType() const;
+			GenericExpressionType * AsGenericType() const;
+			NamedExpressionType* AsNamedType() const;
 			bool IsTextureOrSampler() const;
 			bool IsTexture() const;
 			bool IsStruct() const;
@@ -155,6 +155,7 @@ namespace Spire
 			static void Init();
 			static void Finalize();
             ExpressionType* GetCanonicalType() const;
+			virtual BindableResourceType GetBindableResourceType() const { return BindableResourceType::NonBindable; }
         protected:
             virtual bool IsIntegralImpl() const { return false; }
 			virtual bool EqualsImpl(const ExpressionType * type) const = 0;
@@ -215,6 +216,7 @@ namespace Spire
 				return const_cast<BasicExpressionType*>(this);
 			}
             virtual ExpressionType* CreateCanonicalType() override;
+			virtual BindableResourceType GetBindableResourceType() const override;
 		};
 
 		class ArrayExpressionType : public ExpressionType
@@ -252,6 +254,8 @@ namespace Spire
 				return const_cast<GenericExpressionType*>(this);
 			}
             virtual ExpressionType* CreateCanonicalType() override;
+			virtual BindableResourceType GetBindableResourceType() const override;
+
 		};
 
         class NamedExpressionType : public ExpressionType
@@ -261,6 +265,7 @@ namespace Spire
 
             virtual String ToString() const override;
             virtual ExpressionType * Clone() override;
+			virtual BindableResourceType GetBindableResourceType() const override;
 
         protected:
             virtual bool EqualsImpl(const ExpressionType * type) const override;

@@ -876,7 +876,7 @@ namespace Spire
 							}
 						}
 					}
-					if (!inAbstractWorld && !impl->SyntaxNode->IsRequire && !impl->SyntaxNode->IsInput
+					if (!inAbstractWorld && !impl->SyntaxNode->IsRequire && !impl->SyntaxNode->IsInput && !impl->SyntaxNode->IsParam
 						&& !impl->SyntaxNode->Expression && !impl->SyntaxNode->BlockStatement)
 					{
 						err->diagnose(impl->SyntaxNode->Position, Diagnostics::nonAbstractComponentMustHaveImplementation);

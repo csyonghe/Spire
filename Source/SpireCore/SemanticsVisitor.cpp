@@ -489,7 +489,11 @@ namespace Spire
 					{
 						if (compSym->IsRequire())
 							getSink()->diagnose(comp, Diagnostics::requireWithComputation);
+						if (comp->IsParam)
+							getSink()->diagnose(comp, Diagnostics::paramWithComputation);
 					}
+					if (compSym->Type->DataType->GetBindableResourceType() != BindableResourceType::NonBindable && !comp->IsParam)
+						getSink()->diagnose(comp, Diagnostics::resourceTypeMustBeParam, comp->Name);
 					currentComp = nullptr;
 					return comp;
 				}

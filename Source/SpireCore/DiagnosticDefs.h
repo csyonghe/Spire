@@ -201,6 +201,7 @@ DIAGNOSTIC(33034, Error, recordTypeVariableInImportOperator, "cannot declare a r
 DIAGNOSTIC(33037, Error, componetMarkedExportCannotHaveParameters, "component '$0': definition marked as 'export' cannot have parameters.")
 DIAGNOSTIC(33039, Error, componentInInputWorldCantHaveCode, "'$0': no code allowed for component defined in input world.")
 DIAGNOSTIC(33040, Error, requireWithComputation, "'require': cannot define computation on component requirements.")
+DIAGNOSTIC(33042, Error, paramWithComputation, "'param': cannot define computation on parameters.")
 DIAGNOSTIC(33041, Error, pipelineOfModuleIncompatibleWithPipelineOfShader, "pipeline '$0' targeted by module '$1' is incompatible with pipeline '$2' targeted by shader '$3'.")
 DIAGNOSTIC(33070, Error, expectedFunction, "expression preceding parenthesis of apparent call must have function type.")
 DIAGNOSTIC(33071, Error, importOperatorCalledFromAutoPlacedComponent, "cannot call an import operator from an auto-placed component '$0'. try qualify the component with explicit worlds.")
@@ -214,7 +215,7 @@ DIAGNOSTIC(34025, Error, globalComponentConflictWithPreviousDeclaration, "'$0': 
 DIAGNOSTIC(34026, Warning, componentIsAlreadyDefinedUseRequire, "'$0': component is already defined when compiling shader '$1'. use 'require' to declare it as a parameter.")
 DIAGNOSTIC(34062, Error, cylicReference, "cyclic reference: $0");
 DIAGNOSTIC(34064, Error, noApplicableImplicitImportOperator, "cannot find import operator to import component '$0' to world '$1' when compiling '$2'.")
-
+DIAGNOSTIC(34065, Error, resourceTypeMustBeParam, "'$0': resource typed component must be declared as 'param'.");
 //
 // 4xxxx - IL code generation.
 //

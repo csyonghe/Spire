@@ -40,6 +40,23 @@ namespace Spire
             return this;
         }
 
+		BindableResourceType BasicExpressionType::GetBindableResourceType() const
+		{
+			switch (BaseType)
+			{
+			case Compiler::BaseType::Texture2DArray:
+			case Compiler::BaseType::Texture2DArrayShadow:
+			case Compiler::BaseType::Texture2D:
+			case Compiler::BaseType::Texture3D:
+			case Compiler::BaseType::TextureCube:
+			case Compiler::BaseType::TextureCubeShadow:
+				return BindableResourceType::Texture;
+			case Compiler::BaseType::SamplerState:
+				return BindableResourceType::Sampler;
+			}
+			return BindableResourceType::NonBindable;
+		}
+
 		bool BasicExpressionType::IsVectorTypeImpl() const
 		{
 			return IsVector(BaseType);
@@ -96,11 +113,23 @@ namespace Spire
 			case Compiler::BaseType::Float4x4:
 				res.Append("mat4");
 				break;
+			case Compiler::BaseType::Texture2DArray:
+				res.Append("sampler2DArray");
+				break;
+			case Compiler::BaseType::Texture2DArrayShadow:
+				res.Append("sampler2DArrayShadow");
+				break;
 			case Compiler::BaseType::Texture2D:
 				res.Append("sampler2D");
 				break;
+			case Compiler::BaseType::Texture3D:
+				res.Append("sampler3D");
+				break;
 			case Compiler::BaseType::TextureCube:
 				res.Append("samplerCube");
+				break;
+			case Compiler::BaseType::TextureCubeShadow:
+				res.Append("samplerCubeShadow");
 				break;
 			case Compiler::BaseType::Function:
 				res.Append(Func->SyntaxNode->InternalName);
@@ -753,6 +782,14 @@ namespace Spire
             canonicalGenericType->GenericTypeName = GenericTypeName;
             return canonicalGenericType;
         }
+		BindableResourceType GenericExpressionType::GetBindableResourceType() const
+		{
+			if (GenericTypeName == "StructuredBuffer" || GenericTypeName == "RWStructuredBuffer")
+				return BindableResourceType::StorageBuffer;
+			else if (GenericTypeName == "Uniform")
+				return BindableResourceType::Buffer;
+			return BindableResourceType::NonBindable;
+		}
 		CoreLib::Basic::String GenericExpressionType::ToString() const
 		{
 			return GenericTypeName + "<" + BaseType->ToString() + ">";
@@ -777,6 +814,11 @@ namespace Spire
             result->decl = decl;
             return result;
         }
+
+		BindableResourceType NamedExpressionType::GetBindableResourceType() const
+		{
+			return GetCanonicalType()->GetBindableResourceType();
+		}
 
         bool NamedExpressionType::EqualsImpl(const ExpressionType * /*type*/) const
         {
