@@ -264,7 +264,7 @@ namespace Spire
 			return rs;
 		}
 
-        static RefPtr<TypeDefDecl> ParseTypeDef(Parser* parser)
+        RefPtr<TypeDefDecl> ParseTypeDef(Parser* parser)
         {
             // Consume the `typedef` keyword
             parser->ReadToken("typedef");
@@ -277,6 +277,8 @@ namespace Spire
             RefPtr<TypeDefDecl> typeDefDecl = new TypeDefDecl();
             typeDefDecl->Name = nameToken;
             typeDefDecl->TypeNode = type;
+
+			parser->typeNames.Add(nameToken.Content);
 
             return typeDefDecl;
         }
@@ -832,6 +834,7 @@ namespace Spire
 				ReadToken(TokenType::Semicolon);
 			}
 			ReadToken("}");
+			typeNames.Add(rs->Name.Content);
 			return rs;
 		}
 
