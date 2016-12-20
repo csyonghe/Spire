@@ -1027,34 +1027,21 @@ namespace Spire
 				return stmt;
 			}
 
-            RefPtr<ExpressionType> currentMultiDeclTypeSpec;
-            RefPtr<MultiDecl> VisitMultiDecl(MultiDecl* decl)
-            {
-                RefPtr<ExpressionType> type = TranslateTypeNode(decl->TypeNode);
-                currentMultiDeclTypeSpec = type;
-
-				if (type->IsTextureOrSampler() || type->AsGenericType())
-				{
-					getSink()->diagnose(decl->TypeNode, Diagnostics::invalidTypeForLocalVariable);
-				}
-				else if (type->AsBasicType() && type->AsBasicType()->RecordTypeName.Length())
-				{
-					getSink()->diagnose(decl->TypeNode, Diagnostics::recordTypeVariableInImportOperator);
-				}
-                for (auto d : decl->decls)
-                {
-                    d->Accept(this).As<Decl>();
-                }
-                currentMultiDeclTypeSpec = nullptr;
-                return decl;
-            }
-
             virtual RefPtr<Variable> VisitDeclrVariable(Variable* varDecl)
             {
 				if (varDecl->Scope->decls.ContainsKey(varDecl->Name.Content))
 					getSink()->diagnose(varDecl, Diagnostics::variableNameAlreadyDefined, varDecl->Name);
 
-                varDecl->Type = currentMultiDeclTypeSpec;
+                RefPtr<ExpressionType> type = TranslateTypeNode(varDecl->TypeNode);
+				if (type->IsTextureOrSampler() || type->AsGenericType())
+				{
+					getSink()->diagnose(varDecl->TypeNode, Diagnostics::invalidTypeForLocalVariable);
+				}
+				else if (type->AsBasicType() && type->AsBasicType()->RecordTypeName.Length())
+				{
+					getSink()->diagnose(varDecl->TypeNode, Diagnostics::recordTypeVariableInImportOperator);
+				}
+                varDecl->Type = type;
 				if (varDecl->Type->Equals(ExpressionType::Void.Ptr()))
 					getSink()->diagnose(varDecl, Diagnostics::invalidTypeVoid);
 				if (varDecl->Type->IsArray() && varDecl->Type->AsArrayType()->ArrayLength <= 0)

@@ -1149,35 +1149,19 @@ namespace Spire
 
         static RefPtr<Decl> ParseLocalVarDecls(Parser* parser)
         {
-            // TODO(tfoley): it is wasteful to allocate this if
-            // it won't always be needed/used
-            RefPtr<MultiDecl> multiDecl = new MultiDecl();
-		
-			parser->FillPosition(multiDecl.Ptr());
+			RefPtr<Variable> var = new Variable();
+			parser->FillPosition(var.Ptr());
 
-            multiDecl->modifiers = ParseModifiers(parser);
-			multiDecl->TypeNode = parser->ParseType();
-			while (!parser->tokenReader.IsAtEnd())
+            var->modifiers = ParseModifiers(parser);
+			var->TypeNode = parser->ParseType();
+			var->Name = parser->ReadToken(TokenType::Identifier);
+			if (AdvanceIf(parser, TokenType::OpAssign))
 			{
-				RefPtr<Variable> var = new Variable();
-				parser->FillPosition(var.Ptr());
-				Token name = parser->ReadToken(TokenType::Identifier);
-				var->Name = name;
-				if (parser->LookAheadToken(TokenType::OpAssign))
-				{
-					parser->ReadToken(TokenType::OpAssign);
-					var->Expr = parser->ParseExpression();
-				}
-
-				multiDecl->decls.Add(var);
-				if (parser->LookAheadToken(TokenType::Comma))
-					parser->ReadToken(TokenType::Comma);
-				else
-					break;
+				var->Expr = parser->ParseExpression();
 			}
 			parser->ReadToken(TokenType::Semicolon);
-			
-			return multiDecl;
+
+			return var;
         }
 
 		RefPtr<VarDeclrStatementSyntaxNode> Parser::ParseVarDeclrStatement()

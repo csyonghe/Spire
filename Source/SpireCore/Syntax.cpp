@@ -562,19 +562,6 @@ namespace Spire
 			return rs;
 		}
 
-        RefPtr<SyntaxNode> MultiDecl::Accept(SyntaxVisitor * visitor)
-        {
-            return visitor->VisitMultiDecl(this);
-        }
-
-        MultiDecl * MultiDecl::Clone(CloneContext & ctx)
-        {
-            auto rs = CloneSyntaxNodeFields(new MultiDecl(*this), ctx);
-            for (auto& d : rs->decls)
-                d = d->Clone(ctx);
-            return rs;
-        }
-
 		RefPtr<SyntaxNode> StructField::Accept(SyntaxVisitor * visitor)
 		{
 			return visitor->VisitStructField(this);
