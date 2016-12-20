@@ -786,7 +786,7 @@ namespace Spire
 		class ChoiceValueSyntaxNode : public ExpressionSyntaxNode
 		{
 		public:
-			String WorldName, AlternateName;
+			String WorldName;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) { return this; }
 			virtual ChoiceValueSyntaxNode * Clone(CloneContext & ctx);
 		};
@@ -979,7 +979,6 @@ namespace Spire
 			RefPtr<TypeSyntaxNode> TypeNode;
 			RefPtr<ExpressionType> Type;
 			RefPtr<RateSyntaxNode> Rate;
-			Token AlternateName;
 			RefPtr<BlockStatementSyntaxNode> BlockStatement;
 			RefPtr<ExpressionSyntaxNode> Expression;
 			List<RefPtr<ParameterSyntaxNode>> Parameters;

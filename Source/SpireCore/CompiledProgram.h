@@ -132,32 +132,28 @@ namespace Spire
 		class ShaderChoiceValue
 		{
 		public:
-			String WorldName, AlternateName;
+			String WorldName;
 			ShaderChoiceValue() = default;
-			ShaderChoiceValue(String world, String alt)
+			ShaderChoiceValue(String world)
 			{
 				WorldName = world;
-				AlternateName = alt;
 			}
 			static ShaderChoiceValue Parse(String str);
 			String ToString()
 			{
-				if (AlternateName.Length() == 0)
-					return WorldName;
-				else
-					return WorldName + ":" + AlternateName;
+				return WorldName;
 			}
 			bool operator == (const ShaderChoiceValue & val)
 			{
-				return WorldName == val.WorldName && AlternateName == val.AlternateName;
+				return WorldName == val.WorldName;
 			}
 			bool operator != (const ShaderChoiceValue & val)
 			{
-				return WorldName != val.WorldName || AlternateName != val.AlternateName;
+				return WorldName != val.WorldName;
 			}
 			int GetHashCode()
 			{
-				return WorldName.GetHashCode() ^ AlternateName.GetHashCode();
+				return WorldName.GetHashCode();
 			}
 		};
 

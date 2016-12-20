@@ -582,14 +582,10 @@ namespace Spire
 			auto depOrder = shader->GetDependencyOrder();
 			for (auto & comp : depOrder)
 			{
-				// automatically deduced overloadable worlds for a component definition without explicit rate qualifier
-				Dictionary<String, EnumerableHashSet<String>> autoWorlds; // keyed on alternate name 
 				comp->Type->FeasibleWorlds.Clear();
 				for (auto & impl : comp->Implementations)
 				{
-					if (!autoWorlds.ContainsKey(impl->AlternateName))
-						autoWorlds[impl->AlternateName] = allWorlds;
-					auto & autoWorld = autoWorlds[impl->AlternateName]();
+					auto & autoWorld = allWorlds;
 					for (auto & w : impl->Worlds)
 					{
 						ShaderComponentSymbol* unaccessibleComp = nullptr;
@@ -609,7 +605,7 @@ namespace Spire
 				{
 					if (impl->Worlds.Count() == 0) // if this component definition is not qualified with a world
 					{
-						EnumerableHashSet<String> deducedWorlds = autoWorlds[impl->AlternateName]();
+						EnumerableHashSet<String> deducedWorlds = allWorlds;
 						EnumerableHashSet<String> feasibleWorlds;
 						// the auto-deduced world for this definition is all feasible worlds in autoWorld.
 						for (auto & w : deducedWorlds)

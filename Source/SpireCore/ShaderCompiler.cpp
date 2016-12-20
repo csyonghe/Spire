@@ -119,7 +119,7 @@ namespace Spire
 								// find specified impl
 								for (auto & impl : comp->Implementations)
 								{
-									if (impl->AlternateName == selectedDef->AlternateName && impl->Worlds.Contains(selectedDef->WorldName))
+									if (impl->Worlds.Contains(selectedDef->WorldName))
 										pinnedImpl.Add(impl.Ptr());
 								}
 							}
@@ -434,7 +434,7 @@ namespace Spire
 									{
 										for (auto w : impl->Worlds)
 											if (comp.Value.Symbol->Type->ConstrainedWorlds.Contains(w))
-												choice.Options.Add(ShaderChoiceValue(w, impl->AlternateName));
+												choice.Options.Add(ShaderChoiceValue(w));
 									}
 									if (auto defs = shader.Value->IR->DefinitionsByComponent.TryGetValue(comp.Key))
 									{

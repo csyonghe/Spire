@@ -335,7 +335,7 @@ namespace Spire
 				for (auto & cimpl : comp->Implementations)
 				{
 					for (auto & w : cimpl->Worlds)
-						if (impl->Worlds.Contains(w) && impl->AlternateName == cimpl->AlternateName)
+						if (impl->Worlds.Contains(w))
 						{
                             err->diagnose(impl->SyntaxNode->Position, Diagnostics::componentIsAlreadyDefinedInThatWorld, comp->Name, w);
 							rs = false;
@@ -346,7 +346,7 @@ namespace Spire
 			{
 				for (auto & cimpl : comp->Implementations)
 				{
-					if (cimpl->Worlds.Count() == 0 && impl->Worlds.Count() == 0 && impl->AlternateName == cimpl->AlternateName)
+					if (cimpl->Worlds.Count() == 0 && impl->Worlds.Count() == 0)
 					{
                         err->diagnose(impl->SyntaxNode->Position, Diagnostics::componentIsAlreadyDefined, comp->Name);
 						rs = false;
