@@ -645,6 +645,9 @@ namespace Spire
         class VarDeclBase : public Decl
         {
         public:
+            // Syntax for type specifier
+			RefPtr<TypeSyntaxNode> TypeNode;
+
             // Resolved type of the variable
 			RefPtr<ExpressionType> Type;
 
@@ -652,32 +655,8 @@ namespace Spire
 			RefPtr<ExpressionSyntaxNode> Expr;
         };
 
-        // A single variable declaration
-        class SingleVarDecl : public VarDeclBase
-        {
-        public:
-			RefPtr<TypeSyntaxNode> TypeNode;
-        };
-
-        // A compound declaration that might declare multiple things,
-        // using C-style declarator syntax
-        class MultiDecl : public Decl
-        {
-        public:
-            // The type specifier that all the declarations share
-			RefPtr<TypeSyntaxNode> TypeNode;
-
-            // The actual decls
-            List<RefPtr<Decl>> decls;
-
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-            virtual MultiDecl * Clone(CloneContext & ctx) override;
-        };
-
-
         // A field of a `struct` type
-		class StructField :
-            public SingleVarDecl // TODO(tfoley): should really allow `MultiDecl` inside a `struct`
+		class StructField : public VarDeclBase
 		{
 		public:
 			StructField()
@@ -762,7 +741,7 @@ namespace Spire
 			In, Out, InOut, Uniform
 		};
 
-		class ParameterSyntaxNode : public SingleVarDecl
+		class ParameterSyntaxNode : public VarDeclBase
 		{
 		public:
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
@@ -1417,16 +1396,6 @@ namespace Spire
 			{
 				return type;
 			}
-
-            virtual RefPtr<MultiDecl> VisitMultiDecl(MultiDecl* decl)
-            {
-                decl->TypeNode = decl->TypeNode->Accept(this).As<TypeSyntaxNode>();
-                for (auto& d : decl->decls)
-                {
-                    d = d->Accept(this).As<Decl>();
-                }
-                return decl;
-            }
 
 			virtual RefPtr<Variable> VisitDeclrVariable(Variable* dclr)
 			{
