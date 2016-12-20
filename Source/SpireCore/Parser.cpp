@@ -805,10 +805,6 @@ namespace Spire
 			component->TypeNode = ParseType();
 			FillPosition(component.Ptr());
 			component->Name = ReadToken(TokenType::Identifier);
-			if (AdvanceIf(this, TokenType::Colon))
-			{
-				component->AlternateName = ReadToken(TokenType::Identifier);
-			}
 			if (AdvanceIf(this, TokenType::LParent))
 			{
 				while (!AdvanceIfMatch(this, TokenType::RParent))

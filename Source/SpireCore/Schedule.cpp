@@ -120,16 +120,7 @@ namespace Spire
 								auto token = ReadToken(TokenType::StringLiterial);
 								RefPtr<ChoiceValueSyntaxNode> choiceValue = new ChoiceValueSyntaxNode();
 								choiceValue->Position = token.Position;
-								int splitterPos = token.Content.IndexOf(':');
-								if (splitterPos != -1)
-								{
-									choiceValue->WorldName = token.Content.SubString(0, splitterPos);
-									choiceValue->AlternateName = token.Content.SubString(splitterPos + 1, token.Content.Length() - splitterPos - 1);
-								}
-								else
-								{
-									choiceValue->WorldName = token.Content;
-								}
+								choiceValue->WorldName = token.Content;
 								worlds.Add(choiceValue);
 								if (LookAheadToken(","))
 									ReadToken(TokenType::Comma);

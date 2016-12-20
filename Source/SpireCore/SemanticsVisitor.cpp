@@ -717,10 +717,6 @@ namespace Spire
 						if (w.Pinned)
 							compImpl->SrcPinnedWorlds.Add(w.World.Content);
 				}
-				if (compImpl->SyntaxNode->AlternateName.Type == TokenType::Identifier)
-				{
-					compImpl->AlternateName = compImpl->SyntaxNode->AlternateName.Content;
-				}
 				if (compImpl->SyntaxNode->IsOutput())
 				{
 					if (compImpl->SyntaxNode->Rate)
