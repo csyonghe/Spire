@@ -277,7 +277,7 @@ namespace Spire
 				for (auto comp : pipeline->GetAbstractComponents())
 				{
 					comp->Type = TranslateTypeNode(comp->TypeNode);
-					if (comp->IsRequire || comp->IsInput || (comp->Rate && comp->Rate->Worlds.Count() == 1
+					if (comp->IsRequire() || comp->IsInput() || (comp->Rate && comp->Rate->Worlds.Count() == 1
 						&& psymbol->IsAbstractWorld(comp->Rate->Worlds.First().World.Content)))
 						AddNewComponentSymbol(psymbol->Components, psymbol->FunctionComponents, comp);
                     else
@@ -296,7 +296,7 @@ namespace Spire
 						getSink()->diagnose(op->DestWorld, Diagnostics::undefinedWorldName, op->DestWorld.Content);
 					else
 					{
-						if (psymbol->Worlds[op->DestWorld.Content].GetValue()->IsAbstract)
+						if (psymbol->Worlds[op->DestWorld.Content].GetValue()->IsAbstract())
 							getSink()->diagnose(op->DestWorld, Diagnostics::abstractWorldAsTargetOfImport);
 						else if (!psymbol->WorldDependency.ContainsKey(op->SourceWorld.Content))
 							getSink()->diagnose(op->SourceWorld, Diagnostics::undefinedWorldName2, op->SourceWorld.Content);
@@ -481,19 +481,15 @@ namespace Spire
 					currentShader->Components.TryGetValue(comp->Name.Content, compSym);
 					currentComp = compSym.Ptr();
 					SyntaxVisitor::VisitComponent(comp);
-					if (comp->Parameters.Count() > 0)
-					{
-						comp->IsInline = true;
-					}
 					if (comp->Expression || comp->BlockStatement)
 					{
 						if (compSym->IsRequire())
 							getSink()->diagnose(comp, Diagnostics::requireWithComputation);
-						if (comp->IsParam)
+						if (comp->IsParam())
 							getSink()->diagnose(comp, Diagnostics::paramWithComputation);
 					}
-					if (compSym->Type->DataType->GetBindableResourceType() != BindableResourceType::NonBindable && !comp->IsParam
-						&& !comp->IsRequire)
+					if (compSym->Type->DataType->GetBindableResourceType() != BindableResourceType::NonBindable && !comp->IsParam()
+						&& !comp->IsRequire())
 						getSink()->diagnose(comp, Diagnostics::resourceTypeMustBeParamOrRequire, comp->Name);
 					currentComp = nullptr;
 					return comp;
@@ -509,7 +505,7 @@ namespace Spire
 					{
 						ShaderUsing su;
 						su.Shader = refShader.Ptr();
-						su.IsPublic = import->IsPublic;
+						su.IsPublic = import->IsPublic();
 						if (import->IsInplace)
 						{
 							currentShader->ShaderUsings.Add(su);
@@ -575,7 +571,7 @@ namespace Spire
 					if (auto comp = dynamic_cast<ComponentSyntaxNode*>(mbr.Ptr()))
 					{
 						comp->Type = TranslateTypeNode(comp->TypeNode);
-						if (comp->IsRequire)
+						if (comp->IsRequire())
 						{
 							shaderSymbol->IsAbstract = true;
 							if (!shaderSymbol->SyntaxNode->IsModule)
@@ -721,11 +717,7 @@ namespace Spire
 						if (w.Pinned)
 							compImpl->SrcPinnedWorlds.Add(w.World.Content);
 				}
-				if (compImpl->SyntaxNode->AlternateName.Type == TokenType::Identifier)
-				{
-					compImpl->AlternateName = compImpl->SyntaxNode->AlternateName.Content;
-				}
-				if (compImpl->SyntaxNode->IsOutput)
+				if (compImpl->SyntaxNode->IsOutput())
 				{
 					if (compImpl->SyntaxNode->Rate)
 					{
@@ -750,7 +742,7 @@ namespace Spire
 				}
 				else
 				{
-					if (comp->IsRequire)
+					if (comp->IsRequire())
 						getSink()->diagnose(compImpl->SyntaxNode.Ptr(), Diagnostics::requirementsClashWithPreviousDef, compImpl->SyntaxNode->Name.Content);
 					else
 					{
@@ -878,7 +870,7 @@ namespace Spire
 
 			virtual RefPtr<FunctionSyntaxNode> VisitFunction(FunctionSyntaxNode *functionNode) override
 			{
-				if (!functionNode->IsExtern)
+				if (!functionNode->IsExtern())
 				{
 					currentFunc = symbolTable->Functions.TryGetValue(functionNode->InternalName)->Ptr();
 					this->function = functionNode;
@@ -1031,34 +1023,21 @@ namespace Spire
 				return stmt;
 			}
 
-            RefPtr<ExpressionType> currentMultiDeclTypeSpec;
-            RefPtr<MultiDecl> VisitMultiDecl(MultiDecl* decl)
-            {
-                RefPtr<ExpressionType> type = TranslateTypeNode(decl->TypeNode);
-                currentMultiDeclTypeSpec = type;
-
-				if (type->IsTextureOrSampler() || type->AsGenericType())
-				{
-					getSink()->diagnose(decl->TypeNode, Diagnostics::invalidTypeForLocalVariable);
-				}
-				else if (type->AsBasicType() && type->AsBasicType()->RecordTypeName.Length())
-				{
-					getSink()->diagnose(decl->TypeNode, Diagnostics::recordTypeVariableInImportOperator);
-				}
-                for (auto d : decl->decls)
-                {
-                    d->Accept(this).As<Decl>();
-                }
-                currentMultiDeclTypeSpec = nullptr;
-                return decl;
-            }
-
             virtual RefPtr<Variable> VisitDeclrVariable(Variable* varDecl)
             {
 				if (varDecl->Scope->decls.ContainsKey(varDecl->Name.Content))
 					getSink()->diagnose(varDecl, Diagnostics::variableNameAlreadyDefined, varDecl->Name);
 
-                varDecl->Type = currentMultiDeclTypeSpec;
+                RefPtr<ExpressionType> type = TranslateTypeNode(varDecl->TypeNode);
+				if (type->IsTextureOrSampler() || type->AsGenericType())
+				{
+					getSink()->diagnose(varDecl->TypeNode, Diagnostics::invalidTypeForLocalVariable);
+				}
+				else if (type->AsBasicType() && type->AsBasicType()->RecordTypeName.Length())
+				{
+					getSink()->diagnose(varDecl->TypeNode, Diagnostics::recordTypeVariableInImportOperator);
+				}
+                varDecl->Type = type;
 				if (varDecl->Type->Equals(ExpressionType::Void.Ptr()))
 					getSink()->diagnose(varDecl, Diagnostics::invalidTypeVoid);
 				if (varDecl->Type->IsArray() && varDecl->Type->AsArrayType()->ArrayLength <= 0)
@@ -1462,7 +1441,7 @@ namespace Spire
 				}
 				if (func)
 				{
-					if (!func->SyntaxNode->IsExtern)
+					if (!func->SyntaxNode->IsExtern())
 					{
 						varExpr->Variable = func->SyntaxNode->InternalName;
 						if (currentFunc)
@@ -1552,8 +1531,7 @@ namespace Spire
 						{
 							for (int i = 0; i < (*params).Count(); i++)
 							{
-								if ((*params)[i]->Qualifier == ParameterQualifier::Out ||
-									(*params)[i]->Qualifier == ParameterQualifier::InOut)
+								if ((*params)[i]->HasModifier(ModifierFlag::Out))
 								{
 									if (i < expr->Arguments.Count() && expr->Arguments[i]->Type->AsBasicType() &&
 										!expr->Arguments[i]->Type->AsBasicType()->IsLeftValue)

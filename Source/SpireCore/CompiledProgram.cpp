@@ -46,11 +46,7 @@ namespace Spire
 		}
 		ShaderChoiceValue ShaderChoiceValue::Parse(String str)
 		{
-			ShaderChoiceValue result;
-			int idx = str.IndexOf(':');
-			if (idx == -1)
-				return ShaderChoiceValue(str, "");
-			return ShaderChoiceValue(str.SubString(0, idx), str.SubString(idx + 1, str.Length() - idx - 1));
+			return ShaderChoiceValue(str);
 		}
 		
 }

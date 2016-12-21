@@ -142,7 +142,7 @@ namespace Spire
 		{
 			WorldSyntaxNode* worldDecl;
 			if (Worlds.TryGetValue(world, worldDecl))
-				return worldDecl->IsAbstract;
+				return worldDecl->IsAbstract();
 			return false;
 		}
 
@@ -294,7 +294,7 @@ namespace Spire
 			{
 				if (shaderUsing.Shader->Components.TryGetValue(compName, refComp))
 				{
-					if (refComp->Implementations.First()->SyntaxNode->IsPublic)
+					if (refComp->Implementations.First()->SyntaxNode->IsPublic())
 					{
 						result.Component = refComp.Ptr();
 						result.IsAccessible = true;
@@ -335,7 +335,7 @@ namespace Spire
 				for (auto & cimpl : comp->Implementations)
 				{
 					for (auto & w : cimpl->Worlds)
-						if (impl->Worlds.Contains(w) && impl->AlternateName == cimpl->AlternateName)
+						if (impl->Worlds.Contains(w))
 						{
                             err->diagnose(impl->SyntaxNode->Position, Diagnostics::componentIsAlreadyDefinedInThatWorld, comp->Name, w);
 							rs = false;
@@ -346,7 +346,7 @@ namespace Spire
 			{
 				for (auto & cimpl : comp->Implementations)
 				{
-					if (cimpl->Worlds.Count() == 0 && impl->Worlds.Count() == 0 && impl->AlternateName == cimpl->AlternateName)
+					if (cimpl->Worlds.Count() == 0 && impl->Worlds.Count() == 0)
 					{
                         err->diagnose(impl->SyntaxNode->Position, Diagnostics::componentIsAlreadyDefined, comp->Name);
 						rs = false;
@@ -355,7 +355,7 @@ namespace Spire
 			}
 			for (auto & cimpl : comp->Implementations)
 			{
-				if (impl->SyntaxNode->IsOutput != cimpl->SyntaxNode->IsOutput)
+				if (impl->SyntaxNode->IsOutput() != cimpl->SyntaxNode->IsOutput())
 				{
                     err->diagnose(impl->SyntaxNode->Position,
                         Diagnostics::inconsistentSignatureForComponent,
@@ -365,7 +365,7 @@ namespace Spire
 					rs = false;
 					break;
 				}
-				if (impl->SyntaxNode->IsRequire != cimpl->SyntaxNode->IsRequire)
+				if (impl->SyntaxNode->IsRequire() != cimpl->SyntaxNode->IsRequire())
 				{
                     err->diagnose(impl->SyntaxNode->Position,
                         Diagnostics::inconsistentSignatureForComponent,
@@ -375,7 +375,7 @@ namespace Spire
 					rs = false;
 					break;
 				}
-				if (impl->SyntaxNode->IsPublic != cimpl->SyntaxNode->IsPublic)
+				if (impl->SyntaxNode->IsPublic() != cimpl->SyntaxNode->IsPublic())
 				{
                     err->diagnose(impl->SyntaxNode->Position,
                         Diagnostics::inconsistentSignatureForComponent,
@@ -396,7 +396,7 @@ namespace Spire
 					break;
 				}
 			}
-			if (impl->SyntaxNode->IsRequire && comp->Implementations.Count() != 0)
+			if (impl->SyntaxNode->IsRequire() && comp->Implementations.Count() != 0)
 			{
                 err->diagnose(impl->SyntaxNode->Position,
                     Diagnostics::parameterNameConflictsWithExistingDefinition, comp->Name);
@@ -539,7 +539,7 @@ namespace Spire
 				if (subClosure.Value->IsInPlace)
 				{
 					rs = subClosure.Value->FindComponent(name, findInPrivate, includeParams);
-					if (rs && (findInPrivate || rs->Implementations.First()->SyntaxNode->IsPublic))
+					if (rs && (findInPrivate || rs->Implementations.First()->SyntaxNode->IsPublic()))
 						return rs;
 					else
 						rs = nullptr;

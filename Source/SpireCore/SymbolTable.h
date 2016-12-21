@@ -23,7 +23,6 @@ namespace Spire
 		class ShaderComponentImplSymbol : public RefObject
 		{
 		public:
-			String AlternateName;
 			EnumerableHashSet<String> Worlds, ExportWorlds, SrcPinnedWorlds;
 			RefPtr<ComponentSyntaxNode> SyntaxNode;
 			EnumerableDictionary<ShaderComponentSymbol *, EnumerableHashSet<RefPtr<ImportExpressionSyntaxNode>>> DependentComponents; // key: dependent components, value: set of import expression nodes (null means implicit reference)
@@ -31,7 +30,6 @@ namespace Spire
 			ShaderComponentImplSymbol() = default;
 			ShaderComponentImplSymbol(const ShaderComponentImplSymbol & other)
 			{
-				AlternateName = other.AlternateName;
 				Worlds = other.Worlds;
 				ExportWorlds = other.ExportWorlds;
 				SrcPinnedWorlds = other.SrcPinnedWorlds;
@@ -52,7 +50,7 @@ namespace Spire
 			bool IsRequire()
 			{
 				for (auto & impl : Implementations)
-					if (impl->SyntaxNode->IsRequire)
+					if (impl->SyntaxNode->IsRequire())
 						return true;
 				return false;
 			}

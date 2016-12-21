@@ -41,13 +41,13 @@ namespace Spire
 					for (auto & comp : comps)
 					{
 						for (auto & impl : comp->Implementations)
-							for (auto & attrib : impl->SyntaxNode->LayoutAttributes)
+							for (auto attrib : impl->SyntaxNode->GetLayoutAttributes())
 							{
 								try
 								{
-									if (attrib.Value.StartsWith("%"))
+									if (attrib->GetValue().StartsWith("%"))
 									{
-										CoreLib::Text::TokenReader parser(attrib.Value.SubString(1, attrib.Value.Length() - 1));
+										CoreLib::Text::TokenReader parser(attrib->GetValue().SubString(1, attrib->GetValue().Length() - 1));
 										auto compName = parser.ReadWord();
 										parser.Read(".");
 										auto compAttrib = parser.ReadWord();
@@ -56,9 +56,9 @@ namespace Spire
 										{
 											for (auto & timpl : compSym->Implementations)
 											{
-												String attribValue;
-												if (timpl->SyntaxNode->LayoutAttributes.TryGetValue(compAttrib, attribValue))
-													attrib.Value = attribValue;
+												Token attribValue;
+												if (timpl->SyntaxNode->FindSimpleAttribute(compAttrib, attribValue))
+													attrib->Value = attribValue;
 											}
 										}
 									}
@@ -90,7 +90,7 @@ namespace Spire
 					{
 						for (auto & w : impl->Worlds)
 						{
-							if (impl->SrcPinnedWorlds.Contains(w) || impl->SyntaxNode->IsInline || impl->ExportWorlds.Contains(w) || impl->SyntaxNode->IsInput)
+							if (impl->SrcPinnedWorlds.Contains(w) || impl->SyntaxNode->IsInline() || impl->ExportWorlds.Contains(w) || impl->SyntaxNode->IsInput())
 							{
 								comp.Value->Type->PinnedWorlds.Add(w);
 							}
@@ -119,7 +119,7 @@ namespace Spire
 								// find specified impl
 								for (auto & impl : comp->Implementations)
 								{
-									if (impl->AlternateName == selectedDef->AlternateName && impl->Worlds.Contains(selectedDef->WorldName))
+									if (impl->Worlds.Contains(selectedDef->WorldName))
 										pinnedImpl.Add(impl.Ptr());
 								}
 							}
@@ -138,8 +138,15 @@ namespace Spire
 						// apply attributes
 						for (auto & impl : comp->Implementations)
 						{
-							for (auto & attrib : attribs.Value)
-								impl->SyntaxNode->LayoutAttributes[attrib.Key] = attrib.Value;
+                            for (auto & attrib : attribs.Value)
+                            {
+                                auto modifier = new SimpleAttribute();
+                                modifier->Key = attrib.Key;
+                                modifier->Value.Content = attrib.Value;
+
+                                modifier->next = impl->SyntaxNode->modifiers.first;
+                                impl->SyntaxNode->modifiers.first = modifier;
+                            }
 						}
 					}
 				}
@@ -191,9 +198,9 @@ namespace Spire
 							def->UniqueKey = comp.Value.Symbol->UniqueKey;
 							def->UniqueName = comp.Value.Symbol->UniqueName;
 							def->Type = comp.Value.Symbol->Type->DataType;
-							def->IsEntryPoint = (impl->ExportWorlds.Contains(w) || impl->SyntaxNode->IsParam ||
+							def->IsEntryPoint = (impl->ExportWorlds.Contains(w) || impl->SyntaxNode->IsParam() ||
 								(shader->Pipeline->IsAbstractWorld(w) &&
-								(impl->SyntaxNode->LayoutAttributes.ContainsKey("Pinned") || shader->Pipeline->Worlds[w]()->LayoutAttributes.ContainsKey("Pinned"))));
+								(impl->SyntaxNode->HasSimpleAttribute("Pinned") || shader->Pipeline->Worlds[w]()->HasSimpleAttribute("Pinned"))));
 							CloneContext cloneCtx;
 							def->SyntaxNode = impl->SyntaxNode->Clone(cloneCtx);
 							def->World = w;
@@ -201,7 +208,7 @@ namespace Spire
 							return def;
 						};
 						// parameter component will only have one defintion that is shared by all worlds
-						if (impl->SyntaxNode->IsParam)
+						if (impl->SyntaxNode->IsParam())
 						{
 							auto def = createComponentDef("<uniform>");
 							result->Definitions.Add(def);
@@ -425,7 +432,7 @@ namespace Spire
 									{
 										for (auto w : impl->Worlds)
 											if (comp.Value.Symbol->Type->ConstrainedWorlds.Contains(w))
-												choice.Options.Add(ShaderChoiceValue(w, impl->AlternateName));
+												choice.Options.Add(ShaderChoiceValue(w));
 									}
 									if (auto defs = shader.Value->IR->DefinitionsByComponent.TryGetValue(comp.Key))
 									{

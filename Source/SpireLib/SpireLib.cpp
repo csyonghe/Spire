@@ -193,12 +193,12 @@ namespace SpireLib
 				units.Add(unit);
 				if (unit.SyntaxNode)
 				{
-					for (auto inc : unit.SyntaxNode->Usings)
+					for (auto inc : unit.SyntaxNode->GetUsings())
 					{
 						bool found = false;
 						for (auto & dir : searchDirs)
 						{
-							String includeFile = Path::Combine(dir, inc.Content);
+							String includeFile = Path::Combine(dir, inc->fileName.Content);
 							if (File::Exists(includeFile))
 							{
 								if (processedUnits.Add(includeFile))
@@ -211,7 +211,7 @@ namespace SpireLib
 						}
 						if (!found)
 						{
-							compileResult.GetErrorWriter()->diagnose(inc.Position, Diagnostics::cannotFindFile, inputFileName);
+							compileResult.GetErrorWriter()->diagnose(inc->fileName.Position, Diagnostics::cannotFindFile, inputFileName);
 						}
 					}
 				}
@@ -556,7 +556,7 @@ namespace SpireLib
 						compMeta.Offset = offset;
 						offset += compMeta.Size;
 						auto impl = comp.Value->Implementations.First();
-						if (impl->SyntaxNode->IsRequire)
+						if (impl->SyntaxNode->IsRequire())
 						{
 							meta.Requirements.Add(compMeta);
 						}
@@ -604,12 +604,12 @@ namespace SpireLib
 					units.Add(unit);
 					if (unit.SyntaxNode)
 					{
-						for (auto inc : unit.SyntaxNode->Usings)
+						for (auto inc : unit.SyntaxNode->GetUsings())
 						{
 							bool found = false;
 							for (auto & dir : searchDirs)
 							{
-								String includeFile = Path::Combine(dir, inc.Content);
+								String includeFile = Path::Combine(dir, inc->fileName.Content);
 								if (File::Exists(includeFile))
 								{
 									if (processedUnits.Add(includeFile))
@@ -622,7 +622,7 @@ namespace SpireLib
 							}
 							if (!found)
 							{
-								result.GetErrorWriter()->diagnose(inc.Position, Diagnostics::cannotFindFile, inputFileName);
+								result.GetErrorWriter()->diagnose(inc->fileName.Position, Diagnostics::cannotFindFile, inputFileName);
 							}
 						}
 					}
