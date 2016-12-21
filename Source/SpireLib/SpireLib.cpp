@@ -466,13 +466,16 @@ namespace SpireLib
 	private:
 		bool useCache = false;
 		CoreLib::String cacheDir;
-		List<CompileUnit> moduleUnits;
-		RefPtr<Spire::Compiler::CompilationContext> compileContext;
-		HashSet<String> processedModuleUnits;
+		struct State
+		{
+			List<CompileUnit> moduleUnits;
+			HashSet<String> processedModuleUnits;
+			EnumerableDictionary<String, ModuleMetaData> modules;
+		};
+		List<State> states;
+		List<RefPtr<Spire::Compiler::CompilationContext>> compileContext;
 		RefPtr<ShaderCompiler> compiler;
-		RefPtr<ProgramSyntaxNode> programToCompile;
 		int errorCount = 0;
-		EnumerableDictionary<String, ModuleMetaData> modules;
 
 		struct IncludeHandlerImpl : IncludeHandler
 		{
@@ -513,8 +516,9 @@ namespace SpireLib
 		CompilationContext(bool /*pUseCache*/, CoreLib::String /*pCacheDir*/)
 		{
 			compiler = CreateShaderCompiler();
-			compileContext = new Spire::Compiler::CompilationContext();
+			compileContext.Add(new Spire::Compiler::CompilationContext());
 			LoadModuleSource(SpireStdLib::GetCode(), "stdlib", NULL);
+			states.Add(State());
 		}
 
 		~CompilationContext()
@@ -524,16 +528,16 @@ namespace SpireLib
 
 		ModuleMetaData * FindModule(CoreLib::String moduleName)
 		{
-			return modules.TryGetValue(moduleName);
+			return states.Last().modules.TryGetValue(moduleName);
 		}
 
 		void UpdateModuleLibrary(List<CompileUnit> & units, SpireDiagnosticSink * sink)
 		{
 			Spire::Compiler::CompileResult result;
-			compiler->Compile(result, *compileContext, units, Options);
-			for (auto & shader : compileContext->Symbols.Shaders)
+			compiler->Compile(result, *compileContext.Last(), units, Options);
+			for (auto & shader : compileContext.Last()->Symbols.Shaders)
 			{
-				if (!modules.ContainsKey(shader.Key))
+				if (!states.Last().modules.ContainsKey(shader.Key))
 				{
 					ModuleMetaData meta;
 					meta.Name = shader.Key;
@@ -561,7 +565,7 @@ namespace SpireLib
 							meta.Parameters.Add(compMeta);
 						}
 					}
-					modules.Add(shader.Key, _Move(meta));
+					states.Last().modules.Add(shader.Key, _Move(meta));
 				}
 			}
 			if (sink)
@@ -574,8 +578,8 @@ namespace SpireLib
 		void LoadModuleSource(CoreLib::String src, CoreLib::String fileName, SpireDiagnosticSink* sink)
 		{
 			List<CompileUnit> units;
-			LoadModuleSource(units, processedModuleUnits, src, fileName, sink);
-			moduleUnits.AddRange(units);
+			LoadModuleSource(units, states.Last().processedModuleUnits, src, fileName, sink);
+			states.Last().moduleUnits.AddRange(units);
 			UpdateModuleLibrary(units, sink);
 		}
 
@@ -639,6 +643,18 @@ namespace SpireLib
 		{
 			return new Shader(name, true);
 		}
+		void PushContext()
+		{
+			states.Add(states.Last());
+			compileContext.Add(new Spire::Compiler::CompilationContext(*compileContext.Last()));
+		}
+		void PopContext()
+		{
+			compileContext.Last() = nullptr;
+			compileContext.SetSize(compileContext.Count() - 1);
+			states.Last() = State();
+			states.SetSize(states.Count() - 1);
+		}
 		bool Compile(CompileResult & result, const Shader & shader, SpireDiagnosticSink* sink)
 		{
 			return Compile(result, shader.GetSource(), shader.GetName(), sink);
@@ -646,7 +662,7 @@ namespace SpireLib
 		bool Compile(CompileResult & result, CoreLib::String source, CoreLib::String fileName, SpireDiagnosticSink* sink)
 		{
 			List<CompileUnit> userUnits;
-			HashSet<String> processedUserUnits = processedModuleUnits;
+			HashSet<String> processedUserUnits = states.Last().processedModuleUnits;
 			if (errorCount != 0)
 				return false;
 
@@ -654,7 +670,7 @@ namespace SpireLib
 			if (errorCount != 0)
 				return false;
 
-			Spire::Compiler::CompilationContext tmpCtx(*compileContext);
+			Spire::Compiler::CompilationContext tmpCtx(*compileContext.Last());
 			Spire::Compiler::CompileResult cresult;
 			compiler->Compile(cresult, tmpCtx, userUnits, Options);
 			result.Sources = cresult.CompiledSource;
@@ -771,6 +787,16 @@ void spLoadModuleLibrary(SpireCompilationContext * ctx, const char * fileName, S
 void spLoadModuleLibraryFromSource(SpireCompilationContext * ctx, const char * source, const char * fileName, SpireDiagnosticSink* sink)
 {
 	CTX(ctx)->LoadModuleSource(source, fileName, sink);
+}
+
+void spPushContext(SpireCompilationContext * ctx)
+{
+	CTX(ctx)->PushContext();
+}
+
+void spPopContext(SpireCompilationContext * ctx)
+{
+	CTX(ctx)->PopContext();
 }
 
 SpireShader * spCreateShader(SpireCompilationContext * ctx, const char * name)

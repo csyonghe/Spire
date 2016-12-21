@@ -274,6 +274,19 @@ extern "C"
 	SPIRE_API void spLoadModuleLibraryFromSource(SpireCompilationContext * ctx, const char * source, const char * fileName, SpireDiagnosticSink* sink);
 
 	/*!
+	@brief Store current compilation context to a stack. spLoadModuleLibrary() and spLoadModuleLibraryFromSource() load new symbols to
+	       a compilation context. spPushContext() and spPopContext() can be used to save and restore context state.
+	@param ctx The compilation context whose state to store.
+	*/
+	void spPushContext(SpireCompilationContext * ctx);
+	/*!
+	@brief Restore current compilation context to a previously saved state. spLoadModuleLibrary() and spLoadModuleLibraryFromSource() load new symbols to
+		   a compilation context. spPushContext() and spPopContext() can be used to save and restore context state.
+	@param ctx The compilation context whose state to restore.
+	*/
+	void spPopContext(SpireCompilationContext * ctx);
+
+	/*!
 	@brief Create a shader object that can be used to assemble a final shader from modules.
 	@param ctx The compilation context.
 	@param name The name of the shader.
