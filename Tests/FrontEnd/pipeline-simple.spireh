@@ -8,53 +8,10 @@ pipeline StandardPipeline
     [Pinned]
     input world MeshVertex;
     
-    [Pinned]
-    input world ModelInstance;
-    
-    [Pinned]
-    
-    input world ViewUniform;
-    
-    [Pinned]
-    input world MaterialUniform;
-    
     world CoarseVertex;// : "glsl(vertex:projCoord)" using projCoord export standardExport;
     world Fragment;// : "glsl" export fragmentExport;
     
     require @CoarseVertex vec4 projCoord; 
-    
-    [Binding: "2"]
-    extern @(CoarseVertex*, Fragment*) Uniform<MaterialUniform> MaterialUniformBlock; 
-    import(MaterialUniform->CoarseVertex) uniformImport()
-    {
-        return project(MaterialUniformBlock);
-    }
-    import(MaterialUniform->Fragment) uniformImport()
-    {
-        return project(MaterialUniformBlock);
-    }
-
-    [Binding: "1"]
-    extern @(CoarseVertex*, Fragment*) Uniform<ViewUniform> ViewUniformBlock;
-    import(ViewUniform->CoarseVertex) uniformImport()
-    {
-        return project(ViewUniformBlock);
-    }
-    import(ViewUniform->Fragment) uniformImport()
-    {
-        return project(ViewUniformBlock);
-    }
-    
-    [Binding: "0"]
-    extern @(CoarseVertex*, Fragment*) Uniform<ModelInstance> ModelInstanceBlock;
-    import(ModelInstance->CoarseVertex) uniformImport()
-    {
-        return project(ModelInstanceBlock);
-    }
-    import(ModelInstance->Fragment) uniformImport()
-    {
-        return project(ModelInstanceBlock);
-    }
     
     [VertexInput]
     extern @CoarseVertex MeshVertex vertAttribIn;

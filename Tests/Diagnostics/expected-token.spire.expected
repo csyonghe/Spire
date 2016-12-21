@@ -1,7 +1,6 @@
 result code = -1
 standard error = {
-Tests/Diagnostics/expected-token.spire(5): error 20001: ';' expected
-Tests/Diagnostics/expected-token.spire(5): error 20002: syntax error.
+Tests/Diagnostics/expected-token.spire(5): error 20001: unexpected ']', expected ';'
 }
 standard output = {
 }
