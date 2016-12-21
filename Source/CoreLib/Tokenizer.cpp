@@ -22,7 +22,7 @@ namespace CoreLib
 			None, Line, File
 		};
 
-		void ParseOperators(const String & str, List<Token> & tokens, TokenFlags& tokenFlags, int line, int col, String fileName)
+		void ParseOperators(const String & str, List<Token> & tokens, TokenFlags& tokenFlags, int line, int col, int startPos, String fileName)
 		{
 			int pos = 0;
 			while (pos < str.Length())
@@ -32,7 +32,7 @@ namespace CoreLib
 				wchar_t nextNextChar = (pos < str.Length() - 2) ? str[pos + 2] : '\0';
 				auto InsertToken = [&](TokenType type, const String & ct)
 				{
-					tokens.Add(Token(type, ct, line, col + pos, pos, fileName, tokenFlags));
+					tokens.Add(Token(type, ct, line, col + pos, pos + startPos, fileName, tokenFlags));
                     tokenFlags = 0;
 				};
 				switch (curChar)
@@ -465,7 +465,7 @@ namespace CoreLib
 					else
 					{
 						//do token analyze
-						ParseOperators(tokenBuilder.ToString(), tokenList, tokenFlags, tokenLine, tokenCol, file);
+						ParseOperators(tokenBuilder.ToString(), tokenList, tokenFlags, tokenLine, tokenCol, pos - tokenBuilder.Length(), file);
 						tokenBuilder.Clear();
 						state = State::Start;
 					}
