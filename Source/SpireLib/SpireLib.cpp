@@ -556,7 +556,7 @@ namespace SpireLib
 						compMeta.Offset = offset;
 						offset += compMeta.Size;
 						auto impl = comp.Value->Implementations.First();
-						if (impl->SyntaxNode->IsRequire)
+						if (impl->SyntaxNode->IsRequire())
 						{
 							meta.Requirements.Add(compMeta);
 						}

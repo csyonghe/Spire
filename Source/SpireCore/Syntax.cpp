@@ -8,19 +8,49 @@ namespace Spire
 {
 	namespace Compiler
 	{
-    Decl* Scope::LookUp(String const& name)
-    {
-        Scope* scope = this;
-        while (scope)
-        {
-            Decl* decl = nullptr;
-            if (scope->decls.TryGetValue(name, decl))
-                return decl;
+        // Scope
 
-            scope = scope->Parent;
+        Decl* Scope::LookUp(String const& name)
+        {
+            Scope* scope = this;
+            while (scope)
+            {
+                Decl* decl = nullptr;
+                if (scope->decls.TryGetValue(name, decl))
+                    return decl;
+
+                scope = scope->Parent;
+            }
+            return nullptr;
         }
-        return nullptr;
-    }
+
+        // Decl
+
+        bool Decl::FindSimpleAttribute(String const& key, String& outValue)
+        {
+            for (auto attr : GetLayoutAttributes())
+            {
+                if (attr->Key == key)
+                {
+                    outValue = attr->Value;
+                    return true;
+                }
+            }
+            return false;
+        }
+        bool Decl::HasSimpleAttribute(String const& key)
+        {
+            for (auto attr : GetLayoutAttributes())
+            {
+                if (attr->Key == key)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        //
 
 		bool BasicExpressionType::EqualsImpl(const ExpressionType * type) const
 		{
