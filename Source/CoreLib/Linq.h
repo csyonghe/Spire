@@ -582,6 +582,12 @@ namespace CoreLib
 		}
 
 		template<typename T>
+		inline auto From(const T & list) -> Queryable<T, decltype(list.begin()), decltype(*list.begin())>
+		{
+			return Queryable<T, decltype(list.begin()), decltype(*list.begin())>(list);
+		}
+
+		template<typename T>
 		inline Queryable<Array<T, 1>, T*, T> FromSingle(const T & obj)
 		{
 			Array<T, 1> arr;

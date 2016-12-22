@@ -517,8 +517,8 @@ namespace SpireLib
 		{
 			compiler = CreateShaderCompiler();
 			compileContext.Add(new Spire::Compiler::CompilationContext());
-			LoadModuleSource(SpireStdLib::GetCode(), "stdlib", NULL);
 			states.Add(State());
+			LoadModuleSource(SpireStdLib::GetCode(), "stdlib", NULL);
 		}
 
 		~CompilationContext()
@@ -546,24 +546,25 @@ namespace SpireLib
 					{
 						if (comp.Value->Implementations.Count() != 1)
 							continue;
+						auto impl = comp.Value->Implementations.First();
+						if (!impl->SyntaxNode->IsRequire && !impl->SyntaxNode->IsParam)
+							continue;
 						ComponentMetaData compMeta;
 						compMeta.Name = comp.Key;
                         compMeta.Type = comp.Value->Type->DataType;
 						compMeta.TypeName = compMeta.Type->ToString();
-						compMeta.Alignment = (int)GetTypeAlignment(compMeta.Type.Ptr(), LayoutRule::Std140);
-						compMeta.Size = (int)GetTypeSize(compMeta.Type.Ptr(), LayoutRule::Std140);
-						offset = RoundToAlignment(offset, compMeta.Alignment);
-						compMeta.Offset = offset;
-						offset += compMeta.Size;
-						auto impl = comp.Value->Implementations.First();
+						if (compMeta.Type->GetBindableResourceType() == BindableResourceType::NonBindable)
+						{
+							compMeta.Alignment = (int)GetTypeAlignment(compMeta.Type.Ptr(), LayoutRule::Std140);
+							compMeta.Size = (int)GetTypeSize(compMeta.Type.Ptr(), LayoutRule::Std140);
+							offset = RoundToAlignment(offset, compMeta.Alignment);
+							compMeta.Offset = offset;
+							offset += compMeta.Size;
+						}
 						if (impl->SyntaxNode->IsRequire)
-						{
 							meta.Requirements.Add(compMeta);
-						}
 						else
-						{
 							meta.Parameters.Add(compMeta);
-						}
 					}
 					states.Last().modules.Add(shader.Key, _Move(meta));
 				}
@@ -699,6 +700,7 @@ namespace SpireLib
 								info.NumLegacyBindingPoints = item.Value->BindingPoints.Count();
 								info.LegacyBindingPoints = item.Value->BindingPoints.Buffer();
 								info.Name = item.Value->Name.Buffer();
+								set.bindings.Add(info);
 							}
 						}
 						paramSets.Add(_Move(set));
@@ -839,7 +841,10 @@ int spModuleGetParameterCount(SpireModule * module)
 int spModuleGetParameterBufferSize(SpireModule * module)
 {
 	auto moduleNode = MODULE(module);
-	return moduleNode->Parameters.Last().Offset + moduleNode->Parameters.Last().Size;
+	int size = 0;
+	for (auto & param : moduleNode->Parameters)
+		size = Math::Max(size, param.Size + param.Offset);
+	return size;
 }
 
 int spModuleGetParameter(SpireModule * module, int index, SpireComponentInfo * result)

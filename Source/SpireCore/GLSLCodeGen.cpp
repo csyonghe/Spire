@@ -470,7 +470,7 @@ namespace Spire
 								auto genType = param.Value->Type.As<ILGenericType>();
 								if (!genType)
 									continue;
-								String bufName = EscapeCodeName(param.Key);
+								String bufName = EscapeCodeName(module.Value->BindingName + "_" + param.Value->Name);
 								ctx.GlobalHeader << "layout(std430, binding = " << param.Value->BindingPoints.First() << ") ";
 								ctx.GlobalHeader << "buffer buf" << bufName << "\n{\n";
 								PrintType(ctx.GlobalHeader, genType->BaseType.Ptr());
@@ -479,7 +479,7 @@ namespace Spire
 							}
 							case BindableResourceType::Texture:
 							{
-								ctx.GlobalHeader << "layout(binding = " << param.Value->BindingPoints.First() << ") ";
+								ctx.GlobalHeader << "layout(binding = " << param.Value->BindingPoints.First() << ") uniform ";
 								PrintType(ctx.GlobalHeader, param.Value->Type.Ptr());
 								ctx.GlobalHeader << " " << EscapeCodeName(module.Value->BindingName + "_" + param.Value->Name) << ";\n";
 								break;
