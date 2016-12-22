@@ -132,6 +132,7 @@ namespace Spire
 			ShaderSyntaxNode * ModuleSyntaxNode = nullptr;
 			CodePosition Position;
 			PipelineSymbol * Pipeline = nullptr;
+			int BindingIndex = -1;
 			bool IsInPlace = false;
 			bool IsPublic = false;
 			String Name;

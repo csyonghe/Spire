@@ -652,6 +652,7 @@ namespace Spire
 			while (!AdvanceIfMatch(this, TokenType::RBrace))
 			{
 				auto attribs = ParseAttribute();
+				bool isStage = false;
 				if (LookAheadToken("input") || LookAheadToken("world"))
 				{
 					auto w = ParseWorld();
@@ -665,13 +666,15 @@ namespace Spire
 				else if (LookAheadToken("stage"))
 				{
 					pipeline->Members.Add(ParseStage());
+					isStage = true;
 				}
 				else
 				{
 					auto comp = ParseComponent();
 					pipeline->Members.Add(comp);
 				}
-				pipeline->Members.Last()->Attributes = attribs;
+				if (!isStage) // stage's attributes are part of stage syntax
+					pipeline->Members.Last()->Attributes = attribs;
 			}
 			PopScope();
 			return pipeline;
@@ -895,14 +898,13 @@ namespace Spire
 				op->TypeName.Content = "TComponentType";
 			}
 			ReadToken(TokenType::LParent);
-			while (!LookAheadToken(TokenType::RParent))
+			while (!AdvanceIf(this, TokenType::RParent))
 			{
 				op->Parameters.Add(ParseParameter());
 				if (AdvanceIf(this, TokenType::RParent))
 					break;
                 ReadToken(TokenType::Comma);
 			}
-			ReadToken(TokenType::RParent);
 			while (LookAheadToken("require"))
 			{
 				ReadToken("require");

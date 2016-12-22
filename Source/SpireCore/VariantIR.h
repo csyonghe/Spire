@@ -13,6 +13,8 @@ namespace Spire
 		public:
 			ShaderSyntaxNode * SyntaxNode;
 			String BindingName;
+			CodePosition UsingPosition;
+			int BindingIndex;
 		};
 		class ComponentDefinitionIR : public RefObject
 		{

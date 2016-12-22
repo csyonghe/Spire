@@ -160,6 +160,8 @@ namespace Spire
 						sbBindingName << namePath[0];
 					inst = new ModuleInstanceIR();
 					inst->SyntaxNode = closure->ModuleSyntaxNode;
+					inst->BindingIndex = closure->BindingIndex;
+					inst->UsingPosition = closure->UsingPosition;
 					result->ModuleInstances.Add(inst);
 					inst->BindingName = sbBindingName.ProduceString();
 					moduleInstanceMap[closure] = inst;

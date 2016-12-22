@@ -151,22 +151,41 @@ namespace Spire
 				// initialize module parameter layouts for all module instances in this shader
 				for (auto module : shader->ModuleInstances)
 				{
+					if (module->BindingIndex != -1)
+					{
+						ModuleInstanceIR * existingModule;
+						if (usedDescriptorSetBindings.TryGetValue(module->BindingIndex, existingModule))
+						{
+							getSink()->diagnose(module->UsingPosition, Diagnostics::bindingAlreadyOccupiedByModule, module->BindingIndex, existingModule->BindingName);
+							getSink()->diagnose(existingModule->UsingPosition, Diagnostics::seeUsingOf, existingModule->SyntaxNode->Name.Content);
+
+						}
+						usedDescriptorSetBindings[module->BindingIndex] = module.Ptr();
+					}
+					else
+					{
+						Token bindingValStr;
+						if (module->SyntaxNode->Attributes.TryGetValue("Binding", bindingValStr))
+						{
+							int bindingVal = StringToInt(bindingValStr.Content);
+							module->BindingIndex = bindingVal;
+							ModuleInstanceIR * existingModule;
+							if (usedDescriptorSetBindings.TryGetValue(bindingVal, existingModule))
+							{
+								getSink()->diagnose(bindingValStr.Position, Diagnostics::bindingAlreadyOccupiedByModule, bindingVal, existingModule->BindingName);
+								getSink()->diagnose(existingModule->SyntaxNode->Position, Diagnostics::seeDefinitionOf, existingModule->SyntaxNode->Name.Content);
+							}
+							usedDescriptorSetBindings[bindingVal] = module.Ptr();
+						}
+					}
+				}
+				shader->ModuleInstances.Sort([](auto x, auto y) {return x->BindingIndex <= y->BindingIndex; });
+				for (auto module : shader->ModuleInstances)
+				{
 					auto set = new ILModuleParameterSet();
 					set->BindingName = module->BindingName;
+					set->DescriptorSetId = module->BindingIndex;
 					compiledShader->ModuleParamSets[module->BindingName] = set;
-					Token bindingValStr;
-					if (module->SyntaxNode->Attributes.TryGetValue("Binding", bindingValStr))
-					{
-						int bindingVal = StringToInt(bindingValStr.Content);
-						set->DescriptorSetId = bindingVal;
-						ModuleInstanceIR * existingModule;
-						if (usedDescriptorSetBindings.TryGetValue(bindingVal, existingModule))
-						{
-							getSink()->diagnose(bindingValStr.Position, Diagnostics::bindingAlreadyOccupiedByModule, bindingVal, existingModule->BindingName);
-							getSink()->diagnose(existingModule->SyntaxNode->Position, Diagnostics::seeDefinitionOf, existingModule->SyntaxNode->Name.Content);
-						}
-						usedDescriptorSetBindings[bindingVal] = module.Ptr();
-					}
 				}
 				// assign DescriptorSetId for unspecified modules
 				for (auto & module : compiledShader->ModuleParamSets)

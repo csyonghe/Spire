@@ -125,6 +125,11 @@ namespace Spire
 						auto refClosure = CreateShaderClosure(err, symTable, shaderSym.Ptr(), import->Position, rootShader, refMap);
 						refClosure->IsPublic = import->IsPublic;
 						refClosure->Parent = rs.Ptr();
+						Token bindingVal;
+						if (import->Attributes.TryGetValue("Binding", bindingVal))
+						{
+							refClosure->BindingIndex = StringToInt(bindingVal.Content);
+						}
 						if (import->IsInplace)
 						{
 							refClosure->IsInPlace = true;

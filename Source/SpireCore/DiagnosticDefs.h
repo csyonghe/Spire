@@ -28,6 +28,7 @@ DIAGNOSTIC(-1, Note, implicitParameterMatchingFailedBecauseShaderDoesNotDefineCo
 DIAGNOSTIC(-1, Note, implicitParameterMatchingFailedBecauseTypeMismatch, "implicit parameter matching failed because the component of the same name does not match parameter type '$0'.")
 DIAGNOSTIC(-1, Note, noteShaderIsTargetingPipeine, "shader '$0' is targeting pipeline '$1'")
 DIAGNOSTIC(-1, Note, seeDefinitionOf, "see definition of '$0'")
+DIAGNOSTIC(-1, Note, seeUsingOf, "see using of '$0'")
 DIAGNOSTIC(-1, Note, seeDefinitionOfShader, "see definition of shader '$0'")
 DIAGNOSTIC(-1, Note, seeInclusionOf, "see inclusion of '$0'")
 DIAGNOSTIC(-1, Note, seeModuleBeingUsedIn, "see module '$0' being used in '$1'")
