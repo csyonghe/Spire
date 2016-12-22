@@ -126,7 +126,7 @@ namespace Spire
 						refClosure->IsPublic = import->IsPublic();
 						refClosure->Parent = rs.Ptr();
 						Token bindingVal;
-						if (import->Attributes.TryGetValue("Binding", bindingVal))
+						if (import->FindSimpleAttribute("Binding", bindingVal))
 						{
 							refClosure->BindingIndex = StringToInt(bindingVal.Content);
 						}
@@ -585,7 +585,7 @@ namespace Spire
 				comp->Type->FeasibleWorlds.Clear();
 				for (auto & impl : comp->Implementations)
 				{
-					auto & autoWorld = allWorlds;
+					auto autoWorld = allWorlds;
 					for (auto & w : impl->Worlds)
 					{
 						ShaderComponentSymbol* unaccessibleComp = nullptr;

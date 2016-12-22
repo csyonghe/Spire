@@ -1050,7 +1050,6 @@ namespace Spire
 		{
 		public:
 			bool IsInplace = false;
-			EnumerableDictionary<String, Token> Attributes;
             bool IsPublic() { return HasModifier(ModifierFlag::Public); }
 			Token ShaderName;
 			Token ObjectName;

@@ -113,7 +113,7 @@ namespace Spire
 			RefPtr<StageSyntaxNode>					ParseStage();
 			RefPtr<WorldSyntaxNode>					ParseWorld();
 			RefPtr<RateSyntaxNode>					ParseRate();
-			RefPtr<ImportSyntaxNode>				ParseImport();
+			RefPtr<ImportSyntaxNode>				ParseImportInner();
 			RefPtr<ImportStatementSyntaxNode>		ParseImportStatement();
 			RefPtr<ImportOperatorDefSyntaxNode>		ParseImportOperator();
 			RefPtr<FunctionSyntaxNode>				ParseFunction(bool parseBody = true);
@@ -650,7 +650,7 @@ namespace Spire
             else
             {
                 // This is an import decl
-                return parser->ParseImport();
+                return parser->ParseImportInner();
             }
         }
 
@@ -693,11 +693,12 @@ namespace Spire
             DeclaratorInfo const&       declaratorInfo,
             RefPtr<FunctionSyntaxNode>  decl)
         {
+            parser->PushScope();
+
             parser->anonymousParamCounter = 0;
             parser->FillPosition(decl.Ptr());
             decl->Position = declaratorInfo.nameToken.Position;
 
-            parser->PushScope();
             decl->Name = declaratorInfo.nameToken;
             decl->ReturnTypeNode = declaratorInfo.typeSpec;
             parser->ReadToken(TokenType::LParent);
@@ -715,11 +716,12 @@ namespace Spire
             DeclaratorInfo const&       declaratorInfo,
             RefPtr<ComponentSyntaxNode> decl)
         {
+            parser->PushScope();
+
             parser->anonymousParamCounter = 0;
             parser->FillPosition(decl.Ptr());
             decl->Position = declaratorInfo.nameToken.Position;
 
-            parser->PushScope();
             decl->Name = declaratorInfo.nameToken;
             decl->TypeNode = declaratorInfo.typeSpec;
             parser->ReadToken(TokenType::LParent);
@@ -944,6 +946,7 @@ namespace Spire
                 RefPtr<Decl> decl = ParseDecl(parser, containerDecl);
                 if (decl)
                 {
+                    decl->ParentDecl = containerDecl;
                     containerDecl->Members.Add(decl);
                 }
                 TryRecover(parser);
@@ -1067,11 +1070,9 @@ namespace Spire
 			return rate;
 		}
 
-		RefPtr<ImportSyntaxNode> Parser::ParseImport()
+		RefPtr<ImportSyntaxNode> Parser::ParseImportInner()
 		{
 			RefPtr<ImportSyntaxNode> rs = new ImportSyntaxNode();
-            rs->modifiers = ParseModifiers(this);
-			ReadToken("using");
 			rs->IsInplace = !LookAheadToken(TokenType::OpAssign, 1);
 			if (!rs->IsInplace)
 			{
@@ -1118,7 +1119,8 @@ namespace Spire
 		{
 			RefPtr<ImportStatementSyntaxNode> rs = new ImportStatementSyntaxNode();
 			FillPosition(rs.Ptr());
-			rs->Import = ParseImport();
+            ReadToken("import");
+			rs->Import = ParseImportInner();
 			return rs;
 		}
 
