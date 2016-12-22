@@ -221,10 +221,10 @@ namespace Spire
 								break;
 							}
 
-							String bindingValStr;
-							if (def->SyntaxNode->LayoutAttributes.TryGetValue("Binding", bindingValStr))
+							Token bindingValStr;
+							if (def->SyntaxNode->Attributes.TryGetValue("Binding", bindingValStr))
 							{
-								int bindingVal = StringToInt(bindingValStr);
+								int bindingVal = StringToInt(bindingValStr.Content);
 
 								ComponentDefinitionIR * otherComp = nullptr;
 								if (bindingRegistry->TryGetValue(bindingVal, otherComp))
@@ -320,7 +320,7 @@ namespace Spire
 					genericTypeMappings[world.Key] = recordType;
 					w->Name = world.Key;
 					w->OutputType = recordType;
-					w->Attributes = world.Value->LayoutAttributes;
+					w->Attributes = world.Value->Attributes;
 					w->Shader = compiledShader.Ptr();
 					w->IsAbstract = world.Value->IsAbstract;
 					auto impOps = pipeline->GetImportOperatorsFromSourceWorld(world.Key);
@@ -348,7 +348,7 @@ namespace Spire
 						for (auto & comp : components)
 						{
 							ILObjectDefinition compDef;
-							compDef.Attributes = comp->SyntaxNode->LayoutAttributes;
+							compDef.Attributes = comp->SyntaxNode->Attributes;
 							compDef.Name = comp->UniqueName;
 							compDef.Type = TranslateExpressionType(comp->Type.Ptr());
 							compDef.Position = comp->SyntaxNode->Position;
@@ -374,7 +374,7 @@ namespace Spire
 							def.Name = comp->UniqueName;
 							def.Type = TranslateExpressionType(comp->Type.Ptr());
 							def.Position = comp->SyntaxNode->Position;
-							def.Attributes = comp->SyntaxNode->LayoutAttributes;
+							def.Attributes = comp->SyntaxNode->Attributes;
 							world.Value->Inputs.Add(def);
 						}
 					}
@@ -390,7 +390,7 @@ namespace Spire
 						{
 							auto recType = genericTypeMappings[importExpr->ImportOperatorDef->SourceWorld.Content]().As<ILRecordType>();
 							ILObjectDefinition entryDef;
-							entryDef.Attributes = comp->SyntaxNode->LayoutAttributes;
+							entryDef.Attributes = comp->SyntaxNode->Attributes;
 							entryDef.Name = importExpr->ComponentUniqueName;
 							entryDef.Type = TranslateExpressionType(importExpr->Type.Ptr());
 							entryDef.Position = importExpr->Position;
@@ -401,7 +401,7 @@ namespace Spire
 						{
 							auto recType = genericTypeMappings[comp->World]().As<ILRecordType>();
 							ILObjectDefinition entryDef;
-							entryDef.Attributes = comp->SyntaxNode->LayoutAttributes;
+							entryDef.Attributes = comp->SyntaxNode->Attributes;
 							entryDef.Name = comp->UniqueName;
 							entryDef.Type = TranslateExpressionType(comp->Type.Ptr());
 							entryDef.Position = comp->SyntaxNode->Position;

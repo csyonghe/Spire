@@ -45,7 +45,7 @@ namespace Spire
 			RefPtr<CFGNode> Code;
 			EnumerableDictionary<String, ILOperand*> Components;
 			bool IsAbstract = false;
-			EnumerableDictionary<String, String> Attributes;
+			EnumerableDictionary<String, Token> Attributes;
 			EnumerableHashSet<String> ReferencedFunctions; // internal names of referenced functions
 			ILShader * Shader = nullptr;
 		};

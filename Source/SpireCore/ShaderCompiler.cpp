@@ -41,13 +41,13 @@ namespace Spire
 					for (auto & comp : comps)
 					{
 						for (auto & impl : comp->Implementations)
-							for (auto & attrib : impl->SyntaxNode->LayoutAttributes)
+							for (auto & attrib : impl->SyntaxNode->Attributes)
 							{
 								try
 								{
-									if (attrib.Value.StartsWith("%"))
+									if (attrib.Value.Content.StartsWith("%"))
 									{
-										CoreLib::Text::TokenReader parser(attrib.Value.SubString(1, attrib.Value.Length() - 1));
+										CoreLib::Text::TokenReader parser(attrib.Value.Content.SubString(1, attrib.Value.Content.Length() - 1));
 										auto compName = parser.ReadWord();
 										parser.Read(".");
 										auto compAttrib = parser.ReadWord();
@@ -56,8 +56,8 @@ namespace Spire
 										{
 											for (auto & timpl : compSym->Implementations)
 											{
-												String attribValue;
-												if (timpl->SyntaxNode->LayoutAttributes.TryGetValue(compAttrib, attribValue))
+												Token attribValue;
+												if (timpl->SyntaxNode->Attributes.TryGetValue(compAttrib, attribValue))
 													attrib.Value = attribValue;
 											}
 										}
@@ -130,19 +130,6 @@ namespace Spire
 						}
 					}
 				}
-				for (auto & attribs : schedule.AddtionalAttributes)
-				{
-					ShaderComponentSymbol * comp = nullptr;
-					if (choiceComps.TryGetValue(attribs.Key, comp))
-					{
-						// apply attributes
-						for (auto & impl : comp->Implementations)
-						{
-							for (auto & attrib : attribs.Value)
-								impl->SyntaxNode->LayoutAttributes[attrib.Key] = attrib.Value;
-						}
-					}
-				}
 				// generate definitions
 				Dictionary<ShaderClosure*, ModuleInstanceIR*> moduleInstanceMap;
 				auto createModuleInstance = [&](ShaderClosure * closure)
@@ -193,7 +180,7 @@ namespace Spire
 							def->Type = comp.Value.Symbol->Type->DataType;
 							def->IsEntryPoint = (impl->ExportWorlds.Contains(w) || impl->SyntaxNode->IsParam ||
 								(shader->Pipeline->IsAbstractWorld(w) &&
-								(impl->SyntaxNode->LayoutAttributes.ContainsKey("Pinned") || shader->Pipeline->Worlds[w]()->LayoutAttributes.ContainsKey("Pinned"))));
+								(impl->SyntaxNode->Attributes.ContainsKey("Pinned") || shader->Pipeline->Worlds[w]()->Attributes.ContainsKey("Pinned"))));
 							CloneContext cloneCtx;
 							def->SyntaxNode = impl->SyntaxNode->Clone(cloneCtx);
 							def->World = w;

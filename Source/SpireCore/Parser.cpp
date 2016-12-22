@@ -108,7 +108,7 @@ namespace Spire
 			Token ReadTypeKeyword();
 			VariableModifier ReadVariableModifier();
 			bool IsTypeKeyword();
-			EnumerableDictionary<String, String>	ParseAttribute();
+			EnumerableDictionary<String, Token>		ParseAttribute();
 			RefPtr<ProgramSyntaxNode>				ParseProgram();
 			RefPtr<ShaderSyntaxNode>				ParseShader();
 			RefPtr<PipelineSyntaxNode>				ParsePipeline();
@@ -505,18 +505,18 @@ namespace Spire
 			return ParseProgram();
 		}
 
-		EnumerableDictionary<String, String> Parser::ParseAttribute()
+		EnumerableDictionary<String, Token> Parser::ParseAttribute()
 		{
-			EnumerableDictionary<String, String> rs;
+			EnumerableDictionary<String, Token> rs;
 			while (LookAheadToken(TokenType::LBracket))
 			{
 				ReadToken(TokenType::LBracket);
 				auto name = ReadToken(TokenType::Identifier).Content;
-				String value;
+				Token value;
 				if (LookAheadToken(TokenType::Colon))
 				{
 					ReadToken(TokenType::Colon);
-					value = ReadToken(TokenType::StringLiterial).Content;
+					value = ReadToken(TokenType::StringLiterial);
 				}
 				rs[name] = value;
 				ReadToken(TokenType::RBracket);
@@ -610,18 +610,21 @@ namespace Spire
 			ReadToken(TokenType::LBrace);
 			while (!AdvanceIfMatch(this, TokenType::RBrace))
 			{
+				auto attribs = ParseAttribute();
 				if (LookAheadToken("inline") || (LookAheadToken("public") && !LookAheadToken("using", 1)) ||
-					LookAheadToken("out") || LookAheadToken(TokenType::At) || IsTypeKeyword()
-					|| LookAheadToken(TokenType::LBracket) || LookAheadToken("require") || LookAheadToken("extern") || LookAheadToken("param"))
+					LookAheadToken("out") || LookAheadToken(TokenType::At) || IsTypeKeyword() ||
+					LookAheadToken("require") || LookAheadToken("extern") || LookAheadToken("param"))
 				{
 					auto comp = ParseComponent();
 					comp->ParentDecl = shader.Ptr();
+					comp->Attributes = attribs;
 					shader->Members.Add(comp);
 				}
 				else if (LookAheadToken("using") || (LookAheadToken("public") && LookAheadToken("using", 1)))
 				{
 					auto imp = ParseImport();
 					imp->ParentDecl = shader.Ptr();
+					imp->Attributes = attribs;
 					shader->Members.Add(imp);
 				}
 				else
@@ -652,13 +655,11 @@ namespace Spire
 				if (LookAheadToken("input") || LookAheadToken("world"))
 				{
 					auto w = ParseWorld();
-					w->LayoutAttributes = attribs;
 					pipeline->Members.Add(w);
 				}
 				else if (LookAheadToken("import"))
 				{
 					auto op = ParseImportOperator();
-					op->LayoutAttributes = attribs;
 					pipeline->Members.Add(op);
 				}
 				else if (LookAheadToken("stage"))
@@ -668,9 +669,9 @@ namespace Spire
 				else
 				{
 					auto comp = ParseComponent();
-					comp->LayoutAttributes = attribs;
 					pipeline->Members.Add(comp);
 				}
+				pipeline->Members.Last()->Attributes = attribs;
 			}
 			PopScope();
 			return pipeline;
@@ -704,7 +705,6 @@ namespace Spire
 		{
 			RefPtr<ComponentSyntaxNode> component = new ComponentSyntaxNode();
 			PushScope();
-			component->LayoutAttributes = ParseAttribute();
 			while (LookAheadToken("inline") || LookAheadToken("out") || LookAheadToken("require") || LookAheadToken("public") ||
 				LookAheadToken("extern") || LookAheadToken("param"))
 			{
@@ -773,7 +773,6 @@ namespace Spire
 		RefPtr<WorldSyntaxNode> Parser::ParseWorld()
 		{
 			RefPtr<WorldSyntaxNode> world = new WorldSyntaxNode();
-			world->LayoutAttributes = ParseAttribute();
 			world->IsAbstract = AdvanceIf(this, "input");
 			ReadToken("world");
 			FillPosition(world.Ptr());

@@ -861,9 +861,9 @@ namespace Spire
 			auto recType = ExtractRecordType(type);
 			ExternComponentCodeGenInfo info;
 			info.Type = type;
-			String bindingVal;
+			Token bindingVal;
 			if (input.Attributes.TryGetValue("Binding", bindingVal))
-				info.Binding = StringToInt(bindingVal);
+				info.Binding = StringToInt(bindingVal.Content);
 			if (recType)
 			{
 				if (auto genType = dynamic_cast<ILGenericType*>(type))

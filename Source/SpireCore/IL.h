@@ -77,7 +77,7 @@ namespace Spire
 		public:
 			RefPtr<ILType> Type;
 			String Name;
-			EnumerableDictionary<String, String> Attributes;
+			EnumerableDictionary<String, CoreLib::Text::Token> Attributes;
 			CodePosition Position;
 			int Binding = -1;
 		};

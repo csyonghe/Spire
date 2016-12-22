@@ -350,6 +350,7 @@ namespace Spire
         public:
             ContainerDecl*  ParentDecl;
 			Token Name;
+			EnumerableDictionary<String, Token> Attributes;
 			virtual Decl * Clone(CloneContext & ctx) = 0;
         };
 
@@ -629,7 +630,6 @@ namespace Spire
 		{
 		public:
 			Token SourceWorld, DestWorld;
-			EnumerableDictionary<String, String> LayoutAttributes;
 			Token TypeName;
 			List<RefPtr<FunctionSyntaxNode>> Requirements;
 			List<String> Usings;
@@ -829,7 +829,6 @@ namespace Spire
 			RefPtr<ExpressionType> Type;
 			RefPtr<RateSyntaxNode> Rate;
 			Token AlternateName;
-			EnumerableDictionary<String, String> LayoutAttributes;
 			RefPtr<BlockStatementSyntaxNode> BlockStatement;
 			RefPtr<ExpressionSyntaxNode> Expression;
 			List<RefPtr<ParameterSyntaxNode>> Parameters;
@@ -841,7 +840,6 @@ namespace Spire
 		{
 		public:
 			bool IsAbstract = false;
-			EnumerableDictionary<String, String> LayoutAttributes;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override { return this; }
 			virtual WorldSyntaxNode * Clone(CloneContext & ctx) override;
 		};
@@ -850,7 +848,6 @@ namespace Spire
 		{
 		public:
 			Token StageType;
-			EnumerableDictionary<String, Token> Attributes;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override { return this; }
 			virtual StageSyntaxNode * Clone(CloneContext & ctx) override;
 		};
@@ -912,7 +909,6 @@ namespace Spire
 		{
 		public:
 			bool IsModule = false;
-			EnumerableDictionary<String, Token> Attributes;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ShaderSyntaxNode * Clone(CloneContext & ctx) override;
 		};
