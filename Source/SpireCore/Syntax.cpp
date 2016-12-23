@@ -233,10 +233,9 @@ namespace Spire
 		FunctionSyntaxNode * FunctionSyntaxNode::Clone(CloneContext & ctx)
 		{
 			auto rs = CloneSyntaxNodeFields(new FunctionSyntaxNode(*this), ctx);
-			rs->Parameters.Clear();
-			for (auto & param : Parameters)
+			for (auto & member : rs->Members)
 			{
-				rs->Parameters.Add(param->Clone(ctx));
+				member = member->Clone(ctx);
 			}
 			rs->ReturnTypeNode = ReturnTypeNode->Clone(ctx);
 			rs->Body = Body->Clone(ctx);

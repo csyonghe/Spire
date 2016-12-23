@@ -606,22 +606,32 @@ namespace Spire
 				return count;
 			}
 
+            List<RefPtr<T>> ToArray()
+            {
+                List<RefPtr<T>> result;
+                for (auto element : (*this))
+                {
+                    result.Add(element);
+                }
+                return result;
+            }
+
 			Element* mBegin;
 			Element* mEnd;
 		};
 
-		// A "container" decl is a parent to other declarations
-		class ContainerDecl : public Decl
-		{
-		public:
-			List<RefPtr<Decl>> Members;
+        // A "container" decl is a parent to other declarations
+        class ContainerDecl : public Decl
+        {
+        public:
+            List<RefPtr<Decl>> Members;
 
-			template<typename T>
-			FilteredMemberList<T> GetMembersOfType()
-			{
-				return FilteredMemberList<T>(Members);
-			}
-		};
+            template<typename T>
+            FilteredMemberList<T> GetMembersOfType()
+            {
+                return FilteredMemberList<T>(Members);
+            }
+        };
 
 		enum class ExpressionAccess
 		{
@@ -761,10 +771,13 @@ namespace Spire
 			virtual ParameterSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class FunctionDeclBase : public Decl
+		class FunctionDeclBase : public ContainerDecl
 		{
 		public:
-			List<RefPtr<ParameterSyntaxNode>> Parameters;
+			FilteredMemberList<ParameterSyntaxNode> GetParameters()
+			{
+				return GetMembersOfType<ParameterSyntaxNode>();
+			}
 			RefPtr<BlockStatementSyntaxNode> Body;
 		};
 
@@ -1261,8 +1274,8 @@ namespace Spire
 			virtual RefPtr<FunctionSyntaxNode> VisitFunction(FunctionSyntaxNode* func)
 			{
 				func->ReturnTypeNode = func->ReturnTypeNode->Accept(this).As<TypeSyntaxNode>();
-				for (auto & param : func->Parameters)
-					param = param->Accept(this).As<ParameterSyntaxNode>();
+				for (auto & member : func->Members)
+					member = member->Accept(this).As<Decl>();
 				if (func->Body)
 					func->Body = func->Body->Accept(this).As<BlockStatementSyntaxNode>();
 				return func;

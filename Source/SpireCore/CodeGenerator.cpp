@@ -659,7 +659,7 @@ namespace Spire
 				variables.PushScope();
 				codeWriter.PushNode();
 				int id = 0;
-				for (auto &param : function->Parameters)
+				for (auto &param : function->GetParameters())
 				{
 					func->Parameters.Add(param->Name.Content, ILParameter(TranslateExpressionType(param->Type), GetParamQualifier(param.Ptr())));
 					auto op = FetchArg(param->Type.Ptr(), ++id);
@@ -1059,12 +1059,14 @@ namespace Spire
 			{
 				variables.PushScope();
 				List<ILOperand*> arguments;
-				for (int i = 0; i < expr->Arguments.Count(); i++)
+				int argIndex = 0;
+				for (auto param : expr->ImportOperatorDef->GetParameters())
 				{
-					expr->Arguments[i]->Accept(this);
+					expr->Arguments[argIndex]->Accept(this);
 					auto argOp = PopStack();
 					arguments.Add(argOp);
-					variables.Add(expr->ImportOperatorDef->Parameters[i]->Name.Content, argOp);
+					variables.Add(param->Name.Content, argOp);
+					argIndex++;
 				}
 				currentImport = expr;
 				auto oldTypeMapping = genericTypeMappings.TryGetValue(expr->ImportOperatorDef->TypeName.Content);
@@ -1169,7 +1171,7 @@ namespace Spire
 					if (basicType->Func)
 					{
 						funcName = basicType->Func->SyntaxNode->IsExtern() ? basicType->Func->SyntaxNode->Name.Content : basicType->Func->SyntaxNode->InternalName;
-						for (auto & param : basicType->Func->SyntaxNode->Parameters)
+						for (auto & param : basicType->Func->SyntaxNode->GetParameters())
 						{
 							if (param->HasModifier(ModifierFlag::Out))
 							{

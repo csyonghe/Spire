@@ -335,7 +335,7 @@ namespace Spire
 				{
 					currentImportOperator = op.Ptr();
 					HashSet<String> paraNames;
-					for (auto & para : op->Parameters)
+					for (auto & para : op->GetParameters())
 					{
 						if (paraNames.Contains(para->Name.Content))
 							getSink()->diagnose(para.Ptr(), Diagnostics::parameterAlreadyDefined, para->Name);
@@ -832,11 +832,13 @@ namespace Spire
 					{
 						StringBuilder argList;
 						argList << "(";
-						for (auto & param : func->Parameters)
+                        bool first = true;
+						for (auto & param : func->GetParameters())
 						{
-							argList << param->Type->ToString();
-							if (param != func->Parameters.Last())
+							if (!first)
 								argList << ", ";
+							argList << param->Type->ToString();
+                            first = false;
 						}
 						argList << ")";
 						getSink()->diagnose(func, Diagnostics::functionRedefinitionWithArgList, func->Name, argList.ProduceString());
@@ -934,7 +936,7 @@ namespace Spire
 				StringBuilder internalName;
 				internalName << functionNode->Name.Content;
 				HashSet<String> paraNames;
-				for (auto & para : functionNode->Parameters)
+				for (auto & para : functionNode->GetParameters())
 				{
 					if (paraNames.Contains(para->Name.Content))
 						getSink()->diagnose(para, Diagnostics::parameterAlreadyDefined, para->Name);
@@ -1161,7 +1163,7 @@ namespace Spire
 					List<RefPtr<FunctionSymbol>> * operatorOverloads = symbolTable->FunctionOverloads.TryGetValue(GetOperatorFunctionName(expr->Operator));
 					auto overload = FindFunctionOverload(*operatorOverloads, [](RefPtr<FunctionSymbol> f)
 					{
-						return f->SyntaxNode->Parameters;
+						return f->SyntaxNode->GetParameters();
 					}, argTypes);
 					if (!overload)
 					{
@@ -1252,12 +1254,14 @@ namespace Spire
 			}
 			bool MatchArguments(FunctionSyntaxNode * functionNode, List <RefPtr<ExpressionSyntaxNode>> &args)
 			{
-				if (functionNode->Parameters.Count() != args.Count())
+				if (functionNode->GetParameters().Count() != args.Count())
 					return false;
-				for (int i = 0; i < functionNode->Parameters.Count(); i++)
+				int i = 0;
+				for (auto param : functionNode->GetParameters())
 				{
-					if (!functionNode->Parameters[i]->Type->Equals(args[i]->Type.Ptr()))
+					if (!param->Type->Equals(args[i]->Type.Ptr()))
 						return false;
+					i++;
 				}
 				return true;
 			}
@@ -1274,22 +1278,23 @@ namespace Spire
 					{
 						int conversions = 0;
 						bool match = true;
-						for (int i = 0; i < arguments.Count(); i++)
+						int i = 0;
+						for (auto param : params)
 						{
 							auto argType = arguments[i];
-							auto paramType = params[i]->Type;
+							auto paramType = param->Type;
 							if (argType->Equals(paramType.Ptr()))
-								continue;
+							{}
 							else if (MatchType_ValueReceiver(paramType.Ptr(), argType.Ptr()))
 							{
 								conversions++;
-								continue;
 							}
 							else
 							{
 								match = false;
 								break;
 							}
+							i++;
 						}
 						if (match && conversions < bestMatchConversions)
 						{
@@ -1399,7 +1404,7 @@ namespace Spire
 						auto validOverloads = From(*impOpList).Where([&](RefPtr<ImportOperatorDefSyntaxNode> imp) { return imp->DestWorld.Content == currentCompNode->Rate->Worlds.First().World.Content; }).ToList();
 						auto func = FindFunctionOverload(validOverloads, [](RefPtr<ImportOperatorDefSyntaxNode> imp)
 						{
-							return imp->Parameters;
+							return imp->GetParameters();
 						}, From(arguments).Skip(1).Select([](RefPtr<ExpressionSyntaxNode> x) {return x->Type; }).ToList());
 						if (func)
 						{
@@ -1479,7 +1484,7 @@ namespace Spire
 					{
 						func = FindFunctionOverload(*functionOverloads, [](RefPtr<FunctionSymbol> f)
 						{
-							return f->SyntaxNode->Parameters;
+							return f->SyntaxNode->GetParameters();
 						}, From(arguments).Select([](RefPtr<ExpressionSyntaxNode> x) {return x->Type; }).ToList());
 						functionNameFound = true;
 					}
@@ -1563,10 +1568,12 @@ namespace Spire
 					// if this is still an invoke expression, test arguments passed to inout/out parameter are LValues
 					if (auto basicType = dynamic_cast<BasicExpressionType*>(invoke->FunctionExpr->Type.Ptr()))
 					{
+						List<RefPtr<ParameterSyntaxNode>> paramsStorage;
 						List<RefPtr<ParameterSyntaxNode>> * params = nullptr;
 						if (basicType->Func)
 						{
-							params = &basicType->Func->SyntaxNode->Parameters;
+							paramsStorage = basicType->Func->SyntaxNode->GetParameters().ToArray();
+							params = &paramsStorage;
 						}
 						else if (basicType->Component)
 						{
@@ -1667,7 +1674,7 @@ namespace Spire
 				List<RefPtr<FunctionSymbol>> * operatorOverloads = symbolTable->FunctionOverloads.TryGetValue(GetOperatorFunctionName(expr->Operator));
 				auto overload = FindFunctionOverload(*operatorOverloads, [](RefPtr<FunctionSymbol> f)
 				{
-					return f->SyntaxNode->Parameters;
+					return f->SyntaxNode->GetParameters();
 				}, argTypes);
 				if (!overload)
 				{

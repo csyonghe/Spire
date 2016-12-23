@@ -723,7 +723,7 @@ namespace Spire
             parser->ReadToken(TokenType::LParent);
             while (!AdvanceIfMatch(parser, TokenType::RParent))
             {
-                decl->Parameters.Add(parser->ParseParameter());
+                decl->Members.Add(parser->ParseParameter());
                 if (AdvanceIf(parser, TokenType::RParent))
                     break;
                 parser->ReadToken(TokenType::Comma);
@@ -1234,7 +1234,7 @@ namespace Spire
 			ReadToken(TokenType::LParent);
 			while (!AdvanceIf(this, TokenType::RParent))
 			{
-				op->Parameters.Add(ParseParameter());
+				op->Members.Add(ParseParameter());
 				if (AdvanceIf(this, TokenType::RParent))
 					break;
                 ReadToken(TokenType::Comma);
@@ -1286,7 +1286,7 @@ namespace Spire
 			ReadToken(TokenType::LParent);
 			while(!AdvanceIfMatch(this, TokenType::RParent))
 			{
-				function->Parameters.Add(ParseParameter());
+				function->Members.Add(ParseParameter());
 				if (AdvanceIf(this, TokenType::RParent))
 					break;
 				ReadToken(TokenType::Comma);
