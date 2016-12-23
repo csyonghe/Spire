@@ -50,15 +50,6 @@ namespace Spire
 				return name;
 		}
 
-		class ComponentReferenceObject : public Object
-		{
-		public:
-			ShaderComponentSymbol * Component = nullptr;
-			ComponentReferenceObject(ShaderComponentSymbol * component)
-				: Component(component)
-			{}
-		};
-
 		class SemanticsVisitor : public SyntaxVisitor
 		{
 			ProgramSyntaxNode * program = nullptr;
@@ -372,6 +363,26 @@ namespace Spire
 				return pipeline;
 			}
 
+			virtual CoreLib::RefPtr<InterfaceSyntaxNode> VisitInterface(InterfaceSyntaxNode * interfaceNode) override
+			{
+				for (auto & comp : interfaceNode->GetComponents())
+				{
+					interfaceNode->Scope->decls.AddIfNotExists(comp->Name.Content, comp.Ptr());
+					for (auto & param : comp->Parameters)
+					{
+						param->Type = TranslateTypeNode(param->TypeNode);
+						if (param->Expr)
+							getSink()->diagnose(param->Expr->Position, Diagnostics::defaultParamNotAllowedInInterface, param->Name);
+					}
+					comp->Type = TranslateTypeNode(comp->TypeNode);
+					if (comp->Expression)
+						comp->Expression->Accept(this);
+					if (comp->BlockStatement)
+						comp->BlockStatement->Accept(this);
+				}
+				return interfaceNode;
+			}
+
 			virtual RefPtr<ImportSyntaxNode> VisitImport(ImportSyntaxNode * import) override
 			{
 				RefPtr<ShaderSymbol> refShader;
@@ -483,14 +494,18 @@ namespace Spire
 					SyntaxVisitor::VisitComponent(comp);
 					if (comp->Expression || comp->BlockStatement)
 					{
-						if (compSym->IsRequire())
+						if (comp->IsRequire())
 							getSink()->diagnose(comp, Diagnostics::requireWithComputation);
 						if (comp->IsParam())
 							getSink()->diagnose(comp, Diagnostics::paramWithComputation);
 					}
 					if (compSym->Type->DataType->GetBindableResourceType() != BindableResourceType::NonBindable && !comp->IsParam()
-						&& !comp->IsRequire())
+						&& !comp->IsRequire() && !dynamic_cast<InterfaceSyntaxNode*>(comp->ParentDecl))
 						getSink()->diagnose(comp, Diagnostics::resourceTypeMustBeParamOrRequire, comp->Name);
+					if (compSym->Type->DataType->GetBindableResourceType() != BindableResourceType::NonBindable && 
+						(comp->Expression || comp->BlockStatement))
+						getSink()->diagnose(comp, Diagnostics::cannotDefineComputationOnResourceType, comp->Name);
+
 					if (comp->HasSimpleAttribute("FragDepth"))
 					{
 						if (!comp->IsOutput())
@@ -532,6 +547,83 @@ namespace Spire
 					return import;
 				}
 			};
+
+			void CheckShaderInterfaceRequirements(ShaderSymbol * shaderSym)
+			{
+				for (auto interfaceName : shaderSym->SyntaxNode->InterfaceNames)
+				{
+					auto interfaceNode = dynamic_cast<InterfaceSyntaxNode*>(symbolTable->LookUp(interfaceName.Content));
+					if (!interfaceNode)
+					{
+						getSink()->diagnose(interfaceName.Position, Diagnostics::undefinedIdentifier, interfaceName);
+						continue;
+					}
+					for (auto comp : interfaceNode->GetComponents())
+					{
+						auto compRef = shaderSym->ResolveComponentReference(comp->Name.Content);
+						if (compRef.IsAccessible)
+						{
+							if (!compRef.Component->Implementations.First()->SyntaxNode->IsPublic())
+							{
+								getSink()->diagnose(compRef.Component->Implementations.First()->SyntaxNode->Position, Diagnostics::interfaceImplMustBePublic, comp->Name.Content, interfaceName);
+								getSink()->diagnose(comp->Position, Diagnostics::seeInterfaceDefinitionOf, comp->Name);
+							}
+							if (!compRef.Component->Type->DataType->Equals(comp->Type.Ptr()))
+							{
+								getSink()->diagnose(compRef.Component->Implementations.First()->SyntaxNode->Position, Diagnostics::componentTypeDoesNotMatchInterface, comp->Name, interfaceName);
+								getSink()->diagnose(comp->Position, Diagnostics::seeInterfaceDefinitionOf, comp->Name);
+								bool matchingImplFound = false;
+								for (auto impl : compRef.Component->Implementations)
+								{
+									if (impl->SyntaxNode->Parameters.Count() == comp->Parameters.Count())
+									{
+										matchingImplFound = true;
+										for (int i = 0; i < comp->Parameters.Count(); i++)
+											if (!comp->Parameters[i]->Type->Equals(impl->SyntaxNode->Parameters[i]->Type))
+											{
+												matchingImplFound = false;
+												break;
+											}
+									}
+								}
+								if (!matchingImplFound)
+								{
+									StringBuilder argList;
+									argList << "(";
+									for (auto & param : comp->Parameters)
+									{
+										argList << param->Type->ToString();
+										if (param != comp->Parameters.Last())
+											argList << ", ";
+									}
+									argList << ")";
+									getSink()->diagnose(compRef.Component->Implementations.First()->SyntaxNode->Position, Diagnostics::shaderDidNotDefineComponentFunction, shaderSym->SyntaxNode->Name, comp->Name.Content + argList.ProduceString(), interfaceName);
+									getSink()->diagnose(comp->Position, Diagnostics::seeInterfaceDefinitionOf, comp->Name);
+								}
+							}
+						}
+						else
+						{
+							if (!comp->Expression && !comp->BlockStatement) // interface does not define default impl, and shader does not provide impl
+							{
+								getSink()->diagnose(shaderSym->SyntaxNode->Position, Diagnostics::shaderDidNotDefineComponent, shaderSym->SyntaxNode->Name, comp->Name.Content, interfaceName);
+								getSink()->diagnose(comp->Position, Diagnostics::seeInterfaceDefinitionOf, comp->Name);
+								if (compRef.Component)
+									getSink()->diagnose(compRef.Component->Implementations.First()->SyntaxNode->Position, Diagnostics::doYouForgetToMakeComponentAccessible, comp->Name,
+										shaderSym->SyntaxNode->Name);
+							}
+							else // if interface provides default impl, add it to shader
+							{
+								CloneContext ctx;
+								auto newComp = comp->Clone(ctx);
+								shaderSym->SyntaxNode->Members.Add(newComp);
+								newComp->modifiers.flags |= Public;
+								AddNewComponentSymbol(shaderSym->Components, shaderSym->FunctionComponents, newComp);
+							}
+						}
+					}
+				}
+			}
 
 			// pass 1: fill components in shader symbol table
 			void VisitShaderPass1(ShaderSyntaxNode * shader)
@@ -594,46 +686,7 @@ namespace Spire
 				// add shader objects to symbol table
 				ShaderImportVisitor importVisitor(sink, symbolTable);
 				shader->Accept(&importVisitor);
-				/* ************************************
-				***************************************
-				for (auto & comp : shaderSymbol->Components)
-				{
-					for (auto & impl : comp.Value->Implementations)
-					{
-						bool inAbstractWorld = false;
-						if (impl->SyntaxNode->Rate)
-						{
-							auto & userSpecifiedWorlds = impl->SyntaxNode->Rate->Worlds;
-							for (auto & world : userSpecifiedWorlds)
-							{
-								if (!shaderSymbol->Pipeline->WorldDependency.ContainsKey(world.World.Content))
-									getSink()->diagnose(33012, "\'" + world.World.Content + "' is not a defined world in '" +
-										pipelineName + "'.", world.World);
-								WorldSymbol worldSym;
-
-								if (shaderSymbol->Pipeline->Worlds.TryGetValue(world.World.Content, worldSym))
-								{
-									if (worldSym.IsAbstract)
-									{
-										inAbstractWorld = true;
-										if (userSpecifiedWorlds.Count() > 1)
-										{
-											getSink()->diagnose(33013, "abstract world cannot appear with other worlds.",
-												world.World);
-										}
-									}
-								}
-							}
-						}
-						if (!inAbstractWorld && !impl->SyntaxNode->IsRequire
-							&& !impl->SyntaxNode->Expression && !impl->SyntaxNode->BlockStatement)
-						{
-							getSink()->diagnose(33014, "non-abstract component must have an implementation.",
-								impl->SyntaxNode.Ptr());
-						}
-					}
-				}
-				*/
+				
 				this->currentShader = nullptr;
 			}
 			// pass 2: type checking component definitions
@@ -642,6 +695,7 @@ namespace Spire
 				RefPtr<ShaderSymbol> shaderSym;
 				if (!symbolTable->Shaders.TryGetValue(shaderNode->Name.Content, shaderSym))
 					return;
+				CheckShaderInterfaceRequirements(shaderSym.Ptr());
 				this->currentShader = shaderSym.Ptr();
 				for (auto & comp : shaderNode->Members)
 				{
@@ -819,6 +873,10 @@ namespace Spire
 				{
 					VisitPipeline(pipeline.Ptr());
 				}
+				for (auto & interfaceNode : program->GetInterfaces())
+				{
+					VisitInterface(interfaceNode.Ptr());
+				}
 				// build initial symbol table for shaders
 				for (auto & shader : program->GetShaders())
 				{
@@ -857,6 +915,7 @@ namespace Spire
 						shader->SemanticallyChecked = true;
 					}
 				}
+
 				return programNode;
 			}
 
@@ -1688,7 +1747,12 @@ namespace Spire
 					}
 					else
 						getSink()->diagnose(expr, Diagnostics::undefinedIdentifier2, expr->Variable);
-					expr->Tags["ComponentReference"] = new ComponentReferenceObject(compRef.Component);
+				}
+				else if (auto compDecl = dynamic_cast<ComponentSyntaxNode*>(decl)) // interface decl
+				{
+					expr->Type = compDecl->Type;
+					if (auto basicType = expr->Type->AsBasicType())
+						basicType->IsLeftValue = false;
 				}
 				else
 					getSink()->diagnose(expr, Diagnostics::undefinedIdentifier2, expr->Variable);
@@ -1844,7 +1908,6 @@ namespace Spire
 					}
 					else
 						expr->Type = ExpressionType::Error;
-					expr->Tags["ComponentReference"] = new ComponentReferenceObject(refComp.Component);
 				}
 				else if (baseType->IsStruct())
 				{

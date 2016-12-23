@@ -28,6 +28,7 @@ DIAGNOSTIC(-1, Note, implicitParameterMatchingFailedBecauseShaderDoesNotDefineCo
 DIAGNOSTIC(-1, Note, implicitParameterMatchingFailedBecauseTypeMismatch, "implicit parameter matching failed because the component of the same name does not match parameter type '$0'.")
 DIAGNOSTIC(-1, Note, noteShaderIsTargetingPipeine, "shader '$0' is targeting pipeline '$1'")
 DIAGNOSTIC(-1, Note, seeDefinitionOf, "see definition of '$0'")
+DIAGNOSTIC(-1, Note, seeInterfaceDefinitionOf, "see interface definition of '$0'")
 DIAGNOSTIC(-1, Note, seeUsingOf, "see using of '$0'")
 DIAGNOSTIC(-1, Note, seeDefinitionOfShader, "see definition of shader '$0'")
 DIAGNOSTIC(-1, Note, seeInclusionOf, "see inclusion of '$0'")
@@ -37,7 +38,7 @@ DIAGNOSTIC(-1, Note, seePotentialDefinitionOfComponent, "see potential definitio
 DIAGNOSTIC(-1, Note, seePreviousDefinition, "see previous definition")
 DIAGNOSTIC(-1, Note, seePreviousDefinitionOf, "see previous definition of '$0'")
 DIAGNOSTIC(-1, Note, seeRequirementDeclaration, "see requirement declaration")
-
+DIAGNOSTIC(-1, Note, doYouForgetToMakeComponentAccessible, "do you forget to make component '$0' acessible from '$1' (missing public qualifier)?")
 //
 // 0xxxx -  Command line and interaction with host platform APIs.
 //
@@ -189,12 +190,12 @@ DIAGNOSTIC(33016, Error, usingInComponentDefinition, "'using': importing not all
 DIAGNOSTIC(33018, Error, nameAlreadyDefined, "'$0' is already defined.")
 DIAGNOSTIC(33018, Error, shaderAlreadyDefined, "shader '$0' has already been defined.")
 DIAGNOSTIC(33019, Error, componentMarkedExportMustHaveWorld, "component '$0': definition marked as 'export' must have an explicitly specified world.")
-DIAGNOSTIC(33020, Error, componentIsAlreadyDefined,             "'$0' is already defined.")
-DIAGNOSTIC(33020, Error, componentIsAlreadyDefinedInThatWorld,  "'$0' is already defined at '$1'.")
+DIAGNOSTIC(33020, Error, componentIsAlreadyDefined, "'$0' is already defined.")
+DIAGNOSTIC(33020, Error, componentIsAlreadyDefinedInThatWorld, "'$0' is already defined at '$1'.")
 DIAGNOSTIC(33021, Error, inconsistentSignatureForComponent, "'$0': inconsistent signature.")
 DIAGNOSTIC(33022, Error, nameAlreadyDefinedInCurrentScope, "'$0' is already defined in current scope.")
 DIAGNOSTIC(33022, Error, parameterNameConflictsWithExistingDefinition, "'$0': parameter name conflicts with existing definition.")
-DIAGNOSTIC(33023, Error, parameterOfModuleIsUnassigned,  "parameter '$0' of module '$1' is unassigned.")
+DIAGNOSTIC(33023, Error, parameterOfModuleIsUnassigned, "parameter '$0' of module '$1' is unassigned.")
 DIAGNOSTIC(33027, Error, argumentTypeDoesNotMatchParameterType, "argument type ($0) does not match parameter type ($1)")
 DIAGNOSTIC(33028, Error, nameIsNotAParameterOfCallee, "'$0' is not a parameter of '$1'.")
 DIAGNOSTIC(33029, Error, requirementsClashWithPreviousDef, "'$0': requirement clash with previous definition.")
@@ -211,6 +212,12 @@ DIAGNOSTIC(33070, Error, expectedFunction, "expression preceding parenthesis of 
 DIAGNOSTIC(33071, Error, importOperatorCalledFromAutoPlacedComponent, "cannot call an import operator from an auto-placed component '$0'. try qualify the component with explicit worlds.")
 DIAGNOSTIC(33072, Error, noApplicableImportOperator, "'$0' is an import operator defined in pipeline '$1', but none of the import operator overloads converting to world '$2' matches argument list ($3).")
 DIAGNOSTIC(33073, Error, importOperatorCalledFromMultiWorldComponent, "cannot call an import operator from a multi-world component definition. consider qualify the component with only one explicit world.")
+DIAGNOSTIC(33080, Error, componentTypeDoesNotMatchInterface, "'$0': component type does not match definition in interface '$1'.")
+DIAGNOSTIC(33081, Error, shaderDidNotDefineComponentFunction, "shader '$0' did not define component function $1 as required by interface '$2'.")
+DIAGNOSTIC(33082, Error, shaderDidNotDefineComponent, "shader '$0' did not define component '$1' as required by interface '$2'.")
+DIAGNOSTIC(33083, Error, interfaceImplMustBePublic, "'$0': component fulfilling interface '$1' must be declared as 'public'.")
+DIAGNOSTIC(33084, Error, defaultParamNotAllowedInInterface, "'$0': default parameter value not allowed in interface definition.")
+
 DIAGNOSTIC(33100, Error, componentCantBeComputedAtWorldBecauseDependentNotAvailable, "'$0' cannot be computed at '$1' because the dependent component '$2' is not accessible.")
 DIAGNOSTIC(33101, Warning, worldIsNotAValidChoiceForKey, "'$0' is not a valid choice for '$1'.")
 DIAGNOSTIC(33102, Error, componentDefinitionCircularity, "component definition '$0' involves circular reference.")
@@ -220,6 +227,7 @@ DIAGNOSTIC(34026, Warning, componentIsAlreadyDefinedUseRequire, "'$0': component
 DIAGNOSTIC(34062, Error, cylicReference, "cyclic reference: $0");
 DIAGNOSTIC(34064, Error, noApplicableImplicitImportOperator, "cannot find import operator to import component '$0' to world '$1' when compiling '$2'.")
 DIAGNOSTIC(34065, Error, resourceTypeMustBeParamOrRequire, "'$0': resource typed component must be declared as 'param' or 'require'.");
+DIAGNOSTIC(34066, Error, cannotDefineComputationOnResourceType, "'$0': cannot define computation on resource typed component.");
 
 DIAGNOSTIC(35001, Error, fragDepthAttributeCanOnlyApplyToOutput, "FragDepth attribute can only apply to an output component.");
 DIAGNOSTIC(35002, Error, fragDepthAttributeCanOnlyApplyToFloatComponent, "FragDepth attribute can only apply to a float component.");

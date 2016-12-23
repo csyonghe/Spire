@@ -841,7 +841,7 @@ namespace Spire
 		{
 		public:
 			RefPtr<ExpressionSyntaxNode> Component;
-			String ComponentUniqueName; // filled by RsolveDependence
+			String ComponentUniqueName; // filled by ResolveDependence
 			RefPtr<ImportOperatorDefSyntaxNode> ImportOperatorDef; // filled by semantics
 			List<RefPtr<ExpressionSyntaxNode>> Arguments;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
@@ -1013,6 +1013,7 @@ namespace Spire
         {
         public:
 			Token ParentPipelineName;
+			List<Token> InterfaceNames;
         };
 		
 		class PipelineSyntaxNode : public ShaderDeclBase
@@ -1069,6 +1070,17 @@ namespace Spire
 			virtual ShaderSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
+		class InterfaceSyntaxNode : public ShaderDeclBase
+		{
+		public:
+			FilteredMemberList<ComponentSyntaxNode> GetComponents()
+			{
+				return GetMembersOfType<ComponentSyntaxNode>();
+			}
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override;
+			virtual InterfaceSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
         class UsingFileDecl : public Decl
         {
         public:
@@ -1094,6 +1106,10 @@ namespace Spire
             {
                 return GetMembersOfType<PipelineSyntaxNode>();
             }
+			FilteredMemberList<InterfaceSyntaxNode> GetInterfaces()
+			{
+				return GetMembersOfType<InterfaceSyntaxNode>();
+			}
             FilteredMemberList<ShaderSyntaxNode> GetShaders()
             {
                 return GetMembersOfType<ShaderSyntaxNode>();
@@ -1447,6 +1463,14 @@ namespace Spire
 				if (project->BaseExpression)
 					project->BaseExpression = project->BaseExpression->Accept(this).As<ExpressionSyntaxNode>();
 				return project;
+			}
+			virtual RefPtr<InterfaceSyntaxNode> VisitInterface(InterfaceSyntaxNode * node)
+			{
+				for (auto & member : node->GetComponents())
+				{
+					member->Accept(this);
+				}
+				return node;
 			}
 		};
 	}

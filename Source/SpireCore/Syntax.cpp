@@ -995,5 +995,17 @@ namespace Spire
 			result->BaseExpression = BaseExpression->Clone(ctx);
 			return result;
 		}
+		RefPtr<SyntaxNode> InterfaceSyntaxNode::Accept(SyntaxVisitor * visitor)
+		{
+			return visitor->VisitInterface(this);
+		}
+		InterfaceSyntaxNode * InterfaceSyntaxNode::Clone(CloneContext & ctx)
+		{
+			auto rs = CloneSyntaxNodeFields(new InterfaceSyntaxNode(*this), ctx);
+			rs->Members.Clear();
+			for (auto & comp : Members)
+				rs->Members.Add(comp->Clone(ctx));
+			return rs;
+		}
 }
 }

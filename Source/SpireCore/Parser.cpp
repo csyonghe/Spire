@@ -109,6 +109,7 @@ namespace Spire
 			bool IsTypeKeyword();
 			RefPtr<ProgramSyntaxNode>				ParseProgram();
 			RefPtr<ShaderSyntaxNode>				ParseShader();
+			RefPtr<InterfaceSyntaxNode>				ParseInterface();
 			RefPtr<PipelineSyntaxNode>				ParsePipeline();
 			RefPtr<StageSyntaxNode>					ParseStage();
 			RefPtr<WorldSyntaxNode>					ParseWorld();
@@ -897,22 +898,24 @@ namespace Spire
             RefPtr<Decl> decl;
 
             // TODO: actual dispatch!
-            if (parser->LookAheadToken("shader") || parser->LookAheadToken("module"))
-                decl = parser->ParseShader();
-            else if (parser->LookAheadToken("pipeline"))
-                decl = parser->ParsePipeline();
-            else if (parser->LookAheadToken("struct"))
-                decl = parser->ParseStruct();
-            else if (parser->LookAheadToken("typedef"))
-                decl = ParseTypeDef(parser);
-            else if (parser->LookAheadToken("using"))
-                decl = ParseUsing(parser);
-            else if (parser->LookAheadToken("world"))
-                decl = parser->ParseWorld();
-            else if (parser->LookAheadToken("import"))
-                decl = parser->ParseImportOperator();
-            else if (parser->LookAheadToken("stage"))
-                decl = parser->ParseStage();
+			if (parser->LookAheadToken("shader") || parser->LookAheadToken("module"))
+				decl = parser->ParseShader();
+			else if (parser->LookAheadToken("pipeline"))
+				decl = parser->ParsePipeline();
+			else if (parser->LookAheadToken("struct"))
+				decl = parser->ParseStruct();
+			else if (parser->LookAheadToken("typedef"))
+				decl = ParseTypeDef(parser);
+			else if (parser->LookAheadToken("using"))
+				decl = ParseUsing(parser);
+			else if (parser->LookAheadToken("world"))
+				decl = parser->ParseWorld();
+			else if (parser->LookAheadToken("import"))
+				decl = parser->ParseImportOperator();
+			else if (parser->LookAheadToken("stage"))
+				decl = parser->ParseStage();
+			else if (parser->LookAheadToken("interface"))
+				decl = parser->ParseInterface();
             else if (AdvanceIf(parser, TokenType::Semicolon))
             {
                 // empty declaration
@@ -964,6 +967,19 @@ namespace Spire
 			return program;
 		}
 
+		RefPtr<InterfaceSyntaxNode> Parser::ParseInterface()
+		{
+			RefPtr<InterfaceSyntaxNode> node = new InterfaceSyntaxNode();
+			ReadToken("interface");
+			PushScope();
+			FillPosition(node.Ptr());
+			node->Name = ReadToken(TokenType::Identifier);
+			ReadToken(TokenType::LBrace);
+			ParseDeclBody(this, node.Ptr(), TokenType::RBrace);
+			PopScope();
+			return node;
+		}
+
 		RefPtr<ShaderSyntaxNode> Parser::ParseShader()
 		{
 			RefPtr<ShaderSyntaxNode> shader = new ShaderSyntaxNode();
@@ -976,9 +992,21 @@ namespace Spire
 			PushScope();
 			FillPosition(shader.Ptr());
 			shader->Name = ReadToken(TokenType::Identifier);
-			if (AdvanceIf(this, TokenType::Colon))
+			while (LookAheadToken("targets") || LookAheadToken("implements"))
 			{
-				shader->ParentPipelineName = ReadToken(TokenType::Identifier);
+				if (AdvanceIf(this, "targets"))
+				{
+					shader->ParentPipelineName = ReadToken(TokenType::Identifier);
+				}
+				if (AdvanceIf(this, "implements"))
+				{
+					while (!LookAheadToken("implements") && !LookAheadToken("targets") && !LookAheadToken(TokenType::LBrace))
+					{
+						shader->InterfaceNames.Add(ReadToken(TokenType::Identifier));
+						if (!AdvanceIf(this, TokenType::Comma))
+							break;
+					}
+				}
 			}
 			
 			ReadToken(TokenType::LBrace);

@@ -328,7 +328,8 @@ namespace Spire
                 if (auto decl = var->Scope->LookUp(var->Variable))
                 {
                     // TODO(tfoley): wire up the variable to the declaration
-                    return var;
+					if (dynamic_cast<VarDeclBase*>(decl)) // make sure this is a ordinary variable (currently ComponentSyntaxNode is not VarDeclBase)
+						return var;
                 }
                 // Otherwise look in other places...
 				if (var->Type->AsBasicType() && var->Type->AsBasicType()->Component)
