@@ -8,19 +8,61 @@ namespace Spire
 {
 	namespace Compiler
 	{
-    Decl* Scope::LookUp(String const& name)
-    {
-        Scope* scope = this;
-        while (scope)
-        {
-            Decl* decl = nullptr;
-            if (scope->decls.TryGetValue(name, decl))
-                return decl;
+        // Scope
 
-            scope = scope->Parent;
+        Decl* Scope::LookUp(String const& name)
+        {
+            Scope* scope = this;
+            while (scope)
+            {
+                Decl* decl = nullptr;
+                if (scope->decls.TryGetValue(name, decl))
+                    return decl;
+
+                scope = scope->Parent.Ptr();
+            }
+            return nullptr;
         }
-        return nullptr;
-    }
+
+        // Decl
+
+        bool Decl::FindSimpleAttribute(String const& key, Token& outValue)
+        {
+            for (auto attr : GetLayoutAttributes())
+            {
+                if (attr->Key == key)
+                {
+                    outValue = attr->Value;
+                    return true;
+                }
+            }
+            return false;
+        }
+        bool Decl::FindSimpleAttribute(String const& key, String& outValue)
+        {
+            for (auto attr : GetLayoutAttributes())
+            {
+                if (attr->Key == key)
+                {
+                    outValue = attr->Value.Content;
+                    return true;
+                }
+            }
+            return false;
+        }
+        bool Decl::HasSimpleAttribute(String const& key)
+        {
+            for (auto attr : GetLayoutAttributes())
+            {
+                if (attr->Key == key)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        //
 
 		bool BasicExpressionType::EqualsImpl(const ExpressionType * type) const
 		{
@@ -471,6 +513,21 @@ namespace Spire
 				rs->Members.Add(comp->Clone(ctx));
 			return rs;
 		}
+
+        // UsingFileDecl
+
+        RefPtr<SyntaxNode> UsingFileDecl::Accept(SyntaxVisitor * visitor)
+        {
+            return visitor->VisitUsingFileDecl(this);
+        }
+
+        UsingFileDecl* UsingFileDecl::Clone(CloneContext & ctx)
+        {
+            return CloneSyntaxNodeFields(new UsingFileDecl(*this), ctx);
+        }
+
+        //
+
 		RateSyntaxNode * RateSyntaxNode::Clone(CloneContext & ctx)
 		{
 			return CloneSyntaxNodeFields(new RateSyntaxNode(*this), ctx);
@@ -531,19 +588,6 @@ namespace Spire
 			rs->Import = Import->Clone(ctx);
 			return rs;
 		}
-
-        RefPtr<SyntaxNode> MultiDecl::Accept(SyntaxVisitor * visitor)
-        {
-            return visitor->VisitMultiDecl(this);
-        }
-
-        MultiDecl * MultiDecl::Clone(CloneContext & ctx)
-        {
-            auto rs = CloneSyntaxNodeFields(new MultiDecl(*this), ctx);
-            for (auto& d : rs->decls)
-                d = d->Clone(ctx);
-            return rs;
-        }
 
 		RefPtr<SyntaxNode> StructField::Accept(SyntaxVisitor * visitor)
 		{

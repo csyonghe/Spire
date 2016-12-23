@@ -106,17 +106,14 @@ namespace Spire
 			bool LookAheadToken(CoreLib::Text::TokenType type, int offset = 0);
 			bool LookAheadToken(const char * string, int offset = 0);
 			Token ReadTypeKeyword();
-			VariableModifier ReadVariableModifier();
 			bool IsTypeKeyword();
-			EnumerableDictionary<String, Token>		ParseAttribute();
 			RefPtr<ProgramSyntaxNode>				ParseProgram();
 			RefPtr<ShaderSyntaxNode>				ParseShader();
 			RefPtr<PipelineSyntaxNode>				ParsePipeline();
 			RefPtr<StageSyntaxNode>					ParseStage();
-			RefPtr<ComponentSyntaxNode>				ParseComponent();
 			RefPtr<WorldSyntaxNode>					ParseWorld();
 			RefPtr<RateSyntaxNode>					ParseRate();
-			RefPtr<ImportSyntaxNode>				ParseImport();
+			RefPtr<ImportSyntaxNode>				ParseImportInner();
 			RefPtr<ImportStatementSyntaxNode>		ParseImportStatement();
 			RefPtr<ImportOperatorDefSyntaxNode>		ParseImportOperator();
 			RefPtr<FunctionSyntaxNode>				ParseFunction(bool parseBody = true);
@@ -505,25 +502,6 @@ namespace Spire
 			return ParseProgram();
 		}
 
-		EnumerableDictionary<String, Token> Parser::ParseAttribute()
-		{
-			EnumerableDictionary<String, Token> rs;
-			while (LookAheadToken(TokenType::LBracket))
-			{
-				ReadToken(TokenType::LBracket);
-				auto name = ReadToken(TokenType::Identifier).Content;
-				Token value;
-				if (LookAheadToken(TokenType::Colon))
-				{
-					ReadToken(TokenType::Colon);
-					value = ReadToken(TokenType::StringLiterial);
-				}
-				rs[name] = value;
-				ReadToken(TokenType::RBracket);
-			}
-			return rs;
-		}
-
         RefPtr<TypeDefDecl> ParseTypeDef(Parser* parser)
         {
             // Consume the `typedef` keyword
@@ -543,49 +521,445 @@ namespace Spire
             return typeDefDecl;
         }
 
+        static Modifiers ParseModifiers(Parser* parser)
+        {
+            Modifiers modifiers;
+            RefPtr<Modifier>* modifierLink = &modifiers.first;
+            for (;;)
+            {
+                if (AdvanceIf(parser, "in"))
+                {
+                    modifiers.flags |= ModifierFlag::In;
+                }
+                else if (AdvanceIf(parser, "input"))
+                {
+                    modifiers.flags |= ModifierFlag::Input;
+                }
+                else if (AdvanceIf(parser, "out"))
+                {
+                    modifiers.flags |= ModifierFlag::Out;
+                }
+                else if (AdvanceIf(parser, "uniform"))
+                {
+                    modifiers.flags |= ModifierFlag::Uniform;
+                }
+                else if (AdvanceIf(parser, "parameter"))
+                {
+                    modifiers.flags |= ModifierFlag::Parameter;
+                }
+                else if (AdvanceIf(parser, "const"))
+                {
+                    modifiers.flags |= ModifierFlag::Const;
+                }
+                else if (AdvanceIf(parser, "centroid"))
+                {
+                    modifiers.flags |= ModifierFlag::Centroid;
+                }
+                else if (AdvanceIf(parser, "instance"))
+                {
+                    modifiers.flags |= ModifierFlag::Instance;
+                }
+                else if (AdvanceIf(parser, "__builtin"))
+                {
+                    modifiers.flags |= ModifierFlag::Builtin;
+                }
+                else if (AdvanceIf(parser, "layout"))
+				{
+					parser->ReadToken(TokenType::LParent);
+					StringBuilder layoutSB;
+					while (!AdvanceIfMatch(parser, TokenType::RParent))
+					{
+						layoutSB.Append(parser->ReadToken(TokenType::Identifier).Content);
+						if (parser->LookAheadToken(TokenType::OpAssign))
+						{
+							layoutSB.Append(parser->ReadToken(TokenType::OpAssign).Content);
+							layoutSB.Append(parser->ReadToken(TokenType::IntLiterial).Content);
+						}
+						if (AdvanceIf(parser, TokenType::RParent))
+							break;
+						parser->ReadToken(TokenType::Comma);
+						layoutSB.Append(", ");
+					}
+
+                    RefPtr<LayoutModifier> modifier = new LayoutModifier();
+                    modifier->LayoutString = layoutSB.ProduceString();
+
+                    *modifierLink = modifier;
+                    modifierLink = &modifier->next;
+				}
+                else if (AdvanceIf(parser, "inline"))
+				{
+					modifiers.flags |= ModifierFlag::Inline;
+				}
+				else if (AdvanceIf(parser, "public"))
+				{
+					modifiers.flags |= ModifierFlag::Public;
+				}
+				else if (AdvanceIf(parser, "require"))
+				{
+					modifiers.flags |= ModifierFlag::Require;
+				}
+				else if (AdvanceIf(parser, "param"))
+				{
+					modifiers.flags |= ModifierFlag::Param;
+				}
+				else if (AdvanceIf(parser, "extern"))
+				{
+					modifiers.flags |= ModifierFlag::Extern;
+				}
+                else if (AdvanceIf(parser, TokenType::LBracket))
+                {
+                    auto name = parser->ReadToken(TokenType::Identifier).Content;
+                    Token valueToken;
+                    if (AdvanceIf(parser, TokenType::Colon))
+                    {
+                        valueToken = parser->ReadToken(TokenType::StringLiterial);
+                    }
+                    parser->ReadToken(TokenType::RBracket);
+
+                    RefPtr<SimpleAttribute> modifier = new SimpleAttribute();
+                    modifier->Key = name;
+                    modifier->Value = valueToken;
+
+                    *modifierLink = modifier;
+                    modifierLink = &modifier->next;
+                }
+                else if (AdvanceIf(parser, "__intrinsic"))
+                {
+                    modifiers.flags |= ModifierFlag::Intrinsic;
+                }
+                else
+                {
+                    // Done with modifier list
+                    return modifiers;
+                }
+            }
+        }
+
+        static RefPtr<Decl> ParseUsing(
+            Parser* parser)
+        {
+            parser->ReadToken("using");
+            if (parser->tokenReader.PeekTokenType() == TokenType::StringLiterial)
+            {
+                auto usingDecl = new UsingFileDecl();
+                usingDecl->fileName = parser->ReadToken(TokenType::StringLiterial);
+                parser->ReadToken(TokenType::Semicolon);
+                return usingDecl;
+            }
+            else
+            {
+                // This is an import decl
+                return parser->ParseImportInner();
+            }
+        }
+
+        static Token ParseDeclName(
+            Parser* parser)
+        {
+            Token name;
+            if (AdvanceIf(parser, "operator"))
+			{
+				name = parser->ReadToken();
+				switch (name.Type)
+				{
+				case TokenType::OpAdd: case TokenType::OpSub: case TokenType::OpMul: case TokenType::OpDiv:
+				case TokenType::OpMod: case TokenType::OpNot: case TokenType::OpBitNot: case TokenType::OpLsh: case TokenType::OpRsh:
+				case TokenType::OpEql: case TokenType::OpNeq: case TokenType::OpGreater: case TokenType::OpLess: case TokenType::OpGeq:
+				case TokenType::OpLeq: case TokenType::OpAnd: case TokenType::OpOr: case TokenType::OpBitXor: case TokenType::OpBitAnd:
+				case TokenType::OpBitOr: case TokenType::OpInc: case TokenType::OpDec:
+					break;
+				default:
+					parser->sink->diagnose(name.Position, Diagnostics::invalidOperator, name.Content);
+					break;
+				}
+			}
+			else
+			{
+				name = parser->ReadToken(TokenType::Identifier);
+			}
+            return name;
+        }
+
+        struct DeclaratorInfo
+        {
+            RefPtr<RateSyntaxNode>  rate;
+            RefPtr<TypeSyntaxNode>  typeSpec;
+            Token                   nameToken;
+        };
+
+        static void ParseFuncDeclHeader(
+            Parser*                     parser,
+            DeclaratorInfo const&       declaratorInfo,
+            RefPtr<FunctionSyntaxNode>  decl)
+        {
+            parser->PushScope();
+
+            parser->anonymousParamCounter = 0;
+            parser->FillPosition(decl.Ptr());
+            decl->Position = declaratorInfo.nameToken.Position;
+
+            decl->Name = declaratorInfo.nameToken;
+            decl->ReturnTypeNode = declaratorInfo.typeSpec;
+            parser->ReadToken(TokenType::LParent);
+            while (!AdvanceIfMatch(parser, TokenType::RParent))
+            {
+                decl->Parameters.Add(parser->ParseParameter());
+                if (AdvanceIf(parser, TokenType::RParent))
+                    break;
+                parser->ReadToken(TokenType::Comma);
+            }
+        }
+
+        static void ParseFuncDeclHeader(
+            Parser*                     parser,
+            DeclaratorInfo const&       declaratorInfo,
+            RefPtr<ComponentSyntaxNode> decl)
+        {
+            parser->PushScope();
+
+            parser->anonymousParamCounter = 0;
+            parser->FillPosition(decl.Ptr());
+            decl->Position = declaratorInfo.nameToken.Position;
+
+            decl->Name = declaratorInfo.nameToken;
+            decl->TypeNode = declaratorInfo.typeSpec;
+            parser->ReadToken(TokenType::LParent);
+            while (!AdvanceIfMatch(parser, TokenType::RParent))
+            {
+                decl->Parameters.Add(parser->ParseParameter());
+                if (AdvanceIf(parser, TokenType::RParent))
+                    break;
+                parser->ReadToken(TokenType::Comma);
+            }
+        }
+
+        static RefPtr<Decl> ParseFuncDecl(
+            Parser*                 parser,
+            ContainerDecl*          containerDecl,
+            DeclaratorInfo const&   declaratorInfo)
+        {
+            if (dynamic_cast<ShaderDeclBase*>(containerDecl))
+            {
+                // inside a shader, we create a component decl
+                RefPtr<ComponentSyntaxNode> decl = new ComponentSyntaxNode();
+                ParseFuncDeclHeader(parser, declaratorInfo, decl);
+
+                //
+                decl->Rate = declaratorInfo.rate;
+                //
+
+                if (AdvanceIf(parser, TokenType::Semicolon))
+                {
+                    // empty body
+                }
+                else
+                {
+                    decl->BlockStatement = parser->ParseBlockStatement();
+                }
+
+                parser->PopScope();
+                return decl;
+            }
+            else
+            {
+                // everywhere else, we create an ordinary `FunctionSyntaxNode`
+
+                RefPtr<FunctionSyntaxNode> decl = new FunctionSyntaxNode();
+                ParseFuncDeclHeader(parser, declaratorInfo, decl);
+
+                if (AdvanceIf(parser, TokenType::Semicolon))
+                {
+                    // empty body
+                }
+                else
+                {
+                    decl->Body = parser->ParseBlockStatement();
+                }
+
+                parser->PopScope();
+                return decl;
+            }
+        }
+
+        static RefPtr<VarDeclBase> CreateVarDeclForContext(
+            ContainerDecl*  containerDecl )
+        {
+            if (dynamic_cast<StructSyntaxNode*>(containerDecl))
+            {
+                return new StructField();
+            }
+            else if (dynamic_cast<FunctionDeclBase*>(containerDecl))
+            {
+                return new ParameterSyntaxNode();
+            }
+            else
+            {
+                return new Variable();
+            }
+        }
+
+        static RefPtr<Decl> ParseVarDecl(
+            Parser*                 parser,
+            ContainerDecl*          containerDecl,
+            DeclaratorInfo const&   declaratorInfo)
+        {
+            if (dynamic_cast<ShaderDeclBase*>(containerDecl))
+            {
+                // inside a shader, we create a component decl
+                RefPtr<ComponentSyntaxNode> decl = new ComponentSyntaxNode();
+                parser->FillPosition(decl.Ptr());
+                decl->Position = declaratorInfo.nameToken.Position;
+
+                //
+                decl->Rate = declaratorInfo.rate;
+                //
+
+                decl->Name = declaratorInfo.nameToken;
+                decl->TypeNode = declaratorInfo.typeSpec;
+
+                // Note(tfoley): this case is the one place where a component
+                // declaration differents in any meaningful way from an
+                // ordinary variable declaration.
+                if (parser->tokenReader.PeekTokenType() == TokenType::LBrace)
+                {
+                    decl->BlockStatement = parser->ParseBlockStatement();
+                }
+                else
+                {
+                    if (AdvanceIf(parser, TokenType::OpAssign))
+                    {
+                        decl->Expression = parser->ParseExpression();
+                    }
+                    // TODO(tfoley): support the block case here
+                    parser->ReadToken(TokenType::Semicolon);
+                }
+
+                return decl;
+            }
+            else
+            {
+                // everywhere else, we create an ordinary `VarDeclBase`
+                RefPtr<VarDeclBase> decl = CreateVarDeclForContext(containerDecl);
+                parser->FillPosition(decl.Ptr());
+                decl->Position = declaratorInfo.nameToken.Position;
+
+                decl->Name = declaratorInfo.nameToken;
+                decl->TypeNode = declaratorInfo.typeSpec;
+
+                if (AdvanceIf(parser, TokenType::OpAssign))
+                {
+                    decl->Expr = parser->ParseExpression();
+                }
+                parser->ReadToken(TokenType::Semicolon);
+
+                return decl;
+            }
+        }
+
+        static RefPtr<Decl> ParseDeclaratorDecl(
+            Parser*         parser,
+            ContainerDecl*  containerDecl)
+        {
+            DeclaratorInfo declaratorInfo;
+
+            // For now we just parse <type-spec> <decl-name>
+            //
+            // TODO(tfoley): Actual C-style declarator-based parsed.
+            //
+            if (parser->tokenReader.PeekTokenType() == TokenType::At)
+            {
+                declaratorInfo.rate = parser->ParseRate();
+            }
+            declaratorInfo.typeSpec = parser->ParseType();
+            declaratorInfo.nameToken = ParseDeclName(parser);
+
+            // TODO(tfoley): handle array-ness here...
+
+            // Look at the token after the name to disambiguate
+            switch (parser->tokenReader.PeekTokenType())
+            {
+            case TokenType::LParent:
+                // It must be a function
+                return ParseFuncDecl(parser, containerDecl, declaratorInfo);
+
+            default:
+                // Assume it is a variable-like declaration
+                return ParseVarDecl(parser, containerDecl, declaratorInfo);
+            }
+        }
+
+        static RefPtr<Decl> ParseDeclWithModifiers(
+            Parser*             parser,
+            ContainerDecl*      containerDecl,
+            Modifiers const&    modifiers )
+        {
+            RefPtr<Decl> decl;
+
+            // TODO: actual dispatch!
+            if (parser->LookAheadToken("shader") || parser->LookAheadToken("module"))
+                decl = parser->ParseShader();
+            else if (parser->LookAheadToken("pipeline"))
+                decl = parser->ParsePipeline();
+            else if (parser->LookAheadToken("struct"))
+                decl = parser->ParseStruct();
+            else if (parser->LookAheadToken("typedef"))
+                decl = ParseTypeDef(parser);
+            else if (parser->LookAheadToken("using"))
+                decl = ParseUsing(parser);
+            else if (parser->LookAheadToken("world"))
+                decl = parser->ParseWorld();
+            else if (parser->LookAheadToken("import"))
+                decl = parser->ParseImportOperator();
+            else if (parser->LookAheadToken("stage"))
+                decl = parser->ParseStage();
+            else if (AdvanceIf(parser, TokenType::Semicolon))
+            {
+                // empty declaration
+            }
+            else
+                decl = ParseDeclaratorDecl(parser, containerDecl);
+
+            if (decl)
+            {
+                decl->modifiers = modifiers;
+            }
+            return decl;
+        }
+
+        static RefPtr<Decl> ParseDecl(
+            Parser*         parser,
+            ContainerDecl*  containerDecl)
+        {
+            Modifiers modifiers = ParseModifiers(parser);
+            return ParseDeclWithModifiers(parser, containerDecl, modifiers);
+        }
+
+        // Parse a body consisting of declarations
+        static void ParseDeclBody(
+            Parser*         parser,
+            ContainerDecl*  containerDecl,
+            CoreLib::Text::TokenType       closingToken)
+        {
+            while(!AdvanceIfMatch(parser, closingToken))
+            {
+                RefPtr<Decl> decl = ParseDecl(parser, containerDecl);
+                if (decl)
+                {
+                    decl->ParentDecl = containerDecl;
+                    containerDecl->Members.Add(decl);
+                }
+                TryRecover(parser);
+            }
+        }
+
 		RefPtr<ProgramSyntaxNode> Parser::ParseProgram()
 		{
 			scopeStack.Add(new Scope());
 			RefPtr<ProgramSyntaxNode> program = new ProgramSyntaxNode();
 			program->Position = CodePosition(0, 0, 0, fileName);
 			program->Scope = scopeStack.Last();
-			while (!tokenReader.IsAtEnd())
-			{
-				EnumerableDictionary<String, Token> attributes;
-				while (AdvanceIf(this, TokenType::LBracket))
-				{
-					attributes[ReadToken(TokenType::Identifier).Content] = ReadToken();
-					ReadToken(TokenType::RBracket);
-				}
-				if (LookAheadToken("shader") || LookAheadToken("module"))
-				{
-					auto shader = ParseShader();
-					shader->Attributes = _Move(attributes);
-					program->Members.Add(shader);
-				}
-				else if (LookAheadToken("pipeline"))
-					program->Members.Add(ParsePipeline());
-				else if (LookAheadToken("struct"))
-					program->Members.Add(ParseStruct());
-				else if (LookAheadToken("typedef"))
-					program->Members.Add(ParseTypeDef(this));
-				else if (LookAheadToken("using"))
-				{
-					ReadToken("using");
-					program->Usings.Add(ReadToken(TokenType::StringLiterial));
-					ReadToken(TokenType::Semicolon);
-				}
-				else if (IsTypeKeyword() || LookAheadToken("inline") || LookAheadToken("extern")
-					|| LookAheadToken("__intrinsic") || LookAheadToken(TokenType::Identifier))
-					program->Members.Add(ParseFunction());
-                else if (AdvanceIf(this, TokenType::Semicolon))
-                {}
-				else
-				{
-                    Unexpected(this);
-                    TryRecover(this);
-				}
-			}
+            ParseDeclBody(this, program.Ptr(), TokenType::EndOfFile);
 			scopeStack.Clear();
 			return program;
 		}
@@ -608,31 +982,7 @@ namespace Spire
 			}
 			
 			ReadToken(TokenType::LBrace);
-			while (!AdvanceIfMatch(this, TokenType::RBrace))
-			{
-				auto attribs = ParseAttribute();
-				if (LookAheadToken("inline") || (LookAheadToken("public") && !LookAheadToken("using", 1)) ||
-					LookAheadToken("out") || LookAheadToken(TokenType::At) || IsTypeKeyword() ||
-					LookAheadToken("require") || LookAheadToken("extern") || LookAheadToken("param"))
-				{
-					auto comp = ParseComponent();
-					comp->ParentDecl = shader.Ptr();
-					comp->Attributes = attribs;
-					shader->Members.Add(comp);
-				}
-				else if (LookAheadToken("using") || (LookAheadToken("public") && LookAheadToken("using", 1)))
-				{
-					auto imp = ParseImport();
-					imp->ParentDecl = shader.Ptr();
-					imp->Attributes = attribs;
-					shader->Members.Add(imp);
-				}
-				else
-				{
-                    Unexpected(this);
-                    TryRecover(this);
-				}
-			}
+            ParseDeclBody(this, shader.Ptr(), TokenType::RBrace);
 			PopScope();
 			return shader;
 		}
@@ -649,33 +999,7 @@ namespace Spire
 				pipeline->ParentPipelineName = ReadToken(TokenType::Identifier);
 			}
 			ReadToken(TokenType::LBrace);
-			while (!AdvanceIfMatch(this, TokenType::RBrace))
-			{
-				auto attribs = ParseAttribute();
-				bool isStage = false;
-				if (LookAheadToken("input") || LookAheadToken("world"))
-				{
-					auto w = ParseWorld();
-					pipeline->Members.Add(w);
-				}
-				else if (LookAheadToken("import"))
-				{
-					auto op = ParseImportOperator();
-					pipeline->Members.Add(op);
-				}
-				else if (LookAheadToken("stage"))
-				{
-					pipeline->Members.Add(ParseStage());
-					isStage = true;
-				}
-				else
-				{
-					auto comp = ParseComponent();
-					pipeline->Members.Add(comp);
-				}
-				if (!isStage) // stage's attributes are part of stage syntax
-					pipeline->Members.Last()->Attributes = attribs;
-			}
+            ParseDeclBody(this, pipeline.Ptr(), TokenType::RBrace);
 			PopScope();
 			return pipeline;
 		}
@@ -704,79 +1028,10 @@ namespace Spire
 			return stage;
 		}
 
-		RefPtr<ComponentSyntaxNode> Parser::ParseComponent()
-		{
-			RefPtr<ComponentSyntaxNode> component = new ComponentSyntaxNode();
-			PushScope();
-			while (LookAheadToken("inline") || LookAheadToken("out") || LookAheadToken("require") || LookAheadToken("public") ||
-				LookAheadToken("extern") || LookAheadToken("param"))
-			{
-				if (AdvanceIf(this, "inline"))
-				{
-					component->IsInline = true;
-				}
-				else if (AdvanceIf(this, "out"))
-				{
-					component->IsOutput = true;
-				}
-				else if (AdvanceIf(this, "public"))
-				{
-					component->IsPublic = true;
-				}
-				else if (AdvanceIf(this, "require"))
-				{
-					component->IsRequire = true;
-				}
-				else if (AdvanceIf(this, "param"))
-				{
-					component->IsParam = true;
-					component->IsPublic = true;
-				}
-				else if (AdvanceIf(this, "extern"))
-				{
-					component->IsInput = true;
-				}
-				else
-					break;
-			}
-			if (LookAheadToken(TokenType::At))
-				component->Rate = ParseRate();
-			component->TypeNode = ParseType();
-			FillPosition(component.Ptr());
-			component->Name = ReadToken(TokenType::Identifier);
-			if (AdvanceIf(this, TokenType::Colon))
-			{
-				component->AlternateName = ReadToken(TokenType::Identifier);
-			}
-			if (AdvanceIf(this, TokenType::LParent))
-			{
-				while (!AdvanceIfMatch(this, TokenType::RParent))
-				{
-					component->Parameters.Add(ParseParameter());
-                    if (AdvanceIf(this, TokenType::RParent))
-                        break;
-                    ReadToken(TokenType::Comma);
-				}
-			}
-			if (AdvanceIf(this, TokenType::OpAssign))
-			{
-				component->Expression = ParseExpression();
-				ReadToken(TokenType::Semicolon);
-			}
-			else if (LookAheadToken(TokenType::LBrace))
-			{
-				component->BlockStatement = ParseBlockStatement();
-			}
-			else
-				ReadToken(TokenType::Semicolon);
-			PopScope();
-			return component;
-		}
-
 		RefPtr<WorldSyntaxNode> Parser::ParseWorld()
 		{
 			RefPtr<WorldSyntaxNode> world = new WorldSyntaxNode();
-			world->IsAbstract = AdvanceIf(this, "input");
+            world->modifiers = ParseModifiers(this);
 			ReadToken("world");
 			FillPosition(world.Ptr());
 			world->Name = ReadToken(TokenType::Identifier);
@@ -815,14 +1070,9 @@ namespace Spire
 			return rate;
 		}
 
-		RefPtr<ImportSyntaxNode> Parser::ParseImport()
+		RefPtr<ImportSyntaxNode> Parser::ParseImportInner()
 		{
 			RefPtr<ImportSyntaxNode> rs = new ImportSyntaxNode();
-			if (AdvanceIf(this, "public"))
-			{
-				rs->IsPublic = true;
-			}
-			ReadToken("using");
 			rs->IsInplace = !LookAheadToken(TokenType::OpAssign, 1);
 			if (!rs->IsInplace)
 			{
@@ -869,7 +1119,8 @@ namespace Spire
 		{
 			RefPtr<ImportStatementSyntaxNode> rs = new ImportStatementSyntaxNode();
 			FillPosition(rs.Ptr());
-			rs->Import = ParseImport();
+            ReadToken("import");
+			rs->Import = ParseImportInner();
 			return rs;
 		}
 
@@ -921,25 +1172,7 @@ namespace Spire
 		{
 			anonymousParamCounter = 0;
 			RefPtr<FunctionSyntaxNode> function = new FunctionSyntaxNode();
-			if (LookAheadToken("__intrinsic"))
-			{
-				function->HasSideEffect = false;
-				function->IsExtern = true;
-                tokenReader.AdvanceToken();
-			}
-			else if (LookAheadToken("extern"))
-			{
-				function->IsExtern = true;
-                tokenReader.AdvanceToken();
-			}
-			else
-				function->IsExtern = false;
-			function->IsInline = true;
-			if (LookAheadToken("inline"))
-			{
-				function->IsInline = true;
-                tokenReader.AdvanceToken();
-			}
+            function->modifiers = ParseModifiers(this);
 			
 			PushScope();
 			function->ReturnTypeNode = ParseType();
@@ -977,7 +1210,7 @@ namespace Spire
 			}
 			if (parseBody)
 			{
-				if (!function->IsExtern)
+				if (!function->IsExtern())
 					function->Body = ParseBlockStatement();
 				else
 					ReadToken(TokenType::Semicolon);
@@ -997,24 +1230,9 @@ namespace Spire
 				ReadToken();
 				rs->IsIntrinsic = true;
 			}
-			ReadToken(TokenType::LBrace);
-			while (!AdvanceIfMatch(this, TokenType::RBrace))
-			{
-				RefPtr<TypeSyntaxNode> type = ParseType();
-				do
-				{
-					RefPtr<StructField> field = new StructField();
-					FillPosition(field.Ptr());
-					field->TypeNode = type;
-					field->Name = ReadToken(TokenType::Identifier);
-					rs->Members.Add(field);
-					if (!LookAheadToken(TokenType::Comma))
-						break;
-					ReadToken(TokenType::Comma);
-				} while (!tokenReader.IsAtEnd());
-				ReadToken(TokenType::Semicolon);
-			}
 			typeNames.Add(rs->Name.Content);
+			ReadToken(TokenType::LBrace);
+            ParseDeclBody(this, rs.Ptr(), TokenType::RBrace);
 			return rs;
 		}
 
@@ -1101,91 +1319,12 @@ namespace Spire
 			return blockStatement;
 		}
 
-		VariableModifier Parser::ReadVariableModifier()
-		{
-			auto token = ReadToken(TokenType::Identifier);
-			if (token.Content == "in")
-				return VariableModifier::In;
-			else if (token.Content == "out")
-				return VariableModifier::Out;
-			else if (token.Content == "uniform")
-				return VariableModifier::Uniform;
-			else if (token.Content == "parameter")
-				return VariableModifier::Parameter;
-			else if (token.Content == "const")
-				return VariableModifier::Const;
-			else if (token.Content == "centroid")
-				return VariableModifier::Centroid;
-			else if (token.Content == "instance")
-				return VariableModifier::Instance;
-			else if (token.Content == "__builtin")
-				return VariableModifier::Builtin;
-			return VariableModifier::None; 
-		}
-
-        static RefPtr<Decl> ParseLocalVarDecls(Parser* parser)
-        {
-            // TODO(tfoley): it is wasteful to allocate this if
-            // it won't always be needed/used
-            RefPtr<MultiDecl> multiDecl = new MultiDecl();
-		
-			parser->FillPosition(multiDecl.Ptr());
-			while (!parser->tokenReader.IsAtEnd())
-			{
-				if (parser->LookAheadToken("layout"))
-				{
-					parser->ReadToken("layout");
-					parser->ReadToken(TokenType::LParent);
-					StringBuilder layoutSB;
-					while (!parser->LookAheadToken(TokenType::RParent))
-					{
-						layoutSB.Append(parser->ReadToken(TokenType::Identifier).Content);
-						if (parser->LookAheadToken(TokenType::OpAssign))
-						{
-							layoutSB.Append(parser->ReadToken(TokenType::OpAssign).Content);
-							layoutSB.Append(parser->ReadToken(TokenType::IntLiterial).Content);
-						}
-						if (!parser->LookAheadToken(TokenType::Comma))
-							break;
-						else
-							layoutSB.Append(", ");
-					}
-					parser->ReadToken(TokenType::RParent);
-					multiDecl->LayoutString = layoutSB.ProduceString();
-				}
-				else
-					break;
-			}
-			multiDecl->TypeNode = parser->ParseType();
-			while (!parser->tokenReader.IsAtEnd())
-			{
-				RefPtr<Variable> var = new Variable();
-				parser->FillPosition(var.Ptr());
-				Token name = parser->ReadToken(TokenType::Identifier);
-				var->Name = name;
-				if (parser->LookAheadToken(TokenType::OpAssign))
-				{
-					parser->ReadToken(TokenType::OpAssign);
-					var->Expr = parser->ParseExpression();
-				}
-
-				multiDecl->decls.Add(var);
-				if (parser->LookAheadToken(TokenType::Comma))
-					parser->ReadToken(TokenType::Comma);
-				else
-					break;
-			}
-			parser->ReadToken(TokenType::Semicolon);
-			
-			return multiDecl;
-        }
-
 		RefPtr<VarDeclrStatementSyntaxNode> Parser::ParseVarDeclrStatement()
 		{
 			RefPtr<VarDeclrStatementSyntaxNode>varDeclrStatement = new VarDeclrStatementSyntaxNode();
 		
 			FillPosition(varDeclrStatement.Ptr());
-            varDeclrStatement->decl = ParseLocalVarDecls(this);
+            varDeclrStatement->decl = ParseDecl(this, nullptr);
 			return varDeclrStatement;
 		}
 
@@ -1312,28 +1451,7 @@ namespace Spire
 		RefPtr<ParameterSyntaxNode> Parser::ParseParameter()
 		{
 			RefPtr<ParameterSyntaxNode> parameter = new ParameterSyntaxNode();
-			if (LookAheadToken("in"))
-			{
-				parameter->Qualifier = ParameterQualifier::In;
-				ReadToken("in");
-			}
-			else if (LookAheadToken("inout"))
-			{
-				parameter->Qualifier = ParameterQualifier::InOut;
-				ReadToken("inout");
-			}
-			else if (LookAheadToken("out"))
-			{
-				parameter->Qualifier = ParameterQualifier::Out;
-				ReadToken("out");
-			}
-			else if (LookAheadToken("uniform"))
-			{
-				parameter->Qualifier = ParameterQualifier::Uniform;
-				ReadToken("uniform");
-				if (LookAheadToken("in"))
-					ReadToken("in");
-			}
+            parameter->modifiers = ParseModifiers(this);
 			parameter->TypeNode = ParseType();
 			if (LookAheadToken(TokenType::Identifier))
 			{

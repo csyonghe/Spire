@@ -12,8 +12,8 @@ namespace Spire
 			{
 				RefPtr<ShaderComponentSymbol> ccomp;
 				RefPtr<ShaderClosure> su;
-				if ((comp.Value->Implementations.First()->SyntaxNode->IsPublic ||
-					comp.Value->Implementations.First()->SyntaxNode->IsOutput))
+				if ((comp.Value->Implementations.First()->SyntaxNode->IsPublic() ||
+					comp.Value->Implementations.First()->SyntaxNode->IsOutput()))
 				{
                     if (parent->Components.TryGetValue(comp.Key, ccomp))
                     {
@@ -123,10 +123,10 @@ namespace Spire
 							}
 						}
 						auto refClosure = CreateShaderClosure(err, symTable, shaderSym.Ptr(), import->Position, rootShader, refMap);
-						refClosure->IsPublic = import->IsPublic;
+						refClosure->IsPublic = import->IsPublic();
 						refClosure->Parent = rs.Ptr();
 						Token bindingVal;
-						if (import->Attributes.TryGetValue("Binding", bindingVal))
+						if (import->FindSimpleAttribute("Binding", bindingVal))
 						{
 							refClosure->BindingIndex = StringToInt(bindingVal.Content);
 						}
@@ -156,7 +156,7 @@ namespace Spire
 			// check for unassigned arguments
 			for (auto & comp : shader->Components)
 			{
-				if (comp.Value->Implementations.First()->SyntaxNode->IsRequire &&
+				if (comp.Value->Implementations.First()->SyntaxNode->IsRequire() &&
 					!pRefMap.ContainsKey(comp.Key))
 				{
                     err->diagnose(rs->UsingPosition, Diagnostics::parameterOfModuleIsUnassigned, comp.Key, shader->SyntaxNode->Name);
@@ -335,7 +335,7 @@ namespace Spire
 				{
 					if (auto comp = shaderClosure->FindComponent(var->Type->AsBasicType()->Component->Name))
 					{
-						if (comp->Implementations.First()->SyntaxNode->IsRequire)
+						if (comp->Implementations.First()->SyntaxNode->IsRequire())
 							shaderClosure->RefMap.TryGetValue(comp->Name, comp);
 						var->Tags["ComponentReference"] = new StringObject(comp->UniqueName);
 						AddReference(comp.Ptr(), currentImport, var->Position);
@@ -345,7 +345,7 @@ namespace Spire
 				}
 				if (auto comp = shaderClosure->FindComponent(var->Variable))
 				{
-					if (comp->Implementations.First()->SyntaxNode->IsRequire)
+					if (comp->Implementations.First()->SyntaxNode->IsRequire())
 						shaderClosure->RefMap.TryGetValue(var->Variable, comp);
 					var->Tags["ComponentReference"] = new StringObject(comp->UniqueName);
 
@@ -455,7 +455,7 @@ namespace Spire
 
 		bool IsInAbstractWorld(PipelineSymbol * pipeline, ShaderComponentSymbol* comp)
 		{
-			return comp->Implementations.First()->Worlds.Count() && !comp->Implementations.First()->SyntaxNode->IsRequire &&
+			return comp->Implementations.First()->Worlds.Count() && !comp->Implementations.First()->SyntaxNode->IsRequire() &&
 				pipeline->IsAbstractWorld(comp->Implementations.First()->Worlds.First());
 		}
 
@@ -470,7 +470,7 @@ namespace Spire
 				else
 				{
 					String uniqueChoiceName;
-					if (comp.Value->Implementations.First()->SyntaxNode->IsPublic)
+					if (comp.Value->Implementations.First()->SyntaxNode->IsPublic())
 						uniqueChoiceName = publicNamePrefix + comp.Key;
 					else
 						uniqueChoiceName = namePrefix + comp.Key;
@@ -546,7 +546,7 @@ namespace Spire
 		bool IsWorldFeasible(SymbolTable * symTable, PipelineSymbol * pipeline, ShaderComponentImplSymbol * impl, String world, ShaderComponentSymbol*& unaccessibleComp)
 		{
 			// shader parameter (uniform values) are available to all worlds
-			if (impl->SyntaxNode->IsParam)
+			if (impl->SyntaxNode->IsParam())
 				return true;
 			bool isWFeasible = true;
 			for (auto & dcomp : impl->DependentComponents)
@@ -582,14 +582,10 @@ namespace Spire
 			auto depOrder = shader->GetDependencyOrder();
 			for (auto & comp : depOrder)
 			{
-				// automatically deduced overloadable worlds for a component definition without explicit rate qualifier
-				Dictionary<String, EnumerableHashSet<String>> autoWorlds; // keyed on alternate name 
 				comp->Type->FeasibleWorlds.Clear();
 				for (auto & impl : comp->Implementations)
 				{
-					if (!autoWorlds.ContainsKey(impl->AlternateName))
-						autoWorlds[impl->AlternateName] = allWorlds;
-					auto & autoWorld = autoWorlds[impl->AlternateName]();
+					auto autoWorld = allWorlds;
 					for (auto & w : impl->Worlds)
 					{
 						ShaderComponentSymbol* unaccessibleComp = nullptr;
@@ -609,7 +605,7 @@ namespace Spire
 				{
 					if (impl->Worlds.Count() == 0) // if this component definition is not qualified with a world
 					{
-						EnumerableHashSet<String> deducedWorlds = autoWorlds[impl->AlternateName]();
+						EnumerableHashSet<String> deducedWorlds = allWorlds;
 						EnumerableHashSet<String> feasibleWorlds;
 						// the auto-deduced world for this definition is all feasible worlds in autoWorld.
 						for (auto & w : deducedWorlds)
@@ -770,7 +766,7 @@ namespace Spire
 
 				if (comp.Value.Symbol->Implementations.Count() == 1 &&
 					comp.Value.Symbol->Implementations.First()->SyntaxNode->Expression &&
-					!comp.Value.Symbol->Implementations.First()->SyntaxNode->IsOutput)
+					!comp.Value.Symbol->Implementations.First()->SyntaxNode->IsOutput())
 				{
 					RefPtr<Object> compRef;
 					if (comp.Value.Symbol->Implementations.First()->SyntaxNode->Expression->Tags.TryGetValue("ComponentReference", compRef))
@@ -869,7 +865,7 @@ namespace Spire
 							WorldSyntaxNode* worldDecl;
 							if (shader->Pipeline->Worlds.TryGetValue(world.World.Content, worldDecl))
 							{
-								if (worldDecl->IsAbstract)
+								if (worldDecl->IsAbstract())
 								{
 									inAbstractWorld = true;
 									if (userSpecifiedWorlds.Count() > 1)
@@ -881,7 +877,7 @@ namespace Spire
 							}
 						}
 					}
-					if (!inAbstractWorld && !impl->SyntaxNode->IsRequire && !impl->SyntaxNode->IsInput && !impl->SyntaxNode->IsParam
+					if (!inAbstractWorld && !impl->SyntaxNode->IsRequire() && !impl->SyntaxNode->IsInput() && !impl->SyntaxNode->IsParam()
 						&& !impl->SyntaxNode->Expression && !impl->SyntaxNode->BlockStatement)
 					{
 						err->diagnose(impl->SyntaxNode->Position, Diagnostics::nonAbstractComponentMustHaveImplementation);
@@ -895,7 +891,7 @@ namespace Spire
 							auto world = shader->Pipeline->Worlds.TryGetValue(w.World.Content);
 							if (world)
 							{
-								if ((*world)->IsAbstract)
+								if ((*world)->IsAbstract())
 									isDefinedInAbstractWorld = true;
 								else
 									isDefinedInNonAbstractWorld = true;
