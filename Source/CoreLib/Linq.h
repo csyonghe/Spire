@@ -111,7 +111,7 @@ namespace CoreLib
 		{
 		private:
 			TQueryable items;
-			const TFunc & func;
+			TFunc func;
 		public:
 			WhereQuery(const TQueryable & queryable, const TFunc & f)
 				: items(queryable), func(f)
@@ -121,11 +121,11 @@ namespace CoreLib
 			private:
 				TEnumerator ptr;
 				TEnumerator end;
-				const TFunc & func;
+				const TFunc * func;
 			public:
 				Enumerator(const Enumerator &) = default;
 				Enumerator(TEnumerator ptr, TEnumerator end, const TFunc & f)
-					: ptr(ptr), end(end), func(f)
+					: ptr(ptr), end(end), func(&f)
 				{}
 				T operator *() const
 				{
@@ -136,7 +136,7 @@ namespace CoreLib
 					++ptr;
 					while (ptr != end)
 					{
-						if (func(*ptr))
+						if ((*func)(*ptr))
 							break;
 						else
 							++ptr;
@@ -148,7 +148,7 @@ namespace CoreLib
 					Enumerator rs = *this;
 					while (rs.ptr != end)
 					{
-						if (func(*rs.ptr))
+						if ((*func)(*rs.ptr))
 							break;
 						++rs.ptr;
 					}
@@ -246,7 +246,7 @@ namespace CoreLib
 		{
 		private:
 			TQueryable items;
-			const TFunc & func;
+			TFunc func;
 		public:
 			SelectQuery(const TQueryable & queryable, const TFunc & f)
 				: items(queryable), func(f)
@@ -256,15 +256,15 @@ namespace CoreLib
 			private:
 				TEnumerator ptr;
 				TEnumerator end;
-				const TFunc &func;
+				const TFunc * func;
 			public:
 				Enumerator(const Enumerator &) = default;
 				Enumerator(TEnumerator ptr, TEnumerator end, const TFunc & f)
-					: ptr(ptr), end(end), func(f)
+					: ptr(ptr), end(end), func(&f)
 				{}
-				auto operator *() const -> decltype(func(*ptr))
+				auto operator *() const -> decltype((*func)(*ptr))
 				{
-					return func(*ptr);
+					return (*func)(*ptr);
 				}
 				Enumerator& operator ++()
 				{
@@ -301,7 +301,7 @@ namespace CoreLib
 		{
 		private:
 			TQueryable items;
-			const TFunc & func;
+			TFunc func;
 			SelectManyQuery()
 			{}
 		public:
@@ -314,13 +314,13 @@ namespace CoreLib
 			private:
 				TEnumerator ptr;
 				TEnumerator end;
-				const TFunc &func;
+				const TFunc * func;
 				TItems items;
 				TItemPtr subPtr;
 			public:
 				Enumerator(const Enumerator &) = default;
 				Enumerator(TEnumerator ptr, TEnumerator end, const TFunc & f)
-					: ptr(ptr), end(end), func(f)
+					: ptr(ptr), end(end), func(&f)
 				{
 					if (ptr != end)
 					{
@@ -340,7 +340,7 @@ namespace CoreLib
 						++ptr;
 						if (ptr != end)
 						{
-							items = func(*ptr);
+							items = (*func)(*ptr);
 							subPtr = items.begin();
 						}
 						else

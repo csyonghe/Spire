@@ -17,13 +17,13 @@ namespace Spire
 		class ImportNodeVisitor : public SyntaxVisitor
 		{
 		public:
-			const Func & func;
+			const Func * func;
 			ImportNodeVisitor(const Func & f)
-				: SyntaxVisitor(nullptr), func(f)
+				: SyntaxVisitor(nullptr), func(&f)
 			{}
 			virtual RefPtr<ExpressionSyntaxNode> VisitImportExpression(ImportExpressionSyntaxNode * expr) override
 			{
-				func(expr);
+				(*func)(expr);
 				return expr;
 			}
 		};
@@ -190,7 +190,7 @@ namespace Spire
 						descriptorSetIdAllocator++;
 					}
 				}
-				shader->ModuleInstances.Sort([](auto x, auto y) {return x->BindingIndex <= y->BindingIndex; });
+				shader->ModuleInstances.Sort([](RefPtr<ModuleInstanceIR> & x, RefPtr<ModuleInstanceIR> & y) {return x->BindingIndex <= y->BindingIndex; });
 				for (auto module : shader->ModuleInstances)
 				{
 					bool hasParam = false;
@@ -362,7 +362,8 @@ namespace Spire
 				// 2) For each abstract world, add its components to record type
 
 				Dictionary<String, List<ComponentDefinitionIR*>> worldComps;
-				auto worlds = From(pipeline->Worlds).Select([](const KeyValuePair<String, WorldSyntaxNode*> &kv) {return kv.Key; }).Concat(FromSingle(String("<uniform>")));
+				auto worlds = From(pipeline->Worlds).Select([](KeyValuePair<String, WorldSyntaxNode*> kv) {return kv.Key; }).Concat(FromSingle(String("<uniform>")));
+				//worlds.Add("<uniform>");
 				for (auto world : worlds)
 				{
 					// gather list of components

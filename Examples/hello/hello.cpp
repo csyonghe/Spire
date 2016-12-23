@@ -19,6 +19,12 @@
 // We will use the C standard library just for printing error messages.
 #include <stdio.h>
 
+#ifdef _MSC_VER
+#include <stddef.h>
+#if (_MSC_VER < 1900)
+#define snprintf sprintf_s
+#endif
+#endif
 //
 
 static int gWindowWidth = 1024;

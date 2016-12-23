@@ -198,7 +198,7 @@ namespace Spire
 			void ReplaceReference(RefPtr<StringObject> refComp)
 			{
 				String targetComp;
-				if (replacements.TryGetValue(refComp->Content, targetComp))
+				if ((*replacements).TryGetValue(refComp->Content, targetComp))
 				{
 					auto oldComp = shaderClosure->AllComponents[refComp->Content]().Symbol;
 					auto newComp = shaderClosure->AllComponents[targetComp]().Symbol;
@@ -226,9 +226,9 @@ namespace Spire
 			}
 		public:
 			ShaderComponentImplSymbol * currentImpl = nullptr;
-			EnumerableDictionary<String, String> & replacements;
+			EnumerableDictionary<String, String> * replacements;
 			ReplaceReferenceVisitor(ShaderClosure * closure, ShaderComponentSymbol * comp, EnumerableDictionary<String, String> &pReplacements)
-				: SyntaxVisitor(nullptr), shaderClosure(closure), currentComponent(comp), replacements(pReplacements)
+				: SyntaxVisitor(nullptr), shaderClosure(closure), currentComponent(comp), replacements(&pReplacements)
 			{}
 
 			RefPtr<ExpressionSyntaxNode> VisitImportExpression(ImportExpressionSyntaxNode * import) override
