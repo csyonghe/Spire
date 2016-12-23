@@ -49,6 +49,9 @@ namespace Spire
 						}
 					}
 				}
+			for (auto & def : Definitions)
+				if (def->SyntaxNode->HasSimpleAttribute("FragDepth"))
+					def->IsEntryPoint = true;
 			List<ComponentDefinitionIR*> workList;
 			HashSet<ComponentDefinitionIR*> referencedDefs;
 			for (auto & def : Definitions)

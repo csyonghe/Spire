@@ -269,6 +269,8 @@ namespace Spire
 
 			bool IsIntegral() const;
 			bool Equals(const ExpressionType * type) const;
+			bool Equals(RefPtr<ExpressionType> type) const;
+
 			bool IsVectorType() const;
 			bool IsArray() const;
 			bool IsGenericType(String typeName) const;

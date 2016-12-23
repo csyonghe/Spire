@@ -632,6 +632,11 @@ namespace Spire
             return GetCanonicalType()->EqualsImpl(type->GetCanonicalType());
         }
 
+		bool ExpressionType::Equals(RefPtr<ExpressionType> type) const
+		{
+			return Equals(type.Ptr());
+		}
+
         bool ExpressionType::IsVectorType() const
         {
             return GetCanonicalType()->IsVectorTypeImpl();

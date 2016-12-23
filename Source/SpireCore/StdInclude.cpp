@@ -217,6 +217,7 @@ __intrinsic vec4 vec4(uvec4 val);
 
 __intrinsic mat3 transpose(mat3 in);
 __intrinsic mat4 transpose(mat4 in);
+__intrinsic mat3 mat3(mat4 in);
 
 struct trait __intrinsic {};
 __intrinsic trait IsTriviallyPassable(float);

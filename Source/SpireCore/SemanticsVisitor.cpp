@@ -491,6 +491,13 @@ namespace Spire
 					if (compSym->Type->DataType->GetBindableResourceType() != BindableResourceType::NonBindable && !comp->IsParam()
 						&& !comp->IsRequire())
 						getSink()->diagnose(comp, Diagnostics::resourceTypeMustBeParamOrRequire, comp->Name);
+					if (comp->HasSimpleAttribute("FragDepth"))
+					{
+						if (!comp->IsOutput())
+							getSink()->diagnose(comp, Diagnostics::fragDepthAttributeCanOnlyApplyToOutput);
+						if (!comp->Type->Equals(ExpressionType::Float))
+							getSink()->diagnose(comp, Diagnostics::fragDepthAttributeCanOnlyApplyToFloatComponent);
+					}
 					currentComp = nullptr;
 					return comp;
 				}

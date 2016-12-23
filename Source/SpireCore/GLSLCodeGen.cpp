@@ -737,6 +737,8 @@ namespace Spire
 			{
 				for (auto & field : world->OutputType->Members)
 				{
+					if (field.Value.Attributes.ContainsKey("FragDepth"))
+						continue;
 					if (declPrefix.Length())
 						ctx.GlobalHeader << declPrefix << " ";
 					if (field.Value.Type->IsIntegral())
@@ -749,7 +751,10 @@ namespace Spire
 			}
 			virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) override
 			{
-				ctx.Body << AddWorldNameSuffix(instr->ComponentName, world->OutputType->TypeName) << " = ";
+				if (world->OutputType->Members[instr->ComponentName]().Attributes.ContainsKey("FragDepth"))
+					ctx.Body << "gl_FragDepth = ";
+				else
+					ctx.Body << AddWorldNameSuffix(instr->ComponentName, world->OutputType->TypeName) << " = ";
 				codeGen->PrintOp(ctx, instr->Operand.Ptr());
 				ctx.Body << ";\n";
 			}

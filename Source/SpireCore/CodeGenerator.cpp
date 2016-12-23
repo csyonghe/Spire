@@ -627,11 +627,6 @@ namespace Spire
 				{
 					currentComponent->SyntaxNode->Expression->Accept(this);
 					componentVar = exprStack.Last();
-					if (currentWorld->OutputType->Members.ContainsKey(currentComponent->UniqueName))
-					{
-						auto exp = new ExportInstruction(currentComponent->UniqueName, currentWorld, componentVar);
-						codeWriter.Insert(exp);
-					}
 					exprStack.Clear();
 				}
 				else if (currentComponent->SyntaxNode->BlockStatement)
@@ -639,6 +634,12 @@ namespace Spire
 					returnRegister = nullptr;
 					currentComponent->SyntaxNode->BlockStatement->Accept(this);
 					componentVar = returnRegister;
+				}
+
+				if (currentWorld->OutputType->Members.ContainsKey(currentComponent->UniqueName))
+				{
+					auto exp = new ExportInstruction(currentComponent->UniqueName, currentWorld, componentVar);
+					codeWriter.Insert(exp);
 				}
 
 				/*if (!currentComponent->Type->IsTexture() && !currentComponent->Type->IsArray())

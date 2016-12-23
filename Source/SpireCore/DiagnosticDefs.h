@@ -220,6 +220,10 @@ DIAGNOSTIC(34026, Warning, componentIsAlreadyDefinedUseRequire, "'$0': component
 DIAGNOSTIC(34062, Error, cylicReference, "cyclic reference: $0");
 DIAGNOSTIC(34064, Error, noApplicableImplicitImportOperator, "cannot find import operator to import component '$0' to world '$1' when compiling '$2'.")
 DIAGNOSTIC(34065, Error, resourceTypeMustBeParamOrRequire, "'$0': resource typed component must be declared as 'param' or 'require'.");
+
+DIAGNOSTIC(35001, Error, fragDepthAttributeCanOnlyApplyToOutput, "FragDepth attribute can only apply to an output component.");
+DIAGNOSTIC(35002, Error, fragDepthAttributeCanOnlyApplyToFloatComponent, "FragDepth attribute can only apply to a float component.");
+
 //
 // 4xxxx - IL code generation.
 //
