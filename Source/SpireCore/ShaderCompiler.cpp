@@ -333,10 +333,13 @@ namespace Spire
 						backend = backends["spirv"]().Ptr();
 						break;
 					case CodeGenTarget::GLSL:
-						backend = backends["gls"]().Ptr();
+						backend = backends["glsl"]().Ptr();
+						break;
+					case CodeGenTarget::GLSL_Vulkan:
+						backend = backends["glsl_vk"]().Ptr();
 						break;
 					case CodeGenTarget::HLSL:
-						backend = backends["hls"]().Ptr();
+						backend = backends["hlsl"]().Ptr();
 						break;
 					default:
 						// TODO: emit an appropriate diagnostic
@@ -478,9 +481,10 @@ namespace Spire
 					BasicExpressionType::Init();
 				}
 				compilerInstances++;
-				backends.Add("gls", CreateGLSLCodeGen());
-				backends.Add("hls", CreateHLSLCodeGen());
+				backends.Add("glsl", CreateGLSLCodeGen());
+				backends.Add("hlsl", CreateHLSLCodeGen());
 				backends.Add("spirv", CreateSpirVCodeGen());
+				backends.Add("glsl_vk", CreateGLSL_VulkanCodeGen());
 			}
 
 			~ShaderCompilerImpl()

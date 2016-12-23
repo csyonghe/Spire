@@ -471,11 +471,11 @@ namespace SpireLib
 			List<CompileUnit> moduleUnits;
 			HashSet<String> processedModuleUnits;
 			EnumerableDictionary<String, ModuleMetaData> modules;
+			int errorCount = 0;
 		};
 		List<State> states;
 		List<RefPtr<Spire::Compiler::CompilationContext>> compileContext;
 		RefPtr<ShaderCompiler> compiler;
-		int errorCount = 0;
 
 		struct IncludeHandlerImpl : IncludeHandler
 		{
@@ -576,16 +576,19 @@ namespace SpireLib
 			}
 		}
 
-		void LoadModuleSource(CoreLib::String src, CoreLib::String fileName, SpireDiagnosticSink* sink)
+		int LoadModuleSource(CoreLib::String src, CoreLib::String fileName, SpireDiagnosticSink* sink)
 		{
 			List<CompileUnit> units;
-			LoadModuleSource(units, states.Last().processedModuleUnits, src, fileName, sink);
+			int errCount = LoadModuleUnits(units, src, fileName, sink);
 			states.Last().moduleUnits.AddRange(units);
 			UpdateModuleLibrary(units, sink);
+			return errCount;
 		}
 
-		int LoadModuleSource(List<CompileUnit> & units, HashSet<String> & processedUnits, CoreLib::String src, CoreLib::String fileName, SpireDiagnosticSink* sink)
+		int LoadModuleUnits(List<CompileUnit> & units, CoreLib::String src, CoreLib::String fileName, SpireDiagnosticSink* sink)
 		{
+			auto & processedUnits = states.Last().processedModuleUnits;
+
 			Spire::Compiler::CompileResult result;
 			List<String> unitsToInclude;
 			unitsToInclude.Add(fileName);
@@ -662,26 +665,27 @@ namespace SpireLib
 		}
 		bool Compile(CompileResult & result, CoreLib::String source, CoreLib::String fileName, SpireDiagnosticSink* sink)
 		{
-			List<CompileUnit> userUnits;
-			HashSet<String> processedUserUnits = states.Last().processedModuleUnits;
-			if (errorCount != 0)
+			if (states.Last().errorCount != 0)
 				return false;
-
-			errorCount += LoadModuleSource(userUnits, processedUserUnits, source, fileName, sink);
-			if (errorCount != 0)
+			PushContext();
+			List<CompileUnit> units;
+			states.Last().errorCount += LoadModuleUnits(units, source, fileName, sink);
+			if (states.Last().errorCount != 0)
+			{
+				PopContext();
 				return false;
-
-			Spire::Compiler::CompilationContext tmpCtx(*compileContext.Last());
+			}
+		
 			Spire::Compiler::CompileResult cresult;
-			compiler->Compile(cresult, tmpCtx, userUnits, Options);
+			compiler->Compile(cresult, *compileContext.Last(), units, Options);
 			result.Sources = cresult.CompiledSource;
-			errorCount += cresult.GetErrorCount();
+			states.Last().errorCount += cresult.GetErrorCount();
 			if (sink)
 			{
 				sink->diagnostics.AddRange(cresult.sink.diagnostics);
 				sink->errorCount += cresult.GetErrorCount();
 			}
-			if (errorCount == 0)
+			if (states.Last().errorCount == 0)
 			{
 				for (auto shader : result.Sources)
 				{
@@ -708,7 +712,9 @@ namespace SpireLib
 					result.ParamSets[shader.Key] = _Move(paramSets);
 				}
 			}
-			return errorCount == 0;
+			bool succ = states.Last().errorCount == 0;
+			PopContext();
+			return succ;
 		}
 	};
 }

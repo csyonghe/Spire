@@ -13,6 +13,8 @@ namespace Spire
 	{
 		class GLSLCodeGen : public CLikeCodeGen
 		{
+		private:
+			bool useVulkanBinding = false;
 		protected:
 			OutputStrategy * CreateStandardOutputStrategy(ILWorld * world, String layoutPrefix) override;
 			OutputStrategy * CreatePackedBufferOutputStrategy(ILWorld * world) override;
@@ -446,7 +448,10 @@ namespace Spire
 						}
 					if (containsOrdinaryParams)
 					{
-						ctx.GlobalHeader << "layout(binding = " << module.Value->DescriptorSetId << ", std140) ";
+						if (useVulkanBinding)
+							ctx.GlobalHeader << "layout(std140, set = " << module.Value->DescriptorSetId << ", binding = 0) ";
+						else
+							ctx.GlobalHeader << "layout(binding = " << module.Value->DescriptorSetId << ", std140) ";
 						ctx.GlobalHeader << "uniform buf" << bufferName << "\n{\n";
 						for (auto param : module.Value->Parameters)
 						{
@@ -458,11 +463,12 @@ namespace Spire
 						}
 						ctx.GlobalHeader << "} " << bufferName << ";\n";
 					}
+					int slotId = 1;
 					for (auto param : module.Value->Parameters)
 					{
-						if (param.Value->BindingPoints.Count())
+						auto bindableType = param.Value->Type->GetBindableResourceType();
+						if (bindableType != BindableResourceType::NonBindable)
 						{
-							auto bindableType = param.Value->Type->GetBindableResourceType();
 							switch (bindableType)
 							{
 							case BindableResourceType::StorageBuffer:
@@ -471,7 +477,10 @@ namespace Spire
 								if (!genType)
 									continue;
 								String bufName = EscapeCodeName(module.Value->BindingName + "_" + param.Value->Name);
-								ctx.GlobalHeader << "layout(std430, binding = " << param.Value->BindingPoints.First() << ") ";
+								if (useVulkanBinding)
+									ctx.GlobalHeader << "layout(std430, set = " << module.Value->DescriptorSetId << ", binding = " << slotId << ") ";
+								else
+									ctx.GlobalHeader << "layout(std430, binding = " << param.Value->BindingPoints.First() << ") ";
 								ctx.GlobalHeader << "buffer buf" << bufName << "\n{\n";
 								PrintType(ctx.GlobalHeader, genType->BaseType.Ptr());
 								ctx.GlobalHeader << " " << bufName << "[];\n};\n";
@@ -479,7 +488,11 @@ namespace Spire
 							}
 							case BindableResourceType::Texture:
 							{
-								ctx.GlobalHeader << "layout(binding = " << param.Value->BindingPoints.First() << ") uniform ";
+								if (useVulkanBinding)
+									ctx.GlobalHeader << "layout(set = " << module.Value->DescriptorSetId << ", binding = " << slotId << ")";
+								else
+									ctx.GlobalHeader << "layout(binding = " << param.Value->BindingPoints.First() << ")";
+								ctx.GlobalHeader << " uniform ";
 								PrintType(ctx.GlobalHeader, param.Value->Type.Ptr());
 								ctx.GlobalHeader << " " << EscapeCodeName(module.Value->BindingName + "_" + param.Value->Name) << ";\n";
 								break;
@@ -487,6 +500,7 @@ namespace Spire
 							default:
 								continue;
 							}
+							slotId++;
 						}
 					}
 				}
@@ -703,7 +717,11 @@ namespace Spire
 				rs.MainCode = sb.ProduceString();
 				return rs;
 			}
-
+		public:
+			GLSLCodeGen(bool vulkanBinding)
+			{
+				useVulkanBinding = vulkanBinding;
+			}
 		};
 
 
@@ -907,7 +925,11 @@ namespace Spire
 
 		CodeGenBackend * CreateGLSLCodeGen()
 		{
-			return new GLSLCodeGen();
+			return new GLSLCodeGen(false);
+		}
+		CodeGenBackend * CreateGLSL_VulkanCodeGen()
+		{
+			return new GLSLCodeGen(true);
 		}
 	}
 }

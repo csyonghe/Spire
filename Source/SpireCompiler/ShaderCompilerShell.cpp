@@ -52,11 +52,15 @@ int wmain(int argc, wchar_t* argv[])
 				else if (argStr == "-backend")
 				{
 					String name = tryReadCommandLineArgument(arg, &argCursor, argEnd);
-					if (name == "gls")
+					if (name == "glsl")
 					{
 						options.Target = CodeGenTarget::GLSL;
 					}
-					else if (name == "hls")
+					else if (name == "glsl_vk")
+					{
+						options.Target = CodeGenTarget::GLSL_Vulkan;
+					}
+					else if (name == "hlsl")
 					{
 						options.Target = CodeGenTarget::HLSL;
 					}
