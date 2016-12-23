@@ -342,7 +342,6 @@ namespace Spire
 						else
 							paraNames.Add(para->Name.Content);
 						para->Type = TranslateTypeNode(para->TypeNode);
-						op->Scope->decls.AddIfNotExists(para->Name.Content, para.Ptr());
 						if (para->Type->Equals(ExpressionType::Void.Ptr()))
 						{
 							getSink()->diagnose(para.Ptr(), Diagnostics::parameterCannotBeVoid);
@@ -721,7 +720,6 @@ namespace Spire
 				for (auto & param : comp->GetParameters())
 				{
 					param->Accept(this);
-					comp->Scope->decls.Add(param->Name.Content, param.Ptr());
 				}
 				if (comp->Expression)
 				{
@@ -943,7 +941,6 @@ namespace Spire
 					else
 						paraNames.Add(para->Name.Content);
 					para->Type = TranslateTypeNode(para->TypeNode);
-					functionNode->Scope->decls.AddIfNotExists(para->Name.Content, para.Ptr());
 					if (para->Type->Equals(ExpressionType::Void.Ptr()))
 						getSink()->diagnose(para, Diagnostics::parameterCannotBeVoid);
 					internalName << "@" << para->Type->ToString();
@@ -1072,9 +1069,6 @@ namespace Spire
 
 			virtual RefPtr<Variable> VisitDeclrVariable(Variable* varDecl)
 			{
-				if (varDecl->Scope->decls.ContainsKey(varDecl->Name.Content))
-					getSink()->diagnose(varDecl, Diagnostics::variableNameAlreadyDefined, varDecl->Name);
-
 				RefPtr<ExpressionType> type = TranslateTypeNode(varDecl->TypeNode);
 				if (type->IsTextureOrSampler() || type->AsGenericType())
 				{
@@ -1089,8 +1083,6 @@ namespace Spire
 					getSink()->diagnose(varDecl, Diagnostics::invalidTypeVoid);
 				if (varDecl->Type->IsArray() && varDecl->Type->AsArrayType()->ArrayLength <= 0)
 					getSink()->diagnose(varDecl, Diagnostics::invalidArraySize);
-
-				varDecl->Scope->decls.AddIfNotExists(varDecl->Name.Content, varDecl);
 				if (varDecl->Expr != NULL)
 				{
 					varDecl->Expr = varDecl->Expr->Accept(this).As<ExpressionSyntaxNode>();

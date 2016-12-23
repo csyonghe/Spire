@@ -15,9 +15,11 @@ namespace Spire
             Scope* scope = this;
             while (scope)
             {
-                Decl* decl = nullptr;
-                if (scope->decls.TryGetValue(name, decl))
-                    return decl;
+                for (auto m : scope->containerDecl->Members)
+                {
+                    if (m->Name.Content == name)
+                        return m.Ptr();
+                }
 
                 scope = scope->Parent.Ptr();
             }
@@ -241,6 +243,27 @@ namespace Spire
 			rs->Body = Body->Clone(ctx);
 			return rs;
 		}
+
+        //
+
+        RefPtr<SyntaxNode> ScopeDecl::Accept(SyntaxVisitor * visitor)
+        {
+            return visitor->VisitScopeDecl(this);
+        }
+
+        ScopeDecl* ScopeDecl::Clone(CloneContext & ctx)
+        {
+            auto rs = CloneSyntaxNodeFields(new ScopeDecl(*this), ctx);
+            for (auto & member : rs->Members)
+            {
+                member = member->Clone(ctx);
+            }
+            return rs;
+        }
+
+
+        //
+
 		RefPtr<SyntaxNode> BlockStatementSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
 			return visitor->VisitBlockStatement(this);

@@ -412,14 +412,17 @@ namespace Spire
 			EnumerableHashSet<String> PinnedWorlds;
 		};
 
+		class ContainerDecl;
 		class Scope : public RefObject
 		{
 		public:
 			RefPtr<Scope> Parent;
+			ContainerDecl*  containerDecl;
 			Dictionary<String, Decl*> decls;
 			Decl* LookUp(String const& name);
-			Scope()
-				: Parent(0)
+			Scope(RefPtr<Scope> parent, ContainerDecl* containerDecl)
+				: Parent(parent)
+				, containerDecl(containerDecl)
 			{}
 		};
 
@@ -750,7 +753,21 @@ namespace Spire
 			virtual StatementSyntaxNode* Clone(CloneContext & ctx) = 0;
 		};
 
-		class BlockStatementSyntaxNode : public StatementSyntaxNode
+        // A scope for local declarations (e.g., as part of a statement)
+        class ScopeDecl : public ContainerDecl
+        {
+        public:
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual ScopeDecl * Clone(CloneContext & ctx) override;
+        };
+
+        class ScopeStmt : public StatementSyntaxNode
+        {
+        public:
+            RefPtr<ScopeDecl> scopeDecl;
+        };
+
+		class BlockStatementSyntaxNode : public ScopeStmt
 		{
 		public:
 			List<RefPtr<StatementSyntaxNode>> Statements;
@@ -1189,7 +1206,7 @@ namespace Spire
 			virtual IfStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class ForStatementSyntaxNode : public StatementSyntaxNode
+		class ForStatementSyntaxNode : public ScopeStmt
 		{
 		public:
 			RefPtr<StatementSyntaxNode> InitialStatement;
@@ -1283,6 +1300,12 @@ namespace Spire
 				if (func->Body)
 					func->Body = func->Body->Accept(this).As<BlockStatementSyntaxNode>();
 				return func;
+			}
+			virtual RefPtr<ScopeDecl> VisitScopeDecl(ScopeDecl* decl)
+			{
+                // By default don't visit children, because they will always
+                // be encountered in the ordinary flow of the corresponding statement.
+				return decl;
 			}
 			virtual RefPtr<StructSyntaxNode> VisitStruct(StructSyntaxNode * s)
 			{
