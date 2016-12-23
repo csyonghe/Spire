@@ -251,7 +251,7 @@ namespace Spire
 			for (auto & dep : Dependency)
 			{
 				dependencyClosure.Add(dep);
-				if (dep->SyntaxNode->Parameters.Count())
+				if (dep->SyntaxNode->IsComponentFunction())
 				{
 					for (auto & x : dep->GetComponentFunctionDependencyClosure())
 						dependencyClosure.Add(x);

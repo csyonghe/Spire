@@ -746,7 +746,7 @@ namespace Spire
             parser->ReadToken(TokenType::LParent);
             while (!AdvanceIfMatch(parser, TokenType::RParent))
             {
-                decl->Parameters.Add(parser->ParseParameter());
+                decl->Members.Add(parser->ParseParameter());
                 if (AdvanceIf(parser, TokenType::RParent))
                     break;
                 parser->ReadToken(TokenType::Comma);

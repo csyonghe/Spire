@@ -466,7 +466,7 @@ namespace Spire
 				for (auto & comp : shader->Definitions)
 				{
 					currentComponent = comp.Ptr();
-					if (comp->SyntaxNode->Parameters.Count())
+					if (comp->SyntaxNode->IsComponentFunction())
 					{
 						auto funcName = GetComponentFunctionName(comp->SyntaxNode.Ptr());
 						if (result.Program->Functions.ContainsKey(funcName))
@@ -479,7 +479,7 @@ namespace Spire
 						result.Program->Functions[funcName] = func;
 						for (auto dep : comp->GetComponentFunctionDependencyClosure())
 						{
-							if (dep->SyntaxNode->Parameters.Count())
+							if (dep->SyntaxNode->IsComponentFunction())
 							{
 								funcSym->ReferencedFunctions.Add(GetComponentFunctionName(dep->SyntaxNode.Ptr()));
 							}
@@ -490,7 +490,7 @@ namespace Spire
 						codeWriter.PushNode();
 						for (auto & dep : comp->GetComponentFunctionDependencyClosure())
 						{
-							if (dep->SyntaxNode->Parameters.Count() == 0)
+							if (!dep->SyntaxNode->IsComponentFunction())
 							{
 								auto paramType = TranslateExpressionType(dep->Type);
 								String paramName = EscapeCodeName("p" + String(id) + "_" + dep->OriginalName);
@@ -501,7 +501,7 @@ namespace Spire
 								id++;
 							}
 						}
-						for (auto & param : comp->SyntaxNode->Parameters)
+						for (auto & param : comp->SyntaxNode->GetParameters())
 						{
 							auto paramType = TranslateExpressionType(param->Type);
 							String paramName = EscapeCodeName("p" + String(id) + "_" + param->Name.Content);
@@ -556,7 +556,7 @@ namespace Spire
 
 					for (auto & comp : components)
 					{
-						if (comp->SyntaxNode->Parameters.Count() == 0)
+						if (!comp->SyntaxNode->IsComponentFunction())
 							VisitComponent(comp);
 					}
 
@@ -769,7 +769,7 @@ namespace Spire
 					{
 						stmt->Expression->Accept(this);
 						returnRegister = PopStack();
-						if (currentComponent->SyntaxNode->Parameters.Count() == 0)
+						if (!currentComponent->SyntaxNode->IsComponentFunction())
 						{
 							if (currentWorld->OutputType->Members.ContainsKey(currentComponent->UniqueName))
 							{
@@ -1185,7 +1185,7 @@ namespace Spire
 						auto funcCompName = expr->FunctionExpr->Tags["ComponentReference"]().As<StringObject>()->Content;
 						auto funcComp = *(currentShader->DefinitionsByComponent[funcCompName]().TryGetValue(currentComponent->World));
 						funcName = GetComponentFunctionName(funcComp->SyntaxNode.Ptr());
-						for (auto & param : funcComp->SyntaxNode->Parameters)
+						for (auto & param : funcComp->SyntaxNode->GetParameters())
 						{
 							if (param->HasModifier(ModifierFlag::Out))
 							{
@@ -1196,7 +1196,7 @@ namespace Spire
 						// push additional arguments
 						for (auto & dep : funcComp->GetComponentFunctionDependencyClosure())
 						{
-							if (dep->SyntaxNode->Parameters.Count() == 0)
+							if (!dep->SyntaxNode->IsComponentFunction())
 							{
 								ILOperand * op = nullptr;
 								if (variables.TryGetValue(dep->UniqueName, op))

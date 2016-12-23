@@ -993,12 +993,12 @@ namespace Spire
 			virtual RateSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class ComponentSyntaxNode : public Decl
+		class ComponentSyntaxNode : public ContainerDecl
 		{
 		public:
 			bool IsOutput() { return HasModifier(ModifierFlag::Out); }
 			bool IsPublic() { return HasModifier(ModifierFlag::Public); }
-			bool IsInline() { return HasModifier(ModifierFlag::Inline) || (Parameters.Count() != 0); }
+			bool IsInline() { return HasModifier(ModifierFlag::Inline) || IsComponentFunction(); }
 			bool IsRequire() { return HasModifier(ModifierFlag::Require); }
 			bool IsInput() { return HasModifier(ModifierFlag::Extern); }
 			bool IsParam() { return HasModifier(ModifierFlag::Param); }
@@ -1007,7 +1007,11 @@ namespace Spire
 			RefPtr<RateSyntaxNode> Rate;
 			RefPtr<BlockStatementSyntaxNode> BlockStatement;
 			RefPtr<ExpressionSyntaxNode> Expression;
-			List<RefPtr<ParameterSyntaxNode>> Parameters;
+			FilteredMemberList<ParameterSyntaxNode> GetParameters()
+			{
+				return GetMembersOfType<ParameterSyntaxNode>();
+			}
+			bool IsComponentFunction() { return GetParameters().Count() != 0; }
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ComponentSyntaxNode * Clone(CloneContext & ctx) override;
 		};

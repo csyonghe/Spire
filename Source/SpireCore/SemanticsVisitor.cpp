@@ -13,7 +13,7 @@ namespace Spire
 		{
 			StringBuilder sb;
 			sb << comp->Name.Content;
-			for (auto & param : comp->Parameters)
+			for (auto & param : comp->GetParameters())
 			{
 				sb << "@" << param->Type->ToString();
 			}
@@ -368,7 +368,7 @@ namespace Spire
 				for (auto & comp : interfaceNode->GetComponents())
 				{
 					interfaceNode->Scope->decls.AddIfNotExists(comp->Name.Content, comp.Ptr());
-					for (auto & param : comp->Parameters)
+					for (auto & param : comp->GetParameters())
 					{
 						param->Type = TranslateTypeNode(param->TypeNode);
 						if (param->Expr)
@@ -425,7 +425,7 @@ namespace Spire
 						
 						if (refComp)
 						{
-							if (refComp->Implementations.First()->SyntaxNode->Parameters.Count()) // this is a function parameter
+							if (refComp->Implementations.First()->SyntaxNode->IsComponentFunction()) // this is a function parameter
 							{
 								arg->ArgumentName.Content = refComp->Name;
 								// construct an invocation node to resolve overloaded component function
@@ -433,7 +433,7 @@ namespace Spire
 								tempInvoke->Position = arg->Position;
 								tempInvoke->Scope = arg->Scope;
 								tempInvoke->FunctionExpr = arg->Expression;
-								for (auto & param : refComp->Implementations.First()->SyntaxNode->Parameters)
+								for (auto & param : refComp->Implementations.First()->SyntaxNode->GetParameters())
 								{
 									RefPtr<VarExpressionSyntaxNode> tempArg = new VarExpressionSyntaxNode();
 									tempArg->Type = param->Type;
@@ -657,7 +657,7 @@ namespace Spire
 								getSink()->diagnose(shaderSymbol->SyntaxNode, Diagnostics::parametersOnlyAllowedInModules);
 							}
 						}
-						for (auto & param : comp->Parameters)
+						for (auto & param : comp->GetParameters())
 							param->Type = TranslateTypeNode(param->TypeNode);
 						AddNewComponentSymbol(shaderSymbol->Components, shaderSymbol->FunctionComponents, comp);
 					}
@@ -718,7 +718,7 @@ namespace Spire
 				RefPtr<ShaderComponentSymbol> compSym;
 				currentShader->Components.TryGetValue(comp->Name.Content, compSym);
 				this->currentComp = compSym.Ptr();
-				for (auto & param : comp->Parameters)
+				for (auto & param : comp->GetParameters())
 				{
 					param->Accept(this);
 					comp->Scope->decls.Add(param->Name.Content, param.Ptr());
@@ -768,7 +768,7 @@ namespace Spire
 					{
 						getSink()->diagnose(compImpl->SyntaxNode.Ptr(), Diagnostics::componentMarkedExportMustHaveWorld, compImpl->SyntaxNode->Name);
 					}
-					if (compImpl->SyntaxNode->Parameters.Count() > 0)
+					if (compImpl->SyntaxNode->IsComponentFunction())
 						getSink()->diagnose(compImpl->SyntaxNode->Name, Diagnostics::componetMarkedExportCannotHaveParameters, compImpl->SyntaxNode->Name);
 				}
 				auto compName = GetFullComponentName(comp.Ptr());
@@ -792,14 +792,14 @@ namespace Spire
 							getSink()->diagnose(compSym->Implementations.First()->SyntaxNode, Diagnostics::seePreviousDefinition);
 						}
 					}
-					if (compImpl->SyntaxNode->Parameters.Count())
+					if (compImpl->SyntaxNode->IsComponentFunction())
 					{
 						getSink()->diagnose(compImpl->SyntaxNode.Ptr(), Diagnostics::functionRedefinition, compImpl->SyntaxNode->Name.Content);
 						getSink()->diagnose(compSym->Implementations.Last()->SyntaxNode, Diagnostics::seePreviousDefinition);
 					}
 					symbolTable->CheckComponentImplementationConsistency(sink, compSym.Ptr(), compImpl.Ptr());
 				}
-				if (compImpl->SyntaxNode->Parameters.Count())
+				if (compImpl->SyntaxNode->IsComponentFunction())
 				{
 					auto list = funcComponents.TryGetValue(comp->Name.Content);
 					if (!list)
@@ -1313,7 +1313,7 @@ namespace Spire
 				{
 					auto func = FindFunctionOverload(*list, [](RefPtr<ShaderComponentSymbol> & comp)
 					{
-						return comp->Implementations.First()->SyntaxNode->Parameters;
+						return comp->Implementations.First()->SyntaxNode->GetParameters();
 					}, args);
 					if (func)
 					{
@@ -1577,7 +1577,8 @@ namespace Spire
 						}
 						else if (basicType->Component)
 						{
-							params = &basicType->Component->Implementations.First()->SyntaxNode->Parameters;
+							paramsStorage = basicType->Component->Implementations.First()->SyntaxNode->GetParameters().ToArray();
+							params = &paramsStorage;
 						}
 						if (params)
 						{
