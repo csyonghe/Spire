@@ -149,25 +149,25 @@ namespace Spire
 				else
 				{
 					expType->BaseType = BaseType::Struct;
-                    if (auto decl = symbolTable->LookUp(typeNode->TypeName))
-                    {
-                        if (auto structDecl = dynamic_cast<StructSyntaxNode*>(decl))
-                        {
-                            expType->structDecl = structDecl;
-                        }
-                        else if (auto typeDefDecl = dynamic_cast<TypeDefDecl*>(decl))
-                        {
-                            RefPtr<NamedExpressionType> namedType = new NamedExpressionType();
-                            namedType->decl = typeDefDecl;
+					if (auto decl = symbolTable->LookUp(typeNode->TypeName))
+					{
+						if (auto structDecl = dynamic_cast<StructSyntaxNode*>(decl))
+						{
+							expType->structDecl = structDecl;
+						}
+						else if (auto typeDefDecl = dynamic_cast<TypeDefDecl*>(decl))
+						{
+							RefPtr<NamedExpressionType> namedType = new NamedExpressionType();
+							namedType->decl = typeDefDecl;
 
-                            typeResult = namedType;
-                            return typeNode;
-                        }
-                        else
-                        {
-                            getSink()->diagnose(typeNode, Diagnostics::undefinedTypeName, typeNode->TypeName);
-                        }
-                    }
+							typeResult = namedType;
+							return typeNode;
+						}
+						else
+						{
+							getSink()->diagnose(typeNode, Diagnostics::undefinedTypeName, typeNode->TypeName);
+						}
+					}
 					else if (currentPipeline || currentShader)
 					{
 						PipelineSymbol * pipe = currentPipeline ? currentPipeline : currentShader->ParentPipeline;
@@ -189,17 +189,17 @@ namespace Spire
 								expType->GenericTypeVar = typeNode->TypeName;
 								matched = true;
 							}
-							
+
 						}
 						if (!matched)
 						{
-                            getSink()->diagnose(typeNode, Diagnostics::undefinedTypeName, typeNode->TypeName);
+							getSink()->diagnose(typeNode, Diagnostics::undefinedTypeName, typeNode->TypeName);
 							typeResult = ExpressionType::Error;
 						}
 					}
 					else
 					{
-                        getSink()->diagnose(typeNode, Diagnostics::undefinedTypeName, typeNode->TypeName);
+						getSink()->diagnose(typeNode, Diagnostics::undefinedTypeName, typeNode->TypeName);
 						typeResult = ExpressionType::Error;
 						return typeNode;
 					}
@@ -222,15 +222,15 @@ namespace Spire
 				typeNode->BaseType->Accept(this);
 				rs->BaseType = typeResult;
 				rs->GenericTypeName = typeNode->GenericTypeName;
-                if (rs->GenericTypeName != "PackedBuffer" &&
-                    rs->GenericTypeName != "StructuredBuffer" &&
-                    rs->GenericTypeName != "RWStructuredBuffer" &&
-                    rs->GenericTypeName != "Uniform" &&
-                    rs->GenericTypeName != "Patch" &&
-                    rs->GenericTypeName != "PackedBuffer")
-                {
-                    getSink()->diagnose(typeNode, Diagnostics::undefinedIdentifier, rs->GenericTypeName);
-                }
+				if (rs->GenericTypeName != "PackedBuffer" &&
+					rs->GenericTypeName != "StructuredBuffer" &&
+					rs->GenericTypeName != "RWStructuredBuffer" &&
+					rs->GenericTypeName != "Uniform" &&
+					rs->GenericTypeName != "Patch" &&
+					rs->GenericTypeName != "PackedBuffer")
+				{
+					getSink()->diagnose(typeNode, Diagnostics::undefinedIdentifier, rs->GenericTypeName);
+				}
 				typeResult = rs;
 				return typeNode;
 			}
@@ -248,7 +248,7 @@ namespace Spire
 					}
 					else
 					{
-                        getSink()->diagnose(pipeline->ParentPipelineName, Diagnostics::undefinedPipelineName, pipeline->ParentPipelineName.Content);
+						getSink()->diagnose(pipeline->ParentPipelineName, Diagnostics::undefinedPipelineName, pipeline->ParentPipelineName.Content);
 					}
 				}
 				currentPipeline = psymbol.Ptr();
@@ -271,10 +271,10 @@ namespace Spire
 					if (comp->IsRequire() || comp->IsInput() || (comp->Rate && comp->Rate->Worlds.Count() == 1
 						&& psymbol->IsAbstractWorld(comp->Rate->Worlds.First().World.Content)))
 						AddNewComponentSymbol(psymbol->Components, psymbol->FunctionComponents, comp);
-                    else
-                    {
+					else
+					{
 						getSink()->diagnose(comp.Ptr(), Diagnostics::cannotDefineComponentsInAPipeline);
-                    }
+					}
 				}
 				for (auto & op : pipeline->GetImportOperators())
 				{
@@ -303,7 +303,7 @@ namespace Spire
 							}
 						}
 					}
-					
+
 				}
 				// propagate world dependency graph
 				bool changed = true;
@@ -342,11 +342,11 @@ namespace Spire
 						else
 							paraNames.Add(para->Name.Content);
 						para->Type = TranslateTypeNode(para->TypeNode);
-                        op->Scope->decls.AddIfNotExists(para->Name.Content, para.Ptr());
-                        if (para->Type->Equals(ExpressionType::Void.Ptr()))
-                        {
+						op->Scope->decls.AddIfNotExists(para->Name.Content, para.Ptr());
+						if (para->Type->Equals(ExpressionType::Void.Ptr()))
+						{
 							getSink()->diagnose(para.Ptr(), Diagnostics::parameterCannotBeVoid);
-                        }
+						}
 					}
 					auto oldSymFuncs = symbolTable->Functions;
 					auto oldSymFuncOverloads = symbolTable->FunctionOverloads;
@@ -488,7 +488,7 @@ namespace Spire
 				virtual RefPtr<ComponentSyntaxNode> VisitComponent(ComponentSyntaxNode * comp) override
 				{
 					RefPtr<ShaderComponentSymbol> compSym;
-					
+
 					currentShader->Components.TryGetValue(comp->Name.Content, compSym);
 					currentComp = compSym.Ptr();
 					SyntaxVisitor::VisitComponent(comp);
@@ -502,7 +502,7 @@ namespace Spire
 					if (compSym->Type->DataType->GetBindableResourceType() != BindableResourceType::NonBindable && !comp->IsParam()
 						&& !comp->IsRequire() && !dynamic_cast<InterfaceSyntaxNode*>(comp->ParentDecl))
 						getSink()->diagnose(comp, Diagnostics::resourceTypeMustBeParamOrRequire, comp->Name);
-					if (compSym->Type->DataType->GetBindableResourceType() != BindableResourceType::NonBindable && 
+					if (compSym->Type->DataType->GetBindableResourceType() != BindableResourceType::NonBindable &&
 						(comp->Expression || comp->BlockStatement))
 						getSink()->diagnose(comp, Diagnostics::cannotDefineComputationOnResourceType, comp->Name);
 
@@ -560,7 +560,7 @@ namespace Spire
 					}
 					for (auto comp : interfaceNode->GetComponents())
 					{
-						auto compRef = shaderSym->ResolveComponentReference(comp->Name.Content);
+						auto compRef = shaderSym->ResolveComponentReference(GetFullComponentName(comp.Ptr()));
 						if (compRef.IsAccessible)
 						{
 							if (!compRef.Component->Implementations.First()->SyntaxNode->IsPublic())
@@ -572,34 +572,6 @@ namespace Spire
 							{
 								getSink()->diagnose(compRef.Component->Implementations.First()->SyntaxNode->Position, Diagnostics::componentTypeDoesNotMatchInterface, comp->Name, interfaceName);
 								getSink()->diagnose(comp->Position, Diagnostics::seeInterfaceDefinitionOf, comp->Name);
-								bool matchingImplFound = false;
-								for (auto impl : compRef.Component->Implementations)
-								{
-									if (impl->SyntaxNode->Parameters.Count() == comp->Parameters.Count())
-									{
-										matchingImplFound = true;
-										for (int i = 0; i < comp->Parameters.Count(); i++)
-											if (!comp->Parameters[i]->Type->Equals(impl->SyntaxNode->Parameters[i]->Type))
-											{
-												matchingImplFound = false;
-												break;
-											}
-									}
-								}
-								if (!matchingImplFound)
-								{
-									StringBuilder argList;
-									argList << "(";
-									for (auto & param : comp->Parameters)
-									{
-										argList << param->Type->ToString();
-										if (param != comp->Parameters.Last())
-											argList << ", ";
-									}
-									argList << ")";
-									getSink()->diagnose(compRef.Component->Implementations.First()->SyntaxNode->Position, Diagnostics::shaderDidNotDefineComponentFunction, shaderSym->SyntaxNode->Name, comp->Name.Content + argList.ProduceString(), interfaceName);
-									getSink()->diagnose(comp->Position, Diagnostics::seeInterfaceDefinitionOf, comp->Name);
-								}
 							}
 						}
 						else
@@ -633,7 +605,7 @@ namespace Spire
 				inheritanceSet.Add(curShader->Name.Content);
 				auto & shaderSymbol = symbolTable->Shaders[curShader->Name.Content].GetValue();
 				this->currentShader = shaderSymbol.Ptr();
-				
+
 				if (shader->ParentPipelineName.Content.Length() == 0) // implicit pipeline
 				{
 					if (program->GetPipelines().Count() == 1)
@@ -686,7 +658,7 @@ namespace Spire
 				// add shader objects to symbol table
 				ShaderImportVisitor importVisitor(sink, symbolTable);
 				shader->Accept(&importVisitor);
-				
+
 				this->currentShader = nullptr;
 			}
 			// pass 2: type checking component definitions
@@ -742,12 +714,12 @@ namespace Spire
 				for (auto & param : comp->Parameters)
 				{
 					param->Accept(this);
-                    comp->Scope->decls.Add(param->Name.Content, param.Ptr());
+					comp->Scope->decls.Add(param->Name.Content, param.Ptr());
 				}
 				if (comp->Expression)
 				{
 					comp->Expression = comp->Expression->Accept(this).As<ExpressionSyntaxNode>();
-					if (!MatchType_ValueReceiver(compSym->Type->DataType.Ptr(), comp->Expression->Type.Ptr()) && 
+					if (!MatchType_ValueReceiver(compSym->Type->DataType.Ptr(), comp->Expression->Type.Ptr()) &&
 						!comp->Expression->Type->Equals(ExpressionType::Error.Ptr()))
 						getSink()->diagnose(comp->Name, Diagnostics::typeMismatch, comp->Expression->Type, currentComp->Type);
 				}
@@ -762,7 +734,7 @@ namespace Spire
 				importStmt->Import->Accept(this);
 				return importStmt;
 			}
-			void AddNewComponentSymbol(EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>> & components, 
+			void AddNewComponentSymbol(EnumerableDictionary<String, RefPtr<ShaderComponentSymbol>> & components,
 				EnumerableDictionary<String, List<RefPtr<ShaderComponentSymbol>>> & funcComponents,
 				RefPtr<ComponentSyntaxNode> comp)
 			{
@@ -807,17 +779,17 @@ namespace Spire
 						getSink()->diagnose(compImpl->SyntaxNode.Ptr(), Diagnostics::requirementsClashWithPreviousDef, compImpl->SyntaxNode->Name.Content);
 					else
 					{
-                        if (!compSym->Type->DataType->Equals(comp->Type.Ptr()))
-                        {
+						if (!compSym->Type->DataType->Equals(comp->Type.Ptr()))
+						{
 							getSink()->diagnose(comp->Name, Diagnostics::componentOverloadTypeMismatch, comp->Name.Content);
 							getSink()->diagnose(compSym->Implementations.First()->SyntaxNode, Diagnostics::seePreviousDefinition);
-                        }
+						}
 					}
-                    if (compImpl->SyntaxNode->Parameters.Count())
-                    {
+					if (compImpl->SyntaxNode->Parameters.Count())
+					{
 						getSink()->diagnose(compImpl->SyntaxNode.Ptr(), Diagnostics::functionRedefinition, compImpl->SyntaxNode->Name.Content);
 						getSink()->diagnose(compSym->Implementations.Last()->SyntaxNode, Diagnostics::seePreviousDefinition);
-                    }
+					}
 					symbolTable->CheckComponentImplementationConsistency(sink, compSym.Ptr(), compImpl.Ptr());
 				}
 				if (compImpl->SyntaxNode->Parameters.Count())
@@ -840,7 +812,7 @@ namespace Spire
 				this->function = nullptr;
 				for (auto & s : program->Members)
 				{
-                    symbolTable->globalDecls.AddIfNotExists(s->Name.Content, s.Ptr());
+					symbolTable->globalDecls.AddIfNotExists(s->Name.Content, s.Ptr());
 				}
 				for (auto & s : program->GetTypeDefs())
 					VisitTypeDefDecl(s.Ptr());
@@ -921,18 +893,18 @@ namespace Spire
 
 			virtual RefPtr<StructSyntaxNode> VisitStruct(StructSyntaxNode * structNode) override
 			{
-                for (auto field : structNode->GetFields())
-                {
-                    field->Type = TranslateTypeNode(field->TypeNode);
-                }
+				for (auto field : structNode->GetFields())
+				{
+					field->Type = TranslateTypeNode(field->TypeNode);
+				}
 				return structNode;
 			}
 
-            virtual RefPtr<TypeDefDecl> VisitTypeDefDecl(TypeDefDecl* decl) override
-            {
-                decl->Type = TranslateTypeNode(decl->TypeNode);
-                return decl;
-            }
+			virtual RefPtr<TypeDefDecl> VisitTypeDefDecl(TypeDefDecl* decl) override
+			{
+				decl->Type = TranslateTypeNode(decl->TypeNode);
+				return decl;
+			}
 
 			virtual RefPtr<FunctionSyntaxNode> VisitFunction(FunctionSyntaxNode *functionNode) override
 			{
@@ -967,7 +939,7 @@ namespace Spire
 						getSink()->diagnose(para, Diagnostics::parameterCannotBeVoid);
 					internalName << "@" << para->Type->ToString();
 				}
-				functionNode->InternalName = internalName.ProduceString();	
+				functionNode->InternalName = internalName.ProduceString();
 				RefPtr<FunctionSymbol> symbol = new FunctionSymbol();
 				symbol->SyntaxNode = functionNode;
 				symbolTable->Functions[functionNode->InternalName] = symbol;
@@ -980,7 +952,7 @@ namespace Spire
 				overloadList->Add(symbol);
 				this->function = NULL;
 			}
-			
+
 			virtual RefPtr<StatementSyntaxNode> VisitBlockStatement(BlockStatementSyntaxNode *stmt) override
 			{
 				for (auto & node : stmt->Statements)
@@ -1006,12 +978,12 @@ namespace Spire
 				loops.Add(stmt);
 				if (stmt->Predicate != NULL)
 					stmt->Predicate = stmt->Predicate->Accept(this).As<ExpressionSyntaxNode>();
-                if (!stmt->Predicate->Type->Equals(ExpressionType::Error.Ptr()) &&
-                    !stmt->Predicate->Type->Equals(ExpressionType::Int.Ptr()) &&
-                    !stmt->Predicate->Type->Equals(ExpressionType::Bool.Ptr()))
-                {
+				if (!stmt->Predicate->Type->Equals(ExpressionType::Error.Ptr()) &&
+					!stmt->Predicate->Type->Equals(ExpressionType::Int.Ptr()) &&
+					!stmt->Predicate->Type->Equals(ExpressionType::Bool.Ptr()))
+				{
 					getSink()->diagnose(stmt, Diagnostics::whilePredicateTypeError);
-                }
+				}
 				stmt->Statement->Accept(this);
 
 				loops.RemoveAt(loops.Count() - 1);
@@ -1027,7 +999,7 @@ namespace Spire
 				if (stmt->PredicateExpression)
 				{
 					stmt->PredicateExpression = stmt->PredicateExpression->Accept(this).As<ExpressionSyntaxNode>();
-					if (!stmt->PredicateExpression->Type->Equals(ExpressionType::Bool.Ptr()) && 
+					if (!stmt->PredicateExpression->Type->Equals(ExpressionType::Bool.Ptr()) &&
 						!stmt->PredicateExpression->Type->Equals(ExpressionType::Int.Ptr()) &&
 						!stmt->PredicateExpression->Type->Equals(ExpressionType::UInt.Ptr()))
 					{
@@ -1047,14 +1019,14 @@ namespace Spire
 			{
 				if (stmt->Predicate != NULL)
 					stmt->Predicate = stmt->Predicate->Accept(this).As<ExpressionSyntaxNode>();
-				if (!stmt->Predicate->Type->Equals(ExpressionType::Error.Ptr()) 
-					&& (!stmt->Predicate->Type->Equals(ExpressionType::Int.Ptr()) && 
+				if (!stmt->Predicate->Type->Equals(ExpressionType::Error.Ptr())
+					&& (!stmt->Predicate->Type->Equals(ExpressionType::Int.Ptr()) &&
 						!stmt->Predicate->Type->Equals(ExpressionType::Bool.Ptr())))
 					getSink()->diagnose(stmt, Diagnostics::ifPredicateTypeError);
 
 				if (stmt->PositiveStatement != NULL)
 					stmt->PositiveStatement->Accept(this);
-				
+
 				if (stmt->NegativeStatement != NULL)
 					stmt->NegativeStatement->Accept(this);
 				return stmt;
@@ -1069,7 +1041,7 @@ namespace Spire
 				if (!stmt->Expression)
 				{
 					if (function && !function->ReturnType->Equals(ExpressionType::Void.Ptr()))
-						getSink()->diagnose(stmt,  Diagnostics::returnNeedsExpression);
+						getSink()->diagnose(stmt, Diagnostics::returnNeedsExpression);
 				}
 				else
 				{
@@ -1089,12 +1061,12 @@ namespace Spire
 				return stmt;
 			}
 
-            virtual RefPtr<Variable> VisitDeclrVariable(Variable* varDecl)
-            {
+			virtual RefPtr<Variable> VisitDeclrVariable(Variable* varDecl)
+			{
 				if (varDecl->Scope->decls.ContainsKey(varDecl->Name.Content))
 					getSink()->diagnose(varDecl, Diagnostics::variableNameAlreadyDefined, varDecl->Name);
 
-                RefPtr<ExpressionType> type = TranslateTypeNode(varDecl->TypeNode);
+				RefPtr<ExpressionType> type = TranslateTypeNode(varDecl->TypeNode);
 				if (type->IsTextureOrSampler() || type->AsGenericType())
 				{
 					getSink()->diagnose(varDecl->TypeNode, Diagnostics::invalidTypeForLocalVariable);
@@ -1103,7 +1075,7 @@ namespace Spire
 				{
 					getSink()->diagnose(varDecl->TypeNode, Diagnostics::recordTypeVariableInImportOperator);
 				}
-                varDecl->Type = type;
+				varDecl->Type = type;
 				if (varDecl->Type->Equals(ExpressionType::Void.Ptr()))
 					getSink()->diagnose(varDecl, Diagnostics::invalidTypeVoid);
 				if (varDecl->Type->IsArray() && varDecl->Type->AsArrayType()->ArrayLength <= 0)
@@ -1119,14 +1091,14 @@ namespace Spire
 						getSink()->diagnose(varDecl, Diagnostics::typeMismatch, varDecl->Expr->Type, varDecl->Type);
 					}
 				}
-                return varDecl;
-            }
+				return varDecl;
+			}
 
 			virtual RefPtr<StatementSyntaxNode> VisitWhileStatement(WhileStatementSyntaxNode *stmt) override
 			{
 				loops.Add(stmt);
 				stmt->Predicate = stmt->Predicate->Accept(this).As<ExpressionSyntaxNode>();
-				if (!stmt->Predicate->Type->Equals(ExpressionType::Error.Ptr()) && 
+				if (!stmt->Predicate->Type->Equals(ExpressionType::Error.Ptr()) &&
 					!stmt->Predicate->Type->Equals(ExpressionType::Int.Ptr()) &&
 					!stmt->Predicate->Type->Equals(ExpressionType::Bool.Ptr()))
 					getSink()->diagnose(stmt, Diagnostics::whilePredicateTypeError2);
@@ -1229,9 +1201,9 @@ namespace Spire
 				{
 					auto & baseExprType = expr->BaseExpression->Type;
 					bool isValid = baseExprType->AsGenericType() &&
-							(baseExprType->AsGenericType()->GenericTypeName == "StructuredBuffer" ||
-								baseExprType->AsGenericType()->GenericTypeName == "RWStructuredBuffer" ||
-							 baseExprType->AsGenericType()->GenericTypeName == "PackedBuffer");
+						(baseExprType->AsGenericType()->GenericTypeName == "StructuredBuffer" ||
+							baseExprType->AsGenericType()->GenericTypeName == "RWStructuredBuffer" ||
+							baseExprType->AsGenericType()->GenericTypeName == "PackedBuffer");
 					isValid = isValid || (baseExprType->AsBasicType() && GetVectorSize(baseExprType->AsBasicType()->BaseType) != 0);
 					isValid = isValid || baseExprType->AsArrayType();
 					if (!isValid)
@@ -1239,7 +1211,7 @@ namespace Spire
 						getSink()->diagnose(expr, Diagnostics::subscriptNonArray);
 						expr->Type = ExpressionType::Error;
 					}
-					if (!expr->IndexExpression->Type->Equals(ExpressionType::Int.Ptr()) && 
+					if (!expr->IndexExpression->Type->Equals(ExpressionType::Int.Ptr()) &&
 						!expr->IndexExpression->Type->Equals(ExpressionType::UInt.Ptr()))
 					{
 						getSink()->diagnose(expr, Diagnostics::subscriptIndexNonInteger);
@@ -1355,10 +1327,10 @@ namespace Spire
 
 			RefPtr<ExpressionSyntaxNode> ResolveFunctionOverload(InvokeExpressionSyntaxNode * invoke, MemberExpressionSyntaxNode* memberExpr, List<RefPtr<ExpressionSyntaxNode>> & arguments)
 			{
-                // TODO(tfoley): Figure out why we even need to do this here...
-                DiagnosticSink::State savedState = sink->saveState();
+				// TODO(tfoley): Figure out why we even need to do this here...
+				DiagnosticSink::State savedState = sink->saveState();
 				memberExpr->BaseExpression->Accept(this);
-                sink->restoreState(savedState);
+				sink->restoreState(savedState);
 				if (memberExpr->BaseExpression->Type->IsShader())
 				{
 					auto basicType = memberExpr->BaseExpression->Type->AsBasicType();
@@ -1447,9 +1419,9 @@ namespace Spire
 									argList << ", ";
 							}
 							getSink()->diagnose(varExpr, Diagnostics::noApplicableImportOperator,
-                                varExpr->Variable,
-                                currentShader->ParentPipeline->SyntaxNode->Name,
-                                currentCompNode->Rate->Worlds.First().World,
+								varExpr->Variable,
+								currentShader->ParentPipeline->SyntaxNode->Name,
+								currentCompNode->Rate->Worlds.First().World,
 								argList.ProduceString());
 							invoke->Type = ExpressionType::Error;
 						}
@@ -1706,13 +1678,13 @@ namespace Spire
 			{
 				ShaderUsing shaderObj;
 				expr->Type = ExpressionType::Error;
-                auto decl = expr->Scope->LookUp(expr->Variable);
-                auto varDecl = dynamic_cast<VarDeclBase*>(decl);
-                if(varDecl)
+				auto decl = expr->Scope->LookUp(expr->Variable);
+				auto varDecl = dynamic_cast<VarDeclBase*>(decl);
+				if (varDecl)
 				{
 					expr->Type = varDecl->Type;
-                    if (auto basicType = expr->Type->AsBasicType())
-                        basicType->IsLeftValue = !(dynamic_cast<ComponentSyntaxNode*>(varDecl));
+					if (auto basicType = expr->Type->AsBasicType())
+						basicType->IsLeftValue = !(dynamic_cast<ComponentSyntaxNode*>(varDecl));
 				}
 				else if (currentShader && currentShader->ShaderObjects.TryGetValue(expr->Variable, shaderObj))
 				{
@@ -1766,12 +1738,12 @@ namespace Spire
 			{
 				expr->Expression = expr->Expression->Accept(this).As<ExpressionSyntaxNode>();
 				auto targetType = TranslateTypeNode(expr->TargetType);
-				
+
 				if (!expr->Expression->Type->Equals(ExpressionType::Error.Ptr()) && targetType->AsBasicType())
 				{
 					if (!expr->Expression->Type->AsBasicType())
 						expr->Type = ExpressionType::Error;
-					else if (!IsNumeric(GetVectorBaseType(expr->Expression->Type->AsBasicType()->BaseType)) 
+					else if (!IsNumeric(GetVectorBaseType(expr->Expression->Type->AsBasicType()->BaseType))
 						|| !IsNumeric(GetVectorBaseType(targetType->AsBasicType()->BaseType)))
 						expr->Type = ExpressionType::Error;
 					else if (targetType->AsBasicType()->BaseType == BaseType::Void || expr->Expression->Type->AsBasicType()->BaseType == BaseType::Void)
@@ -1790,7 +1762,7 @@ namespace Spire
 			virtual RefPtr<ExpressionSyntaxNode> VisitSelectExpression(SelectExpressionSyntaxNode * expr) override
 			{
 				expr->SelectorExpr = expr->SelectorExpr->Accept(this).As<ExpressionSyntaxNode>();
-				if (!expr->SelectorExpr->Type->Equals(ExpressionType::Int.Ptr()) && !expr->SelectorExpr->Type->Equals(ExpressionType::Bool.Ptr()) 
+				if (!expr->SelectorExpr->Type->Equals(ExpressionType::Int.Ptr()) && !expr->SelectorExpr->Type->Equals(ExpressionType::Bool.Ptr())
 					&& !expr->SelectorExpr->Type->Equals(ExpressionType::Error.Ptr()))
 				{
 					expr->Type = ExpressionType::Error;
@@ -1940,6 +1912,6 @@ namespace Spire
 		{
 			return new SemanticsVisitor(symbols, err);
 		}
-		
+
 	}
 }
