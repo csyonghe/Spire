@@ -211,7 +211,7 @@ namespace SpireLib
 						}
 						if (!found)
 						{
-							compileResult.GetErrorWriter()->diagnose(inc->fileName.Position, Diagnostics::cannotFindFile, inputFileName);
+							compileResult.GetErrorWriter()->diagnose(inc->fileName.Position, Diagnostics::cannotFindFile, inc->fileName);
 						}
 					}
 				}

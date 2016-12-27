@@ -588,6 +588,22 @@ namespace Spire
                     *modifierLink = modifier;
                     modifierLink = &modifier->next;
 				}
+				else if (AdvanceIf(parser, "specialize"))
+				{
+					RefPtr<SpecializeModifier> modifier = new SpecializeModifier();
+					if (AdvanceIf(parser, TokenType::LParent))
+					{
+						while (!AdvanceIfMatch(parser, TokenType::RParent))
+						{
+							modifier->Values.Add(parser->ParseExpression());
+							if (AdvanceIf(parser, TokenType::RParent))
+								break;
+							parser->ReadToken(TokenType::Comma);
+						}
+					}
+					*modifierLink = modifier;
+					modifierLink = &modifier->next;
+				}
                 else if (AdvanceIf(parser, "inline"))
 				{
 					modifiers.flags |= ModifierFlag::Inline;

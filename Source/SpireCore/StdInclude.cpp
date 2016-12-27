@@ -141,6 +141,9 @@ __intrinsic float clamp(float v, float v1, float v2);
 __intrinsic vec2 clamp(vec2 v, vec2 v1, vec2 v2);
 __intrinsic vec3 clamp(vec3 v, vec3 v1, vec3 v2);
 __intrinsic vec4 clamp(vec4 v, vec4 v1, vec4 v2);
+__intrinsic vec2 clamp(vec2 v, float v1, float v2);
+__intrinsic vec3 clamp(vec3 v, float v1, float v2);
+__intrinsic vec4 clamp(vec4 v, float v1, float v2);
 
 __intrinsic vec3 reflect(vec3 I, vec3 N);
 __intrinsic vec3 refract(vec3 I, vec3 N, float eta);

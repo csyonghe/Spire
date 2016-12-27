@@ -13,182 +13,182 @@ namespace Spire
 		class SyntaxVisitor;
 		class FunctionSyntaxNode;
 
-        // We use a unified representation for modifiers on all declarations.
-        // (Eventually this will also apply to statements that support attributes)
-        //
-        // The parser allows any set of modifiers on any declaration, and we leave
-        // it to later phases of analysis to reject inappropriate uses.
-        // TODO: implement rejection properly.
-        //
-        // Some common modifiers (thos represented by single keywords) are
-        // specified via a simple set of flags.
-        // TODO: consider using a real AST even for these, so we can give good
-        // error messages on confliction modifiers.
-        typedef unsigned int ModifierFlags;
-        enum ModifierFlag : ModifierFlags
-        {
-            None        = 0,
-            Uniform     = 1 << 0,
-            Out         = 1 << 1,
-            In          = 1 << 2,
-            Centroid    = 1 << 3,
-            Const       = 1 << 4,
-            Instance    = 1 << 5,
-            Builtin     = 1 << 6,
-            Parameter   = (1 << 7) | ModifierFlag::Uniform,
+		// We use a unified representation for modifiers on all declarations.
+		// (Eventually this will also apply to statements that support attributes)
+		//
+		// The parser allows any set of modifiers on any declaration, and we leave
+		// it to later phases of analysis to reject inappropriate uses.
+		// TODO: implement rejection properly.
+		//
+		// Some common modifiers (thos represented by single keywords) are
+		// specified via a simple set of flags.
+		// TODO: consider using a real AST even for these, so we can give good
+		// error messages on confliction modifiers.
+		typedef unsigned int ModifierFlags;
+		enum ModifierFlag : ModifierFlags
+		{
+			None = 0,
+			Uniform = 1 << 0,
+			Out = 1 << 1,
+			In = 1 << 2,
+			Centroid = 1 << 3,
+			Const = 1 << 4,
+			Instance = 1 << 5,
+			Builtin = 1 << 6,
+			Parameter = (1 << 7) | ModifierFlag::Uniform,
 
-            Inline      = 1 << 8,
-            Public      = 1 << 9,
-            Require     = 1 << 10,
-            Param       = (1 << 11) | ModifierFlag::Public,
-            Extern      = 1 << 12,
-            Input       = 1 << 13,
-            Intrinsic   = (1 << 14) | ModifierFlag::Extern,
+			Inline = 1 << 8,
+			Public = 1 << 9,
+			Require = 1 << 10,
+			Param = (1 << 11) | ModifierFlag::Public,
+			Extern = 1 << 12,
+			Input = 1 << 13,
+			Intrinsic = (1 << 14) | ModifierFlag::Extern,
 
 
-            // TODO(tfoley): This should probably be its own flag
-            InOut       = ModifierFlag::In | ModifierFlag::Out,
-        };
-        //
-        // Other modifiers may have more elaborate data, and so
-        // are represented as heap-allocated objects, in a linked
-        // list.
-        //
-        class Modifier : public RefObject
-        {
-        public:
-            RefPtr<Modifier> next;
-        };
+			// TODO(tfoley): This should probably be its own flag
+			InOut = ModifierFlag::In | ModifierFlag::Out,
+		};
+		//
+		// Other modifiers may have more elaborate data, and so
+		// are represented as heap-allocated objects, in a linked
+		// list.
+		//
+		class Modifier : public RefObject
+		{
+		public:
+			RefPtr<Modifier> next;
+		};
 
-        // A `layout` modifier
-        class LayoutModifier : public Modifier
-        {
-        public:
-            String LayoutString;
-        };
+		// A `layout` modifier
+		class LayoutModifier : public Modifier
+		{
+		public:
+			String LayoutString;
+		};
 
-        // An attribute of the form `[Name]` or `[Name: Value]`
-        class SimpleAttribute : public Modifier
-        {
-        public:
-            String Key;
-            Token Value;
+		// An attribute of the form `[Name]` or `[Name: Value]`
+		class SimpleAttribute : public Modifier
+		{
+		public:
+			String Key;
+			Token Value;
 
-            String const& GetValue() const { return Value.Content; }
-        };
+			String const& GetValue() const { return Value.Content; }
+		};
 
-        // A set of modifiers attached to a syntax node
-        struct Modifiers
-        {
-            // The first modifier in the linked list of heap-allocated modifiers
-            RefPtr<Modifier> first;
+		// A set of modifiers attached to a syntax node
+		struct Modifiers
+		{
+			// The first modifier in the linked list of heap-allocated modifiers
+			RefPtr<Modifier> first;
 
-            // The bit-flags for the common modifiers
-            ModifierFlags flags = ModifierFlag::None;
-        };
+			// The bit-flags for the common modifiers
+			ModifierFlags flags = ModifierFlag::None;
+		};
 
-        // Helper class for iterating over a list of heap-allocated modifiers
-        struct ModifierList
-        {
-            struct Iterator
-            {
-                Modifier* current;
+		// Helper class for iterating over a list of heap-allocated modifiers
+		struct ModifierList
+		{
+			struct Iterator
+			{
+				Modifier* current;
 
-                Modifier* operator*()
-                {
-                    return current;
-                }
+				Modifier* operator*()
+				{
+					return current;
+				}
 
-                void operator++()
-                {
-                    current = current->next.Ptr();
-                }
+				void operator++()
+				{
+					current = current->next.Ptr();
+				}
 
-                bool operator!=(Iterator other)
-                {
-                    return current != other.current;
-                };
+				bool operator!=(Iterator other)
+				{
+					return current != other.current;
+				};
 
-                Iterator()
-                    : current(nullptr)
-                {}
+				Iterator()
+					: current(nullptr)
+				{}
 
-                Iterator(Modifier* modifier)
-                    : current(modifier)
-                {}
-            };
+				Iterator(Modifier* modifier)
+					: current(modifier)
+				{}
+			};
 
-            ModifierList()
-                : modifiers(nullptr)
-            {}
+			ModifierList()
+				: modifiers(nullptr)
+			{}
 
-            ModifierList(Modifier* modifiers)
-                : modifiers(modifiers)
-            {}
+			ModifierList(Modifier* modifiers)
+				: modifiers(modifiers)
+			{}
 
-            Iterator begin() { return Iterator(modifiers); }
-            Iterator end() { return Iterator(nullptr); }
+			Iterator begin() { return Iterator(modifiers); }
+			Iterator end() { return Iterator(nullptr); }
 
-            Modifier* modifiers;
-        };
+			Modifier* modifiers;
+		};
 
-        // Helper class for iterating over heap-allocated modifiers
-        // of a specific type.
-        template<typename T>
-        struct FilteredModifierList
-        {
-            struct Iterator
-            {
-                Modifier* current;
+		// Helper class for iterating over heap-allocated modifiers
+		// of a specific type.
+		template<typename T>
+		struct FilteredModifierList
+		{
+			struct Iterator
+			{
+				Modifier* current;
 
-                T* operator*()
-                {
-                    return (T*) current;
-                }
+				T* operator*()
+				{
+					return (T*)current;
+				}
 
-                void operator++()
-                {
-                    current = Adjust(current->next.Ptr());
-                }
+				void operator++()
+				{
+					current = Adjust(current->next.Ptr());
+				}
 
-                bool operator!=(Iterator other)
-                {
-                    return current != other.current;
-                };
+				bool operator!=(Iterator other)
+				{
+					return current != other.current;
+				};
 
-                Iterator()
-                    : current(nullptr)
-                {}
+				Iterator()
+					: current(nullptr)
+				{}
 
-                Iterator(Modifier* modifier)
-                    : current(modifier)
-                {}
-            };
+				Iterator(Modifier* modifier)
+					: current(modifier)
+				{}
+			};
 
-            FilteredModifierList()
-                : modifiers(nullptr)
-            {}
+			FilteredModifierList()
+				: modifiers(nullptr)
+			{}
 
-            FilteredModifierList(Modifier* modifiers)
-                : modifiers(Adjust(modifiers))
-            {}
+			FilteredModifierList(Modifier* modifiers)
+				: modifiers(Adjust(modifiers))
+			{}
 
-            Iterator begin() { return Iterator(modifiers); }
-            Iterator end() { return Iterator(nullptr); }
+			Iterator begin() { return Iterator(modifiers); }
+			Iterator end() { return Iterator(nullptr); }
 
-            static Modifier* Adjust(Modifier* modifier)
-            {
-                Modifier* m = modifier;
-                for (;;)
-                {
-                    if (!m) return m;
-                    if (dynamic_cast<T*>(m)) return m;
-                    m = m->next.Ptr();
-                }
-            }
+			static Modifier* Adjust(Modifier* modifier)
+			{
+				Modifier* m = modifier;
+				for (;;)
+				{
+					if (!m) return m;
+					if (dynamic_cast<T*>(m)) return m;
+					m = m->next.Ptr();
+				}
+			}
 
-            Modifier* modifiers;
-        };
+			Modifier* modifiers;
+		};
 
 		enum class BaseType
 		{
@@ -229,7 +229,7 @@ namespace Spire
 			return (BaseType)(((int)type) & (~15));
 		}
 
-        class Decl;
+		class Decl;
 		class SymbolTable;
 		class ShaderSymbol;
 		class ShaderClosure;
@@ -239,8 +239,8 @@ namespace Spire
 		class BasicExpressionType;
 		class ArrayExpressionType;
 		class GenericExpressionType;
-        class TypeDefDecl;
-        class NamedExpressionType;
+		class TypeDefDecl;
+		class NamedExpressionType;
 
 		class ExpressionType : public RefObject
 		{
@@ -284,10 +284,10 @@ namespace Spire
 			bool IsShader() const;
 			static void Init();
 			static void Finalize();
-            ExpressionType* GetCanonicalType() const;
+			ExpressionType* GetCanonicalType() const;
 			virtual BindableResourceType GetBindableResourceType() const { return BindableResourceType::NonBindable; }
-        protected:
-            virtual bool IsIntegralImpl() const { return false; }
+		protected:
+			virtual bool IsIntegralImpl() const { return false; }
 			virtual bool EqualsImpl(const ExpressionType * type) const = 0;
 			virtual bool IsVectorTypeImpl() const { return false; }
 			virtual bool IsArrayImpl() const { return false; }
@@ -297,8 +297,8 @@ namespace Spire
 			virtual GenericExpressionType * AsGenericTypeImpl() const { return nullptr; }
 			virtual NamedExpressionType * AsNamedTypeImpl() const { return nullptr; }
 
-            virtual ExpressionType* CreateCanonicalType() = 0;
-            ExpressionType* canonicalType = nullptr;
+			virtual ExpressionType* CreateCanonicalType() = 0;
+			ExpressionType* canonicalType = nullptr;
 		};
 
 		class BasicExpressionType : public ExpressionType
@@ -312,7 +312,7 @@ namespace Spire
 			ShaderClosure * ShaderClosure = nullptr;
 			FunctionSymbol * Func = nullptr;
 			ShaderComponentSymbol * Component = nullptr;
-            StructSyntaxNode* structDecl = nullptr;
+			StructSyntaxNode* structDecl = nullptr;
 			String RecordTypeName, GenericTypeVar;
 
 			BasicExpressionType()
@@ -337,7 +337,7 @@ namespace Spire
 			}
 			virtual CoreLib::Basic::String ToString() const override;
 			virtual ExpressionType * Clone() override;
-        protected:
+		protected:
 			virtual bool IsIntegralImpl() const override;
 			virtual bool EqualsImpl(const ExpressionType * type) const override;
 			virtual bool IsVectorTypeImpl() const override;
@@ -345,7 +345,7 @@ namespace Spire
 			{
 				return const_cast<BasicExpressionType*>(this);
 			}
-            virtual ExpressionType* CreateCanonicalType() override;
+			virtual ExpressionType* CreateCanonicalType() override;
 			virtual BindableResourceType GetBindableResourceType() const override;
 		};
 
@@ -356,14 +356,14 @@ namespace Spire
 			int ArrayLength = 0;
 			virtual CoreLib::Basic::String ToString() const override;
 			virtual ExpressionType * Clone() override;
-        protected:
+		protected:
 			virtual bool IsArrayImpl() const override;
 			virtual bool EqualsImpl(const ExpressionType * type) const override;
 			virtual ArrayExpressionType * AsArrayTypeImpl() const override
 			{
 				return const_cast<ArrayExpressionType*>(this);
 			}
-            virtual ExpressionType* CreateCanonicalType() override;
+			virtual ExpressionType* CreateCanonicalType() override;
 		};
 
 		class GenericExpressionType : public ExpressionType
@@ -373,7 +373,7 @@ namespace Spire
 			String GenericTypeName;
 			virtual CoreLib::Basic::String ToString() const override;
 			virtual ExpressionType * Clone() override;
-        protected:
+		protected:
 			virtual bool EqualsImpl(const ExpressionType * type) const override;
 			virtual bool IsGenericTypeImpl(String typeName) const override
 			{
@@ -383,27 +383,27 @@ namespace Spire
 			{
 				return const_cast<GenericExpressionType*>(this);
 			}
-            virtual ExpressionType* CreateCanonicalType() override;
+			virtual ExpressionType* CreateCanonicalType() override;
 			virtual BindableResourceType GetBindableResourceType() const override;
 
 		};
 
-        class NamedExpressionType : public ExpressionType
-        {
-        public:
-            TypeDefDecl* decl;
+		class NamedExpressionType : public ExpressionType
+		{
+		public:
+			TypeDefDecl* decl;
 
-            virtual String ToString() const override;
-            virtual ExpressionType * Clone() override;
+			virtual String ToString() const override;
+			virtual ExpressionType * Clone() override;
 			virtual BindableResourceType GetBindableResourceType() const override;
 
-        protected:
-            virtual bool EqualsImpl(const ExpressionType * type) const override;
-            virtual NamedExpressionType * AsNamedTypeImpl() const override;
-            virtual ExpressionType* CreateCanonicalType() override;
-        };
+		protected:
+			virtual bool EqualsImpl(const ExpressionType * type) const override;
+			virtual NamedExpressionType * AsNamedTypeImpl() const override;
+			virtual ExpressionType* CreateCanonicalType() override;
+		};
 
-		
+
 		class Type
 		{
 		public:
@@ -411,15 +411,15 @@ namespace Spire
 			// ContrainedWorlds: Implementation must be defined at at least one of of these worlds in order to satisfy global dependency
 			// FeasibleWorlds: The component can be computed at any of these worlds
 			EnumerableHashSet<String> ConstrainedWorlds, FeasibleWorlds;
-			EnumerableHashSet<String> PinnedWorlds; 
+			EnumerableHashSet<String> PinnedWorlds;
 		};
 
 		class Scope : public RefObject
 		{
 		public:
 			RefPtr<Scope> Parent;
-            Dictionary<String, Decl*> decls;
-            Decl* LookUp(String const& name);
+			Dictionary<String, Decl*> decls;
+			Decl* LookUp(String const& name);
 			Scope()
 				: Parent(0)
 			{}
@@ -450,7 +450,7 @@ namespace Spire
 						if (ctx.ScopeTranslateTable.TryGetValue(target->Scope->Parent.Ptr(), parentScope))
 							target->Scope->Parent = parentScope.Ptr();
 					}
-					
+
 				}
 				target->Position = this->Position;
 				target->Tags = this->Tags;
@@ -509,119 +509,121 @@ namespace Spire
 			}
 		};
 
-        class ContainerDecl;
+		class ContainerDecl;
+		class SpecializeModifier;
 
-        class Decl : public SyntaxNode
-        {
-        public:
-            ContainerDecl*  ParentDecl;
+		class Decl : public SyntaxNode
+		{
+		public:
+			ContainerDecl*  ParentDecl;
 			Token Name;
-            Modifiers modifiers;
+			Modifiers modifiers;
 
-            bool HasModifier(ModifierFlags flags) { return (modifiers.flags & flags) == flags; }
+			bool HasModifier(ModifierFlags flags) { return (modifiers.flags & flags) == flags; }
 
-            template<typename T>
-            FilteredModifierList<T> GetModifiersOfType() { return FilteredModifierList<T>(modifiers.first.Ptr()); }
+			template<typename T>
+			FilteredModifierList<T> GetModifiersOfType() { return FilteredModifierList<T>(modifiers.first.Ptr()); }
 
-            FilteredModifierList<SimpleAttribute> GetLayoutAttributes() { return GetModifiersOfType<SimpleAttribute>(); }
+			FilteredModifierList<SimpleAttribute> GetLayoutAttributes() { return GetModifiersOfType<SimpleAttribute>(); }
 
-            bool FindSimpleAttribute(String const& key, Token& outValue);
-            bool FindSimpleAttribute(String const& key, String& outValue);
-            bool HasSimpleAttribute(String const& key);
+			bool FindSimpleAttribute(String const& key, Token& outValue);
+			bool FindSimpleAttribute(String const& key, String& outValue);
+			bool HasSimpleAttribute(String const& key);
+			SpecializeModifier * FindSpecializeModifier();
 
 			virtual Decl * Clone(CloneContext & ctx) = 0;
-        };
+		};
 
-        template<typename T>
-        struct FilteredMemberList
-        {
-            typedef RefPtr<Decl> Element;
+		template<typename T>
+		struct FilteredMemberList
+		{
+			typedef RefPtr<Decl> Element;
 
-            FilteredMemberList()
-                : mBegin(NULL)
-                , mEnd(NULL)
-            {}
+			FilteredMemberList()
+				: mBegin(NULL)
+				, mEnd(NULL)
+			{}
 
-            explicit FilteredMemberList(
-                List<Element> const& list)
-                : mBegin(Adjust(list.begin(), list.end()))
-                , mEnd(list.end())
-            {}
+			explicit FilteredMemberList(
+				List<Element> const& list)
+				: mBegin(Adjust(list.begin(), list.end()))
+				, mEnd(list.end())
+			{}
 
-            struct Iterator
-            {
-                Element* mCursor;
-                Element* mEnd;
+			struct Iterator
+			{
+				Element* mCursor;
+				Element* mEnd;
 
-                bool operator!=(Iterator const& other)
-                {
-                    return mCursor != other.mCursor;
-                }
+				bool operator!=(Iterator const& other)
+				{
+					return mCursor != other.mCursor;
+				}
 
-                void operator++()
-                {
-                    mCursor = Adjust(mCursor + 1, mEnd);
-                }
+				void operator++()
+				{
+					mCursor = Adjust(mCursor + 1, mEnd);
+				}
 
-                RefPtr<T>& operator*()
-                {
-                    return *(RefPtr<T>*)mCursor;
-                }
-            };
+				RefPtr<T>& operator*()
+				{
+					return *(RefPtr<T>*)mCursor;
+				}
+			};
 
-            Iterator begin()
-            {
-                Iterator iter = { mBegin, mEnd };
-                return iter;
-            }
+			Iterator begin()
+			{
+				Iterator iter = { mBegin, mEnd };
+				return iter;
+			}
 
-            Iterator end()
-            {
-                Iterator iter = { mEnd, mEnd };
-                return iter;
-            }
+			Iterator end()
+			{
+				Iterator iter = { mEnd, mEnd };
+				return iter;
+			}
 
-            static Element* Adjust(Element* cursor, Element* end)
-            {
-                while (cursor != end)
-                {
-                    if ((*cursor).As<T>())
-                        return cursor;
-                    cursor++;
-                }
-                return cursor;
-            }
+			static Element* Adjust(Element* cursor, Element* end)
+			{
+				while (cursor != end)
+				{
+					if ((*cursor).As<T>())
+						return cursor;
+					cursor++;
+				}
+				return cursor;
+			}
 
-            // TODO(tfoley): It is ugly to have these.
-            // We should probably fix the call sites instead.
-            RefPtr<T>& First() { return *begin(); }
-            int Count()
-            {
-                int count = 0;
-                for (auto iter : (*this))
-                {
-                    (void)iter;
-                    count++;
-                }
-                return count;
-            }
+			// TODO(tfoley): It is ugly to have these.
+			// We should probably fix the call sites instead.
+			RefPtr<T>& First() { return *begin(); }
+			int Count()
+			{
+				int count = 0;
+				for (auto iter : (*this))
+				{
+					(void)iter;
+					count++;
+				}
+				return count;
+			}
 
-            Element* mBegin;
-            Element* mEnd;
-        };
+			Element* mBegin;
+			Element* mEnd;
+		};
 
-        // A "container" decl is a parent to other declarations
-        class ContainerDecl : public Decl
-        {
-        public:
-            List<RefPtr<Decl>> Members;
+		// A "container" decl is a parent to other declarations
+		class ContainerDecl : public Decl
+		{
+		public:
+			List<RefPtr<Decl>> Members;
 
-            template<typename T>
-            FilteredMemberList<T> GetMembersOfType()
-            {
-                return FilteredMemberList<T>(Members);
-            }
-        };
+			template<typename T>
+			FilteredMemberList<T> GetMembersOfType()
+			{
+				return FilteredMemberList<T>(Members);
+			}
+		};
 
 		enum class ExpressionAccess
 		{
@@ -642,25 +644,33 @@ namespace Spire
 		};
 
 
-        //
-        // Declarations
-        //
+		// A 'specialize' modifier indicating the shader parameter should be specialized
+		class SpecializeModifier : public Modifier
+		{
+		public:
+			List<RefPtr<ExpressionSyntaxNode>> Values;
 
-        // Base class for all variable-like declarations
-        class VarDeclBase : public Decl
-        {
-        public:
-            // Syntax for type specifier
+		};
+
+		//
+		// Declarations
+		//
+
+		// Base class for all variable-like declarations
+		class VarDeclBase : public Decl
+		{
+		public:
+			// Syntax for type specifier
 			RefPtr<TypeSyntaxNode> TypeNode;
 
-            // Resolved type of the variable
+			// Resolved type of the variable
 			RefPtr<ExpressionType> Type;
 
-            // Initializer expression (optional)
+			// Initializer expression (optional)
 			RefPtr<ExpressionSyntaxNode> Expr;
-        };
+		};
 
-        // A field of a `struct` type
+		// A field of a `struct` type
 		class StructField : public VarDeclBase
 		{
 		public:
@@ -679,31 +689,31 @@ namespace Spire
 		class StructSyntaxNode : public ContainerDecl
 		{
 		public:
-            FilteredMemberList<StructField> GetFields()
-            {
-                return GetMembersOfType<StructField>();
-            }
+			FilteredMemberList<StructField> GetFields()
+			{
+				return GetMembersOfType<StructField>();
+			}
 			bool IsIntrinsic = false;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			StructField* FindField(String name)
 			{
-                for (auto field : GetFields())
-                {
-                    if (field->Name.Content == name)
-                        return field.Ptr();
-                }
-                return nullptr;
+				for (auto field : GetFields())
+				{
+					if (field->Name.Content == name)
+						return field.Ptr();
+				}
+				return nullptr;
 			}
 			int FindFieldIndex(String name)
 			{
-                int index = 0;
-                for (auto field : GetFields())
-                {
-                    if (field->Name.Content == name)
-                        return index;
-                    index++;
-                }
-                return -1;
+				int index = 0;
+				for (auto field : GetFields())
+				{
+					if (field->Name.Content == name)
+						return index;
+					index++;
+				}
+				return -1;
 			}
 			virtual StructSyntaxNode * Clone(CloneContext & ctx) override
 			{
@@ -715,16 +725,16 @@ namespace Spire
 			}
 		};
 
-        // A `typedef` declaration
-        class TypeDefDecl : public Decl
-        {
-        public:
-            RefPtr<TypeSyntaxNode> TypeNode;
-            RefPtr<ExpressionType> Type;
+		// A `typedef` declaration
+		class TypeDefDecl : public Decl
+		{
+		public:
+			RefPtr<TypeSyntaxNode> TypeNode;
+			RefPtr<ExpressionType> Type;
 
-            virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-            virtual TypeDefDecl * Clone(CloneContext & ctx) override;
-        };
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual TypeDefDecl * Clone(CloneContext & ctx) override;
+		};
 
 		class StatementSyntaxNode : public SyntaxNode
 		{
@@ -740,7 +750,7 @@ namespace Spire
 			virtual BlockStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-        // TODO(tfoley): Only used by IL at this point
+		// TODO(tfoley): Only used by IL at this point
 		enum class ParameterQualifier
 		{
 			In, Out, InOut, Uniform
@@ -753,12 +763,12 @@ namespace Spire
 			virtual ParameterSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-        class FunctionDeclBase : public Decl
-        {
-        public:
+		class FunctionDeclBase : public Decl
+		{
+		public:
 			List<RefPtr<ParameterSyntaxNode>> Parameters;
 			RefPtr<BlockStatementSyntaxNode> Body;
-        };
+		};
 
 		class FunctionSyntaxNode : public FunctionDeclBase
 		{
@@ -766,9 +776,9 @@ namespace Spire
 			String InternalName;
 			RefPtr<ExpressionType> ReturnType;
 			RefPtr<TypeSyntaxNode> ReturnTypeNode;
-            bool IsInline() { return HasModifier(ModifierFlag::Inline); }
-            bool IsExtern() { return HasModifier(ModifierFlag::Extern); }
-            bool HasSideEffect() { return !HasModifier(ModifierFlag::Intrinsic); }
+			bool IsInline() { return HasModifier(ModifierFlag::Inline); }
+			bool IsExtern() { return HasModifier(ModifierFlag::Extern); }
+			bool HasSideEffect() { return !HasModifier(ModifierFlag::Intrinsic); }
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			FunctionSyntaxNode()
 			{
@@ -825,7 +835,7 @@ namespace Spire
 		{
 			Neg, Not, BitNot, PreInc, PreDec, PostInc, PostDec,
 			Mul, Div, Mod,
-			Add, Sub, 
+			Add, Sub,
 			Lsh, Rsh,
 			Eql, Neq, Greater, Less, Geq, Leq,
 			BitAnd, BitXor, BitOr,
@@ -836,7 +846,7 @@ namespace Spire
 		};
 
 		String GetOperatorFunctionName(Operator op);
-		
+
 		class ImportExpressionSyntaxNode : public ExpressionSyntaxNode
 		{
 		public:
@@ -864,7 +874,7 @@ namespace Spire
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual UnaryExpressionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
-		
+
 		class BinaryExpressionSyntaxNode : public ExpressionSyntaxNode
 		{
 		public:
@@ -882,7 +892,7 @@ namespace Spire
 			RefPtr<ExpressionSyntaxNode> IndexExpression;
 			virtual IndexExpressionSyntaxNode * Clone(CloneContext & ctx) override;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-		}; 
+		};
 
 		class MemberExpressionSyntaxNode : public ExpressionSyntaxNode
 		{
@@ -943,7 +953,7 @@ namespace Spire
 		class VarDeclrStatementSyntaxNode : public StatementSyntaxNode
 		{
 		public:
-            RefPtr<Decl> decl;
+			RefPtr<Decl> decl;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual VarDeclrStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
@@ -975,12 +985,12 @@ namespace Spire
 		class ComponentSyntaxNode : public Decl
 		{
 		public:
-            bool IsOutput()     { return HasModifier(ModifierFlag::Out); }
-            bool IsPublic()     { return HasModifier(ModifierFlag::Public); }
-            bool IsInline()     { return HasModifier(ModifierFlag::Inline) || (Parameters.Count() != 0); }
-            bool IsRequire()    { return HasModifier(ModifierFlag::Require); }
-            bool IsInput()      { return HasModifier(ModifierFlag::Extern); }
-            bool IsParam()      { return HasModifier(ModifierFlag::Param); }
+			bool IsOutput() { return HasModifier(ModifierFlag::Out); }
+			bool IsPublic() { return HasModifier(ModifierFlag::Public); }
+			bool IsInline() { return HasModifier(ModifierFlag::Inline) || (Parameters.Count() != 0); }
+			bool IsRequire() { return HasModifier(ModifierFlag::Require); }
+			bool IsInput() { return HasModifier(ModifierFlag::Extern); }
+			bool IsParam() { return HasModifier(ModifierFlag::Param); }
 			RefPtr<TypeSyntaxNode> TypeNode;
 			RefPtr<ExpressionType> Type;
 			RefPtr<RateSyntaxNode> Rate;
@@ -994,7 +1004,7 @@ namespace Spire
 		class WorldSyntaxNode : public Decl
 		{
 		public:
-            bool IsAbstract() { return HasModifier(ModifierFlag::Input); }
+			bool IsAbstract() { return HasModifier(ModifierFlag::Input); }
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override { return this; }
 			virtual WorldSyntaxNode * Clone(CloneContext & ctx) override;
 		};
@@ -1008,34 +1018,34 @@ namespace Spire
 			virtual StageSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-        // Shared functionality for "shader class"-like declarations
-        class ShaderDeclBase : public ContainerDecl
-        {
-        public:
+		// Shared functionality for "shader class"-like declarations
+		class ShaderDeclBase : public ContainerDecl
+		{
+		public:
 			Token ParentPipelineName;
 			List<Token> InterfaceNames;
-        };
-		
+		};
+
 		class PipelineSyntaxNode : public ShaderDeclBase
 		{
 		public:
-            // Access members of specific types
-            FilteredMemberList<WorldSyntaxNode> GetWorlds()
-            {
-                return GetMembersOfType<WorldSyntaxNode>();
-            }
-            FilteredMemberList<ImportOperatorDefSyntaxNode> GetImportOperators()
-            {
-                return GetMembersOfType<ImportOperatorDefSyntaxNode>();
-            }
-            FilteredMemberList<StageSyntaxNode> GetStages()
-            {
-                return GetMembersOfType<StageSyntaxNode>();
-            }
-            FilteredMemberList<ComponentSyntaxNode> GetAbstractComponents()
-            {
-                return GetMembersOfType<ComponentSyntaxNode>();
-            }
+			// Access members of specific types
+			FilteredMemberList<WorldSyntaxNode> GetWorlds()
+			{
+				return GetMembersOfType<WorldSyntaxNode>();
+			}
+			FilteredMemberList<ImportOperatorDefSyntaxNode> GetImportOperators()
+			{
+				return GetMembersOfType<ImportOperatorDefSyntaxNode>();
+			}
+			FilteredMemberList<StageSyntaxNode> GetStages()
+			{
+				return GetMembersOfType<StageSyntaxNode>();
+			}
+			FilteredMemberList<ComponentSyntaxNode> GetAbstractComponents()
+			{
+				return GetMembersOfType<ComponentSyntaxNode>();
+			}
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override { return this; }
 			virtual PipelineSyntaxNode * Clone(CloneContext & ctx) override;
 		};
@@ -1053,7 +1063,7 @@ namespace Spire
 		{
 		public:
 			bool IsInplace = false;
-            bool IsPublic() { return HasModifier(ModifierFlag::Public); }
+			bool IsPublic() { return HasModifier(ModifierFlag::Public); }
 			Token ShaderName;
 			Token ObjectName;
 			List<RefPtr<ImportArgumentSyntaxNode>> Arguments;
@@ -1081,50 +1091,50 @@ namespace Spire
 			virtual InterfaceSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-        class UsingFileDecl : public Decl
-        {
-        public:
-            Token fileName;
+		class UsingFileDecl : public Decl
+		{
+		public:
+			Token fileName;
 
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual UsingFileDecl * Clone(CloneContext & ctx) override;
-        };
+		};
 
 		class ProgramSyntaxNode : public ContainerDecl
 		{
 		public:
-            // Access members of specific types
-            FilteredMemberList<UsingFileDecl> GetUsings()
-            {
-                return GetMembersOfType<UsingFileDecl>();
-            }
-            FilteredMemberList<FunctionSyntaxNode> GetFunctions()
-            {
-                return GetMembersOfType<FunctionSyntaxNode>();
-            }
-            FilteredMemberList<PipelineSyntaxNode> GetPipelines()
-            {
-                return GetMembersOfType<PipelineSyntaxNode>();
-            }
+			// Access members of specific types
+			FilteredMemberList<UsingFileDecl> GetUsings()
+			{
+				return GetMembersOfType<UsingFileDecl>();
+			}
+			FilteredMemberList<FunctionSyntaxNode> GetFunctions()
+			{
+				return GetMembersOfType<FunctionSyntaxNode>();
+			}
+			FilteredMemberList<PipelineSyntaxNode> GetPipelines()
+			{
+				return GetMembersOfType<PipelineSyntaxNode>();
+			}
 			FilteredMemberList<InterfaceSyntaxNode> GetInterfaces()
 			{
 				return GetMembersOfType<InterfaceSyntaxNode>();
 			}
-            FilteredMemberList<ShaderSyntaxNode> GetShaders()
-            {
-                return GetMembersOfType<ShaderSyntaxNode>();
-            }
-            FilteredMemberList<StructSyntaxNode> GetStructs()
-            {
-                return GetMembersOfType<StructSyntaxNode>();
-            }
-            FilteredMemberList<TypeDefDecl> GetTypeDefs()
-            {
-                return GetMembersOfType<TypeDefDecl>();
-            }
+			FilteredMemberList<ShaderSyntaxNode> GetShaders()
+			{
+				return GetMembersOfType<ShaderSyntaxNode>();
+			}
+			FilteredMemberList<StructSyntaxNode> GetStructs()
+			{
+				return GetMembersOfType<StructSyntaxNode>();
+			}
+			FilteredMemberList<TypeDefDecl> GetTypeDefs()
+			{
+				return GetMembersOfType<TypeDefDecl>();
+			}
 			void Include(ProgramSyntaxNode * other)
 			{
-                Members.AddRange(other->Members);
+				Members.AddRange(other->Members);
 			}
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ProgramSyntaxNode * Clone(CloneContext & ctx) override;
@@ -1210,7 +1220,7 @@ namespace Spire
 		{
 		protected:
 			DiagnosticSink * sink = nullptr;
-            DiagnosticSink* getSink() { return sink; }
+			DiagnosticSink* getSink() { return sink; }
 		public:
 			SyntaxVisitor(DiagnosticSink * sink)
 				: sink(sink)
@@ -1228,10 +1238,10 @@ namespace Spire
 				return shader;
 			}
 
-            virtual RefPtr<UsingFileDecl> VisitUsingFileDecl(UsingFileDecl * decl)
-            {
-                return decl;
-            }
+			virtual RefPtr<UsingFileDecl> VisitUsingFileDecl(UsingFileDecl * decl)
+			{
+				return decl;
+			}
 
 			virtual RefPtr<ComponentSyntaxNode> VisitComponent(ComponentSyntaxNode * comp);
 			virtual RefPtr<FunctionSyntaxNode> VisitFunction(FunctionSyntaxNode* func)
@@ -1251,7 +1261,7 @@ namespace Spire
 			}
 			virtual RefPtr<TypeDefDecl> VisitTypeDefDecl(TypeDefDecl* decl)
 			{
-                decl->TypeNode = decl->TypeNode->Accept(this).As<TypeSyntaxNode>();
+				decl->TypeNode = decl->TypeNode->Accept(this).As<TypeSyntaxNode>();
 				return decl;
 			}
 			virtual RefPtr<StatementSyntaxNode> VisitDiscardStatement(DiscardStatementSyntaxNode * stmt)
@@ -1320,7 +1330,7 @@ namespace Spire
 			}
 			virtual RefPtr<StatementSyntaxNode> VisitVarDeclrStatement(VarDeclrStatementSyntaxNode* stmt)
 			{
-                stmt->decl = stmt->decl->Accept(this).As<Decl>();
+				stmt->decl = stmt->decl->Accept(this).As<Decl>();
 				return stmt;
 			}
 			virtual RefPtr<StatementSyntaxNode> VisitWhileStatement(WhileStatementSyntaxNode* stmt)

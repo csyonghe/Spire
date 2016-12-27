@@ -416,11 +416,18 @@ namespace Spire
 							arg->ArgumentName.Position = arg->Position;
 						}
 						position++;
-						RefPtr<ShaderComponentSymbol> refComp;
-						if (refShader->Components.TryGetValue(arg->ArgumentName.Content, refComp))
+						RefPtr<ShaderComponentSymbol> refComp, argComp;
+						if (auto funcs = refShader->FunctionComponents.TryGetValue(arg->ArgumentName.Content))
+							if (funcs->First()->IsRequire())
+								refComp = funcs->First();
+						if (!refComp)
+							refShader->Components.TryGetValue(arg->ArgumentName.Content, refComp);
+						
+						if (refComp)
 						{
 							if (refComp->Implementations.First()->SyntaxNode->Parameters.Count()) // this is a function parameter
 							{
+								arg->ArgumentName.Content = refComp->Name;
 								// construct an invocation node to resolve overloaded component function
 								RefPtr<InvokeExpressionSyntaxNode> tempInvoke = new InvokeExpressionSyntaxNode();
 								tempInvoke->Position = arg->Position;

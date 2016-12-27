@@ -298,6 +298,14 @@ namespace CoreLib
 #endif
 				}
 			}
+			bool operator==(const char * strbuffer) const
+			{
+				if (!buffer)
+					return (strbuffer == 0 || strcmp(strbuffer, "") == 0);
+				if (!strbuffer)
+					return buffer == nullptr || strcmp(buffer.Ptr(), "") == 0;
+				return (strcmp(buffer.Ptr(), strbuffer) == 0);
+			}
 
 			bool operator==(const String & str) const
 			{
@@ -306,6 +314,14 @@ namespace CoreLib
 				if (!str.buffer)
 					return buffer == nullptr || strcmp(buffer.Ptr(), "") == 0;
 				return (strcmp(buffer.Ptr(), str.buffer.Ptr()) == 0);
+			}
+			bool operator!=(const char * strbuffer) const
+			{
+				if (!buffer)
+					return (strbuffer != 0 && strcmp(strbuffer, "") != 0);
+				if (strbuffer == 0)
+					return length != 0;
+				return (strcmp(buffer.Ptr(), strbuffer) != 0);
 			}
 			bool operator!=(const String & str) const
 			{

@@ -62,6 +62,13 @@ namespace Spire
             return false;
         }
 
+		SpecializeModifier * Decl::FindSpecializeModifier()
+		{
+			for (auto m : GetModifiersOfType<SpecializeModifier>())
+				return m;
+			return nullptr;
+		}
+
         //
 
 		bool BasicExpressionType::EqualsImpl(const ExpressionType * type) const
