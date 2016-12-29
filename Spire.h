@@ -82,6 +82,7 @@ extern "C"
 	- spCreateCompilationContext()
 	- spDestroyCompilationContext()
 	- spCreateShader()
+	- spCreateShaderFromSource()
 	- spCompileShader()
 	- spSetCodeGenTarget()
 	- spAddSearchPath()
@@ -96,6 +97,7 @@ extern "C"
 	Related Functions
 	- spShaderAddModule()
 	- spShaderAddModuleByName()
+	- spShaderGetName()
 	- spShaderTargetPipeline()
 	*/
 	struct SpireShader {};
@@ -296,6 +298,20 @@ extern "C"
 	@param name The name of the shader.
 	*/
 	SPIRE_API SpireShader* spCreateShader(SpireCompilationContext * ctx, const char * name);
+
+	/*!
+	@brief Create a shader object from Spire source code.
+	@param ctx The compilation context.
+	@param name The source code of the shader.
+	*/
+	SPIRE_API SpireShader* spCreateShaderFromSource(SpireCompilationContext * ctx, const char * source);
+
+	/*!
+	@brief Retrieves the name of a shader.
+	@param shader The shader object whose name to retrieve.
+	@return Name of the shader object.
+	*/
+	SPIRE_API const char * spShaderGetName(SpireShader * shader);
 
 	/*!
 	@brief Adds a module to a shader.

@@ -394,11 +394,17 @@ namespace SpireLib
 		bool isShader = false;
 		String targetPipeline, shaderName;
 		List<String> usings;
+		String src;
 	public:
 		Shader(String name, bool pIsShader)
 		{
 			shaderName = name;
 			isShader = pIsShader;
+		}
+		Shader(String name, String source)
+		{
+			shaderName = name;
+			src = source;
 		}
 		void TargetPipeline(CoreLib::String pipelineName)
 		{
@@ -414,15 +420,20 @@ namespace SpireLib
 		}
 		String GetSource() const
 		{
-			StringBuilder codeBuilder;
-			codeBuilder << "shader " << shaderName;
-			if (targetPipeline.Length())
-				codeBuilder << ":" << targetPipeline;
-			codeBuilder << "\n{\n";
-			for (auto & m : usings)
-				codeBuilder << "using " << m << ";\n";
-			codeBuilder << "\n}\n";
-			return codeBuilder.ToString();
+			if (src.Length())
+				return src;
+			else
+			{
+				StringBuilder codeBuilder;
+				codeBuilder << "shader " << shaderName;
+				if (targetPipeline.Length())
+					codeBuilder << ":" << targetPipeline;
+				codeBuilder << "\n{\n";
+				for (auto & m : usings)
+					codeBuilder << "using " << m << ";\n";
+				codeBuilder << "\n}\n";
+				return codeBuilder.ToString();
+			}
 		}
 	};
 
@@ -647,6 +658,12 @@ namespace SpireLib
 		{
 			return new Shader(name, true);
 		}
+		Shader * NewShaderFromSource(const char * source)
+		{
+			Spire::Compiler::CompileResult result;
+			compiler->Parse(result, source, "", nullptr, Dictionary<String, String>());
+			return new Shader(result.Program->Shaders.First()->Name, source);
+		}
 		void PushContext()
 		{
 			states.Add(states.Last());
@@ -810,6 +827,16 @@ void spPopContext(SpireCompilationContext * ctx)
 SpireShader * spCreateShader(SpireCompilationContext * ctx, const char * name)
 {
 	return reinterpret_cast<SpireShader*>(CTX(ctx)->NewShader(name));
+}
+
+SpireShader* spCreateShaderFromSource(SpireCompilationContext * ctx, const char * source)
+{
+	return reinterpret_cast<SpireShader*>(CTX(ctx)->NewShaderFromSource(source));
+}
+
+const char* spShaderGetName(SpireShader * shader)
+{
+	return SHADER(shader)->GetName().Buffer();
 }
 
 void spShaderAddModule(SpireShader * shader, SpireModule * module)
