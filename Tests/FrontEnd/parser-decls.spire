@@ -31,7 +31,8 @@ module M
 }
 
 // a module can "inherit" from a pipeline
-module M2 : P
+module M2
+	targets P
 {
 }
 

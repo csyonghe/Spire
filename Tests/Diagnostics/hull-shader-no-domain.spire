@@ -43,7 +43,8 @@ pipeline P
     }
 }
 
-shader S : P
+shader S
+    targets P
 {
 	@FineVertex float4 RS_Position = float4(0.0);
 	@ControlPoint float2 tessLevelInner = float2(2.0);
