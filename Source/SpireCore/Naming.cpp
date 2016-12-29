@@ -6,13 +6,13 @@ namespace Spire
 	{
 		using namespace CoreLib;
 
-		String EscapeDoubleUnderscore(String str)
+		CoreLib::String EscapeCodeName(CoreLib::String str)
 		{
 			StringBuilder sb;
 			bool isUnderScore = false;
 			for (auto ch : str)
 			{
-				if (ch == '_')
+				if (ch == '_' || !((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')))
 				{
 					if (isUnderScore)
 						sb << "I_";

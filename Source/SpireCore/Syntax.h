@@ -44,8 +44,6 @@ namespace Spire
 			Extern = 1 << 12,
 			Input = 1 << 13,
 			Intrinsic = (1 << 14) | ModifierFlag::Extern,
-
-
 			// TODO(tfoley): This should probably be its own flag
 			InOut = ModifierFlag::In | ModifierFlag::Out,
 		};
@@ -1072,6 +1070,22 @@ namespace Spire
 
 		};
 
+		class TemplateShaderParameterSyntaxNode : public SyntaxNode
+		{
+		public:
+			Token ModuleName, InterfaceName;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * /*visitor*/) { return this; }
+			virtual TemplateShaderParameterSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
+		class TemplateShaderSyntaxNode : public ShaderDeclBase
+		{
+		public:
+			List<RefPtr<TemplateShaderParameterSyntaxNode>> Parameters;
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual TemplateShaderSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
 		class ShaderSyntaxNode : public ShaderDeclBase
 		{
 		public:
@@ -1482,6 +1496,15 @@ namespace Spire
 				}
 				return node;
 			}
+			virtual RefPtr<SyntaxNode> VisitTemplateShader(TemplateShaderSyntaxNode * shader)
+			{
+				for (auto & param : shader->Parameters)
+					param->Accept(this);
+				for (auto & member : shader->Members)
+					member->Accept(this);
+				return shader;
+			}
+
 		};
 	}
 }

@@ -161,7 +161,6 @@ namespace Spire
 			void PrintDef(StringBuilder & sbCode, ILType* type, const String & name);
 
 			String GetFuncOriginalName(const String & name);
-			String EscapeCodeName(const String & name);
 
 			virtual void PrintOp(CodeGenContext & ctx, ILOperand * op, bool forceExpression = false);
 			void PrintBinaryInstrExpr(CodeGenContext & ctx, BinaryInstruction * instr);

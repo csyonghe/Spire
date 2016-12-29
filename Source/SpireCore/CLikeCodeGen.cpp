@@ -26,7 +26,7 @@ namespace Spire
 			if (name.EndsWith(suffix))
 				return name;
 			else
-				return EscapeDoubleUnderscore(name + "_" + suffix);
+				return EscapeCodeName(name + "_" + suffix);
 		}
 
 		void CLikeCodeGen::PrintType(StringBuilder & sbCode, ILType* type)
@@ -54,22 +54,6 @@ namespace Spire
 			else
 				originalName = name;
 			return originalName;
-		}
-
-		String CLikeCodeGen::EscapeCodeName(const String & name)
-		{
-			StringBuilder rs;
-			for (int i = 0; i < name.Length(); i++)
-			{
-				if ((name[i] >= 'a' && name[i] <= 'z') || (name[i] >= 'A' && name[i] <= 'Z') ||
-					name[i] == '_' || (name[i] >= '0' && name[i] <= '9'))
-				{
-					rs << name[i];
-				}
-				else if (i != name.Length() - 1)
-					rs << '_';
-			}
-			return EscapeDoubleUnderscore(rs.ProduceString());
 		}
 
 		void CLikeCodeGen::PrintOp(CodeGenContext & ctx, ILOperand * op, bool forceExpression)

@@ -441,19 +441,6 @@ namespace Spire
 			}
 		}
 
-		String GetUniqueCodeName(String name)
-		{
-			StringBuilder sb;
-			for (auto ch : name)
-			{
-				if (ch == '.')
-					sb << "_";
-				else
-					sb << ch;
-			}
-			return EscapeDoubleUnderscore(sb.ProduceString());
-		}
-
 		bool IsInAbstractWorld(PipelineSymbol * pipeline, ShaderComponentSymbol* comp)
 		{
 			return comp->Implementations.First()->Worlds.Count() && !comp->Implementations.First()->SyntaxNode->IsRequire() &&
@@ -477,7 +464,7 @@ namespace Spire
 						uniqueChoiceName = namePrefix + comp.Key;
 					comp.Value->ChoiceNames.Add(uniqueChoiceName);
 					comp.Value->UniqueKey = uniqueChoiceName;
-					comp.Value->UniqueName = GetUniqueCodeName(uniqueChoiceName);
+					comp.Value->UniqueName = EscapeCodeName(uniqueChoiceName);
 				}
 			}
 			for (auto & subClosure : shader->SubClosures)

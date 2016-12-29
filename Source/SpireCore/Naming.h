@@ -7,7 +7,8 @@ namespace Spire
 {
 	namespace Compiler
 	{
-		CoreLib::String EscapeDoubleUnderscore(CoreLib::String str);
+		CoreLib::String EscapeCodeName(CoreLib::String str);
+
 	}
 }
 

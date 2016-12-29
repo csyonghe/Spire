@@ -1014,5 +1014,24 @@ namespace Spire
 				rs->Members.Add(comp->Clone(ctx));
 			return rs;
 		}
+		RefPtr<SyntaxNode> TemplateShaderSyntaxNode::Accept(SyntaxVisitor * visitor)
+		{
+			return visitor->VisitTemplateShader(this);
+		}
+		TemplateShaderSyntaxNode * TemplateShaderSyntaxNode::Clone(CloneContext & ctx)
+		{
+			auto rs = CloneSyntaxNodeFields(new TemplateShaderSyntaxNode(*this), ctx);
+			rs->Parameters.Clear();
+			for (auto & param : Parameters)
+				rs->Parameters.Add(param->Clone(ctx));
+			for (auto & member : Members)
+				rs->Members.Add(member->Clone(ctx));
+			return rs;
+		}
+		TemplateShaderParameterSyntaxNode * TemplateShaderParameterSyntaxNode::Clone(CloneContext & ctx)
+		{
+			auto rs = CloneSyntaxNodeFields(new TemplateShaderParameterSyntaxNode(*this), ctx);
+			return rs;
+		}
 }
 }

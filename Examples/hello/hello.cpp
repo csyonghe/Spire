@@ -107,18 +107,17 @@ HRESULT initialize( ID3D11Device* dxDevice )
 
     // Create a shader, which will initially be empty
     char const* shaderName = "HelloShader";
-    SpireShader* spireShader = spCreateShader(spireContext, "HelloShader");
+	SpireShader* spireShader = spCreateShaderFromSource(spireContext, R"(
+		template shader HelloShader(module0) targets StandardPipeline
+		{
+			using module0;
+		}
+	)");
 
-    // TODO(tfoley): This step should not be required, because there is only
-    // one pipeline being declared/used.
-    spShaderSetPipeline(spireShader, "StandardPipeline");
-
-    // Add a module of code to the shader.
-    // Note: we could call this multiple times to construct a complex effect
-    spShaderAddModuleByName(spireShader, "HelloModule");
+	SpireModule * helloModule = spFindModule(spireContext, "HelloModule");
 
     // Compile the constructed shader
-    SpireCompilationResult* spireResult = spCompileShader(spireContext, spireShader, spireSink);
+    SpireCompilationResult* spireResult = spCompileShader(spireContext, spireShader, &helloModule, 1, spireSink);
 
     // Inspect any error messages that got reported...
     emitSpireDiagnostics(spireSink);
@@ -132,8 +131,8 @@ HRESULT initialize( ID3D11Device* dxDevice )
     // output parameter.
     int sourceCodeLength;
 
-    char const* vertexShaderCode = spGetShaderStageSource(spireResult, shaderName, "vs", &sourceCodeLength);
-    char const* fragmentShaderCode = spGetShaderStageSource(spireResult, shaderName, "fs", &sourceCodeLength);
+    char const* vertexShaderCode = spGetShaderStageSource(spireResult, nullptr, "vs", &sourceCodeLength);
+    char const* fragmentShaderCode = spGetShaderStageSource(spireResult, nullptr, "fs", &sourceCodeLength);
 
     // TODO(tfoley): Query the required constant-buffer size
     int constantBufferSize = 16 * sizeof(float);

@@ -118,15 +118,7 @@ namespace Spire
 			{
 				StringBuilder nameSb;
 				nameSb << comp->ParentDecl->Name.Content << "." << comp->Name.Content;
-				StringBuilder finalNameSb;
-				for (auto ch : nameSb.ProduceString())
-				{
-					if ((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z'))
-						finalNameSb << ch;
-					else
-						finalNameSb << '_';
-				}
-				return EscapeDoubleUnderscore(finalNameSb.ProduceString());
+				return EscapeCodeName(nameSb.ProduceString());
 			}
 		public:
 			virtual RefPtr<StructSyntaxNode> VisitStruct(StructSyntaxNode * st) override
@@ -348,7 +340,7 @@ namespace Spire
 				currentShader = shader;
 				auto pipeline = shader->Shader->Pipeline;
 				compiledShader = new ILShader();
-				compiledShader->Name = shader->Shader->Name;
+				compiledShader->Name = EscapeCodeName(shader->Shader->Name);
 				compiledShader->Position = shader->Shader->Position;
 
 				GenerateParameterBindingInfo(shader);
@@ -501,7 +493,7 @@ namespace Spire
 							if (dep->SyntaxNode->Parameters.Count() == 0)
 							{
 								auto paramType = TranslateExpressionType(dep->Type);
-								String paramName = EscapeDoubleUnderscore("p" + String(id) + "_" + dep->OriginalName);
+								String paramName = EscapeCodeName("p" + String(id) + "_" + dep->OriginalName);
 								func->Parameters.Add(paramName, ILParameter(paramType));
 								auto argInstr = codeWriter.FetchArg(paramType, id + 1);
 								argInstr->Name = paramName;
@@ -512,7 +504,7 @@ namespace Spire
 						for (auto & param : comp->SyntaxNode->Parameters)
 						{
 							auto paramType = TranslateExpressionType(param->Type);
-							String paramName = EscapeDoubleUnderscore("p" + String(id) + "_" + param->Name.Content);
+							String paramName = EscapeCodeName("p" + String(id) + "_" + param->Name.Content);
 							func->Parameters.Add(paramName, ILParameter(paramType, GetParamQualifier(param.Ptr())));
 							auto argInstr = codeWriter.FetchArg(paramType, id + 1);
 							argInstr->Name = paramName;
@@ -603,7 +595,7 @@ namespace Spire
 			void VisitComponent(ComponentDefinitionIR * comp)
 			{
 				currentComponent = comp;
-				String varName = EscapeDoubleUnderscore(currentComponent->OriginalName);
+				String varName = EscapeCodeName(currentComponent->OriginalName);
 				RefPtr<ILType> type = TranslateExpressionType(currentComponent->Type);
 
 				if (comp->SyntaxNode->IsInput())
@@ -671,7 +663,7 @@ namespace Spire
 				{
 					func->Parameters.Add(param->Name.Content, ILParameter(TranslateExpressionType(param->Type), GetParamQualifier(param.Ptr())));
 					auto op = FetchArg(param->Type.Ptr(), ++id);
-					op->Name = EscapeDoubleUnderscore(String("p_") + param->Name.Content);
+					op->Name = EscapeCodeName(String("p_") + param->Name.Content);
 					variables.Add(param->Name.Content, op);
 				}
 				function->Body->Accept(this);
@@ -846,7 +838,7 @@ namespace Spire
 			RefPtr<Variable> VisitDeclrVariable(Variable* varDecl)
 			{
 				AllocVarInstruction * varOp = AllocVar(varDecl->Type.Ptr());
-				varOp->Name = EscapeDoubleUnderscore(varDecl->Name.Content);
+				varOp->Name = EscapeCodeName(varDecl->Name.Content);
 				variables.Add(varDecl->Name.Content, varOp);
 				if (varDecl->Expr)
 				{

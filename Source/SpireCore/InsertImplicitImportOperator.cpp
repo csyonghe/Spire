@@ -30,7 +30,7 @@ namespace Spire
 			ComponentDefinitionIR * MakeComponentAvailableAtWorldInternal(HashSet<String> & visitedComponents, String componentUniqueName, String world)
 			{
 				RefPtr<ComponentDefinitionIR> refDef;
-				if (passThroughComponents.TryGetValue(EscapeDoubleUnderscore(componentUniqueName + "_" + world), refDef))
+				if (passThroughComponents.TryGetValue(EscapeCodeName(componentUniqueName + "_" + world), refDef))
 					return refDef.Ptr();
 				if (visitedComponents.Contains(componentUniqueName + "@" + world))
 				{
@@ -69,7 +69,7 @@ namespace Spire
 				{
 					auto & node = importPath.Nodes.Last();
 					RefPtr<ComponentDefinitionIR> thruDef;
-					auto thruDefName = EscapeDoubleUnderscore(componentUniqueName + "_" + node.TargetWorld);
+					auto thruDefName = EscapeCodeName(componentUniqueName + "_" + node.TargetWorld);
 					if (!passThroughComponents.TryGetValue(thruDefName, thruDef))
 					{
 						auto srcDef = MakeComponentAvailableAtWorldInternal(visitedComponents, componentUniqueName, node.ImportOperator->SourceWorld.Content);

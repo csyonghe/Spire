@@ -81,8 +81,8 @@ extern "C"
 	Related Functions
 	- spCreateCompilationContext()
 	- spDestroyCompilationContext()
-	- spCreateShader()
 	- spCreateShaderFromSource()
+	- spCreateShaderFromFile()
 	- spCompileShader()
 	- spSetCodeGenTarget()
 	- spAddSearchPath()
@@ -95,10 +95,8 @@ extern "C"
 	Modules can be added to a shader by calling spShaderAddModule().
 
 	Related Functions
-	- spShaderAddModule()
-	- spShaderAddModuleByName()
 	- spShaderGetName()
-	- spShaderTargetPipeline()
+	- spCompileShader()
 	*/
 	struct SpireShader {};
 
@@ -115,7 +113,7 @@ extern "C"
 	- spModuleGetParameterBufferSize()
 	- spModuleGetRequiredComponents()
 	*/
-	struct SpireModule {};
+	struct SpireModule;
 
 	/*!
 	@brief Represents the compilation result, including error messages and compiled source code for each stage.
@@ -293,18 +291,18 @@ extern "C"
 	void spPopContext(SpireCompilationContext * ctx);
 
 	/*!
-	@brief Create a shader object that can be used to assemble a final shader from modules.
-	@param ctx The compilation context.
-	@param name The name of the shader.
-	*/
-	SPIRE_API SpireShader* spCreateShader(SpireCompilationContext * ctx, const char * name);
-
-	/*!
-	@brief Create a shader object from Spire source code.
+	@brief Create a template shader object from Spire source code.
 	@param ctx The compilation context.
 	@param name The source code of the shader.
 	*/
 	SPIRE_API SpireShader* spCreateShaderFromSource(SpireCompilationContext * ctx, const char * source);
+
+	/*!
+	@brief Create a template shader object from a Spire source file.
+	@param ctx The compilation context.
+	@param name The source code of the shader.
+	*/
+	SPIRE_API SpireShader* spCreateShaderFromFile(SpireCompilationContext * ctx, const char * fileName);
 
 	/*!
 	@brief Retrieves the name of a shader.
@@ -312,27 +310,6 @@ extern "C"
 	@return Name of the shader object.
 	*/
 	SPIRE_API const char * spShaderGetName(SpireShader * shader);
-
-	/*!
-	@brief Adds a module to a shader.
-	@param shader A shader object.
-	@param moduleName The name of the module to add to @p shader.
-	*/
-	SPIRE_API void spShaderAddModuleByName(SpireShader * shader, const char * moduleName);
-
-	/*!
-	@brief Adds a module to a shader.
-	@param shader A shader object.
-	@param module The handle of the module to add to @p shader.
-	*/
-	SPIRE_API void spShaderAddModule(SpireShader * shader, SpireModule * moduleName);
-
-	/*!
-	@brief Sets the target pipeline of a shader
-	@param shader A shader object.
-	@param pipelineName The name of the Pipeline that @p shader targets.
-	*/
-	SPIRE_API void spShaderSetPipeline(SpireShader * shader, const char * pipelineName);
 
 	/*!
 	@brief Find a precompiled module in a SpireCompilationContext.
@@ -403,12 +380,18 @@ extern "C"
 	@brief Compiles a shader object.
 	@param ctx A shader compilation context.
 	@param shader The shader object to compile.
+	@param args The modules used as template shader arguments.
+	@param argCount The number of elements in @p args array.
 	@return The return value is a handle to a SpireCompilationResult object that contains error messages and compiled source code.
 	@note You are responsible for destorying a SpireCompilationResult object when it is no longer used. Destroying a SpireCompilationContext
 	does not automatically destroy SpireCompilationResult objects.
     @param sink The sink where diagnostic output should be sent, or NULL to ignore messages.
 	*/
-	SPIRE_API SpireCompilationResult* spCompileShader(SpireCompilationContext * ctx, SpireShader * shader, SpireDiagnosticSink* sink);
+	SPIRE_API SpireCompilationResult* spCompileShader(SpireCompilationContext * ctx, 
+		SpireShader * shader, 
+		SpireModule** args, 
+		int argCount, 
+		SpireDiagnosticSink* sink);
 
 	/*!
 	@brief Compiles a shader object.
@@ -421,7 +404,10 @@ extern "C"
 	@see spDestroyCompilationResult()
     @param sink The sink where diagnostic output should be sent, or NULL to ignore messages.
 	*/
-	SPIRE_API SpireCompilationResult* spCompileShaderFromSource(SpireCompilationContext * ctx, const char * source, const char * fileName, SpireDiagnosticSink* sink);
+	SPIRE_API SpireCompilationResult* spCompileShaderFromSource(SpireCompilationContext * ctx, 
+		const char * source, 
+		const char * fileName,
+		SpireDiagnosticSink* sink);  /*deprecated*/
 
 	/*!
 	@brief Checks if any errors have been output to the diagnostic sink.

@@ -13,6 +13,7 @@
 #include "../CoreLib/Tokenizer.h"
 #include "Closure.h"
 #include "VariantIR.h"
+#include "Naming.h"
 
 #ifdef CreateDirectory
 #undef CreateDirectory
@@ -281,6 +282,76 @@ namespace Spire
 				}
 				return result;
 			}
+			ShaderSyntaxNode * InstantiateShaderTemplate(DiagnosticSink* sink, SymbolTable* symTable, TemplateShaderSyntaxNode* ts, const List<String>& args)
+			{
+				if (ts->Parameters.Count() > args.Count())
+				{
+					sink->diagnose(ts->Position, Diagnostics::insufficientTemplateShaderArguments, ts->Name);
+					return nullptr;
+				}
+				if (ts->Parameters.Count() < args.Count())
+				{
+					sink->diagnose(ts->Position, Diagnostics::tooManyTemplateShaderArguments, ts->Name);
+					return nullptr;
+				}
+				// check semantics
+				bool hasErrors = false;
+				for (int i = 0; i < args.Count(); i++)
+				{
+					auto name = args[i];
+					if (auto module = symTable->Shaders.TryGetValue(name))
+					{
+						if (ts->Parameters[i]->InterfaceName.Content.Length())
+						{
+							if ((*module)->SyntaxNode->InterfaceNames.FindFirst([&](const Token & t) { return t.Content == ts->Parameters[i]->InterfaceName.Content; }) == -1)
+							{
+								hasErrors = true;
+								sink->diagnose(ts->Parameters[i]->Position, Diagnostics::templateShaderArgumentDidNotImplementRequiredInterface, name, ts->Parameters[i]->ModuleName, ts->Parameters[i]->InterfaceName);
+								sink->diagnose((*module)->SyntaxNode->Position, Diagnostics::seeDefinitionOf, (*module)->SyntaxNode->Name);
+							}
+						}
+					}
+					else
+					{
+						hasErrors = true;
+						sink->diagnose(ts->Parameters[i]->Position, Diagnostics::templateShaderArgumentIsNotDefined, args[i], ts->Parameters[i]->ModuleName.Content);
+					}
+				}
+				if (hasErrors)
+					return nullptr;
+				ShaderSyntaxNode * result = new ShaderSyntaxNode();
+				result->Name = ts->Name;
+				StringBuilder nameBuilder;
+				nameBuilder << ts->Name.Content << "<";
+				for (int i = 0; i < args.Count(); i++)
+				{
+					nameBuilder << args[i];
+					if (i < args.Count()-1)
+						nameBuilder << ",";
+				}
+				nameBuilder << ">";
+				result->Name.Content = nameBuilder.ProduceString();
+				result->ParentPipelineName = ts->ParentPipelineName;
+				for (auto & member : ts->Members)
+				{
+					if (auto import = member.As<ImportSyntaxNode>())
+					{
+						int index = ts->Parameters.FindFirst([&](RefPtr<TemplateShaderParameterSyntaxNode> p) { return p->ModuleName.Content == import->ShaderName.Content; });
+						if (index != -1)
+						{
+							CloneContext cloneCtx;
+							auto newImport = import->Clone(cloneCtx);
+							newImport->Scope->Parent = result->Scope;
+							newImport->ShaderName.Content = args[index];
+							result->Members.Add(newImport);
+							continue;
+						}
+					}
+					result->Members.Add(member);
+				}
+				result->IsModule = false;
+				return result;
+			}
 		public:
 			virtual CompileUnit Parse(CompileResult & result, String source, String fileName, IncludeHandler* includeHandler, Dictionary<String,String> const& preprocesorDefinitions) override
 			{
@@ -299,13 +370,32 @@ namespace Spire
 
 				SymbolTable & symTable = context.Symbols;
 				auto & shaderClosures = context.ShaderClosures;
+				
 				RefPtr<SyntaxVisitor> visitor = CreateSemanticsVisitor(&symTable, result.GetErrorWriter());
 				try
 				{
 					programSyntaxNode->Accept(visitor.Ptr());
-					visitor = nullptr;
 					if (result.GetErrorCount() > 0)
 						return;
+					// if user specified a template shader symbol, instantiate the template now
+					String symbolToCompile = options.SymbolToCompile;
+					if (symbolToCompile.Length())
+					{
+						auto templateShaders = programSyntaxNode->GetMembersOfType<TemplateShaderSyntaxNode>();
+						for (auto & ts : templateShaders)
+							if (ts->Name.Content == symbolToCompile)
+							{
+								auto shader = InstantiateShaderTemplate(result.GetErrorWriter(), &symTable, ts.Ptr(), options.TemplateShaderArguments);
+								if (shader)
+								{
+									programSyntaxNode->Members.Add(shader);
+									symbolToCompile = shader->Name.Content;
+									programSyntaxNode->Accept(visitor.Ptr());
+								}
+								break;
+							}
+					}
+					visitor = nullptr;
 					symTable.EvalFunctionReferenceClosure();
 					if (result.GetErrorCount() > 0)
 						return;
@@ -409,8 +499,8 @@ namespace Spire
 						};
 						for (auto & shader : result.Program->Shaders)
 						{
-							if ((options.SymbolToCompile.Length() == 0 && IsSymbolToGen(shader->Name))
-								|| options.SymbolToCompile == shader->Name)
+							if ((symbolToCompile.Length() == 0 && IsSymbolToGen(shader->Name))
+								|| EscapeCodeName(symbolToCompile) == shader->Name)
 							{
 								StringBuilder glslBuilder;
 								Dictionary<String, String> targetCode;

@@ -107,33 +107,35 @@ namespace Spire
 			bool LookAheadToken(const char * string, int offset = 0);
 			Token ReadTypeKeyword();
 			bool IsTypeKeyword();
-			RefPtr<ProgramSyntaxNode>				ParseProgram();
-			RefPtr<ShaderSyntaxNode>				ParseShader();
-			RefPtr<InterfaceSyntaxNode>				ParseInterface();
-			RefPtr<PipelineSyntaxNode>				ParsePipeline();
-			RefPtr<StageSyntaxNode>					ParseStage();
-			RefPtr<WorldSyntaxNode>					ParseWorld();
-			RefPtr<RateSyntaxNode>					ParseRate();
-			RefPtr<ImportSyntaxNode>				ParseImportInner();
-			RefPtr<ImportStatementSyntaxNode>		ParseImportStatement();
-			RefPtr<ImportOperatorDefSyntaxNode>		ParseImportOperator();
-			RefPtr<FunctionSyntaxNode>				ParseFunction(bool parseBody = true);
-			RefPtr<StructSyntaxNode>				ParseStruct();
-			RefPtr<StatementSyntaxNode>				ParseStatement();
-			RefPtr<BlockStatementSyntaxNode>		ParseBlockStatement();
-			RefPtr<VarDeclrStatementSyntaxNode>		ParseVarDeclrStatement();
-			RefPtr<IfStatementSyntaxNode>			ParseIfStatement();
-			RefPtr<ForStatementSyntaxNode>			ParseForStatement();
-			RefPtr<WhileStatementSyntaxNode>		ParseWhileStatement();
-			RefPtr<DoWhileStatementSyntaxNode>		ParseDoWhileStatement();
-			RefPtr<BreakStatementSyntaxNode>		ParseBreakStatement();
-			RefPtr<ContinueStatementSyntaxNode>		ParseContinueStatement();
-			RefPtr<ReturnStatementSyntaxNode>		ParseReturnStatement();
-			RefPtr<ExpressionStatementSyntaxNode>	ParseExpressionStatement();
-			RefPtr<ExpressionSyntaxNode>			ParseExpression(int level = 0);
-			RefPtr<ExpressionSyntaxNode>			ParseLeafExpression();
-			RefPtr<ParameterSyntaxNode>				ParseParameter();
-			RefPtr<TypeSyntaxNode>					ParseType();
+			RefPtr<ProgramSyntaxNode>					ParseProgram();
+			RefPtr<ShaderSyntaxNode>					ParseShader();
+			RefPtr<TemplateShaderSyntaxNode>			ParseTemplateShader();
+			RefPtr<TemplateShaderParameterSyntaxNode>	ParseTemplateShaderParameter();
+			RefPtr<InterfaceSyntaxNode>					ParseInterface();
+			RefPtr<PipelineSyntaxNode>					ParsePipeline();
+			RefPtr<StageSyntaxNode>						ParseStage();
+			RefPtr<WorldSyntaxNode>						ParseWorld();
+			RefPtr<RateSyntaxNode>						ParseRate();
+			RefPtr<ImportSyntaxNode>					ParseImportInner();
+			RefPtr<ImportStatementSyntaxNode>			ParseImportStatement();
+			RefPtr<ImportOperatorDefSyntaxNode>			ParseImportOperator();
+			RefPtr<FunctionSyntaxNode>					ParseFunction(bool parseBody = true);
+			RefPtr<StructSyntaxNode>					ParseStruct();
+			RefPtr<StatementSyntaxNode>					ParseStatement();
+			RefPtr<BlockStatementSyntaxNode>			ParseBlockStatement();
+			RefPtr<VarDeclrStatementSyntaxNode>			ParseVarDeclrStatement();
+			RefPtr<IfStatementSyntaxNode>				ParseIfStatement();
+			RefPtr<ForStatementSyntaxNode>				ParseForStatement();
+			RefPtr<WhileStatementSyntaxNode>			ParseWhileStatement();
+			RefPtr<DoWhileStatementSyntaxNode>			ParseDoWhileStatement();
+			RefPtr<BreakStatementSyntaxNode>			ParseBreakStatement();
+			RefPtr<ContinueStatementSyntaxNode>			ParseContinueStatement();
+			RefPtr<ReturnStatementSyntaxNode>			ParseReturnStatement();
+			RefPtr<ExpressionStatementSyntaxNode>		ParseExpressionStatement();
+			RefPtr<ExpressionSyntaxNode>				ParseExpression(int level = 0);
+			RefPtr<ExpressionSyntaxNode>				ParseLeafExpression();
+			RefPtr<ParameterSyntaxNode>					ParseParameter();
+			RefPtr<TypeSyntaxNode>						ParseType();
 
 			Parser & operator = (const Parser &) = delete;
 		};
@@ -916,6 +918,8 @@ namespace Spire
             // TODO: actual dispatch!
 			if (parser->LookAheadToken("shader") || parser->LookAheadToken("module"))
 				decl = parser->ParseShader();
+			else if (parser->LookAheadToken("template"))
+				decl = parser->ParseTemplateShader();
 			else if (parser->LookAheadToken("pipeline"))
 				decl = parser->ParsePipeline();
 			else if (parser->LookAheadToken("struct"))
@@ -1029,6 +1033,41 @@ namespace Spire
             ParseDeclBody(this, shader.Ptr(), TokenType::RBrace);
 			PopScope();
 			return shader;
+		}
+
+		RefPtr<TemplateShaderSyntaxNode> Parser::ParseTemplateShader()
+		{
+			RefPtr<TemplateShaderSyntaxNode> shader = new TemplateShaderSyntaxNode();
+			ReadToken("template");
+			ReadToken("shader");
+			PushScope();
+			FillPosition(shader.Ptr());
+			shader->Name = ReadToken(TokenType::Identifier);
+			ReadToken(TokenType::LParent);
+			while (!AdvanceIf(this, TokenType::RParent))
+			{
+				shader->Parameters.Add(ParseTemplateShaderParameter());
+				if (!AdvanceIf(this, TokenType::Comma))
+				{
+					ReadToken(TokenType::RParent);
+					break;
+				}
+			}
+			if (AdvanceIf(this, "targets"))
+				shader->ParentPipelineName = ReadToken(TokenType::Identifier);
+			ReadToken(TokenType::LBrace);
+			ParseDeclBody(this, shader.Ptr(), TokenType::RBrace);
+			return shader;
+		}
+
+		RefPtr<TemplateShaderParameterSyntaxNode> Parser::ParseTemplateShaderParameter()
+		{
+			RefPtr<TemplateShaderParameterSyntaxNode> param = new TemplateShaderParameterSyntaxNode();
+			FillPosition(param.Ptr());
+			param->ModuleName = ReadToken(TokenType::Identifier);
+			if (AdvanceIf(this, TokenType::Colon))
+				param->InterfaceName = ReadToken(TokenType::Identifier);
+			return param;
 		}
 
 		RefPtr<PipelineSyntaxNode> Parser::ParsePipeline()
