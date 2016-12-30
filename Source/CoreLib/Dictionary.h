@@ -88,30 +88,30 @@ namespace CoreLib
 			void Free()
 			{
 				if (hashMap)
-					delete [] hashMap;
+					delete[] hashMap;
 				hashMap = 0;
 			}
 			inline bool IsDeleted(int pos) const
 			{
-				return marks.Contains((pos<<1) + 1);
+				return marks.Contains((pos << 1) + 1);
 			}
 			inline bool IsEmpty(int pos) const
 			{
-				return !marks.Contains((pos<<1));
+				return !marks.Contains((pos << 1));
 			}
 			inline void SetDeleted(int pos, bool val)
 			{
 				if (val)
-					marks.Add((pos<<1)+1);
+					marks.Add((pos << 1) + 1);
 				else
-					marks.Remove((pos<<1)+1);
+					marks.Remove((pos << 1) + 1);
 			}
 			inline void SetEmpty(int pos, bool val)
 			{
 				if (val)
-					marks.Remove((pos<<1));
+					marks.Remove((pos << 1));
 				else
-					marks.Add((pos<<1));
+					marks.Add((pos << 1));
 			}
 			struct FindPositionResult
 			{
@@ -132,12 +132,12 @@ namespace CoreLib
 			template<typename T>
 			inline int GetHashPos(T & key) const
 			{
-				return ((unsigned int)(GetHashCode(key)*2654435761)) >> shiftBits;
+				return ((unsigned int)(GetHashCode(key) * 2654435761)) >> shiftBits;
 			}
 			template<typename T>
 			FindPositionResult FindPosition(const T & key) const
 			{
-				int hashPos = GetHashPos((TKey&)key);
+				int hashPos = GetHashPos((T&)key);
 				int insertPos = -1;
 				int numProbes = 0;
 				while (numProbes <= bucketSizeMinusOne)
@@ -159,7 +159,7 @@ namespace CoreLib
 						return FindPositionResult(hashPos, -1);
 					}
 					numProbes++;
-					hashPos = (hashPos+GetProbeOffset(numProbes)) & bucketSizeMinusOne;
+					hashPos = (hashPos + GetProbeOffset(numProbes)) & bucketSizeMinusOne;
 				}
 				if (insertPos != -1)
 					return FindPositionResult(-1, insertPos);
@@ -174,9 +174,9 @@ namespace CoreLib
 			}
 			void Rehash()
 			{
-				if (bucketSizeMinusOne == -1 || _count/(float)bucketSizeMinusOne >= MaxLoadFactor)
+				if (bucketSizeMinusOne == -1 || _count / (float)bucketSizeMinusOne >= MaxLoadFactor)
 				{
-					int newSize = (bucketSizeMinusOne+1) * 2;
+					int newSize = (bucketSizeMinusOne + 1) * 2;
 					int newShiftBits = shiftBits - 1;
 					if (newSize == 0)
 					{
@@ -187,7 +187,7 @@ namespace CoreLib
 					newDict.shiftBits = newShiftBits;
 					newDict.bucketSizeMinusOne = newSize - 1;
 					newDict.hashMap = new KeyValuePair<TKey, TValue>[newSize];
-					newDict.marks.SetMax(newSize*2);
+					newDict.marks.SetMax(newSize * 2);
 					if (hashMap)
 					{
 						for (auto & kvPair : *this)
@@ -198,7 +198,7 @@ namespace CoreLib
 					*this = _Move(newDict);
 				}
 			}
-			
+
 			bool AddIfNotExists(KeyValuePair<TKey, TValue> && kvPair)
 			{
 				Rehash();
@@ -261,8 +261,8 @@ namespace CoreLib
 				}
 				Iterator operator ++(int)
 				{
-					Iterator rs = * this;
-					operator++( );
+					Iterator rs = *this;
+					operator++();
 					return rs;
 				}
 				bool operator != (const Iterator & _that) const
@@ -405,11 +405,11 @@ namespace CoreLib
 				}
 				TValue & operator = (const TValue & val) const
 				{
-					return ((Dictionary<TKey,TValue>*)dict)->Set(KeyValuePair<TKey, TValue>(_Move(key), val));
+					return ((Dictionary<TKey, TValue>*)dict)->Set(KeyValuePair<TKey, TValue>(_Move(key), val));
 				}
 				TValue & operator = (TValue && val) const
 				{
-					return ((Dictionary<TKey,TValue>*)dict)->Set(KeyValuePair<TKey, TValue>(_Move(key), _Move(val)));
+					return ((Dictionary<TKey, TValue>*)dict)->Set(KeyValuePair<TKey, TValue>(_Move(key), _Move(val)));
 				}
 			};
 			ItemProxy operator [](const TKey & key) const
@@ -462,9 +462,9 @@ namespace CoreLib
 				bucketSizeMinusOne = other.bucketSizeMinusOne;
 				_count = other._count;
 				shiftBits = other.shiftBits;
-				hashMap = new KeyValuePair<TKey, TValue>[other.bucketSizeMinusOne+1];
+				hashMap = new KeyValuePair<TKey, TValue>[other.bucketSizeMinusOne + 1];
 				marks = other.marks;
-				for (int i = 0; i<= bucketSizeMinusOne; i++)
+				for (int i = 0; i <= bucketSizeMinusOne; i++)
 					hashMap[i] = other.hashMap[i];
 				return *this;
 			}
@@ -573,7 +573,7 @@ namespace CoreLib
 			template<typename T>
 			FindPositionResult FindPosition(const T & key) const
 			{
-				int hashPos = GetHashPos((TKey&)key);
+				int hashPos = GetHashPos((T&)key);
 				int insertPos = -1;
 				int numProbes = 0;
 				while (numProbes <= bucketSizeMinusOne)
@@ -880,7 +880,7 @@ namespace CoreLib
 				Free();
 			}
 		};
-		
+
 		class _DummyClass
 		{};
 
@@ -944,8 +944,8 @@ namespace CoreLib
 				}
 				Iterator operator ++(int)
 				{
-					Iterator rs = * this;
-					operator++( );
+					Iterator rs = *this;
+					operator++();
 					return rs;
 				}
 				bool operator != (const Iterator & _that) const

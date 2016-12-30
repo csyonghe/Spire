@@ -8,6 +8,35 @@ namespace CoreLib
 {
 	namespace Basic
 	{
+
+		inline int GetHashCode(double key)
+		{
+			return FloatAsInt((float)key);
+		}
+		inline int GetHashCode(float key)
+		{
+			return FloatAsInt(key);
+		}
+		inline int GetHashCode(const char * buffer)
+		{
+			if (!buffer)
+				return 0;
+			int hash = 0;
+			int c;
+			auto str = buffer;
+			c = *str++;
+			while (c)
+			{
+				hash = c + (hash << 6) + (hash << 16) - hash;
+				c = *str++;
+			}
+			return hash;
+		}
+		inline int GetHashCode(char * buffer)
+		{
+			return GetHashCode(const_cast<const char *>(buffer));
+		}
+
 		template<int IsInt>
 		class Hash
 		{
@@ -69,29 +98,7 @@ namespace CoreLib
 			return PointerHash<std::is_pointer<TKey>::value>::GetHashCode(key);
 		}
 
-		inline int GetHashCode(double key)
-		{
-			return FloatAsInt((float)key);
-		}
-		inline int GetHashCode(float key)
-		{
-			return FloatAsInt(key);
-		}
-		inline int GetHashCode(const char * buffer)
-		{
-			if (!buffer)
-				return 0;
-			int hash = 0;
-			int c;
-			auto str = buffer;
-			c = *str++;
-			while (c)
-			{
-				hash = c + (hash << 6) + (hash << 16) - hash;
-				c = *str++;
-			}
-			return hash;
-		}
+
 	}
 }
 

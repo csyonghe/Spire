@@ -629,8 +629,9 @@ namespace SpireLib
 		{
 			Spire::Compiler::CompileResult result;
 			auto unit = compiler->Parse(result, source, fileName, nullptr, Dictionary<String, String>());
-			for (auto shader: unit.SyntaxNode->GetMembersOfType<TemplateShaderSyntaxNode>())
-				return new Shader(shader->Name.Content, String(source));
+			auto list = unit.SyntaxNode->GetMembersOfType<TemplateShaderSyntaxNode>();
+			if (list.Count())
+				return new Shader((*list.begin())->Name.Content, String(source));
 			return nullptr;
 		}
 		Shader * NewShaderFromFile(const char * fileName)

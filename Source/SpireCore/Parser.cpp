@@ -1062,6 +1062,7 @@ namespace Spire
 				shader->ParentPipelineName = ReadToken(TokenType::Identifier);
 			ReadToken(TokenType::LBrace);
 			ParseDeclBody(this, shader.Ptr(), TokenType::RBrace);
+			PopScope();
 			return shader;
 		}
 

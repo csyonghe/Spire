@@ -66,8 +66,9 @@ namespace Spire
 
 		SpecializeModifier * Decl::FindSpecializeModifier()
 		{
-			for (auto m : GetModifiersOfType<SpecializeModifier>())
-				return m;
+			auto list = GetModifiersOfType<SpecializeModifier>();
+			if (list.begin() != list.end())
+				return *list.begin();
 			return nullptr;
 		}
 
