@@ -303,7 +303,8 @@ namespace Spire
 					{
 						if (ts->Parameters[i]->InterfaceName.Content.Length())
 						{
-							if ((*module)->SyntaxNode->InterfaceNames.FindFirst([&](const Token & t) { return t.Content == ts->Parameters[i]->InterfaceName.Content; }) == -1)
+							if ((*module)->SyntaxNode->Name.Content != ts->Parameters[i]->InterfaceName.Content &&
+								(*module)->SyntaxNode->InterfaceNames.FindFirst([&](const Token & t) { return t.Content == ts->Parameters[i]->InterfaceName.Content; }) == -1)
 							{
 								hasErrors = true;
 								sink->diagnose(ts->Parameters[i]->Position, Diagnostics::templateShaderArgumentDidNotImplementRequiredInterface, name, ts->Parameters[i]->ModuleName, ts->Parameters[i]->InterfaceName);
@@ -341,6 +342,10 @@ namespace Spire
 						{
 							CloneContext cloneCtx;
 							auto newImport = import->Clone(cloneCtx);
+							auto attribModifier = new SimpleAttribute();
+							attribModifier->Key = "Binding";
+							attribModifier->Value.Content = String(index);
+							newImport->modifiers.first = attribModifier;
 							newImport->Scope->Parent = result->Scope;
 							newImport->ShaderName.Content = args[index];
 							result->Members.Add(newImport);
