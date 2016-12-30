@@ -749,6 +749,7 @@
     <ClInclude Include="Dictionary.h" />
     <ClInclude Include="Exception.h" />
     <ClInclude Include="Func.h" />
+    <ClInclude Include="Hash.h" />
     <ClInclude Include="IntSet.h" />
     <ClInclude Include="LibIO.h" />
     <ClInclude Include="LibString.h" />

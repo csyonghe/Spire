@@ -5,81 +5,12 @@
 #include "IntSet.h"
 #include "Exception.h"
 #include "LibMath.h"
+#include "Hash.h"
+
 namespace CoreLib
 {
 	namespace Basic
 	{
-		template<int IsInt>
-		class Hash
-		{
-		public:
-		};
-		template<>
-		class Hash<1>
-		{
-		public:
-			template<typename TKey>
-			static int GetHashCode(TKey & key)
-			{
-				return (int)key;
-			}
-		};
-		template<>
-		class Hash<0>
-		{
-		public:
-			template<typename TKey>
-			static int GetHashCode(TKey & key)
-			{
-				return key.GetHashCode();
-			}
-		};
-		template<int IsPointer>
-		class PointerHash
-		{};
-		template<>
-		class PointerHash<1>
-		{
-		public:
-			template<typename TKey>
-			static int GetHashCode(TKey & key)
-			{
-				return (int)((CoreLib::PtrInt)key)/sizeof(typename std::remove_pointer<TKey>::type);
-			}
-		};
-		template<>
-		class PointerHash<0>
-		{
-		public:
-			template<typename TKey>
-			static int GetHashCode(TKey & key)
-			{
-				return Hash<std::is_integral<TKey>::value || std::is_enum<TKey>::value>::GetHashCode(key);
-			}
-		};
-
-		template<typename TKey>
-		int GetHashCode(const TKey & key)
-		{
-			return PointerHash<std::is_pointer<TKey>::value>::GetHashCode(key);
-		}
-
-		template<typename TKey>
-		int GetHashCode(TKey & key)
-		{
-			return PointerHash<std::is_pointer<TKey>::value>::GetHashCode(key);
-		}
-		
-		
-		inline int GetHashCode(double key)
-		{
-			return FloatAsInt((float)key);
-		}
-		inline int GetHashCode(float key)
-		{
-			return FloatAsInt(key);
-		}
-
 		template<typename TKey, typename TValue>
 		class KeyValuePair
 		{
@@ -198,11 +129,13 @@ namespace CoreLib
 				}
 
 			};
-			inline int GetHashPos(TKey & key) const
+			template<typename T>
+			inline int GetHashPos(T & key) const
 			{
 				return ((unsigned int)(GetHashCode(key)*2654435761)) >> shiftBits;
 			}
-			FindPositionResult FindPosition(const TKey & key) const
+			template<typename T>
+			FindPositionResult FindPosition(const T & key) const
 			{
 				int hashPos = GetHashPos((TKey&)key);
 				int insertPos = -1;
@@ -402,14 +335,17 @@ namespace CoreLib
 
 				marks.Clear();
 			}
-			bool ContainsKey(const TKey & key) const
+
+			template<typename T>
+			bool ContainsKey(const T & key) const
 			{
 				if (bucketSizeMinusOne == -1)
 					return false;
 				auto pos = FindPosition(key);
 				return pos.ObjectPosition != -1;
 			}
-			bool TryGetValue(const TKey & key, TValue & value) const
+			template<typename T>
+			bool TryGetValue(const T & key, TValue & value) const
 			{
 				if (bucketSizeMinusOne == -1)
 					return false;
@@ -421,7 +357,8 @@ namespace CoreLib
 				}
 				return false;
 			}
-			TValue * TryGetValue(const TKey & key) const
+			template<typename T>
+			TValue * TryGetValue(const T & key) const
 			{
 				if (bucketSizeMinusOne == -1)
 					return nullptr;
@@ -628,11 +565,13 @@ namespace CoreLib
 				}
 
 			};
-			inline int GetHashPos(TKey & key) const
+			template<typename T>
+			inline int GetHashPos(T & key) const
 			{
 				return ((unsigned int)(GetHashCode(key) * 2654435761)) >> shiftBits;
 			}
-			FindPositionResult FindPosition(const TKey & key) const
+			template<typename T>
+			FindPositionResult FindPosition(const T & key) const
 			{
 				int hashPos = GetHashPos((TKey&)key);
 				int insertPos = -1;
@@ -783,14 +722,16 @@ namespace CoreLib
 				kvPairs.Clear();
 				marks.Clear();
 			}
-			bool ContainsKey(const TKey & key) const
+			template<typename T>
+			bool ContainsKey(const T & key) const
 			{
 				if (bucketSizeMinusOne == -1)
 					return false;
 				auto pos = FindPosition(key);
 				return pos.ObjectPosition != -1;
 			}
-			TValue * TryGetValue(const TKey & key) const
+			template<typename T>
+			TValue * TryGetValue(const T & key) const
 			{
 				if (bucketSizeMinusOne == -1)
 					return nullptr;
@@ -801,7 +742,8 @@ namespace CoreLib
 				}
 				return nullptr;
 			}
-			bool TryGetValue(const TKey & key, TValue & value) const
+			template<typename T>
+			bool TryGetValue(const T & key, TValue & value) const
 			{
 				if (bucketSizeMinusOne == -1)
 					return false;
