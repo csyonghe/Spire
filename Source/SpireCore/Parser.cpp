@@ -1,5 +1,7 @@
 #include "Parser.h"
 
+#include <assert.h>
+
 namespace Spire
 {
 	namespace Compiler
@@ -12,7 +14,7 @@ namespace Spire
 		{
         public:
 			int anonymousParamCounter = 0;
-			List<RefPtr<Scope>> scopeStack;
+			RefPtr<Scope> currentScope;
             TokenReader tokenReader;
             DiagnosticSink * sink;
 			String fileName;
@@ -28,18 +30,15 @@ namespace Spire
 			void FillPosition(SyntaxNode * node)
 			{
 				node->Position = tokenReader.PeekLoc();
-				node->Scope = scopeStack.Last();
+				node->Scope = currentScope;
 			}
-			void PushScope()
+			void PushScope(ContainerDecl* containerDecl)
 			{
-				scopeStack.Add(new Scope());
-				if (scopeStack.Count() > 1)
-					scopeStack.Last()->Parent = scopeStack[scopeStack.Count() - 2].Ptr();
+				currentScope = new Scope(currentScope, containerDecl);
 			}
 			void PopScope()
 			{
-				scopeStack.Last() = 0;
-				scopeStack.RemoveAt(scopeStack.Count() - 1);
+				currentScope = currentScope->Parent;
 			}
 			Parser(TokenSpan const& _tokens, DiagnosticSink * sink, String _fileName)
 				: tokenReader(_tokens), sink(sink), fileName(_fileName)
@@ -712,7 +711,7 @@ namespace Spire
             DeclaratorInfo const&       declaratorInfo,
             RefPtr<FunctionSyntaxNode>  decl)
         {
-            parser->PushScope();
+            parser->PushScope(decl.Ptr());
 
             parser->anonymousParamCounter = 0;
             parser->FillPosition(decl.Ptr());
@@ -723,7 +722,7 @@ namespace Spire
             parser->ReadToken(TokenType::LParent);
             while (!AdvanceIfMatch(parser, TokenType::RParent))
             {
-                decl->Parameters.Add(parser->ParseParameter());
+                decl->Members.Add(parser->ParseParameter());
                 if (AdvanceIf(parser, TokenType::RParent))
                     break;
                 parser->ReadToken(TokenType::Comma);
@@ -735,7 +734,7 @@ namespace Spire
             DeclaratorInfo const&       declaratorInfo,
             RefPtr<ComponentSyntaxNode> decl)
         {
-            parser->PushScope();
+            parser->PushScope(decl.Ptr());
 
             parser->anonymousParamCounter = 0;
             parser->FillPosition(decl.Ptr());
@@ -746,7 +745,7 @@ namespace Spire
             parser->ReadToken(TokenType::LParent);
             while (!AdvanceIfMatch(parser, TokenType::RParent))
             {
-                decl->Parameters.Add(parser->ParseParameter());
+                decl->Members.Add(parser->ParseParameter());
                 if (AdvanceIf(parser, TokenType::RParent))
                     break;
                 parser->ReadToken(TokenType::Comma);
@@ -946,6 +945,10 @@ namespace Spire
             if (decl)
             {
                 decl->modifiers = modifiers;
+                if (containerDecl)
+                {
+                    containerDecl->Members.Add(decl);
+                }
             }
             return decl;
         }
@@ -970,7 +973,7 @@ namespace Spire
                 if (decl)
                 {
                     decl->ParentDecl = containerDecl;
-                    containerDecl->Members.Add(decl);
+                    //containerDecl->Members.Add(decl);
                 }
                 TryRecover(parser);
             }
@@ -978,12 +981,14 @@ namespace Spire
 
 		RefPtr<ProgramSyntaxNode> Parser::ParseProgram()
 		{
-			scopeStack.Add(new Scope());
 			RefPtr<ProgramSyntaxNode> program = new ProgramSyntaxNode();
+			PushScope(program.Ptr());
 			program->Position = CodePosition(0, 0, 0, fileName);
-			program->Scope = scopeStack.Last();
+			program->Scope = currentScope;
             ParseDeclBody(this, program.Ptr(), TokenType::EndOfFile);
-			scopeStack.Clear();
+			PopScope();
+			assert(!currentScope.Ptr());
+			currentScope = nullptr;
 			return program;
 		}
 
@@ -991,7 +996,7 @@ namespace Spire
 		{
 			RefPtr<InterfaceSyntaxNode> node = new InterfaceSyntaxNode();
 			ReadToken("interface");
-			PushScope();
+			PushScope(node.Ptr());
 			FillPosition(node.Ptr());
 			node->Name = ReadToken(TokenType::Identifier);
 			ReadToken(TokenType::LBrace);
@@ -1009,7 +1014,7 @@ namespace Spire
 			}
 			else
 				ReadToken("shader");
-			PushScope();
+			PushScope(shader.Ptr());
 			FillPosition(shader.Ptr());
 			shader->Name = ReadToken(TokenType::Identifier);
 			while (LookAheadToken("targets") || LookAheadToken("implements"))
@@ -1040,7 +1045,7 @@ namespace Spire
 			RefPtr<TemplateShaderSyntaxNode> shader = new TemplateShaderSyntaxNode();
 			ReadToken("template");
 			ReadToken("shader");
-			PushScope();
+			PushScope(shader.Ptr());
 			FillPosition(shader.Ptr());
 			shader->Name = ReadToken(TokenType::Identifier);
 			ReadToken(TokenType::LParent);
@@ -1074,7 +1079,7 @@ namespace Spire
 		{
 			RefPtr<PipelineSyntaxNode> pipeline = new PipelineSyntaxNode();
 			ReadToken("pipeline");
-			PushScope();
+			PushScope(pipeline.Ptr());
 			FillPosition(pipeline.Ptr());
 			pipeline->Name = ReadToken(TokenType::Identifier);
 			if (AdvanceIf(this, TokenType::Colon))
@@ -1210,7 +1215,7 @@ namespace Spire
 		RefPtr<ImportOperatorDefSyntaxNode> Parser::ParseImportOperator()
 		{
 			RefPtr<ImportOperatorDefSyntaxNode> op = new ImportOperatorDefSyntaxNode();
-			PushScope();
+			PushScope(op.Ptr());
 			FillPosition(op.Ptr());
 			ReadToken("import");
 			ReadToken(TokenType::LParent);
@@ -1234,7 +1239,7 @@ namespace Spire
 			ReadToken(TokenType::LParent);
 			while (!AdvanceIf(this, TokenType::RParent))
 			{
-				op->Parameters.Add(ParseParameter());
+				op->Members.Add(ParseParameter());
 				if (AdvanceIf(this, TokenType::RParent))
 					break;
                 ReadToken(TokenType::Comma);
@@ -1251,13 +1256,15 @@ namespace Spire
 			return op;
 		}
 
+        // TODO(tfoley): this definition is now largely redundant (only
+        // used to parse requirements for import operators)
 		RefPtr<FunctionSyntaxNode> Parser::ParseFunction(bool parseBody)
 		{
 			anonymousParamCounter = 0;
 			RefPtr<FunctionSyntaxNode> function = new FunctionSyntaxNode();
             function->modifiers = ParseModifiers(this);
 			
-			PushScope();
+			PushScope(function.Ptr());
 			function->ReturnTypeNode = ParseType();
 			FillPosition(function.Ptr());
 			Token name;
@@ -1286,7 +1293,7 @@ namespace Spire
 			ReadToken(TokenType::LParent);
 			while(!AdvanceIfMatch(this, TokenType::RParent))
 			{
-				function->Parameters.Add(ParseParameter());
+				function->Members.Add(ParseParameter());
 				if (AdvanceIf(this, TokenType::RParent))
 					break;
 				ReadToken(TokenType::Comma);
@@ -1382,8 +1389,10 @@ namespace Spire
 
 		RefPtr<BlockStatementSyntaxNode> Parser::ParseBlockStatement()
 		{
+			RefPtr<ScopeDecl> scopeDecl = new ScopeDecl();
 			RefPtr<BlockStatementSyntaxNode> blockStatement = new BlockStatementSyntaxNode();
-			PushScope();
+            blockStatement->scopeDecl = scopeDecl;
+			PushScope(scopeDecl.Ptr());
 			ReadToken(TokenType::LBrace);
 			if(!tokenReader.IsAtEnd())
 			{
@@ -1407,7 +1416,8 @@ namespace Spire
 			RefPtr<VarDeclrStatementSyntaxNode>varDeclrStatement = new VarDeclrStatementSyntaxNode();
 		
 			FillPosition(varDeclrStatement.Ptr());
-            varDeclrStatement->decl = ParseDecl(this, nullptr);
+            auto decl = ParseDecl(this, currentScope->containerDecl);
+            varDeclrStatement->decl = decl;
 			return varDeclrStatement;
 		}
 
@@ -1430,8 +1440,10 @@ namespace Spire
 
 		RefPtr<ForStatementSyntaxNode> Parser::ParseForStatement()
 		{
+			RefPtr<ScopeDecl> scopeDecl = new ScopeDecl();
 			RefPtr<ForStatementSyntaxNode> stmt = new ForStatementSyntaxNode();
-			PushScope();
+            stmt->scopeDecl = scopeDecl;
+			PushScope(scopeDecl.Ptr());
 			FillPosition(stmt.Ptr());
 			ReadToken("for");
 			ReadToken(TokenType::LParent);
@@ -1464,21 +1476,18 @@ namespace Spire
 		RefPtr<WhileStatementSyntaxNode> Parser::ParseWhileStatement()
 		{
 			RefPtr<WhileStatementSyntaxNode> whileStatement = new WhileStatementSyntaxNode();
-			PushScope();
 			FillPosition(whileStatement.Ptr());
 			ReadToken("while");
 			ReadToken(TokenType::LParent);
 			whileStatement->Predicate = ParseExpression();
 			ReadToken(TokenType::RParent);
 			whileStatement->Statement = ParseStatement();
-			PopScope();
 			return whileStatement;
 		}
 
 		RefPtr<DoWhileStatementSyntaxNode> Parser::ParseDoWhileStatement()
 		{
 			RefPtr<DoWhileStatementSyntaxNode> doWhileStatement = new DoWhileStatementSyntaxNode();
-			PushScope();
 			FillPosition(doWhileStatement.Ptr());
 			ReadToken("do");
 			doWhileStatement->Statement = ParseStatement();
@@ -1487,7 +1496,6 @@ namespace Spire
 			doWhileStatement->Predicate = ParseExpression();
 			ReadToken(TokenType::RParent);
 			ReadToken(TokenType::Semicolon);
-			PopScope();
 			return doWhileStatement;
 		}
 

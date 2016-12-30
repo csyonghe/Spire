@@ -412,14 +412,17 @@ namespace Spire
 			EnumerableHashSet<String> PinnedWorlds;
 		};
 
+		class ContainerDecl;
 		class Scope : public RefObject
 		{
 		public:
 			RefPtr<Scope> Parent;
+			ContainerDecl*  containerDecl;
 			Dictionary<String, Decl*> decls;
 			Decl* LookUp(String const& name);
-			Scope()
-				: Parent(0)
+			Scope(RefPtr<Scope> parent, ContainerDecl* containerDecl)
+				: Parent(parent)
+				, containerDecl(containerDecl)
 			{}
 		};
 
@@ -606,22 +609,32 @@ namespace Spire
 				return count;
 			}
 
+            List<RefPtr<T>> ToArray()
+            {
+                List<RefPtr<T>> result;
+                for (auto element : (*this))
+                {
+                    result.Add(element);
+                }
+                return result;
+            }
+
 			Element* mBegin;
 			Element* mEnd;
 		};
 
-		// A "container" decl is a parent to other declarations
-		class ContainerDecl : public Decl
-		{
-		public:
-			List<RefPtr<Decl>> Members;
+        // A "container" decl is a parent to other declarations
+        class ContainerDecl : public Decl
+        {
+        public:
+            List<RefPtr<Decl>> Members;
 
-			template<typename T>
-			FilteredMemberList<T> GetMembersOfType()
-			{
-				return FilteredMemberList<T>(Members);
-			}
-		};
+            template<typename T>
+            FilteredMemberList<T> GetMembersOfType()
+            {
+                return FilteredMemberList<T>(Members);
+            }
+        };
 
 		enum class ExpressionAccess
 		{
@@ -740,7 +753,21 @@ namespace Spire
 			virtual StatementSyntaxNode* Clone(CloneContext & ctx) = 0;
 		};
 
-		class BlockStatementSyntaxNode : public StatementSyntaxNode
+        // A scope for local declarations (e.g., as part of a statement)
+        class ScopeDecl : public ContainerDecl
+        {
+        public:
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual ScopeDecl * Clone(CloneContext & ctx) override;
+        };
+
+        class ScopeStmt : public StatementSyntaxNode
+        {
+        public:
+            RefPtr<ScopeDecl> scopeDecl;
+        };
+
+		class BlockStatementSyntaxNode : public ScopeStmt
 		{
 		public:
 			List<RefPtr<StatementSyntaxNode>> Statements;
@@ -761,10 +788,13 @@ namespace Spire
 			virtual ParameterSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class FunctionDeclBase : public Decl
+		class FunctionDeclBase : public ContainerDecl
 		{
 		public:
-			List<RefPtr<ParameterSyntaxNode>> Parameters;
+			FilteredMemberList<ParameterSyntaxNode> GetParameters()
+			{
+				return GetMembersOfType<ParameterSyntaxNode>();
+			}
 			RefPtr<BlockStatementSyntaxNode> Body;
 		};
 
@@ -980,12 +1010,12 @@ namespace Spire
 			virtual RateSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class ComponentSyntaxNode : public Decl
+		class ComponentSyntaxNode : public ContainerDecl
 		{
 		public:
 			bool IsOutput() { return HasModifier(ModifierFlag::Out); }
 			bool IsPublic() { return HasModifier(ModifierFlag::Public); }
-			bool IsInline() { return HasModifier(ModifierFlag::Inline) || (Parameters.Count() != 0); }
+			bool IsInline() { return HasModifier(ModifierFlag::Inline) || IsComponentFunction(); }
 			bool IsRequire() { return HasModifier(ModifierFlag::Require); }
 			bool IsInput() { return HasModifier(ModifierFlag::Extern); }
 			bool IsParam() { return HasModifier(ModifierFlag::Param); }
@@ -994,7 +1024,11 @@ namespace Spire
 			RefPtr<RateSyntaxNode> Rate;
 			RefPtr<BlockStatementSyntaxNode> BlockStatement;
 			RefPtr<ExpressionSyntaxNode> Expression;
-			List<RefPtr<ParameterSyntaxNode>> Parameters;
+			FilteredMemberList<ParameterSyntaxNode> GetParameters()
+			{
+				return GetMembersOfType<ParameterSyntaxNode>();
+			}
+			bool IsComponentFunction() { return GetParameters().Count() != 0; }
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ComponentSyntaxNode * Clone(CloneContext & ctx) override;
 		};
@@ -1172,7 +1206,7 @@ namespace Spire
 			virtual IfStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class ForStatementSyntaxNode : public StatementSyntaxNode
+		class ForStatementSyntaxNode : public ScopeStmt
 		{
 		public:
 			RefPtr<StatementSyntaxNode> InitialStatement;
@@ -1261,11 +1295,17 @@ namespace Spire
 			virtual RefPtr<FunctionSyntaxNode> VisitFunction(FunctionSyntaxNode* func)
 			{
 				func->ReturnTypeNode = func->ReturnTypeNode->Accept(this).As<TypeSyntaxNode>();
-				for (auto & param : func->Parameters)
-					param = param->Accept(this).As<ParameterSyntaxNode>();
+				for (auto & member : func->Members)
+					member = member->Accept(this).As<Decl>();
 				if (func->Body)
 					func->Body = func->Body->Accept(this).As<BlockStatementSyntaxNode>();
 				return func;
+			}
+			virtual RefPtr<ScopeDecl> VisitScopeDecl(ScopeDecl* decl)
+			{
+                // By default don't visit children, because they will always
+                // be encountered in the ordinary flow of the corresponding statement.
+				return decl;
 			}
 			virtual RefPtr<StructSyntaxNode> VisitStruct(StructSyntaxNode * s)
 			{

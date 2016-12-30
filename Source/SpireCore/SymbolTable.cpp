@@ -121,7 +121,7 @@ namespace Spire
 						if (op->SourceWorld.Content == world0)
 						{
 							ImportPath np = p;
-							if (op->Parameters.Count() != 0)
+							if (op->GetParameters().Count() != 0)
 								np.IsImplicitPath = false;
 							for (auto &req : op->Requirements)
 								np.TypeRequirements.Add(req.Ptr());
@@ -436,7 +436,7 @@ namespace Spire
 				auto retType = PrintType(req->ReturnType, typeStr);
 				StringBuilder sbInternalName;
 				sbInternalName << req->Name.Content;
-				for (auto & op : req->Parameters)
+				for (auto & op : req->GetParameters())
 				{
 					sbInternalName << "@" << PrintType(op->Type, typeStr);
 				}

@@ -514,7 +514,7 @@ namespace Spire
                             err->diagnose(existingComp->Implementations.First()->SyntaxNode, Diagnostics::seePreviousDefinition);
 						}
 					}
-					else if (comp.Value->Implementations.First()->SyntaxNode->Parameters.Count() == 0)
+					else if (!comp.Value->Implementations.First()->SyntaxNode->IsComponentFunction())
 					{
 						err->diagnose(comp.Value->Implementations.First()->SyntaxNode, Diagnostics::componentAlreadyDefinedWhenCompiling, comp.Value->UniqueKey, closure->Name);
 						auto currentClosure = subClosure;
