@@ -657,13 +657,13 @@ namespace SpireLib
 			states.Last() = State();
 			states.SetSize(states.Count() - 1);
 		}
-		bool Compile(CompileResult & result, const Shader & shader, ArrayView<SpireModule*> modulesArgs, SpireDiagnosticSink* sink)
+		bool Compile(CompileResult & result, const Shader & shader, ArrayView<SpireModule*> modulesArgs, const char * additionalSource, SpireDiagnosticSink* sink)
 		{
 			Options.SymbolToCompile = shader.GetName();
 			Options.TemplateShaderArguments.Clear();
 			for (auto module : modulesArgs)
 				Options.TemplateShaderArguments.Add(module->Name);
-			return Compile(result, shader.GetSource(), shader.GetName(), sink);
+			return Compile(result, additionalSource + shader.GetSource(), shader.GetName(), sink);
 		}
 		bool Compile(CompileResult & result, CoreLib::String source, CoreLib::String fileName, SpireDiagnosticSink* sink)
 		{
@@ -891,10 +891,11 @@ void spDestroyShader(SpireShader * shader)
 SpireCompilationResult * spCompileShader(SpireCompilationContext * ctx, SpireShader * shader, 
 	SpireModule** args,
 	int argCount,
+	const char * additionalSource,
 	SpireDiagnosticSink* sink)
 {
 	SpireLib::CompileResult * rs = new SpireLib::CompileResult();
-	CTX(ctx)->Compile(*rs, *SHADER(shader), ArrayView<SpireModule*>(args, argCount), sink);
+	CTX(ctx)->Compile(*rs, *SHADER(shader), ArrayView<SpireModule*>(args, argCount), additionalSource, sink);
 	return reinterpret_cast<SpireCompilationResult*>(rs);
 }
 

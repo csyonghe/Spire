@@ -117,7 +117,7 @@ HRESULT initialize( ID3D11Device* dxDevice )
 	SpireModule * helloModule = spFindModule(spireContext, "HelloModule");
 
     // Compile the constructed shader
-    SpireCompilationResult* spireResult = spCompileShader(spireContext, spireShader, &helloModule, 1, spireSink);
+    SpireCompilationResult* spireResult = spCompileShader(spireContext, spireShader, &helloModule, 1, nullptr, spireSink);
 
     // Inspect any error messages that got reported...
     emitSpireDiagnostics(spireSink);

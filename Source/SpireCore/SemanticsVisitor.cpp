@@ -421,7 +421,7 @@ namespace Spire
 								refComp = funcs->First();
 						if (!refComp)
 							refShader->Components.TryGetValue(arg->ArgumentName.Content, refComp);
-						
+
 						if (refComp)
 						{
 							if (refComp->Implementations.First()->SyntaxNode->IsComponentFunction()) // this is a function parameter
@@ -822,31 +822,44 @@ namespace Spire
 				for (auto & s : program->GetTypeDefs())
 					VisitTypeDefDecl(s.Ptr());
 				for (auto & s : program->GetStructs())
-					VisitStruct(s.Ptr());
-				for (auto & func : program->GetFunctions())
 				{
-					VisitFunctionDeclaration(func.Ptr());
-					if (funcNames.Contains(func->InternalName))
+					if (!s->SemanticallyChecked)
 					{
-						StringBuilder argList;
-						argList << "(";
-                        bool first = true;
-						for (auto & param : func->GetParameters())
-						{
-							if (!first)
-								argList << ", ";
-							argList << param->Type->ToString();
-                            first = false;
-						}
-						argList << ")";
-						getSink()->diagnose(func, Diagnostics::functionRedefinitionWithArgList, func->Name, argList.ProduceString());
+						VisitStruct(s.Ptr());
+						s->SemanticallyChecked = true;
 					}
-					else
-						funcNames.Add(func->InternalName);
 				}
 				for (auto & func : program->GetFunctions())
 				{
-					func->Accept(this);
+					if (!func->SemanticallyChecked)
+					{
+						VisitFunctionDeclaration(func.Ptr());
+						if (funcNames.Contains(func->InternalName))
+						{
+							StringBuilder argList;
+							argList << "(";
+							bool first = true;
+							for (auto & param : func->GetParameters())
+							{
+								if (!first)
+									argList << ", ";
+								argList << param->Type->ToString();
+								first = false;
+							}
+							argList << ")";
+							getSink()->diagnose(func, Diagnostics::functionRedefinitionWithArgList, func->Name, argList.ProduceString());
+						}
+						else
+							funcNames.Add(func->InternalName);
+					}
+				}
+				for (auto & func : program->GetFunctions())
+				{
+					if (!func->SemanticallyChecked)
+					{
+						func->Accept(this);
+						func->SemanticallyChecked = true;
+					}
 				}
 				for (auto & pipeline : program->GetPipelines())
 				{
@@ -854,22 +867,33 @@ namespace Spire
 				}
 				for (auto & interfaceNode : program->GetInterfaces())
 				{
-					VisitInterface(interfaceNode.Ptr());
+					if (!interfaceNode->SemanticallyChecked)
+					{
+						VisitInterface(interfaceNode.Ptr());
+						interfaceNode->SemanticallyChecked = true;
+					}
 				}
 				// build initial symbol table for shaders
 				for (auto & shader : program->GetShaders())
 				{
-					RefPtr<ShaderSymbol> shaderSym = new ShaderSymbol();
-					shaderSym->SyntaxNode = shader.Ptr();
-					if (symbolTable->Shaders.ContainsKey(shader->Name.Content))
+					if (!shader->SemanticallyChecked)
 					{
-						getSink()->diagnose(shader->Name, Diagnostics::shaderAlreadyDefined, shader->Name);
+						RefPtr<ShaderSymbol> shaderSym = new ShaderSymbol();
+						shaderSym->SyntaxNode = shader.Ptr();
+						if (symbolTable->Shaders.ContainsKey(shader->Name.Content))
+						{
+							getSink()->diagnose(shader->Name, Diagnostics::shaderAlreadyDefined, shader->Name);
+						}
+						symbolTable->Shaders[shader->Name.Content] = shaderSym;
 					}
-					symbolTable->Shaders[shader->Name.Content] = shaderSym;
 				}
 				for (auto & shader : program->GetShaders())
 				{
-					VisitShaderPass1(shader.Ptr());
+					if (!shader->SemanticallyChecked)
+					{
+						VisitShaderPass1(shader.Ptr());
+						shader->SemanticallyChecked = true;
+					}
 				}
 				if (sink->GetErrorCount() != 0)
 					return programNode;
@@ -1276,7 +1300,8 @@ namespace Spire
 							auto argType = arguments[i];
 							auto paramType = param->Type;
 							if (argType->Equals(paramType.Ptr()))
-							{}
+							{
+							}
 							else if (MatchType_ValueReceiver(paramType.Ptr(), argType.Ptr()))
 							{
 								conversions++;

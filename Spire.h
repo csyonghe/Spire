@@ -382,15 +382,17 @@ extern "C"
 	@param shader The shader object to compile.
 	@param args The modules used as template shader arguments.
 	@param argCount The number of elements in @p args array.
+	@param additionalSource Additional source code to append before passing to compiler.
+    @param sink The sink where diagnostic output should be sent, or NULL to ignore messages.
 	@return The return value is a handle to a SpireCompilationResult object that contains error messages and compiled source code.
 	@note You are responsible for destorying a SpireCompilationResult object when it is no longer used. Destroying a SpireCompilationContext
 	does not automatically destroy SpireCompilationResult objects.
-    @param sink The sink where diagnostic output should be sent, or NULL to ignore messages.
 	*/
 	SPIRE_API SpireCompilationResult* spCompileShader(SpireCompilationContext * ctx, 
 		SpireShader * shader, 
 		SpireModule** args, 
-		int argCount, 
+		int argCount,
+		const char * additionalSource,
 		SpireDiagnosticSink* sink);
 
 	/*!
@@ -398,11 +400,11 @@ extern "C"
 	@param ctx A shader compilation context.
 	@param source A string that represents the Spire source code that defines a shader.
 	@param fileName The filename to use to report error messages regarding to @p source.
+    @param sink The sink where diagnostic output should be sent, or NULL to ignore messages.
 	@return The return value is a handle to a SpireCompilationResult object that contains error messages and compiled source code.
 	@note You are responsible for destorying a SpireCompilationResult object when it is no longer used. Destroying a SpireCompilationContext
 	does not automatically destroy SpireCompilationResult objects.
 	@see spDestroyCompilationResult()
-    @param sink The sink where diagnostic output should be sent, or NULL to ignore messages.
 	*/
 	SPIRE_API SpireCompilationResult* spCompileShaderFromSource(SpireCompilationContext * ctx, 
 		const char * source, 
