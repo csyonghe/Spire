@@ -237,6 +237,9 @@ DIAGNOSTIC(36001, Error, insufficientTemplateShaderArguments, "instantiating tem
 DIAGNOSTIC(36002, Error, tooManyTemplateShaderArguments, "instantiating template shader '$0': too many arguments.");
 DIAGNOSTIC(36003, Error, templateShaderArgumentIsNotDefined, "'$0' provided as template shader argument to '$1' is not a defined module.");
 DIAGNOSTIC(36004, Error, templateShaderArgumentDidNotImplementRequiredInterface, "module '$0' provided as template shader argument to '$1' did not implement required interface '$2'.");
+DIAGNOSTIC(36010, Error, specializeCanOnlyBeUsedOnParam, "'specialize' modifier can only be used on module parameters.");
+DIAGNOSTIC(36011, Error, specializedParameterMustBeInt, "specialized parameters must be a int, uint or bool.");
+DIAGNOSTIC(36012, Error, specializationValuesMustBeConstantLiterial, "specialization candidate values can only be constant literials.");
 //
 // 4xxxx - IL code generation.
 //
@@ -244,6 +247,7 @@ DIAGNOSTIC(40001, Error, bindingAlreadyOccupiedByComponent, "resource binding lo
 DIAGNOSTIC(40002, Error, invalidBindingValue, "binding location '$0' is out of valid range.")
 DIAGNOSTIC(40003, Error, bindingExceedsLimit, "binding location '$0' assigned to component '$1' exceeds maximum limit.")
 DIAGNOSTIC(40004, Error, bindingAlreadyOccupiedByModule, "DescriptorSet ID '$0' is already occupied by module instance '$1'.")
+DIAGNOSTIC(40005, Error, topLevelModuleUsedWithoutSpecifyingBinding, "top level module '$0' is being used without specifying binding location. Use [Binding: \"index\"] attribute to provide a binding location.")
 //
 // 5xxxx - Target code generation.
 //

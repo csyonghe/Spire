@@ -108,6 +108,7 @@ extern "C"
 	- spLoadModuleLibrary()
 	- spLoadModuleLibraryFromSource()
 	- spFindModule()
+	- spSpecializeModule()
 	- spModuleGetParameterCount()
 	- spModuleGetParameter()
 	- spModuleGetParameterBufferSize()
@@ -161,6 +162,7 @@ extern "C"
 		int Size;                  /**< The size (in bytes) of the component. For opaque types (e.g. sampler and texture), this value is 0.*/
 		int Alignment;             /**< The alignment (in bytes) of the component. For opaque types (e.g. sampler and texture), this value is 0.*/
 		int Offset;				   /**< The offset (in bytes) of the component. For opaque types (e.g. sampler and texture), this value is 0.*/
+		bool Specialize;		   /**< Indicating whether this is a specialization parameter.*/
 	};
 
 	/*!
@@ -327,6 +329,18 @@ extern "C"
 	@note The memory for the return value will be freed when the containing SpireCopmilationContext is destroyed.
 	*/
 	SPIRE_API const char * spGetModuleName(SpireModule * module);
+	
+	/*!
+	@brief Create a specialized module from an existing module.
+	@param ctx A spire compilation context used to hold the specialized module.
+	@param module The module to create specialization from.
+	@param paramValues The values of specialization parameters.
+	@param numParams Number of entries in @p paramValues array.
+	@param sink [Optional] A SpireDiagnosticSink object used to receive error messages.
+	@return If succesfull, this function returns the specialized module; otherwise the return value is NULL.
+	@note The memory for the returning SpireModule will be freed when the @p ctx is destroyed, or when the current context is poped via spPopContext(). 
+	*/
+	SPIRE_API SpireModule * spSpecializeModule(SpireCompilationContext * ctx, SpireModule * module, int * paramValues, int numParams, SpireDiagnosticSink * sink);
 
 	/*!
 	@brief Retrieves number of parameters defined by a module.

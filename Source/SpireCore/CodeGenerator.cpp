@@ -138,7 +138,6 @@ namespace Spire
 
 			void GenerateParameterBindingInfo(ShaderIR * shader)
 			{
-				int descriptorSetIdAllocator = 0;
 				Dictionary<int, ModuleInstanceIR*> usedDescriptorSetBindings;
 				// initialize module parameter layouts for all module instances in this shader
 				for (auto module : shader->ModuleInstances)
@@ -150,54 +149,36 @@ namespace Spire
 						{
 							getSink()->diagnose(module->UsingPosition, Diagnostics::bindingAlreadyOccupiedByModule, module->BindingIndex, existingModule->BindingName);
 							getSink()->diagnose(existingModule->UsingPosition, Diagnostics::seeUsingOf, existingModule->SyntaxNode->Name.Content);
-
 						}
 						usedDescriptorSetBindings[module->BindingIndex] = module.Ptr();
 					}
-					else
-					{
-						Token bindingValStr;
-						if (module->SyntaxNode->FindSimpleAttribute("Binding", bindingValStr))
-						{
-							int bindingVal = StringToInt(bindingValStr.Content);
-							module->BindingIndex = bindingVal;
-							ModuleInstanceIR * existingModule;
-							if (usedDescriptorSetBindings.TryGetValue(bindingVal, existingModule))
-							{
-								getSink()->diagnose(bindingValStr.Position, Diagnostics::bindingAlreadyOccupiedByModule, bindingVal, existingModule->BindingName);
-								getSink()->diagnose(existingModule->SyntaxNode->Position, Diagnostics::seeDefinitionOf, existingModule->SyntaxNode->Name.Content);
-							}
-							usedDescriptorSetBindings[bindingVal] = module.Ptr();
-						}
-					}
 				}
-				// assign DescriptorSetId for unspecified modules
+				// report error if shader uses a top-level module without specifying its binding
 				for (auto & module : shader->ModuleInstances)
 				{
 					if (module->BindingIndex == -1)
 					{
-						while (usedDescriptorSetBindings.ContainsKey(descriptorSetIdAllocator))
-							descriptorSetIdAllocator++;
-						module->BindingIndex = descriptorSetIdAllocator;
-						descriptorSetIdAllocator++;
+						bool hasParam = false;
+						for (auto & comp : module->SyntaxNode->GetMembersOfType<ComponentSyntaxNode>())
+							if (comp->IsParam())
+							{
+								hasParam = true;
+								break;
+							}
+						if (hasParam)
+							getSink()->diagnose(module->UsingPosition, Diagnostics::topLevelModuleUsedWithoutSpecifyingBinding, module->SyntaxNode->Name);
 					}
 				}
-				shader->ModuleInstances.Sort([](RefPtr<ModuleInstanceIR> & x, RefPtr<ModuleInstanceIR> & y) {return x->BindingIndex <= y->BindingIndex; });
+				shader->ModuleInstances.Sort([](RefPtr<ModuleInstanceIR> & x, RefPtr<ModuleInstanceIR> & y) {return x->BindingIndex < y->BindingIndex; });
 				for (auto module : shader->ModuleInstances)
 				{
-					bool hasParam = false;
-					for (auto & comp : module->SyntaxNode->GetMembersOfType<ComponentSyntaxNode>())
-						if (comp->IsParam())
-						{
-							hasParam = true;
-							break;
-						}
-					if (!hasParam)
-						continue;
-					auto set = new ILModuleParameterSet();
-					set->BindingName = module->BindingName;
-					set->DescriptorSetId = module->BindingIndex;
-					compiledShader->ModuleParamSets[module->BindingName] = set;
+					if (module->BindingIndex != -1)
+					{
+						auto set = new ILModuleParameterSet();
+						set->BindingName = module->BindingName;
+						set->DescriptorSetId = module->BindingIndex;
+						compiledShader->ModuleParamSets[module->BindingName] = set;
+					}
 				}
 				// allocate binding slots for shader resources (textures, buffers, samplers etc.), as required by legacy APIs
 				Dictionary<int, ComponentDefinitionIR*> usedTextureBindings, usedBufferBindings, usedSamplerBindings, usedStorageBufferBindings;

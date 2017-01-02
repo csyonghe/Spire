@@ -30,6 +30,8 @@ public:
 	RefPtr<ExpressionType> Type;
 	String TypeName;
 	String Name;
+	bool IsSpecialize = false;
+	List<int> Values;
 	int Offset = 0;
 	int Alignment = 0;
 	int Size = 0;
@@ -513,6 +515,67 @@ namespace SpireLib
 			return states.Last().modules.TryGetValue(moduleName);
 		}
 
+		StringBuilder moduleKeyBuilder;
+		SpireModule * SpecializeModule(SpireModule * module, int * params, int numParams, SpireDiagnosticSink * sink)
+		{
+			moduleKeyBuilder.Clear();
+			moduleKeyBuilder.Append(module->Name);
+			for (auto & param : module->Parameters)
+			{
+				if (param.IsSpecialize)
+				{
+					int id = -1;
+					for (int i = 0; i < numParams; i++)
+					{
+						moduleKeyBuilder.Append(params[id]);
+						moduleKeyBuilder.Append('_');
+					}
+				}
+			}
+			if (auto smodule = states.Last().modules.TryGetValue(moduleKeyBuilder.Buffer()))
+				return smodule;
+			RefPtr<ShaderSymbol> originalModule;
+			compileContext.Last()->Symbols.Shaders.TryGetValue(module->Name, originalModule);
+			CompileUnit unit;
+			unit.SyntaxNode = new ProgramSyntaxNode();
+			CloneContext cloneCtx;
+			auto newModule = originalModule->SyntaxNode->Clone(cloneCtx);
+			newModule->Name.Content = moduleKeyBuilder.ToString();
+			int id = 0;
+			for (auto & member : newModule->Members)
+			{
+				if (auto param = member.As<ComponentSyntaxNode>())
+				{
+					if (auto specialize = param->FindSpecializeModifier())
+					{
+						if (id >= numParams)
+						{
+							return nullptr;
+						}
+						auto newParam = param->Clone(cloneCtx);
+						newParam->modifiers.first = nullptr;
+						newParam->modifiers.flags = ModifierFlag::Public;
+						param->BlockStatement = nullptr;
+						auto expr = new ConstantExpressionSyntaxNode();
+						if (param->Type->Equals(ExpressionType::Bool))
+							expr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Bool;
+						else
+							expr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Int;
+						expr->IntValue = params[id];
+						newParam->Expression = expr;
+						newModule->Members.Add(newParam);
+						param->Name.Content = param->Name.Content + "placeholder";
+						id++;
+					}
+				}
+			}
+			unit.SyntaxNode->Members.Add(newModule);
+			List<CompileUnit> units;
+			units.Add(unit);
+			UpdateModuleLibrary(units, sink);
+			return FindModule(newModule->Name.Content);
+		}
+
 		void UpdateModuleLibrary(List<CompileUnit> & units, SpireDiagnosticSink * sink)
 		{
 			Spire::Compiler::CompileResult result;
@@ -535,6 +598,14 @@ namespace SpireLib
 						compMeta.Name = comp.Key;
                         compMeta.Type = comp.Value->Type->DataType;
 						compMeta.TypeName = compMeta.Type->ToString();
+						if (auto specialize = impl->SyntaxNode->FindSpecializeModifier())
+						{
+							for (auto val : specialize->Values)
+							{
+								compMeta.Values.Add(dynamic_cast<ConstantExpressionSyntaxNode*>(val.Ptr())->IntValue);
+							}
+							compMeta.IsSpecialize = true;
+						}
 						if (compMeta.Type->GetBindableResourceType() == BindableResourceType::NonBindable)
 						{
 							compMeta.Alignment = (int)GetTypeAlignment(compMeta.Type.Ptr(), LayoutRule::Std140);
@@ -835,6 +906,11 @@ const char * spGetModuleName(SpireModule * module)
 	return moduleNode->Name.Buffer();
 }
 
+SpireModule * spSpecializeModule(SpireCompilationContext * ctx, SpireModule * module, int * paramValues, int numParams, SpireDiagnosticSink * sink)
+{
+	return CTX(ctx)->SpecializeModule(module, paramValues, numParams, sink);
+}
+
 int spModuleGetParameterCount(SpireModule * module)
 {
 	auto moduleNode = module;
@@ -859,6 +935,7 @@ int spModuleGetParameter(SpireModule * module, int index, SpireComponentInfo * r
 	result->Alignment = param.Alignment;
 	result->Name = param.Name.Buffer();
 	result->BindableResourceType = (int)param.Type->GetBindableResourceType();
+	result->Specialize = param.IsSpecialize;
 	return 0;
 }
 

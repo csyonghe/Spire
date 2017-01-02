@@ -545,17 +545,9 @@ namespace Spire
                 {
                     modifiers.flags |= ModifierFlag::Uniform;
                 }
-                else if (AdvanceIf(parser, "parameter"))
-                {
-                    modifiers.flags |= ModifierFlag::Parameter;
-                }
                 else if (AdvanceIf(parser, "const"))
                 {
                     modifiers.flags |= ModifierFlag::Const;
-                }
-                else if (AdvanceIf(parser, "centroid"))
-                {
-                    modifiers.flags |= ModifierFlag::Centroid;
                 }
                 else if (AdvanceIf(parser, "instance"))
                 {
@@ -596,7 +588,8 @@ namespace Spire
 					{
 						while (!AdvanceIfMatch(parser, TokenType::RParent))
 						{
-							modifier->Values.Add(parser->ParseExpression());
+							auto expr = parser->ParseExpression();
+							modifier->Values.Add(expr);
 							if (AdvanceIf(parser, TokenType::RParent))
 								break;
 							parser->ReadToken(TokenType::Comma);

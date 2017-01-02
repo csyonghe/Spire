@@ -717,6 +717,24 @@ namespace Spire
 				RefPtr<ShaderComponentSymbol> compSym;
 				currentShader->Components.TryGetValue(comp->Name.Content, compSym);
 				this->currentComp = compSym.Ptr();
+				if (auto specialize = comp->FindSpecializeModifier())
+				{
+					if (!comp->IsParam())
+						getSink()->diagnose(comp->Position, Diagnostics::specializeCanOnlyBeUsedOnParam);
+					if (!compSym->Type->DataType->Equals(ExpressionType::Int) && !compSym->Type->DataType->Equals(ExpressionType::Bool)
+						&& !compSym->Type->DataType->Equals(ExpressionType::UInt))
+						getSink()->diagnose(comp->Position, Diagnostics::specializedParameterMustBeInt);
+					for (auto & val : specialize->Values)
+					{
+						if (!dynamic_cast<ConstantExpressionSyntaxNode*>(val.Ptr()))
+						{
+							getSink()->diagnose(val->Position, Diagnostics::specializationValuesMustBeConstantLiterial);
+						}
+						val->Accept(this);
+						if (!val->Type->Equals(compSym->Type->DataType))
+							getSink()->diagnose(val->Position, Diagnostics::typeMismatch, val->Type, currentComp->Type);
+					}
+				}
 				for (auto & param : comp->GetParameters())
 				{
 					param->Accept(this);

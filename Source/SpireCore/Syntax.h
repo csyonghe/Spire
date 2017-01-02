@@ -31,11 +31,9 @@ namespace Spire
 			Uniform = 1 << 0,
 			Out = 1 << 1,
 			In = 1 << 2,
-			Centroid = 1 << 3,
 			Const = 1 << 4,
 			Instance = 1 << 5,
 			Builtin = 1 << 6,
-			Parameter = (1 << 7) | ModifierFlag::Uniform,
 
 			Inline = 1 << 8,
 			Public = 1 << 9,
