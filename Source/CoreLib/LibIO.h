@@ -15,6 +15,7 @@ namespace CoreLib
 		public:
 			static bool Exists(const CoreLib::Basic::String & fileName);
 			static CoreLib::Basic::String ReadAllText(const CoreLib::Basic::String & fileName);
+			static CoreLib::Basic::List<unsigned char> ReadAllBytes(const CoreLib::Basic::String & fileName);
 			static void WriteAllText(const CoreLib::Basic::String & fileName, const CoreLib::Basic::String & text);
 		};
 
@@ -34,10 +35,7 @@ namespace CoreLib
 			static String GetDirectoryName(const String & path);
 			static String Combine(const String & path1, const String & path2);
 			static String Combine(const String & path1, const String & path2, const String & path3);
-#ifdef CreateDirectory
-#undef CreateDirectory
-#endif
-			static bool CreateDirectory(const String & path);
+			static bool CreateDir(const String & path);
 		};
 
 		class CommandLineWriter : public Object

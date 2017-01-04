@@ -553,7 +553,7 @@ namespace Spire
 						}
 						ctx.GlobalHeader << "} " << bufferName << ";\n";
 					}
-					int slotId = 1;
+					int slotId = containsOrdinaryParams ? 1 : 0;
 					for (auto param : module.Value->Parameters)
 					{
 						auto bindableType = param.Value->Type->GetBindableResourceType();

@@ -55,6 +55,11 @@ namespace CoreLib
 		{
 		private:
 			RefPtr<Stream> stream;
+			inline void Throw(Int64 val)
+			{
+				if (val == 0)
+					throw IOException("read operation failed.");
+			}
 		public:
 			BinaryReader(RefPtr<Stream> stream)
 			{
@@ -76,7 +81,7 @@ namespace CoreLib
 			template<typename T>
 			void Read(T & buffer)
 			{
-				stream->Read(&buffer, sizeof(T));
+				Throw(stream->Read(&buffer, sizeof(T)));
 			}
 			template<typename T>
 			void Read(List<T> & buffer)
@@ -92,37 +97,37 @@ namespace CoreLib
 			int ReadInt32()
 			{
 				int rs;
-				stream->Read(&rs, sizeof(int));
+				Throw(stream->Read(&rs, sizeof(int)));
 				return rs;
 			}
 			short ReadInt16()
 			{
 				short rs;
-				stream->Read(&rs, sizeof(short));
+				Throw(stream->Read(&rs, sizeof(short)));
 				return rs;
 			}
 			Int64 ReadInt64()
 			{
 				Int64 rs;
-				stream->Read(&rs, sizeof(Int64));
+				Throw(stream->Read(&rs, sizeof(Int64)));
 				return rs;
 			}
 			float ReadFloat()
 			{
 				float rs;
-				stream->Read(&rs, sizeof(float));
+				Throw(stream->Read(&rs, sizeof(float)));
 				return rs;
 			}
 			double ReadDouble()
 			{
 				double rs;
-				stream->Read(&rs, sizeof(double));
+				Throw(stream->Read(&rs, sizeof(double)));
 				return rs;
 			}
 			char ReadChar()
 			{
 				char rs;
-				stream->Read(&rs, sizeof(char));
+				Throw(stream->Read(&rs, sizeof(char)));
 				return rs;
 			}
 			String ReadString()
@@ -131,7 +136,7 @@ namespace CoreLib
 				char * buffer = new char[len+1];
 				try
 				{
-					stream->Read(buffer, len);
+					Throw(stream->Read(buffer, len));
 				}
 				catch(IOException & e)
 				{

@@ -516,6 +516,13 @@ extern "C"
 	SPIRE_API SpireParameterSet * spGetShaderParameterSet(SpireCompilationResult * result, const char * shaderName, int index);
 
 	/*!
+	@brief Get the required uniform buffer size of a SpireParameterSet object.
+	@param set A SpireParameterSet object whose uniform buffer size to get.
+	@return Required uniform buffer size.
+	*/
+	SPIRE_API int spParameterSetGetBufferSize(SpireParameterSet * set);
+
+	/*!
 	@brief Get the binding name of a SpireParameterSet object.
 	@param set A SpireParameterSet object whose binding name to get.
 	@return The binding name. The life-time of the returned string is owned by @p set.

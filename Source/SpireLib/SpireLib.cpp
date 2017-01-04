@@ -1161,6 +1161,10 @@ SpireParameterSet * spGetShaderParameterSet(SpireCompilationResult * result, con
 	}
 	return nullptr;
 }
+int spParameterSetGetBufferSize(SpireParameterSet * set)
+{
+	return set->paramSet->BufferSize;
+}
 const char * spParameterSetGetBindingName(SpireParameterSet * set)
 {
 	return set->paramSet->BindingName.Buffer();
