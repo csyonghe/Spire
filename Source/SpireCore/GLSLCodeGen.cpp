@@ -22,9 +22,9 @@ namespace Spire
 
 			void PrintOp(CodeGenContext & ctx, ILOperand * op, bool forceExpression = false) override
 			{
-				// GLSL does not have sampler type, print 0 as placeholder
-				if (op->Type->IsSamplerState())
+				if (!useVulkanBinding && op->Type->IsSamplerState())
 				{
+					// GLSL does not have sampler type, print 0 as placeholder
 					ctx.Body << "0";
 					return;
 				}
@@ -211,6 +211,66 @@ namespace Spire
 					PrintOp(ctx, proj->Operand.Ptr(), true);
 			}
 
+			const char * GetTextureType(ILType * textureType)
+			{
+				auto baseType = dynamic_cast<ILBasicType*>(textureType)->Type;
+				const char * textureName = nullptr;
+				switch (baseType)
+				{
+				case ILBaseType::Texture2D:
+					textureName = "texture2D";
+					break;
+				case ILBaseType::Texture2DArray:
+					textureName = "texture2D";
+					break;
+				case ILBaseType::Texture2DArrayShadow:
+					textureName = "texture2D";
+					break;
+				case ILBaseType::TextureCube:
+					textureName = "textureCube";
+					break;
+				case ILBaseType::TextureCubeShadow:
+					textureName = "textureCube";
+					break;
+				case ILBaseType::Texture3D:
+					textureName = "texture3D";
+					break;
+				default:
+					throw NotImplementedException();
+				}
+				return textureName;
+			}
+
+			const char * GetSamplerType(ILType * textureType)
+			{
+				auto baseType = dynamic_cast<ILBasicType*>(textureType)->Type;
+				const char * samplerName = nullptr;
+				switch (baseType)
+				{
+				case ILBaseType::Texture2D:
+					samplerName = "sampler2D";
+					break;
+				case ILBaseType::Texture2DArray:
+					samplerName = "sampler2DArray";
+					break;
+				case ILBaseType::Texture2DArrayShadow:
+					samplerName = "sampler2DArrayShadow";
+					break;
+				case ILBaseType::TextureCube:
+					samplerName = "samplerCube";
+					break;
+				case ILBaseType::TextureCubeShadow:
+					samplerName = "samplerCubeShadow";
+					break;
+				case ILBaseType::Texture3D:
+					samplerName = "sampler3D";
+					break;
+				default:
+					throw NotImplementedException();
+				}
+				return samplerName;
+			}
+
 			void PrintTypeName(StringBuilder& sb, ILType* type) override
 			{
 				// Currently, all types are internally named based on their GLSL equivalent, so
@@ -218,13 +278,41 @@ namespace Spire
 
 				// GLSL does not have sampler type, use int as placeholder
 				if (type->IsSamplerState())
-					sb << "int";
+				{
+					if (useVulkanBinding)
+						sb << "sampler";
+					else
+						sb << "int";
+				}
+				else if (type->IsTexture())
+				{
+					if (useVulkanBinding)
+						sb << GetTextureType(type);
+					else
+						sb << GetSamplerType(type);
+				}
 				else
 					sb << type->ToString();
 			}
 
 			void PrintTextureCall(CodeGenContext & ctx, CallInstruction * instr)
 			{
+				auto printSamplerArgument = [&](ILOperand * texture, ILOperand * sampler)
+				{
+					if (useVulkanBinding)
+					{
+						ctx.Body << GetSamplerType(texture->Type.Ptr()) << "(";
+						PrintOp(ctx, texture);
+						ctx.Body << ", ";
+						PrintOp(ctx, sampler);
+						ctx.Body << ")";
+					}
+					else
+					{
+						PrintOp(ctx, texture);
+					}
+					ctx.Body << ", ";
+				};
 				if (instr->Function == "Sample")
 				{
 					if (instr->Arguments.Count() == 4)
@@ -232,9 +320,9 @@ namespace Spire
 					else
 						ctx.Body << "texture";
 					ctx.Body << "(";
-					for (int i = 0; i < instr->Arguments.Count(); i++)
+					printSamplerArgument(instr->Arguments[0].Ptr(), instr->Arguments[1].Ptr());
+					for (int i = 2; i < instr->Arguments.Count(); i++)
 					{
-						if (i == 1) continue; // skip sampler_state parameter
 						PrintOp(ctx, instr->Arguments[i].Ptr());
 						if (i < instr->Arguments.Count() - 1)
 							ctx.Body << ", ";
@@ -248,9 +336,9 @@ namespace Spire
 					else
 						ctx.Body << "textureGrad";
 					ctx.Body << "(";
-					for (int i = 0; i < instr->Arguments.Count(); i++)
+					printSamplerArgument(instr->Arguments[0].Ptr(), instr->Arguments[1].Ptr());
+					for (int i = 2; i < instr->Arguments.Count(); i++)
 					{
-						if (i == 1) continue; // skip sampler_state parameter
 						PrintOp(ctx, instr->Arguments[i].Ptr());
 						if (i < instr->Arguments.Count() - 1)
 							ctx.Body << ", ";
@@ -262,8 +350,7 @@ namespace Spire
 					if (instr->Arguments.Count() == 5) // loc, bias, offset
 					{
 						ctx.Body << "textureOffset(";
-						PrintOp(ctx, instr->Arguments[0].Ptr());
-						ctx.Body << ", ";
+						printSamplerArgument(instr->Arguments[0].Ptr(), instr->Arguments[1].Ptr());
 						PrintOp(ctx, instr->Arguments[2].Ptr());
 						ctx.Body << ", ";
 						PrintOp(ctx, instr->Arguments[4].Ptr());
@@ -274,8 +361,7 @@ namespace Spire
 					else
 					{
 						ctx.Body << "texture(";
-						PrintOp(ctx, instr->Arguments[0].Ptr());
-						ctx.Body << ", ";
+						printSamplerArgument(instr->Arguments[0].Ptr(), instr->Arguments[1].Ptr());
 						PrintOp(ctx, instr->Arguments[2].Ptr());
 						ctx.Body << ", ";
 						PrintOp(ctx, instr->Arguments[3].Ptr());
@@ -288,8 +374,7 @@ namespace Spire
 						ctx.Body << "textureOffset(";
 					else
 						ctx.Body << "texture(";
-					PrintOp(ctx, instr->Arguments[0].Ptr());
-					ctx.Body << ", ";
+					printSamplerArgument(instr->Arguments[0].Ptr(), instr->Arguments[1].Ptr());
 					auto baseType = dynamic_cast<ILBasicType*>(instr->Arguments[0]->Type.Ptr());
 					if (baseType)
 					{
