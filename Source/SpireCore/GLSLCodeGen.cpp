@@ -221,10 +221,10 @@ namespace Spire
 					textureName = "texture2D";
 					break;
 				case ILBaseType::Texture2DArray:
-					textureName = "texture2D";
+					textureName = "texture2DArray";
 					break;
 				case ILBaseType::Texture2DArrayShadow:
-					textureName = "texture2D";
+					textureName = "texture2DArray";
 					break;
 				case ILBaseType::TextureCube:
 					textureName = "textureCube";
@@ -280,7 +280,12 @@ namespace Spire
 				if (type->IsSamplerState())
 				{
 					if (useVulkanBinding)
-						sb << "sampler";
+					{
+						if (dynamic_cast<ILBasicType*>(type)->Type == ILBaseType::SamplerComparisonState)
+							sb << "samplerShadow";
+						else
+							sb << "sampler";
+					}
 					else
 						sb << "int";
 				}
@@ -410,7 +415,7 @@ namespace Spire
 				int index = 0;
 				for (auto & field : recType->Members)
 				{
-					if (field.Value.Type->IsSamplerState())
+					if (!useVulkanBinding && field.Value.Type->IsSamplerState())
 						continue;
 					if (input.Attributes.ContainsKey("VertexInput"))
 						sb.GlobalHeader << "layout(location = " << index << ") ";
@@ -449,7 +454,7 @@ namespace Spire
 				int index = 0;
 				for (auto & field : recType->Members)
 				{
-					if (field.Value.Type->IsSamplerState())
+					if (!useVulkanBinding && field.Value.Type->IsSamplerState())
 						continue;
 					if (!isVertexShader && (input.Attributes.ContainsKey("Flat")))
 						sb.GlobalHeader << "flat ";
@@ -582,6 +587,18 @@ namespace Spire
 								ctx.GlobalHeader << " " << EscapeCodeName(module.Value->BindingName + "_" + param.Value->Name) << ";\n";
 								break;
 							}
+							case BindableResourceType::Sampler:
+							{
+								if (useVulkanBinding)
+								{
+									ctx.GlobalHeader << "layout(set = " << module.Value->DescriptorSetId << ", binding = " << slotId << ")";
+									ctx.GlobalHeader << " uniform ";
+									PrintType(ctx.GlobalHeader, param.Value->Type.Ptr());
+									ctx.GlobalHeader << " " << EscapeCodeName(module.Value->BindingName + "_" + param.Value->Name) << ";\n";
+								}
+								break;
+							}
+							break;
 							default:
 								continue;
 							}

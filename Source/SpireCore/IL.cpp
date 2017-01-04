@@ -259,7 +259,7 @@ namespace Spire
 		{
 			auto basicType = dynamic_cast<ILBasicType*>(this);
 			if (basicType)
-				return basicType->Type == ILBaseType::SamplerState;
+				return basicType->Type == ILBaseType::SamplerState || basicType->Type == ILBaseType::SamplerComparisonState;
 			else
 				return false;
 		}

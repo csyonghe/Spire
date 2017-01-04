@@ -142,6 +142,8 @@ namespace Spire
 					expType->BaseType = BaseType::Texture3D;
 				else if (typeNode->TypeName == "SamplerState" || typeNode->TypeName == "sampler" || typeNode->TypeName == "sampler_state")
 					expType->BaseType = BaseType::SamplerState;
+				else if (typeNode->TypeName == "SamplerComparisonState")
+					expType->BaseType = BaseType::SamplerComparisonState;
 				else if (typeNode->TypeName == "void")
 					expType->BaseType = BaseType::Void;
 				else if (typeNode->TypeName == "bool")

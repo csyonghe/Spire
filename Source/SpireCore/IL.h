@@ -26,7 +26,7 @@ namespace Spire
 			Texture3D = 54,
 			Bool = 128, Bool2 = 129, Bool3 = 130, Bool4 = 131,
 			UInt = 512, UInt2 = 513, UInt3 = 514, UInt4 = 515,
-			SamplerState = 4096,
+			SamplerState = 4096, SamplerComparisonState = 4097
 		};
 		int SizeofBaseType(ILBaseType type);
 		int RoundToAlignment(int offset, int alignment);
@@ -133,6 +133,7 @@ namespace Spire
 				case ILBaseType::Texture3D:
 					return BindableResourceType::Texture;
 				case ILBaseType::SamplerState:
+				case ILBaseType::SamplerComparisonState:
 					return BindableResourceType::Sampler;
 				default:
 					return BindableResourceType::NonBindable;
@@ -203,6 +204,8 @@ namespace Spire
 					return "bvec4";
 				else if (Type == ILBaseType::SamplerState)
 					return "SamplerState";
+				else if (Type == ILBaseType::SamplerComparisonState)
+					return "SamplerComparisonState";
 				else if (Type == ILBaseType::Void)
 					return "void";
 				else

@@ -104,6 +104,7 @@ namespace Spire
 			case Compiler::BaseType::TextureCubeShadow:
 				return BindableResourceType::Texture;
 			case Compiler::BaseType::SamplerState:
+			case Compiler::BaseType::SamplerComparisonState:
 				return BindableResourceType::Sampler;
 			}
 			return BindableResourceType::NonBindable;

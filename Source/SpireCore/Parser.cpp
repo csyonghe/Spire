@@ -89,6 +89,7 @@ namespace Spire
 				typeNames.Add("Texture");
 				typeNames.Add("sampler");
 				typeNames.Add("SamplerState");
+				typeNames.Add("SamplerComparisonState");
 				typeNames.Add("sampler_state");
 				typeNames.Add("Uniform");
 				typeNames.Add("StructuredBuffer");
