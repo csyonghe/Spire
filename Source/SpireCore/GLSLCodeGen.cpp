@@ -837,10 +837,12 @@ namespace Spire
 			{}
 			virtual void DeclareOutput(CodeGenContext & ctx, ILStage *) override
 			{
+				int location = 0;
 				for (auto & field : world->OutputType->Members)
 				{
 					if (field.Value.Attributes.ContainsKey("FragDepth"))
 						continue;
+					ctx.GlobalHeader << "layout(location = " << location << ") ";
 					if (declPrefix.Length())
 						ctx.GlobalHeader << declPrefix << " ";
 					if (field.Value.Type->IsIntegral())
@@ -849,6 +851,7 @@ namespace Spire
 					String declName = field.Key;
 					codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), AddWorldNameSuffix(declName, world->OutputType->TypeName));
 					ctx.GlobalHeader << ";\n";
+					location++;
 				}
 			}
 			virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) override
