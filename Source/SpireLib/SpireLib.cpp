@@ -48,9 +48,13 @@ public:
 struct SpireModule
 {
 	String Name;
+	int Id = 0;
 	List<ComponentMetaData> Parameters;
 	List<ComponentMetaData> Requirements;
+	static int IdAllocator;
 };
+
+int SpireModule::IdAllocator = 0;
 
 namespace SpireLib
 {
@@ -422,8 +426,11 @@ namespace SpireLib
 		String shaderName;
 		String src;
 	public:
+		int Id;
 		Shader(String name, String source)
 		{
+			static int idAllocator = 0;
+			Id = idAllocator++;
 			shaderName = name;
 			src = source;
 		}
@@ -585,6 +592,7 @@ namespace SpireLib
 				if (!states.Last().modules.ContainsKey(shader.Key))
 				{
 					SpireModule meta;
+					meta.Id = SpireModule::IdAllocator++;
 					meta.Name = shader.Key;
 					int offset = 0;
 					for (auto & comp : shader.Value->Components)
@@ -889,6 +897,11 @@ SpireShader* spCreateShaderFromFile(SpireCompilationContext * ctx, const char * 
 	return reinterpret_cast<SpireShader*>(CTX(ctx)->NewShaderFromFile(fileName));
 }
 
+unsigned int spShaderGetId(SpireShader * shader)
+{
+	return SHADER(shader)->Id;
+}
+
 const char* spShaderGetName(SpireShader * shader)
 {
 	return SHADER(shader)->GetName().Buffer();
@@ -897,6 +910,11 @@ const char* spShaderGetName(SpireShader * shader)
 SpireModule * spFindModule(SpireCompilationContext * ctx, const char * moduleName)
 {
 	return CTX(ctx)->FindModule(moduleName);
+}
+
+unsigned int spGetModuleUID(SpireModule * module)
+{
+	return module->Id;
 }
 
 const char * spGetModuleName(SpireModule * module)

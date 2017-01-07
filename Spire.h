@@ -308,6 +308,13 @@ extern "C"
 	SPIRE_API SpireShader* spCreateShaderFromFile(SpireCompilationContext * ctx, const char * fileName);
 
 	/*!
+	@brief Retrieves the runtime unique Id of a shader.
+	@param shader The shader object whose Id to retrieve.
+	@return Id of the shader object.
+	*/
+	SPIRE_API unsigned int spShaderGetId(SpireShader * shader);
+
+	/*!
 	@brief Retrieves the name of a shader.
 	@param shader The shader object whose name to retrieve.
 	@return Name of the shader object.
@@ -322,6 +329,13 @@ extern "C"
 	@note All SpireModule objects are destroyed when its containing SpireCompilationContext is destroyed.
 	*/
 	SPIRE_API SpireModule * spFindModule(SpireCompilationContext * ctx, const char * moduleName);
+	
+	/*!
+	@brief Retrieve the run-time unique Id of a SpireModule.
+	@param module The module to get the unique Id of.
+	@return The unique Id of the module.
+	*/
+	SPIRE_API unsigned int spGetModuleUID(SpireModule * module);
 
 	/*!
 	@brief Retrieve the name of a SpireModule.
