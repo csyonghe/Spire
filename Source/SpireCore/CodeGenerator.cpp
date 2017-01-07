@@ -177,6 +177,7 @@ namespace Spire
 						auto set = new ILModuleParameterSet();
 						set->BindingName = module->BindingName;
 						set->DescriptorSetId = module->BindingIndex;
+						set->UniformBufferLegacyBindingPoint = set->DescriptorSetId;
 						compiledShader->ModuleParamSets[module->BindingName] = set;
 					}
 				}

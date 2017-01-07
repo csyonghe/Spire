@@ -552,6 +552,13 @@ extern "C"
 	SPIRE_API int spParameterSetGetBindingIndex(SpireParameterSet * set);
 
 	/*!
+	@brief Get the legacy binding index for the uniform buffer of a SpireParameterSet object.
+	@param set A SpireParameterSet object whose uniform buffer legacy binding index to get.
+	@return The legacy binding index.
+	*/
+	SPIRE_API int spParameterSetGetUniformBufferLegacyBindingPoint(SpireParameterSet * set);
+
+	/*!
 	@brief Get the number of binding slots of a SpireParameterSet object.
 	@param set A SpireParameterSet object whose number of binding slots to get.
 	@return The number of binding slots.

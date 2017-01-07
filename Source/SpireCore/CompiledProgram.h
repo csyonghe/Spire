@@ -87,6 +87,7 @@ namespace Spire
 			int BufferSize = 0;
 			String BindingName;
 			int DescriptorSetId = -1;
+			int UniformBufferLegacyBindingPoint = -1;
 			EnumerableDictionary<String, RefPtr<ILModuleParameterInstance>> Parameters;
 		};
 

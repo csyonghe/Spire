@@ -21,6 +21,7 @@ struct SpireParameterSet
 {
 	ILModuleParameterSet * paramSet = nullptr;
 	int bindingSlotCount = 0;
+	int uniformBufferLegacyBindingPoint = -1;
 	List<SpireResourceBindingInfo> bindings;
 };
 
@@ -775,6 +776,7 @@ namespace SpireLib
 					{
 						SpireParameterSet set;
 						set.paramSet = pset.Value.Ptr();
+						set.uniformBufferLegacyBindingPoint = pset.Value->UniformBufferLegacyBindingPoint;
 						for (auto & item : pset.Value->Parameters)
 						{
 							auto resType = item.Value->Type->GetBindableResourceType();
@@ -1190,6 +1192,10 @@ const char * spParameterSetGetBindingName(SpireParameterSet * set)
 int spParameterSetGetBindingIndex(SpireParameterSet * set)
 {
 	return set->paramSet->DescriptorSetId;
+}
+int spParameterSetGetUniformBufferLegacyBindingPoint(SpireParameterSet * set)
+{
+	return set->paramSet->UniformBufferLegacyBindingPoint;
 }
 int spParameterSetGetBindingSlotCount(SpireParameterSet * set)
 {

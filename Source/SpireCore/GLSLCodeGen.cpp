@@ -549,7 +549,8 @@ namespace Spire
 							else
 							{
 								ctx.GlobalHeader << "layout(std140, set = 0, binding =" << oneDescBindingLoc << ") ";
-								module.Value->DescriptorSetId = oneDescBindingLoc;
+								module.Value->UniformBufferLegacyBindingPoint = oneDescBindingLoc;
+								oneDescBindingLoc++;
 							}
 						}
 						else
@@ -564,7 +565,6 @@ namespace Spire
 							}
 						}
 						ctx.GlobalHeader << "} " << bufferName << ";\n";
-						oneDescBindingLoc++;
 					}
 					int slotId = containsOrdinaryParams ? 1 : 0;
 					for (auto param : module.Value->Parameters)
