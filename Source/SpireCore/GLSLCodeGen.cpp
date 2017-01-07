@@ -15,6 +15,7 @@ namespace Spire
 		{
 		private:
 			bool useVulkanBinding = false;
+			bool useSingleDescSet = false;
 		protected:
 			OutputStrategy * CreateStandardOutputStrategy(ILWorld * world, String layoutPrefix) override;
 			OutputStrategy * CreatePackedBufferOutputStrategy(ILWorld * world) override;
@@ -525,6 +526,7 @@ namespace Spire
 			}
 			void GenerateShaderParameterDefinition(CodeGenContext & ctx, ILShader * shader)
 			{
+				int oneDescBindingLoc = 0;
 				for (auto module : shader->ModuleParamSets)
 				{
 					// generate uniform buffer declaration
@@ -539,7 +541,17 @@ namespace Spire
 					if (containsOrdinaryParams)
 					{
 						if (useVulkanBinding)
-							ctx.GlobalHeader << "layout(std140, set = " << module.Value->DescriptorSetId << ", binding = 0) ";
+						{
+							if (!useSingleDescSet)
+							{
+								ctx.GlobalHeader << "layout(std140, set = " << module.Value->DescriptorSetId << ", binding = 0) ";
+							}
+							else
+							{
+								ctx.GlobalHeader << "layout(std140, set = 0, binding =" << oneDescBindingLoc << ") ";
+								module.Value->DescriptorSetId = oneDescBindingLoc;
+							}
+						}
 						else
 							ctx.GlobalHeader << "layout(binding = " << module.Value->DescriptorSetId << ", std140) ";
 						ctx.GlobalHeader << "uniform buf" << bufferName << "\n{\n";
@@ -552,6 +564,7 @@ namespace Spire
 							}
 						}
 						ctx.GlobalHeader << "} " << bufferName << ";\n";
+						oneDescBindingLoc++;
 					}
 					int slotId = containsOrdinaryParams ? 1 : 0;
 					for (auto param : module.Value->Parameters)
@@ -568,7 +581,17 @@ namespace Spire
 									continue;
 								String bufName = EscapeCodeName(module.Value->BindingName + "_" + param.Value->Name);
 								if (useVulkanBinding)
-									ctx.GlobalHeader << "layout(std430, set = " << module.Value->DescriptorSetId << ", binding = " << slotId << ") ";
+								{
+									if (!useSingleDescSet)
+										ctx.GlobalHeader << "layout(std430, set = " << module.Value->DescriptorSetId << ", binding = " << slotId << ") ";
+									else
+									{
+										ctx.GlobalHeader << "layout(std430, set = 0, binding = " << oneDescBindingLoc << ") ";
+										param.Value->BindingPoints.Clear();
+										param.Value->BindingPoints.Add(oneDescBindingLoc);
+										oneDescBindingLoc++;
+									}
+								}
 								else
 									ctx.GlobalHeader << "layout(std430, binding = " << param.Value->BindingPoints.First() << ") ";
 								ctx.GlobalHeader << "buffer buf" << bufName << "\n{\n";
@@ -579,7 +602,17 @@ namespace Spire
 							case BindableResourceType::Texture:
 							{
 								if (useVulkanBinding)
-									ctx.GlobalHeader << "layout(set = " << module.Value->DescriptorSetId << ", binding = " << slotId << ")";
+								{
+									if (!useSingleDescSet)
+										ctx.GlobalHeader << "layout(set = " << module.Value->DescriptorSetId << ", binding = " << slotId << ")";
+									else
+									{
+										ctx.GlobalHeader << "layout(set = 0, binding = " << oneDescBindingLoc << ")";
+										param.Value->BindingPoints.Clear();
+										param.Value->BindingPoints.Add(oneDescBindingLoc);
+										oneDescBindingLoc++;
+									}
+								}
 								else
 									ctx.GlobalHeader << "layout(binding = " << param.Value->BindingPoints.First() << ")";
 								ctx.GlobalHeader << " uniform ";
@@ -591,7 +624,15 @@ namespace Spire
 							{
 								if (useVulkanBinding)
 								{
-									ctx.GlobalHeader << "layout(set = " << module.Value->DescriptorSetId << ", binding = " << slotId << ")";
+									if (!useSingleDescSet)
+										ctx.GlobalHeader << "layout(set = " << module.Value->DescriptorSetId << ", binding = " << slotId << ")";
+									else
+									{
+										ctx.GlobalHeader << "layout(set = 0, binding = " << oneDescBindingLoc << ")";
+										param.Value->BindingPoints.Clear();
+										param.Value->BindingPoints.Add(oneDescBindingLoc);
+										oneDescBindingLoc++;
+									}
 									ctx.GlobalHeader << " uniform ";
 									PrintType(ctx.GlobalHeader, param.Value->Type.Ptr());
 									ctx.GlobalHeader << " " << EscapeCodeName(module.Value->BindingName + "_" + param.Value->Name) << ";\n";
@@ -616,11 +657,14 @@ namespace Spire
 					if (w.Value->Code)
 						AnalyzeSamplerUsage(samplerTextures, program, w.Value->Code.Ptr(), err);
 				}
-				for (auto & sampler : samplerTextures)
+				if (!useVulkanBinding)
 				{
-					sampler.Key->BindingPoints.Clear();
-					for (auto & tex : sampler.Value)
-						sampler.Key->BindingPoints.AddRange(tex->BindingPoints);
+					for (auto & sampler : samplerTextures)
+					{
+						sampler.Key->BindingPoints.Clear();
+						for (auto & tex : sampler.Value)
+							sampler.Key->BindingPoints.AddRange(tex->BindingPoints);
+					}
 				}
 				CLikeCodeGen::GenerateShaderMetaData(result, program, shader, err);
 			}
@@ -820,9 +864,10 @@ namespace Spire
 				return rs;
 			}
 		public:
-			GLSLCodeGen(bool vulkanBinding)
+			GLSLCodeGen(bool vulkanBinding, bool pUseSingleDescSet)
 			{
 				useVulkanBinding = vulkanBinding;
+				useSingleDescSet = pUseSingleDescSet;
 			}
 		};
 
@@ -1035,11 +1080,15 @@ namespace Spire
 
 		CodeGenBackend * CreateGLSLCodeGen()
 		{
-			return new GLSLCodeGen(false);
+			return new GLSLCodeGen(false, false);
 		}
 		CodeGenBackend * CreateGLSL_VulkanCodeGen()
 		{
-			return new GLSLCodeGen(true);
+			return new GLSLCodeGen(true, false);
+		}
+		CodeGenBackend * CreateGLSL_VulkanOneDescCodeGen()
+		{
+			return new GLSLCodeGen(true, true);
 		}
 	}
 }

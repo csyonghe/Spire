@@ -433,6 +433,9 @@ namespace Spire
 					case CodeGenTarget::GLSL_Vulkan:
 						backend = backends["glsl_vk"]().Ptr();
 						break;
+					case CodeGenTarget::GLSL_Vulkan_OneDesc:
+						backend = backends["glsl_vk_onedesc"]().Ptr();
+						break;
 					case CodeGenTarget::HLSL:
 						backend = backends["hlsl"]().Ptr();
 						break;
@@ -580,6 +583,7 @@ namespace Spire
 				backends.Add("hlsl", CreateHLSLCodeGen());
 				backends.Add("spirv", CreateSpirVCodeGen());
 				backends.Add("glsl_vk", CreateGLSL_VulkanCodeGen());
+				backends.Add("glsl_vk_onedesc", CreateGLSL_VulkanOneDescCodeGen());
 			}
 
 			~ShaderCompilerImpl()

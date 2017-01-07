@@ -99,6 +99,7 @@ namespace Spire
 			case Compiler::BaseType::Texture2DArray:
 			case Compiler::BaseType::Texture2DArrayShadow:
 			case Compiler::BaseType::Texture2D:
+			case Compiler::BaseType::Texture2DShadow:
 			case Compiler::BaseType::Texture3D:
 			case Compiler::BaseType::TextureCube:
 			case Compiler::BaseType::TextureCubeShadow:

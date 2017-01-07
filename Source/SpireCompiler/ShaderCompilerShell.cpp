@@ -60,6 +60,10 @@ int wmain(int argc, wchar_t* argv[])
 					{
 						options.Target = CodeGenTarget::GLSL_Vulkan;
 					}
+					else if (name == "glsl_vk_onedesc")
+					{
+						options.Target = CodeGenTarget::GLSL_Vulkan_OneDesc;
+					}
 					else if (name == "hlsl")
 					{
 						options.Target = CodeGenTarget::HLSL;
