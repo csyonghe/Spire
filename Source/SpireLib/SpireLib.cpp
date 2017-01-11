@@ -52,6 +52,7 @@ struct SpireModule
 	int Id = 0;
 	List<ComponentMetaData> Parameters;
 	List<ComponentMetaData> Requirements;
+	Dictionary<String, String> Attribs;
 	static int IdAllocator;
 };
 
@@ -596,6 +597,8 @@ namespace SpireLib
 					meta.Id = SpireModule::IdAllocator++;
 					meta.Name = shader.Key;
 					int offset = 0;
+					for (auto attrib : shader.Value->SyntaxNode->GetModifiersOfType<SimpleAttribute>())
+						meta.Attribs[attrib->Key] = attrib->Value.Content;
 					for (auto & comp : shader.Value->Components)
 					{
 						if (comp.Value->Implementations.Count() != 1)
@@ -943,6 +946,10 @@ int spModuleGetParameterBufferSize(SpireModule * module)
 	for (auto & param : moduleNode->Parameters)
 		size = Math::Max(size, param.Size + param.Offset);
 	return size;
+}
+int spModuleHasAttrib(SpireModule * module, const char * name)
+{
+	return module->Attribs.ContainsKey(name);
 }
 
 int spModuleGetParameter(SpireModule * module, int index, SpireComponentInfo * result)

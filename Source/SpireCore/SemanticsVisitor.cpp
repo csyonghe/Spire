@@ -750,6 +750,7 @@ namespace Spire
 				}
 				if (comp->BlockStatement)
 					comp->BlockStatement->Accept(this);
+
 				this->currentComp = nullptr;
 				this->currentCompNode = nullptr;
 				return comp;

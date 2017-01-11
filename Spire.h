@@ -372,6 +372,14 @@ extern "C"
 	SPIRE_API int spModuleGetParameterBufferSize(SpireModule * module);
 
 	/*!
+	@brief Returns whether a module has defined an attribute with specified name.
+	@param module The module from which to query attribute definition.
+	@param componentName The name of the attribute to test existence of.
+	@return 1 if the component is defined, 0 otherwise.
+	*/
+	SPIRE_API int spModuleHasAttrib(SpireModule * module, const char * attribName);
+
+	/*!
 	@brief Retrieves parameter info from a SpireModule.
 	@param module The module from which to retrieve parameters.
 	@param index Index of the requesting parameter.
