@@ -593,6 +593,11 @@ namespace VectorMath
 		}
 	};
 
+	enum class ClipSpaceType
+	{
+		NegativeOneToOne, ZeroToOne
+	};
+
 	class Matrix4
 	{
 	public:
@@ -678,10 +683,10 @@ namespace VectorMath
 		}
 		static inline void CreateIdentityMatrix(Matrix4 & mOut);
 		static inline void CreateRandomMatrix(Matrix4 & mOut);
-		static inline void CreateOrthoMatrix(Matrix4 & mOut, float left, float right, float top, float bottom, float zNear, float zFar);
-		static inline void CreatePerspectiveMatrixFromViewAngle(Matrix4 &mOut, float fovY, float aspect, float zNear, float zFar);
+		static inline void CreateOrthoMatrix(Matrix4 & mOut, float left, float right, float top, float bottom, float zNear, float zFar, ClipSpaceType clipSpace = ClipSpaceType::NegativeOneToOne);
+		static inline void CreatePerspectiveMatrixFromViewAngle(Matrix4 &mOut, float fovY, float aspect, float zNear, float zFar, ClipSpaceType clipSpace = ClipSpaceType::NegativeOneToOne);
 		static inline void CreatePerspectiveMatrixFromViewAngleTiled(Matrix4 &mOut, float fovY, float aspect, float zNear, float zFar, float x0, float y0, float x1, float y1);
-		static inline void CreatePerspectiveMatrix(Matrix4 &mOut, float left, float right, float bottom, float top, float zNear, float zFar);
+		static inline void CreatePerspectiveMatrix(Matrix4 &mOut, float left, float right, float bottom, float top, float zNear, float zFar, ClipSpaceType clipSpace = ClipSpaceType::NegativeOneToOne);
 		static void LookAt(Matrix4 & rs, const Vec3 & pos, const Vec3 & center, const Vec3 & up);
 		static inline void RotationX(Matrix4 & rs, float angle);
 		static inline void RotationY(Matrix4 & rs, float angle);
@@ -699,6 +704,7 @@ namespace VectorMath
 		inline void TransposeTransformNormal(Vec3 & rs, const Vec3 & vIn) const;
 		inline void TransposeTransform(Vec3 & rs, const Vec3 & vIn) const;
 		inline void TransposeTransform(Vec4 & rs_d, const Vec4& vIn) const;
+		inline Vec3 TransformHomogeneous(const Vec3 & vIn) const;
 		inline void TransformHomogeneous(Vec3 & rs, const Vec3 & vIn) const;
 		inline void TransformHomogeneous2D(Vec2 & rs, const Vec3 & vIn) const;
 		static inline void MultiplyFPU(Matrix4 &mOut, const Matrix4& M1, const Matrix4& M2);
@@ -886,38 +892,48 @@ namespace VectorMath
 		mOut.m[0][0] = mOut.m[1][1] = mOut.m[2][2] = mOut.m[3][3] = 1.0f;
 	}
 
-	inline void Matrix4::CreateOrthoMatrix(Matrix4 & mOut, float left, float right, float top, float bottom, float zNear, float zFar)
+	inline void Matrix4::CreateOrthoMatrix(Matrix4 & mOut, float left, float right, float top, float bottom, float zNear, float zFar, ClipSpaceType clipSpace)
 	{
 		memset(&mOut, 0, sizeof(Matrix4));
 		mOut.m[0][0] = 2.0f / (right - left);
 		mOut.m[1][1] = 2.0f / (top - bottom);
-		mOut.m[2][2] = -2.0f / (zFar - zNear);
 		mOut.m[3][0] = -(right + left) / (right - left);
 		mOut.m[3][1] = -(top + bottom) / (top - bottom);
-		mOut.m[3][2] = -(zFar + zNear) / (zFar - zNear);
+		if (clipSpace == ClipSpaceType::NegativeOneToOne)
+		{
+			mOut.m[2][2] = -2.0f / (zFar - zNear);
+			mOut.m[3][2] = -(zFar + zNear) / (zFar - zNear);
+		}
+		else
+		{
+			mOut.m[2][2] = -1.0f / (zFar - zNear);
+			mOut.m[3][2] = 0.5f - 0.5f * (zFar + zNear) / (zFar - zNear);
+		}
 		mOut.m[3][3] = 1.0f;
 	}
 
-	inline void Matrix4::CreatePerspectiveMatrix(Matrix4 &mOut, float left, float right, float bottom, float top, float znear, float zfar)
+	inline void Matrix4::CreatePerspectiveMatrix(Matrix4 &mOut, float left, float right, float bottom, float top, float znear, float zfar, ClipSpaceType /*clipSpace*/)
 	{
 		memset(&mOut, 0, sizeof(Matrix4));
 		mOut.m[0][0] = (znear*2.0f) / (right - left);
 		mOut.m[1][1] = (2.0f*znear) / (top - bottom);
 		mOut.m[2][0] = (right + left) / (right - left);
 		mOut.m[2][1] = (top + bottom) / (top - bottom);
-		mOut.m[2][2] = (zfar + znear) / (znear - zfar);
 		mOut.m[2][3] = -1.0f;
+		
+		mOut.m[2][2] = (zfar + znear) / (znear - zfar);
 		mOut.m[3][2] = 2.0f*zfar*znear / (znear - zfar);
+		
 	}
 
-	inline void Matrix4::CreatePerspectiveMatrixFromViewAngle(Matrix4 &mOut, float fovY, float aspect, float zNear, float zFar)
+	inline void Matrix4::CreatePerspectiveMatrixFromViewAngle(Matrix4 &mOut, float fovY, float aspect, float zNear, float zFar, ClipSpaceType clipSpace)
 	{
 		float xmin, xmax, ymin, ymax;
 		ymax = zNear * tan(fovY * CoreLib::Basic::Math::Pi / 360.0f);
 		ymin = -ymax;
 		xmin = ymin * aspect;
 		xmax = ymax * aspect;
-		Matrix4::CreatePerspectiveMatrix(mOut, xmin, xmax, ymin, ymax, zNear, zFar);
+		Matrix4::CreatePerspectiveMatrix(mOut, xmin, xmax, ymin, ymax, zNear, zFar, clipSpace);
 	}
 
 	inline void Matrix4::CreatePerspectiveMatrixFromViewAngleTiled(Matrix4 &mOut, float fovY, float aspect, float zNear, float zFar, float x0, float y0, float x1, float y1)
@@ -1013,6 +1029,18 @@ namespace VectorMath
 		rs.x = m[0][0] * vIn.x + m[1][0] * vIn.y + m[2][0] * vIn.z + m[3][0];
 		rs.y = m[0][1] * vIn.x + m[1][1] * vIn.y + m[2][1] * vIn.z + m[3][1];
 		rs.z = m[0][2] * vIn.x + m[1][2] * vIn.y + m[2][2] * vIn.z + m[3][2];
+	}
+	inline Vec3 Matrix4::TransformHomogeneous(const Vec3 & vIn) const
+	{
+		Vec3 rs;
+		rs.x = m[0][0] * vIn.x + m[1][0] * vIn.y + m[2][0] * vIn.z + m[3][0];
+		rs.y = m[0][1] * vIn.x + m[1][1] * vIn.y + m[2][1] * vIn.z + m[3][1];
+		rs.z = m[0][2] * vIn.x + m[1][2] * vIn.y + m[2][2] * vIn.z + m[3][2];
+		float w = 1.0f / (m[0][3] * vIn.x + m[1][3] * vIn.y + m[2][3] * vIn.z + m[3][3]);
+		rs.x *= w;
+		rs.y *= w;
+		rs.z *= w;
+		return rs;
 	}
 	inline void Matrix4::TransformHomogeneous(Vec3 & rs, const Vec3 & vIn) const
 	{
@@ -1872,12 +1900,13 @@ namespace VectorMath
 			}
 			return q * (1.0f / q.Length());
 		}
+		// equivalent to mat(colX, colY, colZ)
 		static inline Quaternion FromCoordinates(const Vec3 & axisX, const Vec3 & axisY, const Vec3 & axisZ)
 		{
 			Matrix3 a;
-			a.values[0] = axisX.x; a.values[3] = axisX.y, a.values[6] = axisX.z;
-			a.values[1] = axisY.x; a.values[4] = axisY.y, a.values[7] = axisY.z;
-			a.values[2] = axisZ.x; a.values[5] = axisZ.y, a.values[8] = axisZ.z;
+			a.values[0] = axisX.x; a.values[1] = axisX.y; a.values[2] = axisX.z;
+			a.values[3] = axisY.x; a.values[4] = axisY.y; a.values[5] = axisY.z;
+			a.values[6] = axisZ.x; a.values[7] = axisZ.y; a.values[8] = axisZ.z;
 
 			return FromMatrix(a);
 		}
@@ -1918,6 +1947,15 @@ namespace VectorMath
 			else
 				return Lerp(q1, q3, t);
 		}
+
+        static inline void SetYawAngle(Quaternion & q, float yaw)
+        {
+            Matrix4 roty;
+            Matrix4::RotationY(roty, yaw);
+            Matrix4 original = q.ToMatrix4();
+            Matrix4::Multiply(original, roty, original);
+            q = Quaternion::FromMatrix(original.GetMatrix3());
+        }
 	};
 }
 

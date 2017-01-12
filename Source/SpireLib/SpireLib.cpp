@@ -287,7 +287,7 @@ namespace SpireLib
 		writer << "name " << MetaData.ShaderName << EndLine;
 		for (auto & ublock : MetaData.ParameterSets)
 		{
-			writer << "paramset \"" << ublock.Key << "\" size " << ublock.Value->BufferSize 
+			writer << "paramset \"" << ublock.Key << "\" size " << ublock.Value->BufferSize
 				<< " binding " << ublock.Value->DescriptorSetId << "\n{\n";
 			for (auto & entry : ublock.Value->Parameters)
 			{
@@ -463,10 +463,10 @@ namespace SpireLib
 		{
 			List<CompileUnit> moduleUnits;
 			HashSet<String> processedModuleUnits;
-			EnumerableDictionary<String, SpireModule> modules;
+			EnumerableDictionary<String, RefPtr<SpireModule>> modules;
 			int errorCount = 0;
 		};
-		List<State> states;
+		Array<State, 128> states;
 		List<RefPtr<Spire::Compiler::CompilationContext>> compileContext;
 		RefPtr<ShaderCompiler> compiler;
 
@@ -521,7 +521,11 @@ namespace SpireLib
 
 		SpireModule * FindModule(CoreLib::String moduleName)
 		{
-			return states.Last().modules.TryGetValue(moduleName);
+			auto ptr = states.Last().modules.TryGetValue(moduleName);
+			if (ptr)
+				return ptr->Ptr();
+			else
+				return nullptr;
 		}
 
 		StringBuilder moduleKeyBuilder;
@@ -542,7 +546,7 @@ namespace SpireLib
 				}
 			}
 			if (auto smodule = states.Last().modules.TryGetValue(moduleKeyBuilder.Buffer()))
-				return smodule;
+				return smodule->Ptr();
 			RefPtr<ShaderSymbol> originalModule;
 			compileContext.Last()->Symbols.Shaders.TryGetValue(module->Name, originalModule);
 			CompileUnit unit;
@@ -593,7 +597,8 @@ namespace SpireLib
 			{
 				if (!states.Last().modules.ContainsKey(shader.Key))
 				{
-					SpireModule meta;
+					RefPtr<SpireModule> newModule = new SpireModule();
+					auto & meta = *newModule;
 					meta.Id = SpireModule::IdAllocator++;
 					meta.Name = shader.Key;
 					int offset = 0;
@@ -608,7 +613,7 @@ namespace SpireLib
 							continue;
 						ComponentMetaData compMeta;
 						compMeta.Name = comp.Key;
-                        compMeta.Type = comp.Value->Type->DataType;
+						compMeta.Type = comp.Value->Type->DataType;
 						compMeta.TypeName = compMeta.Type->ToString();
 						if (auto specialize = impl->SyntaxNode->FindSpecializeModifier())
 						{
@@ -631,7 +636,7 @@ namespace SpireLib
 						else
 							meta.Parameters.Add(compMeta);
 					}
-					states.Last().modules.Add(shader.Key, _Move(meta));
+					states.Last().modules.Add(shader.Key, newModule);
 				}
 			}
 			if (sink)
@@ -760,7 +765,7 @@ namespace SpireLib
 				PopContext();
 				return false;
 			}
-		
+
 			Spire::Compiler::CompileResult cresult;
 			compiler->Compile(cresult, *compileContext.Last(), units, Options);
 			result.Sources = cresult.CompiledSource;
@@ -979,8 +984,8 @@ int spModuleGetRequiredComponents(SpireModule * module, SpireComponentInfo * buf
 	{
 		buffer[ptr].Name = comp.Name.Buffer();
 		buffer[ptr].TypeName = comp.TypeName.Buffer();
-		buffer[ptr].Alignment = (int) GetTypeAlignment(comp.Type.Ptr());
-		buffer[ptr].Size = (int) GetTypeSize(comp.Type.Ptr());
+		buffer[ptr].Alignment = (int)GetTypeAlignment(comp.Type.Ptr());
+		buffer[ptr].Size = (int)GetTypeSize(comp.Type.Ptr());
 		buffer[ptr].Offset = comp.Offset;
 		ptr++;
 	}
@@ -992,7 +997,7 @@ void spDestroyShader(SpireShader * shader)
 	delete SHADER(shader);
 }
 
-SpireCompilationResult * spCompileShader(SpireCompilationContext * ctx, SpireShader * shader, 
+SpireCompilationResult * spCompileShader(SpireCompilationContext * ctx, SpireShader * shader,
 	SpireModule** args,
 	int argCount,
 	const char * additionalSource,

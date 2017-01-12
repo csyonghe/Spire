@@ -263,6 +263,10 @@ namespace CoreLib
 			{
 				stream->Close();
 			}
+            void ReleaseStream()
+            {
+                stream.Release();
+            }
 		};
 
 		class StreamReader : public TextReader
@@ -304,6 +308,10 @@ namespace CoreLib
 			{
 				stream->Close();
 			}
+            void ReleaseStream()
+            {
+                stream.Release();
+            }
 		};
 
 	}

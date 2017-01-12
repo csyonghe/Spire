@@ -504,7 +504,7 @@ namespace CoreLib
 
 			int GetHashCode() const
 			{
-				return CoreLib::Basic::GetHashCode(buffer.Ptr());
+				return CoreLib::Basic::GetHashCode((const char*)buffer.Ptr());
 			}
 			String PadLeft(char ch, int length);
 			String PadRight(char ch, int length);

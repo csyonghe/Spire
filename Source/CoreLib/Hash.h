@@ -98,7 +98,7 @@ namespace CoreLib
 			return PointerHash<std::is_pointer<TKey>::value>::GetHashCode(key);
 		}
 
-
+		
 	}
 }
 

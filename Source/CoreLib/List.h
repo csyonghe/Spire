@@ -341,6 +341,11 @@ namespace CoreLib
 				InsertRange(id, list.buffer, list._count);
 			}
 
+			void AddRange(ArrayView<T> list)
+			{
+				InsertRange(_count, list.Buffer(), list.Count());
+			}
+
 			void AddRange(const T * vals, int n)
 			{
 				InsertRange(_count, vals, n);

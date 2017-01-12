@@ -120,6 +120,7 @@ namespace CoreLib
 		{
 			return ArrayView<T>(obj);
 		}
+		
 		template<typename T>
 		ArrayView<T> MakeArrayView(T * buffer, int count)
 		{

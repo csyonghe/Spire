@@ -37,17 +37,21 @@ struct DefaultLayoutRulesImpl : LayoutRulesImpl
         case BaseType::Int:
         case BaseType::UInt:
         case BaseType::Float:
+		case BaseType::Bool:
             return{ 4, 4 };
 
         case BaseType::Int2:      return GetVectorLayout(GetScalarLayout(BaseType::Int),    2);
+		case BaseType::Bool2:      return GetVectorLayout(GetScalarLayout(BaseType::Bool),  2);
         case BaseType::UInt2:     return GetVectorLayout(GetScalarLayout(BaseType::UInt),   2);
         case BaseType::Float2:    return GetVectorLayout(GetScalarLayout(BaseType::Float),  2);
         case BaseType::Int3:      return GetVectorLayout(GetScalarLayout(BaseType::Int),    3);
         case BaseType::UInt3:     return GetVectorLayout(GetScalarLayout(BaseType::UInt),   3);
         case  BaseType::Float3:   return GetVectorLayout(GetScalarLayout(BaseType::Float),  3);
+		case BaseType::Bool3:      return GetVectorLayout(GetScalarLayout(BaseType::Bool),  3);
         case BaseType::Int4:      return GetVectorLayout(GetScalarLayout(BaseType::Int),    4);
         case BaseType::UInt4:     return GetVectorLayout(GetScalarLayout(BaseType::UInt),   4);
         case BaseType::Float4:    return GetVectorLayout(GetScalarLayout(BaseType::Float),  4);
+		case BaseType::Bool4:      return GetVectorLayout(GetScalarLayout(BaseType::Bool),  4);
 
         case BaseType::Float3x3:  return GetMatrixLayout(GetScalarLayout(BaseType::Float),  3, 3);
         case BaseType::Float4x4:  return GetMatrixLayout(GetScalarLayout(BaseType::Float),  4, 4);
