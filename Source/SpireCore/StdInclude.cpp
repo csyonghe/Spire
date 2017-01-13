@@ -15,6 +15,9 @@ __intrinsic vec4 dFdx(vec4 v);
 __intrinsic vec4 dFdy(vec4 v);
 __intrinsic vec4 fwidth(vec4 v);
 
+__intrinsic float intBitsToFloat(int x);
+__intrinsic int floatBitsToInt(float x);
+
 __intrinsic vec3 normalize(vec3 v);
 __intrinsic float dot(vec2 v0, vec2 v1);
 __intrinsic float dot(vec3 v0, vec3 v1);
