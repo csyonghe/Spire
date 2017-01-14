@@ -184,7 +184,7 @@ namespace Spire
 			{
 				PrintOp(ctx, op0);
 				bool printDefault = true;
-				if (op0->Type->GetVectorSize() <= 4)
+				if (op0->Type->GetVectorSize() <= 4 && op0->Type->IsVector())
 				{
 					if (auto c = dynamic_cast<ILConstOperand*>(op1))
 					{
