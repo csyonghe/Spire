@@ -168,6 +168,10 @@ __intrinsic mat3 mat3(float a0, float a1, float a2, float a3, float a4, float a5
 __intrinsic mat4 mat4(vec4 a, vec4 b, vec4 c, vec4 d);
 __intrinsic mat4 mat4(float a0, float a1, float a2, float a3, float a4, float a5, float a6, float a7, float a8, float a9, float a10, float a11, float a12, float a13, float a14, float a15);
 __intrinsic vec3 cross(vec3 v1, vec3 v2);
+__intrinsic float float(float v);
+__intrinsic int int(int v);
+__intrinsic uint uint(uint v);
+__intrinsic bool bool(bool v);
 __intrinsic vec2 vec2(float v);
 __intrinsic vec3 vec3(float v);
 __intrinsic vec4 vec4(float v);
