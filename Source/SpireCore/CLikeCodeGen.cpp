@@ -767,6 +767,7 @@ namespace Spire
 			intrinsicTextureFunctions.Add("Sample");
 			intrinsicTextureFunctions.Add("SampleBias");
 			intrinsicTextureFunctions.Add("SampleGrad");
+			intrinsicTextureFunctions.Add("SampleLevel");
 			intrinsicTextureFunctions.Add("SampleCmp");
 		}
 

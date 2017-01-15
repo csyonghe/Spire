@@ -45,11 +45,17 @@ namespace CoreLib
 
 		int StringToInt(const String & str, int radix)
 		{
-			return (int)strtol(str.Buffer(), NULL, radix);
+			if (str.StartsWith("0x"))
+				return (int)strtoll(str.Buffer(), NULL, 16);
+			else
+				return (int)strtoll(str.Buffer(), NULL, radix);
 		}
 		unsigned int StringToUInt(const String & str, int radix)
 		{
-			return (unsigned int)strtoul(str.Buffer(), NULL, radix);
+			if (str.StartsWith("0x"))
+				return (unsigned int)strtoull(str.Buffer(), NULL, 16);
+			else
+				return (unsigned int)strtoull(str.Buffer(), NULL, radix);
 		}
 		double StringToDouble(const String & str)
 		{

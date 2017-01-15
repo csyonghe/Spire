@@ -335,6 +335,19 @@ namespace Spire
 					}
 					ctx.Body << ")";
 				}
+				else if (instr->Function == "SampleLevel")
+				{
+					ctx.Body << "textureLod";
+					ctx.Body << "(";
+					printSamplerArgument(instr->Arguments[0].Ptr(), instr->Arguments[1].Ptr());
+					for (int i = 2; i < instr->Arguments.Count(); i++)
+					{
+						PrintOp(ctx, instr->Arguments[i].Ptr());
+						if (i < instr->Arguments.Count() - 1)
+							ctx.Body << ", ";
+					}
+					ctx.Body << ")";
+				}
 				else if (instr->Function == "SampleGrad")
 				{
 					if (instr->Arguments.Count() == 6)

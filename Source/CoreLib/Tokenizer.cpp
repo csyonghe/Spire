@@ -14,7 +14,7 @@ namespace CoreLib
 
 		enum class State
 		{
-			Start, Identifier, Operator, Int, Fixed, Double, Char, String, MultiComment, SingleComment
+			Start, Identifier, Operator, Int, Hex, Fixed, Double, Char, String, MultiComment, SingleComment
 		};
 
 		enum class LexDerivative
@@ -493,6 +493,12 @@ namespace CoreLib
 						}
 						pos++;
 					}
+					else if (curChar == 'x')
+					{
+						state = State::Hex;
+						tokenBuilder.Append(curChar);
+						pos++;
+					}
 					else
 					{
 						if (derivative == LexDerivative::Line)
@@ -506,6 +512,18 @@ namespace CoreLib
 						{
 							InsertToken(TokenType::IntLiterial);
 						}
+						state = State::Start;
+					}
+					break;
+				case State::Hex:
+					if (IsDigit(curChar) || (curChar>='a' && curChar <= 'f') || (curChar >= 'A' && curChar <= 'F'))
+					{
+						tokenBuilder.Append(curChar);
+						pos++;
+					}
+					else
+					{
+						InsertToken(TokenType::IntLiterial);
 						state = State::Start;
 					}
 					break;
