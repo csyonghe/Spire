@@ -294,7 +294,7 @@ namespace SpireLib
 				writer << entry.Value->Name << "(\"" << entry.Key << "\") : ";
 				entry.Value->Type->Serialize(writer);
 				writer << " at ";
-				if (entry.Value->BindingPoints.Count())
+				if (entry.Value->BufferOffset == -1)
 				{
 					writer << "binding(";
 					for (auto binding : entry.Value->BindingPoints)
