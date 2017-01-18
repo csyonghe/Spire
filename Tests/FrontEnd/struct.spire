@@ -19,8 +19,8 @@ Foo makeFoo(float x, float y)
 	return foo;
 }
 
-shader Test
-    targets StandardPipeline
+template shader Test()
+//    targets StandardPipeline
 {
 	// Uniform of struct type
 	param Foo foo1;
