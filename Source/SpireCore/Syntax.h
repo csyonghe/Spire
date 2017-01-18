@@ -494,19 +494,6 @@ namespace Spire
 			}
 		};
 
-		class GenericTypeSyntaxNode : public TypeSyntaxNode
-		{
-		public:
-			RefPtr<TypeSyntaxNode> BaseType;
-			String GenericTypeName;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-			virtual GenericTypeSyntaxNode * Clone(CloneContext & ctx) override
-			{
-				auto rs = CloneSyntaxNodeFields(new GenericTypeSyntaxNode(*this), ctx);
-				rs->BaseType = BaseType->Clone(ctx);
-				return rs;
-			}
-		};
 
 		class ContainerDecl;
 		class SpecializeModifier;
@@ -1265,6 +1252,33 @@ namespace Spire
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ExpressionStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
+
+		// Note(tfoley): Moved this further down in the file because it depends on
+		// `ExpressionSyntaxNode` and a forward reference just isn't good enough
+		// for `RefPtr`.
+		//
+		class GenericTypeSyntaxNode : public TypeSyntaxNode
+		{
+		public:
+			// The type argument to the generic type
+			RefPtr<TypeSyntaxNode> BaseType;
+
+			// The name of the generic to apply (e.g., `Buffer`)
+			String GenericTypeName;
+			
+			// Additional expression arguments after the first (type) argument.
+			List<RefPtr<ExpressionSyntaxNode>> Args;
+
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual GenericTypeSyntaxNode * Clone(CloneContext & ctx) override
+			{
+				auto rs = CloneSyntaxNodeFields(new GenericTypeSyntaxNode(*this), ctx);
+				rs->BaseType = BaseType->Clone(ctx);
+				return rs;
+			}
+		};
+
+		//
 
 		class SyntaxVisitor : public Object
 		{

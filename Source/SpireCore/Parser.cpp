@@ -21,6 +21,7 @@ namespace Spire
 			HashSet<String> typeNames;
 			HashSet<String> classNames;
 			bool isInImportOperator = false;
+			int genericDepth = 0;
 
             // Is the parser in a "recovering" state?
             // During recovery we don't emit additional errors, until we find
@@ -1564,7 +1565,15 @@ namespace Spire
 				gtype->Position = typeName.Position;
 				gtype->GenericTypeName = typeName.Content;
 				ReadToken(TokenType::OpLess);
+				// For now assume all generics have one type argument, and then
+				// zero or more value arguments
 				gtype->BaseType = ParseType();
+				this->genericDepth++;
+				while (AdvanceIf(this, TokenType::Comma))
+				{
+					gtype->Args.Add(ParseExpression());
+				}
+				this->genericDepth--;
 				ReadToken(TokenType::OpGreater);
 				rs = gtype;
 			}
@@ -1604,7 +1613,7 @@ namespace Spire
 				return Associativity::Left;
 		}
 
-		int GetOpLevel(CoreLib::Text::TokenType type)
+		int GetOpLevel(Parser* parser, CoreLib::Text::TokenType type)
 		{
 			switch(type)
 			{
@@ -1633,13 +1642,17 @@ namespace Spire
 			case TokenType::OpEql:
 			case TokenType::OpNeq:
 				return 7;
-			case TokenType::OpGeq:
-			case TokenType::OpLeq:
 			case TokenType::OpGreater:
+			case TokenType::OpGeq:
+				// Don't allow these ops inside a generic argument
+				if (parser->genericDepth > 0) return -1;
+			case TokenType::OpLeq:
 			case TokenType::OpLess:
 				return 8;
-			case TokenType::OpLsh:
 			case TokenType::OpRsh:
+				// Don't allow this op inside a generic argument
+				if (parser->genericDepth > 0) return -1;
+			case TokenType::OpLsh:
 				return 9;
 			case TokenType::OpAdd:
 			case TokenType::OpSub:
@@ -1755,7 +1768,7 @@ namespace Spire
 				if (GetAssociativityFromLevel(level) == Associativity::Left)
 				{
 					auto left = ParseExpression(level + 1);
-					while (GetOpLevel(tokenReader.PeekTokenType()) == level)
+					while (GetOpLevel(this, tokenReader.PeekTokenType()) == level)
 					{
 						RefPtr<BinaryExpressionSyntaxNode> tmp = new BinaryExpressionSyntaxNode();
 						tmp->LeftExpression = left;
@@ -1770,7 +1783,7 @@ namespace Spire
 				else
 				{
 					auto left = ParseExpression(level + 1);
-					if (GetOpLevel(tokenReader.PeekTokenType()) == level)
+					if (GetOpLevel(this, tokenReader.PeekTokenType()) == level)
 					{
 						RefPtr<BinaryExpressionSyntaxNode> tmp = new BinaryExpressionSyntaxNode();
 						tmp->LeftExpression = left;
