@@ -90,6 +90,7 @@ namespace CoreLib
 				return rs;
 			}
 			static String FromWString(const wchar_t * wstr);
+			static String FromWString(const wchar_t * wstr, const wchar_t * wend);
 			static String FromWChar(const wchar_t ch);
 			static String FromUnicodePoint(unsigned int codePoint);
 			String()

@@ -6,7 +6,7 @@ using namespace CoreLib::IO;
 using namespace Spire::Compiler;
 
 // Try to read an argument for a command-line option.
-String tryReadCommandLineArgument(wchar_t const* option, wchar_t***ioCursor, wchar_t**end)
+wchar_t const* tryReadCommandLineArgumentRaw(wchar_t const* option, wchar_t***ioCursor, wchar_t**end)
 {
 	wchar_t**& cursor = *ioCursor;
 	if (cursor == end)
@@ -16,9 +16,15 @@ String tryReadCommandLineArgument(wchar_t const* option, wchar_t***ioCursor, wch
 	}
 	else
 	{
-		return String::FromWString(*cursor++);
+		return *cursor++;
 	}
 }
+
+String tryReadCommandLineArgument(wchar_t const* option, wchar_t***ioCursor, wchar_t**end)
+{
+	return String::FromWString(tryReadCommandLineArgumentRaw(option, ioCursor, end));
+}
+
 
 int wmain(int argc, wchar_t* argv[])
 {
@@ -79,6 +85,43 @@ int wmain(int argc, wchar_t* argv[])
 				}
 				else if (argStr == "-genchoice")
 					options.Mode = CompilerMode::GenerateChoice;
+				else if (argStr[1] == 'D')
+				{
+					// The value to be defined might be part of the same option, as in:
+					//     -DFOO
+					// or it might come separately, as in:
+					//     -D FOO
+					wchar_t const* defineStr = arg + 2;
+					if (defineStr[0] == 0)
+					{
+						// Need to read another argument from the command line
+						defineStr = tryReadCommandLineArgumentRaw(arg, &argCursor, argEnd);
+					}
+					// The string that sets up the define can have an `=` between
+					// the name to be defined and its value, so we search for one.
+					wchar_t const* eqPos = nullptr;
+					for(wchar_t const* dd = defineStr; *dd; ++dd)
+					{
+						if (*dd == '=')
+						{
+							eqPos = dd;
+							break;
+						}
+					}
+
+					// Now set the preprocessor define
+					//
+					if (eqPos)
+					{
+						// If we found an `=`, we split the string...
+						options.PreprocessorDefinitions[String::FromWString(defineStr, eqPos)] = String::FromWString(eqPos+1);
+					}
+					else
+					{
+						// If there was no `=`, then just #define it to an empty string
+						options.PreprocessorDefinitions[String::FromWString(defineStr)] = String();
+					}
+				}
 				else if (argStr == "--")
 				{
 					// The `--` option causes us to stop trying to parse options,
