@@ -570,7 +570,7 @@ namespace SpireLib
 						newParam->modifiers.flags = ModifierFlag::Public;
 						param->BlockStatement = nullptr;
 						auto expr = new ConstantExpressionSyntaxNode();
-						if (param->Type->Equals(ExpressionType::Bool))
+						if (param->Type.Equals(ExpressionType::Bool))
 							expr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Bool;
 						else
 							expr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Int;

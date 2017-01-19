@@ -40,6 +40,11 @@ void printDiagnosticArg(StringBuilder& sb, ExpressionType* type)
     sb << type->ToString();
 }
 
+void printDiagnosticArg(StringBuilder& sb, TypeExp const& type)
+{
+	sb << type.type->ToString();
+}
+
 void printDiagnosticArg(StringBuilder& sb, ILType* type)
 {
     sb << type->ToString();
@@ -73,6 +78,11 @@ CodePosition const& getDiagnosticPos(CoreLib::Text::Token const& token)
 CodePosition const& getDiagnosticPos(ShaderClosure* shader)
 {
     return shader->Position;
+}
+
+CodePosition const& getDiagnosticPos(TypeExp const& typeExp)
+{
+	return typeExp.exp->Position;
 }
 
 // Take the format string for a diagnostic message, along with its arguments, and turn it into a

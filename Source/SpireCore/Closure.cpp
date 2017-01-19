@@ -97,8 +97,8 @@ namespace Spire
 						compSyntax->Name.Content = compName;
 						CloneContext cloneCtx;
 						compSyntax->Expression = arg->Expression->Clone(cloneCtx);
-						compSyntax->TypeNode = new BasicTypeSyntaxNode();
-						compSyntax->TypeNode->Position = compSyntax->Position;
+						compSyntax->Type = TypeExp(new BasicTypeSyntaxNode());
+						compSyntax->Type.exp->Position = compSyntax->Position;
 						impl->SyntaxNode = compSyntax;
 						ccomp->Name = compName;
 						ccomp->Type = new Type();

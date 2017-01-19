@@ -680,6 +680,43 @@ namespace Spire
 		};
 
 		//
+		// Type Expressions
+		//
+
+		// A "type expression" is a term that we expect to resolve to a type during checking.
+		// We store both the original syntax and the resolved type here.
+		struct TypeExp
+		{
+			TypeExp() {}
+			TypeExp(TypeExp const& other)
+				: exp(other.exp)
+				, type(other.type)
+			{}
+			explicit TypeExp(RefPtr<TypeSyntaxNode> exp)
+				: exp(exp)
+			{}
+
+			RefPtr<TypeSyntaxNode> exp;
+			RefPtr<ExpressionType> type;
+
+			bool Equals(ExpressionType* other) {
+				return type->Equals(other);
+			}
+			bool Equals(RefPtr<ExpressionType> other) {
+				return type->Equals(other.Ptr());
+			}
+			ExpressionType* Ptr() { return type.Ptr(); }
+			operator RefPtr<ExpressionType>()
+			{
+				return type;
+			}
+
+			TypeExp Clone(CloneContext& context);
+			TypeExp Accept(SyntaxVisitor* visitor);
+		};
+
+
+		//
 		// Declarations
 		//
 
@@ -687,11 +724,8 @@ namespace Spire
 		class VarDeclBase : public Decl
 		{
 		public:
-			// Syntax for type specifier
-			RefPtr<TypeSyntaxNode> TypeNode;
-
-			// Resolved type of the variable
-			RefPtr<ExpressionType> Type;
+			// Type of the variable
+			TypeExp Type;
 
 			// Initializer expression (optional)
 			RefPtr<ExpressionSyntaxNode> Expr;
@@ -707,7 +741,7 @@ namespace Spire
 			virtual StructField * Clone(CloneContext & ctx) override
 			{
 				auto rs = CloneSyntaxNodeFields(new StructField(*this), ctx);
-				rs->TypeNode = TypeNode->Clone(ctx);
+				rs->Type = Type.Clone(ctx);
 				return rs;
 			}
 		};
@@ -757,8 +791,7 @@ namespace Spire
 		class TypeDefDecl : public Decl
 		{
 		public:
-			RefPtr<TypeSyntaxNode> TypeNode;
-			RefPtr<ExpressionType> Type;
+			TypeExp Type;
 
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual TypeDefDecl * Clone(CloneContext & ctx) override;
@@ -819,8 +852,7 @@ namespace Spire
 		{
 		public:
 			String InternalName;
-			RefPtr<ExpressionType> ReturnType;
-			RefPtr<TypeSyntaxNode> ReturnTypeNode;
+			TypeExp ReturnType;
 			bool SemanticallyChecked = false;
 			bool IsInline() { return HasModifier(ModifierFlag::Inline); }
 			bool IsExtern() { return HasModifier(ModifierFlag::Extern); }
@@ -1037,8 +1069,7 @@ namespace Spire
 			bool IsRequire() { return HasModifier(ModifierFlag::Require); }
 			bool IsInput() { return HasModifier(ModifierFlag::Extern); }
 			bool IsParam() { return HasModifier(ModifierFlag::Param); }
-			RefPtr<TypeSyntaxNode> TypeNode;
-			RefPtr<ExpressionType> Type;
+			TypeExp Type;
 			RefPtr<RateSyntaxNode> Rate;
 			RefPtr<BlockStatementSyntaxNode> BlockStatement;
 			RefPtr<ExpressionSyntaxNode> Expression;
@@ -1370,7 +1401,7 @@ namespace Spire
 			virtual RefPtr<ComponentSyntaxNode> VisitComponent(ComponentSyntaxNode * comp);
 			virtual RefPtr<FunctionSyntaxNode> VisitFunction(FunctionSyntaxNode* func)
 			{
-				func->ReturnTypeNode = func->ReturnTypeNode->Accept(this).As<TypeSyntaxNode>();
+				func->ReturnType = func->ReturnType.Accept(this);
 				for (auto & member : func->Members)
 					member = member->Accept(this).As<Decl>();
 				if (func->Body)
@@ -1391,7 +1422,7 @@ namespace Spire
 			}
 			virtual RefPtr<TypeDefDecl> VisitTypeDefDecl(TypeDefDecl* decl)
 			{
-				decl->TypeNode = decl->TypeNode->Accept(this).As<TypeSyntaxNode>();
+				decl->Type = decl->Type.Accept(this);
 				return decl;
 			}
 			virtual RefPtr<StatementSyntaxNode> VisitDiscardStatement(DiscardStatementSyntaxNode * stmt)
@@ -1400,7 +1431,7 @@ namespace Spire
 			}
 			virtual RefPtr<StructField> VisitStructField(StructField * f)
 			{
-				f->TypeNode = f->TypeNode->Accept(this).As<TypeSyntaxNode>();
+				f->Type = f->Type.Accept(this);
 				return f;
 			}
 			virtual RefPtr<StatementSyntaxNode> VisitBlockStatement(BlockStatementSyntaxNode* stmt)

@@ -15,7 +15,7 @@ namespace Spire
 			sb << comp->Name.Content;
 			for (auto & param : comp->GetParameters())
 			{
-				sb << "@" << param->Type->ToString();
+				sb << "@" << param->Type.type->ToString();
 			}
 			return sb.ProduceString();
 		}
@@ -94,6 +94,13 @@ namespace Spire
 			{
 				node->Accept(this);
 				return typeResult;
+			}
+			TypeExp TranslateTypeNode(TypeExp const& typeExp)
+			{
+				TypeExp result;
+				result.exp = typeExp.exp;
+				result.type = TranslateTypeNode(typeExp.exp);
+				return result;
 			}
 			RefPtr<TypeSyntaxNode> VisitBasicType(BasicTypeSyntaxNode * typeNode) override
 			{
@@ -269,7 +276,7 @@ namespace Spire
 				}
 				for (auto comp : pipeline->GetAbstractComponents())
 				{
-					comp->Type = TranslateTypeNode(comp->TypeNode);
+					comp->Type = TranslateTypeNode(comp->Type);
 					if (comp->IsRequire() || comp->IsInput() || (comp->Rate && comp->Rate->Worlds.Count() == 1
 						&& psymbol->IsAbstractWorld(comp->Rate->Worlds.First().World.Content)))
 						AddNewComponentSymbol(psymbol->Components, psymbol->FunctionComponents, comp);
@@ -343,8 +350,8 @@ namespace Spire
 							getSink()->diagnose(para.Ptr(), Diagnostics::parameterAlreadyDefined, para->Name);
 						else
 							paraNames.Add(para->Name.Content);
-						para->Type = TranslateTypeNode(para->TypeNode);
-						if (para->Type->Equals(ExpressionType::Void.Ptr()))
+						para->Type = TranslateTypeNode(para->Type);
+						if (para->Type.Equals(ExpressionType::Void.Ptr()))
 						{
 							getSink()->diagnose(para.Ptr(), Diagnostics::parameterCannotBeVoid);
 						}
@@ -371,11 +378,11 @@ namespace Spire
 					interfaceNode->Scope->decls.AddIfNotExists(comp->Name.Content, comp.Ptr());
 					for (auto & param : comp->GetParameters())
 					{
-						param->Type = TranslateTypeNode(param->TypeNode);
+						param->Type = TranslateTypeNode(param->Type);
 						if (param->Expr)
 							getSink()->diagnose(param->Expr->Position, Diagnostics::defaultParamNotAllowedInInterface, param->Name);
 					}
-					comp->Type = TranslateTypeNode(comp->TypeNode);
+					comp->Type = TranslateTypeNode(comp->Type);
 					if (comp->Expression)
 						comp->Expression->Accept(this);
 					if (comp->BlockStatement)
@@ -518,7 +525,7 @@ namespace Spire
 					{
 						if (!comp->IsOutput())
 							getSink()->diagnose(comp, Diagnostics::fragDepthAttributeCanOnlyApplyToOutput);
-						if (!comp->Type->Equals(ExpressionType::Float))
+						if (!comp->Type.Equals(ExpressionType::Float))
 							getSink()->diagnose(comp, Diagnostics::fragDepthAttributeCanOnlyApplyToFloatComponent);
 					}
 					currentComp = nullptr;
@@ -649,7 +656,7 @@ namespace Spire
 				{
 					if (auto comp = dynamic_cast<ComponentSyntaxNode*>(mbr.Ptr()))
 					{
-						comp->Type = TranslateTypeNode(comp->TypeNode);
+						comp->Type = TranslateTypeNode(comp->Type);
 						if (comp->IsRequire())
 						{
 							shaderSymbol->IsAbstract = true;
@@ -659,7 +666,7 @@ namespace Spire
 							}
 						}
 						for (auto & param : comp->GetParameters())
-							param->Type = TranslateTypeNode(param->TypeNode);
+							param->Type = TranslateTypeNode(param->Type);
 						AddNewComponentSymbol(shaderSymbol->Components, shaderSymbol->FunctionComponents, comp);
 					}
 				}
@@ -864,7 +871,7 @@ namespace Spire
 							{
 								if (!first)
 									argList << ", ";
-								argList << param->Type->ToString();
+								argList << param->Type.type->ToString();
 								first = false;
 							}
 							argList << ")";
@@ -947,14 +954,14 @@ namespace Spire
 			{
 				for (auto field : structNode->GetFields())
 				{
-					field->Type = TranslateTypeNode(field->TypeNode);
+					field->Type = TranslateTypeNode(field->Type);
 				}
 				return structNode;
 			}
 
 			virtual RefPtr<TypeDefDecl> VisitTypeDefDecl(TypeDefDecl* decl) override
 			{
-				decl->Type = TranslateTypeNode(decl->TypeNode);
+				decl->Type = TranslateTypeNode(decl->Type);
 				return decl;
 			}
 
@@ -974,7 +981,7 @@ namespace Spire
 			void VisitFunctionDeclaration(FunctionSyntaxNode *functionNode)
 			{
 				this->function = functionNode;
-				auto returnType = TranslateTypeNode(functionNode->ReturnTypeNode);
+				auto returnType = TranslateTypeNode(functionNode->ReturnType);
 				functionNode->ReturnType = returnType;
 				StringBuilder internalName;
 				internalName << functionNode->Name.Content;
@@ -985,10 +992,10 @@ namespace Spire
 						getSink()->diagnose(para, Diagnostics::parameterAlreadyDefined, para->Name);
 					else
 						paraNames.Add(para->Name.Content);
-					para->Type = TranslateTypeNode(para->TypeNode);
-					if (para->Type->Equals(ExpressionType::Void.Ptr()))
+					para->Type = TranslateTypeNode(para->Type);
+					if (para->Type.Equals(ExpressionType::Void.Ptr()))
 						getSink()->diagnose(para, Diagnostics::parameterCannotBeVoid);
-					internalName << "@" << para->Type->ToString();
+					internalName << "@" << para->Type.type->ToString();
 				}
 				functionNode->InternalName = internalName.ProduceString();
 				RefPtr<FunctionSymbol> symbol = new FunctionSymbol();
@@ -1091,7 +1098,7 @@ namespace Spire
 				}
 				if (!stmt->Expression)
 				{
-					if (function && !function->ReturnType->Equals(ExpressionType::Void.Ptr()))
+					if (function && !function->ReturnType.Equals(ExpressionType::Void.Ptr()))
 						getSink()->diagnose(stmt, Diagnostics::returnNeedsExpression);
 				}
 				else
@@ -1114,19 +1121,19 @@ namespace Spire
 
 			virtual RefPtr<Variable> VisitDeclrVariable(Variable* varDecl)
 			{
-				RefPtr<ExpressionType> type = TranslateTypeNode(varDecl->TypeNode);
-				if (type->IsTextureOrSampler() || type->AsGenericType())
+				TypeExp typeExp = TranslateTypeNode(varDecl->Type);
+				if (typeExp.type->IsTextureOrSampler() || typeExp.type->AsGenericType())
 				{
-					getSink()->diagnose(varDecl->TypeNode, Diagnostics::invalidTypeForLocalVariable);
+					getSink()->diagnose(varDecl->Type, Diagnostics::invalidTypeForLocalVariable);
 				}
-				else if (type->AsBasicType() && type->AsBasicType()->RecordTypeName.Length())
+				else if (typeExp.type->AsBasicType() && typeExp.type->AsBasicType()->RecordTypeName.Length())
 				{
-					getSink()->diagnose(varDecl->TypeNode, Diagnostics::recordTypeVariableInImportOperator);
+					getSink()->diagnose(varDecl->Type, Diagnostics::recordTypeVariableInImportOperator);
 				}
-				varDecl->Type = type;
-				if (varDecl->Type->Equals(ExpressionType::Void.Ptr()))
+				varDecl->Type = typeExp;
+				if (varDecl->Type.Equals(ExpressionType::Void.Ptr()))
 					getSink()->diagnose(varDecl, Diagnostics::invalidTypeVoid);
-				if (varDecl->Type->IsArray() && varDecl->Type->AsArrayType()->ArrayLength <= 0)
+				if (varDecl->Type.type->IsArray() && varDecl->Type.type->AsArrayType()->ArrayLength <= 0)
 					getSink()->diagnose(varDecl, Diagnostics::invalidArraySize);
 				if (varDecl->Expr != NULL)
 				{
@@ -1296,7 +1303,7 @@ namespace Spire
 				int i = 0;
 				for (auto param : functionNode->GetParameters())
 				{
-					if (!param->Type->Equals(args[i]->Type.Ptr()))
+					if (!param->Type.Equals(args[i]->Type.Ptr()))
 						return false;
 					i++;
 				}

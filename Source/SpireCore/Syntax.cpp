@@ -242,7 +242,7 @@ namespace Spire
 			{
 				member = member->Clone(ctx);
 			}
-			rs->ReturnTypeNode = ReturnTypeNode->Clone(ctx);
+			rs->ReturnType = ReturnType.Clone(ctx);
 			rs->Body = Body->Clone(ctx);
 			return rs;
 		}
@@ -509,7 +509,7 @@ namespace Spire
 		ParameterSyntaxNode * ParameterSyntaxNode::Clone(CloneContext & ctx)
 		{
 			auto rs = CloneSyntaxNodeFields(new ParameterSyntaxNode(*this), ctx);
-			rs->TypeNode = TypeNode->Clone(ctx);
+			rs->Type = Type.Clone(ctx);
 			rs->Expr = Expr->Clone(ctx);
 			return rs;
 		}
@@ -524,7 +524,7 @@ namespace Spire
 		ComponentSyntaxNode * ComponentSyntaxNode::Clone(CloneContext & ctx)
 		{
 			auto rs = CloneSyntaxNodeFields(new ComponentSyntaxNode(*this), ctx);
-			rs->TypeNode = TypeNode->Clone(ctx);
+			rs->Type = Type.Clone(ctx);
 			if (Rate)
 				rs->Rate = Rate->Clone(ctx);
 			if (BlockStatement)
@@ -920,7 +920,7 @@ namespace Spire
 
         ExpressionType* NamedExpressionType::CreateCanonicalType()
         {
-            return decl->Type->GetCanonicalType();
+            return decl->Type.type->GetCanonicalType();
         }
 
 		RefPtr<SyntaxNode> ImportExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
@@ -970,8 +970,7 @@ namespace Spire
 
 		RefPtr<ComponentSyntaxNode> SyntaxVisitor::VisitComponent(ComponentSyntaxNode * comp)
 		{
-			if (comp->TypeNode)
-				comp->TypeNode = comp->TypeNode->Accept(this).As<TypeSyntaxNode>();
+			comp->Type = comp->Type.Accept(this);
 			if (comp->Expression)
 				comp->Expression = comp->Expression->Accept(this).As<ExpressionSyntaxNode>();
 			if (comp->BlockStatement)
@@ -1085,5 +1084,28 @@ namespace Spire
 			auto rs = CloneSyntaxNodeFields(new TemplateShaderParameterSyntaxNode(*this), ctx);
 			return rs;
 		}
+
+		// TypeExp
+
+		TypeExp TypeExp::Clone(CloneContext& context)
+		{
+			TypeExp result;
+			if (exp)
+				result.exp = exp->Clone(context);
+			if (type)
+				result.type = type->Clone();
+			return result;
+		}
+
+		TypeExp TypeExp::Accept(SyntaxVisitor* visitor)
+		{
+			TypeExp result;
+			result.exp = exp->Accept(visitor).As<TypeSyntaxNode>();
+			result.type = type;
+			return result;
+		}
+
+
+		//
 }
 }

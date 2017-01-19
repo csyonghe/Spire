@@ -73,6 +73,7 @@ namespace Spire
         class ExpressionType;
         class ILType;
         class StageAttribute;
+		struct TypeExp;
 
         void printDiagnosticArg(StringBuilder& sb, char const* str);
 		void printDiagnosticArg(StringBuilder& sb, int val);
@@ -80,6 +81,7 @@ namespace Spire
         void printDiagnosticArg(StringBuilder& sb, Decl* decl);
         void printDiagnosticArg(StringBuilder& sb, Type* type);
         void printDiagnosticArg(StringBuilder& sb, ExpressionType* type);
+        void printDiagnosticArg(StringBuilder& sb, TypeExp const& type);
         void printDiagnosticArg(StringBuilder& sb, ILType* type);
         void printDiagnosticArg(StringBuilder& sb, CoreLib::Text::TokenType tokenType);
         void printDiagnosticArg(StringBuilder& sb, Token const& token);
@@ -98,6 +100,7 @@ namespace Spire
         CodePosition const& getDiagnosticPos(SyntaxNode const* syntax);
         CodePosition const& getDiagnosticPos(CoreLib::Text::Token const& token);
         CodePosition const& getDiagnosticPos(ShaderClosure* shader);
+        CodePosition const& getDiagnosticPos(TypeExp const& typeExp);
 
         template<typename T>
         CodePosition getDiagnosticPos(RefPtr<T> const& ptr)

@@ -385,7 +385,7 @@ namespace Spire
 					rs = false;
 					break;
 				}
-				if (!impl->SyntaxNode->Type->Equals(cimpl->SyntaxNode->Type.Ptr()))
+				if (!impl->SyntaxNode->Type.Equals(cimpl->SyntaxNode->Type.Ptr()))
 				{
                     err->diagnose(impl->SyntaxNode->Position,
                         Diagnostics::inconsistentSignatureForComponent,
@@ -444,7 +444,7 @@ namespace Spire
 				auto func = Functions.TryGetValue(funcName);
 				if (!func)
 					return false;
-				if ((*func)->SyntaxNode->ReturnType->ToString() != retType)
+				if ((*func)->SyntaxNode->ReturnType.type->ToString() != retType)
 					return false;
 			}
 			return true;

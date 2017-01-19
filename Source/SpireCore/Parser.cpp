@@ -136,7 +136,8 @@ namespace Spire
 			RefPtr<ExpressionSyntaxNode>				ParseExpression(int level = 0);
 			RefPtr<ExpressionSyntaxNode>				ParseLeafExpression();
 			RefPtr<ParameterSyntaxNode>					ParseParameter();
-			RefPtr<TypeSyntaxNode>						ParseType();
+			RefPtr<TypeSyntaxNode>					ParseType();
+			TypeExp										ParseTypeExp();
 
 			Parser & operator = (const Parser &) = delete;
 		};
@@ -525,13 +526,13 @@ namespace Spire
             parser->ReadToken("typedef");
 
             // TODO(tfoley): parse an actual declarator
-            auto type = parser->ParseType();
+            auto type = parser->ParseTypeExp();
 
             auto nameToken = parser->ReadToken(TokenType::Identifier);
 
             RefPtr<TypeDefDecl> typeDefDecl = new TypeDefDecl();
             typeDefDecl->Name = nameToken;
-            typeDefDecl->TypeNode = type;
+            typeDefDecl->Type = type;
 
 			parser->typeNames.Add(nameToken.Content);
 
@@ -713,9 +714,9 @@ namespace Spire
 
         struct DeclaratorInfo
         {
-            RefPtr<RateSyntaxNode>  rate;
-            RefPtr<TypeSyntaxNode>  typeSpec;
-            Token                   nameToken;
+            RefPtr<RateSyntaxNode>		rate;
+            RefPtr<TypeSyntaxNode>	typeSpec;
+            Token						nameToken;
         };
 
         static void ParseFuncDeclHeader(
@@ -730,7 +731,7 @@ namespace Spire
             decl->Position = declaratorInfo.nameToken.Position;
 
             decl->Name = declaratorInfo.nameToken;
-            decl->ReturnTypeNode = declaratorInfo.typeSpec;
+            decl->ReturnType = TypeExp(declaratorInfo.typeSpec);
             parser->ReadToken(TokenType::LParent);
             while (!AdvanceIfMatch(parser, TokenType::RParent))
             {
@@ -753,7 +754,7 @@ namespace Spire
             decl->Position = declaratorInfo.nameToken.Position;
 
             decl->Name = declaratorInfo.nameToken;
-            decl->TypeNode = declaratorInfo.typeSpec;
+            decl->Type = TypeExp(declaratorInfo.typeSpec);
             parser->ReadToken(TokenType::LParent);
             while (!AdvanceIfMatch(parser, TokenType::RParent))
             {
@@ -847,7 +848,7 @@ namespace Spire
                 //
 
                 decl->Name = declaratorInfo.nameToken;
-                decl->TypeNode = declaratorInfo.typeSpec;
+                decl->Type = TypeExp(declaratorInfo.typeSpec);
 
 				ParseOptSemantics(parser, decl.Ptr());
 
@@ -878,7 +879,7 @@ namespace Spire
                 decl->Position = declaratorInfo.nameToken.Position;
 
                 decl->Name = declaratorInfo.nameToken;
-                decl->TypeNode = declaratorInfo.typeSpec;
+                decl->Type = TypeExp(declaratorInfo.typeSpec);
 
                 if (AdvanceIf(parser, TokenType::OpAssign))
                 {
@@ -1394,7 +1395,7 @@ namespace Spire
             function->modifiers = ParseModifiers(this);
 			
 			PushScope(function.Ptr());
-			function->ReturnTypeNode = ParseType();
+			function->ReturnType = ParseTypeExp();
 			FillPosition(function.Ptr());
 			Token name;
 			if (LookAheadToken("operator"))
@@ -1672,7 +1673,7 @@ namespace Spire
 		{
 			RefPtr<ParameterSyntaxNode> parameter = new ParameterSyntaxNode();
             parameter->modifiers = ParseModifiers(this);
-			parameter->TypeNode = ParseType();
+			parameter->Type = ParseTypeExp();
 			if (LookAheadToken(TokenType::Identifier))
 			{
 				Token name = ReadToken(TokenType::Identifier);
@@ -1732,6 +1733,11 @@ namespace Spire
 				rs = arrType;
 			}
 			return rs;
+		}
+
+		TypeExp Parser::ParseTypeExp()
+		{
+			return TypeExp(ParseType());
 		}
 
 		enum class Associativity
