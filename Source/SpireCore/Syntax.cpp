@@ -941,6 +941,33 @@ namespace Spire
 		{
 			return new StageSyntaxNode(*this);
 		}
+
+		// BufferDecl
+
+		RefPtr<SyntaxNode> BufferDecl::Accept(SyntaxVisitor *visitor)
+		{
+			return visitor->VisitBufferDecl(this);
+		}
+
+		// HLSLConstantBufferDecl
+
+		HLSLConstantBufferDecl * HLSLConstantBufferDecl::Clone(CloneContext & ctx)
+		{
+			assert(!"unimplemented");
+			return nullptr;
+		}
+
+		// HLSLTextureBufferDecl
+
+		HLSLTextureBufferDecl * HLSLTextureBufferDecl::Clone(CloneContext & ctx)
+		{
+			assert(!"unimplemented");
+			return nullptr;
+		}
+
+		//
+
+
 		RefPtr<ComponentSyntaxNode> SyntaxVisitor::VisitComponent(ComponentSyntaxNode * comp)
 		{
 			if (comp->TypeNode)

@@ -73,6 +73,37 @@ namespace Spire
 			String const& GetValue() const { return Value.Content; }
 		};
 
+		// An HLSL semantic
+		class HLSLSemantic : public Modifier
+		{
+		public:
+			Token name;
+		};
+
+
+		// An HLSL semantic that affects layout
+		class HLSLLayoutSemantic : public HLSLSemantic
+		{
+		public:
+			Token registerName;
+			Token componentMask;
+		};
+
+		// An HLSL `register` semantic
+		class HLSLRegisterSemantic : public HLSLLayoutSemantic
+		{
+		};
+
+		// TODO(tfoley): `packoffset`
+		class HLSLPackOffsetSemantic : public HLSLLayoutSemantic
+		{
+		};
+
+		// An HLSL semantic that just associated a declaration with a semantic name
+		class HLSLSimpleSemantic : public HLSLSemantic
+		{
+		};
+
 		// A set of modifiers attached to a syntax node
 		struct Modifiers
 		{
@@ -1037,6 +1068,35 @@ namespace Spire
 			virtual StageSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
+		// Shared base class for declarations of buffers with shader parameters
+		//
+		// TODO(tfoley): Should this actually be unified with the component
+		// declaration syntax in some way?
+		//
+		class BufferDecl : public ContainerDecl
+		{
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override;
+		};
+
+		// An HLSL buffer declaration
+		class HLSLBufferDecl : public BufferDecl {};
+
+		// An HLSL `cbuffer` declaration
+		class HLSLConstantBufferDecl : public HLSLBufferDecl
+		{
+		public:
+			virtual HLSLConstantBufferDecl * Clone(CloneContext & ctx) override;
+		};
+
+		// An HLSL `tbuffer` declaration
+		class HLSLTextureBufferDecl : public HLSLBufferDecl
+		{
+		public:
+			virtual HLSLTextureBufferDecl * Clone(CloneContext & ctx) override;
+		};
+
+		// TODO(tfoley): equivalent cases for GLSL uniform buffer declarations
+
 		// Shared functionality for "shader class"-like declarations
 		class ShaderDeclBase : public ContainerDecl
 		{
@@ -1559,6 +1619,13 @@ namespace Spire
 				for (auto & member : shader->Members)
 					member->Accept(this);
 				return shader;
+			}
+
+			virtual RefPtr<SyntaxNode> VisitBufferDecl(BufferDecl * decl)
+			{
+				for (auto & member : decl->Members)
+					member->Accept(this);
+				return decl;
 			}
 
 		};

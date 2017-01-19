@@ -141,6 +141,19 @@ namespace Spire
 			Parser & operator = (const Parser &) = delete;
 		};
 
+		// Forward Declarations
+
+		static void ParseDeclBody(
+			Parser*						parser,
+			ContainerDecl*				containerDecl,
+			CoreLib::Text::TokenType	closingToken);
+
+		static void ParseOptSemantics(
+			Parser* parser,
+			Decl*	decl);
+
+		//
+
         static void Unexpected(
             Parser*     parser)
         {
@@ -543,6 +556,10 @@ namespace Spire
                 {
                     modifiers.flags |= ModifierFlag::Out;
                 }
+                else if (AdvanceIf(parser, "inout"))
+                {
+                    modifiers.flags |= ModifierFlag::InOut;
+                }
                 else if (AdvanceIf(parser, "uniform"))
                 {
                     modifiers.flags |= ModifierFlag::Uniform;
@@ -745,6 +762,7 @@ namespace Spire
                     break;
                 parser->ReadToken(TokenType::Comma);
             }
+			ParseOptSemantics(parser, decl.Ptr());
         }
 
         static RefPtr<Decl> ParseFuncDecl(
@@ -831,6 +849,8 @@ namespace Spire
                 decl->Name = declaratorInfo.nameToken;
                 decl->TypeNode = declaratorInfo.typeSpec;
 
+				ParseOptSemantics(parser, decl.Ptr());
+
                 // Note(tfoley): this case is the one place where a component
                 // declaration differents in any meaningful way from an
                 // ordinary variable declaration.
@@ -902,6 +922,117 @@ namespace Spire
             }
         }
 
+		//
+		// layout-semantic ::= (register | packoffset) '(' register-name component-mask? ')'
+		// register-name ::= identifier
+		// component-mask ::= '.' identifier
+		//
+		static void ParseHLSLLayoutSemantic(
+			Parser*				parser,
+			HLSLLayoutSemantic*	semantic)
+		{
+			semantic->name = parser->ReadToken(TokenType::Identifier);
+
+			parser->ReadToken(TokenType::LParent);
+			semantic->registerName = parser->ReadToken(TokenType::Identifier);
+			if (AdvanceIf(parser, TokenType::Dot))
+			{
+				semantic->componentMask = parser->ReadToken(TokenType::Identifier);
+			}
+			parser->ReadToken(TokenType::RParent);
+		}
+
+		//
+		// semantic ::= identifier ( '(' args ')' )?
+		//
+		static RefPtr<Modifier> ParseSemantic(
+			Parser* parser)
+		{
+			if (parser->LookAheadToken("register"))
+			{
+				RefPtr<HLSLRegisterSemantic> semantic = new HLSLRegisterSemantic();
+				ParseHLSLLayoutSemantic(parser, semantic.Ptr());
+				return semantic;
+			}
+			else if (parser->LookAheadToken("packoffset"))
+			{
+				RefPtr<HLSLPackOffsetSemantic> semantic = new HLSLPackOffsetSemantic();
+				ParseHLSLLayoutSemantic(parser, semantic.Ptr());
+				return semantic;
+			}
+			else
+			{
+				RefPtr<HLSLSimpleSemantic> semantic = new HLSLSimpleSemantic();
+				semantic->name = parser->ReadToken(TokenType::Identifier);
+				return semantic;
+			}
+		}
+
+		//
+		// opt-semantics ::= (':' semantic)*
+		//
+		static void ParseOptSemantics(
+			Parser* parser,
+			Decl*	decl)
+		{
+			if (!AdvanceIf(parser, TokenType::Colon))
+				return;
+
+			RefPtr<Modifier>* link = &decl->modifiers.first;
+			assert(!*link);
+
+			for (;;)
+			{
+				RefPtr<Modifier> semantic = ParseSemantic(parser);
+				if (semantic)
+				{
+					*link = semantic;
+					link = &semantic->next;
+				}
+
+				switch (parser->tokenReader.PeekTokenType())
+				{
+				case TokenType::LBrace:
+				case TokenType::Semicolon:
+				case TokenType::Comma:
+				case TokenType::RParent:
+				case TokenType::EndOfFile:
+					return;
+
+				default:
+					break;
+				}
+
+				parser->ReadToken(TokenType::Colon);
+			}
+		}
+
+		static RefPtr<Decl> ParseHLSLBufferDecl(
+			Parser*	parser)
+		{
+			RefPtr<HLSLBufferDecl> bufferDecl;
+			if (AdvanceIf(parser, "cbuffer"))
+			{
+				bufferDecl = new HLSLConstantBufferDecl();
+			}
+			else if (AdvanceIf(parser, "tbuffer"))
+			{
+				bufferDecl = new HLSLTextureBufferDecl();
+			}
+			else
+			{
+				Unexpected(parser);
+			}
+
+			bufferDecl->Name = parser->ReadToken(TokenType::Identifier);
+
+			ParseOptSemantics(parser, bufferDecl.Ptr());
+
+			parser->ReadToken(TokenType::LBrace);
+			ParseDeclBody(parser, bufferDecl.Ptr(), TokenType::RBrace);
+			return bufferDecl;
+		}
+
         static RefPtr<Decl> ParseDeclWithModifiers(
             Parser*             parser,
             ContainerDecl*      containerDecl,
@@ -930,6 +1061,8 @@ namespace Spire
 				decl = parser->ParseStage();
 			else if (parser->LookAheadToken("interface"))
 				decl = parser->ParseInterface();
+			else if (parser->LookAheadToken("cbuffer") || parser->LookAheadToken("tbuffer"))
+				decl = ParseHLSLBufferDecl(parser);
             else if (AdvanceIf(parser, TokenType::Semicolon))
             {
                 // empty declaration
@@ -1548,6 +1681,7 @@ namespace Spire
 			else
 				parameter->Name.Content = "_anonymousParam" + String(anonymousParamCounter++);
 			FillPosition(parameter.Ptr());
+			ParseOptSemantics(this, parameter.Ptr());
 			return parameter;
 		}
 
