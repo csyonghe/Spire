@@ -220,11 +220,10 @@ namespace Spire
 		enum class BaseType
 		{
 			Void = 0,
-			Int = 16, Int2 = 17, Int3 = 18, Int4 = 19,
-			Float = 32, Float2 = 33, Float3 = 34, Float4 = 35,
-			UInt = 512, UInt2 = 513, UInt3 = 514, UInt4 = 515,
-			Bool = 128, Bool2 = 129, Bool3 = 130, Bool4 = 131,
-			Float3x3 = 40, Float4x4 = 47,
+			Int = 16,
+			Float = 32,
+			UInt = 512,
+			Bool = 128,
 			Texture2D = 48,
 			TextureCube = 49,
 			Texture2DArray = 50,
@@ -238,21 +237,6 @@ namespace Spire
 			Generic = 8192,
 			Error = 16384,
 		};
-
-		inline bool IsVector(BaseType type)
-		{
-			return (((int)type) & 15) != 0;
-		}
-
-		inline int GetVectorSize(BaseType type)
-		{
-			return (((int)type) & 15) + 1;
-		}
-
-		inline BaseType GetVectorBaseType(BaseType type)
-		{
-			return (BaseType)(((int)type) & (~15));
-		}
 
 		class Decl;
 		class SymbolTable;
@@ -268,23 +252,18 @@ namespace Spire
 		class DeclRefType;
 		class NamedExpressionType;
 		class TypeExpressionType;
+		class VectorExpressionType;
+		class MatrixExpressionType;
+		class ArithmeticExpressionType;
 
 		class ExpressionType : public RefObject
 		{
 		public:
 			static RefPtr<ExpressionType> Bool;
 			static RefPtr<ExpressionType> UInt;
-			static RefPtr<ExpressionType> UInt2;
-			static RefPtr<ExpressionType> UInt3;
-			static RefPtr<ExpressionType> UInt4;
 			static RefPtr<ExpressionType> Int;
-			static RefPtr<ExpressionType> Int2;
-			static RefPtr<ExpressionType> Int3;
-			static RefPtr<ExpressionType> Int4;
 			static RefPtr<ExpressionType> Float;
 			static RefPtr<ExpressionType> Float2;
-			static RefPtr<ExpressionType> Float3;
-			static RefPtr<ExpressionType> Float4;
 			static RefPtr<ExpressionType> Void;
 			static RefPtr<ExpressionType> Error;
 			// Note: just exists to make sure we can clean up
@@ -300,7 +279,10 @@ namespace Spire
 			bool IsVectorType() const;
 			bool IsArray() const;
 			bool IsGenericType(String typeName) const;
+			ArithmeticExpressionType * AsArithmeticType() const;
 			BasicExpressionType * AsBasicType() const;
+			VectorExpressionType * AsVectorType() const;
+			MatrixExpressionType * AsMatrixType() const;
 			ArrayExpressionType * AsArrayType() const;
 			GenericExpressionType * AsGenericType() const;
 			DeclRefType* AsDeclRefType() const;
@@ -320,7 +302,10 @@ namespace Spire
 			virtual bool IsVectorTypeImpl() const { return false; }
 			virtual bool IsArrayImpl() const { return false; }
 			virtual bool IsGenericTypeImpl(String typeName) const { return nullptr; }
+			virtual ArithmeticExpressionType * AsArithmeticTypeImpl() const { return nullptr; }
 			virtual BasicExpressionType * AsBasicTypeImpl() const { return nullptr; }
+			virtual VectorExpressionType * AsVectorTypeImpl() const { return nullptr; }
+			virtual MatrixExpressionType * AsMatrixTypeImpl() const { return nullptr; }
 			virtual ArrayExpressionType * AsArrayTypeImpl() const { return nullptr; }
 			virtual GenericExpressionType * AsGenericTypeImpl() const { return nullptr; }
 			virtual DeclRefType * AsDeclRefTypeImpl() const { return nullptr; }
@@ -331,7 +316,17 @@ namespace Spire
 			ExpressionType* canonicalType = nullptr;
 		};
 
-		class BasicExpressionType : public ExpressionType
+		// Base class for types that can be used in arithmetic expressions
+		class ArithmeticExpressionType : public ExpressionType
+		{
+		public:
+			virtual BasicExpressionType* GetScalarType() const = 0;
+
+		protected:
+			virtual ArithmeticExpressionType * AsArithmeticTypeImpl() const override;
+		};
+
+		class BasicExpressionType : public ArithmeticExpressionType
 		{
 		public:
 			BaseType BaseType;
@@ -359,9 +354,9 @@ namespace Spire
 			}
 			virtual CoreLib::Basic::String ToString() const override;
 		protected:
+			virtual BasicExpressionType* GetScalarType() const override;
 			virtual bool IsIntegralImpl() const override;
 			virtual bool EqualsImpl(const ExpressionType * type) const override;
-			virtual bool IsVectorTypeImpl() const override;
 			virtual BasicExpressionType * AsBasicTypeImpl() const override
 			{
 				return const_cast<BasicExpressionType*>(this);
@@ -456,6 +451,7 @@ namespace Spire
 			// The type that this is the type of...
 			RefPtr<ExpressionType> type;
 
+
 			virtual String ToString() const override;
 
 		protected:
@@ -463,6 +459,79 @@ namespace Spire
 			virtual TypeExpressionType * AsTypeTypeImpl() const override;
 			virtual ExpressionType* CreateCanonicalType() override;
 		};
+
+		// A vector type, e.g., `vector<T,N>`
+		class VectorExpressionType : public ArithmeticExpressionType
+		{
+		public:
+			VectorExpressionType(
+				RefPtr<ExpressionType>	elementType,
+				int						elementCount)
+				: elementType(elementType)
+				, elementCount(elementCount)
+			{}
+
+			// The type of vector elements.
+			// As an invariant, this should be a basic type or an alias.
+			RefPtr<ExpressionType>	elementType;
+
+			// The number of elements
+			//
+			// TODO(tfoley): If we start allowing generics, then this might
+			// need to be a symbolic "constant" expression, and not just
+			// a literal value.
+			int						elementCount;
+
+			virtual String ToString() const override;
+
+		protected:
+			virtual BasicExpressionType* GetScalarType() const override;
+			virtual bool EqualsImpl(const ExpressionType * type) const override;
+			virtual VectorExpressionType * AsVectorTypeImpl() const override;
+			virtual ExpressionType* CreateCanonicalType() override;
+		};
+
+		// A matrix type, e.g., `matrix<T,R,C>`
+		class MatrixExpressionType : public ArithmeticExpressionType
+		{
+		public:
+			MatrixExpressionType(
+				RefPtr<ExpressionType>	elementType,
+				int						rowCount,
+				int						colCount)
+				: elementType(elementType)
+				, rowCount(rowCount)
+				, colCount(colCount)
+			{}
+
+			// The type of vector elements.
+			// As an invariant, this should be a basic type or an alias.
+			RefPtr<ExpressionType>	elementType;
+
+			// The type of the matrix rows
+			RefPtr<VectorExpressionType>	rowType;
+
+			// The number of rows and columns
+			int								rowCount;
+			int								colCount;
+
+			virtual String ToString() const override;
+
+		protected:
+			virtual BasicExpressionType* GetScalarType() const override;
+			virtual bool EqualsImpl(const ExpressionType * type) const override;
+			virtual MatrixExpressionType * AsMatrixTypeImpl() const override;
+			virtual ExpressionType* CreateCanonicalType() override;
+
+		};
+
+		inline BaseType GetVectorBaseType(VectorExpressionType* vecType) {
+			return vecType->elementType->AsBasicType()->BaseType;
+		}
+
+		inline int GetVectorSize(VectorExpressionType* vecType) {
+			return vecType->elementCount;
+		}
 
 		class Type
 		{
@@ -479,7 +548,7 @@ namespace Spire
 		{
 		public:
 			RefPtr<Scope> Parent;
-			ContainerDecl*  containerDecl;
+			ContainerDecl* containerDecl;
 			Dictionary<String, Decl*> decls;
 			Decl* LookUp(String const& name);
 			Scope(RefPtr<Scope> parent, ContainerDecl* containerDecl)
@@ -1402,7 +1471,7 @@ namespace Spire
 		public:
 			// The name of the generic to apply (e.g., `Buffer`)
 			String GenericTypeName;
-			
+
 			// Additional expression arguments after the first (type) argument.
 			List<RefPtr<ExpressionSyntaxNode>> Args;
 
@@ -1424,6 +1493,51 @@ namespace Spire
 
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual BuiltinTypeDecl * Clone(CloneContext & ctx) override;
+		};
+
+		// A declaration of a built-in type that doesn't map to a basic type (e.g., `vector`)
+		class MagicTypeDecl : public Decl
+		{
+		public:
+			String tag;
+
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual MagicTypeDecl * Clone(CloneContext & ctx) override;
+		};
+
+		//
+
+		// A generic declaration, parameterized on types/values
+		class GenericDecl : public ContainerDecl
+		{
+		public:
+			// The decl that is genericized...
+			RefPtr<Decl> inner;
+
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual GenericDecl * Clone(CloneContext & ctx) override;
+		};
+
+		class GenericTypeParamDecl : public Decl
+		{
+		public:
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual GenericTypeParamDecl * Clone(CloneContext & ctx) override;
+		};
+
+		class GenericValueParamDecl : public VarDeclBase
+		{
+		public:
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual GenericValueParamDecl * Clone(CloneContext & ctx) override;
+		};
+
+		// The declaration of the `vector` type
+		class VectorTypeDecl : public Decl
+		{
+		public:
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual VectorTypeDecl * Clone(CloneContext & ctx) override;
 		};
 
 		//
@@ -1706,6 +1820,17 @@ namespace Spire
 				for (auto & member : decl->Members)
 					member->Accept(this);
 				return decl;
+			}
+
+			virtual TypeExp VisitTypeExp(TypeExp const& typeExp)
+			{
+				TypeExp result = typeExp;
+				result.exp = typeExp.exp->Accept(this).As<ExpressionSyntaxNode>();
+				if (auto typeType = result.exp->Type.type.As<TypeExpressionType>())
+				{
+					result.type = typeType->type;
+				}
+				return result;
 			}
 
 		};

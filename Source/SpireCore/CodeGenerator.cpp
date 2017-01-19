@@ -1404,7 +1404,6 @@ namespace Spire
 
 			RefPtr<ILType> TranslateExpressionType(ExpressionType * type)
 			{
-				RefPtr<ILType> resultType = 0;
 				if (auto basicType = type->AsBasicType())
 				{
 					if (basicType->BaseType == BaseType::Generic)
@@ -1415,8 +1414,72 @@ namespace Spire
 					{
 						auto base = new ILBasicType();
 						base->Type = (ILBaseType)basicType->BaseType;
-						resultType = base;
+						return base;
 					}
+				}
+				else if (auto vecType = type->AsVectorType())
+				{
+					auto elementType = vecType->elementType->AsBasicType();
+					int elementCount = vecType->elementCount;
+					assert(elementType);
+
+					static const struct {
+						BaseType	elementType;
+						int			elementCount;
+						ILBaseType	ilBaseType;
+					} kMapping[] = {
+						{ BaseType::Float, 2, /*ILBaseType::*/Float2 },
+						{ BaseType::Float, 3, /*ILBaseType::*/Float3 },
+						{ BaseType::Float, 4, /*ILBaseType::*/Float4 },
+						{ BaseType::Int, 2, /*ILBaseType::*/Int2 },
+						{ BaseType::Int, 3, /*ILBaseType::*/Int3 },
+						{ BaseType::Int, 4, /*ILBaseType::*/Int4 },
+						{ BaseType::UInt, 2, /*ILBaseType::*/UInt2 },
+						{ BaseType::UInt, 3, /*ILBaseType::*/UInt3 },
+						{ BaseType::UInt, 4, /*ILBaseType::*/UInt4 },
+					};
+					static const int kMappingCount = sizeof(kMapping) / sizeof(kMapping[0]);
+
+					for (int ii = 0; ii < kMappingCount; ++ii)
+					{
+						if (elementCount != kMapping[ii].elementCount) continue;
+						if (elementType->BaseType != kMapping[ii].elementType) continue;
+
+						auto base = new ILBasicType();
+						base->Type = kMapping[ii].ilBaseType;
+						return base;
+					}
+					throw NotImplementedException("vector type");
+				}
+				else if (auto matType = type->AsMatrixType())
+				{
+					auto elementType = matType->elementType->AsBasicType();
+					int rowCount = matType->rowCount;
+					int colCount = matType->colCount;
+					assert(elementType);
+
+					static const struct {
+						BaseType	elementType;
+						int			rowCount;
+						int			colCount;
+						ILBaseType	ilBaseType;
+					} kMapping[] = {
+						{ BaseType::Float, 3, 3, /*ILBaseType::*/Float3x3 },
+						{ BaseType::Float, 4, 4, /*ILBaseType::*/Float4x4 },
+					};
+					static const int kMappingCount = sizeof(kMapping) / sizeof(kMapping[0]);
+
+					for (int ii = 0; ii < kMappingCount; ++ii)
+					{
+						if (rowCount != kMapping[ii].rowCount) continue;
+						if (colCount != kMapping[ii].colCount) continue;
+						if (elementType->BaseType != kMapping[ii].elementType) continue;
+
+						auto base = new ILBasicType();
+						base->Type = kMapping[ii].ilBaseType;
+						return base;
+					}
+					throw NotImplementedException("matrix type");
 				}
 				else if (auto declRefType = type->AsDeclRefType())
 				{
@@ -1439,16 +1502,16 @@ namespace Spire
 					auto nArrType = new ILArrayType();
 					nArrType->BaseType = TranslateExpressionType(arrType->BaseType.Ptr());
 					nArrType->ArrayLength = arrType->ArrayLength;
-					resultType = nArrType;
+					return nArrType;
 				}
 				else if (auto genType = type->AsGenericType())
 				{
 					auto gType = new ILGenericType();
 					gType->GenericTypeName = genType->GenericTypeName;
 					gType->BaseType = TranslateExpressionType(genType->BaseType.Ptr());
-					resultType = gType;
+					return gType;
 				}
-				return resultType;
+				throw NotImplementedException("decl type");
 			}
 
 			RefPtr<ILType> TranslateExpressionType(const RefPtr<ExpressionType> & type)

@@ -153,6 +153,10 @@ namespace Spire
 			Parser* parser,
 			Decl*	decl);
 
+		static RefPtr<Decl> ParseDecl(
+			Parser*			parser,
+			ContainerDecl*	containerDecl);
+
 		//
 
         static void Unexpected(
@@ -1047,6 +1051,72 @@ namespace Spire
 			return decl;
 		}
 
+		static RefPtr<Decl> ParseMagicTypeDecl(
+			Parser* parser)
+		{
+			RefPtr<MagicTypeDecl> decl = new MagicTypeDecl();
+			parser->ReadToken("__magic_type");
+			parser->ReadToken(TokenType::LParent);
+			decl->tag = parser->ReadToken(TokenType::Identifier).Content;
+			parser->ReadToken(TokenType::RParent);
+			decl->Name = parser->ReadToken(TokenType::Identifier);
+			parser->ReadToken(TokenType::Semicolon);
+			return decl;
+		}
+
+		static RefPtr<Decl> ParseGenericParamDecl(
+			Parser* parser)
+		{
+			// simple syntax to introduce a value parameter
+			if (AdvanceIf(parser, "let"))
+			{
+				// default case is a type parameter
+				auto paramDecl = new GenericValueParamDecl();
+				paramDecl->Name = parser->ReadToken(TokenType::Identifier);
+				if (AdvanceIf(parser, TokenType::Colon))
+				{
+					paramDecl->Type = parser->ParseTypeExp();
+				}
+				return paramDecl;
+			}
+			else
+			{
+				// default case is a type parameter
+				auto paramDecl = new GenericTypeParamDecl();
+				paramDecl->Name = parser->ReadToken(TokenType::Identifier);
+				return paramDecl;
+			}
+		}
+
+		static RefPtr<Decl> ParseGenericDecl(
+			Parser* parser)
+		{
+			RefPtr<GenericDecl> decl = new GenericDecl();
+			parser->PushScope(decl.Ptr());
+			parser->ReadToken("__generic");
+			parser->ReadToken(TokenType::OpLess);
+			while (!parser->LookAheadToken(TokenType::OpGreater))
+			{
+				decl->Members.Add(ParseGenericParamDecl(parser));
+
+				if (parser->LookAheadToken(TokenType::OpGreater))
+					break;
+
+				parser->ReadToken(TokenType::Comma);
+			}
+			parser->ReadToken(TokenType::OpGreater);
+
+			decl->inner = ParseDecl(parser, decl.Ptr());
+
+			// A generic decl hijacks the name of the declaration
+			// it wraps, so that lookup can find it.
+			decl->Name = decl->inner->Name;
+
+			parser->PopScope();
+			return decl;
+		}
+
+
         static RefPtr<Decl> ParseDeclWithModifiers(
             Parser*             parser,
             ContainerDecl*      containerDecl,
@@ -1079,6 +1149,10 @@ namespace Spire
 				decl = ParseHLSLBufferDecl(parser);
 			else if (parser->LookAheadToken("__builtin_type"))
 				decl = ParseBuiltinTypeDecl(parser);
+			else if (parser->LookAheadToken("__magic_type"))
+				decl = ParseMagicTypeDecl(parser);
+			else if (parser->LookAheadToken("__generic"))
+				decl = ParseGenericDecl(parser);
             else if (AdvanceIf(parser, TokenType::Semicolon))
             {
                 // empty declaration

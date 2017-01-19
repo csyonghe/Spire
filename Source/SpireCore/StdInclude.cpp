@@ -289,24 +289,9 @@ namespace Spire
 			} kBaseTypes[] = {
 				{ "void",	BaseType::Void },
 				{ "int",	BaseType::Int },
-				{ "int2",	BaseType::Int2 },
-				{ "int3",	BaseType::Int3 },
-				{ "int4",	BaseType::Int4 },
 				{ "float",	BaseType::Float },
-				{ "float2",	BaseType::Float2 },
-				{ "float3",	BaseType::Float3 },
-				{ "float4",	BaseType::Float4 },
 				{ "uint",	BaseType::UInt },
-				{ "uint2",	BaseType::UInt2 },
-				{ "uint3",	BaseType::UInt3 },
-				{ "uint4",	BaseType::UInt4 },
 				{ "bool",	BaseType::Bool },
-				{ "bool2",	BaseType::Bool2 },
-				{ "bool3",	BaseType::Bool3 },
-				{ "bool4",	BaseType::Bool4 },
-
-				{ "float3x3",	BaseType::Float3x3 },
-				{ "float4x4",	BaseType::Float4x4 },
 
 				{ "Texture2D",				BaseType::Texture2D },
 				{ "TextureCube",			BaseType::TextureCube },
@@ -324,26 +309,50 @@ namespace Spire
 				sb << "__builtin_type(" << int(kBaseTypes[tt].tag) << ") " << kBaseTypes[tt].name << ";\n";
 			}
 
+			// Declare vector and matrix types
+
+			sb << "__generic<T, let N : int> __magic_type(Vector) vector;\n";
+			sb << "__generic<T, let R : int, let C : int> __magic_type(Matrix) matrix;\n";
+
 			static const struct {
-				char const* hlslPrefix;
+				char const* name;
 				char const* glslPrefix;
-			} kTypeMap[] =
+			} kTypes[] =
 			{
-				{ "float", "" },
-				{ "int", "i" },
-				{ "uint", "u" },
-				{ "bool", "b" },
+				{"float", ""},
+				{"int", "i"},
+				{"uint", "u"},
+				{"bool", "b"},
 			};
-			static const int kTypeMapCount = sizeof(kTypeMap) / sizeof(kTypeMap[0]);
-			for (int tt = 0; tt < kTypeMapCount; ++tt)
+			static const int kTypeCount = sizeof(kTypes) / sizeof(kTypes[0]);
+
+			for (int tt = 0; tt < kTypeCount; ++tt)
 			{
+				// Declare HLSL vector types
+				for (int ii = 1; ii <= 4; ++ii)
+				{
+					sb << "typedef vector<" << kTypes[tt].name << "," << ii << "> " << kTypes[tt].name << ii << ";\n";
+				}
+
+				// Declare HLSL matrix types
+				for (int rr = 2; rr <= 4; ++rr)
+				for (int cc = 2; cc <= 4; ++cc)
+				{
+					sb << "typedef matrix<" << kTypes[tt].name << "," << rr << "," << cc << "> " << kTypes[tt].name << rr << "x" << cc << ";\n";
+				}
+
+				// Declare GLSL aliases for HLSL types
 				for (int vv = 2; vv <= 4; ++vv)
 				{
-					sb << "typedef " << kTypeMap[tt].hlslPrefix << vv << " " << kTypeMap[tt].glslPrefix << "vec" << vv << ";\n";
+					sb << "typedef " << kTypes[tt].name << vv << " " << kTypes[tt].glslPrefix << "vec" << vv << ";\n";
+					sb << "typedef " << kTypes[tt].name << vv << "x" << vv << " " << kTypes[tt].glslPrefix << "mat" << vv << ";\n";
+				}
+				for (int rr = 2; rr <= 4; ++rr)
+				for (int cc = 2; cc <= 4; ++cc)
+				{
+					sb << "typedef " << kTypes[tt].name << rr << "x" << cc << " " << kTypes[tt].glslPrefix << "mat" << rr << "x" << cc << ";\n";
 				}
 			}
-			sb << "typedef float3x3 mat3;\n";
-			sb << "typedef float4x4 mat4;\n";
 
 			sb << "__intrinsic vec3 operator * (vec3, mat3);\n";
 			sb << "__intrinsic vec3 operator * (mat3, vec3);\n";

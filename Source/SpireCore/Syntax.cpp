@@ -109,11 +109,6 @@ namespace Spire
 			return BindableResourceType::NonBindable;
 		}
 
-		bool BasicExpressionType::IsVectorTypeImpl() const
-		{
-			return IsVector(BaseType);
-		}
-
 		CoreLib::Basic::String BasicExpressionType::ToString() const
 		{
 			CoreLib::Basic::StringBuilder res;
@@ -131,39 +126,6 @@ namespace Spire
 				break;
 			case Compiler::BaseType::Float:
 				res.Append("float");
-				break;
-			case Compiler::BaseType::Int2:
-				res.Append("ivec2");
-				break;
-			case Compiler::BaseType::UInt2:
-				res.Append("uvec2");
-				break;
-			case Compiler::BaseType::Float2:
-				res.Append("vec2");
-				break;
-			case Compiler::BaseType::Int3:
-				res.Append("ivec3");
-				break;
-			case Compiler::BaseType::UInt3:
-				res.Append("uvec3");
-				break;
-			case Compiler::BaseType::Float3:
-				res.Append("vec3");
-				break;
-			case Compiler::BaseType::Int4:
-				res.Append("ivec4");
-				break;
-			case Compiler::BaseType::UInt4:
-				res.Append("uvec4");
-				break;
-			case Compiler::BaseType::Float4:
-				res.Append("vec4");
-				break;
-			case Compiler::BaseType::Float3x3:
-				res.Append("mat3");
-				break;
-			case Compiler::BaseType::Float4x4:
-				res.Append("mat4");
 				break;
 			case Compiler::BaseType::Texture2DArray:
 				res.Append("sampler2DArray");
@@ -634,10 +596,20 @@ namespace Spire
 			auto rs = CloneSyntaxNodeFields(new DiscardStatementSyntaxNode(*this), ctx);
 			return rs;
 		}
+
+		// BasicExpressionType
+
+		BasicExpressionType* BasicExpressionType::GetScalarType() const
+		{
+			return const_cast<BasicExpressionType*>(this);
+		}
+
 		bool BasicExpressionType::IsIntegralImpl() const
 		{
 			return (BaseType == Compiler::BaseType::Int || BaseType == Compiler::BaseType::UInt || BaseType == Compiler::BaseType::Bool);
 		}
+
+		//
 
         bool ExpressionType::IsIntegral() const
         {
@@ -669,10 +641,27 @@ namespace Spire
             return GetCanonicalType()->IsGenericTypeImpl(typeName);
         }
 
+		ArithmeticExpressionType * ExpressionType::AsArithmeticType() const
+		{
+			return GetCanonicalType()->AsArithmeticTypeImpl();
+		}
+
         BasicExpressionType * ExpressionType::AsBasicType() const
         {
             return GetCanonicalType()->AsBasicTypeImpl();
         }
+
+		VectorExpressionType * ExpressionType::AsVectorType() const
+		{
+			return GetCanonicalType()->AsVectorTypeImpl();
+		}
+
+		MatrixExpressionType * ExpressionType::AsMatrixType() const
+		{
+			return GetCanonicalType()->AsMatrixTypeImpl();
+		}
+
+
 
         ArrayExpressionType * ExpressionType::AsArrayType() const
         {
@@ -755,17 +744,9 @@ namespace Spire
 
 		RefPtr<ExpressionType> ExpressionType::Bool;
 		RefPtr<ExpressionType> ExpressionType::UInt;
-		RefPtr<ExpressionType> ExpressionType::UInt2;
-		RefPtr<ExpressionType> ExpressionType::UInt3;
-		RefPtr<ExpressionType> ExpressionType::UInt4;
 		RefPtr<ExpressionType> ExpressionType::Int;
-		RefPtr<ExpressionType> ExpressionType::Int2;
-		RefPtr<ExpressionType> ExpressionType::Int3;
-		RefPtr<ExpressionType> ExpressionType::Int4;
 		RefPtr<ExpressionType> ExpressionType::Float;
 		RefPtr<ExpressionType> ExpressionType::Float2;
-		RefPtr<ExpressionType> ExpressionType::Float3;
-		RefPtr<ExpressionType> ExpressionType::Float4;
 		RefPtr<ExpressionType> ExpressionType::Void;
 		RefPtr<ExpressionType> ExpressionType::Error;
         List<RefPtr<ExpressionType>> ExpressionType::sCanonicalTypes;
@@ -774,17 +755,11 @@ namespace Spire
 		{
 			Bool = new BasicExpressionType(BaseType::Bool);
 			UInt = new BasicExpressionType(BaseType::UInt);
-			UInt2 = new BasicExpressionType(BaseType::UInt2);
-			UInt3 = new BasicExpressionType(BaseType::UInt3);
-			UInt4 = new BasicExpressionType(BaseType::UInt4);
 			Int = new BasicExpressionType(BaseType::Int);
-			Int2 = new BasicExpressionType(BaseType::Int2);
-			Int3 = new BasicExpressionType(BaseType::Int3);
-			Int4 = new BasicExpressionType(BaseType::Int4);
-			Float = new BasicExpressionType(BaseType::Float);
-			Float2 = new BasicExpressionType(BaseType::Float2);
-			Float3 = new BasicExpressionType(BaseType::Float3);
-			Float4 = new BasicExpressionType(BaseType::Float4);
+
+			RefPtr<BasicExpressionType> floatType = new BasicExpressionType(BaseType::Float);
+			Float = floatType;
+			Float2 = new VectorExpressionType(floatType, 2);
 			Void = new BasicExpressionType(BaseType::Void);
 			Error = new BasicExpressionType(BaseType::Error);
 		}
@@ -792,17 +767,8 @@ namespace Spire
 		{
 			Bool = nullptr;
 			UInt = nullptr;
-			UInt2 = nullptr;
-			UInt3 = nullptr;
-			UInt4 = nullptr;
 			Int = nullptr;
-			Int2 = nullptr;
-			Int3 = nullptr;
-			Int4 = nullptr;
 			Float = nullptr;
-			Float2 = nullptr;
-			Float3 = nullptr;
-			Float4 = nullptr;
 			Void = nullptr;
 			Error = nullptr;
             // Note(tfoley): This seems to be just about the only way to clear out a List<T>
@@ -932,11 +898,11 @@ namespace Spire
 			return sb.ProduceString();
 		}
 
-		bool TypeExpressionType::EqualsImpl(const ExpressionType * type) const
+		bool TypeExpressionType::EqualsImpl(const ExpressionType * t) const
 		{
-			if (auto typeType = type->AsTypeType())
+			if (auto typeType = t->AsTypeType())
 			{
-				return type->Equals(typeType->type);
+				return t->Equals(typeType->type);
 			}
 			return false;
 		}
@@ -949,6 +915,90 @@ namespace Spire
 		ExpressionType* TypeExpressionType::CreateCanonicalType()
 		{
 			auto canType = new TypeExpressionType(type->GetCanonicalType());
+			sCanonicalTypes.Add(canType);
+			return canType;
+		}
+
+		// ArithmeticExpressionType
+
+		ArithmeticExpressionType * ArithmeticExpressionType::AsArithmeticTypeImpl() const
+		{
+			return const_cast<ArithmeticExpressionType*>(this);
+		}
+
+
+		// VectorExpressionType
+
+		String VectorExpressionType::ToString() const
+		{
+			StringBuilder sb;
+			sb << "vector<" << elementType->ToString() << "," << elementCount << ">";
+			return sb.ProduceString();
+		}
+
+		BasicExpressionType* VectorExpressionType::GetScalarType() const
+		{
+			return elementType->AsBasicType();
+		}
+
+		bool VectorExpressionType::EqualsImpl(const ExpressionType * type) const
+		{
+			if (auto vecType = type->AsVectorType())
+			{
+				return elementType->Equals(vecType->elementType)
+					&& elementCount == vecType->elementCount;
+			}
+			
+			return false;
+		}
+
+		VectorExpressionType * VectorExpressionType::AsVectorTypeImpl() const
+		{
+			return const_cast<VectorExpressionType*>(this);
+		}
+
+		ExpressionType* VectorExpressionType::CreateCanonicalType()
+		{
+			auto canElementType = elementType->GetCanonicalType();
+			auto canType = new VectorExpressionType(canElementType, elementCount);
+			sCanonicalTypes.Add(canType);
+			return canType;
+		}
+
+		// MatrixExpressionType
+
+		String MatrixExpressionType::ToString() const
+		{
+			StringBuilder sb;
+			sb << "matrix<" << elementType->ToString() << "," << rowCount << "," << colCount << ">";
+			return sb.ProduceString();
+		}
+
+		BasicExpressionType* MatrixExpressionType::GetScalarType() const
+		{
+			return elementType->AsBasicType();
+		}
+
+		bool MatrixExpressionType::EqualsImpl(const ExpressionType * type) const
+		{
+			if (auto matType = type->AsMatrixType())
+			{
+				return elementType->Equals(matType->elementType)
+					&& rowCount == matType->rowCount
+					&& colCount == matType->colCount;
+			}
+			
+			return false;
+		}
+		MatrixExpressionType * MatrixExpressionType::AsMatrixTypeImpl() const
+		{
+			return const_cast<MatrixExpressionType*>(this);
+		}
+
+		ExpressionType* MatrixExpressionType::CreateCanonicalType()
+		{
+			auto canElementType = elementType->GetCanonicalType();
+			auto canType = new MatrixExpressionType(canElementType, rowCount, colCount);
 			sCanonicalTypes.Add(canType);
 			return canType;
 		}
@@ -1129,10 +1179,7 @@ namespace Spire
 
 		TypeExp TypeExp::Accept(SyntaxVisitor* visitor)
 		{
-			TypeExp result;
-			result.exp = exp->Accept(visitor).As<ExpressionSyntaxNode>();
-			result.type = type;
-			return result;
+			return visitor->VisitTypeExp(*this);
 		}
 
 		// BuiltinTypeDecl
@@ -1148,6 +1195,58 @@ namespace Spire
 			throw "unimplemented";
 		}
 
-		//
-}
+		// MagicTypeDecl
+
+		RefPtr<SyntaxNode> MagicTypeDecl::Accept(SyntaxVisitor * visitor)
+		{
+			// ignore
+			return this;
+		}
+
+		MagicTypeDecl * MagicTypeDecl::Clone(CloneContext & ctx)
+		{
+			throw "unimplemented";
+		}
+
+		// GenericDecl
+
+		RefPtr<SyntaxNode> GenericDecl::Accept(SyntaxVisitor * visitor) {
+			throw "unimplemented";
+		}
+
+		GenericDecl * GenericDecl::Clone(CloneContext & ctx) {
+			throw "unimplemented";
+		}
+
+		// GenericTypeParamDecl
+
+		RefPtr<SyntaxNode> GenericTypeParamDecl::Accept(SyntaxVisitor * visitor) {
+			throw "unimplemented";
+		}
+
+		GenericTypeParamDecl * GenericTypeParamDecl::Clone(CloneContext & ctx) {
+			throw "unimplemented";
+		}
+
+		// GenericValueParamDecl
+
+		RefPtr<SyntaxNode> GenericValueParamDecl::Accept(SyntaxVisitor * visitor) {
+			throw "unimplemented";
+		}
+
+		GenericValueParamDecl * GenericValueParamDecl::Clone(CloneContext & ctx) {
+			throw "unimplemented";
+		}
+
+		// VectorTypeDecl
+
+		RefPtr<SyntaxNode> VectorTypeDecl::Accept(SyntaxVisitor * visitor) {
+			throw "unimplemented";
+		}
+
+		VectorTypeDecl * VectorTypeDecl::Clone(CloneContext & ctx) {
+			throw "unimplemented";
+		}
+
+	}
 }

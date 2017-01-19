@@ -1,5 +1,7 @@
 #include "SyntaxVisitors.h"
 
+#include <assert.h>
+
 namespace Spire
 {
 	namespace Compiler
@@ -94,6 +96,7 @@ namespace Spire
 			{
 				typeResult = ExpressionType::Error;
 				node->Accept(this);
+				assert(typeResult);
 				return typeResult;
 			}
 			TypeExp TranslateTypeNode(TypeExp const& typeExp)
@@ -103,26 +106,121 @@ namespace Spire
 				result.type = TranslateTypeNode(typeExp.exp);
 				return result;
 			}
+
+			RefPtr<ExpressionType> ExtractGenericArgType(RefPtr<ExpressionSyntaxNode> exp)
+			{
+				if (auto typeType = exp->Type.type.As<TypeExpressionType>())
+				{
+					return typeType->type;
+				}
+				else
+				{
+					throw "unimplemented";
+				}
+			}
+
+			int ExtractGenericArgInteger(RefPtr<ExpressionSyntaxNode> exp)
+			{
+				return CheckIntegerConstantExpression(exp.Ptr());
+			}
+
 			RefPtr<ExpressionSyntaxNode> VisitGenericType(GenericTypeSyntaxNode * typeNode) override
 			{
-				RefPtr<GenericExpressionType> rs = new GenericExpressionType();
+				auto& args = typeNode->Args;
 				for (auto& arg : typeNode->Args)
 				{
 					arg = arg->Accept(this).As<ExpressionSyntaxNode>();
 				}
-				rs->BaseType = typeResult;
-				rs->GenericTypeName = typeNode->GenericTypeName;
-				if (rs->GenericTypeName != "PackedBuffer" &&
-					rs->GenericTypeName != "StructuredBuffer" &&
-					rs->GenericTypeName != "RWStructuredBuffer" &&
-					rs->GenericTypeName != "Uniform" &&
-					rs->GenericTypeName != "Patch" &&
-					rs->GenericTypeName != "PackedBuffer")
+
+				// Certain generic types have baked-in support here
+				if (typeNode->GenericTypeName == "PackedBuffer" ||
+					typeNode->GenericTypeName == "StructuredBuffer" ||
+					typeNode->GenericTypeName == "RWStructuredBuffer" ||
+					typeNode->GenericTypeName == "Uniform" ||
+					typeNode->GenericTypeName == "Patch" ||
+					typeNode->GenericTypeName == "PackedBuffer")
 				{
-					getSink()->diagnose(typeNode, Diagnostics::undefinedIdentifier, rs->GenericTypeName);
+					RefPtr<GenericExpressionType> rs = new GenericExpressionType();
+					rs->BaseType = typeResult;
+					rs->GenericTypeName = typeNode->GenericTypeName;
+					typeResult = rs;
+					return typeNode;
 				}
-				typeResult = rs;
-				return typeNode;
+				else
+				{
+					auto decl = typeNode->Scope->LookUp(typeNode->GenericTypeName);
+					if (!decl)
+					{
+						getSink()->diagnose(typeNode, Diagnostics::undefinedIdentifier, typeNode->GenericTypeName);
+						typeResult = ExpressionType::Error;
+						return typeNode;
+					}
+
+					if (auto genericDecl = dynamic_cast<GenericDecl*>(decl))
+					{
+						int argCount = typeNode->Args.Count();
+						int argIndex = 0;
+						for (RefPtr<Decl> member : genericDecl->Members)
+						{
+							if (auto typeParam = member.As<GenericTypeParamDecl>())
+							{
+								if (argIndex == argCount)
+								{
+									// Too few arguments!
+
+								}
+
+								// TODO: checking!
+							}
+							else if (auto valParam = member.As<GenericValueParamDecl>())
+							{
+								// TODO: checking
+							}
+							else
+							{
+
+							}
+						}
+						if (argIndex != argCount)
+						{
+							// Too many arguments!
+						}
+
+						// Now instantiate the declaration given those arguments
+						if (auto magicTypeDecl = genericDecl->inner.As<MagicTypeDecl>())
+						{
+							if (magicTypeDecl->tag == "Vector")
+							{
+								auto vecType = new VectorExpressionType(
+									ExtractGenericArgType(args[0]),
+									ExtractGenericArgInteger(args[1]));
+								typeResult = vecType;
+								typeNode->Type = new TypeExpressionType(vecType);
+								return typeNode;
+							}
+							else if (magicTypeDecl->tag == "Matrix")
+							{
+								auto vecType = new MatrixExpressionType(
+									ExtractGenericArgType(args[0]),
+									ExtractGenericArgInteger(args[1]),
+									ExtractGenericArgInteger(args[2]));
+								typeResult = vecType;
+								typeNode->Type = new TypeExpressionType(vecType);
+								return typeNode;
+							}
+						}
+
+						// catch-all for cases that we don't handle
+						throw "unimplemented";
+					}
+					else
+					{
+						// TODO: correct diagnostic here!
+						getSink()->diagnose(typeNode, Diagnostics::undefinedIdentifier, typeNode->GenericTypeName);
+						typeResult = ExpressionType::Error;
+						return typeNode;
+					}
+				}
 			}
 		public:
 			RefPtr<PipelineSyntaxNode> VisitPipeline(PipelineSyntaxNode * pipeline) override
@@ -589,14 +687,14 @@ namespace Spire
 					return true;
 				if (receiverType->IsVectorType() && valueType->IsVectorType())
 				{
-					auto recieverBasicType = receiverType->AsBasicType();
-					auto valueBasicType = valueType->AsBasicType();
-					if (GetVectorBaseType(recieverBasicType->BaseType) == BaseType::Float &&
-						GetVectorSize(recieverBasicType->BaseType) == GetVectorSize(valueBasicType->BaseType))
+					auto recieverVecType = receiverType->AsVectorType();
+					auto valueVecType = valueType->AsVectorType();
+					if (GetVectorBaseType(recieverVecType) == BaseType::Float &&
+						GetVectorSize(recieverVecType) == GetVectorSize(valueVecType))
 						return true;
-					if (GetVectorBaseType(recieverBasicType->BaseType) == BaseType::UInt &&
-						GetVectorBaseType(valueBasicType->BaseType) == BaseType::Int &&
-						GetVectorSize(recieverBasicType->BaseType) == GetVectorSize(valueBasicType->BaseType))
+					if (GetVectorBaseType(recieverVecType) == BaseType::UInt &&
+						GetVectorBaseType(valueVecType) == BaseType::Int &&
+						GetVectorSize(recieverVecType) == GetVectorSize(valueVecType))
 						return true;
 				}
 				return false;
@@ -1186,7 +1284,7 @@ namespace Spire
 						(baseExprType->AsGenericType()->GenericTypeName == "StructuredBuffer" ||
 							baseExprType->AsGenericType()->GenericTypeName == "RWStructuredBuffer" ||
 							baseExprType->AsGenericType()->GenericTypeName == "PackedBuffer");
-					isValid = isValid || (baseExprType->AsBasicType() && GetVectorSize(baseExprType->AsBasicType()->BaseType) != 0);
+					isValid = isValid || (baseExprType->AsBasicType()); /*TODO(tfoley): figure this out: */ // && GetVectorSize(baseExprType->AsBasicType()->BaseType) != 0);
 					isValid = isValid || baseExprType->AsArrayType();
 					if (!isValid)
 					{
@@ -1208,14 +1306,17 @@ namespace Spire
 				{
 					expr->Type = genType->BaseType;
 				}
-				else if (auto basicType = expr->BaseExpression->Type->AsBasicType())
+				else if (auto vecType = expr->BaseExpression->Type->AsVectorType())
 				{
-					if (basicType->BaseType == BaseType::Float3x3)
-						expr->Type = ExpressionType::Float3;
-					else if (basicType->BaseType == BaseType::Float4x4)
-						expr->Type = ExpressionType::Float4;
-					else
-						expr->Type = new BasicExpressionType(GetVectorBaseType(basicType->BaseType));
+					expr->Type = vecType->elementType;
+				}
+				else if (auto matType = expr->BaseExpression->Type->AsMatrixType())
+				{
+					expr->Type = matType->rowType;
+				}
+				else
+				{
+					// TODO(tfoley): need an error case here...
 				}
 
 				// Result of an index expression is an l-value iff base is.
@@ -1788,24 +1889,36 @@ namespace Spire
 				expr->Expression = expr->Expression->Accept(this).As<ExpressionSyntaxNode>();
 				auto targetType = TranslateTypeNode(expr->TargetType);
 
-				if (!expr->Expression->Type->Equals(ExpressionType::Error.Ptr()) && targetType->AsBasicType())
+				// The way to perform casting depends on the types involved
+				if (expr->Expression->Type->Equals(ExpressionType::Error.Ptr()))
 				{
-					if (!expr->Expression->Type->AsBasicType())
-						expr->Type = ExpressionType::Error;
-					else if (!IsNumeric(GetVectorBaseType(expr->Expression->Type->AsBasicType()->BaseType))
-						|| !IsNumeric(GetVectorBaseType(targetType->AsBasicType()->BaseType)))
-						expr->Type = ExpressionType::Error;
-					else if (targetType->AsBasicType()->BaseType == BaseType::Void || expr->Expression->Type->AsBasicType()->BaseType == BaseType::Void)
-						expr->Type = ExpressionType::Error;
-					else
+					// If the expression being casted has an error type, then just silently succeed
+					expr->Type = targetType;
+					return expr;
+				}
+				else if (auto targetArithType = targetType->AsArithmeticType())
+				{
+					if (auto exprArithType = expr->Expression->Type->AsArithmeticType())
+					{
+						// Both source and destination types are arithmetic, so we might
+						// have a valid cast
+						auto targetScalarType = targetArithType->GetScalarType();
+						auto exprScalarType = exprArithType->GetScalarType();
+
+						if (!IsNumeric(exprScalarType->BaseType)) goto fail;
+						if (!IsNumeric(targetScalarType->BaseType)) goto fail;
+
+						// TODO(tfoley): this checking is incomplete here, and could
+						// lead to downstream compilation failures
 						expr->Type = targetType;
+						return expr;
+					}
 				}
-				else
-					expr->Type = ExpressionType::Error;
-				if (expr->Type->Equals(ExpressionType::Error.Ptr()) && !expr->Expression->Type->Equals(ExpressionType::Error.Ptr()))
-				{
-					getSink()->diagnose(expr, Diagnostics::invalidTypeCast, expr->Expression->Type, targetType->ToString());
-				}
+
+			fail:
+				// Default: in no other case succeds, then the cast failed and we emit a diagnostic.
+				getSink()->diagnose(expr, Diagnostics::invalidTypeCast, expr->Expression->Type, targetType->ToString());
+				expr->Type = ExpressionType::Error;
 				return expr;
 			}
 			virtual RefPtr<ExpressionSyntaxNode> VisitSelectExpression(SelectExpressionSyntaxNode * expr) override
@@ -1852,9 +1965,7 @@ namespace Spire
 					// catch-all
 					expr->Type = ExpressionType::Error;
 				}
-				else if (!baseType->AsBasicType())
-					expr->Type = ExpressionType::Error;
-				else if (IsVector(baseType->AsBasicType()->BaseType))
+				else if (auto baseVecType = baseType->AsVectorType())
 				{
 					Array<int, 4> children;
 					if (expr->MemberName.Length() > 4)
@@ -1890,7 +2001,7 @@ namespace Spire
 								break;
 							}
 						}
-						int vecLen = GetVectorSize(baseType->AsBasicType()->BaseType);
+						int vecLen = GetVectorSize(baseVecType);
 						for (auto m : children)
 						{
 							if (m >= vecLen)
@@ -1900,21 +2011,11 @@ namespace Spire
 								break;
 							}
 						}
-						if ((vecLen == 9 || vecLen == 16) && children.Count() > 1)
-						{
-							error = true;
-							expr->Type = ExpressionType::Error;
-						}
 						if (!error)
 						{
-							if (vecLen == 9)
-								expr->Type = new BasicExpressionType((BaseType)((int)GetVectorBaseType(baseType->AsBasicType()->BaseType) + 2));
-							else if (vecLen == 16)
-								expr->Type = new BasicExpressionType((BaseType)((int)GetVectorBaseType(baseType->AsBasicType()->BaseType) + 3));
-							else
-							{
-								expr->Type = new BasicExpressionType((BaseType)((int)GetVectorBaseType(baseType->AsBasicType()->BaseType) + children.Count() - 1));
-							}
+							expr->Type = new VectorExpressionType(
+								baseVecType->elementType,
+								children.Count());
 						}
 
 						// compute whether result of swizzle is an l-value
@@ -1938,6 +2039,9 @@ namespace Spire
 						}
 					}
 				}
+				// All remaining cases assume we have a `BasicType`
+				else if (!baseType->AsBasicType())
+					expr->Type = ExpressionType::Error;
 				else if (baseType->AsBasicType()->BaseType == BaseType::Shader)
 				{
 					ShaderUsing shaderObj;
