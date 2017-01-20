@@ -331,8 +331,6 @@ namespace Spire
 		class BasicExpressionType : public ExpressionType
 		{
 		public:
-			bool IsLeftValue;
-			bool IsMaskedVector = false;
 			BaseType BaseType;
 			ShaderSymbol * Shader = nullptr;
 			ShaderClosure * ShaderClosure = nullptr;
@@ -345,13 +343,11 @@ namespace Spire
 			{
 				BaseType = Compiler::BaseType::Int;
 				Func = 0;
-				IsLeftValue = false;
 			}
 			BasicExpressionType(Compiler::BaseType baseType)
 			{
 				BaseType = baseType;
 				Func = 0;
-				IsLeftValue = false;
 			}
 			BasicExpressionType(ShaderSymbol * shaderSym, Compiler::ShaderClosure * closure)
 			{
@@ -654,10 +650,45 @@ namespace Spire
 			Read, Write
 		};
 
+		struct QualType
+		{
+			RefPtr<ExpressionType>	type;
+			bool					IsLeftValue;
+
+			QualType()
+				: IsLeftValue(false)
+			{}
+
+			QualType(RefPtr<ExpressionType> type)
+				: type(type)
+				, IsLeftValue(false)
+			{}
+
+			QualType(ExpressionType* type)
+				: type(type)
+				, IsLeftValue(false)
+			{}
+
+			void operator=(RefPtr<ExpressionType> t)
+			{
+				*this = QualType(t);
+			}
+
+			void operator=(ExpressionType* t)
+			{
+				*this = QualType(t);
+			}
+
+			ExpressionType* Ptr() { return type.Ptr(); }
+
+			operator RefPtr<ExpressionType>() { return type; }
+			RefPtr<ExpressionType> operator->() { return type; }
+		};
+
 		class ExpressionSyntaxNode : public SyntaxNode
 		{
 		public:
-			RefPtr<ExpressionType> Type;
+			QualType Type;
 			ExpressionAccess Access;
 			ExpressionSyntaxNode()
 			{

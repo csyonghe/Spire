@@ -1174,7 +1174,7 @@ namespace Spire
 				RefPtr<ExpressionType> matchedType;
 				auto checkAssign = [&]()
 				{
-					if (!(leftType->AsBasicType() && leftType->AsBasicType()->IsLeftValue) &&
+					if (!leftType.IsLeftValue &&
 						!leftType->Equals(ExpressionType::Error.Ptr()))
 						getSink()->diagnose(expr->LeftExpression.Ptr(), Diagnostics::assignNonLValue);
 					if (expr->Operator == Operator::AndAssign ||
@@ -1289,10 +1289,9 @@ namespace Spire
 						expr->Type = new BasicExpressionType(GetVectorBaseType(basicType->BaseType));
 				}
 				expr->Type = expr->Type->Clone();
-				if (auto basicType = expr->Type->AsBasicType())
-				{
-					basicType->IsLeftValue = true;
-				}
+
+				// Result of an index expression is an l-value iff base is.
+				expr->Type.IsLeftValue = expr->BaseExpression->Type.IsLeftValue;
 				return expr;
 			}
 			bool MatchArguments(FunctionSyntaxNode * functionNode, List <RefPtr<ExpressionSyntaxNode>> &args)
@@ -1378,7 +1377,7 @@ namespace Spire
 
 			ShaderComponentSymbol * ResolveFunctionComponent(ShaderSymbol * shader, String name, const List<RefPtr<ExpressionSyntaxNode>> & args, bool topLevel = true)
 			{
-				return ResolveFunctionComponent(shader, name, From(args).Select([](RefPtr<ExpressionSyntaxNode> x) {return x->Type; }).ToList(), topLevel);
+				return ResolveFunctionComponent(shader, name, From(args).Select([](RefPtr<ExpressionSyntaxNode> x) {return x->Type.type; }).ToList(), topLevel);
 			}
 
 			RefPtr<ExpressionSyntaxNode> ResolveFunctionOverload(InvokeExpressionSyntaxNode * invoke, MemberExpressionSyntaxNode* memberExpr, List<RefPtr<ExpressionSyntaxNode>> & arguments)
@@ -1449,7 +1448,7 @@ namespace Spire
 						auto func = FindFunctionOverload(validOverloads, [](RefPtr<ImportOperatorDefSyntaxNode> imp)
 						{
 							return imp->GetParameters();
-						}, From(arguments).Skip(1).Select([](RefPtr<ExpressionSyntaxNode> x) {return x->Type; }).ToList());
+						}, From(arguments).Skip(1).Select([](RefPtr<ExpressionSyntaxNode> x) {return x->Type.type; }).ToList());
 						if (func)
 						{
 							RefPtr<ImportExpressionSyntaxNode> importExpr = new ImportExpressionSyntaxNode();
@@ -1529,7 +1528,7 @@ namespace Spire
 						func = FindFunctionOverload(*functionOverloads, [](RefPtr<FunctionSymbol> f)
 						{
 							return f->SyntaxNode->GetParameters();
-						}, From(arguments).Select([](RefPtr<ExpressionSyntaxNode> x) {return x->Type; }).ToList());
+						}, From(arguments).Select([](RefPtr<ExpressionSyntaxNode> x) {return x->Type.type; }).ToList());
 						functionNameFound = true;
 					}
 				}
@@ -1631,7 +1630,7 @@ namespace Spire
 								if ((*params)[i]->HasModifier(ModifierFlag::Out))
 								{
 									if (i < expr->Arguments.Count() && expr->Arguments[i]->Type->AsBasicType() &&
-										!expr->Arguments[i]->Type->AsBasicType()->IsLeftValue)
+										!expr->Arguments[i]->Type.IsLeftValue)
 									{
 										getSink()->diagnose(expr->Arguments[i], Diagnostics::argumentExpectedLValue, (*params)[i]->Name);
 									}
@@ -1742,14 +1741,15 @@ namespace Spire
 				if (varDecl)
 				{
 					expr->Type = varDecl->Type;
-					if (auto basicType = expr->Type->AsBasicType())
-						basicType->IsLeftValue = !(dynamic_cast<ComponentSyntaxNode*>(varDecl));
+
+					// A variable reference is an l-value as long as the variable is mutable.
+					// Currently the only immutable variable declarations are components.
+					expr->Type.IsLeftValue = !(dynamic_cast<ComponentSyntaxNode*>(varDecl));
 				}
 				else if (currentShader && currentShader->ShaderObjects.TryGetValue(expr->Variable, shaderObj))
 				{
 					auto basicType = new BasicExpressionType(BaseType::Shader);
 					basicType->Shader = shaderObj.Shader;
-					basicType->IsLeftValue = false;
 					expr->Type = basicType;
 				}
 				else if (currentPipeline && currentImportOperator)
@@ -1769,8 +1769,6 @@ namespace Spire
 					if (compRef.IsAccessible)
 					{
 						expr->Type = compRef.Component->Type->DataType->Clone();
-						if (auto basicType = expr->Type->AsBasicType())
-							basicType->IsLeftValue = false;
 					}
 					else if (compRef.Component)
 					{
@@ -1782,8 +1780,6 @@ namespace Spire
 				else if (auto compDecl = dynamic_cast<ComponentSyntaxNode*>(decl)) // interface decl
 				{
 					expr->Type = compDecl->Type;
-					if (auto basicType = expr->Type->AsBasicType())
-						basicType->IsLeftValue = false;
 				}
 				else
 					getSink()->diagnose(expr, Diagnostics::undefinedIdentifier2, expr->Variable);
@@ -1903,20 +1899,26 @@ namespace Spire
 							{
 								expr->Type = new BasicExpressionType((BaseType)((int)GetVectorBaseType(baseType->AsBasicType()->BaseType) + children.Count() - 1));
 							}
-							expr->Type->AsBasicType()->IsMaskedVector = true;
 						}
-						if (auto bt = expr->Type->AsBasicType())
+
+						// compute whether result of swizzle is an l-value
+						//
+						// Note(tfoley): The logic here seems to compute
+						// whether the swizzle ever re-orders components,
+						// but it should actually be checking if there are
+						// any duplicated components.
 						{
-							bt->IsLeftValue = !baseType->AsBasicType()->IsMaskedVector;
+							bool isLValue = true;
 							if (children.Count() > vecLen || children.Count() == 0)
-								bt->IsLeftValue = false;
+								isLValue = false;
 							int curMax = children[0];
 							for (int i = 0; i < children.Count(); i++)
 								if (children[i] < curMax)
 								{
-									bt->IsLeftValue = false;
+									isLValue = false;
 									curMax = children[i];
 								}
+							expr->Type.IsLeftValue = isLValue;
 						}
 					}
 				}
@@ -1950,10 +1952,10 @@ namespace Spire
 					}
 					else
 						expr->Type = field->Type;
-					if (auto bt = expr->Type->AsBasicType())
-					{
-						bt->IsLeftValue = baseType->AsBasicType()->IsLeftValue;
-					}
+
+					// A reference to a struct member is an l-value if the reference to the struct
+					// value was also an l-value.
+					expr->Type.IsLeftValue = expr->BaseExpression->Type.IsLeftValue;
 				}
 				else
 					expr->Type = ExpressionType::Error;

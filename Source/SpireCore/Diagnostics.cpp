@@ -45,6 +45,11 @@ void printDiagnosticArg(StringBuilder& sb, TypeExp const& type)
 	sb << type.type->ToString();
 }
 
+void printDiagnosticArg(StringBuilder& sb, QualType const& type)
+{
+	sb << type.type->ToString();
+}
+
 void printDiagnosticArg(StringBuilder& sb, ILType* type)
 {
     sb << type->ToString();

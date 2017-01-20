@@ -1212,19 +1212,19 @@ namespace Spire
 			{
 				expr->Expression->Accept(this);
 				auto base = PopStack();
-				if (expr->Expression->Type == expr->Type)
+				if (expr->Expression->Type->Equals(expr->Type))
 				{
 					PushStack(base);
 				}
-				else if (expr->Expression->Type == ExpressionType::Float &&
-					expr->Type == ExpressionType::Int)
+				else if (expr->Expression->Type->Equals(ExpressionType::Float) &&
+					expr->Type->Equals(ExpressionType::Int))
 				{
 					auto instr = new Float2IntInstruction(base);
 					codeWriter.Insert(instr);
 					PushStack(instr);
 				}
-				else if (expr->Expression->Type == ExpressionType::Int &&
-					expr->Type == ExpressionType::Float)
+				else if (expr->Expression->Type->Equals(ExpressionType::Int) &&
+					expr->Type->Equals(ExpressionType::Float))
 				{
 					auto instr = new Int2FloatInstruction(base);
 					codeWriter.Insert(instr);
@@ -1251,7 +1251,7 @@ namespace Spire
 						instr = new AddInstruction();
 					instr->Operands.SetSize(2);
 					instr->Operands[0] = base;
-					if (expr->Type == ExpressionType::Float)
+					if (expr->Type->Equals(ExpressionType::Float))
 						instr->Operands[1] = result.Program->ConstantPool->CreateConstant(1.0f);
 					else
 						instr->Operands[1] = result.Program->ConstantPool->CreateConstant(1);
@@ -1277,7 +1277,7 @@ namespace Spire
 						instr = new AddInstruction();
 					instr->Operands.SetSize(2);
 					instr->Operands[0] = base;
-					if (expr->Type == ExpressionType::Float)
+					if (expr->Type->Equals(ExpressionType::Float))
 						instr->Operands[1] = result.Program->ConstantPool->CreateConstant(1.0f);
 					else
 						instr->Operands[1] = result.Program->ConstantPool->CreateConstant(1);
