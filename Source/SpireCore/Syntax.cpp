@@ -212,13 +212,6 @@ namespace Spire
 			return res.ProduceString();
 		}
 
-		ExpressionType * BasicExpressionType::Clone()
-		{
-			BasicExpressionType * rs = new BasicExpressionType(*this);
-			return rs;
-		}
-
-
 		RefPtr<SyntaxNode> ProgramSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
 			return visitor->VisitProgram(this);
@@ -839,12 +832,6 @@ namespace Spire
 			else
 				return BaseType->ToString() + "[]";
 		}
-		ExpressionType * ArrayExpressionType::Clone()
-		{
-			auto rs = new ArrayExpressionType(*this);
-			rs->BaseType = BaseType->Clone();
-			return rs;
-		}
 		RefPtr<SyntaxNode> ArrayTypeSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
 			return visitor->VisitArrayType(this);
@@ -881,25 +868,12 @@ namespace Spire
 		{
 			return GenericTypeName + "<" + BaseType->ToString() + ">";
 		}
-		ExpressionType * GenericExpressionType::Clone()
-		{
-			auto rs = new GenericExpressionType(*this);
-			rs->BaseType = BaseType->Clone();
-			return rs;
-		}
 
         // NamedExpressionType
 
         String NamedExpressionType::ToString() const
         {
             return decl->Name.Content;
-        }
-
-        ExpressionType * NamedExpressionType::Clone()
-        {
-            NamedExpressionType* result = new NamedExpressionType();
-            result->decl = decl;
-            return result;
         }
 
 		BindableResourceType NamedExpressionType::GetBindableResourceType() const
@@ -1092,8 +1066,6 @@ namespace Spire
 			TypeExp result;
 			if (exp)
 				result.exp = exp->Clone(context);
-			if (type)
-				result.type = type->Clone();
 			return result;
 		}
 

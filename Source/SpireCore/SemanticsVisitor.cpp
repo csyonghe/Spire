@@ -1288,7 +1288,6 @@ namespace Spire
 					else
 						expr->Type = new BasicExpressionType(GetVectorBaseType(basicType->BaseType));
 				}
-				expr->Type = expr->Type->Clone();
 
 				// Result of an index expression is an l-value iff base is.
 				expr->Type.IsLeftValue = expr->BaseExpression->Type.IsLeftValue;
@@ -1457,7 +1456,7 @@ namespace Spire
 							CloneContext cloneCtx;
 							importExpr->ImportOperatorDef = func->Clone(cloneCtx);
 							importExpr->ImportOperatorDef->Scope->Parent = varExpr->Scope->Parent;
-							importExpr->Type = arguments[0]->Type->Clone();
+							importExpr->Type = arguments[0]->Type;
 							importExpr->Scope = varExpr->Scope;
 							importExpr->Access = ExpressionAccess::Read;
 							for (int i = 1; i < arguments.Count(); i++)
@@ -1768,7 +1767,7 @@ namespace Spire
 					auto compRef = currentShader->ResolveComponentReference(expr->Variable);
 					if (compRef.IsAccessible)
 					{
-						expr->Type = compRef.Component->Type->DataType->Clone();
+						expr->Type = compRef.Component->Type->DataType;
 					}
 					else if (compRef.Component)
 					{

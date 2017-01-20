@@ -292,7 +292,6 @@ namespace Spire
 			static List<RefPtr<ExpressionType>> sCanonicalTypes;
 		public:
 			virtual String ToString() const = 0;
-			virtual ExpressionType * Clone() = 0;
 
 			bool IsIntegral() const;
 			bool Equals(const ExpressionType * type) const;
@@ -356,7 +355,6 @@ namespace Spire
 				this->Shader = shaderSym;
 			}
 			virtual CoreLib::Basic::String ToString() const override;
-			virtual ExpressionType * Clone() override;
 		protected:
 			virtual bool IsIntegralImpl() const override;
 			virtual bool EqualsImpl(const ExpressionType * type) const override;
@@ -375,7 +373,6 @@ namespace Spire
 			RefPtr<ExpressionType> BaseType;
 			int ArrayLength = 0;
 			virtual CoreLib::Basic::String ToString() const override;
-			virtual ExpressionType * Clone() override;
 		protected:
 			virtual bool IsArrayImpl() const override;
 			virtual bool EqualsImpl(const ExpressionType * type) const override;
@@ -392,7 +389,6 @@ namespace Spire
 			RefPtr<ExpressionType> BaseType;
 			String GenericTypeName;
 			virtual CoreLib::Basic::String ToString() const override;
-			virtual ExpressionType * Clone() override;
 		protected:
 			virtual bool EqualsImpl(const ExpressionType * type) const override;
 			virtual bool IsGenericTypeImpl(String typeName) const override
@@ -414,7 +410,6 @@ namespace Spire
 			TypeDefDecl* decl;
 
 			virtual String ToString() const override;
-			virtual ExpressionType * Clone() override;
 			virtual BindableResourceType GetBindableResourceType() const override;
 
 		protected:
