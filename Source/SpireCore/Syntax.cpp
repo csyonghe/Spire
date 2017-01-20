@@ -82,7 +82,6 @@ namespace Spire
 			return (basicType->BaseType == BaseType &&
 				basicType->Func == Func &&
 				basicType->Shader == Shader &&
-				basicType->structDecl == structDecl &&
 				basicType->RecordTypeName == RecordTypeName);
 		}
 
@@ -692,6 +691,11 @@ namespace Spire
             return GetCanonicalType()->AsGenericTypeImpl();
         }
 
+		DeclRefType * ExpressionType::AsDeclRefType() const
+		{
+			return GetCanonicalType()->AsDeclRefTypeImpl();
+		}
+
         NamedExpressionType* ExpressionType::AsNamedType() const
         {
             return AsNamedTypeImpl();
@@ -737,10 +741,11 @@ namespace Spire
 		}
 		bool ExpressionType::IsStruct() const
 		{
-			auto basicType = AsBasicType();
-			if (basicType)
-				return basicType->structDecl != nullptr;
-			return false;
+			auto declRefType = AsDeclRefType();
+			if (!declRefType) return false;
+			auto structDecl = dynamic_cast<StructSyntaxNode*>(declRefType->decl);
+			if (!structDecl) return false;
+			return true;
 		}
 		bool ExpressionType::IsShader() const
 		{
@@ -867,6 +872,33 @@ namespace Spire
 		CoreLib::Basic::String GenericExpressionType::ToString() const
 		{
 			return GenericTypeName + "<" + BaseType->ToString() + ">";
+		}
+
+		// DeclRefType
+
+		String DeclRefType::ToString() const
+		{
+			return decl->Name.Content;
+		}
+
+		bool DeclRefType::EqualsImpl(const ExpressionType * type) const
+		{
+			if (auto declRefType = type->AsDeclRefType())
+			{
+				return decl == declRefType->decl;
+			}
+			return false;
+		}
+
+		DeclRefType * DeclRefType::AsDeclRefTypeImpl() const
+		{
+			return const_cast<DeclRefType*>(this);
+		}
+
+		ExpressionType* DeclRefType::CreateCanonicalType()
+		{
+			// A declaration reference is already canonical
+			return this;
 		}
 
         // NamedExpressionType

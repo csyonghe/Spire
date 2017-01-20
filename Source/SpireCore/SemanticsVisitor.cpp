@@ -157,12 +157,13 @@ namespace Spire
 					expType->BaseType = BaseType::Bool;
 				else
 				{
-					expType->BaseType = BaseType::Struct;
 					if (auto decl = symbolTable->LookUp(typeNode->TypeName))
 					{
 						if (auto structDecl = dynamic_cast<StructSyntaxNode*>(decl))
 						{
-							expType->structDecl = structDecl;
+							RefPtr<DeclRefType> declRefType = new DeclRefType(structDecl);
+							typeResult = declRefType;
+							return typeNode;
 						}
 						else if (auto typeDefDecl = dynamic_cast<TypeDefDecl*>(decl))
 						{
@@ -1835,7 +1836,29 @@ namespace Spire
 			{
 				expr->BaseExpression = expr->BaseExpression->Accept(this).As<ExpressionSyntaxNode>();
 				auto & baseType = expr->BaseExpression->Type;
-				if (!baseType->AsBasicType())
+				if (auto declRefType = baseType->AsDeclRefType())
+				{
+					if (auto structDecl = dynamic_cast<StructSyntaxNode*>(declRefType->decl))
+					{
+						StructField* field = structDecl->FindField(expr->MemberName);
+						if (!field)
+						{
+							expr->Type = ExpressionType::Error;
+							getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->MemberName, baseType);
+						}
+						else
+							expr->Type = field->Type;
+
+						// A reference to a struct member is an l-value if the reference to the struct
+						// value was also an l-value.
+						expr->Type.IsLeftValue = expr->BaseExpression->Type.IsLeftValue;
+						return expr;
+					}
+
+					// catch-all
+					expr->Type = ExpressionType::Error;
+				}
+				else if (!baseType->AsBasicType())
 					expr->Type = ExpressionType::Error;
 				else if (IsVector(baseType->AsBasicType()->BaseType))
 				{
@@ -1940,21 +1963,6 @@ namespace Spire
 					}
 					else
 						expr->Type = ExpressionType::Error;
-				}
-				else if (baseType->IsStruct())
-				{
-					StructField* field = baseType->AsBasicType()->structDecl->FindField(expr->MemberName);
-					if (!field)
-					{
-						expr->Type = ExpressionType::Error;
-						getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->MemberName, baseType->AsBasicType()->structDecl);
-					}
-					else
-						expr->Type = field->Type;
-
-					// A reference to a struct member is an l-value if the reference to the struct
-					// value was also an l-value.
-					expr->Type.IsLeftValue = expr->BaseExpression->Type.IsLeftValue;
 				}
 				else
 					expr->Type = ExpressionType::Error;

@@ -197,25 +197,10 @@ LayoutRulesImpl* GetLayoutRulesImpl(LayoutRule rule)
 
 LayoutInfo GetLayout(ExpressionType* type, LayoutRulesImpl* rules)
 {
+top:
     if (auto basicType = dynamic_cast<BasicExpressionType*>(type))
     {
-        if (auto structDecl = basicType->structDecl)
-        {
-            LayoutInfo info = rules->BeginStructLayout();
-
-            for (auto field : structDecl->GetFields())
-            {
-                rules->AddStructField(&info,
-                    GetLayout(field->Type.Ptr(), rules));
-            }
-
-            rules->EndStructLayout(&info);
-            return info;
-        }
-        else
-        {
-            return rules->GetScalarLayout(basicType->BaseType);
-        }
+        return rules->GetScalarLayout(basicType->BaseType);
     }
     else if (auto arrayType = dynamic_cast<ArrayExpressionType*>(type))
     {
@@ -227,11 +212,32 @@ LayoutInfo GetLayout(ExpressionType* type, LayoutRulesImpl* rules)
     {
         return GetLayout(genericType->BaseType.Ptr(), rules);
     }
-    else
-    {
-        assert(!"unimplemented");
-        return{ 0, 1 };
-    }
+	else if (auto namedType = dynamic_cast<NamedExpressionType*>(type))
+	{
+		auto decl = namedType->decl;
+		if (auto structDecl = dynamic_cast<StructSyntaxNode*>(decl))
+		{
+            LayoutInfo info = rules->BeginStructLayout();
+
+            for (auto field : structDecl->GetFields())
+            {
+                rules->AddStructField(&info,
+                    GetLayout(field->Type.Ptr(), rules));
+            }
+
+            rules->EndStructLayout(&info);
+            return info;
+		}
+		else if (auto typeDefDecl = dynamic_cast<TypeDefDecl*>(decl))
+		{
+			type = typeDefDecl->Type.Ptr();
+			goto top;
+		}
+	}
+
+	// catch-all case in case nothing matched
+	assert(!"unimplemented");
+	return{ 0, 1 };
 }
 
 LayoutInfo GetLayout(ILType* type, LayoutRulesImpl* rules)

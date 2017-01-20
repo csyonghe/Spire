@@ -235,7 +235,6 @@ namespace Spire
 			SamplerState = 4096, SamplerComparisonState = 4097,
 			Function = 64,
 			Shader = 256,
-			Struct = 1024,
 			Record = 2048,
 			Generic = 8192,
 			Error = 16384,
@@ -267,6 +266,7 @@ namespace Spire
 		class ArrayExpressionType;
 		class GenericExpressionType;
 		class TypeDefDecl;
+		class DeclRefType;
 		class NamedExpressionType;
 
 		class ExpressionType : public RefObject
@@ -303,6 +303,7 @@ namespace Spire
 			BasicExpressionType * AsBasicType() const;
 			ArrayExpressionType * AsArrayType() const;
 			GenericExpressionType * AsGenericType() const;
+			DeclRefType* AsDeclRefType() const;
 			NamedExpressionType* AsNamedType() const;
 			bool IsTextureOrSampler() const;
 			bool IsTexture() const;
@@ -321,6 +322,7 @@ namespace Spire
 			virtual BasicExpressionType * AsBasicTypeImpl() const { return nullptr; }
 			virtual ArrayExpressionType * AsArrayTypeImpl() const { return nullptr; }
 			virtual GenericExpressionType * AsGenericTypeImpl() const { return nullptr; }
+			virtual DeclRefType * AsDeclRefTypeImpl() const { return nullptr; }
 			virtual NamedExpressionType * AsNamedTypeImpl() const { return nullptr; }
 
 			virtual ExpressionType* CreateCanonicalType() = 0;
@@ -335,7 +337,6 @@ namespace Spire
 			ShaderClosure * ShaderClosure = nullptr;
 			FunctionSymbol * Func = nullptr;
 			ShaderComponentSymbol * Component = nullptr;
-			StructSyntaxNode* structDecl = nullptr;
 			String RecordTypeName, GenericTypeVar;
 
 			BasicExpressionType()
@@ -401,9 +402,27 @@ namespace Spire
 			}
 			virtual ExpressionType* CreateCanonicalType() override;
 			virtual BindableResourceType GetBindableResourceType() const override;
-
 		};
 
+		// A type that takes the form of a reference to some declaration
+		class DeclRefType : public ExpressionType
+		{
+		public:
+			DeclRefType(Decl* decl)
+				: decl(decl)
+			{}
+
+			Decl* decl;
+
+			virtual String ToString() const override;
+
+		protected:
+			virtual bool EqualsImpl(const ExpressionType * type) const override;
+			virtual DeclRefType * AsDeclRefTypeImpl() const override;
+			virtual ExpressionType* CreateCanonicalType() override;
+		};
+
+		// A type alias of some kind (e.g., via `typedef`)
 		class NamedExpressionType : public ExpressionType
 		{
 		public:

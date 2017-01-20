@@ -1132,11 +1132,16 @@ namespace Spire
 							PushStack(rs);
 						}
 					}
-					else if (expr->BaseExpression->Type->IsStruct())
+					else if(auto declRefType = expr->BaseExpression->Type->AsDeclRefType())
 					{
-						int id = expr->BaseExpression->Type->AsBasicType()->structDecl->FindFieldIndex(expr->MemberName);
-						GenerateIndexExpression(base, result.Program->ConstantPool->CreateConstant(id),
-							expr->Access == ExpressionAccess::Read);
+						if (auto structDecl = dynamic_cast<StructSyntaxNode*>(declRefType->decl))
+						{
+							int id = structDecl->FindFieldIndex(expr->MemberName);
+							GenerateIndexExpression(base, result.Program->ConstantPool->CreateConstant(id),
+								expr->Access == ExpressionAccess::Read);
+						}
+						else
+							throw NotImplementedException("member expression codegen");
 					}
 					else
 						throw NotImplementedException("member expression codegen");
@@ -1402,11 +1407,7 @@ namespace Spire
 				RefPtr<ILType> resultType = 0;
 				if (auto basicType = type->AsBasicType())
 				{
-					if (basicType->BaseType == BaseType::Struct)
-					{
-						resultType = TranslateStructType(basicType->structDecl);
-					}
-					else if (basicType->BaseType == BaseType::Record)
+					if (basicType->BaseType == BaseType::Record)
 					{
 						return genericTypeMappings[basicType->RecordTypeName]();
 					}
@@ -1419,6 +1420,17 @@ namespace Spire
 						auto base = new ILBasicType();
 						base->Type = (ILBaseType)basicType->BaseType;
 						resultType = base;
+					}
+				}
+				else if (auto declRefType = type->AsDeclRefType())
+				{
+					if (auto structDecl = dynamic_cast<StructSyntaxNode*>(declRefType->decl))
+					{
+						return TranslateStructType(structDecl);
+					}
+					else
+					{
+						throw NotImplementedException("decl type");
 					}
 				}
 				else if (auto arrType = type->AsArrayType())
