@@ -81,8 +81,7 @@ namespace Spire
 				return false;
 			return (basicType->BaseType == BaseType &&
 				basicType->Func == Func &&
-				basicType->Shader == Shader &&
-				basicType->RecordTypeName == RecordTypeName);
+				basicType->Shader == Shader);
 		}
 
         ExpressionType* BasicExpressionType::CreateCanonicalType()
@@ -195,9 +194,6 @@ namespace Spire
 				break;
 			case Compiler::BaseType::Void:
 				res.Append("void");
-				break;
-			case Compiler::BaseType::Record:
-				res.Append(RecordTypeName);
 				break;
 			case Compiler::BaseType::SamplerState:
 				res.Append("SamplerState");
@@ -421,7 +417,8 @@ namespace Spire
 		{
 			auto rs = CloneSyntaxNodeFields(new IndexExpressionSyntaxNode(*this), ctx);
 			rs->BaseExpression = BaseExpression->Clone(ctx);
-			rs->IndexExpression = IndexExpression->Clone(ctx);
+			if(IndexExpression)
+				rs->IndexExpression = IndexExpression->Clone(ctx);
 			return rs;
 		}
 		RefPtr<SyntaxNode> IndexExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
@@ -504,10 +501,6 @@ namespace Spire
 			rs->Type = Type.Clone(ctx);
 			rs->Expr = Expr->Clone(ctx);
 			return rs;
-		}
-		RefPtr<SyntaxNode> BasicTypeSyntaxNode::Accept(SyntaxVisitor * visitor)
-		{
-			return visitor->VisitBasicType(this);
 		}
 		RefPtr<SyntaxNode> ComponentSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
@@ -701,6 +694,11 @@ namespace Spire
             return AsNamedTypeImpl();
         }
 
+		TypeExpressionType* ExpressionType::AsTypeType() const
+		{
+			return GetCanonicalType()->AsTypeTypeImpl();
+		}
+
         ExpressionType* ExpressionType::GetCanonicalType() const
         {
             ExpressionType* et = const_cast<ExpressionType*>(this);
@@ -837,10 +835,6 @@ namespace Spire
 			else
 				return BaseType->ToString() + "[]";
 		}
-		RefPtr<SyntaxNode> ArrayTypeSyntaxNode::Accept(SyntaxVisitor * visitor)
-		{
-			return visitor->VisitArrayType(this);
-		}
 		RefPtr<SyntaxNode> GenericTypeSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
 			return visitor->VisitGenericType(this);
@@ -928,6 +922,38 @@ namespace Spire
         {
             return decl->Type.type->GetCanonicalType();
         }
+
+		// TypeExpressionType
+
+		String TypeExpressionType::ToString() const
+		{
+			StringBuilder sb;
+			sb << "typeof(" << type->ToString() << ")";
+			return sb.ProduceString();
+		}
+
+		bool TypeExpressionType::EqualsImpl(const ExpressionType * type) const
+		{
+			if (auto typeType = type->AsTypeType())
+			{
+				return type->Equals(typeType->type);
+			}
+			return false;
+		}
+
+		TypeExpressionType * TypeExpressionType::AsTypeTypeImpl() const
+		{
+			return const_cast<TypeExpressionType*>(this);
+		}
+
+		ExpressionType* TypeExpressionType::CreateCanonicalType()
+		{
+			auto canType = new TypeExpressionType(type->GetCanonicalType());
+			sCanonicalTypes.Add(canType);
+			return canType;
+		}
+
+		//
 
 		RefPtr<SyntaxNode> ImportExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
@@ -1104,11 +1130,23 @@ namespace Spire
 		TypeExp TypeExp::Accept(SyntaxVisitor* visitor)
 		{
 			TypeExp result;
-			result.exp = exp->Accept(visitor).As<TypeSyntaxNode>();
+			result.exp = exp->Accept(visitor).As<ExpressionSyntaxNode>();
 			result.type = type;
 			return result;
 		}
 
+		// BuiltinTypeDecl
+
+		RefPtr<SyntaxNode> BuiltinTypeDecl::Accept(SyntaxVisitor * visitor)
+		{
+			// ignore
+			return this;
+		}
+
+		BuiltinTypeDecl * BuiltinTypeDecl::Clone(CloneContext & ctx)
+		{
+			throw "unimplemented";
+		}
 
 		//
 }

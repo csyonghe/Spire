@@ -97,7 +97,7 @@ namespace Spire
 						compSyntax->Name.Content = compName;
 						CloneContext cloneCtx;
 						compSyntax->Expression = arg->Expression->Clone(cloneCtx);
-						compSyntax->Type = TypeExp(new BasicTypeSyntaxNode());
+						compSyntax->Type = TypeExp(new VarExpressionSyntaxNode());
 						compSyntax->Type.exp->Position = compSyntax->Position;
 						impl->SyntaxNode = compSyntax;
 						ccomp->Name = compName;
@@ -358,6 +358,11 @@ namespace Spire
 					if (var->Type->AsBasicType())
 						originalShader = var->Type->AsBasicType()->Shader;
 					var->Type = new BasicExpressionType(originalShader, closure.Ptr());
+				}
+				// HACK(tfoley): For now just ignore cases where this is really a type
+				if (auto typeType = var->Type.type.As<TypeExpressionType>())
+				{
+					// ignore it
 				}
 				else if (!(var->Type->AsBasicType() && var->Type->AsBasicType()->BaseType == BaseType::Function))
 					throw InvalidProgramException("cannot resolve reference.");

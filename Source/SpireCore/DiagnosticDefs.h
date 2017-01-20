@@ -240,6 +240,12 @@ DIAGNOSTIC(36004, Error, templateShaderArgumentDidNotImplementRequiredInterface,
 DIAGNOSTIC(36010, Error, specializeCanOnlyBeUsedOnParam, "'specialize' modifier can only be used on module parameters.");
 DIAGNOSTIC(36011, Error, specializedParameterMustBeInt, "specialized parameters must be a int, uint or bool.");
 DIAGNOSTIC(36012, Error, specializationValuesMustBeConstantLiterial, "specialization candidate values can only be constant literials.");
+
+
+DIAGNOSTIC(39999, Error, expectedIntegerConstantWrongType, "expected integer constant (found: '$0')")
+DIAGNOSTIC(39999, Error, expectedIntegerConstantNotConstant, "expression does not evaluate to a compile-time constant")
+
+
 //
 // 4xxxx - IL code generation.
 //

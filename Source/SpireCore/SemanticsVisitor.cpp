@@ -90,8 +90,9 @@ namespace Spire
 		public:
 			// Translate Types
 			RefPtr<ExpressionType> typeResult;
-			RefPtr<ExpressionType> TranslateTypeNode(const RefPtr<TypeSyntaxNode> & node)
+			RefPtr<ExpressionType> TranslateTypeNode(const RefPtr<ExpressionSyntaxNode> & node)
 			{
+				typeResult = ExpressionType::Error;
 				node->Accept(this);
 				return typeResult;
 			}
@@ -102,134 +103,13 @@ namespace Spire
 				result.type = TranslateTypeNode(typeExp.exp);
 				return result;
 			}
-			RefPtr<TypeSyntaxNode> VisitBasicType(BasicTypeSyntaxNode * typeNode) override
-			{
-				RefPtr<BasicExpressionType> expType = new BasicExpressionType();
-				if (typeNode->TypeName == "int")
-					expType->BaseType = BaseType::Int;
-				else if (typeNode->TypeName == "uint")
-					expType->BaseType = BaseType::UInt;
-				else if (typeNode->TypeName == "float" || typeNode->TypeName == "half")
-					expType->BaseType = BaseType::Float;
-				else if (typeNode->TypeName == "ivec2" || typeNode->TypeName == "int2")
-					expType->BaseType = BaseType::Int2;
-				else if (typeNode->TypeName == "ivec3" || typeNode->TypeName == "int3")
-					expType->BaseType = BaseType::Int3;
-				else if (typeNode->TypeName == "ivec4" || typeNode->TypeName == "int4")
-					expType->BaseType = BaseType::Int4;
-				else if (typeNode->TypeName == "uvec2" || typeNode->TypeName == "uint2")
-					expType->BaseType = BaseType::UInt2;
-				else if (typeNode->TypeName == "uvec3" || typeNode->TypeName == "uint3")
-					expType->BaseType = BaseType::UInt3;
-				else if (typeNode->TypeName == "uvec4" || typeNode->TypeName == "uint4")
-					expType->BaseType = BaseType::UInt4;
-				else if (typeNode->TypeName == "vec2" || typeNode->TypeName == "float2" || typeNode->TypeName == "half2")
-					expType->BaseType = BaseType::Float2;
-				else if (typeNode->TypeName == "vec3" || typeNode->TypeName == "float3" || typeNode->TypeName == "half3")
-					expType->BaseType = BaseType::Float3;
-				else if (typeNode->TypeName == "vec4" || typeNode->TypeName == "float4" || typeNode->TypeName == "half4")
-					expType->BaseType = BaseType::Float4;
-				else if (typeNode->TypeName == "mat3" || typeNode->TypeName == "mat3x3" || typeNode->TypeName == "float3x3" || typeNode->TypeName == "half3x3")
-					expType->BaseType = BaseType::Float3x3;
-				else if (typeNode->TypeName == "mat4" || typeNode->TypeName == "mat4x4" || typeNode->TypeName == "float4x4" || typeNode->TypeName == "half4x4")
-					expType->BaseType = BaseType::Float4x4;
-				else if (typeNode->TypeName == "texture" || typeNode->TypeName == "Texture" || typeNode->TypeName == "Texture2D")
-					expType->BaseType = BaseType::Texture2D;
-				else if (typeNode->TypeName == "TextureCUBE" || typeNode->TypeName == "TextureCube")
-					expType->BaseType = BaseType::TextureCube;
-				else if (typeNode->TypeName == "Texture2DArray")
-					expType->BaseType = BaseType::Texture2DArray;
-				else if (typeNode->TypeName == "Texture2DArrayShadow")
-					expType->BaseType = BaseType::Texture2DArrayShadow;
-				else if (typeNode->TypeName == "Texture2DShadow")
-					expType->BaseType = BaseType::Texture2DShadow;
-				else if (typeNode->TypeName == "TextureCubeShadow")
-					expType->BaseType = BaseType::TextureCubeShadow;
-				else if (typeNode->TypeName == "Texture3D")
-					expType->BaseType = BaseType::Texture3D;
-				else if (typeNode->TypeName == "SamplerState" || typeNode->TypeName == "sampler" || typeNode->TypeName == "sampler_state")
-					expType->BaseType = BaseType::SamplerState;
-				else if (typeNode->TypeName == "SamplerComparisonState")
-					expType->BaseType = BaseType::SamplerComparisonState;
-				else if (typeNode->TypeName == "void")
-					expType->BaseType = BaseType::Void;
-				else if (typeNode->TypeName == "bool")
-					expType->BaseType = BaseType::Bool;
-				else
-				{
-					if (auto decl = symbolTable->LookUp(typeNode->TypeName))
-					{
-						if (auto structDecl = dynamic_cast<StructSyntaxNode*>(decl))
-						{
-							RefPtr<DeclRefType> declRefType = new DeclRefType(structDecl);
-							typeResult = declRefType;
-							return typeNode;
-						}
-						else if (auto typeDefDecl = dynamic_cast<TypeDefDecl*>(decl))
-						{
-							RefPtr<NamedExpressionType> namedType = new NamedExpressionType();
-							namedType->decl = typeDefDecl;
-
-							typeResult = namedType;
-							return typeNode;
-						}
-						else
-						{
-							getSink()->diagnose(typeNode, Diagnostics::undefinedTypeName, typeNode->TypeName);
-						}
-					}
-					else if (currentPipeline || currentShader)
-					{
-						PipelineSymbol * pipe = currentPipeline ? currentPipeline : currentShader->ParentPipeline;
-						bool matched = false;
-						if (pipe)
-						{
-							if (pipe->Worlds.ContainsKey(typeNode->TypeName))
-							{
-								expType->BaseType = BaseType::Record;
-								expType->RecordTypeName = typeNode->TypeName;
-								matched = true;
-							}
-						}
-						if (currentImportOperator)
-						{
-							if (typeNode->TypeName == currentImportOperator->TypeName.Content)
-							{
-								expType->BaseType = BaseType::Generic;
-								expType->GenericTypeVar = typeNode->TypeName;
-								matched = true;
-							}
-
-						}
-						if (!matched)
-						{
-							getSink()->diagnose(typeNode, Diagnostics::undefinedTypeName, typeNode->TypeName);
-							typeResult = ExpressionType::Error;
-						}
-					}
-					else
-					{
-						getSink()->diagnose(typeNode, Diagnostics::undefinedTypeName, typeNode->TypeName);
-						typeResult = ExpressionType::Error;
-						return typeNode;
-					}
-				}
-				typeResult = expType;
-				return typeNode;
-			}
-			RefPtr<TypeSyntaxNode> VisitArrayType(ArrayTypeSyntaxNode * typeNode) override
-			{
-				RefPtr<ArrayExpressionType> rs = new ArrayExpressionType();
-				rs->ArrayLength = typeNode->ArrayLength;
-				typeNode->BaseType->Accept(this);
-				rs->BaseType = typeResult;
-				typeResult = rs;
-				return typeNode;
-			}
-			RefPtr<TypeSyntaxNode> VisitGenericType(GenericTypeSyntaxNode * typeNode) override
+			RefPtr<ExpressionSyntaxNode> VisitGenericType(GenericTypeSyntaxNode * typeNode) override
 			{
 				RefPtr<GenericExpressionType> rs = new GenericExpressionType();
-				typeNode->BaseType->Accept(this);
+				for (auto& arg : typeNode->Args)
+				{
+					arg = arg->Accept(this).As<ExpressionSyntaxNode>();
+				}
 				rs->BaseType = typeResult;
 				rs->GenericTypeName = typeNode->GenericTypeName;
 				if (rs->GenericTypeName != "PackedBuffer" &&
@@ -1127,9 +1007,14 @@ namespace Spire
 				{
 					getSink()->diagnose(varDecl->Type, Diagnostics::invalidTypeForLocalVariable);
 				}
-				else if (typeExp.type->AsBasicType() && typeExp.type->AsBasicType()->RecordTypeName.Length())
+				else if (auto declRefType = typeExp.type->AsDeclRefType())
 				{
-					getSink()->diagnose(varDecl->Type, Diagnostics::recordTypeVariableInImportOperator);
+					if (auto worldDecl = dynamic_cast<WorldSyntaxNode*>(declRefType->decl))
+					{
+						// The type references a world, and we don't want to allow that here.
+						// TODO(tfoley): there is no clear reason why this shouldn't be allowed semantically.
+						getSink()->diagnose(varDecl->Type, Diagnostics::recordTypeVariableInImportOperator);
+					}
 				}
 				varDecl->Type = typeExp;
 				if (varDecl->Type.Equals(ExpressionType::Void.Ptr()))
@@ -1245,12 +1130,55 @@ namespace Spire
 				}
 				return expr;
 			}
+
+			// Check that an expression resolves to an integer constant, and get its value
+			int CheckIntegerConstantExpression(ExpressionSyntaxNode* exp, int defaultValue = 0)
+			{
+				if (!exp->Type.type->Equals(ExpressionType::Int))
+				{
+					getSink()->diagnose(exp, Diagnostics::expectedIntegerConstantWrongType, exp->Type);
+					return defaultValue;
+				}
+
+				// TODO(tfoley): more serious constant folding here
+				if (auto constExp = dynamic_cast<ConstantExpressionSyntaxNode*>(exp))
+				{
+					return constExp->IntValue;
+				}
+
+				getSink()->diagnose(exp, Diagnostics::expectedIntegerConstantNotConstant);
+				return defaultValue;
+			}
+
 			virtual RefPtr<ExpressionSyntaxNode> VisitIndexExpression(IndexExpressionSyntaxNode *expr) override
 			{
 				expr->BaseExpression = expr->BaseExpression->Accept(this).As<ExpressionSyntaxNode>();
-				expr->IndexExpression = expr->IndexExpression->Accept(this).As<ExpressionSyntaxNode>();
+				if (expr->IndexExpression)
+				{
+					expr->IndexExpression = expr->IndexExpression->Accept(this).As<ExpressionSyntaxNode>();
+				}
 				if (expr->BaseExpression->Type->Equals(ExpressionType::Error.Ptr()))
 					expr->Type = ExpressionType::Error;
+				else if (auto baseTypeType = expr->BaseExpression->Type.type.As<TypeExpressionType>())
+				{
+					// We are trying to "index" into a type, so we have an expression like `float[2]`
+					// which should be interpreted as resolving to an array type.
+
+					int elementCount = 0;
+					if (expr->IndexExpression)
+					{
+						elementCount = CheckIntegerConstantExpression(expr->IndexExpression.Ptr());
+					}
+
+					auto elementType = baseTypeType->type;
+					auto arrayType = new ArrayExpressionType();
+					arrayType->BaseType = elementType;
+					arrayType->ArrayLength = elementCount;
+
+					typeResult = arrayType;
+					expr->Type = new TypeExpressionType(arrayType);
+					return expr;
+				}
 				else
 				{
 					auto & baseExprType = expr->BaseExpression->Type;
@@ -1565,6 +1493,23 @@ namespace Spire
 				return invoke;
 			}
 
+			bool IsValidWorldTypeForProjection(
+				ProjectExpressionSyntaxNode*	projection,
+				String const&					expectedWorld)
+			{
+				auto baseType = projection->BaseExpression->Type;
+				auto declRefType = baseType->AsDeclRefType();
+				if (!declRefType)
+					return false;
+
+				auto worldDecl = dynamic_cast<WorldSyntaxNode*>(declRefType->decl);
+				if (!worldDecl)
+					return false;
+
+				// TODO(tfoley): Doing this is a string-based check is wrong...
+				return worldDecl->Name.Content == expectedWorld;
+			}
+
 			RefPtr<ExpressionSyntaxNode> VisitProject(ProjectExpressionSyntaxNode * project) override
 			{
 				if (currentImportOperator == nullptr)
@@ -1573,9 +1518,13 @@ namespace Spire
 					return project;
 				}
 				project->BaseExpression->Accept(this);
-				auto baseType = project->BaseExpression->Type->AsBasicType();
-				if (!baseType || baseType->RecordTypeName != currentImportOperator->SourceWorld.Content)
+
+				// Check that the type we are projecting from matches the expected world type.
+				if (!IsValidWorldTypeForProjection(project, currentImportOperator->SourceWorld.Content))
+				{
 					getSink()->diagnose(project, Diagnostics::projectTypeMismatch, currentImportOperator->SourceWorld);
+				}
+
 				auto rsType = new BasicExpressionType(BaseType::Generic);
 				project->Type = rsType;
 				rsType->GenericTypeVar = currentImportOperator->TypeName.Content;
@@ -1757,6 +1706,31 @@ namespace Spire
 						// TODO(tfoley): this is not correct in the case where we have a
 						// component *function*.
 						expr->Type = compDecl->Type;
+					}
+					else if (auto typeDecl = dynamic_cast<BuiltinTypeDecl*>(decl))
+					{
+						// TODO(tfoley): stash the resulting type somewhere on the decl, for convenience
+						RefPtr<BasicExpressionType> type = new BasicExpressionType(typeDecl->tag);
+						typeResult = type;
+						expr->Type = new TypeExpressionType(type);
+					}
+					else if (auto typeAliasDecl = dynamic_cast<TypeDefDecl*>(decl))
+					{
+						auto type = new NamedExpressionType(typeAliasDecl);
+						typeResult = type;
+						expr->Type = new TypeExpressionType(type);
+					}
+					else if (auto aggTypeDecl = dynamic_cast<AggTypeDecl*>(decl))
+					{
+						auto type = new DeclRefType(aggTypeDecl);
+						typeResult = type;
+						expr->Type = new TypeExpressionType(type);
+					}
+					else if (auto simpleTypeDecl = dynamic_cast<SimpleTypeDecl*>(decl))
+					{
+						auto type = new DeclRefType(simpleTypeDecl);
+						typeResult = type;
+						expr->Type = new TypeExpressionType(type);
 					}
 					else
 					{

@@ -56,7 +56,13 @@ namespace Spire
 		class ShaderCompiler : public CoreLib::Basic::Object
 		{
 		public:
-			virtual CompileUnit Parse(CompileResult & result, String source, String fileName, IncludeHandler* includeHandler, Dictionary<String,String> const& preprocessorDefinitions) = 0;
+			virtual CompileUnit Parse(
+				CompileResult & result,
+				String source,
+				String fileName,
+				IncludeHandler* includeHandler,
+				Dictionary<String,String> const& preprocessorDefinitions,
+				CompileUnit predefUnit) = 0;
 			virtual void Compile(CompileResult & result, CompilationContext & context, List<CompileUnit> & units, const CompileOptions & options) = 0;
 			void Compile(CompileResult & result, List<CompileUnit> & units, const CompileOptions & options)
 			{

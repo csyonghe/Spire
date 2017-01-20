@@ -1407,11 +1407,7 @@ namespace Spire
 				RefPtr<ILType> resultType = 0;
 				if (auto basicType = type->AsBasicType())
 				{
-					if (basicType->BaseType == BaseType::Record)
-					{
-						return genericTypeMappings[basicType->RecordTypeName]();
-					}
-					else if (basicType->BaseType == BaseType::Generic)
+					if (basicType->BaseType == BaseType::Generic)
 					{
 						return genericTypeMappings[basicType->GenericTypeVar]();
 					}
@@ -1424,7 +1420,12 @@ namespace Spire
 				}
 				else if (auto declRefType = type->AsDeclRefType())
 				{
-					if (auto structDecl = dynamic_cast<StructSyntaxNode*>(declRefType->decl))
+					auto decl = declRefType->decl;
+					if (auto worldDecl = dynamic_cast<WorldSyntaxNode*>(decl))
+					{
+						return genericTypeMappings[worldDecl->Name.Content];
+					}
+					else if (auto structDecl = dynamic_cast<StructSyntaxNode*>(decl))
 					{
 						return TranslateStructType(structDecl);
 					}

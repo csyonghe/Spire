@@ -281,6 +281,70 @@ namespace Spire
 			String intTypes[] = { "int", "ivec2", "ivec3", "ivec4" };
 			String uintTypes[] = { "uint", "uvec2", "uvec3", "uvec4" };
 
+			// Generate declarations for all the base types
+
+			static const struct {
+				char const* name;
+				BaseType	tag;
+			} kBaseTypes[] = {
+				{ "void",	BaseType::Void },
+				{ "int",	BaseType::Int },
+				{ "int2",	BaseType::Int2 },
+				{ "int3",	BaseType::Int3 },
+				{ "int4",	BaseType::Int4 },
+				{ "float",	BaseType::Float },
+				{ "float2",	BaseType::Float2 },
+				{ "float3",	BaseType::Float3 },
+				{ "float4",	BaseType::Float4 },
+				{ "uint",	BaseType::UInt },
+				{ "uint2",	BaseType::UInt2 },
+				{ "uint3",	BaseType::UInt3 },
+				{ "uint4",	BaseType::UInt4 },
+				{ "bool",	BaseType::Bool },
+				{ "bool2",	BaseType::Bool2 },
+				{ "bool3",	BaseType::Bool3 },
+				{ "bool4",	BaseType::Bool4 },
+
+				{ "float3x3",	BaseType::Float3x3 },
+				{ "float4x4",	BaseType::Float4x4 },
+
+				{ "Texture2D",				BaseType::Texture2D },
+				{ "TextureCube",			BaseType::TextureCube },
+				{ "Texture2DArray",			BaseType::Texture2DArray },
+				{ "Texture2DShadow",		BaseType::Texture2DShadow },
+				{ "TextureCubeShadow",		BaseType::TextureCubeShadow },
+				{ "Texture2DArrayShadow",	BaseType::Texture2DArrayShadow },
+				{ "Texture3D",				BaseType::Texture3D },
+				{ "SamplerState",			BaseType::SamplerState },
+				{ "SamplerComparisonState",	BaseType::SamplerComparisonState },
+			};
+			static const int kBaseTypeCount = sizeof(kBaseTypes) / sizeof(kBaseTypes[0]);
+			for (int tt = 0; tt < kBaseTypeCount; ++tt)
+			{
+				sb << "__builtin_type(" << int(kBaseTypes[tt].tag) << ") " << kBaseTypes[tt].name << ";\n";
+			}
+
+			static const struct {
+				char const* hlslPrefix;
+				char const* glslPrefix;
+			} kTypeMap[] =
+			{
+				{ "float", "" },
+				{ "int", "i" },
+				{ "uint", "u" },
+				{ "bool", "b" },
+			};
+			static const int kTypeMapCount = sizeof(kTypeMap) / sizeof(kTypeMap[0]);
+			for (int tt = 0; tt < kTypeMapCount; ++tt)
+			{
+				for (int vv = 2; vv <= 4; ++vv)
+				{
+					sb << "typedef " << kTypeMap[tt].hlslPrefix << vv << " " << kTypeMap[tt].glslPrefix << "vec" << vv << ";\n";
+				}
+			}
+			sb << "typedef float3x3 mat3;\n";
+			sb << "typedef float4x4 mat4;\n";
+
 			sb << "__intrinsic vec3 operator * (vec3, mat3);\n";
 			sb << "__intrinsic vec3 operator * (mat3, vec3);\n";
 

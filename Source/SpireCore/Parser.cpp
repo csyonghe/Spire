@@ -99,7 +99,7 @@ namespace Spire
 				typeNames.Add("StorageBuffer");
 				typeNames.Add("Patch");
 			}
-			RefPtr<ProgramSyntaxNode> Parse();
+			RefPtr<ProgramSyntaxNode> Parse(ProgramSyntaxNode*	predefUnit);
 
 			Token ReadToken();
 			Token ReadToken(CoreLib::Text::TokenType type);
@@ -108,7 +108,7 @@ namespace Spire
 			bool LookAheadToken(const char * string, int offset = 0);
 			Token ReadTypeKeyword();
 			bool IsTypeKeyword();
-			RefPtr<ProgramSyntaxNode>					ParseProgram();
+			RefPtr<ProgramSyntaxNode>					ParseProgram(ProgramSyntaxNode*	predefUnit);
 			RefPtr<ShaderSyntaxNode>					ParseShader();
 			RefPtr<TemplateShaderSyntaxNode>			ParseTemplateShader();
 			RefPtr<TemplateShaderParameterSyntaxNode>	ParseTemplateShaderParameter();
@@ -136,7 +136,7 @@ namespace Spire
 			RefPtr<ExpressionSyntaxNode>				ParseExpression(int level = 0);
 			RefPtr<ExpressionSyntaxNode>				ParseLeafExpression();
 			RefPtr<ParameterSyntaxNode>					ParseParameter();
-			RefPtr<TypeSyntaxNode>					ParseType();
+			RefPtr<ExpressionSyntaxNode>				ParseType();
 			TypeExp										ParseTypeExp();
 
 			Parser & operator = (const Parser &) = delete;
@@ -515,9 +515,9 @@ namespace Spire
                 && typeNames.Contains(tokenReader.PeekToken().Content);
 		}
 
-		RefPtr<ProgramSyntaxNode> Parser::Parse()
+		RefPtr<ProgramSyntaxNode> Parser::Parse(ProgramSyntaxNode*	predefUnit)
 		{
-			return ParseProgram();
+			return ParseProgram(predefUnit);
 		}
 
         RefPtr<TypeDefDecl> ParseTypeDef(Parser* parser)
@@ -714,9 +714,9 @@ namespace Spire
 
         struct DeclaratorInfo
         {
-            RefPtr<RateSyntaxNode>		rate;
-            RefPtr<TypeSyntaxNode>	typeSpec;
-            Token						nameToken;
+            RefPtr<RateSyntaxNode>			rate;
+            RefPtr<ExpressionSyntaxNode>	typeSpec;
+            Token							nameToken;
         };
 
         static void ParseFuncDeclHeader(
@@ -1034,6 +1034,19 @@ namespace Spire
 			return bufferDecl;
 		}
 
+		static RefPtr<Decl> ParseBuiltinTypeDecl(
+			Parser* parser)
+		{
+			RefPtr<BuiltinTypeDecl> decl = new BuiltinTypeDecl();
+			parser->ReadToken("__builtin_type");
+			parser->ReadToken(TokenType::LParent);
+			decl->tag = BaseType(StringToInt(parser->ReadToken(TokenType::IntLiterial).Content));
+			parser->ReadToken(TokenType::RParent);
+			decl->Name = parser->ReadToken(TokenType::Identifier);
+			parser->ReadToken(TokenType::Semicolon);
+			return decl;
+		}
+
         static RefPtr<Decl> ParseDeclWithModifiers(
             Parser*             parser,
             ContainerDecl*      containerDecl,
@@ -1064,6 +1077,8 @@ namespace Spire
 				decl = parser->ParseInterface();
 			else if (parser->LookAheadToken("cbuffer") || parser->LookAheadToken("tbuffer"))
 				decl = ParseHLSLBufferDecl(parser);
+			else if (parser->LookAheadToken("__builtin_type"))
+				decl = ParseBuiltinTypeDecl(parser);
             else if (AdvanceIf(parser, TokenType::Semicolon))
             {
                 // empty declaration
@@ -1108,14 +1123,25 @@ namespace Spire
             }
         }
 
-		RefPtr<ProgramSyntaxNode> Parser::ParseProgram()
+		RefPtr<ProgramSyntaxNode> Parser::ParseProgram(ProgramSyntaxNode*	predefUnit)
 		{
+			if (predefUnit)
+			{
+				PushScope(predefUnit);
+			}
+
 			RefPtr<ProgramSyntaxNode> program = new ProgramSyntaxNode();
 			PushScope(program.Ptr());
 			program->Position = CodePosition(0, 0, 0, fileName);
 			program->Scope = currentScope;
             ParseDeclBody(this, program.Ptr(), TokenType::EndOfFile);
 			PopScope();
+
+			if (predefUnit)
+			{
+				PopScope();
+			}
+
 			assert(!currentScope.Ptr());
 			currentScope = nullptr;
 			return program;
@@ -1490,7 +1516,7 @@ namespace Spire
 			{
 				Token* startPos = tokenReader.mCursor;
 				bool isVarDeclr = false;
-				RefPtr<TypeSyntaxNode> type = ParseType();
+				RefPtr<ExpressionSyntaxNode> type = ParseType();
 				if (LookAheadToken(TokenType::Identifier))
 				{
 					type = nullptr;
@@ -1686,27 +1712,32 @@ namespace Spire
 			return parameter;
 		}
 
-		RefPtr<TypeSyntaxNode> Parser::ParseType()
+		RefPtr<ExpressionSyntaxNode> ParseGenericArg(Parser* parser)
+		{
+			return parser->ParseExpression();
+		}
+
+		RefPtr<ExpressionSyntaxNode> Parser::ParseType()
 		{
 			Token typeName;
 			if (LookAheadToken(TokenType::Identifier))
 				typeName = ReadToken(TokenType::Identifier);
 			else
 				typeName = ReadTypeKeyword();
-			RefPtr<TypeSyntaxNode> rs;
+			RefPtr<ExpressionSyntaxNode> rs;
 			if (LookAheadToken(TokenType::OpLess))
 			{
 				RefPtr<GenericTypeSyntaxNode> gtype = new GenericTypeSyntaxNode();
+				FillPosition(gtype.Ptr()); // set up scope for lookup
 				gtype->Position = typeName.Position;
 				gtype->GenericTypeName = typeName.Content;
 				ReadToken(TokenType::OpLess);
-				// For now assume all generics have one type argument, and then
-				// zero or more value arguments
-				gtype->BaseType = ParseType();
 				this->genericDepth++;
+				// For now assume all generics have at least one argument
+				gtype->Args.Add(ParseGenericArg(this));
 				while (AdvanceIf(this, TokenType::Comma))
 				{
-					gtype->Args.Add(ParseExpression());
+					gtype->Args.Add(ParseGenericArg(this));
 				}
 				this->genericDepth--;
 				ReadToken(TokenType::OpGreater);
@@ -1714,21 +1745,22 @@ namespace Spire
 			}
 			else
 			{
-				auto basicType = new BasicTypeSyntaxNode();
+				auto basicType = new VarExpressionSyntaxNode();
+				FillPosition(basicType); // set up scope for lookup
 				basicType->Position = typeName.Position;
-				basicType->TypeName = typeName.Content;
+				basicType->Variable = typeName.Content;
 				rs = basicType;
 			}
 			while (LookAheadToken(TokenType::LBracket))
 			{
-				RefPtr<ArrayTypeSyntaxNode> arrType = new ArrayTypeSyntaxNode();
+				RefPtr<IndexExpressionSyntaxNode> arrType = new IndexExpressionSyntaxNode();
 				arrType->Position = rs->Position;
-				arrType->BaseType = rs;
+				arrType->BaseExpression = rs;
 				ReadToken(TokenType::LBracket);
-				if (LookAheadToken(TokenType::IntLiterial))
-					arrType->ArrayLength = StringToInt(ReadToken(TokenType::IntLiterial).Content);
-				else
-					arrType->ArrayLength = 0;
+				if (!LookAheadToken(TokenType::RBracket))
+				{
+					arrType->IndexExpression = ParseExpression();
+				}
 				ReadToken(TokenType::RBracket);
 				rs = arrType;
 			}
@@ -2105,10 +2137,11 @@ namespace Spire
         RefPtr<ProgramSyntaxNode> ParseProgram(
             TokenSpan const&    tokens,
             DiagnosticSink*     sink,
-            String const&       fileName)
+            String const&       fileName,
+			ProgramSyntaxNode*	predefUnit)
         {
             Parser parser(tokens, sink, fileName);
-            return parser.Parse();
+            return parser.Parse(predefUnit);
         }
 
 	}

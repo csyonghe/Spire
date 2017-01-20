@@ -214,7 +214,8 @@ namespace SpireLib
 		auto searchDirs = options.SearchDirectories;
 		searchDirs.Add(Path::GetDirectoryName(fileName));
 		searchDirs.Reverse();
-		auto predefUnit = compiler->Parse(compileResult, SpireStdLib::GetCode(), "stdlib", &includeHandler, options.PreprocessorDefinitions);
+		CompileUnit predefUnit;
+		predefUnit = compiler->Parse(compileResult, SpireStdLib::GetCode(), "stdlib", &includeHandler, options.PreprocessorDefinitions, predefUnit);
 		for (int i = 0; i < unitsToInclude.Count(); i++)
 		{
 			auto inputFileName = unitsToInclude[i];
@@ -223,7 +224,7 @@ namespace SpireLib
 				String source = src;
 				if (i > 0)
 					source = File::ReadAllText(inputFileName);
-				auto unit = compiler->Parse(compileResult, source, inputFileName, &includeHandler, options.PreprocessorDefinitions);
+				auto unit = compiler->Parse(compileResult, source, inputFileName, &includeHandler, options.PreprocessorDefinitions, predefUnit);
 				units.Add(unit);
 				if (unit.SyntaxNode)
 				{
@@ -469,6 +470,7 @@ namespace SpireLib
 		Array<State, 128> states;
 		List<RefPtr<Spire::Compiler::CompilationContext>> compileContext;
 		RefPtr<ShaderCompiler> compiler;
+		CompileUnit predefUnit;
 
 		struct IncludeHandlerImpl : IncludeHandler
 		{
@@ -674,7 +676,7 @@ namespace SpireLib
 					String source = src;
 					if (i > 0)
 						source = File::ReadAllText(inputFileName);
-					auto unit = compiler->Parse(result, source, inputFileName, &includeHandler, Options.PreprocessorDefinitions);
+					auto unit = compiler->Parse(result, source, inputFileName, &includeHandler, Options.PreprocessorDefinitions, predefUnit);
 					units.Add(unit);
 					if (unit.SyntaxNode)
 					{
@@ -716,7 +718,7 @@ namespace SpireLib
 		Shader * NewShaderFromSource(const char * source, const char * fileName)
 		{
 			Spire::Compiler::CompileResult result;
-			auto unit = compiler->Parse(result, source, fileName, nullptr, Dictionary<String, String>());
+			auto unit = compiler->Parse(result, source, fileName, nullptr, Dictionary<String, String>(), predefUnit);
 			auto list = unit.SyntaxNode->GetMembersOfType<TemplateShaderSyntaxNode>();
 			if (list.Count())
 				return new Shader((*list.begin())->Name.Content, String(source));

@@ -11,7 +11,8 @@ namespace Spire
         RefPtr<ProgramSyntaxNode> ParseProgram(
             TokenSpan const&    tokens,
             DiagnosticSink*     sink,
-            String const&       fileName);
+            String const&       fileName,
+			ProgramSyntaxNode*	predefUnit);
 	}
 }
 

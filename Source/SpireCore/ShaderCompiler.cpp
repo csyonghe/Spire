@@ -358,11 +358,12 @@ namespace Spire
 				return result;
 			}
 		public:
-			virtual CompileUnit Parse(CompileResult & result, String source, String fileName, IncludeHandler* includeHandler, Dictionary<String,String> const& preprocesorDefinitions) override
+			virtual CompileUnit Parse(CompileResult & result, String source, String fileName, IncludeHandler* includeHandler, Dictionary<String,String> const& preprocesorDefinitions,
+				CompileUnit predefUnit) override
 			{
                 auto tokens = PreprocessSource(source, fileName, result.GetErrorWriter(), includeHandler, preprocesorDefinitions);
 				CompileUnit rs;
-                rs.SyntaxNode = ParseProgram(tokens, result.GetErrorWriter(), fileName);
+                rs.SyntaxNode = ParseProgram(tokens, result.GetErrorWriter(), fileName, predefUnit.SyntaxNode.Ptr());
 				return rs;
 			}
 			virtual void Compile(CompileResult & result, CompilationContext & context, List<CompileUnit> & units, const CompileOptions & options) override

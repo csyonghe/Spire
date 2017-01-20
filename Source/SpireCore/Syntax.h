@@ -235,7 +235,6 @@ namespace Spire
 			SamplerState = 4096, SamplerComparisonState = 4097,
 			Function = 64,
 			Shader = 256,
-			Record = 2048,
 			Generic = 8192,
 			Error = 16384,
 		};
@@ -268,6 +267,7 @@ namespace Spire
 		class TypeDefDecl;
 		class DeclRefType;
 		class NamedExpressionType;
+		class TypeExpressionType;
 
 		class ExpressionType : public RefObject
 		{
@@ -305,6 +305,7 @@ namespace Spire
 			GenericExpressionType * AsGenericType() const;
 			DeclRefType* AsDeclRefType() const;
 			NamedExpressionType* AsNamedType() const;
+			TypeExpressionType* AsTypeType() const;
 			bool IsTextureOrSampler() const;
 			bool IsTexture() const;
 			bool IsStruct() const;
@@ -324,6 +325,7 @@ namespace Spire
 			virtual GenericExpressionType * AsGenericTypeImpl() const { return nullptr; }
 			virtual DeclRefType * AsDeclRefTypeImpl() const { return nullptr; }
 			virtual NamedExpressionType * AsNamedTypeImpl() const { return nullptr; }
+			virtual TypeExpressionType * AsTypeTypeImpl() const { return nullptr; }
 
 			virtual ExpressionType* CreateCanonicalType() = 0;
 			ExpressionType* canonicalType = nullptr;
@@ -337,7 +339,7 @@ namespace Spire
 			ShaderClosure * ShaderClosure = nullptr;
 			FunctionSymbol * Func = nullptr;
 			ShaderComponentSymbol * Component = nullptr;
-			String RecordTypeName, GenericTypeVar;
+			String GenericTypeVar;
 
 			BasicExpressionType()
 			{
@@ -426,6 +428,10 @@ namespace Spire
 		class NamedExpressionType : public ExpressionType
 		{
 		public:
+			NamedExpressionType(TypeDefDecl* decl)
+				: decl(decl)
+			{}
+
 			TypeDefDecl* decl;
 
 			virtual String ToString() const override;
@@ -437,6 +443,26 @@ namespace Spire
 			virtual ExpressionType* CreateCanonicalType() override;
 		};
 
+		// The "type" of an expression that resolves to a type.
+		// For example, in the expression `float(2)` the sub-expression,
+		// `float` would have the type `TypeType(float)`.
+		class TypeExpressionType : public ExpressionType
+		{
+		public:
+			TypeExpressionType(RefPtr<ExpressionType> type)
+				: type(type)
+			{}
+
+			// The type that this is the type of...
+			RefPtr<ExpressionType> type;
+
+			virtual String ToString() const override;
+
+		protected:
+			virtual bool EqualsImpl(const ExpressionType * type) const override;
+			virtual TypeExpressionType * AsTypeTypeImpl() const override;
+			virtual ExpressionType* CreateCanonicalType() override;
+		};
 
 		class Type
 		{
@@ -500,38 +526,6 @@ namespace Spire
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) = 0;
 			virtual SyntaxNode * Clone(CloneContext & ctx) = 0;
 		};
-
-		class TypeSyntaxNode : public SyntaxNode
-		{
-		public:
-			virtual TypeSyntaxNode * Clone(CloneContext & ctx) = 0;
-		};
-
-		class BasicTypeSyntaxNode : public TypeSyntaxNode
-		{
-		public:
-			String TypeName;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-			virtual BasicTypeSyntaxNode * Clone(CloneContext & ctx) override
-			{
-				return CloneSyntaxNodeFields(new BasicTypeSyntaxNode(*this), ctx);
-			}
-		};
-
-		class ArrayTypeSyntaxNode : public TypeSyntaxNode
-		{
-		public:
-			RefPtr<TypeSyntaxNode> BaseType;
-			int ArrayLength;
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-			virtual ArrayTypeSyntaxNode * Clone(CloneContext & ctx) override
-			{
-				auto rs = CloneSyntaxNodeFields(new ArrayTypeSyntaxNode(*this), ctx);
-				rs->BaseType = BaseType->Clone(ctx);
-				return rs;
-			}
-		};
-
 
 		class ContainerDecl;
 		class SpecializeModifier;
@@ -734,11 +728,11 @@ namespace Spire
 				: exp(other.exp)
 				, type(other.type)
 			{}
-			explicit TypeExp(RefPtr<TypeSyntaxNode> exp)
+			explicit TypeExp(RefPtr<ExpressionSyntaxNode> exp)
 				: exp(exp)
 			{}
 
-			RefPtr<TypeSyntaxNode> exp;
+			RefPtr<ExpressionSyntaxNode> exp;
 			RefPtr<ExpressionType> type;
 
 			bool Equals(ExpressionType* other) {
@@ -788,8 +782,11 @@ namespace Spire
 			}
 		};
 
+		// Declaration of a type that represents some sort of aggregate
+		class AggTypeDecl : public ContainerDecl
+		{};
 
-		class StructSyntaxNode : public ContainerDecl
+		class StructSyntaxNode : public AggTypeDecl
 		{
 		public:
 			FilteredMemberList<StructField> GetFields()
@@ -829,8 +826,13 @@ namespace Spire
 			}
 		};
 
+		// A declaration that represents a simple (non-aggregate) type
+		class SimpleTypeDecl : public Decl
+		{
+		};
+
 		// A `typedef` declaration
-		class TypeDefDecl : public Decl
+		class TypeDefDecl : public SimpleTypeDecl
 		{
 		public:
 			TypeExp Type;
@@ -1040,7 +1042,7 @@ namespace Spire
 		class TypeCastExpressionSyntaxNode : public ExpressionSyntaxNode
 		{
 		public:
-			RefPtr<TypeSyntaxNode> TargetType;
+			RefPtr<ExpressionSyntaxNode> TargetType;
 			RefPtr<ExpressionSyntaxNode> Expression;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual TypeCastExpressionSyntaxNode * Clone(CloneContext & ctx) override;
@@ -1129,7 +1131,7 @@ namespace Spire
 			virtual ComponentSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class WorldSyntaxNode : public Decl
+		class WorldSyntaxNode : public SimpleTypeDecl
 		{
 		public:
 			bool IsAbstract() { return HasModifier(ModifierFlag::Input); }
@@ -1176,7 +1178,7 @@ namespace Spire
 		// TODO(tfoley): equivalent cases for GLSL uniform buffer declarations
 
 		// Shared functionality for "shader class"-like declarations
-		class ShaderDeclBase : public ContainerDecl
+		class ShaderDeclBase : public AggTypeDecl
 		{
 		public:
 			Token ParentPipelineName;
@@ -1395,12 +1397,9 @@ namespace Spire
 		// `ExpressionSyntaxNode` and a forward reference just isn't good enough
 		// for `RefPtr`.
 		//
-		class GenericTypeSyntaxNode : public TypeSyntaxNode
+		class GenericTypeSyntaxNode : public ExpressionSyntaxNode
 		{
 		public:
-			// The type argument to the generic type
-			RefPtr<TypeSyntaxNode> BaseType;
-
 			// The name of the generic to apply (e.g., `Buffer`)
 			String GenericTypeName;
 			
@@ -1411,9 +1410,20 @@ namespace Spire
 			virtual GenericTypeSyntaxNode * Clone(CloneContext & ctx) override
 			{
 				auto rs = CloneSyntaxNodeFields(new GenericTypeSyntaxNode(*this), ctx);
-				rs->BaseType = BaseType->Clone(ctx);
+				for (auto& arg : rs->Args)
+					arg = arg->Clone(ctx);
 				return rs;
 			}
+		};
+
+		// A declaration of a built-in type (e.g., `float`)
+		class BuiltinTypeDecl : public Decl
+		{
+		public:
+			BaseType tag;
+
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual BuiltinTypeDecl * Clone(CloneContext & ctx) override;
 		};
 
 		//
@@ -1638,15 +1648,7 @@ namespace Spire
 			{
 				return param;
 			}
-			virtual RefPtr<TypeSyntaxNode> VisitBasicType(BasicTypeSyntaxNode* type)
-			{
-				return type;
-			}
-			virtual RefPtr<TypeSyntaxNode> VisitArrayType(ArrayTypeSyntaxNode* type)
-			{
-				return type;
-			}
-			virtual RefPtr<TypeSyntaxNode> VisitGenericType(GenericTypeSyntaxNode* type)
+			virtual RefPtr<ExpressionSyntaxNode> VisitGenericType(GenericTypeSyntaxNode* type)
 			{
 				return type;
 			}
