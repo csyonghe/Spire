@@ -1292,7 +1292,6 @@ namespace Spire
 				if (auto basicType = expr->Type->AsBasicType())
 				{
 					basicType->IsLeftValue = true;
-					basicType->IsReference = true;
 				}
 				return expr;
 			}

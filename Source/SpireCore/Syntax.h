@@ -332,7 +332,6 @@ namespace Spire
 		{
 		public:
 			bool IsLeftValue;
-			bool IsReference;
 			bool IsMaskedVector = false;
 			BaseType BaseType;
 			ShaderSymbol * Shader = nullptr;
@@ -347,14 +346,12 @@ namespace Spire
 				BaseType = Compiler::BaseType::Int;
 				Func = 0;
 				IsLeftValue = false;
-				IsReference = false;
 			}
 			BasicExpressionType(Compiler::BaseType baseType)
 			{
 				BaseType = baseType;
 				Func = 0;
 				IsLeftValue = false;
-				IsReference = false;
 			}
 			BasicExpressionType(ShaderSymbol * shaderSym, Compiler::ShaderClosure * closure)
 			{
