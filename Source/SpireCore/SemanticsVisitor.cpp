@@ -1737,16 +1737,36 @@ namespace Spire
 				ShaderUsing shaderObj;
 				expr->Type = ExpressionType::Error;
 				auto decl = expr->Scope->LookUp(expr->Variable);
-				auto varDecl = dynamic_cast<VarDeclBase*>(decl);
-				if (varDecl)
+				if (decl)
 				{
-					expr->Type = varDecl->Type;
+					// Found declaration through ordinary scope lookup rules
+					expr->decl = decl;
 
-					// A variable reference is an l-value as long as the variable is mutable.
-					// Currently the only immutable variable declarations are components.
-					expr->Type.IsLeftValue = !(dynamic_cast<ComponentSyntaxNode*>(varDecl));
+					// We need to insert an appropriate type for the expression, based on
+					// what we found.
+					if (auto varDecl = dynamic_cast<VarDeclBase*>(decl))
+					{
+						expr->Type = varDecl->Type;
+
+						// A variable reference is an l-value as long as the variable is mutable.
+						// Currently the only immutable variable declarations are components.
+						expr->Type.IsLeftValue = !(dynamic_cast<ComponentSyntaxNode*>(varDecl));
+					}
+					else if (auto compDecl = dynamic_cast<ComponentSyntaxNode*>(decl))
+					{
+						// TODO(tfoley): this is not correct in the case where we have a
+						// component *function*.
+						expr->Type = compDecl->Type;
+					}
+					else
+					{
+						getSink()->diagnose(expr, Diagnostics::unimplemented, "declaration reference case");
+					}
+					return expr;
 				}
-				else if (currentShader && currentShader->ShaderObjects.TryGetValue(expr->Variable, shaderObj))
+
+				// Ad hoc lookup rules for cases where the scope-based lookup currently doesn't apply.
+				if (currentShader && currentShader->ShaderObjects.TryGetValue(expr->Variable, shaderObj))
 				{
 					auto basicType = new BasicExpressionType(BaseType::Shader);
 					basicType->Shader = shaderObj.Shader;

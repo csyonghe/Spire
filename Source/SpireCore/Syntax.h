@@ -929,7 +929,12 @@ namespace Spire
 		class VarExpressionSyntaxNode : public ExpressionSyntaxNode
 		{
 		public:
+			// The name of the symbol being referenced
 			String Variable;
+
+			// The declaration of the symbol being referenced
+			Decl* decl = nullptr;
+
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual VarExpressionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
