@@ -340,10 +340,18 @@ namespace CoreLib
 			}
 			RefPtrImpl<T, 1, Destructor>& operator=(const RefPtrImpl<T, 1, Destructor> & ptr)
 			{
-				if (ptr.pointer != pointer)
+				// Note: It is possible that the object this pointer references owns
+				// (directly or indirectly) the storage for the argument `ptr`. If
+				// that is the case and the `Unreference()` call below frees this
+				// object, then the argument would become invalid.
+				//
+				// We copy the pointer value out of the argument first, in order
+				// to protected against this case.
+				T* ptrPointer = ptr.pointer;
+				if (ptrPointer != pointer)
 				{
 					Unreference();
-					pointer = ptr.pointer;
+					pointer = ptrPointer;
 					if (pointer)
 						pointer->_refCount++;
 				}
