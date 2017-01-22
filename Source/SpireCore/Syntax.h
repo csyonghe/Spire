@@ -232,7 +232,6 @@ namespace Spire
 			Texture2DArrayShadow = 53,
 			Texture3D = 54,
 			SamplerState = 4096, SamplerComparisonState = 4097,
-			Function = 64,
 			Shader = 256,
 			Generic = 8192,
 			Error = 16384,
@@ -279,6 +278,13 @@ namespace Spire
 			bool IsVectorType() const;
 			bool IsArray() const;
 			bool IsGenericType(String typeName) const;
+
+			template<typename T>
+			T* As() const
+			{
+				return dynamic_cast<T*>(GetCanonicalType());
+			}
+
 			ArithmeticExpressionType * AsArithmeticType() const;
 			BasicExpressionType * AsBasicType() const;
 			VectorExpressionType * AsVectorType() const;
@@ -326,25 +332,37 @@ namespace Spire
 			virtual ArithmeticExpressionType * AsArithmeticTypeImpl() const override;
 		};
 
+		// Function types are currently used for references to symbols that name
+		// either ordinary functions, or "component functions."
+		// We do not directly store a representation of the type, and instead
+		// use a reference to the symbol to stand in for its logical type
+		class FuncType : public ExpressionType
+		{
+		public:
+			ShaderComponentSymbol * Component = nullptr;
+			FunctionSymbol * Func = nullptr;
+
+			virtual String ToString() const override;
+		protected:
+			virtual bool EqualsImpl(const ExpressionType * type) const override;
+			virtual ExpressionType* CreateCanonicalType() override;
+		};
+
 		class BasicExpressionType : public ArithmeticExpressionType
 		{
 		public:
 			BaseType BaseType;
 			ShaderSymbol * Shader = nullptr;
 			ShaderClosure * ShaderClosure = nullptr;
-			FunctionSymbol * Func = nullptr;
-			ShaderComponentSymbol * Component = nullptr;
 			String GenericTypeVar;
 
 			BasicExpressionType()
 			{
 				BaseType = Compiler::BaseType::Int;
-				Func = 0;
 			}
 			BasicExpressionType(Compiler::BaseType baseType)
 			{
 				BaseType = baseType;
-				Func = 0;
 			}
 			BasicExpressionType(ShaderSymbol * shaderSym, Compiler::ShaderClosure * closure)
 			{
@@ -774,7 +792,6 @@ namespace Spire
 			ExpressionSyntaxNode(const ExpressionSyntaxNode & expr) = default;
 			virtual ExpressionSyntaxNode* Clone(CloneContext & ctx) = 0;
 		};
-
 
 		// A 'specialize' modifier indicating the shader parameter should be specialized
 		class SpecializeModifier : public Modifier

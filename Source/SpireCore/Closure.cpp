@@ -332,17 +332,21 @@ namespace Spire
 						return var;
                 }
                 // Otherwise look in other places...
-				if (var->Type->AsBasicType() && var->Type->AsBasicType()->Component)
+				// TODO(tfoley): is this really only used for functions?
+				if (auto funcType = var->Type->As<FuncType>())
 				{
-					if (auto comp = shaderClosure->FindComponent(var->Type->AsBasicType()->Component->Name))
+					if (auto funcComponent = funcType->Component)
 					{
-						if (comp->Implementations.First()->SyntaxNode->IsRequire())
-							shaderClosure->RefMap.TryGetValue(comp->Name, comp);
-						var->Tags["ComponentReference"] = new StringObject(comp->UniqueName);
-						AddReference(comp.Ptr(), currentImport, var->Position);
+						if (auto comp = shaderClosure->FindComponent(funcComponent->Name))
+						{
+							if (comp->Implementations.First()->SyntaxNode->IsRequire())
+								shaderClosure->RefMap.TryGetValue(comp->Name, comp);
+							var->Tags["ComponentReference"] = new StringObject(comp->UniqueName);
+							AddReference(comp.Ptr(), currentImport, var->Position);
+						}
+						else
+							throw InvalidProgramException("cannot resolve reference.");
 					}
-					else
-						throw InvalidProgramException("cannot resolve reference.");
 				}
 				if (auto comp = shaderClosure->FindComponent(var->Variable))
 				{
@@ -364,7 +368,7 @@ namespace Spire
 				{
 					// ignore it
 				}
-				else if (!(var->Type->AsBasicType() && var->Type->AsBasicType()->BaseType == BaseType::Function))
+				else if (!var->Type->As<FuncType>())
 					throw InvalidProgramException("cannot resolve reference.");
 				return var;
 			}
@@ -387,15 +391,18 @@ namespace Spire
 						member->Type = new BasicExpressionType(originalShader, shader.Ptr());
 					}
 				}
-				else if (member->Type->AsBasicType() && member->Type->AsBasicType()->Component)
+				else if (auto funcType = member->Type->As<FuncType>())
 				{
-					if (auto comp = shaderClosure->FindComponent(member->Type->AsBasicType()->Component->Name))
+					if (auto funcComponentSym = funcType->Component)
 					{
-						member->Tags["ComponentReference"] = new StringObject(comp->UniqueName);
-						AddReference(comp.Ptr(), currentImport, member->Position);
+						if (auto comp = shaderClosure->FindComponent(funcComponentSym->Name))
+						{
+							member->Tags["ComponentReference"] = new StringObject(comp->UniqueName);
+							AddReference(comp.Ptr(), currentImport, member->Position);
+						}
+						else
+							throw InvalidProgramException("cannot resolve reference.");
 					}
-					else
-						throw InvalidProgramException("cannot resolve reference.");
 				}
 				return member;
 			}

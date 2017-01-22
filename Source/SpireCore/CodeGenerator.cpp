@@ -1153,12 +1153,12 @@ namespace Spire
 				List<ILOperand*> args;
 				String funcName;
 				bool hasSideEffect = false;
-				if (auto basicType = expr->FunctionExpr->Type->AsBasicType())
+				if (auto funcType = expr->FunctionExpr->Type->As<FuncType>())
 				{
-					if (basicType->Func)
+					if (funcType->Func)
 					{
-						funcName = basicType->Func->SyntaxNode->IsExtern() ? basicType->Func->SyntaxNode->Name.Content : basicType->Func->SyntaxNode->InternalName;
-						for (auto & param : basicType->Func->SyntaxNode->GetParameters())
+						funcName = funcType->Func->SyntaxNode->IsExtern() ? funcType->Func->SyntaxNode->Name.Content : funcType->Func->SyntaxNode->InternalName;
+						for (auto & param : funcType->Func->SyntaxNode->GetParameters())
 						{
 							if (param->HasModifier(ModifierFlag::Out))
 							{
@@ -1167,7 +1167,7 @@ namespace Spire
 							}
 						}
 					}
-					else if (basicType->Component)
+					else if (funcType->Component)
 					{
 						auto funcCompName = expr->FunctionExpr->Tags["ComponentReference"]().As<StringObject>()->Content;
 						auto funcComp = *(currentShader->DefinitionsByComponent[funcCompName]().TryGetValue(currentComponent->World));

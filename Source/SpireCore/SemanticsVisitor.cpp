@@ -109,9 +109,13 @@ namespace Spire
 
 			RefPtr<ExpressionType> ExtractGenericArgType(RefPtr<ExpressionSyntaxNode> exp)
 			{
-				if (auto typeType = exp->Type.type.As<TypeExpressionType>())
+				if (auto typeType = exp->Type.type->As<TypeExpressionType>())
 				{
 					return typeType->type;
+				}
+				else if (exp->Type.type->Equals(ExpressionType::Error))
+				{
+					return exp->Type;
 				}
 				else
 				{
@@ -429,17 +433,20 @@ namespace Spire
 								auto resolvedExpr = ResolveInvoke(tempInvoke.Ptr());
 								if (auto resolveInvoke = resolvedExpr.As<InvokeExpressionSyntaxNode>())
 								{
-									auto funcType = resolveInvoke->FunctionExpr->Type->AsBasicType();
-									if (funcType->Component)
+									if (auto funcType = resolveInvoke->FunctionExpr->Type->As<FuncType>())
 									{
-										// modify function name to resolved name
-										if (auto memberExpr = arg->Expression.As<MemberExpressionSyntaxNode>())
-											memberExpr->MemberName = funcType->Component->Name;
-										else if (auto varExpr = arg->Expression.As<VarExpressionSyntaxNode>())
-											varExpr->Variable = funcType->Component->Name;
+										if (auto funcComponent = funcType->Component)
+										{
+											// modify function name to resolved name
+											if (auto memberExpr = arg->Expression.As<MemberExpressionSyntaxNode>())
+												memberExpr->MemberName = funcComponent->Name;
+											else if (auto varExpr = arg->Expression.As<VarExpressionSyntaxNode>())
+												varExpr->Variable = funcComponent->Name;
+										}
+										else
+											getSink()->diagnose(arg.Ptr(), Diagnostics::ordinaryFunctionAsModuleArgument);
+
 									}
-									else
-										getSink()->diagnose(arg.Ptr(), Diagnostics::ordinaryFunctionAsModuleArgument);
 								}
 								else
 									getSink()->diagnose(arg.Ptr(), Diagnostics::invalidValueForArgument, arg->ArgumentName.Content);
@@ -1421,8 +1428,7 @@ namespace Spire
 					auto func = ResolveFunctionComponent(basicType->Shader, memberExpr->MemberName, arguments);
 					if (func)
 					{
-						auto funcType = new BasicExpressionType();
-						funcType->BaseType = BaseType::Function;
+						auto funcType = new FuncType();
 						funcType->Component = func;
 						memberExpr->Type = funcType;
 						memberExpr->MemberName = func->Name;
@@ -1450,8 +1456,7 @@ namespace Spire
 					auto func = ResolveFunctionComponent(currentShader, varExpr->Variable, arguments);
 					if (func)
 					{
-						auto funcType = new BasicExpressionType();
-						funcType->BaseType = BaseType::Function;
+						auto funcType = new FuncType();
 						funcType->Component = func;
 						varExpr->Type = funcType;
 						invoke->Type = func->Implementations.First()->SyntaxNode->Type;
@@ -1543,7 +1548,7 @@ namespace Spire
 							found = false;
 						}
 					}
-					auto funcType = new BasicExpressionType(BaseType::Function);
+					auto funcType = new FuncType();
 					funcType->Func = symbolTable->FunctionOverloads["texture"]().First().Ptr();
 					varExpr->Type = funcType;
 				}
@@ -1570,8 +1575,7 @@ namespace Spire
 							currentFunc->ReferencedFunctions.Add(func->SyntaxNode->InternalName);
 					}
 					invoke->Type = func->SyntaxNode->ReturnType;
-					auto funcType = new BasicExpressionType();
-					funcType->BaseType = BaseType::Function;
+					auto funcType = new FuncType();
 					funcType->Func = func.Ptr();
 					varExpr->Type = funcType;
 					found = true;
@@ -1659,18 +1663,18 @@ namespace Spire
 				if (auto invoke = dynamic_cast<InvokeExpressionSyntaxNode*>(rs.Ptr()))
 				{
 					// if this is still an invoke expression, test arguments passed to inout/out parameter are LValues
-					if (auto basicType = dynamic_cast<BasicExpressionType*>(invoke->FunctionExpr->Type.Ptr()))
+					if(auto funcType = invoke->FunctionExpr->Type->As<FuncType>())
 					{
 						List<RefPtr<ParameterSyntaxNode>> paramsStorage;
 						List<RefPtr<ParameterSyntaxNode>> * params = nullptr;
-						if (basicType->Func)
+						if (auto funcSym = funcType->Func)
 						{
-							paramsStorage = basicType->Func->SyntaxNode->GetParameters().ToArray();
+							paramsStorage = funcSym->SyntaxNode->GetParameters().ToArray();
 							params = &paramsStorage;
 						}
-						else if (basicType->Component)
+						else if (auto componentFuncSym = funcType->Component)
 						{
-							paramsStorage = basicType->Component->Implementations.First()->SyntaxNode->GetParameters().ToArray();
+							paramsStorage = componentFuncSym->Implementations.First()->SyntaxNode->GetParameters().ToArray();
 							params = &paramsStorage;
 						}
 						if (params)

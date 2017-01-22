@@ -80,7 +80,6 @@ namespace Spire
 			if (basicType == nullptr)
 				return false;
 			return (basicType->BaseType == BaseType &&
-				basicType->Func == Func &&
 				basicType->Shader == Shader);
 		}
 
@@ -147,9 +146,6 @@ namespace Spire
 				break;
 			case Compiler::BaseType::TextureCubeShadow:
 				res.Append("samplerCubeShadow");
-				break;
-			case Compiler::BaseType::Function:
-				res.Append(Func->SyntaxNode->InternalName);
 				break;
 			case Compiler::BaseType::Shader:
 				res.Append(Shader->SyntaxNode->Name.Content);
@@ -690,6 +686,7 @@ namespace Spire
 
         ExpressionType* ExpressionType::GetCanonicalType() const
         {
+			if (!this) return nullptr;
             ExpressionType* et = const_cast<ExpressionType*>(this);
             if (!et->canonicalType)
             {
@@ -888,6 +885,34 @@ namespace Spire
         {
             return decl->Type.type->GetCanonicalType();
         }
+
+		// FuncType
+
+		String FuncType::ToString() const
+		{
+			// TODO: a better approach than this
+			if (Func)
+				return Func->SyntaxNode->InternalName;
+			else if (Component)
+				return Component->Name;
+			else
+				return "/* unknown FuncType */";
+		}
+
+		bool FuncType::EqualsImpl(const ExpressionType * type) const
+		{
+			if (auto funcType = type->As<FuncType>())
+			{
+				return Func == funcType->Func
+					&& Component == funcType->Component;
+			}
+			return false;
+		}
+
+		ExpressionType* FuncType::CreateCanonicalType()
+		{
+			return this;
+		}
 
 		// TypeExpressionType
 
