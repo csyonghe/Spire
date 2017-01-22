@@ -679,8 +679,8 @@ namespace Spire
 
 			bool MatchType_GenericType(String typeName, ExpressionType * valueType)
 			{
-				if (auto basicType = valueType->AsBasicType())
-					return basicType->GenericTypeVar == typeName;
+				if (auto genericType = valueType->As<ImportOperatorGenericParamType>())
+					return genericType->GenericTypeVar == typeName;
 				return false;
 			}
 
@@ -1629,9 +1629,8 @@ namespace Spire
 					getSink()->diagnose(project, Diagnostics::projectTypeMismatch, currentImportOperator->SourceWorld);
 				}
 
-				auto rsType = new BasicExpressionType(BaseType::Generic);
+				auto rsType = new ImportOperatorGenericParamType(currentImportOperator->TypeName.Content);
 				project->Type = rsType;
-				rsType->GenericTypeVar = currentImportOperator->TypeName.Content;
 				return project;
 			}
 

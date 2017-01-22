@@ -409,10 +409,11 @@ namespace Spire
 		{
 			if (auto basic = type->AsBasicType())
 			{
-				if (basic->BaseType == BaseType::Generic)
-					return recordReplaceStr;
-				else
-					return basic->ToString();
+				return basic->ToString();
+			}
+			else if (auto genericParamType = type->As<ImportOperatorGenericParamType>())
+			{
+				return recordReplaceStr;
 			}
 			else if (auto arr = type.As<ArrayExpressionType>())
 			{

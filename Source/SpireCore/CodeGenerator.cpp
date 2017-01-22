@@ -1406,16 +1406,13 @@ namespace Spire
 			{
 				if (auto basicType = type->AsBasicType())
 				{
-					if (basicType->BaseType == BaseType::Generic)
-					{
-						return genericTypeMappings[basicType->GenericTypeVar]();
-					}
-					else
-					{
-						auto base = new ILBasicType();
-						base->Type = (ILBaseType)basicType->BaseType;
-						return base;
-					}
+					auto base = new ILBasicType();
+					base->Type = (ILBaseType)basicType->BaseType;
+					return base;
+				}
+				else if (auto genericType = type->As<ImportOperatorGenericParamType>())
+				{
+					return genericTypeMappings[genericType->GenericTypeVar]();
 				}
 				else if (auto vecType = type->AsVectorType())
 				{

@@ -232,7 +232,6 @@ namespace Spire
 			Texture2DArrayShadow = 53,
 			Texture3D = 54,
 			SamplerState = 4096, SamplerComparisonState = 4097,
-			Generic = 8192,
 			Error = 16384,
 		};
 
@@ -366,11 +365,26 @@ namespace Spire
 			virtual ExpressionType* CreateCanonicalType() override;
 		};
 
+		// A reference to the generic type parameter of an import operator
+		class ImportOperatorGenericParamType : public ExpressionType
+		{
+		public:
+			String GenericTypeVar;
+
+			ImportOperatorGenericParamType(String genericTypeVar)
+				: GenericTypeVar(genericTypeVar)
+			{}
+
+			virtual String ToString() const override;
+		protected:
+			virtual bool EqualsImpl(const ExpressionType * type) const override;
+			virtual ExpressionType* CreateCanonicalType() override;
+		};
+
 		class BasicExpressionType : public ArithmeticExpressionType
 		{
 		public:
 			BaseType BaseType;
-			String GenericTypeVar;
 
 			BasicExpressionType()
 			{

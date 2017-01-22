@@ -931,6 +931,30 @@ namespace Spire
 			return this;
 		}
 
+		// ImportOperatorGenericParamType
+
+		String ImportOperatorGenericParamType::ToString() const
+		{
+			return GenericTypeVar;
+		}
+
+		bool ImportOperatorGenericParamType::EqualsImpl(const ExpressionType * type) const
+		{
+			if (auto genericType = type->As<ImportOperatorGenericParamType>())
+			{
+				// TODO(tfoley): This does not compare the shader closure,
+				// because the original implementation in `BasicExpressionType`
+				// didn't either. It isn't clear whether that would be right or wrong.
+				return GenericTypeVar == genericType->GenericTypeVar;
+			}
+			return false;
+		}
+
+		ExpressionType* ImportOperatorGenericParamType::CreateCanonicalType()
+		{
+			return this;
+		}
+
 		// TypeExpressionType
 
 		String TypeExpressionType::ToString() const
