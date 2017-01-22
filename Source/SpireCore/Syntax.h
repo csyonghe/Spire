@@ -232,7 +232,6 @@ namespace Spire
 			Texture2DArrayShadow = 53,
 			Texture3D = 54,
 			SamplerState = 4096, SamplerComparisonState = 4097,
-			Shader = 256,
 			Generic = 8192,
 			Error = 16384,
 		};
@@ -348,12 +347,29 @@ namespace Spire
 			virtual ExpressionType* CreateCanonicalType() override;
 		};
 
+		// The type of a shader symbol.
+		class ShaderType : public ExpressionType
+		{
+		public:
+			ShaderSymbol * Shader = nullptr;
+			ShaderClosure * ShaderClosure = nullptr;
+
+			ShaderType(ShaderSymbol * shaderSym, Compiler::ShaderClosure * closure)
+			{
+				this->ShaderClosure = closure;
+				this->Shader = shaderSym;
+			}
+
+			virtual String ToString() const override;
+		protected:
+			virtual bool EqualsImpl(const ExpressionType * type) const override;
+			virtual ExpressionType* CreateCanonicalType() override;
+		};
+
 		class BasicExpressionType : public ArithmeticExpressionType
 		{
 		public:
 			BaseType BaseType;
-			ShaderSymbol * Shader = nullptr;
-			ShaderClosure * ShaderClosure = nullptr;
 			String GenericTypeVar;
 
 			BasicExpressionType()
@@ -363,12 +379,6 @@ namespace Spire
 			BasicExpressionType(Compiler::BaseType baseType)
 			{
 				BaseType = baseType;
-			}
-			BasicExpressionType(ShaderSymbol * shaderSym, Compiler::ShaderClosure * closure)
-			{
-				this->BaseType = BaseType::Shader;
-				this->ShaderClosure = closure;
-				this->Shader = shaderSym;
 			}
 			virtual CoreLib::Basic::String ToString() const override;
 		protected:

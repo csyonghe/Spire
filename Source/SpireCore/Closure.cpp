@@ -359,9 +359,9 @@ namespace Spire
 				else if (auto closure = shaderClosure->FindClosure(var->Variable))
 				{
 					ShaderSymbol * originalShader = nullptr;
-					if (var->Type->AsBasicType())
-						originalShader = var->Type->AsBasicType()->Shader;
-					var->Type = new BasicExpressionType(originalShader, closure.Ptr());
+					if (auto originalShaderType = var->Type->As<ShaderType>())
+						originalShader = originalShaderType->Shader;
+					var->Type = new ShaderType(originalShader, closure.Ptr());
 				}
 				// HACK(tfoley): For now just ignore cases where this is really a type
 				if (auto typeType = var->Type.type.As<TypeExpressionType>())
@@ -376,19 +376,19 @@ namespace Spire
 			RefPtr<ExpressionSyntaxNode> VisitMemberExpression(MemberExpressionSyntaxNode * member) override
 			{
 				member->BaseExpression->Accept(this);
-				if (member->BaseExpression->Type->AsBasicType() && member->BaseExpression->Type->AsBasicType()->ShaderClosure)
+				if (auto baseShaderType = member->BaseExpression->Type->As<ShaderType>())
 				{
-					if (auto comp = member->BaseExpression->Type->AsBasicType()->ShaderClosure->FindComponent(member->MemberName))
+					if (auto comp = baseShaderType->ShaderClosure->FindComponent(member->MemberName))
 					{
 						member->Tags["ComponentReference"] = new StringObject(comp->UniqueName);
 						AddReference(comp.Ptr(), currentImport, member->Position);
 					}
-					else if (auto shader = member->BaseExpression->Type->AsBasicType()->ShaderClosure->FindClosure(member->MemberName))
+					else if (auto shader = baseShaderType->ShaderClosure->FindClosure(member->MemberName))
 					{
 						ShaderSymbol * originalShader = nullptr;
-						if (member->Type->AsBasicType())
-							originalShader = member->Type->AsBasicType()->Shader;
-						member->Type = new BasicExpressionType(originalShader, shader.Ptr());
+						if (auto memberShaderType = member->Type->As<ShaderType>())
+							originalShader = memberShaderType->Shader;
+						member->Type = new ShaderType(originalShader, shader.Ptr());
 					}
 				}
 				else if (auto funcType = member->Type->As<FuncType>())

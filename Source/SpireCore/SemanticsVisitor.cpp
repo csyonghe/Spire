@@ -1422,10 +1422,9 @@ namespace Spire
 				DiagnosticSink::State savedState = sink->saveState();
 				memberExpr->BaseExpression->Accept(this);
 				sink->restoreState(savedState);
-				if (memberExpr->BaseExpression->Type->IsShader())
+				if (auto baseShaderType = memberExpr->BaseExpression->Type->As<ShaderType>())
 				{
-					auto basicType = memberExpr->BaseExpression->Type->AsBasicType();
-					auto func = ResolveFunctionComponent(basicType->Shader, memberExpr->MemberName, arguments);
+					auto func = ResolveFunctionComponent(baseShaderType->Shader, memberExpr->MemberName, arguments);
 					if (func)
 					{
 						auto funcType = new FuncType();
@@ -1847,8 +1846,7 @@ namespace Spire
 				// Ad hoc lookup rules for cases where the scope-based lookup currently doesn't apply.
 				if (currentShader && currentShader->ShaderObjects.TryGetValue(expr->Variable, shaderObj))
 				{
-					auto basicType = new BasicExpressionType(BaseType::Shader);
-					basicType->Shader = shaderObj.Shader;
+					auto basicType = new ShaderType(shaderObj.Shader, nullptr);
 					expr->Type = basicType;
 				}
 				else if (currentPipeline && currentImportOperator)
@@ -2043,21 +2041,17 @@ namespace Spire
 						}
 					}
 				}
-				// All remaining cases assume we have a `BasicType`
-				else if (!baseType->AsBasicType())
-					expr->Type = ExpressionType::Error;
-				else if (baseType->AsBasicType()->BaseType == BaseType::Shader)
+				else if (auto baseShaderType = baseType->As<ShaderType>())
 				{
 					ShaderUsing shaderObj;
-					auto refComp = baseType->AsBasicType()->Shader->ResolveComponentReference(expr->MemberName);
+					auto refComp = baseShaderType->Shader->ResolveComponentReference(expr->MemberName);
 					if (refComp.IsAccessible)
 						expr->Type = refComp.Component->Type->DataType;
-					else if (baseType->AsBasicType()->Shader->ShaderObjects.TryGetValue(expr->MemberName, shaderObj))
+					else if (baseShaderType->Shader->ShaderObjects.TryGetValue(expr->MemberName, shaderObj))
 					{
 						if (shaderObj.IsPublic)
 						{
-							auto shaderType = new BasicExpressionType(BaseType::Shader);
-							shaderType->Shader = shaderObj.Shader;
+							auto shaderType = new ShaderType(shaderObj.Shader, nullptr);
 							expr->Type = shaderType;
 						}
 						else
@@ -2066,6 +2060,9 @@ namespace Spire
 					else
 						expr->Type = ExpressionType::Error;
 				}
+				// All remaining cases assume we have a `BasicType`
+				else if (!baseType->AsBasicType())
+					expr->Type = ExpressionType::Error;
 				else
 					expr->Type = ExpressionType::Error;
 				if (!baseType->Equals(ExpressionType::Error.Ptr()) &&

@@ -79,8 +79,7 @@ namespace Spire
 			auto basicType = dynamic_cast<const BasicExpressionType*>(type);
 			if (basicType == nullptr)
 				return false;
-			return (basicType->BaseType == BaseType &&
-				basicType->Shader == Shader);
+			return basicType->BaseType == BaseType;
 		}
 
         ExpressionType* BasicExpressionType::CreateCanonicalType()
@@ -146,9 +145,6 @@ namespace Spire
 				break;
 			case Compiler::BaseType::TextureCubeShadow:
 				res.Append("samplerCubeShadow");
-				break;
-			case Compiler::BaseType::Shader:
-				res.Append(Shader->SyntaxNode->Name.Content);
 				break;
 			case Compiler::BaseType::Void:
 				res.Append("void");
@@ -733,10 +729,7 @@ namespace Spire
 		}
 		bool ExpressionType::IsShader() const
 		{
-			auto basicType = AsBasicType();
-			if (basicType)
-				return basicType->Shader != nullptr;
-			return false;
+			return this->As<ShaderType>() != nullptr;
 		}
 
 		RefPtr<ExpressionType> ExpressionType::Bool;
@@ -910,6 +903,30 @@ namespace Spire
 		}
 
 		ExpressionType* FuncType::CreateCanonicalType()
+		{
+			return this;
+		}
+
+		// ShaderType
+
+		String ShaderType::ToString() const
+		{
+			return Shader->SyntaxNode->Name.Content;
+		}
+
+		bool ShaderType::EqualsImpl(const ExpressionType * type) const
+		{
+			if (auto shaderType = type->As<ShaderType>())
+			{
+				// TODO(tfoley): This does not compare the shader closure,
+				// because the original implementation in `BasicExpressionType`
+				// didn't either. It isn't clear whether that would be right or wrong.
+				return Shader == shaderType->Shader;
+			}
+			return false;
+		}
+
+		ExpressionType* ShaderType::CreateCanonicalType()
 		{
 			return this;
 		}
