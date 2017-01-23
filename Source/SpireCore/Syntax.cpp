@@ -88,25 +88,6 @@ namespace Spire
             return this;
         }
 
-		BindableResourceType BasicExpressionType::GetBindableResourceType() const
-		{
-			switch (BaseType)
-			{
-			case Compiler::BaseType::Texture2DArray:
-			case Compiler::BaseType::Texture2DArrayShadow:
-			case Compiler::BaseType::Texture2D:
-			case Compiler::BaseType::Texture2DShadow:
-			case Compiler::BaseType::Texture3D:
-			case Compiler::BaseType::TextureCube:
-			case Compiler::BaseType::TextureCubeShadow:
-				return BindableResourceType::Texture;
-			case Compiler::BaseType::SamplerState:
-			case Compiler::BaseType::SamplerComparisonState:
-				return BindableResourceType::Sampler;
-			}
-			return BindableResourceType::NonBindable;
-		}
-
 		CoreLib::Basic::String BasicExpressionType::ToString() const
 		{
 			CoreLib::Basic::StringBuilder res;
@@ -125,32 +106,8 @@ namespace Spire
 			case Compiler::BaseType::Float:
 				res.Append("float");
 				break;
-			case Compiler::BaseType::Texture2DArray:
-				res.Append("sampler2DArray");
-				break;
-			case Compiler::BaseType::Texture2DArrayShadow:
-				res.Append("sampler2DArrayShadow");
-				break;
-			case Compiler::BaseType::Texture2D:
-				res.Append("sampler2D");
-				break;
-			case Compiler::BaseType::Texture2DShadow:
-				res.Append("sampler2DShadow");
-				break;
-			case Compiler::BaseType::Texture3D:
-				res.Append("sampler3D");
-				break;
-			case Compiler::BaseType::TextureCube:
-				res.Append("samplerCube");
-				break;
-			case Compiler::BaseType::TextureCubeShadow:
-				res.Append("samplerCubeShadow");
-				break;
 			case Compiler::BaseType::Void:
 				res.Append("void");
-				break;
-			case Compiler::BaseType::SamplerState:
-				res.Append("SamplerState");
 				break;
 			case Compiler::BaseType::Error:
 				res.Append("<errtype>");
@@ -692,32 +649,35 @@ namespace Spire
             return et->canonicalType;
         }
 
+		BindableResourceType ExpressionType::GetBindableResourceType() const
+		{
+			if (auto textureType = As<TextureType>())
+				return BindableResourceType::Texture;
+			else if (auto samplerType = As<SamplerStateType>())
+				return BindableResourceType::Sampler;
+			else if (auto genericType = As<GenericExpressionType>())
+			{
+				auto name = genericType->GenericTypeName;
+				if (name == "StructuredBuffer" || name == "RWStructuredBuffer")
+					return BindableResourceType::StorageBuffer;
+				else if (name == "Uniform")
+					return BindableResourceType::Buffer;
+			}
+
+			return BindableResourceType::NonBindable;
+		}
+
 		bool ExpressionType::IsTexture() const
 		{
-			auto basicType = AsBasicType();
-			if (basicType)
-				return basicType->BaseType == BaseType::Texture2D ||
-				basicType->BaseType == BaseType::TextureCube ||
-				basicType->BaseType == BaseType::Texture2DArray ||
-				basicType->BaseType == BaseType::Texture2DShadow ||
-				basicType->BaseType == BaseType::TextureCubeShadow ||
-				basicType->BaseType == BaseType::Texture2DArrayShadow ||
-				basicType->BaseType == BaseType::Texture3D;
-			return false;
+			return As<TextureType>() != nullptr;
+		}
+		bool ExpressionType::IsSampler() const
+		{
+			return As<SamplerStateType>() != nullptr;
 		}
 		bool ExpressionType::IsTextureOrSampler() const
 		{
-			auto basicType = AsBasicType();
-			if (basicType)
-				return basicType->BaseType == BaseType::Texture2D ||
-					basicType->BaseType == BaseType::TextureCube ||
-					basicType->BaseType == BaseType::Texture2DArray ||
-					basicType->BaseType == BaseType::Texture2DShadow ||
-					basicType->BaseType == BaseType::TextureCubeShadow ||
-					basicType->BaseType == BaseType::Texture2DArrayShadow ||
-					basicType->BaseType == BaseType::Texture3D ||
-					basicType->BaseType == BaseType::SamplerState;
-			return false;
+			return IsTexture() || IsSampler();
 		}
 		bool ExpressionType::IsStruct() const
 		{
@@ -811,14 +771,7 @@ namespace Spire
             canonicalGenericType->GenericTypeName = GenericTypeName;
             return canonicalGenericType;
         }
-		BindableResourceType GenericExpressionType::GetBindableResourceType() const
-		{
-			if (GenericTypeName == "StructuredBuffer" || GenericTypeName == "RWStructuredBuffer")
-				return BindableResourceType::StorageBuffer;
-			else if (GenericTypeName == "Uniform")
-				return BindableResourceType::Buffer;
-			return BindableResourceType::NonBindable;
-		}
+
 		CoreLib::Basic::String GenericExpressionType::ToString() const
 		{
 			return GenericTypeName + "<" + BaseType->ToString() + ">";
@@ -857,11 +810,6 @@ namespace Spire
         {
             return decl->Name.Content;
         }
-
-		BindableResourceType NamedExpressionType::GetBindableResourceType() const
-		{
-			return GetCanonicalType()->GetBindableResourceType();
-		}
 
         bool NamedExpressionType::EqualsImpl(const ExpressionType * /*type*/) const
         {

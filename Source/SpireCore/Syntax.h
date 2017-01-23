@@ -224,6 +224,7 @@ namespace Spire
 			Float = 32,
 			UInt = 512,
 			Bool = 128,
+#if 0
 			Texture2D = 48,
 			TextureCube = 49,
 			Texture2DArray = 50,
@@ -232,6 +233,7 @@ namespace Spire
 			Texture2DArrayShadow = 53,
 			Texture3D = 54,
 			SamplerState = 4096, SamplerComparisonState = 4097,
+#endif
 			Error = 16384,
 		};
 
@@ -294,12 +296,13 @@ namespace Spire
 			TypeExpressionType* AsTypeType() const;
 			bool IsTextureOrSampler() const;
 			bool IsTexture() const;
+			bool IsSampler() const;
 			bool IsStruct() const;
 			bool IsShader() const;
 			static void Init();
 			static void Finalize();
 			ExpressionType* GetCanonicalType() const;
-			virtual BindableResourceType GetBindableResourceType() const { return BindableResourceType::NonBindable; }
+			BindableResourceType GetBindableResourceType() const;
 		protected:
 			virtual bool IsIntegralImpl() const { return false; }
 			virtual bool EqualsImpl(const ExpressionType * type) const = 0;
@@ -424,7 +427,63 @@ namespace Spire
 				return const_cast<BasicExpressionType*>(this);
 			}
 			virtual ExpressionType* CreateCanonicalType() override;
-			virtual BindableResourceType GetBindableResourceType() const override;
+		};
+
+
+		class TextureType : public DeclRefType
+		{
+		public:
+			// Bits representing the kind of texture type we are looking at
+			// (e.g., `Texture2DMS` vs. `TextureCubeArray`)
+			uint16_t flavor;
+			enum
+			{
+				// Mask for the overall "shape" of the texture
+				ShapeMask		= 0x0F,
+
+				// Flag for whether the shape has "array-ness"
+				ArrayFlag		= 0x80,
+
+				// Whether or not the texture stores multiple samples per pixel
+				MultisampleFlag	= 0x10,
+
+				// Whether or not this is a shadow texture
+				//
+				// TODO(tfoley): is this even meaningful/used?
+				ShadowFlag		= 0x20, 
+			};
+
+			enum Shape : uint8_t
+			{
+				Shape1D			= 0x01,
+				Shape2D			= 0x02,
+				Shape3D			= 0x03,
+				ShapeCube		= 0x04,
+
+				Shape1DArray	= Shape1D | ArrayFlag,
+				Shape2DArray	= Shape2D | ArrayFlag,
+				// No Shape3DArray
+				ShapeCubeArray	= ShapeCube | ArrayFlag,
+			};
+
+			
+
+			Shape GetBaseShape() const { return Shape(flavor & ShapeMask); }
+			bool isArray() const { return (flavor & ArrayFlag) != 0; }
+			bool isMultisample() const { return (flavor & MultisampleFlag) != 0; }
+			bool isShadow() const { return (flavor & ShadowFlag) != 0; }
+		};
+
+		class SamplerStateType : public DeclRefType
+		{
+		public:
+			// What flavor of sampler state is this
+			enum class Flavor : uint8_t
+			{
+				SamplerState,
+				SamplerComparisonState,
+			};
+			Flavor flavor;
 		};
 
 		class ArrayExpressionType : public ExpressionType
@@ -460,7 +519,6 @@ namespace Spire
 				return const_cast<GenericExpressionType*>(this);
 			}
 			virtual ExpressionType* CreateCanonicalType() override;
-			virtual BindableResourceType GetBindableResourceType() const override;
 		};
 
 
@@ -476,7 +534,6 @@ namespace Spire
 			TypeDefDecl* decl;
 
 			virtual String ToString() const override;
-			virtual BindableResourceType GetBindableResourceType() const override;
 
 		protected:
 			virtual bool EqualsImpl(const ExpressionType * type) const override;
@@ -1552,7 +1609,8 @@ namespace Spire
 		class MagicTypeModifier : public Modifier
 		{
 		public:
-			String tag;
+			String name;
+			uint32_t tag;
 		};
 
 		//

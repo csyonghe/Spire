@@ -293,6 +293,7 @@ namespace Spire
 				{ "uint",	BaseType::UInt },
 				{ "bool",	BaseType::Bool },
 
+#if 0
 				{ "Texture2D",				BaseType::Texture2D },
 				{ "TextureCube",			BaseType::TextureCube },
 				{ "Texture2DArray",			BaseType::Texture2DArray },
@@ -302,12 +303,55 @@ namespace Spire
 				{ "Texture3D",				BaseType::Texture3D },
 				{ "SamplerState",			BaseType::SamplerState },
 				{ "SamplerComparisonState",	BaseType::SamplerComparisonState },
+#endif
 			};
 			static const int kBaseTypeCount = sizeof(kBaseTypes) / sizeof(kBaseTypes[0]);
 			for (int tt = 0; tt < kBaseTypeCount; ++tt)
 			{
-				sb << "__builtin_type(" << int(kBaseTypes[tt].tag) << ") struct " << kBaseTypes[tt].name << " {}\n";
+				sb << "__builtin_type(" << int(kBaseTypes[tt].tag) << ") struct " << kBaseTypes[tt].name << " {};\n";
 			}
+
+			static const struct {
+				char const*			name;
+				TextureType::Shape	baseShape;
+			} kBaseTextureTypes[] = {
+				{ "Texture1D",				TextureType::Shape1D },
+				{ "Texture2D",				TextureType::Shape2D },
+				{ "Texture3D",				TextureType::Shape3D },
+				{ "TextureCube",			TextureType::ShapeCube },
+			};
+			static const int kBaseTextureTypeCount = sizeof(kBaseTextureTypes) / sizeof(kBaseTextureTypes[0]);
+			for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
+			{
+				char const* name = kBaseTextureTypes[tt].name;
+				TextureType::Shape baseShape = kBaseTextureTypes[tt].baseShape;
+
+				for (int isArray = 0; isArray < 2; ++isArray)
+				{
+					// Arrays of 3D textures aren't allowed
+					if (isArray && baseShape == TextureType::Shape3D) continue;
+
+					for (int isMultisample = 0; isMultisample < 2; ++isMultisample)
+					for (int isShadow = 0; isShadow < 2; ++isShadow)
+					{
+						// TODO: any constraints to enforce on what gets to be multisampled?
+
+						unsigned flavor = baseShape;
+						if (isArray)		flavor |= TextureType::ArrayFlag;
+						if (isMultisample)	flavor |= TextureType::MultisampleFlag;
+						if (isShadow)		flavor |= TextureType::ShadowFlag;
+
+						sb << "__magic_type(Texture," << int(flavor) << ") struct " << name;
+						if (isMultisample) sb << "MS";
+						if (isArray) sb << "Array";
+						if (isShadow) sb << "Shadow";
+						sb << " {};\n";
+					}
+				}
+			}
+
+			sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerState) << ") struct SamplerState {};";
+			sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerComparisonState) << ") struct SamplerComparisonState {};";
 
 			// Declare ad hoc aliases for some types, just to get things compiling
 			//

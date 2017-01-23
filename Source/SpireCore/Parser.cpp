@@ -677,7 +677,11 @@ namespace Spire
 				{
 					RefPtr<MagicTypeModifier> modifier = new MagicTypeModifier();
 					parser->ReadToken(TokenType::LParent);
-					modifier->tag = parser->ReadToken(TokenType::Identifier).Content;
+					modifier->name = parser->ReadToken(TokenType::Identifier).Content;
+					if (AdvanceIf(parser, TokenType::Comma))
+					{
+						modifier->tag = uint32_t(StringToInt(parser->ReadToken(TokenType::IntLiterial).Content));
+					}
 					parser->ReadToken(TokenType::RParent);
 
 					*modifierLink = modifier;

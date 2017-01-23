@@ -40,10 +40,6 @@ struct DefaultLayoutRulesImpl : LayoutRulesImpl
 		case BaseType::Bool:
             return{ 4, 4 };
 
-        case BaseType::Texture2D:
-        case BaseType::TextureCube:
-            return{ 8, 8 };
-
         default:
             assert(!"unimplemented");
             return{ 0, 1 };

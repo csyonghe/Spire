@@ -193,7 +193,7 @@ namespace Spire
 						// Now instantiate the declaration given those arguments
 						if (auto magicType = genericDecl->inner->FindModifier<MagicTypeModifier>())
 						{
-							if (magicType->tag == "Vector")
+							if (magicType->name == "Vector")
 							{
 								auto vecType = new VectorExpressionType(
 									ExtractGenericArgType(args[0]),
@@ -202,7 +202,7 @@ namespace Spire
 								typeNode->Type = new TypeExpressionType(vecType);
 								return typeNode;
 							}
-							else if (magicType->tag == "Matrix")
+							else if (magicType->name == "Matrix")
 							{
 								auto vecType = new MatrixExpressionType(
 									ExtractGenericArgType(args[0]),
@@ -1797,7 +1797,24 @@ namespace Spire
 				}
 				else if (auto magicMod = decl->FindModifier<MagicTypeModifier>())
 				{
-					throw "unimplemented";
+					if (magicMod->name == "Texture")
+					{
+						auto type = new TextureType();
+						type->decl = decl;
+						type->flavor = magicMod->tag;
+						return type;
+					}
+					else if (magicMod->name == "SamplerState")
+					{
+						auto type = new SamplerStateType();
+						type->decl = decl;
+						type->flavor = SamplerStateType::Flavor(magicMod->tag);
+						return type;
+					}
+					else
+					{
+						throw "unimplemented";
+					}
 				}
 				else
 				{
