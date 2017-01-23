@@ -433,6 +433,9 @@ namespace Spire
 		class TextureType : public DeclRefType
 		{
 		public:
+			// The type that results from fetching an element from this texture
+			RefPtr<ExpressionType> elementType;
+
 			// Bits representing the kind of texture type we are looking at
 			// (e.g., `Texture2DMS` vs. `TextureCubeArray`)
 			uint16_t flavor;
@@ -472,6 +475,13 @@ namespace Spire
 			bool isArray() const { return (flavor & ArrayFlag) != 0; }
 			bool isMultisample() const { return (flavor & MultisampleFlag) != 0; }
 			bool isShadow() const { return (flavor & ShadowFlag) != 0; }
+
+			TextureType(
+				uint16_t flavor,
+				RefPtr<ExpressionType> elementType)
+				: elementType(elementType)
+				, flavor(flavor)
+			{}
 		};
 
 		class SamplerStateType : public DeclRefType
@@ -560,6 +570,25 @@ namespace Spire
 		protected:
 			virtual bool EqualsImpl(const ExpressionType * type) const override;
 			virtual TypeExpressionType * AsTypeTypeImpl() const override;
+			virtual ExpressionType* CreateCanonicalType() override;
+		};
+
+		class GenericDecl;
+
+		// The "type" of an expression that names a generic declaration.
+		class GenericDeclRefType : public ExpressionType
+		{
+		public:
+			GenericDeclRefType(GenericDecl* decl)
+				: decl(decl)
+			{}
+
+			GenericDecl* decl;
+
+			virtual String ToString() const override;
+
+		protected:
+			virtual bool EqualsImpl(const ExpressionType * type) const override;
 			virtual ExpressionType* CreateCanonicalType() override;
 		};
 
@@ -1626,9 +1655,12 @@ namespace Spire
 			virtual GenericDecl * Clone(CloneContext & ctx) override;
 		};
 
-		class GenericTypeParamDecl : public Decl
+		class GenericTypeParamDecl : public SimpleTypeDecl
 		{
 		public:
+			// The "initializer" for the parameter represents a default value
+			TypeExp initType;
+
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual GenericTypeParamDecl * Clone(CloneContext & ctx) override;
 		};
@@ -1698,6 +1730,13 @@ namespace Spire
 				for (auto & f : s->Members)
 					f = f->Accept(this).As<Decl>();
 				return s;
+			}
+			virtual RefPtr<GenericDecl> VisitGenericDecl(GenericDecl * decl)
+			{
+				for (auto & m : decl->Members)
+					m = m->Accept(this).As<Decl>();
+				decl->inner = decl->inner->Accept(this).As<Decl>();
+				return decl;
 			}
 			virtual RefPtr<TypeDefDecl> VisitTypeDefDecl(TypeDefDecl* decl)
 			{

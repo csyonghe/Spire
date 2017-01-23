@@ -1075,6 +1075,10 @@ namespace Spire
 				{
 					paramDecl->Type = parser->ParseTypeExp();
 				}
+				if (AdvanceIf(parser, TokenType::OpAssign))
+				{
+					paramDecl->Expr = parser->ParseExpression();
+				}
 				return paramDecl;
 			}
 			else
@@ -1082,6 +1086,10 @@ namespace Spire
 				// default case is a type parameter
 				auto paramDecl = new GenericTypeParamDecl();
 				paramDecl->Name = parser->ReadToken(TokenType::Identifier);
+				if (AdvanceIf(parser, TokenType::OpAssign))
+				{
+					paramDecl->initType = parser->ParseTypeExp();
+				}
 				return paramDecl;
 			}
 		}

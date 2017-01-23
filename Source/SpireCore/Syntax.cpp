@@ -933,6 +933,28 @@ namespace Spire
 			return canType;
 		}
 
+		// GenericDeclRefType
+
+		String GenericDeclRefType::ToString() const
+		{
+			// TODO: what is appropriate here?
+			return "<GenericDeclRef>";
+		}
+
+		bool GenericDeclRefType::EqualsImpl(const ExpressionType * type) const
+		{
+			if (auto genericDeclRefType = type->As<GenericDeclRefType>())
+			{
+				return decl == genericDeclRefType->decl;
+			}
+			return false;
+		}
+
+		ExpressionType* GenericDeclRefType::CreateCanonicalType()
+		{
+			return this;
+		}
+
 		// ArithmeticExpressionType
 
 		ArithmeticExpressionType * ArithmeticExpressionType::AsArithmeticTypeImpl() const
@@ -1202,8 +1224,9 @@ namespace Spire
 
 		// GenericDecl
 
-		RefPtr<SyntaxNode> GenericDecl::Accept(SyntaxVisitor * visitor) {
-			throw "unimplemented";
+		RefPtr<SyntaxNode> GenericDecl::Accept(SyntaxVisitor * visitor)
+		{
+			return visitor->VisitGenericDecl(this);
 		}
 
 		GenericDecl * GenericDecl::Clone(CloneContext & ctx) {

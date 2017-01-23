@@ -311,48 +311,6 @@ namespace Spire
 				sb << "__builtin_type(" << int(kBaseTypes[tt].tag) << ") struct " << kBaseTypes[tt].name << " {};\n";
 			}
 
-			static const struct {
-				char const*			name;
-				TextureType::Shape	baseShape;
-			} kBaseTextureTypes[] = {
-				{ "Texture1D",				TextureType::Shape1D },
-				{ "Texture2D",				TextureType::Shape2D },
-				{ "Texture3D",				TextureType::Shape3D },
-				{ "TextureCube",			TextureType::ShapeCube },
-			};
-			static const int kBaseTextureTypeCount = sizeof(kBaseTextureTypes) / sizeof(kBaseTextureTypes[0]);
-			for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
-			{
-				char const* name = kBaseTextureTypes[tt].name;
-				TextureType::Shape baseShape = kBaseTextureTypes[tt].baseShape;
-
-				for (int isArray = 0; isArray < 2; ++isArray)
-				{
-					// Arrays of 3D textures aren't allowed
-					if (isArray && baseShape == TextureType::Shape3D) continue;
-
-					for (int isMultisample = 0; isMultisample < 2; ++isMultisample)
-					for (int isShadow = 0; isShadow < 2; ++isShadow)
-					{
-						// TODO: any constraints to enforce on what gets to be multisampled?
-
-						unsigned flavor = baseShape;
-						if (isArray)		flavor |= TextureType::ArrayFlag;
-						if (isMultisample)	flavor |= TextureType::MultisampleFlag;
-						if (isShadow)		flavor |= TextureType::ShadowFlag;
-
-						sb << "__magic_type(Texture," << int(flavor) << ") struct " << name;
-						if (isMultisample) sb << "MS";
-						if (isArray) sb << "Array";
-						if (isShadow) sb << "Shadow";
-						sb << " {};\n";
-					}
-				}
-			}
-
-			sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerState) << ") struct SamplerState {};";
-			sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerComparisonState) << ") struct SamplerComparisonState {};";
-
 			// Declare ad hoc aliases for some types, just to get things compiling
 			//
 			// TODO(tfoley): At the very least, `double` should be treated as a distinct type.
@@ -403,6 +361,60 @@ namespace Spire
 					sb << "typedef " << kTypes[tt].name << rr << "x" << cc << " " << kTypes[tt].glslPrefix << "mat" << rr << "x" << cc << ";\n";
 				}
 			}
+
+			// Declare built-in texture and sampler types
+
+			static const struct {
+				char const*			name;
+				TextureType::Shape	baseShape;
+			} kBaseTextureTypes[] = {
+				{ "Texture1D",				TextureType::Shape1D },
+				{ "Texture2D",				TextureType::Shape2D },
+				{ "Texture3D",				TextureType::Shape3D },
+				{ "TextureCube",			TextureType::ShapeCube },
+			};
+			static const int kBaseTextureTypeCount = sizeof(kBaseTextureTypes) / sizeof(kBaseTextureTypes[0]);
+			for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
+			{
+				char const* name = kBaseTextureTypes[tt].name;
+				TextureType::Shape baseShape = kBaseTextureTypes[tt].baseShape;
+
+				for (int isArray = 0; isArray < 2; ++isArray)
+				{
+					// Arrays of 3D textures aren't allowed
+					if (isArray && baseShape == TextureType::Shape3D) continue;
+
+					for (int isMultisample = 0; isMultisample < 2; ++isMultisample)
+					for (int isShadow = 0; isShadow < 2; ++isShadow)
+					{
+						// TODO: any constraints to enforce on what gets to be multisampled?
+
+						unsigned flavor = baseShape;
+						if (isArray)		flavor |= TextureType::ArrayFlag;
+						if (isMultisample)	flavor |= TextureType::MultisampleFlag;
+						if (isShadow)		flavor |= TextureType::ShadowFlag;
+
+						// emit a generic signature
+						// TODO: allow for multisample count to come in as well...
+						sb << "__generic<T = float4> ";
+
+						sb << "__magic_type(Texture," << int(flavor) << ") struct " << name;
+						if (isMultisample) sb << "MS";
+						if (isArray) sb << "Array";
+						if (isShadow) sb << "Shadow";
+						sb << " {};\n";
+					}
+				}
+			}
+
+			sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerState) << ") struct SamplerState {};";
+			sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerComparisonState) << ") struct SamplerComparisonState {};";
+
+
+
+
+
+
 
 			sb << "__intrinsic vec3 operator * (vec3, mat3);\n";
 			sb << "__intrinsic vec3 operator * (mat3, vec3);\n";

@@ -94,6 +94,8 @@ namespace Spire
 			RefPtr<ExpressionType> typeResult;
 			RefPtr<ExpressionType> TranslateTypeNode(const RefPtr<ExpressionSyntaxNode> & node)
 			{
+				if (!node) return nullptr;
+
 				typeResult = ExpressionType::Error;
 				node->Accept(this);
 				assert(typeResult);
@@ -126,6 +128,126 @@ namespace Spire
 			int ExtractGenericArgInteger(RefPtr<ExpressionSyntaxNode> exp)
 			{
 				return CheckIntegerConstantExpression(exp.Ptr());
+			}
+
+			// Construct a type reprsenting the instantiation of
+			// the given generic declaration for the given arguments.
+			// The arguments should already be checked against
+			// the declaration.
+			RefPtr<ExpressionType> InstantiateGenericType(
+				GenericDecl*								genericDecl,
+				List<RefPtr<ExpressionSyntaxNode>> const&	args)
+			{
+				if (auto magicType = genericDecl->inner->FindModifier<MagicTypeModifier>())
+				{
+					if (magicType->name == "Vector")
+					{
+						auto vecType = new VectorExpressionType(
+							ExtractGenericArgType(args[0]),
+							ExtractGenericArgInteger(args[1]));
+						vecType->decl = genericDecl->inner.Ptr();
+						return vecType;
+					}
+					else if (magicType->name == "Matrix")
+					{
+						auto matType = new MatrixExpressionType(
+							ExtractGenericArgType(args[0]),
+							ExtractGenericArgInteger(args[1]),
+							ExtractGenericArgInteger(args[2]));
+						matType->decl = genericDecl->inner.Ptr();
+						return matType;
+					}
+					else if (magicType->name == "Texture")
+					{
+						auto textureType = new TextureType(
+							magicType->tag,
+							ExtractGenericArgType(args[0]));
+						textureType->decl = genericDecl->inner.Ptr();
+						return textureType;
+					}
+					else
+					{
+						throw "unimplemented";
+					}
+				}
+
+				// catch-all for cases that we don't handle
+				throw "unimplemented";
+			}
+
+			// Take an existing type (expression) and coerce it to one
+			// that can be used for declaraing a variable/parameter/etc.
+			TypeExp CoerceToProperType(TypeExp const& typeExp)
+			{
+				TypeExp result = typeExp;
+				ExpressionType* type = result.type.Ptr();
+				if (auto basicType = type->As<BasicExpressionType>())
+				{
+					// TODO: `void` shouldn't be a basic type, to make this easier to avoid
+					if (basicType->BaseType == BaseType::Void)
+					{
+						// TODO(tfoley): pick the right diagnostic message
+						getSink()->diagnose(result.exp.Ptr(), Diagnostics::parameterCannotBeVoid);
+						result.type = ExpressionType::Error;
+						return result;
+					}
+					else
+					{
+						return result;
+					}
+				}
+				else if (auto genericDeclRefType = type->As<GenericDeclRefType>())
+				{
+					// We are using a reference to a generic declaration as a concrete
+					// type. This means we should substitute in any default parameter values
+					// if they are available.
+					//
+					// TODO(tfoley): A more expressive type system would substitute in
+					// "fresh" variables and then solve for their values...
+					//
+
+					auto genericDecl = genericDeclRefType->decl;
+					List<RefPtr<ExpressionSyntaxNode>> args;
+					for (RefPtr<Decl> member : genericDecl->Members)
+					{
+						if (auto typeParam = member.As<GenericTypeParamDecl>())
+						{
+							if (!typeParam->initType.exp)
+							{
+								getSink()->diagnose(result.exp.Ptr(), Diagnostics::unimplemented, "can't fill in default for generic type parameter");
+								result.type = ExpressionType::Error;
+								return result;
+							}
+
+							// TODO: this is one place where syntax should get cloned!
+							args.Add(typeParam->initType.exp);
+						}
+						else if (auto valParam = member.As<GenericValueParamDecl>())
+						{
+							if (!valParam->Expr)
+							{
+								getSink()->diagnose(result.exp.Ptr(), Diagnostics::unimplemented, "can't fill in default for generic type parameter");
+								result.type = ExpressionType::Error;
+								return result;
+							}
+
+							// TODO: this is one place where syntax should get cloned!
+							args.Add(valParam->Expr);
+						}
+						else
+						{
+							// ignore non-parameter members
+						}
+					}
+
+					result.type = InstantiateGenericType(genericDecl, args);
+					return result;
+				}
+				else
+				{
+					// default case: we expect this to be a proper type
+					return result;
+				}
 			}
 
 			RefPtr<ExpressionSyntaxNode> VisitGenericType(GenericTypeSyntaxNode * typeNode) override
@@ -191,31 +313,10 @@ namespace Spire
 						}
 
 						// Now instantiate the declaration given those arguments
-						if (auto magicType = genericDecl->inner->FindModifier<MagicTypeModifier>())
-						{
-							if (magicType->name == "Vector")
-							{
-								auto vecType = new VectorExpressionType(
-									ExtractGenericArgType(args[0]),
-									ExtractGenericArgInteger(args[1]));
-								typeResult = vecType;
-								typeNode->Type = new TypeExpressionType(vecType);
-								return typeNode;
-							}
-							else if (magicType->name == "Matrix")
-							{
-								auto vecType = new MatrixExpressionType(
-									ExtractGenericArgType(args[0]),
-									ExtractGenericArgInteger(args[1]),
-									ExtractGenericArgInteger(args[2]));
-								typeResult = vecType;
-								typeNode->Type = new TypeExpressionType(vecType);
-								return typeNode;
-							}
-						}
-
-						// catch-all for cases that we don't handle
-						throw "unimplemented";
+						auto type = InstantiateGenericType(genericDecl, args);
+						typeResult = type;
+						typeNode->Type = new TypeExpressionType(type);
+						return typeNode;
 					}
 					else
 					{
@@ -824,6 +925,29 @@ namespace Spire
 				}
 				compSym->Implementations.Add(compImpl);
 			}
+
+			virtual RefPtr<GenericDecl> VisitGenericDecl(GenericDecl* genericDecl) override
+			{
+				// check the parameters
+				for (auto m : genericDecl->Members)
+				{
+					if (auto typeParam = m.As<GenericTypeParamDecl>())
+					{
+						typeParam->initType = TranslateTypeNode(typeParam->initType);
+					}
+					else if (auto valParam = m.As<GenericValueParamDecl>())
+					{
+						// TODO: some real checking here...
+						valParam->Type = TranslateTypeNode(valParam->Type);
+					}
+				}
+
+				// check the nested declaration
+				// TODO: this needs to be done in an appropriate environment...
+				genericDecl->inner->Accept(this);
+				return genericDecl;
+			}
+
 			virtual RefPtr<ProgramSyntaxNode> VisitProgram(ProgramSyntaxNode * programNode) override
 			{
 				HashSet<String> funcNames;
@@ -843,6 +967,14 @@ namespace Spire
 						s->SemanticallyChecked = true;
 					}
 				}
+
+				// HACK(tfoley): Visiting all generic declarations here,
+				// because otherwise they won't get visited.
+				for (auto & g : program->GetMembersOfType<GenericDecl>())
+				{
+					VisitGenericDecl(g.Ptr());
+				}
+
 				for (auto & func : program->GetFunctions())
 				{
 					if (!func->SemanticallyChecked)
@@ -978,7 +1110,7 @@ namespace Spire
 						getSink()->diagnose(para, Diagnostics::parameterAlreadyDefined, para->Name);
 					else
 						paraNames.Add(para->Name.Content);
-					para->Type = TranslateTypeNode(para->Type);
+					para->Type = CoerceToProperType(TranslateTypeNode(para->Type));
 					if (para->Type.Equals(ExpressionType::Void.Ptr()))
 						getSink()->diagnose(para, Diagnostics::parameterCannotBeVoid);
 					internalName << "@" << para->Type.type->ToString();
@@ -1797,14 +1929,7 @@ namespace Spire
 				}
 				else if (auto magicMod = decl->FindModifier<MagicTypeModifier>())
 				{
-					if (magicMod->name == "Texture")
-					{
-						auto type = new TextureType();
-						type->decl = decl;
-						type->flavor = magicMod->tag;
-						return type;
-					}
-					else if (magicMod->name == "SamplerState")
+					if (magicMod->name == "SamplerState")
 					{
 						auto type = new SamplerStateType();
 						type->decl = decl;
@@ -1874,6 +1999,12 @@ namespace Spire
 					else if (auto simpleTypeDecl = dynamic_cast<SimpleTypeDecl*>(decl))
 					{
 						auto type = CreateDeclRefType(simpleTypeDecl);
+						typeResult = type;
+						expr->Type = new TypeExpressionType(type);
+					}
+					else if (auto genericDecl = dynamic_cast<GenericDecl*>(decl))
+					{
+						auto type = new GenericDeclRefType(genericDecl);
 						typeResult = type;
 						expr->Type = new TypeExpressionType(type);
 					}
