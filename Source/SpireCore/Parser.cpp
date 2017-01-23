@@ -663,6 +663,26 @@ namespace Spire
                 {
                     modifiers.flags |= ModifierFlag::Intrinsic;
                 }
+				else if (AdvanceIf(parser,"__builtin_type"))
+				{
+					RefPtr<BuiltinTypeModifier> modifier = new BuiltinTypeModifier();
+					parser->ReadToken(TokenType::LParent);
+					modifier->tag = BaseType(StringToInt(parser->ReadToken(TokenType::IntLiterial).Content));
+					parser->ReadToken(TokenType::RParent);
+
+					*modifierLink = modifier;
+					modifierLink = &modifier->next;
+				}
+				else if (AdvanceIf(parser,"__magic_type"))
+				{
+					RefPtr<MagicTypeModifier> modifier = new MagicTypeModifier();
+					parser->ReadToken(TokenType::LParent);
+					modifier->tag = parser->ReadToken(TokenType::Identifier).Content;
+					parser->ReadToken(TokenType::RParent);
+
+					*modifierLink = modifier;
+					modifierLink = &modifier->next;
+				}
                 else
                 {
                     // Done with modifier list
@@ -1038,32 +1058,6 @@ namespace Spire
 			return bufferDecl;
 		}
 
-		static RefPtr<Decl> ParseBuiltinTypeDecl(
-			Parser* parser)
-		{
-			RefPtr<BuiltinTypeDecl> decl = new BuiltinTypeDecl();
-			parser->ReadToken("__builtin_type");
-			parser->ReadToken(TokenType::LParent);
-			decl->tag = BaseType(StringToInt(parser->ReadToken(TokenType::IntLiterial).Content));
-			parser->ReadToken(TokenType::RParent);
-			decl->Name = parser->ReadToken(TokenType::Identifier);
-			parser->ReadToken(TokenType::Semicolon);
-			return decl;
-		}
-
-		static RefPtr<Decl> ParseMagicTypeDecl(
-			Parser* parser)
-		{
-			RefPtr<MagicTypeDecl> decl = new MagicTypeDecl();
-			parser->ReadToken("__magic_type");
-			parser->ReadToken(TokenType::LParent);
-			decl->tag = parser->ReadToken(TokenType::Identifier).Content;
-			parser->ReadToken(TokenType::RParent);
-			decl->Name = parser->ReadToken(TokenType::Identifier);
-			parser->ReadToken(TokenType::Semicolon);
-			return decl;
-		}
-
 		static RefPtr<Decl> ParseGenericParamDecl(
 			Parser* parser)
 		{
@@ -1147,10 +1141,6 @@ namespace Spire
 				decl = parser->ParseInterface();
 			else if (parser->LookAheadToken("cbuffer") || parser->LookAheadToken("tbuffer"))
 				decl = ParseHLSLBufferDecl(parser);
-			else if (parser->LookAheadToken("__builtin_type"))
-				decl = ParseBuiltinTypeDecl(parser);
-			else if (parser->LookAheadToken("__magic_type"))
-				decl = ParseMagicTypeDecl(parser);
 			else if (parser->LookAheadToken("__generic"))
 				decl = ParseGenericDecl(parser);
             else if (AdvanceIf(parser, TokenType::Semicolon))

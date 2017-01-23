@@ -1248,31 +1248,9 @@ namespace Spire
 			return visitor->VisitTypeExp(*this);
 		}
 
-		// BuiltinTypeDecl
+		// BuiltinTypeModifier
 
-		RefPtr<SyntaxNode> BuiltinTypeDecl::Accept(SyntaxVisitor * visitor)
-		{
-			// ignore
-			return this;
-		}
-
-		BuiltinTypeDecl * BuiltinTypeDecl::Clone(CloneContext & ctx)
-		{
-			throw "unimplemented";
-		}
-
-		// MagicTypeDecl
-
-		RefPtr<SyntaxNode> MagicTypeDecl::Accept(SyntaxVisitor * visitor)
-		{
-			// ignore
-			return this;
-		}
-
-		MagicTypeDecl * MagicTypeDecl::Clone(CloneContext & ctx)
-		{
-			throw "unimplemented";
-		}
+		// MagicTypeModifier
 
 		// GenericDecl
 

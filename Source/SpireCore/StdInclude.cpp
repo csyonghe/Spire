@@ -306,7 +306,7 @@ namespace Spire
 			static const int kBaseTypeCount = sizeof(kBaseTypes) / sizeof(kBaseTypes[0]);
 			for (int tt = 0; tt < kBaseTypeCount; ++tt)
 			{
-				sb << "__builtin_type(" << int(kBaseTypes[tt].tag) << ") " << kBaseTypes[tt].name << ";\n";
+				sb << "__builtin_type(" << int(kBaseTypes[tt].tag) << ") struct " << kBaseTypes[tt].name << " {}\n";
 			}
 
 			// Declare ad hoc aliases for some types, just to get things compiling
@@ -317,8 +317,8 @@ namespace Spire
 
 			// Declare vector and matrix types
 
-			sb << "__generic<T, let N : int> __magic_type(Vector) vector;\n";
-			sb << "__generic<T, let R : int, let C : int> __magic_type(Matrix) matrix;\n";
+			sb << "__generic<T, let N : int> __magic_type(Vector) struct vector {}\n";
+			sb << "__generic<T, let R : int, let C : int> __magic_type(Matrix) struct matrix {}\n";
 
 			static const struct {
 				char const* name;

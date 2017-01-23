@@ -320,8 +320,28 @@ namespace Spire
 			ExpressionType* canonicalType = nullptr;
 		};
 
+		// A type that takes the form of a reference to some declaration
+		class DeclRefType : public ExpressionType
+		{
+		public:
+			DeclRefType()
+			{}
+			DeclRefType(Decl* decl)
+				: decl(decl)
+			{}
+
+			Decl* decl = nullptr;
+
+			virtual String ToString() const override;
+
+		protected:
+			virtual bool EqualsImpl(const ExpressionType * type) const override;
+			virtual DeclRefType * AsDeclRefTypeImpl() const override;
+			virtual ExpressionType* CreateCanonicalType() override;
+		};
+
 		// Base class for types that can be used in arithmetic expressions
-		class ArithmeticExpressionType : public ExpressionType
+		class ArithmeticExpressionType : public DeclRefType
 		{
 		public:
 			virtual BasicExpressionType* GetScalarType() const = 0;
@@ -443,23 +463,7 @@ namespace Spire
 			virtual BindableResourceType GetBindableResourceType() const override;
 		};
 
-		// A type that takes the form of a reference to some declaration
-		class DeclRefType : public ExpressionType
-		{
-		public:
-			DeclRefType(Decl* decl)
-				: decl(decl)
-			{}
 
-			Decl* decl;
-
-			virtual String ToString() const override;
-
-		protected:
-			virtual bool EqualsImpl(const ExpressionType * type) const override;
-			virtual DeclRefType * AsDeclRefTypeImpl() const override;
-			virtual ExpressionType* CreateCanonicalType() override;
-		};
 
 		// A type alias of some kind (e.g., via `typedef`)
 		class NamedExpressionType : public ExpressionType
@@ -652,6 +656,15 @@ namespace Spire
 
 			template<typename T>
 			FilteredModifierList<T> GetModifiersOfType() { return FilteredModifierList<T>(modifiers.first.Ptr()); }
+
+			// Find the first modifier of a given type, or return `nullptr` if none is found.
+			template<typename T>
+			T* FindModifier()
+			{
+				for (auto m : GetModifiersOfType<T>())
+					return m;
+				return nullptr;
+			}
 
 			FilteredModifierList<SimpleAttribute> GetLayoutAttributes() { return GetModifiersOfType<SimpleAttribute>(); }
 
@@ -1526,24 +1539,20 @@ namespace Spire
 			}
 		};
 
-		// A declaration of a built-in type (e.g., `float`)
-		class BuiltinTypeDecl : public Decl
+		// A modifier that indicates a built-in base type (e.g., `float`)
+		class BuiltinTypeModifier : public Modifier
 		{
 		public:
 			BaseType tag;
-
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-			virtual BuiltinTypeDecl * Clone(CloneContext & ctx) override;
 		};
 
-		// A declaration of a built-in type that doesn't map to a basic type (e.g., `vector`)
-		class MagicTypeDecl : public Decl
+		// A modifier that indicates a built-in type that isn't a base type (e.g., `vector`)
+		//
+		// TODO(tfoley): This deserves a better name than "magic"
+		class MagicTypeModifier : public Modifier
 		{
 		public:
 			String tag;
-
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-			virtual MagicTypeDecl * Clone(CloneContext & ctx) override;
 		};
 
 		//

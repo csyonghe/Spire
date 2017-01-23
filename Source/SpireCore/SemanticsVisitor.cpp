@@ -191,9 +191,9 @@ namespace Spire
 						}
 
 						// Now instantiate the declaration given those arguments
-						if (auto magicTypeDecl = genericDecl->inner.As<MagicTypeDecl>())
+						if (auto magicType = genericDecl->inner->FindModifier<MagicTypeModifier>())
 						{
-							if (magicTypeDecl->tag == "Vector")
+							if (magicType->tag == "Vector")
 							{
 								auto vecType = new VectorExpressionType(
 									ExtractGenericArgType(args[0]),
@@ -202,7 +202,7 @@ namespace Spire
 								typeNode->Type = new TypeExpressionType(vecType);
 								return typeNode;
 							}
-							else if (magicTypeDecl->tag == "Matrix")
+							else if (magicType->tag == "Matrix")
 							{
 								auto vecType = new MatrixExpressionType(
 									ExtractGenericArgType(args[0]),
@@ -1784,6 +1784,27 @@ namespace Spire
 				}
 				return expr;
 			}
+
+			// TODO: need to figure out how to unify this with the logic
+			// in the generic case...
+			static DeclRefType* CreateDeclRefType(Decl* decl)
+			{
+				if (auto builtinMod = decl->FindModifier<BuiltinTypeModifier>())
+				{
+					auto type = new BasicExpressionType(builtinMod->tag);
+					type->decl = decl;
+					return type;
+				}
+				else if (auto magicMod = decl->FindModifier<MagicTypeModifier>())
+				{
+					throw "unimplemented";
+				}
+				else
+				{
+					return new DeclRefType(decl);
+				}
+			}
+
 			virtual RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode *expr) override
 			{
 				ShaderUsing shaderObj;
@@ -1810,6 +1831,9 @@ namespace Spire
 						// component *function*.
 						expr->Type = compDecl->Type;
 					}
+// TODO(tfoley): Need to update this to construct the right kind of
+// type to refer to the given declaration...
+#if TIMREMOVED
 					else if (auto typeDecl = dynamic_cast<BuiltinTypeDecl*>(decl))
 					{
 						// TODO(tfoley): stash the resulting type somewhere on the decl, for convenience
@@ -1817,6 +1841,7 @@ namespace Spire
 						typeResult = type;
 						expr->Type = new TypeExpressionType(type);
 					}
+#endif
 					else if (auto typeAliasDecl = dynamic_cast<TypeDefDecl*>(decl))
 					{
 						auto type = new NamedExpressionType(typeAliasDecl);
@@ -1825,13 +1850,13 @@ namespace Spire
 					}
 					else if (auto aggTypeDecl = dynamic_cast<AggTypeDecl*>(decl))
 					{
-						auto type = new DeclRefType(aggTypeDecl);
+						auto type = CreateDeclRefType(aggTypeDecl);
 						typeResult = type;
 						expr->Type = new TypeExpressionType(type);
 					}
 					else if (auto simpleTypeDecl = dynamic_cast<SimpleTypeDecl*>(decl))
 					{
-						auto type = new DeclRefType(simpleTypeDecl);
+						auto type = CreateDeclRefType(simpleTypeDecl);
 						typeResult = type;
 						expr->Type = new TypeExpressionType(type);
 					}
