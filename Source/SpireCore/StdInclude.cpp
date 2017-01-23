@@ -309,6 +309,12 @@ namespace Spire
 				sb << "__builtin_type(" << int(kBaseTypes[tt].tag) << ") " << kBaseTypes[tt].name << ";\n";
 			}
 
+			// Declare ad hoc aliases for some types, just to get things compiling
+			//
+			// TODO(tfoley): At the very least, `double` should be treated as a distinct type.
+			sb << "typedef float double;\n";
+			sb << "typedef float half;\n";
+
 			// Declare vector and matrix types
 
 			sb << "__generic<T, let N : int> __magic_type(Vector) vector;\n";
