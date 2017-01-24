@@ -8,24 +8,6 @@ namespace Spire
 {
 	namespace Compiler
 	{
-        // Scope
-
-        Decl* Scope::LookUp(String const& name)
-        {
-            Scope* scope = this;
-            while (scope)
-            {
-                for (auto m : scope->containerDecl->Members)
-                {
-                    if (m->Name.Content == name)
-                        return m.Ptr();
-                }
-
-                scope = scope->Parent.Ptr();
-            }
-            return nullptr;
-        }
-
         // Decl
 
         bool Decl::FindSimpleAttribute(String const& key, Token& outValue)
@@ -402,6 +384,22 @@ namespace Spire
 		{
 			return CloneSyntaxNodeFields(new VarExpressionSyntaxNode(*this), ctx);
 		}
+
+		// OverloadedExpr
+
+		RefPtr<SyntaxNode> OverloadedExpr::Accept(SyntaxVisitor * visitor)
+		{
+//			throw "unimplemented";
+			return this;
+		}
+
+		OverloadedExpr * OverloadedExpr::Clone(CloneContext & ctx)
+		{
+			throw "unimplemented";
+		}
+
+		//
+
 		RefPtr<SyntaxNode> ParameterSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
 			return visitor->VisitParameter(this);
@@ -699,6 +697,7 @@ namespace Spire
 		RefPtr<ExpressionType> ExpressionType::Float2;
 		RefPtr<ExpressionType> ExpressionType::Void;
 		RefPtr<ExpressionType> ExpressionType::Error;
+		RefPtr<ExpressionType> ExpressionType::Overloaded;
         List<RefPtr<ExpressionType>> ExpressionType::sCanonicalTypes;
 
 		void ExpressionType::Init()
@@ -712,6 +711,7 @@ namespace Spire
 			Float2 = new VectorExpressionType(floatType, 2);
 			Void = new BasicExpressionType(BaseType::Void);
 			Error = new BasicExpressionType(BaseType::Error);
+			Overloaded = new OverloadGroupType();
 		}
 		void ExpressionType::Finalize()
 		{
@@ -802,6 +802,23 @@ namespace Spire
 		{
 			// A declaration reference is already canonical
 			return this;
+		}
+
+		// OverloadGroupType
+
+		String OverloadGroupType::ToString() const
+		{
+			return "overload group";
+		}
+
+		bool OverloadGroupType::EqualsImpl(const ExpressionType * type) const
+		{
+			return false;
+		}
+
+		ExpressionType* OverloadGroupType::CreateCanonicalType()
+		{
+			return  this;
 		}
 
         // NamedExpressionType
@@ -997,6 +1014,7 @@ namespace Spire
 		{
 			auto canElementType = elementType->GetCanonicalType();
 			auto canType = new VectorExpressionType(canElementType, elementCount);
+			canType->decl = decl;
 			sCanonicalTypes.Add(canType);
 			return canType;
 		}
@@ -1035,6 +1053,7 @@ namespace Spire
 		{
 			auto canElementType = elementType->GetCanonicalType();
 			auto canType = new MatrixExpressionType(canElementType, rowCount, colCount);
+			canType->decl = decl;
 			sCanonicalTypes.Add(canType);
 			return canType;
 		}
@@ -1254,6 +1273,33 @@ namespace Spire
 		GenericValueParamDecl * GenericValueParamDecl::Clone(CloneContext & ctx) {
 			throw "unimplemented";
 		}
+
+		// ExtensionDecl
+
+		RefPtr<SyntaxNode> ExtensionDecl::Accept(SyntaxVisitor * visitor)
+		{
+			visitor->VisitExtensionDecl(this);
+			return this;
+		}
+
+		ExtensionDecl* ExtensionDecl::Clone(CloneContext & ctx)
+		{
+			throw "unimplemented";
+		}
+
+		// ConstructorDecl
+
+		RefPtr<SyntaxNode> ConstructorDecl::Accept(SyntaxVisitor * visitor)
+		{
+			visitor->VisitConstructorDecl(this);
+			return this;
+		}
+
+		ConstructorDecl* ConstructorDecl::Clone(CloneContext & ctx)
+		{
+			throw "unimplemented";
+		}
+
 
 	}
 }

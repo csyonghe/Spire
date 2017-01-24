@@ -92,37 +92,128 @@ namespace Spire
 		public:
 			// Translate Types
 			RefPtr<ExpressionType> typeResult;
+			RefPtr<ExpressionSyntaxNode> TranslateTypeNodeImpl(const RefPtr<ExpressionSyntaxNode> & node)
+			{
+				if (!node) return nullptr;
+				auto expr = node->Accept(this).As<ExpressionSyntaxNode>();
+				expr = ExpectATypeRepr(expr);
+				return expr;
+			}
+			RefPtr<ExpressionType> ExtractTypeFromTypeRepr(const RefPtr<ExpressionSyntaxNode>& typeRepr)
+			{
+				if (!typeRepr) return nullptr;
+				if (auto typeType = typeRepr->Type->As<TypeExpressionType>())
+				{
+					return typeType->type;
+				}
+				return ExpressionType::Error;
+			}
 			RefPtr<ExpressionType> TranslateTypeNode(const RefPtr<ExpressionSyntaxNode> & node)
 			{
 				if (!node) return nullptr;
-
-				typeResult = ExpressionType::Error;
-				node->Accept(this);
-				assert(typeResult);
-				return typeResult;
+				auto typeRepr = TranslateTypeNodeImpl(node);
+				return ExtractTypeFromTypeRepr(typeRepr);
 			}
 			TypeExp TranslateTypeNode(TypeExp const& typeExp)
 			{
+				auto typeRepr = TranslateTypeNodeImpl(typeExp.exp);
+
 				TypeExp result;
-				result.exp = typeExp.exp;
-				result.type = TranslateTypeNode(typeExp.exp);
+				result.exp = typeRepr;
+				result.type = ExtractTypeFromTypeRepr(typeRepr);
 				return result;
+			}
+
+			RefPtr<ExpressionSyntaxNode> ConstructDeclRefExpr(
+				Decl*							decl,
+				RefPtr<ExpressionSyntaxNode>	baseExpr,
+				RefPtr<ExpressionSyntaxNode>	originalExpr)
+			{
+				if (baseExpr)
+				{
+					auto expr = new MemberExpressionSyntaxNode();
+					expr->Position = originalExpr->Position;
+					expr->BaseExpression = baseExpr;
+					expr->MemberName = decl->Name.Content;
+					expr->Type = GetTypeForDeclRef(decl);
+					return expr;
+				}
+				else
+				{
+					auto expr = new VarExpressionSyntaxNode();
+					expr->Position = originalExpr->Position;
+					expr->Variable = decl->Name.Content;
+					expr->Type = GetTypeForDeclRef(decl);
+					return expr;
+				}
+			}
+
+			RefPtr<ExpressionSyntaxNode> ResolveOverloadedExpr(RefPtr<OverloadedExpr> overloadedExpr, LookupMask mask)
+			{
+				auto lookupResult = overloadedExpr->lookupResult;
+				assert(lookupResult.isValid() && lookupResult.isOverloaded());
+
+				// filter the lookup to only consider declarations of the right flavor
+				lookupResult.mask = LookupMask(uint8_t(lookupResult.mask) & uint8_t(mask));
+				
+				// and re-run lookup to see what we found
+				lookupResult = DoLookup(lookupResult.decl->Name.Content, lookupResult);
+
+				if (!lookupResult.isValid())
+				{
+					// If we didn't find any symbols after filtering, then just
+					// use the original and report errors that way
+					return overloadedExpr;
+				}
+
+				if (lookupResult.isOverloaded())
+				{
+					// We had an ambiguity anyway, so report it.
+					getSink()->diagnose(overloadedExpr, Diagnostics::unimplemented, "ambiguous reference");
+
+					// TODO(tfoley): should we construct a new ErrorExpr here?
+					overloadedExpr->Type = ExpressionType::Error;
+					return overloadedExpr;
+				}
+
+				// otherwise, we had a single decl and it was valid, hooray!
+				return ConstructDeclRefExpr(lookupResult.decl, overloadedExpr->base, overloadedExpr);
+			}
+
+			RefPtr<ExpressionSyntaxNode> ExpectATypeRepr(RefPtr<ExpressionSyntaxNode> expr)
+			{
+				if (auto overloadedExpr = expr.As<OverloadedExpr>())
+				{
+					expr = ResolveOverloadedExpr(overloadedExpr, LookupMask::Type);
+				}
+
+				if (auto typeType = expr->Type.type->As<TypeExpressionType>())
+				{
+					return expr;
+				}
+				else if (expr->Type.type->Equals(ExpressionType::Error))
+				{
+					return expr;
+				}
+
+				getSink()->diagnose(expr, Diagnostics::unimplemented, "expected a type");
+				// TODO: construct some kind of `ErrorExpr`?
+				return expr;
+			}
+
+			RefPtr<ExpressionType> ExpectAType(RefPtr<ExpressionSyntaxNode> expr)
+			{
+				auto typeRepr = ExpectATypeRepr(expr);
+				if (auto typeType = typeRepr->Type->As<TypeExpressionType>())
+				{
+					return typeType->type;
+				}
+				return ExpressionType::Error;
 			}
 
 			RefPtr<ExpressionType> ExtractGenericArgType(RefPtr<ExpressionSyntaxNode> exp)
 			{
-				if (auto typeType = exp->Type.type->As<TypeExpressionType>())
-				{
-					return typeType->type;
-				}
-				else if (exp->Type.type->Equals(ExpressionType::Error))
-				{
-					return exp->Type;
-				}
-				else
-				{
-					throw "unimplemented";
-				}
+				return ExpectAType(exp);
 			}
 
 			int ExtractGenericArgInteger(RefPtr<ExpressionSyntaxNode> exp)
@@ -287,14 +378,22 @@ namespace Spire
 				}
 			}
 
+			RefPtr<ExpressionSyntaxNode> CheckTerm(RefPtr<ExpressionSyntaxNode> term)
+			{
+				return term->Accept(this).As<ExpressionSyntaxNode>();
+			}
+
 			RefPtr<ExpressionSyntaxNode> VisitGenericType(GenericTypeSyntaxNode * typeNode) override
 			{
+				auto& base = typeNode->base;
+				base = CheckTerm(base);
 				auto& args = typeNode->Args;
 				for (auto& arg : typeNode->Args)
 				{
-					arg = arg->Accept(this).As<ExpressionSyntaxNode>();
+					arg = CheckTerm(arg);
 				}
 
+#if TIMREMOVED
 				// Certain generic types have baked-in support here
 				if (typeNode->GenericTypeName == "PackedBuffer" ||
 					typeNode->GenericTypeName == "StructuredBuffer" ||
@@ -310,14 +409,17 @@ namespace Spire
 					return typeNode;
 				}
 				else
+#endif
 				{
-					auto decl = typeNode->Scope->LookUp(typeNode->GenericTypeName);
-					if (!decl)
+					auto baseDeclRef = base.As<DeclRefExpr>();
+
+					if (!baseDeclRef)
 					{
-						getSink()->diagnose(typeNode, Diagnostics::undefinedIdentifier, typeNode->GenericTypeName);
+						getSink()->diagnose(typeNode, Diagnostics::unimplemented, "unexpected base term in generic app");
 						typeResult = ExpressionType::Error;
 						return typeNode;
 					}
+					auto decl = baseDeclRef->decl;
 
 					if (auto genericDecl = dynamic_cast<GenericDecl*>(decl))
 					{
@@ -358,7 +460,7 @@ namespace Spire
 					else
 					{
 						// TODO: correct diagnostic here!
-						getSink()->diagnose(typeNode, Diagnostics::undefinedIdentifier, typeNode->GenericTypeName);
+						getSink()->diagnose(typeNode, Diagnostics::unimplemented, "unexpected base term in generic app");
 						typeResult = ExpressionType::Error;
 						return typeNode;
 					}
@@ -503,7 +605,6 @@ namespace Spire
 			{
 				for (auto & comp : interfaceNode->GetComponents())
 				{
-					interfaceNode->Scope->decls.AddIfNotExists(comp->Name.Content, comp.Ptr());
 					for (auto & param : comp->GetParameters())
 					{
 						param->Type = TranslateTypeNode(param->Type);
@@ -567,7 +668,6 @@ namespace Spire
 								// construct an invocation node to resolve overloaded component function
 								RefPtr<InvokeExpressionSyntaxNode> tempInvoke = new InvokeExpressionSyntaxNode();
 								tempInvoke->Position = arg->Position;
-								tempInvoke->Scope = arg->Scope;
 								tempInvoke->FunctionExpr = arg->Expression;
 								for (auto & param : refComp->Implementations.First()->SyntaxNode->GetParameters())
 								{
@@ -1649,7 +1749,6 @@ namespace Spire
 				{
 					invoke->Arguments.Insert(0, memberExpr->BaseExpression);
 					auto funcExpr = new VarExpressionSyntaxNode();
-					funcExpr->Scope = invoke->Scope;
 					funcExpr->Position = invoke->Position;
 					funcExpr->Variable = memberExpr->MemberName;
 					invoke->FunctionExpr = funcExpr;
@@ -1699,9 +1798,7 @@ namespace Spire
 							importExpr->Component = arguments[0];
 							CloneContext cloneCtx;
 							importExpr->ImportOperatorDef = func->Clone(cloneCtx);
-							importExpr->ImportOperatorDef->Scope->Parent = varExpr->Scope->Parent;
 							importExpr->Type = arguments[0]->Type;
-							importExpr->Scope = varExpr->Scope;
 							importExpr->Access = ExpressionAccess::Read;
 							for (int i = 1; i < arguments.Count(); i++)
 								importExpr->Arguments.Add(arguments[i]);
@@ -1929,27 +2026,214 @@ namespace Spire
 				return appExpr;
 			}
 
+
+			//
+
+			virtual void VisitExtensionDecl(ExtensionDecl* decl) override
+			{
+				decl->targetType = TranslateTypeNode(decl->targetType);
+
+				// TODO: need to check that the target type names a declaration...
+
+				if (auto targetDeclRefType = decl->targetType->As<DeclRefType>())
+				{
+					// Attach our extension to that type as a candidate...
+					if (auto aggTypeDecl = dynamic_cast<AggTypeDecl*>(targetDeclRefType->decl))
+					{
+						decl->nextCandidateExtension = aggTypeDecl->candidateExtensions;
+						aggTypeDecl->candidateExtensions = decl;
+					}
+					else
+					{
+						getSink()->diagnose(decl->targetType.exp, Diagnostics::unimplemented, "expected a nominal type here");
+					}
+				}
+				else if (decl->targetType->Equals(ExpressionType::Error))
+				{
+					// there was an error, so ignore
+				}
+				else
+				{
+					getSink()->diagnose(decl->targetType.exp, Diagnostics::unimplemented, "expected a nominal type here");
+				}
+
+				// now check the members of the extension
+				for (auto m : decl->Members)
+				{
+					EnsureDecl(m);
+				}
+			}
+
+			virtual void VisitConstructorDecl(ConstructorDecl* decl) override
+			{
+			}
+
+			//
+
+			struct OverloadCandidate
+			{
+				enum class Flavor
+				{
+					Func,
+					ComponentFunc,
+				};
+
+				Flavor flavor;
+				union
+				{
+					FunctionDeclBase*		func;
+					ComponentSyntaxNode*	componentFunc;
+				};
+			};
+
+
+
+			// State related to overload resolution for a call
+			// to an overloaded symbol
+			struct OverloadResolveContext
+			{
+
+			};
+
+			void TryFuncOverloadCandidate(
+				RefPtr<FunctionDeclBase>	funcDecl,
+				OverloadResolveContext&		context)
+			{
+				throw "unimplemented";
+			}
+
+			void TryComponentFuncOverloadCandidate(
+				RefPtr<ShaderComponentSymbol>	componentFuncSym,
+				OverloadResolveContext&			context)
+			{
+				throw "unimplemented";
+			}
+
+			void TryFuncOverloadCandidate(
+				RefPtr<FuncType>		funcType,
+				OverloadResolveContext&	context)
+			{
+				if (funcType->decl)
+				{
+					TryFuncOverloadCandidate(funcType->decl, context);
+				}
+				else if (funcType->Func)
+				{
+					TryFuncOverloadCandidate(funcType->Func->SyntaxNode, context);
+				}
+				else if (funcType->Component)
+				{
+					TryComponentFuncOverloadCandidate(funcType->Component, context);
+				}
+			}
+
+			void TryCtorOverloadCandidate(
+				ConstructorDecl*		ctorDecl,
+				OverloadResolveContext&	context)
+			{
+				throw "unimplemented";
+			}
+
+			// If the given declaration has generic parameters, then
+			// return the corresponding `GenericDecl` that holds the
+			// parameters, etc.
+			GenericDecl* GetOuterGeneric(Decl* decl)
+			{
+				auto parentDecl = decl->ParentDecl;
+				if (!parentDecl) return nullptr;
+				auto parentGeneric = dynamic_cast<GenericDecl*>(parentDecl);
+				return parentGeneric;
+			}
+
+			// Is the candidate extension declaration actually applicable to the given type
+			bool IsExtensionApplicableToType(
+				ExtensionDecl*		extDecl,
+				RefPtr<DeclRefType>	type)
+			{
+				if (auto extGenericDecl = GetOuterGeneric(extDecl))
+				{
+					// TODO(tfoley): figure out how to check things here!!!
+					throw "unimplemented";
+					return true;
+				}
+				else
+				{
+					// The easy case is when the extension isn't
+					// generic:
+					return type->Equals(extDecl->targetType);
+				}
+			}
+
+			void TryTypeOverloadCandidate(
+				RefPtr<ExpressionType>	type,
+				OverloadResolveContext&	context)
+			{
+				if (auto declRefType = type->As<DeclRefType>())
+				{
+					if (auto aggTypeDecl = dynamic_cast<AggTypeDecl*>(declRefType->decl))
+					{
+						for (auto ctor : aggTypeDecl->GetMembersOfType<ConstructorDecl>())
+						{
+							// now work through this candidate...
+							TryCtorOverloadCandidate(ctor.Ptr(), context);
+						}
+
+						// Now walk through any extensions we can find for this type
+						for (auto ext = aggTypeDecl->candidateExtensions; ext; ext = ext->nextCandidateExtension)
+						{
+							if (!IsExtensionApplicableToType(ext, declRefType))
+								continue;
+
+							for (auto ctor : ext->GetMembersOfType<ConstructorDecl>())
+							{
+								// now work through this candidate...
+								TryCtorOverloadCandidate(ctor.Ptr(), context);
+							}
+						}
+					}
+				}
+			}
+
+			void EnumerateOverloadCandidates(
+				RefPtr<ExpressionSyntaxNode>	funcExpr,
+				OverloadResolveContext&			context)
+			{
+				auto funcExprType = funcExpr->Type;
+				if (auto funcType = funcExprType->As<FuncType>())
+				{
+					TryFuncOverloadCandidate(funcType, context);
+				}
+				else if (auto typeType = funcExprType->As<TypeExpressionType>())
+				{
+					// The expression named a type, so we have a constructor call
+					// on our hands.
+					TryTypeOverloadCandidate(typeType->type, context);
+				}
+				else if (auto overloadedExpr = funcExpr.As<OverloadedExpr>())
+				{
+					throw "unimplemented";
+				}
+			}
+
+
+
 			RefPtr<ExpressionSyntaxNode> ResolveInvoke(InvokeExpressionSyntaxNode * expr)
 			{
 				// Look at the base expression for the call, and figure out how
 				// to invoke it.
 				auto funcExpr = expr->FunctionExpr;
 				auto funcExprType = funcExpr->Type;
-				if (auto funcType = funcExprType->As<FuncType>())
-				{
-					return ResolveFunctionApp(funcType, expr);
-				}
-				else if (auto typeType = funcExprType->As<TypeExpressionType>())
-				{
-					// The expression named a type, so we have a constructor call
-					// on our hands.
-					return ResolveConstructorApp(typeType->type, expr);
-				}
-				else if (funcExprType->Equals(ExpressionType::Error))
+				if (funcExprType->Equals(ExpressionType::Error))
 				{
 					expr->Type = ExpressionType::Error;
 					return expr;
 				}
+
+				OverloadResolveContext context;
+				EnumerateOverloadCandidates(funcExpr, context);
+
+				// Look at the state of the overload resolution, and
+				// figure out what to do...
 
 				getSink()->diagnose(expr->FunctionExpr, Diagnostics::expectedFunction);
 				expr->Type = ExpressionType::Error;
@@ -2127,17 +2411,130 @@ namespace Spire
 				}
 			}
 
+			bool DeclPassesLookupMask(Decl* decl, LookupMask mask)
+			{
+				// type declarations
+				if(auto aggTypeDecl = dynamic_cast<AggTypeDecl*>(decl))
+				{
+					return int(mask) & int(LookupMask::Type);
+				}
+				else if(auto simpleTypeDecl = dynamic_cast<SimpleTypeDecl*>(decl))
+				{
+					return int(mask) & int(LookupMask::Type);
+				}
+				// function declarations
+				else if(auto funcDecl = dynamic_cast<FunctionDeclBase*>(decl))
+				{
+					return int(mask) & int(LookupMask::Function);
+				}
+				// component declarations have kind of odd rules
+				else if(auto componentDecl = dynamic_cast<ComponentSyntaxNode*>(decl))
+				{
+					if (componentDecl->IsComponentFunction())
+					{
+						return int(mask) & int(LookupMask::Function);
+					}
+					else
+					{
+						return int(mask) & int(LookupMask::Value);
+					}
+				}
+
+				// default behavior is to assume a value declaration
+				// (no overloading allowed)
+
+				return int(mask) & int(LookupMask::Value);
+			}
+
+			LookupResult DoLookup(String const& name, LookupResult inResult)
+			{
+				LookupResult result;
+				result.mask = inResult.mask;
+
+				ContainerDecl* scope = inResult.scope;
+				int index = inResult.index;
+				while (scope)
+				{
+					auto memberCount = scope->Members.Count();
+
+					for (;index < memberCount; index++)
+					{
+						auto member = scope->Members[index].Ptr();
+						if (member->Name.Content != name)
+							continue;
+
+						// TODO: filter based on our mask
+						if (!DeclPassesLookupMask(member, result.mask))
+							continue;
+
+						// if we had previously found a result
+						if (result.isValid())
+						{
+							// we now have a potentially overloaded result,
+							// and can return with this knowledge
+							result.flags |= LookupResult::Flags::Overloaded;
+							return result;
+						}
+						else
+						{
+							// this is the first result!
+							result.decl = member;
+							result.scope = scope;
+							result.index = index;
+
+							// TODO: need to establish a mask for subsequent
+							// lookup...
+						}
+					}
+
+					// we reached the end of a scope, so if we found
+					// anything inside that scope, we should return now
+					// rather than continue to search parent scopes
+					if (result.isValid())
+					{
+						return result;
+					}
+
+					// Otherwise, we proceed to the next scope up.
+					scope = scope->ParentDecl;
+					index = 0;
+				}
+
+				// If we run out of scopes, then we are done.
+				return result;
+			}
+
+			LookupResult LookUp(String const& name, ContainerDecl* scope)
+			{
+				LookupResult result;
+				result.scope = scope;
+				return DoLookup(name, result);
+			}
+
 			virtual RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode *expr) override
 			{
 				ShaderUsing shaderObj;
 				expr->Type = ExpressionType::Error;
-				auto decl = expr->Scope->LookUp(expr->Variable);
-				if (decl)
+
+				auto lookupResult = LookUp(expr->Variable, expr->scope);
+				if (lookupResult.isValid())
 				{
-					// Found declaration through ordinary scope lookup rules
-					expr->decl = decl;
-					expr->Type = GetTypeForDeclRef(decl);
-					return expr;
+					// Found at least one declaration, but did we find many?
+					if (lookupResult.isOverloaded())
+					{
+						auto overloadedExpr = new OverloadedExpr();
+						overloadedExpr->Type = ExpressionType::Overloaded;
+						overloadedExpr->lookupResult = lookupResult;
+						return overloadedExpr;
+					}
+					else
+					{
+						// Only a single decl, that's good
+						auto decl = lookupResult.decl;
+						expr->decl = decl;
+						expr->Type = GetTypeForDeclRef(decl);
+						return expr;
+					}
 				}
 
 				// Ad hoc lookup rules for cases where the scope-based lookup currently doesn't apply.
@@ -2170,10 +2567,6 @@ namespace Spire
 					}
 					else
 						getSink()->diagnose(expr, Diagnostics::undefinedIdentifier2, expr->Variable);
-				}
-				else if (auto compDecl = dynamic_cast<ComponentSyntaxNode*>(decl)) // interface decl
-				{
-					expr->Type = compDecl->Type;
 				}
 				else
 					getSink()->diagnose(expr, Diagnostics::undefinedIdentifier2, expr->Variable);

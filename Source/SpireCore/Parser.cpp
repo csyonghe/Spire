@@ -14,7 +14,7 @@ namespace Spire
 		{
         public:
 			int anonymousParamCounter = 0;
-			RefPtr<Scope> currentScope;
+			RefPtr<ContainerDecl> currentScope;
             TokenReader tokenReader;
             DiagnosticSink * sink;
 			String fileName;
@@ -31,15 +31,15 @@ namespace Spire
 			void FillPosition(SyntaxNode * node)
 			{
 				node->Position = tokenReader.PeekLoc();
-				node->Scope = currentScope;
 			}
 			void PushScope(ContainerDecl* containerDecl)
 			{
-				currentScope = new Scope(currentScope, containerDecl);
+				containerDecl->ParentDecl = currentScope.Ptr();
+				currentScope = containerDecl;
 			}
 			void PopScope()
 			{
-				currentScope = currentScope->Parent;
+				currentScope = currentScope->ParentDecl;
 			}
 			Parser(TokenSpan const& _tokens, DiagnosticSink * sink, String _fileName)
 				: tokenReader(_tokens), sink(sink), fileName(_fileName)
@@ -747,6 +747,17 @@ namespace Spire
             Token							nameToken;
         };
 
+		// Add a member declaration to its container, and ensure that its
+		// parent link is set up correctly.
+		static void AddMember(RefPtr<ContainerDecl> container, RefPtr<Decl> member)
+		{
+			if (container)
+			{
+				member->ParentDecl = container.Ptr();
+				container->Members.Add(member);
+			}
+		}
+
         static void ParseFuncDeclHeader(
             Parser*                     parser,
             DeclaratorInfo const&       declaratorInfo,
@@ -763,7 +774,7 @@ namespace Spire
             parser->ReadToken(TokenType::LParent);
             while (!AdvanceIfMatch(parser, TokenType::RParent))
             {
-                decl->Members.Add(parser->ParseParameter());
+				AddMember(decl, parser->ParseParameter());
                 if (AdvanceIf(parser, TokenType::RParent))
                     break;
                 parser->ReadToken(TokenType::Comma);
@@ -786,7 +797,7 @@ namespace Spire
             parser->ReadToken(TokenType::LParent);
             while (!AdvanceIfMatch(parser, TokenType::RParent))
             {
-                decl->Members.Add(parser->ParseParameter());
+				AddMember(decl, parser->ParseParameter());
                 if (AdvanceIf(parser, TokenType::RParent))
                     break;
                 parser->ReadToken(TokenType::Comma);
@@ -1103,7 +1114,7 @@ namespace Spire
 			parser->ReadToken(TokenType::OpLess);
 			while (!parser->LookAheadToken(TokenType::OpGreater))
 			{
-				decl->Members.Add(ParseGenericParamDecl(parser));
+				AddMember(decl, ParseGenericParamDecl(parser));
 
 				if (parser->LookAheadToken(TokenType::OpGreater))
 					break;
@@ -1122,6 +1133,42 @@ namespace Spire
 			return decl;
 		}
 
+		static RefPtr<ExtensionDecl> ParseExtensionDecl(Parser* parser)
+		{
+			RefPtr<ExtensionDecl> decl = new ExtensionDecl();
+			parser->FillPosition(decl.Ptr());
+			parser->ReadToken("__extension");
+			decl->targetType = parser->ParseTypeExp();
+			parser->ReadToken(TokenType::LBrace);
+            ParseDeclBody(parser, decl.Ptr(), TokenType::RBrace);
+			return decl;
+		}
+
+		static RefPtr<ConstructorDecl> ParseConstructorDecl(Parser* parser)
+		{
+			RefPtr<ConstructorDecl> decl = new ConstructorDecl();
+			parser->FillPosition(decl.Ptr());
+			parser->ReadToken("__init");
+
+            parser->ReadToken(TokenType::LParent);
+            while (!AdvanceIfMatch(parser, TokenType::RParent))
+            {
+				AddMember(decl, parser->ParseParameter());
+                if (AdvanceIf(parser, TokenType::RParent))
+                    break;
+                parser->ReadToken(TokenType::Comma);
+            }
+
+			if (AdvanceIf(parser, TokenType::Semicolon))
+            {
+                // empty body
+            }
+            else
+            {
+                decl->Body = parser->ParseBlockStatement();
+            }
+			return decl;
+		}
 
         static RefPtr<Decl> ParseDeclWithModifiers(
             Parser*             parser,
@@ -1155,6 +1202,10 @@ namespace Spire
 				decl = ParseHLSLBufferDecl(parser);
 			else if (parser->LookAheadToken("__generic"))
 				decl = ParseGenericDecl(parser);
+			else if (parser->LookAheadToken("__extension"))
+				decl = ParseExtensionDecl(parser);
+			else if (parser->LookAheadToken("__init"))
+				decl = ParseConstructorDecl(parser);
             else if (AdvanceIf(parser, TokenType::Semicolon))
             {
                 // empty declaration
@@ -1167,7 +1218,7 @@ namespace Spire
                 decl->modifiers = modifiers;
                 if (containerDecl)
                 {
-                    containerDecl->Members.Add(decl);
+					AddMember(containerDecl, decl);
                 }
             }
             return decl;
@@ -1207,9 +1258,13 @@ namespace Spire
 			}
 
 			RefPtr<ProgramSyntaxNode> program = new ProgramSyntaxNode();
+			if (predefUnit)
+			{
+				program->ParentDecl = predefUnit;
+			}
+
 			PushScope(program.Ptr());
 			program->Position = CodePosition(0, 0, 0, fileName);
-			program->Scope = currentScope;
             ParseDeclBody(this, program.Ptr(), TokenType::EndOfFile);
 			PopScope();
 
@@ -1471,7 +1526,7 @@ namespace Spire
 			ReadToken(TokenType::LParent);
 			while (!AdvanceIf(this, TokenType::RParent))
 			{
-				op->Members.Add(ParseParameter());
+				AddMember(op, ParseParameter());
 				if (AdvanceIf(this, TokenType::RParent))
 					break;
                 ReadToken(TokenType::Comma);
@@ -1525,7 +1580,7 @@ namespace Spire
 			ReadToken(TokenType::LParent);
 			while(!AdvanceIfMatch(this, TokenType::RParent))
 			{
-				function->Members.Add(ParseParameter());
+				AddMember(function, ParseParameter());
 				if (AdvanceIf(this, TokenType::RParent))
 					break;
 				ReadToken(TokenType::Comma);
@@ -1557,6 +1612,7 @@ namespace Spire
             ParseDeclBody(this, rs.Ptr(), TokenType::RBrace);
 			return rs;
 		}
+
 
 		RefPtr<StatementSyntaxNode> Parser::ParseStatement()
 		{
@@ -1648,7 +1704,7 @@ namespace Spire
 			RefPtr<VarDeclrStatementSyntaxNode>varDeclrStatement = new VarDeclrStatementSyntaxNode();
 		
 			FillPosition(varDeclrStatement.Ptr());
-            auto decl = ParseDecl(this, currentScope->containerDecl);
+            auto decl = ParseDecl(this, currentScope.Ptr());
             varDeclrStatement->decl = decl;
 			return varDeclrStatement;
 		}
@@ -1800,13 +1856,20 @@ namespace Spire
 				typeName = ReadToken(TokenType::Identifier);
 			else
 				typeName = ReadTypeKeyword();
-			RefPtr<ExpressionSyntaxNode> rs;
+
+			auto basicType = new VarExpressionSyntaxNode();
+			basicType->scope = currentScope.Ptr();
+			basicType->Position = typeName.Position;
+			basicType->Variable = typeName.Content;
+
+			RefPtr<ExpressionSyntaxNode> rs = basicType;
+
 			if (LookAheadToken(TokenType::OpLess))
 			{
 				RefPtr<GenericTypeSyntaxNode> gtype = new GenericTypeSyntaxNode();
 				FillPosition(gtype.Ptr()); // set up scope for lookup
 				gtype->Position = typeName.Position;
-				gtype->GenericTypeName = typeName.Content;
+				gtype->base = rs;
 				ReadToken(TokenType::OpLess);
 				this->genericDepth++;
 				// For now assume all generics have at least one argument
@@ -1818,14 +1881,6 @@ namespace Spire
 				this->genericDepth--;
 				ReadToken(TokenType::OpGreater);
 				rs = gtype;
-			}
-			else
-			{
-				auto basicType = new VarExpressionSyntaxNode();
-				FillPosition(basicType); // set up scope for lookup
-				basicType->Position = typeName.Position;
-				basicType->Variable = typeName.Content;
-				rs = basicType;
 			}
 			while (LookAheadToken(TokenType::LBracket))
 			{
@@ -2131,6 +2186,7 @@ namespace Spire
 			else if (LookAheadToken(TokenType::Identifier))
 			{
 				RefPtr<VarExpressionSyntaxNode> varExpr = new VarExpressionSyntaxNode();
+				varExpr->scope = currentScope.Ptr();
 				FillPosition(varExpr.Ptr());
 				auto token = ReadToken(TokenType::Identifier);
 				varExpr->Variable = token.Content;
@@ -2196,6 +2252,7 @@ namespace Spire
 				else if (LookAheadToken(TokenType::Dot))
 				{
 					RefPtr<MemberExpressionSyntaxNode> memberExpr = new MemberExpressionSyntaxNode();
+					memberExpr->scope = currentScope.Ptr();
 					FillPosition(memberExpr.Ptr());
 					memberExpr->BaseExpression = rs;
 					ReadToken(TokenType::Dot); 

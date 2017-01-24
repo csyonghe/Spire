@@ -92,7 +92,6 @@ namespace Spire
 						auto importExpr = new ImportExpressionSyntaxNode();
 						importExpr->Type = thruDef->Type;
 						importExpr->ImportOperatorDef = node.ImportOperator->Clone(cloneCtx);
-						importExpr->ImportOperatorDef->Scope->Parent = thruDef->SyntaxNode->Scope.Ptr();
 						importExpr->ComponentUniqueName = srcDef->UniqueName;
 						for (auto & arg : importExpr->Arguments)
 							arg->Accept(this);

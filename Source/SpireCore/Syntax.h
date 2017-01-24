@@ -267,6 +267,7 @@ namespace Spire
 			static RefPtr<ExpressionType> Float2;
 			static RefPtr<ExpressionType> Void;
 			static RefPtr<ExpressionType> Error;
+			static RefPtr<ExpressionType> Overloaded;
 			// Note: just exists to make sure we can clean up
 			// canonical types we create along the way
 			static List<RefPtr<ExpressionType>> sCanonicalTypes;
@@ -323,6 +324,17 @@ namespace Spire
 
 			virtual ExpressionType* CreateCanonicalType() = 0;
 			ExpressionType* canonicalType = nullptr;
+		};
+
+		// The type of a reference to an overloaded name
+		class OverloadGroupType : public ExpressionType
+		{
+		public:
+			virtual String ToString() const override;
+
+		protected:
+			virtual bool EqualsImpl(const ExpressionType * type) const override;
+			virtual ExpressionType* CreateCanonicalType() override;
 		};
 
 		// A type that takes the form of a reference to some declaration
@@ -681,23 +693,10 @@ namespace Spire
 		};
 
 		class ContainerDecl;
-		class Scope : public RefObject
-		{
-		public:
-			RefPtr<Scope> Parent;
-			ContainerDecl* containerDecl;
-			Dictionary<String, Decl*> decls;
-			Decl* LookUp(String const& name);
-			Scope(RefPtr<Scope> parent, ContainerDecl* containerDecl)
-				: Parent(parent)
-				, containerDecl(containerDecl)
-			{}
-		};
 
 		class CloneContext
 		{
 		public:
-			Dictionary<Spire::Compiler::Scope*, RefPtr<Spire::Compiler::Scope>> ScopeTranslateTable;
 		};
 
 		class SyntaxNode : public RefObject
@@ -706,21 +705,6 @@ namespace Spire
 			template<typename T>
 			T* CloneSyntaxNodeFields(T * target, CloneContext & ctx)
 			{
-				if (this->Scope)
-				{
-					RefPtr<Spire::Compiler::Scope> newScope;
-					if (ctx.ScopeTranslateTable.TryGetValue(this->Scope.Ptr(), newScope))
-						target->Scope = newScope;
-					else
-					{
-						target->Scope = new Spire::Compiler::Scope(*this->Scope);
-						ctx.ScopeTranslateTable[this->Scope.Ptr()] = target->Scope;
-						RefPtr<Spire::Compiler::Scope> parentScope;
-						if (ctx.ScopeTranslateTable.TryGetValue(target->Scope->Parent.Ptr(), parentScope))
-							target->Scope->Parent = parentScope.Ptr();
-					}
-
-				}
 				target->Position = this->Position;
 				target->Tags = this->Tags;
 				return target;
@@ -728,7 +712,6 @@ namespace Spire
 		public:
 			EnumerableDictionary<String, RefPtr<Object>> Tags;
 			CodePosition Position;
-			RefPtr<Scope> Scope;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) = 0;
 			virtual SyntaxNode * Clone(CloneContext & ctx) = 0;
 		};
@@ -986,6 +969,7 @@ namespace Spire
 			{
 				return type;
 			}
+			ExpressionType* operator->() { return Ptr(); }
 
 			TypeExp Clone(CloneContext& context);
 			TypeExp Accept(SyntaxVisitor* visitor);
@@ -1022,9 +1006,27 @@ namespace Spire
 			}
 		};
 
+		// An extension to apply to an existing type
+		class ExtensionDecl : public ContainerDecl
+		{
+		public:
+			TypeExp targetType;
+
+			// next extension attached to the same nominal type
+			ExtensionDecl* nextCandidateExtension = nullptr;
+
+
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual ExtensionDecl* Clone(CloneContext & ctx) override;
+		};
+
 		// Declaration of a type that represents some sort of aggregate
 		class AggTypeDecl : public ContainerDecl
-		{};
+		{
+		public:
+			// extensions that might apply to this declaration
+			ExtensionDecl* candidateExtensions = nullptr;
+		};
 
 		class StructSyntaxNode : public AggTypeDecl
 		{
@@ -1132,6 +1134,14 @@ namespace Spire
 			RefPtr<BlockStatementSyntaxNode> Body;
 		};
 
+		// A constructor/initializer to create instances of a type
+		class ConstructorDecl : public FunctionDeclBase
+		{
+		public:
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual ConstructorDecl* Clone(CloneContext & ctx) override;
+		};
+
 		class FunctionSyntaxNode : public FunctionDeclBase
 		{
 		public:
@@ -1166,17 +1176,74 @@ namespace Spire
 			virtual ChoiceValueSyntaxNode * Clone(CloneContext & ctx);
 		};
 
-		class VarExpressionSyntaxNode : public ExpressionSyntaxNode
+		// Base class for expressions that will reference declarations
+		class DeclRefExpr : public ExpressionSyntaxNode
+		{
+		public:
+			// The scope in which to perform lookup
+			ContainerDecl* scope = nullptr;
+
+			// The declaration of the symbol being referenced
+			Decl* decl = nullptr;
+		};
+
+		class VarExpressionSyntaxNode : public DeclRefExpr
 		{
 		public:
 			// The name of the symbol being referenced
 			String Variable;
 
-			// The declaration of the symbol being referenced
-			Decl* decl = nullptr;
-
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual VarExpressionSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
+		// Masks to be applied when lookup up declarations
+		enum class LookupMask : uint8_t
+		{
+			Type = 0x1,
+			Function = 0x2,
+			Value = 0x4,
+
+			All = Type | Function | Value,
+		};
+
+		// Result of looking up a name in some lexical/semantic environment.
+		// Can be used to enumerate all the declarations matching that name,
+		// in the case where the result is overloaded.
+		struct LookupResult
+		{
+			enum Flags : uint8_t
+			{
+				None = 0x0,
+				Overloaded = 0x1,
+			};
+
+			Decl*			decl = nullptr;
+			ContainerDecl*	scope = nullptr;
+			int				index = 0;
+			LookupMask		mask = LookupMask::All;
+			uint8_t			flags = Flags::None;
+
+			// Was at least one result found?
+			bool isValid() { return decl != nullptr; }
+
+			bool isOverloaded() { return flags & Flags::Overloaded; }
+		};
+
+		// An expression that references an overloaded set of declarations
+		// having the same name.
+		class OverloadedExpr : public ExpressionSyntaxNode
+		{
+		public:
+			// Optional: the base expression is this overloaded result
+			// arose from a member-reference expression.
+			RefPtr<ExpressionSyntaxNode> base;
+
+			// The lookup result that was ambiguous
+			LookupResult lookupResult;
+
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual OverloadedExpr * Clone(CloneContext & ctx) override;
 		};
 
 		class ConstantExpressionSyntaxNode : public ExpressionSyntaxNode
@@ -1259,7 +1326,7 @@ namespace Spire
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 		};
 
-		class MemberExpressionSyntaxNode : public ExpressionSyntaxNode
+		class MemberExpressionSyntaxNode : public DeclRefExpr
 		{
 		public:
 			RefPtr<ExpressionSyntaxNode> BaseExpression;
@@ -1636,8 +1703,8 @@ namespace Spire
 		class GenericTypeSyntaxNode : public ExpressionSyntaxNode
 		{
 		public:
-			// The name of the generic to apply (e.g., `Buffer`)
-			String GenericTypeName;
+			// The base expression
+			RefPtr<ExpressionSyntaxNode> base;
 
 			// Additional expression arguments after the first (type) argument.
 			List<RefPtr<ExpressionSyntaxNode>> Args;
@@ -1999,6 +2066,11 @@ namespace Spire
 				return result;
 			}
 
+			virtual void VisitExtensionDecl(ExtensionDecl* decl)
+			{}
+
+			virtual void VisitConstructorDecl(ConstructorDecl* decl)
+			{}
 		};
 	}
 }

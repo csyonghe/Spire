@@ -346,7 +346,6 @@ namespace Spire
 							attribModifier->Key = "Binding";
 							attribModifier->Value.Content = String(index);
 							newImport->modifiers.first = attribModifier;
-							newImport->Scope->Parent = result->Scope;
 							newImport->ShaderName.Content = args[index];
 							result->Members.Add(newImport);
 							continue;

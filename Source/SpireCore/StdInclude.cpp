@@ -362,6 +362,25 @@ namespace Spire
 				}
 			}
 
+			static const char* kComponentNames[]{ "x", "y", "z", "w" };
+
+			// Need to add constructors to the types above
+			for (int ii = 1; ii <= 4; ++ii)
+			{
+				sb << "__generic<T> __extension vector<T, " << ii << ">\n{\n";
+
+				sb << "__init(";
+				for (int jj = 0; jj < ii; ++jj)
+				{
+					if (jj != 0) sb << ", ";
+					sb << "T " << kComponentNames[jj];
+				}
+				sb << ");\n";
+
+				sb << "}\n";
+			}
+
+
 			// Declare built-in texture and sampler types
 
 			sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerState) << ") struct SamplerState {};";
@@ -413,6 +432,37 @@ namespace Spire
 						sb << "\n};\n";
 					}
 				}
+			}
+
+			// Synthesize matrix-vector, vector-matrix, and matrix-matrix multiply operations
+			// TODO(tfoley): just make these generic
+
+			// matrix-vector
+			for (int rr = 2; rr <= 4; ++rr)
+			for (int kk = 2; kk <= 4; ++kk)
+			{
+				sb << "__intrinsic float" << rr << " mul("
+					<< "float" << rr << "x" << kk << " left,"
+					<< "float" << kk << " right);\n";
+			}
+
+			// vector-matrix
+			for (int cc = 2; cc <= 4; ++cc)
+			for (int kk = 2; kk <= 4; ++kk)
+			{
+				sb << "__intrinsic float" << cc << " mul("
+					<< "float" << kk << " left,"
+					<< "float" << kk << "x" << cc << " right);\n";
+			}
+
+			// matrix-matrix
+			for (int rr = 2; rr <= 4; ++rr)
+			for (int kk = 2; kk <= 4; ++kk)
+			for (int cc = 2; cc <= 4; ++cc)
+			{
+				sb << "__intrinsic float" << rr << "x" << cc << " mul("
+					<< "float" << rr << "x" << kk << " left,"
+					<< "float" << kk << "x" << cc << " right);\n";
 			}
 
 
