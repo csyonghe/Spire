@@ -364,6 +364,9 @@ namespace Spire
 
 			// Declare built-in texture and sampler types
 
+			sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerState) << ") struct SamplerState {};";
+			sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerComparisonState) << ") struct SamplerComparisonState {};";
+
 			static const struct {
 				char const*			name;
 				TextureType::Shape	baseShape;
@@ -402,18 +405,15 @@ namespace Spire
 						if (isMultisample) sb << "MS";
 						if (isArray) sb << "Array";
 						if (isShadow) sb << "Shadow";
-						sb << " {};\n";
+						sb << "\n{";
+
+						// TODO(tfoley): properly list operations and their signatures
+						sb << "T Load(int3 u);\n";
+
+						sb << "\n};\n";
 					}
 				}
 			}
-
-			sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerState) << ") struct SamplerState {};";
-			sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerComparisonState) << ") struct SamplerComparisonState {};";
-
-
-
-
-
 
 
 			sb << "__intrinsic vec3 operator * (vec3, mat3);\n";

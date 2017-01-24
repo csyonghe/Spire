@@ -1236,7 +1236,8 @@ namespace Spire
 		// GenericTypeParamDecl
 
 		RefPtr<SyntaxNode> GenericTypeParamDecl::Accept(SyntaxVisitor * visitor) {
-			throw "unimplemented";
+			//throw "unimplemented";
+			return this;
 		}
 
 		GenericTypeParamDecl * GenericTypeParamDecl::Clone(CloneContext & ctx) {
@@ -1246,20 +1247,11 @@ namespace Spire
 		// GenericValueParamDecl
 
 		RefPtr<SyntaxNode> GenericValueParamDecl::Accept(SyntaxVisitor * visitor) {
-			throw "unimplemented";
+			//throw "unimplemented";
+			return this;
 		}
 
 		GenericValueParamDecl * GenericValueParamDecl::Clone(CloneContext & ctx) {
-			throw "unimplemented";
-		}
-
-		// VectorTypeDecl
-
-		RefPtr<SyntaxNode> VectorTypeDecl::Accept(SyntaxVisitor * visitor) {
-			throw "unimplemented";
-		}
-
-		VectorTypeDecl * VectorTypeDecl::Clone(CloneContext & ctx) {
 			throw "unimplemented";
 		}
 

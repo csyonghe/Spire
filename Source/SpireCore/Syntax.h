@@ -5,6 +5,8 @@
 #include "Lexer.h"
 #include "IL.h"
 
+#include <assert.h>
+
 namespace Spire
 {
 	namespace Compiler
@@ -353,6 +355,8 @@ namespace Spire
 			virtual ArithmeticExpressionType * AsArithmeticTypeImpl() const override;
 		};
 
+		class FunctionDeclBase;
+
 		// Function types are currently used for references to symbols that name
 		// either ordinary functions, or "component functions."
 		// We do not directly store a representation of the type, and instead
@@ -362,6 +366,7 @@ namespace Spire
 		public:
 			ShaderComponentSymbol * Component = nullptr;
 			FunctionSymbol * Func = nullptr;
+			FunctionDeclBase* decl = nullptr;
 
 			virtual String ToString() const override;
 		protected:
@@ -731,12 +736,31 @@ namespace Spire
 		class ContainerDecl;
 		class SpecializeModifier;
 
+		// Represents how much checking has been applied to a declaration.
+		enum class DeclCheckState : uint8_t
+		{
+			// The declaration has been parsed, but not checked
+			Unchecked,
+
+			// We are in the process of checking the declaration "header"
+			// (those parts of the declaration needed in order to
+			// reference it)
+			CheckingHeader,
+
+			// We are done checking the declaration header.
+			CheckedHeader,
+
+			// We have checked the declaration fully.
+			Checked,
+		};
+
 		class Decl : public SyntaxNode
 		{
 		public:
 			ContainerDecl*  ParentDecl;
 			Token Name;
 			Modifiers modifiers;
+			DeclCheckState checkState = DeclCheckState::Unchecked;
 
 			bool HasModifier(ModifierFlags flags) { return (modifiers.flags & flags) == flags; }
 
@@ -758,6 +782,13 @@ namespace Spire
 			bool FindSimpleAttribute(String const& key, String& outValue);
 			bool HasSimpleAttribute(String const& key);
 			SpecializeModifier * FindSpecializeModifier();
+
+			bool IsChecked(DeclCheckState state) { return checkState >= state; }
+			void SetCheckState(DeclCheckState state)
+			{
+				assert(state >= checkState);
+				checkState = state;
+			}
 
 			virtual Decl * Clone(CloneContext & ctx) = 0;
 		};
@@ -1002,7 +1033,6 @@ namespace Spire
 			{
 				return GetMembersOfType<StructField>();
 			}
-			bool SemanticallyChecked = false;
 			bool IsIntrinsic = false;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			StructField* FindField(String name)
@@ -1098,6 +1128,7 @@ namespace Spire
 			{
 				return GetMembersOfType<ParameterSyntaxNode>();
 			}
+			TypeExp ReturnType;
 			RefPtr<BlockStatementSyntaxNode> Body;
 		};
 
@@ -1105,8 +1136,6 @@ namespace Spire
 		{
 		public:
 			String InternalName;
-			TypeExp ReturnType;
-			bool SemanticallyChecked = false;
 			bool IsInline() { return HasModifier(ModifierFlag::Inline); }
 			bool IsExtern() { return HasModifier(ModifierFlag::Extern); }
 			bool HasSideEffect() { return !HasModifier(ModifierFlag::Intrinsic); }
@@ -1460,7 +1489,6 @@ namespace Spire
 		{
 		public:
 			bool IsModule = false;
-			bool SemanticallyChecked = false;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ShaderSyntaxNode * Clone(CloneContext & ctx) override;
 		};
@@ -1468,7 +1496,6 @@ namespace Spire
 		class InterfaceSyntaxNode : public ShaderDeclBase
 		{
 		public:
-			bool SemanticallyChecked = false;
 			FilteredMemberList<ComponentSyntaxNode> GetComponents()
 			{
 				return GetMembersOfType<ComponentSyntaxNode>();
@@ -1670,14 +1697,6 @@ namespace Spire
 		public:
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual GenericValueParamDecl * Clone(CloneContext & ctx) override;
-		};
-
-		// The declaration of the `vector` type
-		class VectorTypeDecl : public Decl
-		{
-		public:
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-			virtual VectorTypeDecl * Clone(CloneContext & ctx) override;
 		};
 
 		//

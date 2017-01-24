@@ -175,6 +175,42 @@ namespace Spire
 				throw "unimplemented";
 			}
 
+			// Make sure a declaration has been checked, so we can refer to it.
+			// Note that this may lead to us recursively invoking checking,
+			// so this may not be the best way to handle things.
+			void EnsureDecl(RefPtr<Decl> decl, DeclCheckState state = DeclCheckState::CheckedHeader)
+			{
+				if (decl->IsChecked(state)) return;
+				if (decl->checkState == DeclCheckState::CheckingHeader)
+				{
+					// We tried to reference the same declaration while checking it!
+					throw "circularity";
+				}
+
+				if (DeclCheckState::CheckingHeader > decl->checkState)
+				{
+					decl->SetCheckState(DeclCheckState::CheckingHeader);
+				}
+
+				// TODO: not all of the `Visit` cases are ready to
+				// handle this being called on-the-fly
+				decl->Accept(this);
+
+				decl->SetCheckState(DeclCheckState::Checked);
+			}
+
+			void EnusreAllDeclsRec(RefPtr<Decl> decl)
+			{
+				EnsureDecl(decl, DeclCheckState::Checked);
+				if (auto containerDecl = decl.As<ContainerDecl>())
+				{
+					for (auto m : containerDecl->Members)
+					{
+						EnusreAllDeclsRec(m);
+					}
+				}
+			}
+
 			// Take an existing type (expression) and coerce it to one
 			// that can be used for declaraing a variable/parameter/etc.
 			TypeExp CoerceToProperType(TypeExp const& typeExp)
@@ -207,6 +243,7 @@ namespace Spire
 					//
 
 					auto genericDecl = genericDeclRefType->decl;
+					EnsureDecl(genericDecl);
 					List<RefPtr<ExpressionSyntaxNode>> args;
 					for (RefPtr<Decl> member : genericDecl->Members)
 					{
@@ -328,6 +365,35 @@ namespace Spire
 				}
 			}
 		public:
+			RefPtr<ImportOperatorDefSyntaxNode> VisitImportOperatorDef(ImportOperatorDefSyntaxNode* op) override
+			{
+				currentImportOperator = op;
+				HashSet<String> paraNames;
+				for (auto & para : op->GetParameters())
+				{
+					if (paraNames.Contains(para->Name.Content))
+						getSink()->diagnose(para.Ptr(), Diagnostics::parameterAlreadyDefined, para->Name);
+					else
+						paraNames.Add(para->Name.Content);
+					para->Type = TranslateTypeNode(para->Type);
+					if (para->Type.Equals(ExpressionType::Void.Ptr()))
+					{
+						getSink()->diagnose(para.Ptr(), Diagnostics::parameterCannotBeVoid);
+					}
+				}
+				auto oldSymFuncs = symbolTable->Functions;
+				auto oldSymFuncOverloads = symbolTable->FunctionOverloads;
+				for (auto req : op->Requirements)
+				{
+					VisitFunctionDeclaration(req.Ptr());
+				}
+				op->Body->Accept(this);
+				symbolTable->Functions = oldSymFuncs;
+				symbolTable->FunctionOverloads = oldSymFuncOverloads;
+				currentImportOperator = nullptr;
+				return op;
+			}
+
 			RefPtr<PipelineSyntaxNode> VisitPipeline(PipelineSyntaxNode * pipeline) override
 			{
 				RefPtr<PipelineSymbol> psymbol = new PipelineSymbol();
@@ -368,6 +434,7 @@ namespace Spire
 					{
 						getSink()->diagnose(comp.Ptr(), Diagnostics::cannotDefineComponentsInAPipeline);
 					}
+					comp->SetCheckState(DeclCheckState::Checked);
 				}
 				for (auto & op : pipeline->GetImportOperators())
 				{
@@ -426,30 +493,7 @@ namespace Spire
 
 				for (auto & op : pipeline->GetImportOperators())
 				{
-					currentImportOperator = op.Ptr();
-					HashSet<String> paraNames;
-					for (auto & para : op->GetParameters())
-					{
-						if (paraNames.Contains(para->Name.Content))
-							getSink()->diagnose(para.Ptr(), Diagnostics::parameterAlreadyDefined, para->Name);
-						else
-							paraNames.Add(para->Name.Content);
-						para->Type = TranslateTypeNode(para->Type);
-						if (para->Type.Equals(ExpressionType::Void.Ptr()))
-						{
-							getSink()->diagnose(para.Ptr(), Diagnostics::parameterCannotBeVoid);
-						}
-					}
-					auto oldSymFuncs = symbolTable->Functions;
-					auto oldSymFuncOverloads = symbolTable->FunctionOverloads;
-					for (auto req : op->Requirements)
-					{
-						VisitFunctionDeclaration(req.Ptr());
-					}
-					op->Body->Accept(this);
-					symbolTable->Functions = oldSymFuncs;
-					symbolTable->FunctionOverloads = oldSymFuncOverloads;
-					currentImportOperator = nullptr;
+					EnsureDecl(op);
 				}
 				currentPipeline = nullptr;
 				return pipeline;
@@ -773,7 +817,7 @@ namespace Spire
 				this->currentShader = shaderSym.Ptr();
 				for (auto & comp : shaderNode->Members)
 				{
-					comp->Accept(this);
+					EnsureDecl(comp);
 				}
 				this->currentShader = nullptr;
 			}
@@ -807,8 +851,17 @@ namespace Spire
 				}
 				return false;
 			}
+
 			virtual RefPtr<ComponentSyntaxNode> VisitComponent(ComponentSyntaxNode * comp) override
 			{
+				if (comp->IsChecked(DeclCheckState::Checked)) return comp;
+
+				// HACK(tfoley): Don't want to check these inside a template shader
+				if (!currentShader)
+					return comp;
+
+				comp->SetCheckState(DeclCheckState::CheckingHeader);
+
 				this->currentCompNode = comp;
 				RefPtr<ShaderComponentSymbol> compSym;
 				currentShader->Components.TryGetValue(comp->Name.Content, compSym);
@@ -835,6 +888,9 @@ namespace Spire
 				{
 					param->Accept(this);
 				}
+
+				comp->SetCheckState(DeclCheckState::CheckedHeader);
+
 				if (comp->Expression)
 				{
 					comp->Expression = comp->Expression->Accept(this).As<ExpressionSyntaxNode>();
@@ -847,6 +903,9 @@ namespace Spire
 
 				this->currentComp = nullptr;
 				this->currentCompNode = nullptr;
+
+				comp->SetCheckState(DeclCheckState::Checked);
+
 				return comp;
 			}
 			virtual RefPtr<StatementSyntaxNode> VisitImportStatement(ImportStatementSyntaxNode * importStmt) override
@@ -961,11 +1020,7 @@ namespace Spire
 					VisitTypeDefDecl(s.Ptr());
 				for (auto & s : program->GetStructs())
 				{
-					if (!s->SemanticallyChecked)
-					{
-						VisitStruct(s.Ptr());
-						s->SemanticallyChecked = true;
-					}
+					VisitStruct(s.Ptr());
 				}
 
 				// HACK(tfoley): Visiting all generic declarations here,
@@ -977,7 +1032,7 @@ namespace Spire
 
 				for (auto & func : program->GetFunctions())
 				{
-					if (!func->SemanticallyChecked)
+					if (!func->IsChecked(DeclCheckState::Checked))
 					{
 						VisitFunctionDeclaration(func.Ptr());
 						if (funcNames.Contains(func->InternalName))
@@ -1001,11 +1056,7 @@ namespace Spire
 				}
 				for (auto & func : program->GetFunctions())
 				{
-					if (!func->SemanticallyChecked)
-					{
-						func->Accept(this);
-						func->SemanticallyChecked = true;
-					}
+					EnsureDecl(func);
 				}
 				for (auto & pipeline : program->GetPipelines())
 				{
@@ -1013,16 +1064,12 @@ namespace Spire
 				}
 				for (auto & interfaceNode : program->GetInterfaces())
 				{
-					if (!interfaceNode->SemanticallyChecked)
-					{
-						VisitInterface(interfaceNode.Ptr());
-						interfaceNode->SemanticallyChecked = true;
-					}
+					EnsureDecl(interfaceNode);
 				}
 				// build initial symbol table for shaders
 				for (auto & shader : program->GetShaders())
 				{
-					if (!shader->SemanticallyChecked)
+					if (!shader->IsChecked(DeclCheckState::Checked))
 					{
 						RefPtr<ShaderSymbol> shaderSym = new ShaderSymbol();
 						shaderSym->SyntaxNode = shader.Ptr();
@@ -1035,10 +1082,10 @@ namespace Spire
 				}
 				for (auto & shader : program->GetShaders())
 				{
-					if (!shader->SemanticallyChecked)
+					if (!shader->IsChecked(DeclCheckState::CheckedHeader))
 					{
 						VisitShaderPass1(shader.Ptr());
-						shader->SemanticallyChecked = true;
+						shader->SetCheckState(DeclCheckState::CheckedHeader);
 					}
 				}
 				if (sink->GetErrorCount() != 0)
@@ -1061,8 +1108,17 @@ namespace Spire
 					if (!shader->SemanticallyChecked)
 					{
 						VisitShaderPass2(shader->SyntaxNode);
+						shader->SyntaxNode->SetCheckState(DeclCheckState::Checked);
 						shader->SemanticallyChecked = true;
 					}
+				}
+
+				// Force everything to be fully checked, just in case
+				// Note that we don't just call this on the program,
+				// because we'd end up recursing into this very code path...
+				for (auto d : programNode->Members)
+				{
+					EnusreAllDeclsRec(d);
 				}
 
 				return programNode;
@@ -1070,9 +1126,14 @@ namespace Spire
 
 			virtual RefPtr<StructSyntaxNode> VisitStruct(StructSyntaxNode * structNode) override
 			{
+				if (structNode->IsChecked(DeclCheckState::Checked))
+					return structNode;
+				structNode->SetCheckState(DeclCheckState::Checked);
+
 				for (auto field : structNode->GetFields())
 				{
-					field->Type = TranslateTypeNode(field->Type);
+					field->Type = CoerceToProperType(TranslateTypeNode(field->Type));
+					field->SetCheckState(DeclCheckState::Checked);
 				}
 				return structNode;
 			}
@@ -1085,11 +1146,24 @@ namespace Spire
 
 			virtual RefPtr<FunctionSyntaxNode> VisitFunction(FunctionSyntaxNode *functionNode) override
 			{
+				if (functionNode->IsChecked(DeclCheckState::Checked))
+					return functionNode;
+
+				VisitFunctionDeclaration(functionNode);
+				functionNode->SetCheckState(DeclCheckState::Checked);
+
 				if (!functionNode->IsExtern())
 				{
-					currentFunc = symbolTable->Functions.TryGetValue(functionNode->InternalName)->Ptr();
+					// TIM:HACK: members functions might not have an `InternalName`
+					if (auto found = symbolTable->Functions.TryGetValue(functionNode->InternalName))
+					{
+						currentFunc = found->Ptr();
+					}
 					this->function = functionNode;
-					functionNode->Body->Accept(this);
+					if (functionNode->Body)
+					{
+						functionNode->Body->Accept(this);
+					}
 					this->function = NULL;
 					currentFunc = nullptr;
 				}
@@ -1098,6 +1172,9 @@ namespace Spire
 
 			void VisitFunctionDeclaration(FunctionSyntaxNode *functionNode)
 			{
+				if (functionNode->IsChecked(DeclCheckState::CheckedHeader)) return;
+				functionNode->SetCheckState(DeclCheckState::CheckingHeader);
+
 				this->function = functionNode;
 				auto returnType = TranslateTypeNode(functionNode->ReturnType);
 				functionNode->ReturnType = returnType;
@@ -1127,6 +1204,7 @@ namespace Spire
 				}
 				overloadList->Add(symbol);
 				this->function = NULL;
+				functionNode->SetCheckState(DeclCheckState::CheckedHeader);
 			}
 
 			virtual RefPtr<StatementSyntaxNode> VisitBlockStatement(BlockStatementSyntaxNode *stmt) override
@@ -1766,26 +1844,128 @@ namespace Spire
 				return project;
 			}
 
-			RefPtr<ExpressionSyntaxNode> ResolveInvoke(InvokeExpressionSyntaxNode * expr)
+			// Coerce an expression to a specific  type that it is expected to have in context
+			RefPtr<ExpressionSyntaxNode> CoerceExprToType(
+				RefPtr<ExpressionSyntaxNode>	expr,
+				RefPtr<ExpressionType>			type)
 			{
-				if (auto varExpr = expr->FunctionExpr.As<VarExpressionSyntaxNode>())
+				if (MatchType_ValueReceiver(type.Ptr(), expr->Type.Ptr()))
 				{
-					return ResolveFunctionOverload(expr, varExpr.Ptr(), expr->Arguments);
-				}
-				else if (auto memberExpr = expr->FunctionExpr.As<MemberExpressionSyntaxNode>())
-				{
-					return ResolveFunctionOverload(expr, memberExpr.Ptr(), expr->Arguments);
+					// TODO: insert the conversion operation here...
+					return expr;
 				}
 				else
 				{
-					getSink()->diagnose(expr->FunctionExpr, Diagnostics::expectedFunction);
-					expr->Type = ExpressionType::Error;
+					getSink()->diagnose(expr, Diagnostics::typeMismatch, expr->Type, type);
+					return expr;
 				}
+			}
+
+			// Resolve a call to a function, represented here
+			// by a symbol with a `FuncType` type.
+			RefPtr<ExpressionSyntaxNode> ResolveFunctionApp(
+				RefPtr<FuncType>			funcType,
+				InvokeExpressionSyntaxNode*	appExpr)
+			{
+				// TODO(tfoley): Actual checking logic needs to go here...
+
+				auto& args = appExpr->Arguments;
+				List<RefPtr<ParameterSyntaxNode>> params;
+				RefPtr<ExpressionType> resultType;
+				if (auto funcDecl = funcType->decl)
+				{
+					EnsureDecl(funcDecl);
+
+					params = funcDecl->GetParameters().ToArray();
+					resultType = funcDecl->ReturnType;
+				}
+				else if (auto funcSym = funcType->Func)
+				{
+					auto funcDecl = funcSym->SyntaxNode;
+					EnsureDecl(funcDecl);
+
+					params = funcDecl->GetParameters().ToArray();
+					resultType = funcDecl->ReturnType;
+				}
+				else if (auto componentFuncSym = funcType->Component)
+				{
+					auto componentFuncDecl = componentFuncSym->Implementations.First()->SyntaxNode;
+					params = componentFuncDecl->GetParameters().ToArray();
+					resultType = componentFuncDecl->Type;
+				}
+
+				auto argCount = args.Count();
+				auto paramCount = params.Count();
+				if (argCount != paramCount)
+				{
+					getSink()->diagnose(appExpr, Diagnostics::unimplemented, "wrong number of arguments for call");
+					appExpr->Type = ExpressionType::Error;
+					return appExpr;
+				}
+
+				for (int ii = 0; ii < argCount; ++ii)
+				{
+					auto arg = args[ii];
+					auto param = params[ii];
+
+					arg = CoerceExprToType(arg, param->Type);
+
+					args[ii] = arg;
+				}
+
+				assert(resultType);
+				appExpr->Type = resultType;
+				return appExpr;
+			}
+
+			// Resolve a constructor call, formed by apply a type to arguments
+			RefPtr<ExpressionSyntaxNode> ResolveConstructorApp(
+				RefPtr<ExpressionType>		type,
+				InvokeExpressionSyntaxNode*	appExpr)
+			{
+				// TODO(tfoley): Actual checking logic needs to go here...
+
+				appExpr->Type = type;
+				return appExpr;
+			}
+
+			RefPtr<ExpressionSyntaxNode> ResolveInvoke(InvokeExpressionSyntaxNode * expr)
+			{
+				// Look at the base expression for the call, and figure out how
+				// to invoke it.
+				auto funcExpr = expr->FunctionExpr;
+				auto funcExprType = funcExpr->Type;
+				if (auto funcType = funcExprType->As<FuncType>())
+				{
+					return ResolveFunctionApp(funcType, expr);
+				}
+				else if (auto typeType = funcExprType->As<TypeExpressionType>())
+				{
+					// The expression named a type, so we have a constructor call
+					// on our hands.
+					return ResolveConstructorApp(typeType->type, expr);
+				}
+				else if (funcExprType->Equals(ExpressionType::Error))
+				{
+					expr->Type = ExpressionType::Error;
+					return expr;
+				}
+
+				getSink()->diagnose(expr->FunctionExpr, Diagnostics::expectedFunction);
+				expr->Type = ExpressionType::Error;
 				return expr;
+			}
+
+			RefPtr<ExpressionSyntaxNode> CheckExpr(RefPtr<ExpressionSyntaxNode> expr)
+			{
+				return expr->Accept(this).As<ExpressionSyntaxNode>();
 			}
 
 			virtual RefPtr<ExpressionSyntaxNode> VisitInvokeExpression(InvokeExpressionSyntaxNode *expr) override
 			{
+				// check the base expression first
+				expr->FunctionExpr = CheckExpr(expr->FunctionExpr);
+
 				for (auto & arg : expr->Arguments)
 					arg = arg->Accept(this).As<ExpressionSyntaxNode>();
 
@@ -1956,62 +2136,7 @@ namespace Spire
 				{
 					// Found declaration through ordinary scope lookup rules
 					expr->decl = decl;
-
-					// We need to insert an appropriate type for the expression, based on
-					// what we found.
-					if (auto varDecl = dynamic_cast<VarDeclBase*>(decl))
-					{
-						expr->Type = varDecl->Type;
-
-						// A variable reference is an l-value as long as the variable is mutable.
-						// Currently the only immutable variable declarations are components.
-						expr->Type.IsLeftValue = !(dynamic_cast<ComponentSyntaxNode*>(varDecl));
-					}
-					else if (auto compDecl = dynamic_cast<ComponentSyntaxNode*>(decl))
-					{
-						// TODO(tfoley): this is not correct in the case where we have a
-						// component *function*.
-						expr->Type = compDecl->Type;
-					}
-// TODO(tfoley): Need to update this to construct the right kind of
-// type to refer to the given declaration...
-#if TIMREMOVED
-					else if (auto typeDecl = dynamic_cast<BuiltinTypeDecl*>(decl))
-					{
-						// TODO(tfoley): stash the resulting type somewhere on the decl, for convenience
-						RefPtr<BasicExpressionType> type = new BasicExpressionType(typeDecl->tag);
-						typeResult = type;
-						expr->Type = new TypeExpressionType(type);
-					}
-#endif
-					else if (auto typeAliasDecl = dynamic_cast<TypeDefDecl*>(decl))
-					{
-						auto type = new NamedExpressionType(typeAliasDecl);
-						typeResult = type;
-						expr->Type = new TypeExpressionType(type);
-					}
-					else if (auto aggTypeDecl = dynamic_cast<AggTypeDecl*>(decl))
-					{
-						auto type = CreateDeclRefType(aggTypeDecl);
-						typeResult = type;
-						expr->Type = new TypeExpressionType(type);
-					}
-					else if (auto simpleTypeDecl = dynamic_cast<SimpleTypeDecl*>(decl))
-					{
-						auto type = CreateDeclRefType(simpleTypeDecl);
-						typeResult = type;
-						expr->Type = new TypeExpressionType(type);
-					}
-					else if (auto genericDecl = dynamic_cast<GenericDecl*>(decl))
-					{
-						auto type = new GenericDeclRefType(genericDecl);
-						typeResult = type;
-						expr->Type = new TypeExpressionType(type);
-					}
-					else
-					{
-						getSink()->diagnose(expr, Diagnostics::unimplemented, "declaration reference case");
-					}
+					expr->Type = GetTypeForDeclRef(decl);
 					return expr;
 				}
 
@@ -2113,14 +2238,130 @@ namespace Spire
 				expr->Type = expr->Expr0->Type;
 				return expr;
 			}
+
+			// Get the type to use when referencing a declaration
+			QualType GetTypeForDeclRef(Decl* decl)
+			{
+				// We need to insert an appropriate type for the expression, based on
+				// what we found.
+				if (auto varDecl = dynamic_cast<VarDeclBase*>(decl))
+				{
+					QualType qualType;
+					qualType.type = varDecl->Type;
+					qualType.IsLeftValue = true; // TODO(tfoley): allow explicit `const` or `let` variables
+					return qualType;
+				}
+				else if (auto compDecl = dynamic_cast<ComponentSyntaxNode*>(decl))
+				{
+					if (compDecl->IsComponentFunction())
+					{
+						// TODO: need to implement this case
+					}
+					else
+					{
+						return compDecl->Type.type;
+					}
+				}
+				else if (auto typeAliasDecl = dynamic_cast<TypeDefDecl*>(decl))
+				{
+					auto type = new NamedExpressionType(typeAliasDecl);
+					typeResult = type;
+					return new TypeExpressionType(type);
+				}
+				else if (auto aggTypeDecl = dynamic_cast<AggTypeDecl*>(decl))
+				{
+					auto type = CreateDeclRefType(aggTypeDecl);
+					typeResult = type;
+					return new TypeExpressionType(type);
+				}
+				else if (auto simpleTypeDecl = dynamic_cast<SimpleTypeDecl*>(decl))
+				{
+					auto type = CreateDeclRefType(simpleTypeDecl);
+					typeResult = type;
+					return new TypeExpressionType(type);
+				}
+				else if (auto genericDecl = dynamic_cast<GenericDecl*>(decl))
+				{
+					auto type = new GenericDeclRefType(genericDecl);
+					typeResult = type;
+					return new TypeExpressionType(type);
+				}
+				else if (auto funcDecl = dynamic_cast<FunctionDeclBase*>(decl))
+				{
+					auto type = new FuncType();
+					type->decl = funcDecl;
+					return type;
+				}
+
+				getSink()->diagnose(decl, Diagnostics::unimplemented, "cannot form reference to this kind of declaration");
+				return ExpressionType::Error;
+			}
+
 			virtual RefPtr<ExpressionSyntaxNode> VisitMemberExpression(MemberExpressionSyntaxNode * expr) override
 			{
 				expr->BaseExpression = expr->BaseExpression->Accept(this).As<ExpressionSyntaxNode>();
 				auto & baseType = expr->BaseExpression->Type;
 				if (auto declRefType = baseType->AsDeclRefType())
 				{
-					if (auto structDecl = dynamic_cast<StructSyntaxNode*>(declRefType->decl))
+					if (auto aggTypeDecl = dynamic_cast<AggTypeDecl*>(declRefType->decl))
 					{
+						// Checking of the type must be complete before we can reference its members safely
+						EnsureDecl(aggTypeDecl, DeclCheckState::Checked);
+
+						// TODO(tfoley): It is unfortunate that the lookup strategy
+						// here isn't unified with the ordinary `Scope` case.
+						// In particular, if we add support for "transparent" declarations,
+						// etc. here then we would need to add them in ordinary lookup
+						// as well.
+
+						Decl* memberDecl = nullptr; // The first declaration we found, if any
+						Decl* secondDecl = nullptr; // Another declaration with the same name, if any
+						for (auto m : aggTypeDecl->Members)
+						{
+							if (m->Name.Content != expr->MemberName)
+								continue;
+
+							if (!memberDecl)
+							{
+								memberDecl = m.Ptr();
+							}
+							else
+							{
+								secondDecl = m.Ptr();
+								break;
+							}
+						}
+
+						// If we didn't find any member, then we signal an error
+						if (!memberDecl)
+						{
+							expr->Type = ExpressionType::Error;
+							getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->MemberName, baseType);
+							return expr;
+						}
+
+						// If we found only a single member, then we are fine
+						if (!secondDecl)
+						{
+							expr->Type = GetTypeForDeclRef(memberDecl);
+
+							// When referencing a member variable, the result is an l-value
+							// if and only if the base expression was.
+							if (auto memberVarDecl = dynamic_cast<VarDeclBase*>(memberDecl))
+							{
+								expr->Type.IsLeftValue = expr->BaseExpression->Type.IsLeftValue;
+							}
+							return expr;
+						}
+
+						// We found multiple members with the same name, and need
+						// to resolve the embiguity at some point...
+						expr->Type = ExpressionType::Error;
+						getSink()->diagnose(expr, Diagnostics::unimplemented, "ambiguous member reference");
+						return expr;
+
+#if 0
+
 						StructField* field = structDecl->FindField(expr->MemberName);
 						if (!field)
 						{
@@ -2134,6 +2375,7 @@ namespace Spire
 						// value was also an l-value.
 						expr->Type.IsLeftValue = expr->BaseExpression->Type.IsLeftValue;
 						return expr;
+#endif
 					}
 
 					// catch-all
