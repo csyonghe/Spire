@@ -1518,23 +1518,22 @@ namespace Spire
 		// in the case where the result is overloaded.
 		struct LookupResult
 		{
-			enum Flags : uint8_t
-			{
-				None = 0x0,
-				Overloaded = 0x1,
-			};
-
+			// The declaration that was found, in the smple case
 			Decl*			decl = nullptr;
+
+			// All of the declarations that were found, in the complex case.
+			// Note: if there was no overloading, then this doesn't include
+			// `decl`, just to avoid allocating memory.
+			List<Decl*>		decls;
+
 			ContainerDecl*	scope = nullptr;
 			ContainerDecl*	endScope = nullptr;
-			int				index = 0;
 			LookupMask		mask = LookupMask::All;
-			uint8_t			flags = Flags::None;
 
 			// Was at least one result found?
 			bool isValid() const { return decl != nullptr; }
 
-			bool isOverloaded() const { return flags & Flags::Overloaded; }
+			bool isOverloaded() const { return decls.Count() > 1; }
 		};
 
 		// An expression that references an overloaded set of declarations

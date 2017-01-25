@@ -2728,29 +2728,6 @@ namespace Spire
 				}
 			}
 
-			LookupResult GetNext(LookupResult const& inResult)
-			{
-				if (!inResult.isValid()) return inResult;
-
-				LookupResult result = inResult;
-
-				// For now this is easy enough, because we don't try to work
-				// our way out to parent scopes.
-				// TODO(tfoley): that needs to be fixed eventually
-
-				for (auto m = result.decl->nextInContainerWithSameName; m; m = m->nextInContainerWithSameName)
-				{
-					if (!DeclPassesLookupMask(m, result.mask))
-						continue;
-
-					result.decl = m;
-					return result;
-				}
-
-				result.decl = nullptr;
-				return result;
-			}
-
 			void AddOverloadCandidates(
 				RefPtr<ExpressionSyntaxNode>	funcExpr,
 				OverloadResolveContext&			context)
@@ -2775,11 +2752,11 @@ namespace Spire
 				else if (auto overloadedExpr = funcExpr.As<OverloadedExpr>())
 				{
 					auto lookupResult = overloadedExpr->lookupResult2;
-					while (lookupResult.isValid())
+					assert(lookupResult.isOverloaded());
+					for(auto resultDecl : lookupResult.decls)
 					{
-						DeclRef declRef(lookupResult.decl, overloadedExpr->substitutions);
+						DeclRef declRef(resultDecl, overloadedExpr->substitutions);
 						AddDeclRefOverloadCandidates(declRef, context);
-						lookupResult = GetNext(lookupResult);
 					}
 				}
 			}
@@ -3042,7 +3019,6 @@ namespace Spire
 
 				ContainerDecl* scope = inResult.scope;
 				ContainerDecl* endScope = inResult.endScope;
-				int index = inResult.index;
 				for (;scope != endScope; scope = scope->ParentDecl)
 				{
 
@@ -3067,11 +3043,16 @@ namespace Spire
 							result.decl = m;
 							result.scope = scope;
 						}
+						else if (!result.isOverloaded())
+						{
+							// We are about to make this overloaded
+							result.decls.Add(result.decl);
+							result.decls.Add(m);
+						}
 						else
 						{
-							// Otherwise, we've found a second hit, and should
-							// consider the lookup result overloaded.
-							result.flags |= LookupResult::Flags::Overloaded;
+							// The result was already overloaded, so we pile on
+							result.decls.Add(m);
 						}
 					}
 
