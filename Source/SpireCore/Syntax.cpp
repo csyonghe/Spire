@@ -681,8 +681,8 @@ namespace Spire
 		{
 			auto declRefType = AsDeclRefType();
 			if (!declRefType) return false;
-			auto structDecl = dynamic_cast<StructSyntaxNode*>(declRefType->decl);
-			if (!structDecl) return false;
+			auto structDeclRef = declRefType->declRef.As<StructDeclRef>();
+			if (!structDeclRef) return false;
 			return true;
 		}
 		bool ExpressionType::IsShader() const
@@ -781,14 +781,14 @@ namespace Spire
 
 		String DeclRefType::ToString() const
 		{
-			return decl->Name.Content;
+			return declRef.GetName();
 		}
 
 		bool DeclRefType::EqualsImpl(const ExpressionType * type) const
 		{
 			if (auto declRefType = type->AsDeclRefType())
 			{
-				return decl == declRefType->decl;
+				return declRef.Equals(declRefType->declRef);
 			}
 			return false;
 		}
@@ -825,7 +825,7 @@ namespace Spire
 
         String NamedExpressionType::ToString() const
         {
-            return decl->Name.Content;
+			return declRef.GetName();
         }
 
         bool NamedExpressionType::EqualsImpl(const ExpressionType * /*type*/) const
@@ -841,7 +841,7 @@ namespace Spire
 
         ExpressionType* NamedExpressionType::CreateCanonicalType()
         {
-            return decl->Type.type->GetCanonicalType();
+            return declRef.GetType()->GetCanonicalType();
         }
 
 		// FuncType
@@ -962,7 +962,7 @@ namespace Spire
 		{
 			if (auto genericDeclRefType = type->As<GenericDeclRefType>())
 			{
-				return decl == genericDeclRefType->decl;
+				return declRef.Equals(genericDeclRefType->declRef);
 			}
 			return false;
 		}
@@ -1014,7 +1014,7 @@ namespace Spire
 		{
 			auto canElementType = elementType->GetCanonicalType();
 			auto canType = new VectorExpressionType(canElementType, elementCount);
-			canType->decl = decl;
+			canType->declRef = declRef;
 			sCanonicalTypes.Add(canType);
 			return canType;
 		}
@@ -1053,7 +1053,7 @@ namespace Spire
 		{
 			auto canElementType = elementType->GetCanonicalType();
 			auto canType = new MatrixExpressionType(canElementType, rowCount, colCount);
-			canType->decl = decl;
+			canType->declRef = declRef;
 			sCanonicalTypes.Add(canType);
 			return canType;
 		}
@@ -1300,6 +1300,34 @@ namespace Spire
 			throw "unimplemented";
 		}
 
+		// DeclRef
+
+		RefPtr<ExpressionType> DeclRef::Substitute(RefPtr<ExpressionType> type) const
+		{
+			// No substitutions? Easy.
+			if (!substitutions)
+				return type;
+
+			// Otherwise we need to recurse on the type structure
+			// and apply substitutions where it makes sense
+
+			throw "unimplemented";
+		}
+
+		// Check if this is an equivalent declaration reference to another
+		bool DeclRef::Equals(DeclRef const& declRef) const
+		{
+			if (decl != declRef.decl)
+				return false;
+
+			throw "unimplemented";
+		}
+
+		// Convenience accessors for common properties of declarations
+		String const& DeclRef::GetName() const
+		{
+			return decl->Name.Content;
+		}
 
 	}
 }

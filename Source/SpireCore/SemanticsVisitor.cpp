@@ -125,7 +125,7 @@ namespace Spire
 			}
 
 			RefPtr<ExpressionSyntaxNode> ConstructDeclRefExpr(
-				Decl*							decl,
+				DeclRef							declRef,
 				RefPtr<ExpressionSyntaxNode>	baseExpr,
 				RefPtr<ExpressionSyntaxNode>	originalExpr)
 			{
@@ -134,23 +134,23 @@ namespace Spire
 					auto expr = new MemberExpressionSyntaxNode();
 					expr->Position = originalExpr->Position;
 					expr->BaseExpression = baseExpr;
-					expr->MemberName = decl->Name.Content;
-					expr->Type = GetTypeForDeclRef(decl);
+					expr->MemberName = declRef.GetName();
+					expr->Type = GetTypeForDeclRef(declRef);
 					return expr;
 				}
 				else
 				{
 					auto expr = new VarExpressionSyntaxNode();
 					expr->Position = originalExpr->Position;
-					expr->Variable = decl->Name.Content;
-					expr->Type = GetTypeForDeclRef(decl);
+					expr->Variable = declRef.GetName();
+					expr->Type = GetTypeForDeclRef(declRef);
 					return expr;
 				}
 			}
 
 			RefPtr<ExpressionSyntaxNode> ResolveOverloadedExpr(RefPtr<OverloadedExpr> overloadedExpr, LookupMask mask)
 			{
-				auto lookupResult = overloadedExpr->lookupResult;
+				auto lookupResult = overloadedExpr->lookupResult2;
 				assert(lookupResult.isValid() && lookupResult.isOverloaded());
 
 				// filter the lookup to only consider declarations of the right flavor
@@ -177,7 +177,8 @@ namespace Spire
 				}
 
 				// otherwise, we had a single decl and it was valid, hooray!
-				return ConstructDeclRefExpr(lookupResult.decl, overloadedExpr->base, overloadedExpr);
+				DeclRef declRef(lookupResult.decl, overloadedExpr->substitutions);
+				return ConstructDeclRefExpr(declRef, overloadedExpr->base, overloadedExpr);
 			}
 
 			RefPtr<ExpressionSyntaxNode> ExpectATypeRepr(RefPtr<ExpressionSyntaxNode> expr)
@@ -221,22 +222,58 @@ namespace Spire
 				return CheckIntegerConstantExpression(exp.Ptr());
 			}
 
+			RefPtr<Val> ExtractGenericArgVal(RefPtr<ExpressionSyntaxNode> exp)
+			{
+				if (auto overloadedExpr = exp.As<OverloadedExpr>())
+				{
+					// assume that if it is overloaded, we want a type
+					exp = ResolveOverloadedExpr(overloadedExpr, LookupMask::Type);
+				}
+
+				if (auto typeType = exp->Type->As<TypeExpressionType>())
+				{
+					return typeType->type;
+				}
+				else if (exp->Type->Equals(ExpressionType::Error))
+				{
+					return exp->Type.type;
+				}
+				else
+				{
+					int val = ExtractGenericArgInteger(exp);
+					return new IntVal(val);
+				}
+			}
+
 			// Construct a type reprsenting the instantiation of
 			// the given generic declaration for the given arguments.
 			// The arguments should already be checked against
 			// the declaration.
 			RefPtr<ExpressionType> InstantiateGenericType(
-				GenericDecl*								genericDecl,
+				GenericDeclRef								genericDeclRef,
 				List<RefPtr<ExpressionSyntaxNode>> const&	args)
 			{
-				if (auto magicType = genericDecl->inner->FindModifier<MagicTypeModifier>())
+				RefPtr<Substitutions> subst = new Substitutions();
+				subst->genericDecl = genericDeclRef.GetDecl();
+				subst->outer = genericDeclRef.substitutions;
+
+				for (auto argExpr : args)
+				{
+					subst->args.Add(ExtractGenericArgVal(argExpr));
+				}
+
+				DeclRef innerDeclRef;
+				innerDeclRef.decl = genericDeclRef.GetInner();
+				innerDeclRef.substitutions = subst;
+
+				if (auto magicType = genericDeclRef.GetInner()->FindModifier<MagicTypeModifier>())
 				{
 					if (magicType->name == "Vector")
 					{
 						auto vecType = new VectorExpressionType(
 							ExtractGenericArgType(args[0]),
 							ExtractGenericArgInteger(args[1]));
-						vecType->decl = genericDecl->inner.Ptr();
+						vecType->declRef = innerDeclRef;
 						return vecType;
 					}
 					else if (magicType->name == "Matrix")
@@ -245,7 +282,7 @@ namespace Spire
 							ExtractGenericArgType(args[0]),
 							ExtractGenericArgInteger(args[1]),
 							ExtractGenericArgInteger(args[2]));
-						matType->decl = genericDecl->inner.Ptr();
+						matType->declRef = innerDeclRef;
 						return matType;
 					}
 					else if (magicType->name == "Texture")
@@ -253,7 +290,7 @@ namespace Spire
 						auto textureType = new TextureType(
 							magicType->tag,
 							ExtractGenericArgType(args[0]));
-						textureType->decl = genericDecl->inner.Ptr();
+						textureType->declRef = innerDeclRef;
 						return textureType;
 					}
 					else
@@ -333,10 +370,10 @@ namespace Spire
 					// "fresh" variables and then solve for their values...
 					//
 
-					auto genericDecl = genericDeclRefType->decl;
-					EnsureDecl(genericDecl);
+					auto genericDeclRef = genericDeclRefType->GetDeclRef();
+					EnsureDecl(genericDeclRef.decl);
 					List<RefPtr<ExpressionSyntaxNode>> args;
-					for (RefPtr<Decl> member : genericDecl->Members)
+					for (RefPtr<Decl> member : genericDeclRef.GetDecl()->Members)
 					{
 						if (auto typeParam = member.As<GenericTypeParamDecl>())
 						{
@@ -368,7 +405,7 @@ namespace Spire
 						}
 					}
 
-					result.type = InstantiateGenericType(genericDecl, args);
+					result.type = InstantiateGenericType(genericDeclRef, args);
 					return result;
 				}
 				else
@@ -411,21 +448,21 @@ namespace Spire
 				else
 #endif
 				{
-					auto baseDeclRef = base.As<DeclRefExpr>();
+					auto baseDeclRefExpr = base.As<DeclRefExpr>();
 
-					if (!baseDeclRef)
+					if (!baseDeclRefExpr)
 					{
 						getSink()->diagnose(typeNode, Diagnostics::unimplemented, "unexpected base term in generic app");
 						typeResult = ExpressionType::Error;
 						return typeNode;
 					}
-					auto decl = baseDeclRef->decl;
+					auto declRef = baseDeclRefExpr->declRef;
 
-					if (auto genericDecl = dynamic_cast<GenericDecl*>(decl))
+					if (auto genericDeclRef = declRef.As<GenericDeclRef>())
 					{
 						int argCount = typeNode->Args.Count();
 						int argIndex = 0;
-						for (RefPtr<Decl> member : genericDecl->Members)
+						for (RefPtr<Decl> member : genericDeclRef.GetDecl()->Members)
 						{
 							if (auto typeParam = member.As<GenericTypeParamDecl>())
 							{
@@ -452,7 +489,7 @@ namespace Spire
 						}
 
 						// Now instantiate the declaration given those arguments
-						auto type = InstantiateGenericType(genericDecl, args);
+						auto type = InstantiateGenericType(genericDeclRef, args);
 						typeResult = type;
 						typeNode->Type = new TypeExpressionType(type);
 						return typeNode;
@@ -1424,7 +1461,7 @@ namespace Spire
 				}
 				else if (auto declRefType = typeExp.type->AsDeclRefType())
 				{
-					if (auto worldDecl = dynamic_cast<WorldSyntaxNode*>(declRefType->decl))
+					if (auto worldDeclRef = declRefType->declRef.As<WorldDeclRef>())
 					{
 						// The type references a world, and we don't want to allow that here.
 						// TODO(tfoley): there is no clear reason why this shouldn't be allowed semantically.
@@ -1913,12 +1950,12 @@ namespace Spire
 				if (!declRefType)
 					return false;
 
-				auto worldDecl = dynamic_cast<WorldSyntaxNode*>(declRefType->decl);
-				if (!worldDecl)
+				auto worldDeclRef = declRefType->declRef.As<WorldDeclRef>();
+				if (!worldDeclRef)
 					return false;
 
 				// TODO(tfoley): Doing this is a string-based check is wrong...
-				return worldDecl->Name.Content == expectedWorld;
+				return worldDeclRef.GetName() == expectedWorld;
 			}
 
 			RefPtr<ExpressionSyntaxNode> VisitProject(ProjectExpressionSyntaxNode * project) override
@@ -1965,15 +2002,15 @@ namespace Spire
 				InvokeExpressionSyntaxNode*	appExpr)
 			{
 				// TODO(tfoley): Actual checking logic needs to go here...
-
+#if 0
 				auto& args = appExpr->Arguments;
 				List<RefPtr<ParameterSyntaxNode>> params;
 				RefPtr<ExpressionType> resultType;
-				if (auto funcDecl = funcType->decl)
+				if (auto funcDeclRef = funcType->declRef)
 				{
-					EnsureDecl(funcDecl);
+					EnsureDecl(funcDeclRef.GetDecl());
 
-					params = funcDecl->GetParameters().ToArray();
+					params = funcDeclRef->GetParameters().ToArray();
 					resultType = funcDecl->ReturnType;
 				}
 				else if (auto funcSym = funcType->Func)
@@ -2013,6 +2050,9 @@ namespace Spire
 				assert(resultType);
 				appExpr->Type = resultType;
 				return appExpr;
+#else
+				throw "unimplemented";
+#endif
 			}
 
 			// Resolve a constructor call, formed by apply a type to arguments
@@ -2038,8 +2078,9 @@ namespace Spire
 				if (auto targetDeclRefType = decl->targetType->As<DeclRefType>())
 				{
 					// Attach our extension to that type as a candidate...
-					if (auto aggTypeDecl = dynamic_cast<AggTypeDecl*>(targetDeclRefType->decl))
+					if (auto aggTypeDeclRef = targetDeclRefType->declRef.As<AggTypeDeclRef>())
 					{
+						auto aggTypeDecl = aggTypeDeclRef.GetDecl();
 						decl->nextCandidateExtension = aggTypeDecl->candidateExtensions;
 						aggTypeDecl->candidateExtensions = decl;
 					}
@@ -2098,11 +2139,8 @@ namespace Spire
 				};
 				Status status = Status::Unchecked;
 
-				union
-				{
-					FunctionDeclBase*		func;
-					ComponentSyntaxNode*	componentFunc;
-				};
+				// Reference to the declaration being applied
+				DeclRef declRef;
 
 				// The type of the result expression if this candidate is selected
 				RefPtr<ExpressionType>	resultType;
@@ -2140,11 +2178,11 @@ namespace Spire
 				switch (candidate.flavor)
 				{
 				case OverloadCandidate::Flavor::Func:
-					paramCount = candidate.func->GetParameters().Count();
+					paramCount = candidate.declRef.As<FuncDeclBaseRef>().GetParameters().Count();
 					break;
 
 				case OverloadCandidate::Flavor::ComponentFunc:
-					paramCount = candidate.componentFunc->GetParameters().Count();
+					paramCount = candidate.declRef.As<ComponentDeclRef>().GetParameters().Count();
 					break;
 				}
 				if (argCount != paramCount && context.mode != OverloadResolveContext::Mode::JustTrying)
@@ -2162,15 +2200,15 @@ namespace Spire
 				auto& args = context.appExpr->Arguments;
 				int argCount = args.Count();
 
-				List<RefPtr<ParameterSyntaxNode>> params;
+				List<ParamDeclRef> params;
 				switch (candidate.flavor)
 				{
 				case OverloadCandidate::Flavor::Func:
-					params = candidate.func->GetParameters().ToArray();
+					params = candidate.declRef.As<FuncDeclBaseRef>().GetParameters().ToArray();
 					break;
 
 				case OverloadCandidate::Flavor::ComponentFunc:
-					params = candidate.componentFunc->GetParameters().ToArray();
+					params = candidate.declRef.As<ComponentDeclRef>().GetParameters().ToArray();
 					break;
 				}
 				int paramCount = params.Count();
@@ -2182,13 +2220,13 @@ namespace Spire
 					auto arg = args[ii];
 					auto param = params[ii];
 
-					if (!MatchType_ValueReceiver(param->Type.Ptr(), arg->Type.Ptr()))
+					if (!MatchType_ValueReceiver(param.GetType().Ptr(), arg->Type.Ptr()))
 					{
 						if (context.mode == OverloadResolveContext::Mode::JustTrying)
 							return false;
 						else
 						{
-							getSink()->diagnose(arg, Diagnostics::typeMismatch, arg->Type, param->Type);
+							getSink()->diagnose(arg, Diagnostics::typeMismatch, arg->Type, param.GetType());
 							success = false;
 						}
 					}
@@ -2282,15 +2320,15 @@ namespace Spire
 			}
 
 			void AddFuncOverloadCandidate(
-				RefPtr<FunctionDeclBase>	funcDecl,
+				FuncDeclBaseRef				funcDeclRef,
 				OverloadResolveContext&		context)
 			{
-				EnsureDecl(funcDecl);
+				EnsureDecl(funcDeclRef.GetDecl());
 
 				OverloadCandidate candidate;
 				candidate.flavor = OverloadCandidate::Flavor::Func;
-				candidate.func = funcDecl.Ptr();
-				candidate.resultType = funcDecl->ReturnType;
+				candidate.declRef = funcDeclRef;
+				candidate.resultType = funcDeclRef.GetResultType();
 
 				AddOverloadCandidate(context, candidate);
 			}
@@ -2299,6 +2337,7 @@ namespace Spire
 				RefPtr<ShaderComponentSymbol>	componentFuncSym,
 				OverloadResolveContext&			context)
 			{
+#if 0
 				auto componentFuncDecl = componentFuncSym->Implementations.First()->SyntaxNode.Ptr();
 
 				OverloadCandidate candidate;
@@ -2307,12 +2346,16 @@ namespace Spire
 				candidate.resultType = componentFuncDecl->Type;
 
 				AddOverloadCandidate(context, candidate);
+#else
+				throw "unimplemented";
+#endif
 			}
 
 			void AddFuncOverloadCandidate(
 				RefPtr<FuncType>		funcType,
 				OverloadResolveContext&	context)
 			{
+#if 0
 				if (funcType->decl)
 				{
 					AddFuncOverloadCandidate(funcType->decl, context);
@@ -2325,16 +2368,19 @@ namespace Spire
 				{
 					AddComponentFuncOverloadCandidate(funcType->Component, context);
 				}
+#else
+				throw "unimplemented";
+#endif
 			}
 
 			void AddCtorOverloadCandidate(
 				RefPtr<ExpressionType>	type,
-				ConstructorDecl*		ctorDecl,
+				ConstructorDeclRef		ctorDeclRef,
 				OverloadResolveContext&	context)
 			{
 				OverloadCandidate candidate;
 				candidate.flavor = OverloadCandidate::Flavor::Func;
-				candidate.func = ctorDecl;
+				candidate.declRef = ctorDeclRef;
 				candidate.resultType = type;
 
 				AddOverloadCandidate(context, candidate);
@@ -2361,14 +2407,14 @@ namespace Spire
 				{
 					if (auto sndDeclRefType = snd->As<DeclRefType>())
 					{
-						auto fstDecl = fstDeclRefType->decl;
-						auto sndDecl = sndDeclRefType->decl;
+						auto fstDeclRef = fstDeclRefType->declRef;
+						auto sndDeclRef = sndDeclRefType->declRef;
 
 						// can't be unified if they refer to differnt declarations.
-						if (fstDecl != sndDecl) return false;
+						if (fstDeclRef.GetDecl() != sndDeclRef.GetDecl()) return false;
 
-						// next need to unify the "path" by which
-						// they were referenced...
+						// next we need to unify the substitutions applied
+						// to each decalration reference.
 						//
 						// TODO(tfoley): actually implement this
 						return true;
@@ -2379,7 +2425,7 @@ namespace Spire
 			}
 
 			// Is the candidate extension declaration actually applicable to the given type
-			bool IsExtensionApplicableToType(
+			ExtensionDeclRef ApplyExtensionToType(
 				ExtensionDecl*			extDecl,
 				RefPtr<ExpressionType>	type)
 			{
@@ -2389,41 +2435,51 @@ namespace Spire
 					// with the type in question.
 					// This has to be done with a constraint solver.
 
-					return TryUnifyTypes(extDecl->targetType, type);
+					if (!TryUnifyTypes(extDecl->targetType, type))
+						return DeclRef().As<ExtensionDeclRef>();
+
+					// The result of the unification should be a set
+					// of bindings for the generic parameters so
+					// that we can construction an `ExtensionDeclRef`
+					// where the target type is equivalent to `type`.
+					//
+					// At that point the extension will be applicable.
 
 					// TODO(tfoley): figure out how to check things here!!!
 					throw "unimplemented";
-					return true;
 				}
 				else
 				{
-					// The easy case is when the extension isn't
-					// generic:
-					return type->Equals(extDecl->targetType);
+					// The easy case is when the extension isn't generic:
+					// either it applies to the type or not.
+					if (!type->Equals(extDecl->targetType))
+						return DeclRef().As<ExtensionDeclRef>();
+					return DeclRef(extDecl, nullptr).As<ExtensionDeclRef>();
 				}
 			}
 
 			void AddAggTypeOverloadCandidates(
 				RefPtr<ExpressionType>	type,
-				RefPtr<AggTypeDecl>		aggTypeDecl,
+				AggTypeDeclRef			aggTypeDeclRef,
 				OverloadResolveContext&	context)
 			{
-				for (auto ctor : aggTypeDecl->GetMembersOfType<ConstructorDecl>())
+				for (auto ctorDeclRef : aggTypeDeclRef.GetMembersOfType<ConstructorDeclRef>())
 				{
 					// now work through this candidate...
-					AddCtorOverloadCandidate(type, ctor.Ptr(), context);
+					AddCtorOverloadCandidate(type, ctorDeclRef, context);
 				}
 
-				// Now walk through any extensions we can find for this type
-				for (auto ext = aggTypeDecl->candidateExtensions; ext; ext = ext->nextCandidateExtension)
+				// Now walk through any extensions we can find for this types
+				for (auto ext = aggTypeDeclRef.GetCandidateExtensions(); ext; ext = ext->nextCandidateExtension)
 				{
-					if (!IsExtensionApplicableToType(ext, type))
+					auto extDeclRef = ApplyExtensionToType(ext, type);
+					if (!extDeclRef)
 						continue;
 
-					for (auto ctor : ext->GetMembersOfType<ConstructorDecl>())
+					for (auto ctorDeclRef : extDeclRef.GetMembersOfType<ConstructorDeclRef>())
 					{
 						// now work through this candidate...
-						AddCtorOverloadCandidate(type, ctor.Ptr(), context);
+						AddCtorOverloadCandidate(type, ctorDeclRef, context);
 					}
 				}
 			}
@@ -2434,25 +2490,25 @@ namespace Spire
 			{
 				if (auto declRefType = type->As<DeclRefType>())
 				{
-					if (auto aggTypeDecl = dynamic_cast<AggTypeDecl*>(declRefType->decl))
+					if (auto aggTypeDeclRef = declRefType->declRef.As<AggTypeDeclRef>())
 					{
-						AddAggTypeOverloadCandidates(type, aggTypeDecl, context);
+						AddAggTypeOverloadCandidates(type, aggTypeDeclRef, context);
 					}
 				}
 			}
 
-			void AddDeclOverloadCandidates(
-				RefPtr<Decl>			decl,
+			void AddDeclRefOverloadCandidates(
+				DeclRef					declRef,
 				OverloadResolveContext&	context)
 			{
-				if (auto funcDecl = decl.As<FunctionDeclBase>())
+				if (auto funcDeclRef = declRef.As<FuncDeclBaseRef>())
 				{
-					AddFuncOverloadCandidate(funcDecl, context);
+					AddFuncOverloadCandidate(funcDeclRef, context);
 				}
-				else if (auto aggTypeDecl = decl.As<AggTypeDecl>())
+				else if (auto aggTypeDeclRef = declRef.As<AggTypeDeclRef>())
 				{
-					auto type = CreateDeclRefType(aggTypeDecl.Ptr());
-					AddAggTypeOverloadCandidates(type, aggTypeDecl, context);
+					auto type = CreateDeclRefType(aggTypeDeclRef);
+					AddAggTypeOverloadCandidates(type, aggTypeDeclRef, context);
 				}
 				else
 				{
@@ -2486,11 +2542,11 @@ namespace Spire
 				}
 				else if (auto overloadedExpr = funcExpr.As<OverloadedExpr>())
 				{
-					auto lookupResult = overloadedExpr->lookupResult;
+					auto lookupResult = overloadedExpr->lookupResult2;
 					while (lookupResult.isValid())
 					{
-						AddDeclOverloadCandidates(lookupResult.decl, context);
-
+						DeclRef declRef(lookupResult.decl, overloadedExpr->substitutions);
+						AddDeclRefOverloadCandidates(declRef, context);
 						lookupResult = GetNext(lookupResult);
 					}
 				}
@@ -2692,20 +2748,20 @@ namespace Spire
 
 			// TODO: need to figure out how to unify this with the logic
 			// in the generic case...
-			static DeclRefType* CreateDeclRefType(Decl* decl)
+			static DeclRefType* CreateDeclRefType(DeclRef declRef)
 			{
-				if (auto builtinMod = decl->FindModifier<BuiltinTypeModifier>())
+				if (auto builtinMod = declRef.GetDecl()->FindModifier<BuiltinTypeModifier>())
 				{
 					auto type = new BasicExpressionType(builtinMod->tag);
-					type->decl = decl;
+					type->declRef = declRef;
 					return type;
 				}
-				else if (auto magicMod = decl->FindModifier<MagicTypeModifier>())
+				else if (auto magicMod = declRef.GetDecl()->FindModifier<MagicTypeModifier>())
 				{
 					if (magicMod->name == "SamplerState")
 					{
 						auto type = new SamplerStateType();
-						type->decl = decl;
+						type->declRef = declRef;
 						type->flavor = SamplerStateType::Flavor(magicMod->tag);
 						return type;
 					}
@@ -2716,7 +2772,7 @@ namespace Spire
 				}
 				else
 				{
-					return new DeclRefType(decl);
+					return new DeclRefType(declRef);
 				}
 			}
 
@@ -2833,15 +2889,16 @@ namespace Spire
 					{
 						auto overloadedExpr = new OverloadedExpr();
 						overloadedExpr->Type = ExpressionType::Overloaded;
-						overloadedExpr->lookupResult = lookupResult;
+						overloadedExpr->lookupResult2 = lookupResult;
 						return overloadedExpr;
 					}
 					else
 					{
 						// Only a single decl, that's good
 						auto decl = lookupResult.decl;
-						expr->decl = decl;
-						expr->Type = GetTypeForDeclRef(decl);
+						auto declRef = DeclRef(decl, nullptr);
+						expr->declRef = declRef;
+						expr->Type = GetTypeForDeclRef(declRef);
 						return expr;
 					}
 				}
@@ -2942,60 +2999,61 @@ namespace Spire
 			}
 
 			// Get the type to use when referencing a declaration
-			QualType GetTypeForDeclRef(Decl* decl)
+			QualType GetTypeForDeclRef(DeclRef declRef)
 			{
 				// We need to insert an appropriate type for the expression, based on
 				// what we found.
-				if (auto varDecl = dynamic_cast<VarDeclBase*>(decl))
+				if (auto varDeclRef = declRef.As<VarDeclBaseRef>())
 				{
 					QualType qualType;
-					qualType.type = varDecl->Type;
+					qualType.type = varDeclRef.GetType();
 					qualType.IsLeftValue = true; // TODO(tfoley): allow explicit `const` or `let` variables
 					return qualType;
 				}
-				else if (auto compDecl = dynamic_cast<ComponentSyntaxNode*>(decl))
+				else if(auto compDeclRef = declRef.As<ComponentDeclRef>())
 				{
-					if (compDecl->IsComponentFunction())
+					if (compDeclRef.GetDecl()->IsComponentFunction())
 					{
 						// TODO: need to implement this case
+						throw "unimplemented";
 					}
 					else
 					{
-						return compDecl->Type.type;
+						return compDeclRef.GetType();
 					}
 				}
-				else if (auto typeAliasDecl = dynamic_cast<TypeDefDecl*>(decl))
+				else if (auto typeAliasDeclRef = declRef.As<TypeDefDeclRef>())
 				{
-					auto type = new NamedExpressionType(typeAliasDecl);
+					auto type = new NamedExpressionType(typeAliasDeclRef);
 					typeResult = type;
 					return new TypeExpressionType(type);
 				}
-				else if (auto aggTypeDecl = dynamic_cast<AggTypeDecl*>(decl))
+				else if (auto aggTypeDeclRef = declRef.As<AggTypeDeclRef>())
 				{
-					auto type = CreateDeclRefType(aggTypeDecl);
+					auto type = CreateDeclRefType(aggTypeDeclRef);
 					typeResult = type;
 					return new TypeExpressionType(type);
 				}
-				else if (auto simpleTypeDecl = dynamic_cast<SimpleTypeDecl*>(decl))
+				else if (auto simpleTypeDeclRef = declRef.As<SimpleTypeDeclRef>())
 				{
-					auto type = CreateDeclRefType(simpleTypeDecl);
+					auto type = CreateDeclRefType(simpleTypeDeclRef);
 					typeResult = type;
 					return new TypeExpressionType(type);
 				}
-				else if (auto genericDecl = dynamic_cast<GenericDecl*>(decl))
+				else if (auto genericDeclRef = declRef.As<GenericDeclRef>())
 				{
-					auto type = new GenericDeclRefType(genericDecl);
+					auto type = new GenericDeclRefType(genericDeclRef);
 					typeResult = type;
 					return new TypeExpressionType(type);
 				}
-				else if (auto funcDecl = dynamic_cast<FunctionDeclBase*>(decl))
+				else if (auto funcDeclRef = declRef.As<FuncDeclBaseRef>())
 				{
 					auto type = new FuncType();
-					type->decl = funcDecl;
+					type->declRef = funcDeclRef;
 					return type;
 				}
 
-				getSink()->diagnose(decl, Diagnostics::unimplemented, "cannot form reference to this kind of declaration");
+				getSink()->diagnose(declRef, Diagnostics::unimplemented, "cannot form reference to this kind of declaration");
 				return ExpressionType::Error;
 			}
 
@@ -3005,10 +3063,10 @@ namespace Spire
 				auto & baseType = expr->BaseExpression->Type;
 				if (auto declRefType = baseType->AsDeclRefType())
 				{
-					if (auto aggTypeDecl = dynamic_cast<AggTypeDecl*>(declRefType->decl))
+					if (auto aggTypeDeclRef = declRefType->declRef.As<AggTypeDeclRef>())
 					{
 						// Checking of the type must be complete before we can reference its members safely
-						EnsureDecl(aggTypeDecl, DeclCheckState::Checked);
+						EnsureDecl(aggTypeDeclRef.GetDecl(), DeclCheckState::Checked);
 
 						// TODO(tfoley): It is unfortunate that the lookup strategy
 						// here isn't unified with the ordinary `Scope` case.
@@ -3018,18 +3076,18 @@ namespace Spire
 
 						Decl* memberDecl = nullptr; // The first declaration we found, if any
 						Decl* secondDecl = nullptr; // Another declaration with the same name, if any
-						for (auto m : aggTypeDecl->Members)
+						for (auto m : aggTypeDeclRef.GetMembers())
 						{
-							if (m->Name.Content != expr->MemberName)
+							if (m.GetName() != expr->MemberName)
 								continue;
 
 							if (!memberDecl)
 							{
-								memberDecl = m.Ptr();
+								memberDecl = m.GetDecl();
 							}
 							else
 							{
-								secondDecl = m.Ptr();
+								secondDecl = m.GetDecl();
 								break;
 							}
 						}
@@ -3045,7 +3103,10 @@ namespace Spire
 						// If we found only a single member, then we are fine
 						if (!secondDecl)
 						{
-							expr->Type = GetTypeForDeclRef(memberDecl);
+							// TODO: need to
+							DeclRef memberDeclRef(memberDecl, aggTypeDeclRef.substitutions);
+
+							expr->Type = GetTypeForDeclRef(memberDeclRef);
 
 							// When referencing a member variable, the result is an l-value
 							// if and only if the base expression was.

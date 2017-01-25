@@ -256,8 +256,35 @@ namespace Spire
 		class VectorExpressionType;
 		class MatrixExpressionType;
 		class ArithmeticExpressionType;
+		class GenericDecl;
 
-		class ExpressionType : public RefObject
+		// A compile-time constant value (usually a type)
+		class Val : public RefObject
+		{};
+
+		// Trivial case of a value that is a constant integer
+		class IntVal : public Val
+		{
+		public:
+			int value;
+
+			IntVal(int value)
+				: value(value)
+			{}
+		};
+
+		// A type, representing a classifier for some term in the AST.
+		//
+		// Types can include "sugar" in that they may refer to a
+		// `typedef` which gives them a good name when printed as
+		// part of diagnostic messages.
+		//
+		// In order to operation on types, though, we often want
+		// to look past any sugar, and operate on an underlying
+		// "canonical" type. The reprsentation caches a pointer to
+		// a canonical type on every type, so we can easily
+		// operate on the raw representation when needed.
+		class ExpressionType : public Val
 		{
 		public:
 			static RefPtr<ExpressionType> Bool;
@@ -326,6 +353,78 @@ namespace Spire
 			ExpressionType* canonicalType = nullptr;
 		};
 
+		// A substitution represents a binding of certain
+		// type-level variables to concrete argument values
+		class Substitutions : public Val
+		{
+		public:
+			// The generic declaration that defines the
+			// parametesr we are binding to arguments
+			GenericDecl*	genericDecl;
+
+			// The actual values of the arguments
+			List<RefPtr<Val>> args;
+
+			// Any further substitutions, relating to outer generic declarations
+			RefPtr<Substitutions> outer;
+		};
+
+		// A reference to a declaration, which may include
+		// substitutions for generic parameters.
+		struct DeclRef
+		{
+			typedef Decl DeclType;
+
+			// The underlying declaration
+			Decl* decl = nullptr;
+			Decl* GetDecl() const { return decl; }
+
+			// Optionally, a chain of substititions to perform
+			RefPtr<Substitutions> substitutions;
+
+			DeclRef()
+			{}
+
+			DeclRef(Decl* decl, RefPtr<Substitutions> substitutions)
+				: decl(decl)
+				, substitutions(substitutions)
+			{}
+
+			// Apply substitutions to a type
+			RefPtr<ExpressionType> Substitute(RefPtr<ExpressionType> type) const;
+
+			// Check if this is an equivalent declaration reference to another
+			bool Equals(DeclRef const& declRef) const;
+
+			// Convenience accessors for common properties of declarations
+			String const& GetName() const;
+
+			// "dynamic cast" to a more specific declaration reference type
+			template<typename T>
+			T As() const
+			{
+				T result;
+				result.decl = dynamic_cast<T::DeclType*>(decl);
+				result.substitutions = substitutions;
+				return result;
+			}
+
+			// Implicit conversion mostly so we can use a `DeclRef`
+			// in a conditional context
+			operator Decl*() const
+			{
+				return decl;
+			}
+		};
+
+		// Helper macro for defining `DeclRef` subtypes
+		#define SPIRE_DECLARE_DECL_REF(D)				\
+			typedef D DeclType;							\
+			D* GetDecl() const { return (D*) decl; }	\
+			/* */
+
+
+
 		// The type of a reference to an overloaded name
 		class OverloadGroupType : public ExpressionType
 		{
@@ -343,11 +442,11 @@ namespace Spire
 		public:
 			DeclRefType()
 			{}
-			DeclRefType(Decl* decl)
-				: decl(decl)
+			DeclRefType(DeclRef declRef)
+				: declRef(declRef)
 			{}
 
-			Decl* decl = nullptr;
+			DeclRef declRef;
 
 			virtual String ToString() const override;
 
@@ -368,23 +467,6 @@ namespace Spire
 		};
 
 		class FunctionDeclBase;
-
-		// Function types are currently used for references to symbols that name
-		// either ordinary functions, or "component functions."
-		// We do not directly store a representation of the type, and instead
-		// use a reference to the symbol to stand in for its logical type
-		class FuncType : public ExpressionType
-		{
-		public:
-			ShaderComponentSymbol * Component = nullptr;
-			FunctionSymbol * Func = nullptr;
-			FunctionDeclBase* decl = nullptr;
-
-			virtual String ToString() const override;
-		protected:
-			virtual bool EqualsImpl(const ExpressionType * type) const override;
-			virtual ExpressionType* CreateCanonicalType() override;
-		};
 
 		// The type of a shader symbol.
 		class ShaderType : public ExpressionType
@@ -550,23 +632,6 @@ namespace Spire
 
 
 
-		// A type alias of some kind (e.g., via `typedef`)
-		class NamedExpressionType : public ExpressionType
-		{
-		public:
-			NamedExpressionType(TypeDefDecl* decl)
-				: decl(decl)
-			{}
-
-			TypeDefDecl* decl;
-
-			virtual String ToString() const override;
-
-		protected:
-			virtual bool EqualsImpl(const ExpressionType * type) const override;
-			virtual NamedExpressionType * AsNamedTypeImpl() const override;
-			virtual ExpressionType* CreateCanonicalType() override;
-		};
 
 		// The "type" of an expression that resolves to a type.
 		// For example, in the expression `float(2)` the sub-expression,
@@ -591,23 +656,6 @@ namespace Spire
 		};
 
 		class GenericDecl;
-
-		// The "type" of an expression that names a generic declaration.
-		class GenericDeclRefType : public ExpressionType
-		{
-		public:
-			GenericDeclRefType(GenericDecl* decl)
-				: decl(decl)
-			{}
-
-			GenericDecl* decl;
-
-			virtual String ToString() const override;
-
-		protected:
-			virtual bool EqualsImpl(const ExpressionType * type) const override;
-			virtual ExpressionType* CreateCanonicalType() override;
-		};
 
 		// A vector type, e.g., `vector<T,N>`
 		class VectorExpressionType : public ArithmeticExpressionType
@@ -877,6 +925,100 @@ namespace Spire
 			}
 		};
 
+		template<typename T>
+		struct FilteredMemberRefList
+		{
+			List<RefPtr<Decl>> const&	decls;
+			RefPtr<Substitutions>		substitutions;
+
+			FilteredMemberRefList(
+				List<RefPtr<Decl>> const&	decls,
+				RefPtr<Substitutions>		substitutions)
+				: decls(decls)
+				, substitutions(substitutions)
+			{}
+
+			int Count() const
+			{
+				int count = 0;
+				for (auto d : *this)
+					count++;
+				return count;
+			}
+
+			List<T> ToArray() const
+			{
+				List<T> result;
+				for (auto d : *this)
+					result.Add(d);
+				return result;
+			}
+
+			struct Iterator
+			{
+				FilteredMemberRefList const* list;
+				RefPtr<Decl>* ptr;
+				RefPtr<Decl>* end;
+
+				Iterator() : list(nullptr), ptr(nullptr) {}
+				Iterator(
+					FilteredMemberRefList const* list,
+					RefPtr<Decl>* ptr,
+					RefPtr<Decl>* end)
+					: list(list)
+					, ptr(ptr)
+					, end(end)
+				{}
+
+				bool operator!=(Iterator other)
+				{
+					return ptr != other.ptr;
+				}
+
+				void operator++()
+				{
+					ptr = list->Adjust(ptr + 1, end);
+				}
+
+				T operator*()
+				{
+					return DeclRef(ptr->Ptr(), list->substitutions).As<T>();
+				}
+			};
+
+			Iterator begin() const { return Iterator(this, Adjust(decls.begin(), decls.end()), decls.end()); }
+			Iterator end() const { return Iterator(this, decls.end(), decls.end()); }
+
+			RefPtr<Decl>* Adjust(RefPtr<Decl>* ptr, RefPtr<Decl>* end) const
+			{
+				while (ptr != end)
+				{
+					DeclRef declRef(ptr->Ptr(), substitutions);
+					if (declRef.As<T>())
+						return ptr;
+					ptr++;
+				}
+				return end;
+			}
+		};
+
+		struct ContainerDeclRef : DeclRef
+		{
+			SPIRE_DECLARE_DECL_REF(ContainerDecl);
+
+			FilteredMemberRefList<DeclRef> GetMembers() const
+			{
+				return FilteredMemberRefList<DeclRef>(GetDecl()->Members, substitutions);
+			}
+
+			template<typename T>
+			FilteredMemberRefList<T> GetMembersOfType() const
+			{
+				return FilteredMemberRefList<T>(GetDecl()->Members, substitutions);
+			}
+
+		};
+
 		enum class ExpressionAccess
 		{
 			Read, Write
@@ -991,6 +1133,13 @@ namespace Spire
 			RefPtr<ExpressionSyntaxNode> Expr;
 		};
 
+		struct VarDeclBaseRef : DeclRef
+		{
+			SPIRE_DECLARE_DECL_REF(VarDeclBase);
+
+			RefPtr<ExpressionType> GetType() const { return Substitute(GetDecl()->Type); }
+		};
+
 		// A field of a `struct` type
 		class StructField : public VarDeclBase
 		{
@@ -1004,6 +1153,11 @@ namespace Spire
 				rs->Type = Type.Clone(ctx);
 				return rs;
 			}
+		};
+
+		struct FieldDeclRef : VarDeclBaseRef
+		{
+			SPIRE_DECLARE_DECL_REF(StructField)
 		};
 
 		// An extension to apply to an existing type
@@ -1020,12 +1174,24 @@ namespace Spire
 			virtual ExtensionDecl* Clone(CloneContext & ctx) override;
 		};
 
+		struct ExtensionDeclRef : ContainerDeclRef
+		{
+			SPIRE_DECLARE_DECL_REF(ExtensionDecl);
+		};
+
 		// Declaration of a type that represents some sort of aggregate
 		class AggTypeDecl : public ContainerDecl
 		{
 		public:
 			// extensions that might apply to this declaration
 			ExtensionDecl* candidateExtensions = nullptr;
+		};
+
+		struct AggTypeDeclRef : ContainerDeclRef
+		{
+			SPIRE_DECLARE_DECL_REF(AggTypeDecl);
+
+			ExtensionDecl* GetCandidateExtensions() const { return GetDecl()->candidateExtensions; }
 		};
 
 		class StructSyntaxNode : public AggTypeDecl
@@ -1067,9 +1233,21 @@ namespace Spire
 			}
 		};
 
+		struct StructDeclRef : public AggTypeDeclRef
+		{
+			SPIRE_DECLARE_DECL_REF(StructSyntaxNode);
+
+			FilteredMemberRefList<FieldDeclRef> GetFields() const { return GetMembersOfType<FieldDeclRef>(); }
+		};
+
 		// A declaration that represents a simple (non-aggregate) type
 		class SimpleTypeDecl : public Decl
 		{
+		};
+
+		struct SimpleTypeDeclRef : DeclRef
+		{
+			SPIRE_DECLARE_DECL_REF(SimpleTypeDecl)
 		};
 
 		// A `typedef` declaration
@@ -1081,6 +1259,32 @@ namespace Spire
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual TypeDefDecl * Clone(CloneContext & ctx) override;
 		};
+
+		struct TypeDefDeclRef : SimpleTypeDeclRef
+		{
+			SPIRE_DECLARE_DECL_REF(TypeDefDecl);
+
+			RefPtr<ExpressionType> GetType() const { return Substitute(GetDecl()->Type); }
+		};
+
+		// A type alias of some kind (e.g., via `typedef`)
+		class NamedExpressionType : public ExpressionType
+		{
+		public:
+			NamedExpressionType(TypeDefDeclRef declRef)
+				: declRef(declRef)
+			{}
+
+			TypeDefDeclRef declRef;
+
+			virtual String ToString() const override;
+
+		protected:
+			virtual bool EqualsImpl(const ExpressionType * type) const override;
+			virtual NamedExpressionType * AsNamedTypeImpl() const override;
+			virtual ExpressionType* CreateCanonicalType() override;
+		};
+
 
 		class StatementSyntaxNode : public SyntaxNode
 		{
@@ -1123,6 +1327,11 @@ namespace Spire
 			virtual ParameterSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
+		struct ParamDeclRef : VarDeclBaseRef
+		{
+			SPIRE_DECLARE_DECL_REF(ParameterSyntaxNode);
+		};
+
 		class FunctionDeclBase : public ContainerDecl
 		{
 		public:
@@ -1134,12 +1343,53 @@ namespace Spire
 			RefPtr<BlockStatementSyntaxNode> Body;
 		};
 
+		struct FuncDeclBaseRef : ContainerDeclRef
+		{
+			SPIRE_DECLARE_DECL_REF(FunctionDeclBase);
+
+			RefPtr<ExpressionType> GetResultType() const
+			{
+				return Substitute(GetDecl()->ReturnType.type.Ptr());
+			}
+
+			// TODO: need to apply substitutions here!!!
+			FilteredMemberRefList<ParamDeclRef> GetParameters()
+			{
+				return GetMembersOfType<ParamDeclRef>();
+			}
+		};
+
+				// Function types are currently used for references to symbols that name
+		// either ordinary functions, or "component functions."
+		// We do not directly store a representation of the type, and instead
+		// use a reference to the symbol to stand in for its logical type
+		class FuncType : public ExpressionType
+		{
+		public:
+			ShaderComponentSymbol * Component = nullptr;
+			FunctionSymbol * Func = nullptr;
+			FuncDeclBaseRef declRef;
+
+			virtual String ToString() const override;
+		protected:
+			virtual bool EqualsImpl(const ExpressionType * type) const override;
+			virtual ExpressionType* CreateCanonicalType() override;
+		};
+
+
+
+
 		// A constructor/initializer to create instances of a type
 		class ConstructorDecl : public FunctionDeclBase
 		{
 		public:
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual ConstructorDecl* Clone(CloneContext & ctx) override;
+		};
+
+		struct ConstructorDeclRef : FuncDeclBaseRef
+		{
+			SPIRE_DECLARE_DECL_REF(ConstructorDecl);
 		};
 
 		class FunctionSyntaxNode : public FunctionDeclBase
@@ -1155,6 +1405,11 @@ namespace Spire
 			}
 
 			virtual FunctionSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
+		struct FuncDeclRef : FuncDeclBaseRef
+		{
+			SPIRE_DECLARE_DECL_REF(FunctionSyntaxNode);
 		};
 
 		class ImportOperatorDefSyntaxNode : public FunctionDeclBase
@@ -1184,7 +1439,7 @@ namespace Spire
 			ContainerDecl* scope = nullptr;
 
 			// The declaration of the symbol being referenced
-			Decl* decl = nullptr;
+			DeclRef declRef;
 		};
 
 		class VarExpressionSyntaxNode : public DeclRefExpr
@@ -1240,7 +1495,10 @@ namespace Spire
 			RefPtr<ExpressionSyntaxNode> base;
 
 			// The lookup result that was ambiguous
-			LookupResult lookupResult;
+			LookupResult lookupResult2;
+
+			// Substitutions to apply on the eventual result
+			RefPtr<Substitutions> substitutions;
 
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual OverloadedExpr * Clone(CloneContext & ctx) override;
@@ -1436,12 +1694,29 @@ namespace Spire
 			virtual ComponentSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
+		struct ComponentDeclRef : ContainerDeclRef
+		{
+			SPIRE_DECLARE_DECL_REF(ComponentSyntaxNode);
+
+			FilteredMemberRefList<ParamDeclRef> GetParameters()
+			{
+				return GetMembersOfType<ParamDeclRef>();
+			}
+
+			RefPtr<ExpressionType> GetType() const { return Substitute(GetDecl()->Type); }
+		};
+
 		class WorldSyntaxNode : public SimpleTypeDecl
 		{
 		public:
 			bool IsAbstract() { return HasModifier(ModifierFlag::Input); }
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override { return this; }
 			virtual WorldSyntaxNode * Clone(CloneContext & ctx) override;
+		};
+
+		struct WorldDeclRef : DeclRef
+		{
+		SPIRE_DECLARE_DECL_REF(WorldSyntaxNode)
 		};
 
 		class StageSyntaxNode : public Decl
@@ -1748,6 +2023,33 @@ namespace Spire
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual GenericDecl * Clone(CloneContext & ctx) override;
 		};
+
+		struct GenericDeclRef : DeclRef
+		{
+			SPIRE_DECLARE_DECL_REF(GenericDecl);
+
+			Decl* GetInner() const { return GetDecl()->inner.Ptr(); }
+		};
+
+		// The "type" of an expression that names a generic declaration.
+		class GenericDeclRefType : public ExpressionType
+		{
+		public:
+			GenericDeclRefType(GenericDeclRef declRef)
+				: declRef(declRef)
+			{}
+
+			GenericDeclRef declRef;
+			GenericDeclRef const& GetDeclRef() const { return declRef; }
+
+			virtual String ToString() const override;
+
+		protected:
+			virtual bool EqualsImpl(const ExpressionType * type) const override;
+			virtual ExpressionType* CreateCanonicalType() override;
+		};
+
+
 
 		class GenericTypeParamDecl : public SimpleTypeDecl
 		{

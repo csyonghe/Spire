@@ -325,10 +325,10 @@ namespace Spire
 
 			RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode * var) override
 			{
-                if (auto decl = var->decl)
+                if (auto declRef = var->declRef)
                 {
                     // TODO(tfoley): wire up the variable to the declaration
-					if (dynamic_cast<VarDeclBase*>(decl)) // make sure this is a ordinary variable (currently ComponentSyntaxNode is not VarDeclBase)
+					if(declRef.As<VarDeclBaseRef>()) // make sure this is a ordinary variable (currently ComponentSyntaxNode is not VarDeclBase)
 						return var;
                 }
                 // Otherwise look in other places...

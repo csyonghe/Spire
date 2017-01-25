@@ -1134,9 +1134,9 @@ namespace Spire
 					}
 					else if(auto declRefType = expr->BaseExpression->Type->AsDeclRefType())
 					{
-						if (auto structDecl = dynamic_cast<StructSyntaxNode*>(declRefType->decl))
+						if (auto structDecl = declRefType->declRef.As<StructDeclRef>())
 						{
-							int id = structDecl->FindFieldIndex(expr->MemberName);
+							int id = structDecl.GetDecl()->FindFieldIndex(expr->MemberName);
 							GenerateIndexExpression(base, result.Program->ConstantPool->CreateConstant(id),
 								expr->Access == ExpressionAccess::Read);
 						}
@@ -1480,7 +1480,7 @@ namespace Spire
 				}
 				else if (auto declRefType = type->AsDeclRefType())
 				{
-					auto decl = declRefType->decl;
+					auto decl = declRefType->declRef.decl;
 					if (auto worldDecl = dynamic_cast<WorldSyntaxNode*>(decl))
 					{
 						return genericTypeMappings[worldDecl->Name.Content];
