@@ -1514,6 +1514,7 @@ namespace Spire
 
 			Decl*			decl = nullptr;
 			ContainerDecl*	scope = nullptr;
+			ContainerDecl*	endScope = nullptr;
 			int				index = 0;
 			LookupMask		mask = LookupMask::All;
 			uint8_t			flags = Flags::None;

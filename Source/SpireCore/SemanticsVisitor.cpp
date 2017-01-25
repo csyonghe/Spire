@@ -3003,10 +3003,12 @@ namespace Spire
 			{
 				LookupResult result;
 				result.mask = inResult.mask;
+				result.endScope = inResult.endScope;
 
 				ContainerDecl* scope = inResult.scope;
+				ContainerDecl* endScope = inResult.endScope;
 				int index = inResult.index;
-				while (scope)
+				while (scope != endScope)
 				{
 					auto memberCount = scope->Members.Count();
 
@@ -3062,6 +3064,22 @@ namespace Spire
 				LookupResult result;
 				result.scope = scope;
 				return DoLookup(name, result);
+			}
+
+			// perform lookup within the context of a particular container declaration,
+			// and do *not* look further up the chain
+			LookupResult LookUpLocal(String const& name, ContainerDecl* scope)
+			{
+				LookupResult result;
+				result.scope = scope;
+				result.endScope = scope->ParentDecl;
+				return DoLookup(name, result);
+
+			}
+
+			LookupResult LookUpLocal(String const& name, ContainerDeclRef scope)
+			{
+				return LookUpLocal(name, scope.GetDecl());
 			}
 
 			virtual RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode *expr) override
@@ -3261,6 +3279,29 @@ namespace Spire
 						// Checking of the type must be complete before we can reference its members safely
 						EnsureDecl(aggTypeDeclRef.GetDecl(), DeclCheckState::Checked);
 
+
+						LookupResult lookupResult = LookUpLocal(expr->MemberName, aggTypeDeclRef);
+						if (!lookupResult.isValid())
+						{
+							goto fail;
+						}
+
+						if (lookupResult.isOverloaded())
+						{
+							auto overloadedExpr = new OverloadedExpr();
+							overloadedExpr->Position = expr->Position;
+							overloadedExpr->base = expr->BaseExpression;
+							overloadedExpr->lookupResult2 = lookupResult;
+							return overloadedExpr;
+						}
+
+						// default case: we have found something
+						DeclRef memberDeclRef(lookupResult.decl, aggTypeDeclRef.substitutions);
+						return ConstructDeclRefExpr(memberDeclRef, expr->BaseExpression, expr);
+
+#if 0
+
+
 						// TODO(tfoley): It is unfortunate that the lookup strategy
 						// here isn't unified with the ordinary `Scope` case.
 						// In particular, if we add support for "transparent" declarations,
@@ -3317,6 +3358,8 @@ namespace Spire
 						getSink()->diagnose(expr, Diagnostics::unimplemented, "ambiguous member reference");
 						return expr;
 
+#endif
+
 #if 0
 
 						StructField* field = structDecl->FindField(expr->MemberName);
@@ -3336,7 +3379,10 @@ namespace Spire
 					}
 
 					// catch-all
+				fail:
+					getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->MemberName, baseType);
 					expr->Type = ExpressionType::Error;
+					return expr;
 				}
 				else if (auto baseVecType = baseType->AsVectorType())
 				{
