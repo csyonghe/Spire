@@ -257,10 +257,25 @@ namespace Spire
 		class MatrixExpressionType;
 		class ArithmeticExpressionType;
 		class GenericDecl;
+		class Substitutions;
 
 		// A compile-time constant value (usually a type)
 		class Val : public RefObject
-		{};
+		{
+		public:
+			// construct a new value by applying a set of parameter
+			// substitutions to this one
+			RefPtr<Val> Substitute(Substitutions* subst);
+
+			// Lower-level interface for substition. Like the basic
+			// `Substitute` above, but also takes a by-reference
+			// integer parameter that should be incremented when
+			// returning a modified value (this can help the caller
+			// decide whether they need to do anything).
+			virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff);
+
+			virtual bool EqualsVal(Val* val) = 0;
+		};
 
 		// Trivial case of a value that is a constant integer
 		class IntVal : public Val
@@ -271,6 +286,8 @@ namespace Spire
 			IntVal(int value)
 				: value(value)
 			{}
+
+			virtual bool EqualsVal(Val* val) override;
 		};
 
 		// A type, representing a classifier for some term in the AST.
@@ -333,7 +350,11 @@ namespace Spire
 			static void Finalize();
 			ExpressionType* GetCanonicalType() const;
 			BindableResourceType GetBindableResourceType() const;
+
+			virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
+
 		protected:
+			virtual bool EqualsVal(Val* val) override;
 			virtual bool IsIntegralImpl() const { return false; }
 			virtual bool EqualsImpl(const ExpressionType * type) const = 0;
 			virtual bool IsVectorTypeImpl() const { return false; }
@@ -355,7 +376,7 @@ namespace Spire
 
 		// A substitution represents a binding of certain
 		// type-level variables to concrete argument values
-		class Substitutions : public Val
+		class Substitutions : public RefObject
 		{
 		public:
 			// The generic declaration that defines the
@@ -367,6 +388,12 @@ namespace Spire
 
 			// Any further substitutions, relating to outer generic declarations
 			RefPtr<Substitutions> outer;
+
+			// Apply a set of substitutions to the bindings in this substitution
+			RefPtr<Substitutions> SubstituteImpl(Substitutions* subst, int* ioDiff);
+
+			// Check if these are equivalent substitutiosn to another set
+			bool Equals(Substitutions* subst);
 		};
 
 		// A reference to a declaration, which may include
@@ -392,6 +419,9 @@ namespace Spire
 
 			// Apply substitutions to a type
 			RefPtr<ExpressionType> Substitute(RefPtr<ExpressionType> type) const;
+
+			// Apply substitutions to this declaration reference
+			DeclRef SubstituteImpl(Substitutions* subst, int* ioDiff);
 
 			// Check if this is an equivalent declaration reference to another
 			bool Equals(DeclRef const& declRef) const;
@@ -440,17 +470,20 @@ namespace Spire
 		class DeclRefType : public ExpressionType
 		{
 		public:
+			DeclRef declRef;
+
+			virtual String ToString() const override;
+			virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
+
+			static DeclRefType* Create(DeclRef declRef);
+
+		protected:
 			DeclRefType()
 			{}
 			DeclRefType(DeclRef declRef)
 				: declRef(declRef)
 			{}
 
-			DeclRef declRef;
-
-			virtual String ToString() const override;
-
-		protected:
 			virtual bool EqualsImpl(const ExpressionType * type) const override;
 			virtual DeclRefType * AsDeclRefTypeImpl() const override;
 			virtual ExpressionType* CreateCanonicalType() override;
@@ -581,6 +614,8 @@ namespace Spire
 				: elementType(elementType)
 				, flavor(flavor)
 			{}
+
+			virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
 		};
 
 		class SamplerStateType : public DeclRefType
@@ -680,6 +715,7 @@ namespace Spire
 			int						elementCount;
 
 			virtual String ToString() const override;
+			virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
 
 		protected:
 			virtual BasicExpressionType* GetScalarType() const override;
@@ -713,6 +749,7 @@ namespace Spire
 			int								colCount;
 
 			virtual String ToString() const override;
+			virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
 
 		protected:
 			virtual BasicExpressionType* GetScalarType() const override;
@@ -1177,6 +1214,8 @@ namespace Spire
 		struct ExtensionDeclRef : ContainerDeclRef
 		{
 			SPIRE_DECLARE_DECL_REF(ExtensionDecl);
+
+			RefPtr<ExpressionType> GetTargetType() const { return Substitute(GetDecl()->targetType); }
 		};
 
 		// Declaration of a type that represents some sort of aggregate

@@ -136,6 +136,7 @@ namespace Spire
 					expr->BaseExpression = baseExpr;
 					expr->MemberName = declRef.GetName();
 					expr->Type = GetTypeForDeclRef(declRef);
+					expr->declRef = declRef;
 					return expr;
 				}
 				else
@@ -144,6 +145,7 @@ namespace Spire
 					expr->Position = originalExpr->Position;
 					expr->Variable = declRef.GetName();
 					expr->Type = GetTypeForDeclRef(declRef);
+					expr->declRef = declRef;
 					return expr;
 				}
 			}
@@ -266,41 +268,7 @@ namespace Spire
 				innerDeclRef.decl = genericDeclRef.GetInner();
 				innerDeclRef.substitutions = subst;
 
-				if (auto magicType = genericDeclRef.GetInner()->FindModifier<MagicTypeModifier>())
-				{
-					if (magicType->name == "Vector")
-					{
-						auto vecType = new VectorExpressionType(
-							ExtractGenericArgType(args[0]),
-							ExtractGenericArgInteger(args[1]));
-						vecType->declRef = innerDeclRef;
-						return vecType;
-					}
-					else if (magicType->name == "Matrix")
-					{
-						auto matType = new MatrixExpressionType(
-							ExtractGenericArgType(args[0]),
-							ExtractGenericArgInteger(args[1]),
-							ExtractGenericArgInteger(args[2]));
-						matType->declRef = innerDeclRef;
-						return matType;
-					}
-					else if (magicType->name == "Texture")
-					{
-						auto textureType = new TextureType(
-							magicType->tag,
-							ExtractGenericArgType(args[0]));
-						textureType->declRef = innerDeclRef;
-						return textureType;
-					}
-					else
-					{
-						throw "unimplemented";
-					}
-				}
-
-				// catch-all for cases that we don't handle
-				throw "unimplemented";
+				return DeclRefType::Create(innerDeclRef);
 			}
 
 			// Make sure a declaration has been checked, so we can refer to it.
@@ -1277,7 +1245,11 @@ namespace Spire
 
 			virtual RefPtr<TypeDefDecl> VisitTypeDefDecl(TypeDefDecl* decl) override
 			{
+				if (decl->IsChecked(DeclCheckState::Checked)) return decl;
+
+				decl->SetCheckState(DeclCheckState::CheckingHeader);
 				decl->Type = TranslateTypeNode(decl->Type);
+				decl->SetCheckState(DeclCheckState::Checked);
 				return decl;
 			}
 
@@ -2397,7 +2369,97 @@ namespace Spire
 				return parentGeneric;
 			}
 
+			struct Constraint
+			{
+				Decl*		decl; // the declaration of the thing being constraints
+				RefPtr<Val>	val; // the value to which we are constraining it
+				bool satisfied = false; // Has this constraint been met?
+			};
+
+			// A collection of constraints that will need to be satisified (solved)
+			// in order for checking to suceed.
+			struct ConstraintSystem
+			{
+				List<Constraint> constraints;
+			};
+
+			// Try to find a unification for two values
+			bool TryUnifyVals(
+				ConstraintSystem&	constraints,
+				RefPtr<Val>			fst,
+				RefPtr<Val>			snd)
+			{
+				// if both values are types, then unify types
+				if (auto fstType = fst.As<ExpressionType>())
+				{
+					if (auto sndType = snd.As<ExpressionType>())
+					{
+						return TryUnifyTypes(constraints, fstType, sndType);
+					}
+				}
+
+				// if both values are integers, then compare them
+				if (auto fstIntVal = fst.As<IntVal>())
+				{
+					if (auto sndIntVal = snd.As<IntVal>())
+					{
+						return fstIntVal->value == sndIntVal->value;
+					}
+				}
+
+				throw "unimplemented";
+
+				// default: fail
+				return false;
+			}
+
+			bool TryUnifySubstitutions(
+				ConstraintSystem&		constraints,
+				RefPtr<Substitutions>	fst,
+				RefPtr<Substitutions>	snd)
+			{
+				// They must both be NULL or non-NULL
+				if (!fst || !snd)
+					return fst == snd;
+
+				// They must be specializing the same generic
+				if (fst->genericDecl != snd->genericDecl)
+					return false;
+
+				// Their arguments must unify
+				assert(fst->args.Count() == snd->args.Count());
+				int argCount = fst->args.Count();
+				for (int aa = 0; aa < argCount; ++aa)
+				{
+					if (!TryUnifyVals(constraints, fst->args[aa], snd->args[aa]))
+						return false;
+				}
+
+				// Their "base" specializations must unify
+				if (!TryUnifySubstitutions(constraints, fst->outer, snd->outer))
+					return false;
+
+				return true;
+			}
+
+			bool TryUnifyTypeParam(
+				ConstraintSystem&				constraints,
+				RefPtr<GenericTypeParamDecl>	typeParamDecl,
+				RefPtr<ExpressionType>			type)
+			{
+				// We want to constrain the given type parameter
+				// to equal the given type.
+				Constraint constraint;
+				constraint.decl = typeParamDecl.Ptr();
+				constraint.val = type;
+
+				constraints.constraints.Add(constraint);
+
+				return true;
+			}
+
 			bool TryUnifyTypes(
+				ConstraintSystem&	constraints,
 				RefPtr<ExpressionType> fst,
 				RefPtr<ExpressionType> snd)
 			{
@@ -2405,9 +2467,13 @@ namespace Spire
 
 				if (auto fstDeclRefType = fst->As<DeclRefType>())
 				{
+					auto fstDeclRef = fstDeclRefType->declRef;
+
+					if (auto typeParamDecl = dynamic_cast<GenericTypeParamDecl*>(fstDeclRef.GetDecl()))
+						return TryUnifyTypeParam(constraints, typeParamDecl, snd);
+
 					if (auto sndDeclRefType = snd->As<DeclRefType>())
 					{
-						auto fstDeclRef = fstDeclRefType->declRef;
 						auto sndDeclRef = sndDeclRefType->declRef;
 
 						// can't be unified if they refer to differnt declarations.
@@ -2415,13 +2481,28 @@ namespace Spire
 
 						// next we need to unify the substitutions applied
 						// to each decalration reference.
-						//
-						// TODO(tfoley): actually implement this
+						if (!TryUnifySubstitutions(
+							constraints,
+							fstDeclRef.substitutions,
+							sndDeclRef.substitutions))
+						{
+							return false;
+						}
+
 						return true;
 					}
 				}
 
+				if (auto sndDeclRefType = snd->As<DeclRefType>())
+				{
+					auto sndDeclRef = sndDeclRefType->declRef;
+
+					if (auto typeParamDecl = dynamic_cast<GenericTypeParamDecl*>(sndDeclRef.GetDecl()))
+						return TryUnifyTypeParam(constraints, typeParamDecl, fst);
+				}
+
 				throw "unimplemented";
+				return false;
 			}
 
 			// Is the candidate extension declaration actually applicable to the given type
@@ -2431,22 +2512,153 @@ namespace Spire
 			{
 				if (auto extGenericDecl = GetOuterGeneric(extDecl))
 				{
+#if 0
 					// we need to check whether we can unify the type on the extension
 					// with the type in question.
 					// This has to be done with a constraint solver.
 
-					if (!TryUnifyTypes(extDecl->targetType, type))
+					// Construct type-level constraint variables for all the
+					// generic parameters
+					List<RefPtr<Val>> constraintArgs;
+					for (auto m : extGenericDecl->Members)
+					{
+						if (auto typeParam = m.As<GenericTypeParamDecl>())
+						{
+							auto type = new ConstraintVarType();
+							type->decl = typeParam;
+							constraintArgs.Add(type);
+						}
+						else if (auto valParam = m.As<GenericValueParamDecl>())
+						{
+							auto val = new ConstraintVarIntVal();
+							val->decl = valParam;
+							constraintArgs.Add(val);
+						}
+						else
+						{
+							// ignore anything that isn't a generic parameter
+						}
+					}
+
+					// Consruct a reference to the extension with our constraint variables
+					// as the 
+					RefPtr<Substitutions> constraintSubst = new Substitutions();
+					constraintSubst->genericDecl = extGenericDecl;
+					constraintSubst->args = constraintArgs;
+					ExtensionDeclRef extDeclRef = DeclRef(extDecl, constraintSubst).As<ExtensionDeclRef>();
+#endif
+					ConstraintSystem constraints;
+
+					if (!TryUnifyTypes(constraints, extDecl->targetType, type))
 						return DeclRef().As<ExtensionDeclRef>();
 
-					// The result of the unification should be a set
-					// of bindings for the generic parameters so
-					// that we can construction an `ExtensionDeclRef`
-					// where the target type is equivalent to `type`.
-					//
-					// At that point the extension will be applicable.
+					// We expect to find a bunch of constraints that we'll
+					// need to solve. For now the "solver" is going to be
+					// ridiculously simplistic.
 
-					// TODO(tfoley): figure out how to check things here!!!
-					throw "unimplemented";
+					// We will loop over the generic parameters, and for
+					// each we will try to find a way to satisfy all
+					// the constraints for that parameter
+					List<RefPtr<Val>> args;
+					for (auto m : extGenericDecl->Members)
+					{
+						if (auto typeParam = m.As<GenericTypeParamDecl>())
+						{
+							RefPtr<ExpressionType> type = nullptr;
+							for (auto& c : constraints.constraints)
+							{
+								if (c.decl != typeParam.Ptr())
+									continue;
+
+								auto cType = c.val.As<ExpressionType>();
+								assert(cType.Ptr());
+
+								if (!type)
+								{
+									type = cType;
+								}
+								else
+								{
+									if (!type->Equals(cType))
+									{
+										// failure!
+										return DeclRef().As<ExtensionDeclRef>();
+									}
+								}
+
+								c.satisfied = true;
+							}
+
+							if (!type)
+							{
+								// failure!
+								return DeclRef().As<ExtensionDeclRef>();
+							}
+							args.Add(type);
+						}
+						else if (auto valParam = m.As<GenericValueParamDecl>())
+						{
+							// TODO(tfoley): maybe support more than integers some day?
+							RefPtr<IntVal> val = nullptr;
+							for (auto& c : constraints.constraints)
+							{
+								if (c.decl != valParam.Ptr())
+									continue;
+
+								auto cVal = c.val.As<IntVal>();
+								assert(cVal.Ptr());
+
+								if (!val)
+								{
+									val = cVal;
+								}
+								else
+								{
+									if (val->value != cVal->value)
+									{
+										// failure!
+										return DeclRef().As<ExtensionDeclRef>();
+									}
+								}
+
+								c.satisfied = true;
+							}
+
+							if (!val)
+							{
+								// failure!
+								return DeclRef().As<ExtensionDeclRef>();
+							}
+							args.Add(val);
+						}
+						else
+						{
+							// ignore anything that isn't a generic parameter
+						}
+					}
+
+					// Make sure we haven't constructed any spurious constraints
+					// that we aren't able to satisfy:
+					for (auto c : constraints.constraints)
+					{
+						if (!c.satisfied)
+						{
+							return DeclRef().As<ExtensionDeclRef>();
+						}
+					}
+
+					// Consruct a reference to the extension with our constraint variables
+					// as the 
+					RefPtr<Substitutions> constraintSubst = new Substitutions();
+					constraintSubst->genericDecl = extGenericDecl;
+					constraintSubst->args = args;
+					ExtensionDeclRef extDeclRef = DeclRef(extDecl, constraintSubst).As<ExtensionDeclRef>();
+
+					// We expect/require that the result of unification is such that
+					// the target types are now equal
+					assert(extDeclRef.GetTargetType()->Equals(type));
+
+					return extDeclRef;
 				}
 				else
 				{
@@ -2507,7 +2719,7 @@ namespace Spire
 				}
 				else if (auto aggTypeDeclRef = declRef.As<AggTypeDeclRef>())
 				{
-					auto type = CreateDeclRefType(aggTypeDeclRef);
+					auto type = DeclRefType::Create(aggTypeDeclRef);
 					AddAggTypeOverloadCandidates(type, aggTypeDeclRef, context);
 				}
 				else
@@ -2530,15 +2742,21 @@ namespace Spire
 				OverloadResolveContext&			context)
 			{
 				auto funcExprType = funcExpr->Type;
-				if (auto funcType = funcExprType->As<FuncType>())
-				{
-					AddFuncOverloadCandidate(funcType, context);
-				}
-				else if (auto typeType = funcExprType->As<TypeExpressionType>())
+				if (auto typeType = funcExprType->As<TypeExpressionType>())
 				{
 					// The expression named a type, so we have a constructor call
 					// on our hands.
 					AddTypeOverloadCandidates(typeType->type, context);
+				}
+				else if (auto funcDeclRefExpr = funcExpr.As<DeclRefExpr>())
+				{
+					// The expression referenced a function declaration
+					AddDeclRefOverloadCandidates(funcDeclRefExpr->declRef, context);
+				}
+				else if (auto funcType = funcExprType->As<FuncType>())
+				{
+					// TODO(tfoley): deprecate this path...
+					AddFuncOverloadCandidate(funcType, context);
 				}
 				else if (auto overloadedExpr = funcExpr.As<OverloadedExpr>())
 				{
@@ -2746,36 +2964,6 @@ namespace Spire
 				return expr;
 			}
 
-			// TODO: need to figure out how to unify this with the logic
-			// in the generic case...
-			static DeclRefType* CreateDeclRefType(DeclRef declRef)
-			{
-				if (auto builtinMod = declRef.GetDecl()->FindModifier<BuiltinTypeModifier>())
-				{
-					auto type = new BasicExpressionType(builtinMod->tag);
-					type->declRef = declRef;
-					return type;
-				}
-				else if (auto magicMod = declRef.GetDecl()->FindModifier<MagicTypeModifier>())
-				{
-					if (magicMod->name == "SamplerState")
-					{
-						auto type = new SamplerStateType();
-						type->declRef = declRef;
-						type->flavor = SamplerStateType::Flavor(magicMod->tag);
-						return type;
-					}
-					else
-					{
-						throw "unimplemented";
-					}
-				}
-				else
-				{
-					return new DeclRefType(declRef);
-				}
-			}
-
 			bool DeclPassesLookupMask(Decl* decl, LookupMask mask)
 			{
 				// type declarations
@@ -2878,6 +3066,10 @@ namespace Spire
 
 			virtual RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode *expr) override
 			{
+				// If we've already resolved this expression, don't try again.
+				if (expr->declRef)
+					return expr;
+
 				ShaderUsing shaderObj;
 				expr->Type = ExpressionType::Error;
 
@@ -3024,19 +3216,20 @@ namespace Spire
 				}
 				else if (auto typeAliasDeclRef = declRef.As<TypeDefDeclRef>())
 				{
+					EnsureDecl(typeAliasDeclRef.GetDecl());
 					auto type = new NamedExpressionType(typeAliasDeclRef);
 					typeResult = type;
 					return new TypeExpressionType(type);
 				}
 				else if (auto aggTypeDeclRef = declRef.As<AggTypeDeclRef>())
 				{
-					auto type = CreateDeclRefType(aggTypeDeclRef);
+					auto type = DeclRefType::Create(aggTypeDeclRef);
 					typeResult = type;
 					return new TypeExpressionType(type);
 				}
 				else if (auto simpleTypeDeclRef = declRef.As<SimpleTypeDeclRef>())
 				{
-					auto type = CreateDeclRefType(simpleTypeDeclRef);
+					auto type = DeclRefType::Create(simpleTypeDeclRef);
 					typeResult = type;
 					return new TypeExpressionType(type);
 				}
@@ -3106,6 +3299,7 @@ namespace Spire
 							// TODO: need to
 							DeclRef memberDeclRef(memberDecl, aggTypeDeclRef.substitutions);
 
+							expr->declRef = memberDeclRef;
 							expr->Type = GetTypeForDeclRef(memberDeclRef);
 
 							// When referencing a member variable, the result is an l-value

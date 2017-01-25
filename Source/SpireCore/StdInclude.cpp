@@ -319,7 +319,9 @@ namespace Spire
 
 			// Declare vector and matrix types
 
-			sb << "__generic<T, let N : int> __magic_type(Vector) struct vector {}\n";
+			sb << "__generic<T, let N : int> __magic_type(Vector) struct vector\n{\n";
+			sb << "    __init(T value);\n"; // initialize from single scalar
+			sb << "}\n";
 			sb << "__generic<T, let R : int, let C : int> __magic_type(Matrix) struct matrix {}\n";
 
 			static const struct {
@@ -363,19 +365,27 @@ namespace Spire
 			}
 
 			static const char* kComponentNames[]{ "x", "y", "z", "w" };
+			static const char* kVectorNames[]{ "x", "xy", "xyz", "xyzw" };
 
 			// Need to add constructors to the types above
-			for (int ii = 1; ii <= 4; ++ii)
+			for (int N = 2; N <= 4; ++N)
 			{
-				sb << "__generic<T> __extension vector<T, " << ii << ">\n{\n";
+				sb << "__generic<T> __extension vector<T, " << N << ">\n{\n";
 
+				// initialize from N scalars
 				sb << "__init(";
-				for (int jj = 0; jj < ii; ++jj)
+				for (int ii = 0; ii < N; ++ii)
 				{
-					if (jj != 0) sb << ", ";
-					sb << "T " << kComponentNames[jj];
+					if (ii != 0) sb << ", ";
+					sb << "T " << kComponentNames[ii];
 				}
 				sb << ");\n";
+
+				// Initialize from an N-1 vector and a scalar
+				if (N > 2)
+				{
+					sb << "__init(vector<T," << (N - 1) << "> " << kVectorNames[N - 1] << ", T " << kComponentNames[N] << ");\n";
+				}
 
 				sb << "}\n";
 			}

@@ -573,6 +573,13 @@ namespace Spire
 			return Equals(type.Ptr());
 		}
 
+		bool ExpressionType::EqualsVal(Val* val)
+		{
+			if (auto type = dynamic_cast<ExpressionType*>(val))
+				return const_cast<ExpressionType*>(this)->Equals(type);
+			return false;
+		}
+
         bool ExpressionType::IsVectorType() const
         {
             return GetCanonicalType()->IsVectorTypeImpl();
@@ -635,6 +642,22 @@ namespace Spire
 			return GetCanonicalType()->AsTypeTypeImpl();
 		}
 
+		RefPtr<Val> ExpressionType::SubstituteImpl(Substitutions* subst, int* ioDiff)
+		{
+			int diff = 0;
+			auto canSubst = GetCanonicalType()->SubstituteImpl(subst, &diff);
+
+			// If nothing changed, then don't drop any sugar that is applied
+			if (!diff)
+				return this;
+
+			// If the canonical type changed, then we return a canonical type,
+			// rather than try to re-construct any amount of sugar
+			(*ioDiff)++;
+			return canSubst;
+		}
+
+
         ExpressionType* ExpressionType::GetCanonicalType() const
         {
 			if (!this) return nullptr;
@@ -643,6 +666,7 @@ namespace Spire
             {
                 // TODO(tfoley): worry about thread safety here?
                 et->canonicalType = et->CreateCanonicalType();
+				assert(et->canonicalType);
             }
             return et->canonicalType;
         }
@@ -802,6 +826,133 @@ namespace Spire
 		{
 			// A declaration reference is already canonical
 			return this;
+		}
+
+		RefPtr<Val> DeclRefType::SubstituteImpl(Substitutions* subst, int* ioDiff)
+		{
+			if (!subst) return this;
+
+			// the case we especially care about is when this type references a declaration
+			// of a generic parameter, since that is what we might be substituting...
+			if (auto genericTypeParamDecl = dynamic_cast<GenericTypeParamDecl*>(declRef.GetDecl()))
+			{
+				// search for a substitution that might apply to us
+				for (auto s = subst; s; s = s->outer.Ptr())
+				{
+					// the generic decl associated with the substitution list must be
+					// the generic decl that declared this parameter
+					auto genericDecl = s->genericDecl;
+					if (genericDecl != genericTypeParamDecl->ParentDecl)
+						continue;
+
+					int index = 0;
+					for (auto m : genericDecl->Members)
+					{
+						if (m.Ptr() == genericTypeParamDecl)
+						{
+							// We've found it, so return the corresponding specialization argument
+							(*ioDiff)++;
+							return s->args[index];
+						}
+						else if(auto typeParam = m.As<GenericTypeParamDecl>())
+						{
+							index++;
+						}
+						else if(auto valParam = m.As<GenericValueParamDecl>())
+						{
+							index++;
+						}
+						else
+						{
+						}
+					}
+
+				}
+			}
+
+
+			int diff = 0;
+			DeclRef substDeclRef = declRef.SubstituteImpl(subst, &diff);
+
+			if (!diff)
+				return this;
+
+			// Re-construct the type in case we are using a specialized sub-class
+			return DeclRefType::Create(substDeclRef);
+		}
+
+		static RefPtr<ExpressionType> ExtractGenericArgType(RefPtr<Val> val)
+		{
+			auto type = val.As<ExpressionType>();
+			assert(type.Ptr());
+			return type;
+		}
+
+		static int ExtractGenericArgInteger(RefPtr<Val> val)
+		{
+			auto intVal = val.As<IntVal>();
+			assert(intVal.Ptr());
+			return intVal->value;
+		}
+
+		// TODO: need to figure out how to unify this with the logic
+		// in the generic case...
+		DeclRefType* DeclRefType::Create(DeclRef declRef)
+		{
+			if (auto builtinMod = declRef.GetDecl()->FindModifier<BuiltinTypeModifier>())
+			{
+				auto type = new BasicExpressionType(builtinMod->tag);
+				type->declRef = declRef;
+				return type;
+			}
+			else if (auto magicMod = declRef.GetDecl()->FindModifier<MagicTypeModifier>())
+			{
+				Substitutions* subst = declRef.substitutions.Ptr();
+
+				if (magicMod->name == "SamplerState")
+				{
+					auto type = new SamplerStateType();
+					type->declRef = declRef;
+					type->flavor = SamplerStateType::Flavor(magicMod->tag);
+					return type;
+				}
+				else if (magicMod->name == "Vector")
+				{
+					assert(subst && subst->args.Count() == 2);
+					auto vecType = new VectorExpressionType(
+						ExtractGenericArgType(subst->args[0]),
+						ExtractGenericArgInteger(subst->args[1]));
+					vecType->declRef = declRef;
+					return vecType;
+				}
+				else if (magicMod->name == "Matrix")
+				{
+					assert(subst && subst->args.Count() == 3);
+					auto matType = new MatrixExpressionType(
+						ExtractGenericArgType(subst->args[0]),
+						ExtractGenericArgInteger(subst->args[1]),
+						ExtractGenericArgInteger(subst->args[2]));
+					matType->declRef = declRef;
+					return matType;
+				}
+				else if (magicMod->name == "Texture")
+				{
+					assert(subst && subst->args.Count() >= 1);
+					auto textureType = new TextureType(
+						magicMod->tag,
+						ExtractGenericArgType(subst->args[0]));
+					textureType->declRef = declRef;
+					return textureType;
+				}
+				else
+				{
+					throw "unimplemented";
+				}
+			}
+			else
+			{
+				return new DeclRefType(declRef);
+			}
 		}
 
 		// OverloadGroupType
@@ -1019,6 +1170,22 @@ namespace Spire
 			return canType;
 		}
 
+		RefPtr<Val> VectorExpressionType::SubstituteImpl(Substitutions* subst, int* ioDiff)
+		{
+			int diff = 0;
+			auto substDeclRef = declRef.SubstituteImpl(subst, &diff);
+			auto substElementType = elementType->SubstituteImpl(subst, &diff).As<ExpressionType>();
+
+			if (!diff)
+				return this;
+
+			(*ioDiff)++;
+			auto substType = new VectorExpressionType(substElementType, elementCount);
+			substType->declRef = substDeclRef;
+			return substType;
+		}
+
+
 		// MatrixExpressionType
 
 		String MatrixExpressionType::ToString() const
@@ -1056,6 +1223,39 @@ namespace Spire
 			canType->declRef = declRef;
 			sCanonicalTypes.Add(canType);
 			return canType;
+		}
+
+
+		RefPtr<Val> MatrixExpressionType::SubstituteImpl(Substitutions* subst, int* ioDiff)
+		{
+			int diff = 0;
+			auto substDeclRef = declRef.SubstituteImpl(subst, &diff);
+			auto substElementType = elementType->SubstituteImpl(subst, &diff).As<ExpressionType>();
+
+			if (!diff)
+				return this;
+
+			(*ioDiff)++;
+			auto substType = new MatrixExpressionType(substElementType, rowCount, colCount);
+			substType->declRef = substDeclRef;
+			return substType;
+		}
+
+		// TextureType
+
+		RefPtr<Val> TextureType::SubstituteImpl(Substitutions* subst, int* ioDiff)
+		{
+			int diff = 0;
+			auto substDeclRef = declRef.SubstituteImpl(subst, &diff);
+			auto substElementType = elementType->SubstituteImpl(subst, &diff).As<ExpressionType>();
+
+			if (!diff)
+				return this;
+
+			(*ioDiff)++;
+			auto substType = new TextureType(flavor, substElementType);
+			substType->declRef = substDeclRef;
+			return substType;
 		}
 
 		//
@@ -1300,6 +1500,53 @@ namespace Spire
 			throw "unimplemented";
 		}
 
+		// Substitutions
+
+		RefPtr<Substitutions> Substitutions::SubstituteImpl(Substitutions* subst, int* ioDiff)
+		{
+			if (!this) return nullptr;
+
+			int diff = 0;
+			auto outerSubst = outer->SubstituteImpl(subst, &diff);
+
+			List<RefPtr<Val>> substArgs;
+			for (auto a : args)
+			{
+				substArgs.Add(a->SubstituteImpl(subst, &diff));
+			}
+
+			if (!diff) return this;
+
+			auto substSubst = new Substitutions();
+			substSubst->genericDecl = genericDecl;
+			substSubst->args = substArgs;
+			return substSubst;
+		}
+
+		bool Substitutions::Equals(Substitutions* subst)
+		{
+			// both must be NULL, or non-NULL
+			if (!this || !subst)
+				return !this && !subst;
+
+			if (genericDecl != subst->genericDecl)
+				return false;
+
+			int argCount = args.Count();
+			assert(args.Count() == subst->args.Count());
+			for (int aa = 0; aa < argCount; ++aa)
+			{
+				if (!args[aa]->EqualsVal(subst->args[aa].Ptr()))
+					return false;
+			}
+
+			if (!outer->Equals(subst->outer.Ptr()))
+				return false;
+
+			return true;
+		}
+
+
 		// DeclRef
 
 		RefPtr<ExpressionType> DeclRef::Substitute(RefPtr<ExpressionType> type) const
@@ -1311,8 +1558,25 @@ namespace Spire
 			// Otherwise we need to recurse on the type structure
 			// and apply substitutions where it makes sense
 
-			throw "unimplemented";
+			return type->Substitute(substitutions.Ptr()).As<ExpressionType>();
 		}
+
+		DeclRef DeclRef::SubstituteImpl(Substitutions* subst, int* ioDiff)
+		{
+			if (!substitutions) return *this;
+
+			int diff = 0;
+			RefPtr<Substitutions> substSubst = substitutions->SubstituteImpl(subst, &diff);
+
+			if (!diff)
+				return *this;
+
+			DeclRef substDeclRef;
+			substDeclRef.decl = decl;
+			substDeclRef.substitutions = substSubst;
+			return substDeclRef;
+		}
+
 
 		// Check if this is an equivalent declaration reference to another
 		bool DeclRef::Equals(DeclRef const& declRef) const
@@ -1320,7 +1584,10 @@ namespace Spire
 			if (decl != declRef.decl)
 				return false;
 
-			throw "unimplemented";
+			if (!substitutions->Equals(declRef.substitutions.Ptr()))
+				return false;
+
+			return true;
 		}
 
 		// Convenience accessors for common properties of declarations
@@ -1329,5 +1596,27 @@ namespace Spire
 			return decl->Name.Content;
 		}
 
+		// Val
+
+		RefPtr<Val> Val::Substitute(Substitutions* subst)
+		{
+			int diff = 0;
+			return SubstituteImpl(subst, &diff);
+		}
+
+		RefPtr<Val> Val::SubstituteImpl(Substitutions* subst, int* ioDiff)
+		{
+			// Default behavior is to not substitute at all
+			return this;
+		}
+
+		// Intval
+
+		bool IntVal::EqualsVal(Val* val)
+		{
+			if (auto intVal = dynamic_cast<IntVal*>(val))
+				return value == intVal->value;
+			return false;
+		}
 	}
 }
