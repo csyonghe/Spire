@@ -1966,7 +1966,7 @@ namespace Spire
 					getSink()->diagnose(project, Diagnostics::projectionOutsideImportOperator);
 					return project;
 				}
-				project->BaseExpression->Accept(this);
+				project->BaseExpression = CheckExpr(project->BaseExpression);
 
 				// Check that the type we are projecting from matches the expected world type.
 				if (!IsValidWorldTypeForProjection(project, currentImportOperator->SourceWorld.Content))
