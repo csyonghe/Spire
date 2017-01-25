@@ -472,6 +472,10 @@ namespace Spire
 						for (auto & s : programSyntaxNode->GetStructs())
 							codeGen->ProcessStruct(s.Ptr());
 
+						// Generate symbols for any global variables
+						for (auto & globalVar : programSyntaxNode->GetMembersOfType<VarDeclBase>())
+							codeGen->ProcessGlobalVar(globalVar.Ptr());
+
 						for (auto & func : programSyntaxNode->GetFunctions())
 							codeGen->ProcessFunction(func.Ptr());
 						for (auto & shader : shaderClosures)

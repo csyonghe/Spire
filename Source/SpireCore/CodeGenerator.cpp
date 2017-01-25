@@ -135,6 +135,13 @@ namespace Spire
 			{
 				VisitStruct(st);
 			}
+			virtual void ProcessGlobalVar(VarDeclBase * var) override
+			{
+				// TODO(tfoley): implement this properly
+				AllocVarInstruction * varOp = AllocVar(var->Type.Ptr());
+				varOp->Name = EscapeCodeName(var->Name.Content);
+				variables.Add(var->Name.Content, varOp);
+			}
 
 			void GenerateParameterBindingInfo(ShaderIR * shader)
 			{

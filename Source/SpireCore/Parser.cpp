@@ -1050,27 +1050,76 @@ namespace Spire
 		static RefPtr<Decl> ParseHLSLBufferDecl(
 			Parser*	parser)
 		{
-			RefPtr<HLSLBufferDecl> bufferDecl;
+			// Allocate a buffer type of the correct flavor,
+			// depending on what the declaration keyword was
+
+			RefPtr<HLSLBufferTypeDecl> bufferTypeDecl;
 			if (AdvanceIf(parser, "cbuffer"))
 			{
-				bufferDecl = new HLSLConstantBufferDecl();
+				bufferTypeDecl = new HLSLConstantBufferTypeDecl();
 			}
 			else if (AdvanceIf(parser, "tbuffer"))
 			{
-				bufferDecl = new HLSLTextureBufferDecl();
+				bufferTypeDecl = new HLSLTextureBufferTypeDecl();
 			}
 			else
 			{
 				Unexpected(parser);
 			}
 
-			bufferDecl->Name = parser->ReadToken(TokenType::Identifier);
+			// We are going to represent each buffer as a pair of declarations.
+			// The first is a type declaration that holds all the members, while
+			// the second is a variable declaration that uses the buffer type.
+			// This is conceptually cleaner in the short term because it means
+			// we don't need to have aggergate value declarations (just aggregate
+			// type declarations), and also seems like it will scale better
+			// to GLSL where a buffer declaration can declare an array of
+			// values, and not just a single one...
+			RefPtr<Variable> bufferVarDecl = new Variable();
 
-			ParseOptSemantics(parser, bufferDecl.Ptr());
+			// Both declarations will have a location that points to the name
+			parser->FillPosition(bufferTypeDecl.Ptr());
+			parser->FillPosition(bufferVarDecl.Ptr());
 
+			// Only the type declaration will actually be named, and it will
+			// use the given name to identify itself.
+			bufferTypeDecl->Name = parser->ReadToken(TokenType::Identifier);
+
+			// The variable declaration will use the buffer declaration as its type.
+			auto bufferVarTypeExpr = new VarExpressionSyntaxNode();
+			bufferVarTypeExpr->Position = bufferVarDecl->Position;
+			bufferVarTypeExpr->Variable = bufferTypeDecl->Name.Content;
+			bufferVarTypeExpr->scope = parser->currentScope.Ptr();
+			// TODO(tfoley): We should in theory be able to wire things up here as already-checked syntax
+			// bufferVarTypeExpr->declRef = DeclRef(bufferTypeDecl.Ptr(), nullptr);
+			bufferVarDecl->Type.exp = bufferVarTypeExpr;
+
+			// Any semantics applied to the bufer declaration are taken as applying
+			// to the variable instead.
+			ParseOptSemantics(parser, bufferVarDecl.Ptr());
+
+			// The declarations in the body belong to the type.
 			parser->ReadToken(TokenType::LBrace);
-			ParseDeclBody(parser, bufferDecl.Ptr(), TokenType::RBrace);
-			return bufferDecl;
+			ParseDeclBody(parser, bufferTypeDecl.Ptr(), TokenType::RBrace);
+
+			// All HLSL buffer declarations are "transparent" in that their
+			// members are implicitly made visible in the parent scope.
+			// We achieve this by applying the transparent modifier to the variable.
+			bufferVarDecl->modifiers.flags |= ModifierFlag::Transparent;
+
+			// Because we are constructing two declarations, we have a thorny
+			// issue that were are only supposed to return one.
+			// For now we handle this by adding the type declaration to
+			// the current scope manually, and then returning the variable
+			// declaration.
+			//
+			// Note: this means that any modifiers that have already been parsed
+			// will get attached to the variable declaration, not the type.
+			// There might be cases where we need to shuffle things around.
+
+			AddMember(parser->currentScope, bufferTypeDecl);
+
+			return bufferVarDecl;
 		}
 
 		static RefPtr<Decl> ParseGenericParamDecl(
@@ -1173,7 +1222,7 @@ namespace Spire
         static RefPtr<Decl> ParseDeclWithModifiers(
             Parser*             parser,
             ContainerDecl*      containerDecl,
-            Modifiers const&    modifiers )
+            Modifiers			modifiers )
         {
             RefPtr<Decl> decl;
 
@@ -1215,8 +1264,19 @@ namespace Spire
 
             if (decl)
             {
-                decl->modifiers = modifiers;
-                if (containerDecl)
+				// Combine the explicit modifiers with any extra stuff that came from the parsed declaration
+				decl->modifiers.flags |= modifiers.flags;
+
+				RefPtr<Modifier>* modifierLink = &modifiers.first;
+				while (*modifierLink)
+				{
+					modifierLink = &(*modifierLink)->next;
+				}
+
+				*modifierLink = decl->modifiers.first;
+				decl->modifiers.first = modifiers.first;
+
+				if (containerDecl)
                 {
 					AddMember(containerDecl, decl);
                 }

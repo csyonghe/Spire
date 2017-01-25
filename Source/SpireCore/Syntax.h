@@ -46,6 +46,8 @@ namespace Spire
 			Intrinsic = (1 << 14) | ModifierFlag::Extern,
 			// TODO(tfoley): This should probably be its own flag
 			InOut = ModifierFlag::In | ModifierFlag::Out,
+
+			Transparent = 1 << 15,
 		};
 		//
 		// Other modifiers may have more elaborate data, and so
@@ -952,6 +954,12 @@ namespace Spire
 			Element* mEnd;
 		};
 
+		struct TransparentMemberInfo
+		{
+			// The declaration of the transparent member
+			Decl*	decl;
+		};
+
 		// A "container" decl is a parent to other declarations
 		class ContainerDecl : public Decl
 		{
@@ -972,6 +980,10 @@ namespace Spire
 			// Whether the `memberDictionary` is valid.
 			// Should be set to `false` if any members get added/remoed.
 			bool memberDictionaryIsValid = false;
+
+			// A list of transparent members, to be used in lookup
+			// Note: this is only valid if `memberDictionaryIsValid` is true
+			List<TransparentMemberInfo> transparentMembers;
 		};
 
 		template<typename T>
@@ -1513,27 +1525,65 @@ namespace Spire
 			All = Type | Function | Value,
 		};
 
+		// Represents one item found during lookup
+		struct LookupResultItem
+		{
+			// An object that can be used to construct a proper
+			// declaration reference once we've isolated the
+			// declaration we want...
+			class Breadcrumb : public RefObject
+			{
+			public:
+				DeclRef declRef;
+				RefPtr<Breadcrumb> next;
+				Breadcrumb(DeclRef declRef, RefPtr<Breadcrumb> next)
+					: declRef(declRef)
+					, next(next)
+				{}
+			};
+
+			// A properly-specialized reference to the declaration that was found.
+			DeclRef declRef;
+
+			// Any breadcrumbs needed in order to turn that declaration
+			// reference into a well-formed expression.
+			//
+			// This is unused in the simple case where a declaration
+			// is being referenced directly (rather than through
+			// transparent members).
+			RefPtr<Breadcrumb> breadcrumbs;
+
+			LookupResultItem() = default;
+			explicit LookupResultItem(DeclRef declRef)
+				: declRef(declRef)
+			{}
+			LookupResultItem(DeclRef declRef, RefPtr<Breadcrumb> breadcrumbs)
+				: declRef(declRef)
+				, breadcrumbs(breadcrumbs)
+			{}
+		};
+
 		// Result of looking up a name in some lexical/semantic environment.
 		// Can be used to enumerate all the declarations matching that name,
 		// in the case where the result is overloaded.
 		struct LookupResult
 		{
-			// The declaration that was found, in the smple case
-			Decl*			decl = nullptr;
+			// The one item that was found, in the smple case
+			LookupResultItem item;
 
-			// All of the declarations that were found, in the complex case.
-			// Note: if there was no overloading, then this doesn't include
-			// `decl`, just to avoid allocating memory.
-			List<Decl*>		decls;
+			// All of the items that were found, in the complex case.
+			// Note: if there was no overloading, then this list isn't
+			// used at all, to avoid allocation.
+			List<LookupResultItem> items;
 
 			ContainerDecl*	scope = nullptr;
 			ContainerDecl*	endScope = nullptr;
 			LookupMask		mask = LookupMask::All;
 
 			// Was at least one result found?
-			bool isValid() const { return decl != nullptr; }
+			bool isValid() const { return item.declRef.GetDecl() != nullptr; }
 
-			bool isOverloaded() const { return decls.Count() > 1; }
+			bool isOverloaded() const { return items.Count() > 1; }
 		};
 
 		// An expression that references an overloaded set of declarations
@@ -1547,9 +1597,6 @@ namespace Spire
 
 			// The lookup result that was ambiguous
 			LookupResult lookupResult2;
-
-			// Substitutions to apply on the eventual result
-			RefPtr<Substitutions> substitutions;
 
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual OverloadedExpr * Clone(CloneContext & ctx) override;
@@ -1779,31 +1826,30 @@ namespace Spire
 			virtual StageSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		// Shared base class for declarations of buffers with shader parameters
-		//
-		// TODO(tfoley): Should this actually be unified with the component
-		// declaration syntax in some way?
-		//
-		class BufferDecl : public ContainerDecl
+		// Shared base class for declarations of buffers with shader parameters.
+		// Note that we treat the buffer declaration as a *type* declaration,
+		// and then declare a separate variable of that type, so that the
+		// lookup behavior is more clear.
+		class BufferTypeDecl : public AggTypeDecl
 		{
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override;
 		};
 
 		// An HLSL buffer declaration
-		class HLSLBufferDecl : public BufferDecl {};
+		class HLSLBufferTypeDecl : public BufferTypeDecl {};
 
 		// An HLSL `cbuffer` declaration
-		class HLSLConstantBufferDecl : public HLSLBufferDecl
+		class HLSLConstantBufferTypeDecl : public HLSLBufferTypeDecl
 		{
 		public:
-			virtual HLSLConstantBufferDecl * Clone(CloneContext & ctx) override;
+			virtual HLSLConstantBufferTypeDecl * Clone(CloneContext & ctx) override;
 		};
 
 		// An HLSL `tbuffer` declaration
-		class HLSLTextureBufferDecl : public HLSLBufferDecl
+		class HLSLTextureBufferTypeDecl : public HLSLBufferTypeDecl
 		{
 		public:
-			virtual HLSLTextureBufferDecl * Clone(CloneContext & ctx) override;
+			virtual HLSLTextureBufferTypeDecl * Clone(CloneContext & ctx) override;
 		};
 
 		// TODO(tfoley): equivalent cases for GLSL uniform buffer declarations
@@ -2401,7 +2447,7 @@ namespace Spire
 				return shader;
 			}
 
-			virtual RefPtr<SyntaxNode> VisitBufferDecl(BufferDecl * decl)
+			virtual RefPtr<SyntaxNode> VisitBufferTypeDecl(BufferTypeDecl * decl)
 			{
 				for (auto & member : decl->Members)
 					member->Accept(this);

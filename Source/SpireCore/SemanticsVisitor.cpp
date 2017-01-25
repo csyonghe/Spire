@@ -150,16 +150,46 @@ namespace Spire
 				}
 			}
 
+			LookupResult RefineLookup(LookupResult const& inResult, LookupMask mask)
+			{
+				if (!inResult.isValid()) return inResult;
+				if (!inResult.isOverloaded()) return inResult;
+
+				LookupResult result;
+				for (auto item : inResult.items)
+				{
+					if (!DeclPassesLookupMask(item.declRef.GetDecl(), mask))
+						continue;
+
+					AddToLookupResult(result, item);
+				}
+				return result;
+			}
+
+			RefPtr<ExpressionSyntaxNode> ConstructLookupResultExpr(
+				LookupResultItem const&			item,
+				RefPtr<ExpressionSyntaxNode>	baseExpr,
+				RefPtr<ExpressionSyntaxNode>	originalExpr)
+			{
+				// If we collected any breadcrumbs, then these represent
+				// additional segments of the lookup path that we need
+				// to expand here.
+				auto bb = baseExpr;
+				for (auto breadcrumb = item.breadcrumbs; breadcrumb; breadcrumb = breadcrumb->next)
+				{
+					bb = ConstructDeclRefExpr(breadcrumb->declRef, bb, originalExpr);
+				}
+
+				return ConstructDeclRefExpr(item.declRef, bb, originalExpr);
+			}
+
 			RefPtr<ExpressionSyntaxNode> ResolveOverloadedExpr(RefPtr<OverloadedExpr> overloadedExpr, LookupMask mask)
 			{
 				auto lookupResult = overloadedExpr->lookupResult2;
 				assert(lookupResult.isValid() && lookupResult.isOverloaded());
 
-				// filter the lookup to only consider declarations of the right flavor
-				lookupResult.mask = LookupMask(uint8_t(lookupResult.mask) & uint8_t(mask));
-				
-				// and re-run lookup to see what we found
-				lookupResult = DoLookup(lookupResult.decl->Name.Content, lookupResult);
+				// Take the lookup result we had, and refine it based on what is expected in context.
+				lookupResult = RefineLookup(lookupResult, mask);
 
 				if (!lookupResult.isValid())
 				{
@@ -179,8 +209,7 @@ namespace Spire
 				}
 
 				// otherwise, we had a single decl and it was valid, hooray!
-				DeclRef declRef(lookupResult.decl, overloadedExpr->substitutions);
-				return ConstructDeclRefExpr(declRef, overloadedExpr->base, overloadedExpr);
+				return ConstructLookupResultExpr(lookupResult.item, overloadedExpr->base, overloadedExpr);
 			}
 
 			RefPtr<ExpressionSyntaxNode> ExpectATypeRepr(RefPtr<ExpressionSyntaxNode> expr)
@@ -2112,7 +2141,7 @@ namespace Spire
 				Status status = Status::Unchecked;
 
 				// Reference to the declaration being applied
-				DeclRef declRef;
+				LookupResultItem item;
 
 				// The type of the result expression if this candidate is selected
 				RefPtr<ExpressionType>	resultType;
@@ -2150,11 +2179,11 @@ namespace Spire
 				switch (candidate.flavor)
 				{
 				case OverloadCandidate::Flavor::Func:
-					paramCount = candidate.declRef.As<FuncDeclBaseRef>().GetParameters().Count();
+					paramCount = candidate.item.declRef.As<FuncDeclBaseRef>().GetParameters().Count();
 					break;
 
 				case OverloadCandidate::Flavor::ComponentFunc:
-					paramCount = candidate.declRef.As<ComponentDeclRef>().GetParameters().Count();
+					paramCount = candidate.item.declRef.As<ComponentDeclRef>().GetParameters().Count();
 					break;
 				}
 				if (argCount != paramCount && context.mode != OverloadResolveContext::Mode::JustTrying)
@@ -2176,11 +2205,11 @@ namespace Spire
 				switch (candidate.flavor)
 				{
 				case OverloadCandidate::Flavor::Func:
-					params = candidate.declRef.As<FuncDeclBaseRef>().GetParameters().ToArray();
+					params = candidate.item.declRef.As<FuncDeclBaseRef>().GetParameters().ToArray();
 					break;
 
 				case OverloadCandidate::Flavor::ComponentFunc:
-					params = candidate.declRef.As<ComponentDeclRef>().GetParameters().ToArray();
+					params = candidate.item.declRef.As<ComponentDeclRef>().GetParameters().ToArray();
 					break;
 				}
 				int paramCount = params.Count();
@@ -2292,6 +2321,7 @@ namespace Spire
 			}
 
 			void AddFuncOverloadCandidate(
+				LookupResultItem			item,
 				FuncDeclBaseRef				funcDeclRef,
 				OverloadResolveContext&		context)
 			{
@@ -2299,7 +2329,7 @@ namespace Spire
 
 				OverloadCandidate candidate;
 				candidate.flavor = OverloadCandidate::Flavor::Func;
-				candidate.declRef = funcDeclRef;
+				candidate.item = item;
 				candidate.resultType = funcDeclRef.GetResultType();
 
 				AddOverloadCandidate(context, candidate);
@@ -2346,13 +2376,22 @@ namespace Spire
 			}
 
 			void AddCtorOverloadCandidate(
+				LookupResultItem		typeItem,
 				RefPtr<ExpressionType>	type,
 				ConstructorDeclRef		ctorDeclRef,
 				OverloadResolveContext&	context)
 			{
+				// `typeItem` refers to the type being constructed (the thing
+				// that was applied as a function) so we need to construct
+				// a `LookupResultItem` that refers to the constructor instead
+
+				LookupResultItem ctorItem;
+				ctorItem.declRef = ctorDeclRef;
+				ctorItem.breadcrumbs = new LookupResultItem::Breadcrumb(typeItem.declRef, typeItem.breadcrumbs);
+
 				OverloadCandidate candidate;
 				candidate.flavor = OverloadCandidate::Flavor::Func;
-				candidate.declRef = ctorDeclRef;
+				candidate.item = ctorItem;
 				candidate.resultType = type;
 
 				AddOverloadCandidate(context, candidate);
@@ -2671,6 +2710,7 @@ namespace Spire
 			}
 
 			void AddAggTypeOverloadCandidates(
+				LookupResultItem		typeItem,
 				RefPtr<ExpressionType>	type,
 				AggTypeDeclRef			aggTypeDeclRef,
 				OverloadResolveContext&	context)
@@ -2678,7 +2718,7 @@ namespace Spire
 				for (auto ctorDeclRef : aggTypeDeclRef.GetMembersOfType<ConstructorDeclRef>())
 				{
 					// now work through this candidate...
-					AddCtorOverloadCandidate(type, ctorDeclRef, context);
+					AddCtorOverloadCandidate(typeItem, type, ctorDeclRef, context);
 				}
 
 				// Now walk through any extensions we can find for this types
@@ -2690,8 +2730,10 @@ namespace Spire
 
 					for (auto ctorDeclRef : extDeclRef.GetMembersOfType<ConstructorDeclRef>())
 					{
+						// TODO(tfoley): `typeItem` here should really reference the extension...
+
 						// now work through this candidate...
-						AddCtorOverloadCandidate(type, ctorDeclRef, context);
+						AddCtorOverloadCandidate(typeItem, type, ctorDeclRef, context);
 					}
 				}
 			}
@@ -2704,23 +2746,23 @@ namespace Spire
 				{
 					if (auto aggTypeDeclRef = declRefType->declRef.As<AggTypeDeclRef>())
 					{
-						AddAggTypeOverloadCandidates(type, aggTypeDeclRef, context);
+						AddAggTypeOverloadCandidates(LookupResultItem(aggTypeDeclRef), type, aggTypeDeclRef, context);
 					}
 				}
 			}
 
 			void AddDeclRefOverloadCandidates(
-				DeclRef					declRef,
+				LookupResultItem		item,
 				OverloadResolveContext&	context)
 			{
-				if (auto funcDeclRef = declRef.As<FuncDeclBaseRef>())
+				if (auto funcDeclRef = item.declRef.As<FuncDeclBaseRef>())
 				{
-					AddFuncOverloadCandidate(funcDeclRef, context);
+					AddFuncOverloadCandidate(item, funcDeclRef, context);
 				}
-				else if (auto aggTypeDeclRef = declRef.As<AggTypeDeclRef>())
+				else if (auto aggTypeDeclRef = item.declRef.As<AggTypeDeclRef>())
 				{
 					auto type = DeclRefType::Create(aggTypeDeclRef);
-					AddAggTypeOverloadCandidates(type, aggTypeDeclRef, context);
+					AddAggTypeOverloadCandidates(item, type, aggTypeDeclRef, context);
 				}
 				else
 				{
@@ -2742,7 +2784,7 @@ namespace Spire
 				else if (auto funcDeclRefExpr = funcExpr.As<DeclRefExpr>())
 				{
 					// The expression referenced a function declaration
-					AddDeclRefOverloadCandidates(funcDeclRefExpr->declRef, context);
+					AddDeclRefOverloadCandidates(LookupResultItem(funcDeclRefExpr->declRef), context);
 				}
 				else if (auto funcType = funcExprType->As<FuncType>())
 				{
@@ -2753,10 +2795,9 @@ namespace Spire
 				{
 					auto lookupResult = overloadedExpr->lookupResult2;
 					assert(lookupResult.isOverloaded());
-					for(auto resultDecl : lookupResult.decls)
+					for(auto item : lookupResult.items)
 					{
-						DeclRef declRef(resultDecl, overloadedExpr->substitutions);
-						AddDeclRefOverloadCandidates(declRef, context);
+						AddDeclRefOverloadCandidates(item, context);
 					}
 				}
 			}
@@ -2808,7 +2849,36 @@ namespace Spire
 				else
 				{
 					// There were multple equally-good candidates, but none actually usable.
-					getSink()->diagnose(expr, Diagnostics::unimplemented, "no applicable overload found");
+					// We will construct a diagnostic message to help out.
+
+					String funcName;
+					if (auto baseVar = funcExpr.As<VarExpressionSyntaxNode>())
+						funcName = baseVar->Variable;
+					else if(auto baseMemberRef = funcExpr.As<MemberExpressionSyntaxNode>())
+						funcName = baseMemberRef->MemberName;
+
+					StringBuilder argsListBuilder;
+					argsListBuilder << "(";
+					bool first = true;
+					for (auto a : expr->Arguments)
+					{
+						if (!first) argsListBuilder << ", ";
+						argsListBuilder << a->Type->ToString();
+						first = false;
+					}
+					argsListBuilder << ")";
+					String argsList = argsListBuilder.ProduceString();
+
+					if (funcName.Length() != 0)
+					{
+						getSink()->diagnose(expr, Diagnostics::noApplicableOverloadForNameWithArgs, funcName, argsList);
+					}
+					else
+					{
+						getSink()->diagnose(expr, Diagnostics::noApplicableWithArgs, funcName, argsList);
+					}
+
+					// TODO: iterate over the candidates under consideration and print them?
 					expr->Type = ExpressionType::Error;
 					return expr;
 				}
@@ -2824,8 +2894,18 @@ namespace Spire
 				// check the base expression first
 				expr->FunctionExpr = CheckExpr(expr->FunctionExpr);
 
+				bool anyError = false;
 				for (auto & arg : expr->Arguments)
+				{
 					arg = arg->Accept(this).As<ExpressionSyntaxNode>();
+					if (arg->Type->Equals(ExpressionType::Error))
+						anyError = true;
+				}
+				if (anyError)
+				{
+					expr->Type = ExpressionType::Error;
+					return expr;
+				}
 
 				auto rs = ResolveInvoke(expr);
 				if (auto invoke = dynamic_cast<InvokeExpressionSyntaxNode*>(rs.Ptr()))
@@ -2992,9 +3072,19 @@ namespace Spire
 
 			void BuildMemberDictionary(ContainerDecl* decl)
 			{
+				decl->transparentMembers.Clear();
+
 				for (auto m : decl->Members)
 				{
 					auto name = m->Name.Content;
+
+					// Add any transparent members to a separate list for lookup
+					if (m->HasModifier(ModifierFlag::Transparent))
+					{
+						TransparentMemberInfo info;
+						info.decl = m.Ptr();
+						decl->transparentMembers.Add(info);
+					}
 
 					// Ignore members with an empty name
 					if (name.Length() == 0)
@@ -3007,60 +3097,124 @@ namespace Spire
 						m->nextInContainerWithSameName = next;
 
 					decl->memberDictionary[name] = m.Ptr();
+
 				}
 				decl->memberDictionaryIsValid = true;
 			}
 
-			LookupResult DoLookup(String const& name, LookupResult inResult)
+			void AddToLookupResult(
+				LookupResult&		result,
+				LookupResultItem	item)
 			{
-				LookupResult result;
-				result.mask = inResult.mask;
-				result.endScope = inResult.endScope;
-
-				ContainerDecl* scope = inResult.scope;
-				ContainerDecl* endScope = inResult.endScope;
-				for (;scope != endScope; scope = scope->ParentDecl)
+				if (!result.isValid())
 				{
+					// If we hadn't found a hit before, we have one now
+					result.item = item;
+				}
+				else if (!result.isOverloaded())
+				{
+					// We are about to make this overloaded
+					result.items.Add(result.item);
+					result.items.Add(item);
+				}
+				else
+				{
+					// The result was already overloaded, so we pile on
+					result.items.Add(item);
+				}
+			}
 
-					if (!scope->memberDictionaryIsValid)
-					{
-						BuildMemberDictionary(scope);
-					}
+			// Look for members of the given name in the given container for declarations
+			void DoLocalLookupImpl(
+				String const&							name,
+				ContainerDeclRef						containerDeclRef,
+				LookupResult&							result,
+				RefPtr<LookupResultItem::Breadcrumb>	inBreadcrumbs)
+			{
+				ContainerDecl* containerDecl = containerDeclRef.GetDecl();
 
-					Decl* firstDecl = nullptr;
-					if (!scope->memberDictionary.TryGetValue(name, firstDecl))
+				// Ensure that the lookup dictionary in the container is up to date
+				if (!containerDecl->memberDictionaryIsValid)
+				{
+					BuildMemberDictionary(containerDecl);
+				}
+
+				// Look up the declarations with the chosen name in the container.
+				Decl* firstDecl = nullptr;
+				containerDecl->memberDictionary.TryGetValue(name, firstDecl);
+
+				// Now iterate over those declarations (if any) and see if
+				// we find any that meet our filtering criteria.
+				// For example, we might be filtering so that we only consider
+				// type declarations.
+				for (auto m = firstDecl; m; m = m->nextInContainerWithSameName)
+				{
+					if (!DeclPassesLookupMask(m, result.mask))
 						continue;
 
-					// Must ensure that it is a declaration we care about
-					for (auto m = firstDecl; m; m = m->nextInContainerWithSameName)
-					{
-						if (!DeclPassesLookupMask(m, result.mask))
-							continue;
+					// The declaration passed the test, so add it!
+					AddToLookupResult(result, LookupResultItem(DeclRef(m, containerDeclRef.substitutions), inBreadcrumbs));
+				}
 
-						if (!result.isValid())
-						{
-							// If we hadn't found a hit before, we have one now
-							result.decl = m;
-							result.scope = scope;
-						}
-						else if (!result.isOverloaded())
-						{
-							// We are about to make this overloaded
-							result.decls.Add(result.decl);
-							result.decls.Add(m);
-						}
-						else
-						{
-							// The result was already overloaded, so we pile on
-							result.decls.Add(m);
-						}
+
+				// TODO(tfoley): should we look up in the transparent decls
+				// if we already has a hit in the current container?
+
+				for(auto transparentInfo : containerDecl->transparentMembers)
+				{
+					DeclRef transparentMemberDeclRef(transparentInfo.decl, containerDeclRef.substitutions);
+
+					RefPtr<LookupResultItem::Breadcrumb> breadcrumb = new LookupResultItem::Breadcrumb(
+						transparentMemberDeclRef,
+						inBreadcrumbs);
+
+					DoMemberLookupImpl(name, transparentMemberDeclRef, result, breadcrumb);
+				}
+
+				// TODO(tfoley): need to consider lookup via extension here?
+			}
+
+			void DoMemberLookupImpl(
+				String const&							name,
+				RefPtr<ExpressionType>					baseType,
+				LookupResult&							ioResult,
+				RefPtr<LookupResultItem::Breadcrumb>	inBreadcrumbs)
+			{
+				if (auto baseDeclRefType = baseType->As<DeclRefType>())
+				{
+					if (auto baseAggTypeDeclRef = baseDeclRefType->declRef.As<AggTypeDeclRef>())
+					{
+						DoLocalLookupImpl(name, baseAggTypeDeclRef, ioResult, inBreadcrumbs);
 					}
+				}
+
+				// TODO(tfoley): any other cases to handle here?
+			}
+
+			void DoMemberLookupImpl(
+				String const&							name,
+				DeclRef									baseDeclRef,
+				LookupResult&							ioResult,
+				RefPtr<LookupResultItem::Breadcrumb>	inBreadcrumbs)
+			{
+				auto baseType = GetTypeForDeclRef(baseDeclRef);
+				return DoMemberLookupImpl(name, baseType, ioResult, inBreadcrumbs);
+			}
+
+			void DoLookupImpl(String const& name, LookupResult& result)
+			{
+				ContainerDecl* scope = result.scope;
+				ContainerDecl* endScope = result.endScope;
+				for (;scope != endScope; scope = scope->ParentDecl)
+				{
+					ContainerDeclRef scopeRef = DeclRef(scope, nullptr).As<ContainerDeclRef>();
+					DoLocalLookupImpl(name, scopeRef, result, nullptr);
 
 					if (result.isValid())
 					{
 						// If we've found a result in this scope, then there
 						// is no reason to look further up (for now).
-						return result;
+						return;
 					}
 
 #if 0
@@ -3113,6 +3267,14 @@ namespace Spire
 				}
 
 				// If we run out of scopes, then we are done.
+			}
+
+			LookupResult DoLookup(String const& name, LookupResult inResult)
+			{
+				LookupResult result;
+				result.mask = inResult.mask;
+				result.endScope = inResult.endScope;
+				DoLookupImpl(name, result);
 				return result;
 			}
 
@@ -3120,7 +3282,8 @@ namespace Spire
 			{
 				LookupResult result;
 				result.scope = scope;
-				return DoLookup(name, result);
+				DoLookupImpl(name, result);
+				return result;
 			}
 
 			// perform lookup within the context of a particular container declaration,
@@ -3134,9 +3297,11 @@ namespace Spire
 
 			}
 
-			LookupResult LookUpLocal(String const& name, ContainerDeclRef scope)
+			LookupResult LookUpLocal(String const& name, ContainerDeclRef containerDeclRef)
 			{
-				return LookUpLocal(name, scope.GetDecl());
+				LookupResult result;
+				DoLocalLookupImpl(name, containerDeclRef, result, nullptr);
+				return result;
 			}
 
 			virtual RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode *expr) override
@@ -3162,11 +3327,13 @@ namespace Spire
 					else
 					{
 						// Only a single decl, that's good
-						auto decl = lookupResult.decl;
-						auto declRef = DeclRef(decl, nullptr);
+						return ConstructLookupResultExpr(lookupResult.item, nullptr, expr);
+#if 0
+						auto declRef = lookupResult.declRef;
 						expr->declRef = declRef;
 						expr->Type = GetTypeForDeclRef(declRef);
 						return expr;
+#endif
 					}
 				}
 
@@ -3353,8 +3520,11 @@ namespace Spire
 						}
 
 						// default case: we have found something
+						return ConstructLookupResultExpr(lookupResult.item, expr->BaseExpression, expr);
+#if 0
 						DeclRef memberDeclRef(lookupResult.decl, aggTypeDeclRef.substitutions);
 						return ConstructDeclRefExpr(memberDeclRef, expr->BaseExpression, expr);
+#endif
 
 #if 0
 

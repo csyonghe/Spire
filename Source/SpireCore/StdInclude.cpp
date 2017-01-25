@@ -365,7 +365,7 @@ namespace Spire
 			}
 
 			static const char* kComponentNames[]{ "x", "y", "z", "w" };
-			static const char* kVectorNames[]{ "x", "xy", "xyz", "xyzw" };
+			static const char* kVectorNames[]{ "", "x", "xy", "xyz", "xyzw" };
 
 			// Need to add constructors to the types above
 			for (int N = 2; N <= 4; ++N)
@@ -381,10 +381,15 @@ namespace Spire
 				}
 				sb << ");\n";
 
-				// Initialize from an N-1 vector and a scalar
-				if (N > 2)
+				// Initialize from an M-vector and then scalars
+				for (int M = 2; M < N; ++M)
 				{
-					sb << "__init(vector<T," << (N - 1) << "> " << kVectorNames[N - 1] << ", T " << kComponentNames[N] << ");\n";
+					sb << "__init(vector<T," << M << "> " << kVectorNames[M];
+					for (int ii = M; ii < N; ++ii)
+					{
+						sb << ", T " << kComponentNames[ii];
+					}
+					sb << ");\n";
 				}
 
 				sb << "}\n";

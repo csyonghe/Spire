@@ -23,6 +23,7 @@ namespace Spire
 			virtual void ProcessFunction(FunctionSyntaxNode * func) = 0;
 			virtual void ProcessShader(ShaderIR * shader) = 0;
 			virtual void ProcessStruct(StructSyntaxNode * st) = 0;
+			virtual void ProcessGlobalVar(VarDeclBase * var) = 0;
 		};
 
 		SyntaxVisitor * CreateSemanticsVisitor(SymbolTable * symbols, DiagnosticSink * err);
