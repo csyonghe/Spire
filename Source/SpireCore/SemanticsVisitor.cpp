@@ -2066,6 +2066,16 @@ namespace Spire
 
 			virtual void VisitConstructorDecl(ConstructorDecl* decl) override
 			{
+				if (decl->IsChecked(DeclCheckState::Checked)) return;
+				decl->SetCheckState(DeclCheckState::CheckingHeader);
+
+				for (auto& paramDecl : decl->GetParameters())
+				{
+					paramDecl->Type = CoerceToProperType(TranslateTypeNode(paramDecl->Type));
+				}
+				decl->SetCheckState(DeclCheckState::CheckedHeader);
+
+				// TODO(tfoley): check body
 			}
 
 			//
@@ -2077,13 +2087,25 @@ namespace Spire
 					Func,
 					ComponentFunc,
 				};
-
 				Flavor flavor;
+
+				enum class Status
+				{
+					Unchecked,
+					ArityChecked,
+					TypeChecked,
+					Appicable,
+				};
+				Status status = Status::Unchecked;
+
 				union
 				{
 					FunctionDeclBase*		func;
 					ComponentSyntaxNode*	componentFunc;
 				};
+
+				// The type of the result expression if this candidate is selected
+				RefPtr<ExpressionType>	resultType;
 			};
 
 
@@ -2092,46 +2114,230 @@ namespace Spire
 			// to an overloaded symbol
 			struct OverloadResolveContext
 			{
+				enum class Mode
+				{
+					// We are just checking if a candidate works or not
+					JustTrying,
 
+					// We want to actually update the AST for a chosen candidate
+					ForReal,
+				};
+
+				RefPtr<InvokeExpressionSyntaxNode> appExpr;
+
+				OverloadCandidate bestCandidateStorage;
+				OverloadCandidate*	bestCandidate = nullptr;
+				bool ambiguous = false;
+				Mode mode = Mode::JustTrying;
 			};
 
-			void TryFuncOverloadCandidate(
+			bool TryCheckOverloadCandidateArity(
+				OverloadResolveContext&		context,
+				OverloadCandidate const&	candidate)
+			{
+				int argCount = context.appExpr->Arguments.Count();
+				int paramCount = 0;
+				switch (candidate.flavor)
+				{
+				case OverloadCandidate::Flavor::Func:
+					paramCount = candidate.func->GetParameters().Count();
+					break;
+
+				case OverloadCandidate::Flavor::ComponentFunc:
+					paramCount = candidate.componentFunc->GetParameters().Count();
+					break;
+				}
+				if (argCount != paramCount && context.mode != OverloadResolveContext::Mode::JustTrying)
+				{
+					getSink()->diagnose(context.appExpr, Diagnostics::unimplemented, "parameter and argument count mismatch");
+				}
+
+				return argCount == paramCount;
+			}
+
+			bool TryCheckOverloadCandidateTypes(
+				OverloadResolveContext&		context,
+				OverloadCandidate const&	candidate)
+			{
+				auto& args = context.appExpr->Arguments;
+				int argCount = args.Count();
+
+				List<RefPtr<ParameterSyntaxNode>> params;
+				switch (candidate.flavor)
+				{
+				case OverloadCandidate::Flavor::Func:
+					params = candidate.func->GetParameters().ToArray();
+					break;
+
+				case OverloadCandidate::Flavor::ComponentFunc:
+					params = candidate.componentFunc->GetParameters().ToArray();
+					break;
+				}
+				int paramCount = params.Count();
+				assert(argCount == paramCount);
+
+				bool success = true;
+				for (int ii = 0; ii < argCount; ++ii)
+				{
+					auto arg = args[ii];
+					auto param = params[ii];
+
+					if (!MatchType_ValueReceiver(param->Type.Ptr(), arg->Type.Ptr()))
+					{
+						if (context.mode == OverloadResolveContext::Mode::JustTrying)
+							return false;
+						else
+						{
+							getSink()->diagnose(arg, Diagnostics::typeMismatch, arg->Type, param->Type);
+							success = false;
+						}
+					}
+				}
+				return success;
+			}
+
+			bool TryCheckOverloadCandidateDirections(
+				OverloadResolveContext&		context,
+				OverloadCandidate const&	candidate)
+			{
+				// TODO(tfoley): check `in` and `out` markers, as needed.
+				return true;
+			}
+
+			// Try to check an overload candidate, but bail out
+			// if any step fails
+			void TryCheckOverloadCandidate(
+				OverloadResolveContext&		context,
+				OverloadCandidate&			candidate)
+			{
+				if (!TryCheckOverloadCandidateArity(context, candidate))
+					return;
+
+				candidate.status = OverloadCandidate::Status::ArityChecked;
+				if (!TryCheckOverloadCandidateTypes(context, candidate))
+					return;
+
+				candidate.status = OverloadCandidate::Status::TypeChecked;
+				if (!TryCheckOverloadCandidateDirections(context, candidate))
+					return;
+
+				candidate.status = OverloadCandidate::Status::Appicable;
+			}
+
+			// Take an overload candidate that previously got through
+			// `TryCheckOverloadCandidate` above, and try to finish
+			// up the work and turn it into a real expression.
+			//
+			// If the candidate isn't actually applicable, this is
+			// where we'd start reporting the issue(s).
+			RefPtr<ExpressionSyntaxNode> CompleteOverloadCandidate(
+				OverloadResolveContext&		context,
+				OverloadCandidate&			candidate)
+			{
+				context.mode = OverloadResolveContext::Mode::ForReal;
+				context.appExpr->Type = ExpressionType::Error;
+
+				if (!TryCheckOverloadCandidateArity(context, candidate))
+					return context.appExpr;
+
+				if (!TryCheckOverloadCandidateTypes(context, candidate))
+					return context.appExpr;
+
+				if (!TryCheckOverloadCandidateDirections(context, candidate))
+					return context.appExpr;
+
+				context.appExpr->Type = candidate.resultType;
+				return context.appExpr;
+			}
+
+			void AddOverloadCandidate(
+				OverloadResolveContext& context,
+				OverloadCandidate&		candidate)
+			{
+				// Try the candidate out, to see if it is applicable at all.
+				TryCheckOverloadCandidate(context, candidate);
+
+				if (!context.bestCandidate || candidate.status > context.bestCandidate->status)
+				{
+					// This candidate is the best one so far, so lets remember it
+					context.bestCandidateStorage = candidate;
+					context.bestCandidate = &context.bestCandidateStorage;
+					context.ambiguous = false;
+				}
+				else if (candidate.status == OverloadCandidate::Status::Appicable)
+				{
+					// This is the case where we might have to consider more functions...
+					throw "haven't implemented the case where we track multiple applicable overloads";
+				}
+				else if (candidate.status == context.bestCandidate->status)
+				{
+					// This candidate is just as applicable as the last, but
+					// neither is actually usable.
+					context.ambiguous = true;
+				}
+				else
+				{
+					// This candidate wasn't good enough to keep considering
+				}
+			}
+
+			void AddFuncOverloadCandidate(
 				RefPtr<FunctionDeclBase>	funcDecl,
 				OverloadResolveContext&		context)
 			{
-				throw "unimplemented";
+				EnsureDecl(funcDecl);
+
+				OverloadCandidate candidate;
+				candidate.flavor = OverloadCandidate::Flavor::Func;
+				candidate.func = funcDecl.Ptr();
+				candidate.resultType = funcDecl->ReturnType;
+
+				AddOverloadCandidate(context, candidate);
 			}
 
-			void TryComponentFuncOverloadCandidate(
+			void AddComponentFuncOverloadCandidate(
 				RefPtr<ShaderComponentSymbol>	componentFuncSym,
 				OverloadResolveContext&			context)
 			{
-				throw "unimplemented";
+				auto componentFuncDecl = componentFuncSym->Implementations.First()->SyntaxNode.Ptr();
+
+				OverloadCandidate candidate;
+				candidate.flavor = OverloadCandidate::Flavor::ComponentFunc;
+				candidate.componentFunc = componentFuncDecl;
+				candidate.resultType = componentFuncDecl->Type;
+
+				AddOverloadCandidate(context, candidate);
 			}
 
-			void TryFuncOverloadCandidate(
+			void AddFuncOverloadCandidate(
 				RefPtr<FuncType>		funcType,
 				OverloadResolveContext&	context)
 			{
 				if (funcType->decl)
 				{
-					TryFuncOverloadCandidate(funcType->decl, context);
+					AddFuncOverloadCandidate(funcType->decl, context);
 				}
 				else if (funcType->Func)
 				{
-					TryFuncOverloadCandidate(funcType->Func->SyntaxNode, context);
+					AddFuncOverloadCandidate(funcType->Func->SyntaxNode, context);
 				}
 				else if (funcType->Component)
 				{
-					TryComponentFuncOverloadCandidate(funcType->Component, context);
+					AddComponentFuncOverloadCandidate(funcType->Component, context);
 				}
 			}
 
-			void TryCtorOverloadCandidate(
+			void AddCtorOverloadCandidate(
+				RefPtr<ExpressionType>	type,
 				ConstructorDecl*		ctorDecl,
 				OverloadResolveContext&	context)
 			{
-				throw "unimplemented";
+				OverloadCandidate candidate;
+				candidate.flavor = OverloadCandidate::Flavor::Func;
+				candidate.func = ctorDecl;
+				candidate.resultType = type;
+
+				AddOverloadCandidate(context, candidate);
 			}
 
 			// If the given declaration has generic parameters, then
@@ -2145,13 +2351,46 @@ namespace Spire
 				return parentGeneric;
 			}
 
+			bool TryUnifyTypes(
+				RefPtr<ExpressionType> fst,
+				RefPtr<ExpressionType> snd)
+			{
+				if (fst->Equals(snd)) return true;
+
+				if (auto fstDeclRefType = fst->As<DeclRefType>())
+				{
+					if (auto sndDeclRefType = snd->As<DeclRefType>())
+					{
+						auto fstDecl = fstDeclRefType->decl;
+						auto sndDecl = sndDeclRefType->decl;
+
+						// can't be unified if they refer to differnt declarations.
+						if (fstDecl != sndDecl) return false;
+
+						// next need to unify the "path" by which
+						// they were referenced...
+						//
+						// TODO(tfoley): actually implement this
+						return true;
+					}
+				}
+
+				throw "unimplemented";
+			}
+
 			// Is the candidate extension declaration actually applicable to the given type
 			bool IsExtensionApplicableToType(
-				ExtensionDecl*		extDecl,
-				RefPtr<DeclRefType>	type)
+				ExtensionDecl*			extDecl,
+				RefPtr<ExpressionType>	type)
 			{
 				if (auto extGenericDecl = GetOuterGeneric(extDecl))
 				{
+					// we need to check whether we can unify the type on the extension
+					// with the type in question.
+					// This has to be done with a constraint solver.
+
+					return TryUnifyTypes(extDecl->targetType, type);
+
 					// TODO(tfoley): figure out how to check things here!!!
 					throw "unimplemented";
 					return true;
@@ -2164,7 +2403,32 @@ namespace Spire
 				}
 			}
 
-			void TryTypeOverloadCandidate(
+			void AddAggTypeOverloadCandidates(
+				RefPtr<ExpressionType>	type,
+				RefPtr<AggTypeDecl>		aggTypeDecl,
+				OverloadResolveContext&	context)
+			{
+				for (auto ctor : aggTypeDecl->GetMembersOfType<ConstructorDecl>())
+				{
+					// now work through this candidate...
+					AddCtorOverloadCandidate(type, ctor.Ptr(), context);
+				}
+
+				// Now walk through any extensions we can find for this type
+				for (auto ext = aggTypeDecl->candidateExtensions; ext; ext = ext->nextCandidateExtension)
+				{
+					if (!IsExtensionApplicableToType(ext, type))
+						continue;
+
+					for (auto ctor : ext->GetMembersOfType<ConstructorDecl>())
+					{
+						// now work through this candidate...
+						AddCtorOverloadCandidate(type, ctor.Ptr(), context);
+					}
+				}
+			}
+
+			void AddTypeOverloadCandidates(
 				RefPtr<ExpressionType>	type,
 				OverloadResolveContext&	context)
 			{
@@ -2172,46 +2436,63 @@ namespace Spire
 				{
 					if (auto aggTypeDecl = dynamic_cast<AggTypeDecl*>(declRefType->decl))
 					{
-						for (auto ctor : aggTypeDecl->GetMembersOfType<ConstructorDecl>())
-						{
-							// now work through this candidate...
-							TryCtorOverloadCandidate(ctor.Ptr(), context);
-						}
-
-						// Now walk through any extensions we can find for this type
-						for (auto ext = aggTypeDecl->candidateExtensions; ext; ext = ext->nextCandidateExtension)
-						{
-							if (!IsExtensionApplicableToType(ext, declRefType))
-								continue;
-
-							for (auto ctor : ext->GetMembersOfType<ConstructorDecl>())
-							{
-								// now work through this candidate...
-								TryCtorOverloadCandidate(ctor.Ptr(), context);
-							}
-						}
+						AddAggTypeOverloadCandidates(type, aggTypeDecl, context);
 					}
 				}
 			}
 
-			void EnumerateOverloadCandidates(
+			void AddDeclOverloadCandidates(
+				RefPtr<Decl>			decl,
+				OverloadResolveContext&	context)
+			{
+				if (auto funcDecl = decl.As<FunctionDeclBase>())
+				{
+					AddFuncOverloadCandidate(funcDecl, context);
+				}
+				else if (auto aggTypeDecl = decl.As<AggTypeDecl>())
+				{
+					auto type = CreateDeclRefType(aggTypeDecl.Ptr());
+					AddAggTypeOverloadCandidates(type, aggTypeDecl, context);
+				}
+				else
+				{
+					// TODO(tfoley): any other cases needed here?
+				}
+			}
+
+			LookupResult GetNext(LookupResult const& inResult)
+			{
+				if (!inResult.isValid()) return inResult;
+
+				LookupResult result = inResult;
+				result.index++;
+				return DoLookup(result.decl->Name.Content, result);
+			}
+
+			void AddOverloadCandidates(
 				RefPtr<ExpressionSyntaxNode>	funcExpr,
 				OverloadResolveContext&			context)
 			{
 				auto funcExprType = funcExpr->Type;
 				if (auto funcType = funcExprType->As<FuncType>())
 				{
-					TryFuncOverloadCandidate(funcType, context);
+					AddFuncOverloadCandidate(funcType, context);
 				}
 				else if (auto typeType = funcExprType->As<TypeExpressionType>())
 				{
 					// The expression named a type, so we have a constructor call
 					// on our hands.
-					TryTypeOverloadCandidate(typeType->type, context);
+					AddTypeOverloadCandidates(typeType->type, context);
 				}
 				else if (auto overloadedExpr = funcExpr.As<OverloadedExpr>())
 				{
-					throw "unimplemented";
+					auto lookupResult = overloadedExpr->lookupResult;
+					while (lookupResult.isValid())
+					{
+						AddDeclOverloadCandidates(lookupResult.decl, context);
+
+						lookupResult = GetNext(lookupResult);
+					}
 				}
 			}
 
@@ -2230,14 +2511,42 @@ namespace Spire
 				}
 
 				OverloadResolveContext context;
-				EnumerateOverloadCandidates(funcExpr, context);
+				context.appExpr = expr;
+				AddOverloadCandidates(funcExpr, context);
 
-				// Look at the state of the overload resolution, and
-				// figure out what to do...
+				if (!context.bestCandidate)
+				{
+					// Nothing at all was found that we could even consider invoking
+					getSink()->diagnose(expr->FunctionExpr, Diagnostics::expectedFunction);
+					expr->Type = ExpressionType::Error;
+					return expr;
+				}
 
-				getSink()->diagnose(expr->FunctionExpr, Diagnostics::expectedFunction);
-				expr->Type = ExpressionType::Error;
-				return expr;
+				if (!context.ambiguous)
+				{
+					// There was one best candidate, even if it might not have been
+					// applicable in the end.
+					// We will report errors for this one candidate, then, to give
+					// the user the most help we can.
+					return CompleteOverloadCandidate(context, *context.bestCandidate);
+				}
+
+				// Otherwise things were ambiguous, and we need to report it.
+				if (context.bestCandidate->status == OverloadCandidate::Status::Appicable)
+				{
+					// There were multiple applicable candidates, so we need to
+					// report them.
+					getSink()->diagnose(expr, Diagnostics::unimplemented, "ambiguous overloaded call");
+					expr->Type = ExpressionType::Error;
+					return expr;
+				}
+				else
+				{
+					// There were multple equally-good candidates, but none actually usable.
+					getSink()->diagnose(expr, Diagnostics::unimplemented, "no applicable overload found");
+					expr->Type = ExpressionType::Error;
+					return expr;
+				}
 			}
 
 			RefPtr<ExpressionSyntaxNode> CheckExpr(RefPtr<ExpressionSyntaxNode> expr)

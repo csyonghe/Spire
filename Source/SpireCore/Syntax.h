@@ -1225,9 +1225,9 @@ namespace Spire
 			uint8_t			flags = Flags::None;
 
 			// Was at least one result found?
-			bool isValid() { return decl != nullptr; }
+			bool isValid() const { return decl != nullptr; }
 
-			bool isOverloaded() { return flags & Flags::Overloaded; }
+			bool isOverloaded() const { return flags & Flags::Overloaded; }
 		};
 
 		// An expression that references an overloaded set of declarations
