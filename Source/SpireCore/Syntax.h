@@ -830,6 +830,9 @@ namespace Spire
 			Modifiers modifiers;
 			DeclCheckState checkState = DeclCheckState::Unchecked;
 
+			// The next declaration defined in the same container with the same name
+			Decl* nextInContainerWithSameName = nullptr;
+
 			bool HasModifier(ModifierFlags flags) { return (modifiers.flags & flags) == flags; }
 
 			template<typename T>
@@ -960,6 +963,15 @@ namespace Spire
 			{
 				return FilteredMemberList<T>(Members);
 			}
+
+
+			// Dictionary for looking up members by name.
+			// This is built on demand before performing lookup.
+			Dictionary<String, Decl*> memberDictionary;
+
+			// Whether the `memberDictionary` is valid.
+			// Should be set to `false` if any members get added/remoed.
+			bool memberDictionaryIsValid = false;
 		};
 
 		template<typename T>

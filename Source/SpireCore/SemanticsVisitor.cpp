@@ -2733,8 +2733,22 @@ namespace Spire
 				if (!inResult.isValid()) return inResult;
 
 				LookupResult result = inResult;
-				result.index++;
-				return DoLookup(result.decl->Name.Content, result);
+
+				// For now this is easy enough, because we don't try to work
+				// our way out to parent scopes.
+				// TODO(tfoley): that needs to be fixed eventually
+
+				for (auto m = result.decl->nextInContainerWithSameName; m; m = m->nextInContainerWithSameName)
+				{
+					if (!DeclPassesLookupMask(m, result.mask))
+						continue;
+
+					result.decl = m;
+					return result;
+				}
+
+				result.decl = nullptr;
+				return result;
 			}
 
 			void AddOverloadCandidates(
@@ -2999,6 +3013,27 @@ namespace Spire
 				return int(mask) & int(LookupMask::Value);
 			}
 
+			void BuildMemberDictionary(ContainerDecl* decl)
+			{
+				for (auto m : decl->Members)
+				{
+					auto name = m->Name.Content;
+
+					// Ignore members with an empty name
+					if (name.Length() == 0)
+						continue;
+
+					m->nextInContainerWithSameName = nullptr;
+
+					Decl* next = nullptr;
+					if (decl->memberDictionary.TryGetValue(name, next))
+						m->nextInContainerWithSameName = next;
+
+					decl->memberDictionary[name] = m.Ptr();
+				}
+				decl->memberDictionaryIsValid = true;
+			}
+
 			LookupResult DoLookup(String const& name, LookupResult inResult)
 			{
 				LookupResult result;
@@ -3008,8 +3043,48 @@ namespace Spire
 				ContainerDecl* scope = inResult.scope;
 				ContainerDecl* endScope = inResult.endScope;
 				int index = inResult.index;
-				while (scope != endScope)
+				for (;scope != endScope; scope = scope->ParentDecl)
 				{
+
+					if (!scope->memberDictionaryIsValid)
+					{
+						BuildMemberDictionary(scope);
+					}
+
+					Decl* firstDecl = nullptr;
+					if (!scope->memberDictionary.TryGetValue(name, firstDecl))
+						continue;
+
+					// Must ensure that it is a declaration we care about
+					for (auto m = firstDecl; m; m = m->nextInContainerWithSameName)
+					{
+						if (!DeclPassesLookupMask(m, result.mask))
+							continue;
+
+						if (!result.isValid())
+						{
+							// If we hadn't found a hit before, we have one now
+							result.decl = m;
+							result.scope = scope;
+						}
+						else
+						{
+							// Otherwise, we've found a second hit, and should
+							// consider the lookup result overloaded.
+							result.flags |= LookupResult::Flags::Overloaded;
+						}
+					}
+
+					if (result.isValid())
+					{
+						// If we've found a result in this scope, then there
+						// is no reason to look further up (for now).
+						return result;
+					}
+
+#if 0
+
+
 					auto memberCount = scope->Members.Count();
 
 					for (;index < memberCount; index++)
@@ -3053,6 +3128,7 @@ namespace Spire
 					// Otherwise, we proceed to the next scope up.
 					scope = scope->ParentDecl;
 					index = 0;
+#endif
 				}
 
 				// If we run out of scopes, then we are done.
