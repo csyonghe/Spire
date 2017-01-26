@@ -635,12 +635,33 @@ namespace Spire
 		public:
 			RefPtr<ExpressionType> elementType;
 		};
-		class PatchType : public BuiltinGenericType {};
-		class StorageBufferType : public BuiltinGenericType {};
-		class StructuredBufferType : public StorageBufferType {};
-		class RWStructuredBufferType : public StorageBufferType {};
-		class UniformBufferType : public BuiltinGenericType {};
-		class PackedBufferType : public BuiltinGenericType {};
+
+		// Types that behave like pointers, in that they can be
+		// dereferenced (implicitly) to access members defined
+		// in the element type.
+		class PointerLikeType : public BuiltinGenericType
+		{};
+
+		// Types that behave like arrays, in that they can be
+		// subscripted (explicitly) to access members defined
+		// in the element type.
+		class ArrayLikeType : public BuiltinGenericType
+		{};
+
+		// Generic types used in existing Spire code
+		// TODO(tfoley): check that these are actually working right...
+		class PatchType : public PointerLikeType {};
+		class StorageBufferType : public ArrayLikeType {};
+		class StructuredBufferType : public ArrayLikeType {};
+		class RWStructuredBufferType : public ArrayLikeType {};
+		class UniformBufferType : public PointerLikeType {};
+		class PackedBufferType : public ArrayLikeType {};
+
+		// Type for HLSL `cbuffer` declarations, and `ConstantBuffer<T>`
+		class ConstantBufferType : public PointerLikeType {};
+
+		// Type for HLSL `tbuffer` declarations, and `TextureBuffer<T>`
+		class TextureBufferType : public PointerLikeType {};
 
 		class ArrayExpressionType : public ExpressionType
 		{
@@ -1516,16 +1537,29 @@ namespace Spire
 		// Represents one item found during lookup
 		struct LookupResultItem
 		{
-			// An object that can be used to construct a proper
-			// declaration reference once we've isolated the
-			// declaration we want...
+			// Sometimes lookup finds an item, but there were additional
+			// "hops" taken to reach it. We need to remember these steps
+			// so that if/when we consturct a full expression we generate
+			// appropriate AST nodes for all the steps.
+			//
+			// We build up a list of these "breadcrumbs" while doing
+			// lookup, and store them alongside each item found.
 			class Breadcrumb : public RefObject
 			{
 			public:
+				enum class Kind
+				{
+					Member, // A member was references
+					Deref, // A value with pointer(-like) type was dereferenced
+				};
+
+				Kind kind;
 				DeclRef declRef;
 				RefPtr<Breadcrumb> next;
-				Breadcrumb(DeclRef declRef, RefPtr<Breadcrumb> next)
-					: declRef(declRef)
+
+				Breadcrumb(Kind kind, DeclRef declRef, RefPtr<Breadcrumb> next)
+					: kind(kind)
+					, declRef(declRef)
 					, next(next)
 				{}
 			};
@@ -1679,6 +1713,16 @@ namespace Spire
 			virtual MemberExpressionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
+		// A dereference of a pointer or pointer-like type
+		class DerefExpr : public ExpressionSyntaxNode
+		{
+		public:
+			RefPtr<ExpressionSyntaxNode> base;
+
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual DerefExpr * Clone(CloneContext & ctx) override;
+		};
+
 		class InvokeExpressionSyntaxNode : public ExpressionSyntaxNode
 		{
 		public:
@@ -1813,34 +1857,6 @@ namespace Spire
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override { return this; }
 			virtual StageSyntaxNode * Clone(CloneContext & ctx) override;
 		};
-
-		// Shared base class for declarations of buffers with shader parameters.
-		// Note that we treat the buffer declaration as a *type* declaration,
-		// and then declare a separate variable of that type, so that the
-		// lookup behavior is more clear.
-		class BufferTypeDecl : public AggTypeDecl
-		{
-			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override;
-		};
-
-		// An HLSL buffer declaration
-		class HLSLBufferTypeDecl : public BufferTypeDecl {};
-
-		// An HLSL `cbuffer` declaration
-		class HLSLConstantBufferTypeDecl : public HLSLBufferTypeDecl
-		{
-		public:
-			virtual HLSLConstantBufferTypeDecl * Clone(CloneContext & ctx) override;
-		};
-
-		// An HLSL `tbuffer` declaration
-		class HLSLTextureBufferTypeDecl : public HLSLBufferTypeDecl
-		{
-		public:
-			virtual HLSLTextureBufferTypeDecl * Clone(CloneContext & ctx) override;
-		};
-
-		// TODO(tfoley): equivalent cases for GLSL uniform buffer declarations
 
 		// Shared functionality for "shader class"-like declarations
 		class ShaderDeclBase : public AggTypeDecl
@@ -2433,13 +2449,6 @@ namespace Spire
 				for (auto & member : shader->Members)
 					member->Accept(this);
 				return shader;
-			}
-
-			virtual RefPtr<SyntaxNode> VisitBufferTypeDecl(BufferTypeDecl * decl)
-			{
-				for (auto & member : decl->Members)
-					member->Accept(this);
-				return decl;
 			}
 
 			virtual TypeExp VisitTypeExp(TypeExp const& typeExp)

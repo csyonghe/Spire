@@ -1485,6 +1485,15 @@ namespace Spire
 					}
 					throw NotImplementedException("matrix type");
 				}
+
+				else if (auto cbufferType = type->As<ConstantBufferType>())
+				{
+					auto ilType = new ILGenericType();
+					ilType->GenericTypeName = "ConstantBuffer";
+					ilType->BaseType = TranslateExpressionType(cbufferType->elementType.Ptr());
+					return ilType;
+				}
+
 				else if (auto declRefType = type->AsDeclRefType())
 				{
 					auto decl = declRefType->declRef.decl;

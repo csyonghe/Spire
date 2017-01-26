@@ -451,6 +451,9 @@ namespace Spire
 
 			// Declare additional built-in generic types
 
+			sb << "__generic<T> __magic_type(ConstantBuffer) struct ConstantBuffer {};\n";
+			sb << "__generic<T> __magic_type(TextureBuffer) struct TextureBuffer {};\n";
+
 			sb << "__generic<T> __magic_type(PackedBuffer) struct PackedBuffer {};\n";
 			sb << "__generic<T> __magic_type(StructuredBuffer) struct StructuredBuffer {};\n";
 			sb << "__generic<T> __magic_type(RWStructuredBuffer) struct RWStructuredBuffer {};\n";

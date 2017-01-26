@@ -1050,17 +1050,31 @@ namespace Spire
 		static RefPtr<Decl> ParseHLSLBufferDecl(
 			Parser*	parser)
 		{
-			// Allocate a buffer type of the correct flavor,
-			// depending on what the declaration keyword was
+			// An HLSL declaration of a constant buffer like this:
+			//
+			//     cbuffer Foo : register(b0) { int a; float b; };
+			//
+			// is treated as syntax sugar for a type declaration
+			// and then a global variable declaration using that type:
+			//
+			//     struct Foo { int a; float b; };
+			//     ConstantBuffer<Foo> $anonymous;
+			//
+			// where `$anonymous` is a fresh name, and the variable
+			// declaration is made to be "transparent" so that lookup
+			// will see through it to the members inside.
 
-			RefPtr<HLSLBufferTypeDecl> bufferTypeDecl;
+			// We first look at the declaration keywrod to determine
+			// the type of buffer to declare:
+			String bufferWrapperTypeName;
+			CodePosition bufferWrapperTypeNamePos = parser->tokenReader.PeekLoc();
 			if (AdvanceIf(parser, "cbuffer"))
 			{
-				bufferTypeDecl = new HLSLConstantBufferTypeDecl();
+				bufferWrapperTypeName = "ConstantBuffer";
 			}
 			else if (AdvanceIf(parser, "tbuffer"))
 			{
-				bufferTypeDecl = new HLSLTextureBufferTypeDecl();
+				bufferWrapperTypeName = "TextureBuffer";
 			}
 			else
 			{
@@ -1070,37 +1084,50 @@ namespace Spire
 			// We are going to represent each buffer as a pair of declarations.
 			// The first is a type declaration that holds all the members, while
 			// the second is a variable declaration that uses the buffer type.
-			// This is conceptually cleaner in the short term because it means
-			// we don't need to have aggergate value declarations (just aggregate
-			// type declarations), and also seems like it will scale better
-			// to GLSL where a buffer declaration can declare an array of
-			// values, and not just a single one...
+			RefPtr<StructSyntaxNode> bufferDataTypeDecl = new StructSyntaxNode();
 			RefPtr<Variable> bufferVarDecl = new Variable();
 
 			// Both declarations will have a location that points to the name
-			parser->FillPosition(bufferTypeDecl.Ptr());
+			parser->FillPosition(bufferDataTypeDecl.Ptr());
 			parser->FillPosition(bufferVarDecl.Ptr());
 
 			// Only the type declaration will actually be named, and it will
 			// use the given name to identify itself.
-			bufferTypeDecl->Name = parser->ReadToken(TokenType::Identifier);
+			bufferDataTypeDecl->Name = parser->ReadToken(TokenType::Identifier);
 
-			// The variable declaration will use the buffer declaration as its type.
-			auto bufferVarTypeExpr = new VarExpressionSyntaxNode();
+			// TODO(tfoley): We end up constructing unchecked syntax here that
+			// is expected to type check into the right form, but it might be
+			// cleaner to have a more explicit desugaring pass where we parse
+			// these constructs directly into the AST and *then* desugar them.
+
+			// Construct a type expression to reference the buffer data type
+			auto bufferDataTypeExpr = new VarExpressionSyntaxNode();
+			bufferDataTypeExpr->Position = bufferDataTypeDecl->Position;
+			bufferDataTypeExpr->Variable = bufferDataTypeDecl->Name.Content;
+			bufferDataTypeExpr->scope = parser->currentScope.Ptr();
+
+			// Construct a type exrpession to reference the type constructor
+			auto bufferWrapperTypeExpr = new VarExpressionSyntaxNode();
+			bufferWrapperTypeExpr->Position = bufferWrapperTypeNamePos;
+			bufferWrapperTypeExpr->Variable = bufferWrapperTypeName;
+			bufferWrapperTypeExpr->scope = parser->currentScope.Ptr();
+
+			// Construct a type expression that represents the type for the variable,
+			// which is the wrapper type applied to the data type
+			auto bufferVarTypeExpr = new GenericTypeSyntaxNode();
 			bufferVarTypeExpr->Position = bufferVarDecl->Position;
-			bufferVarTypeExpr->Variable = bufferTypeDecl->Name.Content;
-			bufferVarTypeExpr->scope = parser->currentScope.Ptr();
-			// TODO(tfoley): We should in theory be able to wire things up here as already-checked syntax
-			// bufferVarTypeExpr->declRef = DeclRef(bufferTypeDecl.Ptr(), nullptr);
+			bufferVarTypeExpr->base = bufferWrapperTypeExpr;
+			bufferVarTypeExpr->Args.Add(bufferDataTypeExpr);
+
 			bufferVarDecl->Type.exp = bufferVarTypeExpr;
 
 			// Any semantics applied to the bufer declaration are taken as applying
 			// to the variable instead.
 			ParseOptSemantics(parser, bufferVarDecl.Ptr());
 
-			// The declarations in the body belong to the type.
+			// The declarations in the body belong to the data type.
 			parser->ReadToken(TokenType::LBrace);
-			ParseDeclBody(parser, bufferTypeDecl.Ptr(), TokenType::RBrace);
+			ParseDeclBody(parser, bufferDataTypeDecl.Ptr(), TokenType::RBrace);
 
 			// All HLSL buffer declarations are "transparent" in that their
 			// members are implicitly made visible in the parent scope.
@@ -1117,7 +1144,7 @@ namespace Spire
 			// will get attached to the variable declaration, not the type.
 			// There might be cases where we need to shuffle things around.
 
-			AddMember(parser->currentScope, bufferTypeDecl);
+			AddMember(parser->currentScope, bufferDataTypeDecl);
 
 			return bufferVarDecl;
 		}

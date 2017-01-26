@@ -328,6 +328,22 @@ namespace Spire
 			rs->BaseExpression = BaseExpression->Clone(ctx);
 			return rs;
 		}
+
+		// DerefExpr
+
+		RefPtr<SyntaxNode> DerefExpr::Accept(SyntaxVisitor * visitor)
+		{
+			// throw "unimplemented";
+			return this;
+		}
+
+		DerefExpr * DerefExpr::Clone(CloneContext & ctx)
+		{
+			throw "unimplemented";
+		}
+
+		//
+
 		RefPtr<SyntaxNode> InvokeExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
 			return visitor->VisitInvokeExpression(this);
@@ -928,6 +944,9 @@ namespace Spire
 						return type;												\
 					}
 
+				CASE(ConstantBuffer, ConstantBufferType)
+				CASE(TextureBuffer, TextureBufferType)
+
 				CASE(PackedBuffer, PackedBufferType)
 				CASE(StructuredBuffer, StructuredBufferType)
 				CASE(RWStructuredBuffer, RWStructuredBufferType)
@@ -1267,29 +1286,6 @@ namespace Spire
 		StageSyntaxNode * StageSyntaxNode::Clone(CloneContext &)
 		{
 			return new StageSyntaxNode(*this);
-		}
-
-		// BufferTypeDecl
-
-		RefPtr<SyntaxNode> BufferTypeDecl::Accept(SyntaxVisitor *visitor)
-		{
-			return visitor->VisitBufferTypeDecl(this);
-		}
-
-		// HLSLConstantBufferTypeDecl
-
-		HLSLConstantBufferTypeDecl * HLSLConstantBufferTypeDecl::Clone(CloneContext & ctx)
-		{
-			assert(!"unimplemented");
-			return nullptr;
-		}
-
-		// HLSLTextureBufferTypeDecl
-
-		HLSLTextureBufferTypeDecl * HLSLTextureBufferTypeDecl::Clone(CloneContext & ctx)
-		{
-			assert(!"unimplemented");
-			return nullptr;
 		}
 
 		//

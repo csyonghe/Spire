@@ -166,6 +166,26 @@ namespace Spire
 				return result;
 			}
 
+			RefPtr<ExpressionSyntaxNode> ConstructDerefExpr(
+				RefPtr<ExpressionSyntaxNode> base,
+				RefPtr<ExpressionSyntaxNode> originalExpr)
+			{
+				auto ptrLikeType = base->Type->As<PointerLikeType>();
+				assert(ptrLikeType);
+
+				auto derefExpr = new DerefExpr();
+				derefExpr->Position = originalExpr->Position;
+				derefExpr->base = base;
+				derefExpr->Type = ptrLikeType->elementType;
+
+				// TODO(tfoley): handle l-value status here
+
+				return derefExpr;
+			}
+
+// TODO(tfoley): move this somewhere central
+#define SPIRE_UNREACHABLE(msg) assert(!"ureachable code:" msg)
+
 			RefPtr<ExpressionSyntaxNode> ConstructLookupResultExpr(
 				LookupResultItem const&			item,
 				RefPtr<ExpressionSyntaxNode>	baseExpr,
@@ -177,7 +197,17 @@ namespace Spire
 				auto bb = baseExpr;
 				for (auto breadcrumb = item.breadcrumbs; breadcrumb; breadcrumb = breadcrumb->next)
 				{
-					bb = ConstructDeclRefExpr(breadcrumb->declRef, bb, originalExpr);
+					switch (breadcrumb->kind)
+					{
+					case LookupResultItem::Breadcrumb::Kind::Member:
+						bb = ConstructDeclRefExpr(breadcrumb->declRef, bb, originalExpr);
+						break;
+					case LookupResultItem::Breadcrumb::Kind::Deref:
+						bb = ConstructDerefExpr(bb, originalExpr);
+						break;
+					default:
+						SPIRE_UNREACHABLE("all cases handle");
+					}
 				}
 
 				return ConstructDeclRefExpr(item.declRef, bb, originalExpr);
@@ -1644,7 +1674,7 @@ namespace Spire
 							baseExprType->AsGenericType()->GenericTypeName == "RWStructuredBuffer" ||
 							baseExprType->AsGenericType()->GenericTypeName == "PackedBuffer");
 #else
-					isValid = isValid || baseExprType->As<BuiltinGenericType>();
+					isValid = isValid || baseExprType->As<ArrayLikeType>();
 #endif
 					isValid = isValid || (baseExprType->AsBasicType()); /*TODO(tfoley): figure this out: */ // && GetVectorSize(baseExprType->AsBasicType()->BaseType) != 0);
 					isValid = isValid || baseExprType->AsArrayType();
@@ -1664,7 +1694,7 @@ namespace Spire
 				{
 					expr->Type = expr->BaseExpression->Type->AsArrayType()->BaseType;
 				}
-				else if (auto bufferType = expr->BaseExpression->Type->As<BuiltinGenericType>())
+				else if (auto bufferType = expr->BaseExpression->Type->As<ArrayLikeType>())
 				{
 					expr->Type = bufferType->elementType;
 				}
@@ -2400,7 +2430,7 @@ namespace Spire
 
 				LookupResultItem ctorItem;
 				ctorItem.declRef = ctorDeclRef;
-				ctorItem.breadcrumbs = new LookupResultItem::Breadcrumb(typeItem.declRef, typeItem.breadcrumbs);
+				ctorItem.breadcrumbs = new LookupResultItem::Breadcrumb(LookupResultItem::Breadcrumb::Kind::Member, typeItem.declRef, typeItem.breadcrumbs);
 
 				OverloadCandidate candidate;
 				candidate.flavor = OverloadCandidate::Flavor::Func;
@@ -3137,12 +3167,42 @@ namespace Spire
 				}
 			}
 
+			// Helper for constructing breadcrumb trails during lookup, without
+			// any heap allocation
+			struct BreadcrumbInfo
+			{
+				LookupResultItem::Breadcrumb::Kind kind;
+				DeclRef declRef;
+				BreadcrumbInfo* prev = nullptr;
+			};
+
+			LookupResultItem CreateLookupResultItem(
+				DeclRef declRef,
+				BreadcrumbInfo* breadcrumbInfos)
+			{
+				LookupResultItem item;
+				item.declRef = declRef;
+
+				// breadcrumbs were constructed "backwards" on the stack, so we
+				// reverse them here by building a linked list the other way
+				RefPtr<LookupResultItem::Breadcrumb> breadcrumbs;
+				for (auto bb = breadcrumbInfos; bb; bb = bb->prev)
+				{
+					breadcrumbs = new LookupResultItem::Breadcrumb(
+						bb->kind,
+						bb->declRef,
+						breadcrumbs);
+				}
+				item.breadcrumbs = breadcrumbs;
+				return item;
+			}
+
 			// Look for members of the given name in the given container for declarations
 			void DoLocalLookupImpl(
-				String const&							name,
-				ContainerDeclRef						containerDeclRef,
-				LookupResult&							result,
-				RefPtr<LookupResultItem::Breadcrumb>	inBreadcrumbs)
+				String const&		name,
+				ContainerDeclRef	containerDeclRef,
+				LookupResult&		result,
+				BreadcrumbInfo*		inBreadcrumbs)
 			{
 				ContainerDecl* containerDecl = containerDeclRef.GetDecl();
 
@@ -3166,7 +3226,7 @@ namespace Spire
 						continue;
 
 					// The declaration passed the test, so add it!
-					AddToLookupResult(result, LookupResultItem(DeclRef(m, containerDeclRef.substitutions), inBreadcrumbs));
+					AddToLookupResult(result, CreateLookupResultItem(DeclRef(m, containerDeclRef.substitutions), inBreadcrumbs));
 				}
 
 
@@ -3175,29 +3235,51 @@ namespace Spire
 
 				for(auto transparentInfo : containerDecl->transparentMembers)
 				{
+					// The reference to the transparent member should use whatever
+					// substitutions we used in referring to its outer container
 					DeclRef transparentMemberDeclRef(transparentInfo.decl, containerDeclRef.substitutions);
 
-					RefPtr<LookupResultItem::Breadcrumb> breadcrumb = new LookupResultItem::Breadcrumb(
-						transparentMemberDeclRef,
-						inBreadcrumbs);
+					// We need to leave a breadcrumb so that we know that the result
+					// of lookup involves a member lookup step here
 
-					DoMemberLookupImpl(name, transparentMemberDeclRef, result, breadcrumb);
+					BreadcrumbInfo memberRefBreadcrumb;
+					memberRefBreadcrumb.kind = LookupResultItem::Breadcrumb::Kind::Member;
+					memberRefBreadcrumb.declRef = transparentMemberDeclRef;
+					memberRefBreadcrumb.prev = inBreadcrumbs;
+
+					DoMemberLookupImpl(name, transparentMemberDeclRef, result, &memberRefBreadcrumb);
 				}
 
 				// TODO(tfoley): need to consider lookup via extension here?
 			}
 
 			void DoMemberLookupImpl(
-				String const&							name,
-				RefPtr<ExpressionType>					baseType,
-				LookupResult&							ioResult,
-				RefPtr<LookupResultItem::Breadcrumb>	inBreadcrumbs)
+				String const&			name,
+				RefPtr<ExpressionType>	baseType,
+				LookupResult&			ioResult,
+				BreadcrumbInfo*			breadcrumbs)
 			{
+				// If the type was pointer-like, then dereference it
+				// automatically here.
+				if (auto pointerLikeType = baseType->As<PointerLikeType>())
+				{
+					// Need to leave a breadcrumb to indicate that we
+					// did an implicit dereference here
+					BreadcrumbInfo derefBreacrumb;
+					derefBreacrumb.kind = LookupResultItem::Breadcrumb::Kind::Deref;
+					derefBreacrumb.prev = breadcrumbs;
+
+					// Recursively perform lookup on the result of deref
+					return DoMemberLookupImpl(name, pointerLikeType->elementType, ioResult, &derefBreacrumb);
+				}
+
+				// Default case: no dereference needed
+
 				if (auto baseDeclRefType = baseType->As<DeclRefType>())
 				{
 					if (auto baseAggTypeDeclRef = baseDeclRefType->declRef.As<AggTypeDeclRef>())
 					{
-						DoLocalLookupImpl(name, baseAggTypeDeclRef, ioResult, inBreadcrumbs);
+						DoLocalLookupImpl(name, baseAggTypeDeclRef, ioResult, breadcrumbs);
 					}
 				}
 
@@ -3205,13 +3287,13 @@ namespace Spire
 			}
 
 			void DoMemberLookupImpl(
-				String const&							name,
-				DeclRef									baseDeclRef,
-				LookupResult&							ioResult,
-				RefPtr<LookupResultItem::Breadcrumb>	inBreadcrumbs)
+				String const&	name,
+				DeclRef			baseDeclRef,
+				LookupResult&	ioResult,
+				BreadcrumbInfo*	breadcrumbs)
 			{
 				auto baseType = GetTypeForDeclRef(baseDeclRef);
-				return DoMemberLookupImpl(name, baseType, ioResult, inBreadcrumbs);
+				return DoMemberLookupImpl(name, baseType, ioResult, breadcrumbs);
 			}
 
 			void DoLookupImpl(String const& name, LookupResult& result)
@@ -3508,9 +3590,37 @@ namespace Spire
 				return ExpressionType::Error;
 			}
 
+			RefPtr<ExpressionSyntaxNode> MaybeDereference(RefPtr<ExpressionSyntaxNode> inExpr)
+			{
+				RefPtr<ExpressionSyntaxNode> expr = inExpr;
+				for (;;)
+				{
+					auto& type = expr->Type;
+					if (auto pointerLikeType = type->As<PointerLikeType>())
+					{
+						type = pointerLikeType->elementType;
+
+						auto derefExpr = new DerefExpr();
+						derefExpr->base = expr;
+						derefExpr->Type = pointerLikeType->elementType;
+
+						// TODO(tfoley): deal with l-value-ness here
+
+						expr = derefExpr;
+						continue;
+					}
+
+					// Default case: just use the expression as-is
+					return expr;
+				}
+			}
+
 			virtual RefPtr<ExpressionSyntaxNode> VisitMemberExpression(MemberExpressionSyntaxNode * expr) override
 			{
-				expr->BaseExpression = expr->BaseExpression->Accept(this).As<ExpressionSyntaxNode>();
+				expr->BaseExpression = CheckExpr(expr->BaseExpression);
+
+				expr->BaseExpression = MaybeDereference(expr->BaseExpression);
+
 				auto & baseType = expr->BaseExpression->Type;
 				if (auto declRefType = baseType->AsDeclRefType())
 				{
