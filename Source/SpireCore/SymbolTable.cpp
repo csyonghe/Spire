@@ -422,10 +422,6 @@ namespace Spire
 				else
 					return PrintType(arr->BaseType, recordReplaceStr) + "[]";
 			}
-			else if (auto gen = type.As<GenericExpressionType>())
-			{
-				return gen->GenericTypeName + "<" + PrintType(gen->BaseType, recordReplaceStr) + ">";
-			}
 			return "";
 		}
 

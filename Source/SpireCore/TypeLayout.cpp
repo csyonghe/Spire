@@ -189,10 +189,6 @@ top:
             GetLayout(arrayType->BaseType.Ptr(), rules),
             arrayType->ArrayLength);
     }
-    else if (auto genericType = type->As<GenericExpressionType>())
-    {
-        return GetLayout(genericType->BaseType.Ptr(), rules);
-    }
 	else if (auto declRefType = type->As<DeclRefType>())
 	{
 		auto declRef = declRefType->declRef;

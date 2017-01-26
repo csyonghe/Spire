@@ -622,11 +622,6 @@ namespace Spire
             return GetCanonicalType()->AsArrayTypeImpl();
         }
 
-        GenericExpressionType * ExpressionType::AsGenericType() const
-        {
-            return GetCanonicalType()->AsGenericTypeImpl();
-        }
-
 		DeclRefType * ExpressionType::AsDeclRefType() const
 		{
 			return GetCanonicalType()->AsDeclRefTypeImpl();
@@ -677,13 +672,13 @@ namespace Spire
 				return BindableResourceType::Texture;
 			else if (auto samplerType = As<SamplerStateType>())
 				return BindableResourceType::Sampler;
-			else if (auto genericType = As<GenericExpressionType>())
+			else if(auto storageBufferType = As<StorageBufferType>())
 			{
-				auto name = genericType->GenericTypeName;
-				if (name == "StructuredBuffer" || name == "RWStructuredBuffer")
-					return BindableResourceType::StorageBuffer;
-				else if (name == "Uniform")
-					return BindableResourceType::Buffer;
+				return BindableResourceType::StorageBuffer;
+			}
+			else if(auto uniformBufferType = As<UniformBufferType>())
+			{
+				return BindableResourceType::Buffer;
 			}
 
 			return BindableResourceType::NonBindable;
@@ -778,27 +773,6 @@ namespace Spire
 		RefPtr<SyntaxNode> GenericTypeSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
 			return visitor->VisitGenericType(this);
-		}
-		bool GenericExpressionType::EqualsImpl(const ExpressionType * type) const
-		{
-			if (auto gtype = type->AsGenericType())
-				return GenericTypeName == gtype->GenericTypeName && gtype->BaseType->Equals(BaseType.Ptr());
-			
-			return false;
-		}
-        ExpressionType* GenericExpressionType::CreateCanonicalType()
-        {
-            auto canonicalBaseType = BaseType->GetCanonicalType();
-            auto canonicalGenericType = new GenericExpressionType();
-            sCanonicalTypes.Add(canonicalGenericType);
-            canonicalGenericType->BaseType = canonicalBaseType;
-            canonicalGenericType->GenericTypeName = GenericTypeName;
-            return canonicalGenericType;
-        }
-
-		CoreLib::Basic::String GenericExpressionType::ToString() const
-		{
-			return GenericTypeName + "<" + BaseType->ToString() + ">";
 		}
 
 		// DeclRefType
@@ -944,6 +918,22 @@ namespace Spire
 					textureType->declRef = declRef;
 					return textureType;
 				}
+
+				#define CASE(n,T)													\
+					else if(magicMod->name == #n) {									\
+						assert(subst && subst->args.Count() == 1);					\
+						auto type = new T();										\
+						type->elementType = ExtractGenericArgType(subst->args[0]);	\
+						type->declRef = declRef;									\
+						return type;												\
+					}
+
+				CASE(PackedBuffer, PackedBufferType)
+				CASE(StructuredBuffer, StructuredBufferType)
+				CASE(RWStructuredBuffer, RWStructuredBufferType)
+				CASE(Uniform, UniformBufferType)
+				CASE(Patch, PatchType)
+
 				else
 				{
 					throw "unimplemented";
@@ -1600,6 +1590,8 @@ namespace Spire
 
 		RefPtr<Val> Val::Substitute(Substitutions* subst)
 		{
+			if (!this) return nullptr;
+			if (!subst) return this;
 			int diff = 0;
 			return SubstituteImpl(subst, &diff);
 		}

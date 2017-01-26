@@ -449,6 +449,14 @@ namespace Spire
 				}
 			}
 
+			// Declare additional built-in generic types
+
+			sb << "__generic<T> __magic_type(PackedBuffer) struct PackedBuffer {};\n";
+			sb << "__generic<T> __magic_type(StructuredBuffer) struct StructuredBuffer {};\n";
+			sb << "__generic<T> __magic_type(RWStructuredBuffer) struct RWStructuredBuffer {};\n";
+			sb << "__generic<T> __magic_type(Uniform) struct Uniform {};\n";
+			sb << "__generic<T> __magic_type(Patch) struct Patch {};\n";
+
 			// Synthesize matrix-vector, vector-matrix, and matrix-matrix multiply operations
 			// TODO(tfoley): just make these generic
 

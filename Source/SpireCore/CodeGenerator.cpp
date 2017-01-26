@@ -1508,6 +1508,7 @@ namespace Spire
 					nArrType->ArrayLength = arrType->ArrayLength;
 					return nArrType;
 				}
+#if TIMREMOVED
 				else if (auto genType = type->AsGenericType())
 				{
 					auto gType = new ILGenericType();
@@ -1515,6 +1516,7 @@ namespace Spire
 					gType->BaseType = TranslateExpressionType(genType->BaseType.Ptr());
 					return gType;
 				}
+#endif
 				throw NotImplementedException("decl type");
 			}
 

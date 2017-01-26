@@ -250,7 +250,6 @@ namespace Spire
 		class FunctionSymbol;
 		class BasicExpressionType;
 		class ArrayExpressionType;
-		class GenericExpressionType;
 		class TypeDefDecl;
 		class DeclRefType;
 		class NamedExpressionType;
@@ -339,7 +338,6 @@ namespace Spire
 			VectorExpressionType * AsVectorType() const;
 			MatrixExpressionType * AsMatrixType() const;
 			ArrayExpressionType * AsArrayType() const;
-			GenericExpressionType * AsGenericType() const;
 			DeclRefType* AsDeclRefType() const;
 			NamedExpressionType* AsNamedType() const;
 			TypeExpressionType* AsTypeType() const;
@@ -367,7 +365,6 @@ namespace Spire
 			virtual VectorExpressionType * AsVectorTypeImpl() const { return nullptr; }
 			virtual MatrixExpressionType * AsMatrixTypeImpl() const { return nullptr; }
 			virtual ArrayExpressionType * AsArrayTypeImpl() const { return nullptr; }
-			virtual GenericExpressionType * AsGenericTypeImpl() const { return nullptr; }
 			virtual DeclRefType * AsDeclRefTypeImpl() const { return nullptr; }
 			virtual NamedExpressionType * AsNamedTypeImpl() const { return nullptr; }
 			virtual TypeExpressionType * AsTypeTypeImpl() const { return nullptr; }
@@ -632,6 +629,19 @@ namespace Spire
 			Flavor flavor;
 		};
 
+		// Other cases of generic types known to the compiler
+		class BuiltinGenericType : public DeclRefType
+		{
+		public:
+			RefPtr<ExpressionType> elementType;
+		};
+		class PatchType : public BuiltinGenericType {};
+		class StorageBufferType : public BuiltinGenericType {};
+		class StructuredBufferType : public StorageBufferType {};
+		class RWStructuredBufferType : public StorageBufferType {};
+		class UniformBufferType : public BuiltinGenericType {};
+		class PackedBufferType : public BuiltinGenericType {};
+
 		class ArrayExpressionType : public ExpressionType
 		{
 		public:
@@ -647,28 +657,6 @@ namespace Spire
 			}
 			virtual ExpressionType* CreateCanonicalType() override;
 		};
-
-		class GenericExpressionType : public ExpressionType
-		{
-		public:
-			RefPtr<ExpressionType> BaseType;
-			String GenericTypeName;
-			virtual CoreLib::Basic::String ToString() const override;
-		protected:
-			virtual bool EqualsImpl(const ExpressionType * type) const override;
-			virtual bool IsGenericTypeImpl(String typeName) const override
-			{
-				return GenericTypeName == typeName;
-			}
-			virtual GenericExpressionType * AsGenericTypeImpl() const override
-			{
-				return const_cast<GenericExpressionType*>(this);
-			}
-			virtual ExpressionType* CreateCanonicalType() override;
-		};
-
-
-
 
 		// The "type" of an expression that resolves to a type.
 		// For example, in the expression `float(2)` the sub-expression,

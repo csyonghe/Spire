@@ -1456,7 +1456,7 @@ namespace Spire
 			virtual RefPtr<Variable> VisitDeclrVariable(Variable* varDecl)
 			{
 				TypeExp typeExp = TranslateTypeNode(varDecl->Type);
-				if (typeExp.type->IsTextureOrSampler() || typeExp.type->AsGenericType())
+				if (typeExp.type->GetBindableResourceType() != BindableResourceType::NonBindable)
 				{
 					getSink()->diagnose(varDecl->Type, Diagnostics::invalidTypeForLocalVariable);
 				}
@@ -1635,10 +1635,17 @@ namespace Spire
 				else
 				{
 					auto & baseExprType = expr->BaseExpression->Type;
+
+					bool isValid = false;
+#if TIMREMOVED
+					// TODO(tfoley): need to handle the indexing logic for these types...
 					bool isValid = baseExprType->AsGenericType() &&
 						(baseExprType->AsGenericType()->GenericTypeName == "StructuredBuffer" ||
 							baseExprType->AsGenericType()->GenericTypeName == "RWStructuredBuffer" ||
 							baseExprType->AsGenericType()->GenericTypeName == "PackedBuffer");
+#else
+					isValid = isValid || baseExprType->As<BuiltinGenericType>();
+#endif
 					isValid = isValid || (baseExprType->AsBasicType()); /*TODO(tfoley): figure this out: */ // && GetVectorSize(baseExprType->AsBasicType()->BaseType) != 0);
 					isValid = isValid || baseExprType->AsArrayType();
 					if (!isValid)
@@ -1657,9 +1664,9 @@ namespace Spire
 				{
 					expr->Type = expr->BaseExpression->Type->AsArrayType()->BaseType;
 				}
-				else if (auto genType = expr->BaseExpression->Type->AsGenericType())
+				else if (auto bufferType = expr->BaseExpression->Type->As<BuiltinGenericType>())
 				{
-					expr->Type = genType->BaseType;
+					expr->Type = bufferType->elementType;
 				}
 				else if (auto vecType = expr->BaseExpression->Type->AsVectorType())
 				{
@@ -1797,6 +1804,7 @@ namespace Spire
 
 			RefPtr<ExpressionSyntaxNode> ResolveFunctionOverload(InvokeExpressionSyntaxNode * invoke, VarExpressionSyntaxNode* varExpr, List<RefPtr<ExpressionSyntaxNode>> & arguments)
 			{
+#if TIMREMOVED
 				if (currentShader)
 				{
 					auto func = ResolveFunctionComponent(currentShader, varExpr->Variable, arguments);
@@ -1940,6 +1948,9 @@ namespace Spire
 						getSink()->diagnose(varExpr, Diagnostics::undefinedIdentifier2, varExpr->Variable);
 				}
 				return invoke;
+#else
+				throw "dead code";
+#endif
 			}
 
 			bool IsValidWorldTypeForProjection(
@@ -2381,6 +2392,8 @@ namespace Spire
 				ConstructorDeclRef		ctorDeclRef,
 				OverloadResolveContext&	context)
 			{
+				EnsureDecl(ctorDeclRef.GetDecl());
+
 				// `typeItem` refers to the type being constructed (the thing
 				// that was applied as a function) so we need to construct
 				// a `LookupResultItem` that refers to the constructor instead
@@ -3371,8 +3384,11 @@ namespace Spire
 				else
 					getSink()->diagnose(expr, Diagnostics::undefinedIdentifier2, expr->Variable);
 
+#if TIMREMOVED
+				// These are geneic types that magically "decay" when the value is referenced, and that is super gross
 				if (expr->Type->IsGenericType("Uniform") || expr->Type->IsGenericType("Patch") || expr->Type->IsGenericType("StorageBuffer"))
 					expr->Type = expr->Type->AsGenericType()->BaseType;
+#endif
 
 				return expr;
 			}
