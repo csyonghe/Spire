@@ -48,6 +48,7 @@ namespace Spire
 			InOut = ModifierFlag::In | ModifierFlag::Out,
 
 			Transparent = 1 << 15,
+			FromStdlib = 1 << 16,
 		};
 		//
 		// Other modifiers may have more elaborate data, and so
@@ -427,6 +428,7 @@ namespace Spire
 
 			// Convenience accessors for common properties of declarations
 			String const& GetName() const;
+			DeclRef GetParent() const;
 
 			// "dynamic cast" to a more specific declaration reference type
 			template<typename T>

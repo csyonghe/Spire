@@ -1362,6 +1362,18 @@ namespace Spire
 
 			assert(!currentScope.Ptr());
 			currentScope = nullptr;
+
+			// HACK(tfoley): mark all declarations in the "stdlib" so
+			// that we can detect them later (e.g., so we don't emit them)
+			if (!predefUnit)
+			{
+				for (auto m : program->Members)
+				{
+					m->modifiers.flags |= ModifierFlag::FromStdlib;
+				}
+			}
+
+
 			return program;
 		}
 

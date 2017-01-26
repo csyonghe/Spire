@@ -1582,6 +1582,24 @@ namespace Spire
 			return decl->Name.Content;
 		}
 
+		DeclRef DeclRef::GetParent() const
+		{
+			auto parentDecl = decl->ParentDecl;
+			if (auto parentGeneric = dynamic_cast<GenericDecl*>(parentDecl))
+			{
+				// We need to strip away one layer of specialization
+				assert(substitutions);
+				return DeclRef(parentGeneric, substitutions->outer);
+			}
+			else
+			{
+				// If the parent isn't a generic, then it must
+				// use the same specializations as this declaration
+				return DeclRef(parentDecl, substitutions);
+			}
+
+		}
+
 		// Val
 
 		RefPtr<Val> Val::Substitute(Substitutions* subst)

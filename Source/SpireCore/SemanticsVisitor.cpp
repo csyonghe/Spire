@@ -2204,6 +2204,7 @@ namespace Spire
 				};
 
 				RefPtr<InvokeExpressionSyntaxNode> appExpr;
+				RefPtr<ExpressionSyntaxNode> baseExpr;
 
 				OverloadCandidate bestCandidateStorage;
 				OverloadCandidate*	bestCandidate = nullptr;
@@ -2326,6 +2327,8 @@ namespace Spire
 				if (!TryCheckOverloadCandidateDirections(context, candidate))
 					return context.appExpr;
 
+				context.appExpr->FunctionExpr = ConstructLookupResultExpr(
+					candidate.item, context.baseExpr, context.appExpr->FunctionExpr);
 				context.appExpr->Type = candidate.resultType;
 				return context.appExpr;
 			}
@@ -2861,6 +2864,10 @@ namespace Spire
 
 				OverloadResolveContext context;
 				context.appExpr = expr;
+				if (auto funcMemberExpr = funcExpr.As<MemberExpressionSyntaxNode>())
+				{
+					context.baseExpr = funcMemberExpr->BaseExpression;
+				}
 				AddOverloadCandidates(funcExpr, context);
 
 				if (!context.bestCandidate)

@@ -15,6 +15,8 @@
 #include "VariantIR.h"
 #include "Naming.h"
 
+#include "Emit.h"
+
 #ifdef CreateDirectory
 #undef CreateDirectory
 #endif
@@ -382,6 +384,17 @@ namespace Spire
 					programSyntaxNode->Accept(visitor.Ptr());
 					if (result.GetErrorCount() > 0)
 						return;
+
+					// HACK(tfoley): for right now I just want to pretty-print an AST
+					// into another language, so the whole compiler back-end is just
+					// getting in the way.
+					//
+					// I'm going to bypass it for now and see what I can do:
+					EmitProgram(programSyntaxNode.Ptr());
+					return;
+
+
+
 					// if user specified a template shader symbol, instantiate the template now
 					String symbolToCompile = options.SymbolToCompile;
 					if (symbolToCompile.Length())
