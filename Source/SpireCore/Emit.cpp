@@ -215,6 +215,15 @@ static void EmitExpr(EmitContext* context, RefPtr<ExpressionSyntaxNode> expr)
 		EmitExpr(context, binExpr->RightExpression);
 		return;
 	}
+	else if (auto castExpr = expr.As<TypeCastExpressionSyntaxNode>())
+	{
+		Emit(context, "((");
+		EmitType(context, castExpr->Type);
+		Emit(context, ") ");
+		EmitExpr(context, castExpr->Expression);
+		Emit(context, ")");
+		return;
+	}
 	throw "unimplemented";
 }
 
@@ -399,6 +408,11 @@ static void EmitStmt(EmitContext* context, RefPtr<StatementSyntaxNode> stmt)
 			EmitExpr(context, expr);
 		}
 		Emit(context, ";\n");
+		return;
+	}
+	else if (auto declStmt = stmt.As<VarDeclrStatementSyntaxNode>())
+	{
+		EmitDecl(context, declStmt->decl);
 		return;
 	}
 
