@@ -3864,7 +3864,84 @@ namespace Spire
 				expr->BaseExpression = MaybeDereference(expr->BaseExpression);
 
 				auto & baseType = expr->BaseExpression->Type;
-				if (auto declRefType = baseType->AsDeclRefType())
+
+				// Note: Checking for vector types before declaration-reference types,
+				// because vectors are also declaration reference types...
+				if (auto baseVecType = baseType->AsVectorType())
+				{
+					Array<int, 4> children;
+					if (expr->MemberName.Length() > 4)
+						expr->Type = ExpressionType::Error;
+					else
+					{
+						bool error = false;
+
+						for (int i = 0; i < expr->MemberName.Length(); i++)
+						{
+							auto ch = expr->MemberName[i];
+							switch (ch)
+							{
+							case 'x':
+							case 'r':
+								children.Add(0);
+								break;
+							case 'y':
+							case 'g':
+								children.Add(1);
+								break;
+							case 'z':
+							case 'b':
+								children.Add(2);
+								break;
+							case 'w':
+							case 'a':
+								children.Add(3);
+								break;
+							default:
+								error = true;
+								expr->Type = ExpressionType::Error;
+								break;
+							}
+						}
+						int vecLen = GetVectorSize(baseVecType);
+						for (auto m : children)
+						{
+							if (m >= vecLen)
+							{
+								error = true;
+								expr->Type = ExpressionType::Error;
+								break;
+							}
+						}
+						if (!error)
+						{
+							expr->Type = new VectorExpressionType(
+								baseVecType->elementType,
+								children.Count());
+						}
+
+						// compute whether result of swizzle is an l-value
+						//
+						// Note(tfoley): The logic here seems to compute
+						// whether the swizzle ever re-orders components,
+						// but it should actually be checking if there are
+						// any duplicated components.
+						{
+							bool isLValue = true;
+							if (children.Count() > vecLen || children.Count() == 0)
+								isLValue = false;
+							int curMax = children[0];
+							for (int i = 0; i < children.Count(); i++)
+								if (children[i] < curMax)
+								{
+									isLValue = false;
+									curMax = children[i];
+								}
+							expr->Type.IsLeftValue = isLValue;
+						}
+					}
+				}
+				else if (auto declRefType = baseType->AsDeclRefType())
 				{
 					if (auto aggTypeDeclRef = declRefType->declRef.As<AggTypeDeclRef>())
 					{
@@ -3978,80 +4055,6 @@ namespace Spire
 					getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->MemberName, baseType);
 					expr->Type = ExpressionType::Error;
 					return expr;
-				}
-				else if (auto baseVecType = baseType->AsVectorType())
-				{
-					Array<int, 4> children;
-					if (expr->MemberName.Length() > 4)
-						expr->Type = ExpressionType::Error;
-					else
-					{
-						bool error = false;
-
-						for (int i = 0; i < expr->MemberName.Length(); i++)
-						{
-							auto ch = expr->MemberName[i];
-							switch (ch)
-							{
-							case 'x':
-							case 'r':
-								children.Add(0);
-								break;
-							case 'y':
-							case 'g':
-								children.Add(1);
-								break;
-							case 'z':
-							case 'b':
-								children.Add(2);
-								break;
-							case 'w':
-							case 'a':
-								children.Add(3);
-								break;
-							default:
-								error = true;
-								expr->Type = ExpressionType::Error;
-								break;
-							}
-						}
-						int vecLen = GetVectorSize(baseVecType);
-						for (auto m : children)
-						{
-							if (m >= vecLen)
-							{
-								error = true;
-								expr->Type = ExpressionType::Error;
-								break;
-							}
-						}
-						if (!error)
-						{
-							expr->Type = new VectorExpressionType(
-								baseVecType->elementType,
-								children.Count());
-						}
-
-						// compute whether result of swizzle is an l-value
-						//
-						// Note(tfoley): The logic here seems to compute
-						// whether the swizzle ever re-orders components,
-						// but it should actually be checking if there are
-						// any duplicated components.
-						{
-							bool isLValue = true;
-							if (children.Count() > vecLen || children.Count() == 0)
-								isLValue = false;
-							int curMax = children[0];
-							for (int i = 0; i < children.Count(); i++)
-								if (children[i] < curMax)
-								{
-									isLValue = false;
-									curMax = children[i];
-								}
-							expr->Type.IsLeftValue = isLValue;
-						}
-					}
 				}
 				else if (auto baseShaderType = baseType->As<ShaderType>())
 				{
