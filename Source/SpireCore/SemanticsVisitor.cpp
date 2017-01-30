@@ -366,28 +366,29 @@ namespace Spire
 				}
 			}
 
-			// Take an existing type (expression) and coerce it to one
-			// that can be used for declaraing a variable/parameter/etc.
+			// A "proper" type is one that can be used as the type of an expression.
+			// Put simply, it can be a concrete type like `int`, or a generic
+			// type that is applied to arguments, like `Texture2D<float4>`.
+			// The type `void` is also a proper type, since we can have expressions
+			// that return a `void` result (e.g., many function calls).
+			//
+			// A "non-proper" type is any type that can't actually have values.
+			// A simple example of this in C++ is `std::vector` - you can't have
+			// a value of this type.
+			//
+			// Part of what this function does is give errors if somebody tries
+			// to use a non-proper type as the type of a variable (or anything
+			// else that needs a proper type).
+			//
+			// The other thing it handles is the fact that HLSL lets you use
+			// the name of a non-proper type, and then have the compiler fill
+			// in the default values for its type arguments (e.g., a variable
+			// given type `Texture2D` will actually have type `Texture2D<float4>`).
 			TypeExp CoerceToProperType(TypeExp const& typeExp)
 			{
 				TypeExp result = typeExp;
 				ExpressionType* type = result.type.Ptr();
-				if (auto basicType = type->As<BasicExpressionType>())
-				{
-					// TODO: `void` shouldn't be a basic type, to make this easier to avoid
-					if (basicType->BaseType == BaseType::Void)
-					{
-						// TODO(tfoley): pick the right diagnostic message
-						getSink()->diagnose(result.exp.Ptr(), Diagnostics::parameterCannotBeVoid);
-						result.type = ExpressionType::Error;
-						return result;
-					}
-					else
-					{
-						return result;
-					}
-				}
-				else if (auto genericDeclRefType = type->As<GenericDeclRefType>())
+				if (auto genericDeclRefType = type->As<GenericDeclRefType>())
 				{
 					// We are using a reference to a generic declaration as a concrete
 					// type. This means we should substitute in any default parameter values
@@ -440,6 +441,44 @@ namespace Spire
 					// default case: we expect this to be a proper type
 					return result;
 				}
+			}
+
+			// Check a type, and coerce it to be proper
+			TypeExp CheckProperType(TypeExp typeExp)
+			{
+				return CoerceToProperType(TranslateTypeNode(typeExp));
+			}
+
+			// For our purposes, a "usable" type is one that can be
+			// used to declare a function parameter, variable, etc.
+			// These turn out to be all the proper types except
+			// `void`.
+			//
+			// TODO(tfoley): consider just allowing `void` as a
+			// simple example of a "unit" type, and get rid of
+			// this check.
+			TypeExp CoerceToUsableType(TypeExp const& typeExp)
+			{
+				TypeExp result = CoerceToProperType(typeExp);
+				ExpressionType* type = result.type.Ptr();
+				if (auto basicType = type->As<BasicExpressionType>())
+				{
+					// TODO: `void` shouldn't be a basic type, to make this easier to avoid
+					if (basicType->BaseType == BaseType::Void)
+					{
+						// TODO(tfoley): pick the right diagnostic message
+						getSink()->diagnose(result.exp.Ptr(), Diagnostics::parameterCannotBeVoid);
+						result.type = ExpressionType::Error;
+						return result;
+					}
+				}
+				return result;
+			}
+
+			// Check a type, and coerce it to be usable
+			TypeExp CheckUsableType(TypeExp typeExp)
+			{
+				return CoerceToUsableType(TranslateTypeNode(typeExp));
 			}
 
 			RefPtr<ExpressionSyntaxNode> CheckTerm(RefPtr<ExpressionSyntaxNode> term)
@@ -541,11 +580,7 @@ namespace Spire
 						getSink()->diagnose(para.Ptr(), Diagnostics::parameterAlreadyDefined, para->Name);
 					else
 						paraNames.Add(para->Name.Content);
-					para->Type = TranslateTypeNode(para->Type);
-					if (para->Type.Equals(ExpressionType::Void.Ptr()))
-					{
-						getSink()->diagnose(para.Ptr(), Diagnostics::parameterCannotBeVoid);
-					}
+					para->Type = CheckUsableType(para->Type);
 				}
 				auto oldSymFuncs = symbolTable->Functions;
 				auto oldSymFuncOverloads = symbolTable->FunctionOverloads;
@@ -592,7 +627,7 @@ namespace Spire
 				}
 				for (auto comp : pipeline->GetAbstractComponents())
 				{
-					comp->Type = TranslateTypeNode(comp->Type);
+					comp->Type = CheckProperType(comp->Type);
 					if (comp->IsRequire() || comp->IsInput() || (comp->Rate && comp->Rate->Worlds.Count() == 1
 						&& psymbol->IsAbstractWorld(comp->Rate->Worlds.First().World.Content)))
 						AddNewComponentSymbol(psymbol->Components, psymbol->FunctionComponents, comp);
@@ -671,11 +706,11 @@ namespace Spire
 				{
 					for (auto & param : comp->GetParameters())
 					{
-						param->Type = TranslateTypeNode(param->Type);
+						param->Type = CheckUsableType(param->Type);
 						if (param->Expr)
 							getSink()->diagnose(param->Expr->Position, Diagnostics::defaultParamNotAllowedInInterface, param->Name);
 					}
-					comp->Type = TranslateTypeNode(comp->Type);
+					comp->Type = CheckProperType(comp->Type);
 					if (comp->Expression)
 						comp->Expression->Accept(this);
 					if (comp->BlockStatement)
@@ -951,7 +986,7 @@ namespace Spire
 				{
 					if (auto comp = dynamic_cast<ComponentSyntaxNode*>(mbr.Ptr()))
 					{
-						comp->Type = TranslateTypeNode(comp->Type);
+						comp->Type = CheckProperType(comp->Type);
 						if (comp->IsRequire())
 						{
 							shaderSymbol->IsAbstract = true;
@@ -961,7 +996,7 @@ namespace Spire
 							}
 						}
 						for (auto & param : comp->GetParameters())
-							param->Type = TranslateTypeNode(param->Type);
+							param->Type = CheckUsableType(param->Type);
 						AddNewComponentSymbol(shaderSymbol->Components, shaderSymbol->FunctionComponents, comp);
 					}
 				}
@@ -1156,12 +1191,12 @@ namespace Spire
 				{
 					if (auto typeParam = m.As<GenericTypeParamDecl>())
 					{
-						typeParam->initType = TranslateTypeNode(typeParam->initType);
+						typeParam->initType = CheckProperType(typeParam->initType);
 					}
 					else if (auto valParam = m.As<GenericValueParamDecl>())
 					{
 						// TODO: some real checking here...
-						valParam->Type = TranslateTypeNode(valParam->Type);
+						valParam->Type = CheckUsableType(valParam->Type);
 					}
 				}
 
@@ -1296,7 +1331,7 @@ namespace Spire
 
 				for (auto field : structNode->GetFields())
 				{
-					field->Type = CoerceToProperType(TranslateTypeNode(field->Type));
+					field->Type = CheckUsableType(field->Type);
 					field->SetCheckState(DeclCheckState::Checked);
 				}
 				return structNode;
@@ -1307,7 +1342,7 @@ namespace Spire
 				if (decl->IsChecked(DeclCheckState::Checked)) return decl;
 
 				decl->SetCheckState(DeclCheckState::CheckingHeader);
-				decl->Type = TranslateTypeNode(decl->Type);
+				decl->Type = CheckProperType(decl->Type);
 				decl->SetCheckState(DeclCheckState::Checked);
 				return decl;
 			}
@@ -1344,7 +1379,7 @@ namespace Spire
 				functionNode->SetCheckState(DeclCheckState::CheckingHeader);
 
 				this->function = functionNode;
-				auto returnType = TranslateTypeNode(functionNode->ReturnType);
+				auto returnType = CheckProperType(functionNode->ReturnType);
 				functionNode->ReturnType = returnType;
 				StringBuilder internalName;
 				internalName << functionNode->Name.Content;
@@ -1355,7 +1390,7 @@ namespace Spire
 						getSink()->diagnose(para, Diagnostics::parameterAlreadyDefined, para->Name);
 					else
 						paraNames.Add(para->Name.Content);
-					para->Type = CoerceToProperType(TranslateTypeNode(para->Type));
+					para->Type = CheckUsableType(para->Type);
 					if (para->Type.Equals(ExpressionType::Void.Ptr()))
 						getSink()->diagnose(para, Diagnostics::parameterCannotBeVoid);
 					internalName << "@" << para->Type.type->ToString();
@@ -1485,7 +1520,7 @@ namespace Spire
 
 			virtual RefPtr<Variable> VisitDeclrVariable(Variable* varDecl)
 			{
-				TypeExp typeExp = TranslateTypeNode(varDecl->Type);
+				TypeExp typeExp = CheckUsableType(varDecl->Type);
 				if (typeExp.type->GetBindableResourceType() != BindableResourceType::NonBindable)
 				{
 					getSink()->diagnose(varDecl->Type, Diagnostics::invalidTypeForLocalVariable);
@@ -2113,7 +2148,7 @@ namespace Spire
 
 			virtual void VisitExtensionDecl(ExtensionDecl* decl) override
 			{
-				decl->targetType = TranslateTypeNode(decl->targetType);
+				decl->targetType = CheckProperType(decl->targetType);
 
 				// TODO: need to check that the target type names a declaration...
 
@@ -2154,7 +2189,7 @@ namespace Spire
 
 				for (auto& paramDecl : decl->GetParameters())
 				{
-					paramDecl->Type = CoerceToProperType(TranslateTypeNode(paramDecl->Type));
+					paramDecl->Type = CheckUsableType(paramDecl->Type);
 				}
 				decl->SetCheckState(DeclCheckState::CheckedHeader);
 
@@ -3484,7 +3519,7 @@ namespace Spire
 			virtual RefPtr<ExpressionSyntaxNode> VisitTypeCastExpression(TypeCastExpressionSyntaxNode * expr) override
 			{
 				expr->Expression = expr->Expression->Accept(this).As<ExpressionSyntaxNode>();
-				auto targetType = TranslateTypeNode(expr->TargetType);
+				auto targetType = CheckProperType(expr->TargetType);
 
 				// The way to perform casting depends on the types involved
 				if (expr->Expression->Type->Equals(ExpressionType::Error.Ptr()))

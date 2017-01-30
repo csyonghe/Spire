@@ -2244,7 +2244,7 @@ namespace Spire
 				{
 					RefPtr<TypeCastExpressionSyntaxNode> tcexpr = new TypeCastExpressionSyntaxNode();
 					FillPosition(tcexpr.Ptr());
-					tcexpr->TargetType = ParseType();
+					tcexpr->TargetType = ParseTypeExp();
 					ReadToken(TokenType::RParent);
 					tcexpr->Expression = ParseExpression();
 					expr = tcexpr;

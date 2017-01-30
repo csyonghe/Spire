@@ -366,7 +366,7 @@ namespace Spire
 		TypeCastExpressionSyntaxNode * TypeCastExpressionSyntaxNode::Clone(CloneContext & ctx)
 		{
 			auto rs = CloneSyntaxNodeFields(new TypeCastExpressionSyntaxNode(*this), ctx);
-			rs->TargetType = TargetType->Clone(ctx);
+			rs->TargetType = TargetType.Clone(ctx);
 			rs->Expression = Expression->Clone(ctx);
 			return rs;
 		}

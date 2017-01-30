@@ -1737,7 +1737,7 @@ namespace Spire
 		class TypeCastExpressionSyntaxNode : public ExpressionSyntaxNode
 		{
 		public:
-			RefPtr<ExpressionSyntaxNode> TargetType;
+			TypeExp TargetType;
 			RefPtr<ExpressionSyntaxNode> Expression;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual TypeCastExpressionSyntaxNode * Clone(CloneContext & ctx) override;
