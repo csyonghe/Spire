@@ -1523,7 +1523,12 @@ namespace Spire
 				TypeExp typeExp = CheckUsableType(varDecl->Type);
 				if (typeExp.type->GetBindableResourceType() != BindableResourceType::NonBindable)
 				{
-					getSink()->diagnose(varDecl->Type, Diagnostics::invalidTypeForLocalVariable);
+					// We don't want to allow bindable resource types as local variables (at least for now).
+					auto parentDecl = varDecl->ParentDecl;
+					if (auto parentScopeDecl = dynamic_cast<ScopeDecl*>(parentDecl))
+					{
+						getSink()->diagnose(varDecl->Type, Diagnostics::invalidTypeForLocalVariable);
+					}
 				}
 				else if (auto declRefType = typeExp.type->AsDeclRefType())
 				{
