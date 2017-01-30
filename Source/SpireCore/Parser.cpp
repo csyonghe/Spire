@@ -779,6 +779,7 @@ namespace Spire
                     break;
                 parser->ReadToken(TokenType::Comma);
             }
+			ParseOptSemantics(parser, decl.Ptr());
         }
 
         static void ParseFuncDeclHeader(
