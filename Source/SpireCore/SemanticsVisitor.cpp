@@ -3099,25 +3099,25 @@ namespace Spire
 				// function declarations
 				else if(auto funcDecl = dynamic_cast<FunctionDeclBase*>(decl))
 				{
-					return int(mask) & int(LookupMask::Function);
+					return (int(mask) & int(LookupMask::Function)) != 0;
 				}
 				// component declarations have kind of odd rules
 				else if(auto componentDecl = dynamic_cast<ComponentSyntaxNode*>(decl))
 				{
 					if (componentDecl->IsComponentFunction())
 					{
-						return int(mask) & int(LookupMask::Function);
+						return (int(mask) & int(LookupMask::Function)) != 0;
 					}
 					else
 					{
-						return int(mask) & int(LookupMask::Value);
+						return (int(mask) & int(LookupMask::Value)) != 0;
 					}
 				}
 
 				// default behavior is to assume a value declaration
 				// (no overloading allowed)
 
-				return int(mask) & int(LookupMask::Value);
+				return (int(mask) & int(LookupMask::Value)) != 0;
 			}
 
 			void BuildMemberDictionary(ContainerDecl* decl)

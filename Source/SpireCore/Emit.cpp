@@ -7,6 +7,7 @@
 
 #ifdef _WIN32
 #include <d3dcompiler.h>
+#pragma warning(disable:4996)
 #endif
 
 namespace Spire { namespace Compiler {

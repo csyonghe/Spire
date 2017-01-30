@@ -178,7 +178,6 @@ LayoutRulesImpl* GetLayoutRulesImpl(LayoutRule rule)
 LayoutInfo GetLayout(ExpressionType* inType, LayoutRulesImpl* rules)
 {
 	RefPtr<ExpressionType> type = inType;
-top:
     if (auto basicType = type->As<BasicExpressionType>())
     {
         return rules->GetScalarLayout(basicType->BaseType);
