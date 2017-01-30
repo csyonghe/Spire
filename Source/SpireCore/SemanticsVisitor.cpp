@@ -1028,6 +1028,199 @@ namespace Spire
 				return false;
 			}
 
+			typedef unsigned int ConversionCost;
+			enum : ConversionCost
+			{
+				kConversionCost_None = 0,
+				kConversionCost_Promotion = 10,
+				kConversionCost_Conversion = 20,
+
+				kConversionCost_ScalarToVector = 1,
+			};
+
+			enum BaseTypeConversionKind : uint8_t
+			{
+				kBaseTypeConversionKind_Signed,
+				kBaseTypeConversionKind_Unsigned,
+				kBaseTypeConversionKind_Float,
+				kBaseTypeConversionKind_Error,
+			};
+
+			enum BaseTypeConversionRank : uint8_t
+			{
+				kBaseTypeConversionRank_Bool,
+				kBaseTypeConversionRank_Int8,
+				kBaseTypeConversionRank_Int16,
+				kBaseTypeConversionRank_Int32,
+				kBaseTypeConversionRank_IntPtr,
+				kBaseTypeConversionRank_Int64,
+				kBaseTypeConversionRank_Error,
+			};
+
+			struct BaseTypeConversionInfo
+			{
+				BaseTypeConversionKind	kind;
+				BaseTypeConversionRank	rank;
+			};
+			static BaseTypeConversionInfo GetBaseTypeConversionInfo(BaseType baseType)
+			{
+				switch (baseType)
+				{
+				#define CASE(TAG, KIND, RANK) \
+					case BaseType::TAG: { BaseTypeConversionInfo info = {kBaseTypeConversionKind_##KIND, kBaseTypeConversionRank_##RANK}; return info; } break
+
+					CASE(Bool, Unsigned, Bool);
+					CASE(Int, Signed, Int32);
+					CASE(UInt, Unsigned, Int32);
+					CASE(Float, Float, Int32);
+					CASE(Void, Error, Error);
+					CASE(Error, Error, Error);
+
+				#undef CASE
+
+				default:
+					break;
+				}
+				SPIRE_UNREACHABLE("all cases handled");
+			}
+
+			// Central engine for implementing implicit coercion logic
+			bool TryCoerceImpl(
+				RefPtr<ExpressionType>			toType,		// the target type for conversion
+				RefPtr<ExpressionSyntaxNode>*	outToExpr,	// (optional) a place to stuff the target expression
+				RefPtr<ExpressionType>			fromType,	// the source type for the conversion
+				RefPtr<ExpressionSyntaxNode>	fromExpr,	// the source expression
+				ConversionCost*					outCost)	// (optional) a place to stuff the conversion cost
+			{
+				// Easy case: the types are equal
+				if (toType->Equals(fromType))
+				{
+					if (outToExpr)
+						*outToExpr = fromExpr;
+					if (outCost)
+						*outCost = kConversionCost_None;
+					return true;
+				}
+
+				// TODO(tfoley): catch error types here, and route appropriately
+
+				if (auto toBasicType = toType->AsBasicType())
+				{
+					if (auto fromBasicType = fromType->AsBasicType())
+					{
+						// Conversions between base types are always allowed,
+						// and the only question is what the cost will be.
+
+						auto toInfo = GetBaseTypeConversionInfo(toBasicType->BaseType);
+						auto fromInfo = GetBaseTypeConversionInfo(fromBasicType->BaseType);
+
+						if (outToExpr)
+							*outToExpr = CreateImplicitCastExpr(toType, fromExpr);
+
+						if (outCost)
+						{
+							if (toInfo.kind == fromInfo.kind && toInfo.rank > fromInfo.rank)
+							{
+								*outCost = kConversionCost_Promotion;
+							}
+							else
+							{
+								*outCost = kConversionCost_Conversion;
+							}
+						}
+
+						return true;
+					}
+				}
+
+				if (auto toVectorType = toType->AsVectorType())
+				{
+					if (auto fromVectorType = fromType->AsVectorType())
+					{
+						// Conversion between vector types.
+
+						// If element counts don't match, then bail:
+						if (toVectorType->elementCount != fromVectorType->elementCount)
+							return false;
+
+						// Otherwise, if we can convert the element types, we are golden
+						ConversionCost elementCost;
+						if (CanCoerce(toVectorType->elementType, fromVectorType->elementType, &elementCost))
+						{
+							if (outToExpr)
+								*outToExpr = CreateImplicitCastExpr(toType, fromExpr);
+							if (outCost)
+								*outCost = elementCost;
+							return true;
+						}
+					}
+					else if (auto fromScalarType = fromType->AsBasicType())
+					{
+						// Conversion from scalar to vector.
+						// Should allow as long as we can coerce the scalar to our element type.
+						ConversionCost elementCost;
+						if (CanCoerce(toVectorType->elementType, fromScalarType, &elementCost))
+						{
+							if (outToExpr)
+								*outToExpr = CreateImplicitCastExpr(toType, fromExpr);
+							if (outCost)
+								*outCost = elementCost + kConversionCost_ScalarToVector;
+							return true;
+						}
+					}
+				}
+
+				// TODO: more cases!
+
+				return false;
+			}
+
+			// Check whether a type coercion is possible
+			bool CanCoerce(
+				RefPtr<ExpressionType>			toType,			// the target type for conversion
+				RefPtr<ExpressionType>			fromType,		// the source type for the conversion
+				ConversionCost*					outCost = 0)	// (optional) a place to stuff the conversion cost
+			{
+				return TryCoerceImpl(
+					toType,
+					nullptr,
+					fromType,
+					nullptr,
+					outCost);
+			}
+
+			// Perform type coercion, and emit errors if it isn't possible
+			RefPtr<ExpressionSyntaxNode> Coerce(
+				RefPtr<ExpressionType>			toType,
+				RefPtr<ExpressionSyntaxNode>	fromExpr)
+			{
+				RefPtr<ExpressionSyntaxNode> expr;
+				if (!TryCoerceImpl(
+					toType,
+					&expr,
+					fromExpr->Type.Ptr(),
+					fromExpr.Ptr(),
+					nullptr))
+				{
+					getSink()->diagnose(fromExpr->Position, Diagnostics::typeMismatch, toType, fromExpr->Type);
+				}
+				return expr;
+			}
+
+			RefPtr<ExpressionSyntaxNode> CreateImplicitCastExpr(
+				RefPtr<ExpressionType>			toType,
+				RefPtr<ExpressionSyntaxNode>	fromExpr)
+			{
+				auto castExpr = new TypeCastExpressionSyntaxNode();
+				castExpr->Position = fromExpr->Position;
+				castExpr->TargetType.type = toType;
+				castExpr->Type = toType;
+				castExpr->Expression = fromExpr;
+				return castExpr;
+			}
+
+
+
 			bool MatchType_ValueReceiver(ExpressionType * receiverType, ExpressionType * valueType)
 			{
 				if (receiverType->Equals(valueType))
@@ -1093,9 +1286,7 @@ namespace Spire
 				if (comp->Expression)
 				{
 					comp->Expression = comp->Expression->Accept(this).As<ExpressionSyntaxNode>();
-					if (!MatchType_ValueReceiver(compSym->Type->DataType.Ptr(), comp->Expression->Type.Ptr()) &&
-						!comp->Expression->Type->Equals(ExpressionType::Error.Ptr()))
-						getSink()->diagnose(comp->Name, Diagnostics::typeMismatch, comp->Expression->Type, currentComp->Type);
+					comp->Expression = Coerce(compSym->Type->DataType, comp->Expression);
 				}
 				if (comp->BlockStatement)
 					comp->BlockStatement->Accept(this);
@@ -1505,14 +1696,28 @@ namespace Spire
 					stmt->Expression = stmt->Expression->Accept(this).As<ExpressionSyntaxNode>();
 					if (!stmt->Expression->Type->Equals(ExpressionType::Error.Ptr()))
 					{
-						if (function && !MatchType_ValueReceiver(function->ReturnType.Ptr(), stmt->Expression->Type.Ptr()))
-							getSink()->diagnose(stmt, Diagnostics::functionReturnTypeMismatch, stmt->Expression->Type, function->ReturnType);
-						if (currentComp && !MatchType_ValueReceiver(currentComp->Type->DataType.Ptr(), stmt->Expression->Type.Ptr()))
+						if (function)
 						{
-							getSink()->diagnose(stmt, Diagnostics::componentReturnTypeMismatch, stmt->Expression->Type, currentComp->Type->DataType);
+							stmt->Expression = Coerce(function->ReturnType, stmt->Expression);
 						}
-						if (currentImportOperator && !MatchType_GenericType(currentImportOperator->TypeName.Content, stmt->Expression->Type.Ptr()))
-							getSink()->diagnose(stmt, Diagnostics::importOperatorReturnTypeMismatch, stmt->Expression->Type, currentImportOperator->TypeName);
+						else if (currentComp)
+						{
+							stmt->Expression = Coerce(currentComp->Type->DataType, stmt->Expression);
+						}
+						else if (currentImportOperator)
+						{
+							// TODO(tfoley): fix this up to use new infrastructure
+							if (!MatchType_GenericType(currentImportOperator->TypeName.Content, stmt->Expression->Type.Ptr()))
+								getSink()->diagnose(stmt, Diagnostics::importOperatorReturnTypeMismatch, stmt->Expression->Type, currentImportOperator->TypeName);
+						}
+						else
+						{
+							// TODO(tfoley): this case currently gets triggered for member functions,
+							// which aren't being checked consistently (because of the whole symbol
+							// table idea getting in the way).
+
+//							getSink()->diagnose(stmt, Diagnostics::unimplemented, "case for return stmt");
+						}
 					}
 				}
 				return stmt;
@@ -1547,11 +1752,7 @@ namespace Spire
 				if (varDecl->Expr != NULL)
 				{
 					varDecl->Expr = varDecl->Expr->Accept(this).As<ExpressionSyntaxNode>();
-					if (!MatchType_ValueReceiver(varDecl->Type.Ptr(), varDecl->Expr->Type.Ptr())
-						&& !varDecl->Expr->Type->Equals(ExpressionType::Error.Ptr()))
-					{
-						getSink()->diagnose(varDecl, Diagnostics::typeMismatch, varDecl->Expr->Type, varDecl->Type);
-					}
+					varDecl->Expr = Coerce(varDecl->Type, varDecl->Expr);
 				}
 				return varDecl;
 			}
@@ -1598,7 +1799,9 @@ namespace Spire
 						}
 					}
 					expr->LeftExpression->Access = ExpressionAccess::Write;
-					if (MatchType_ValueReceiver(leftType.Ptr(), expr->Type.Ptr()))
+
+					// TODO(tfoley): Need to actual insert coercion here...
+					if(CanCoerce(leftType, expr->Type))
 						expr->Type = leftType;
 					else
 						expr->Type = ExpressionType::Error;
@@ -2065,16 +2268,8 @@ namespace Spire
 				RefPtr<ExpressionSyntaxNode>	expr,
 				RefPtr<ExpressionType>			type)
 			{
-				if (MatchType_ValueReceiver(type.Ptr(), expr->Type.Ptr()))
-				{
-					// TODO: insert the conversion operation here...
-					return expr;
-				}
-				else
-				{
-					getSink()->diagnose(expr, Diagnostics::typeMismatch, expr->Type, type);
-					return expr;
-				}
+				// TODO(tfoley): clean this up so there is only one version...
+				return Coerce(type, expr);
 			}
 
 			// Resolve a call to a function, represented here
@@ -2297,27 +2492,24 @@ namespace Spire
 				int paramCount = params.Count();
 				assert(argCount == paramCount);
 
-				bool success = true;
 				for (int ii = 0; ii < argCount; ++ii)
 				{
-					auto arg = args[ii];
+					auto& arg = args[ii];
 					auto param = params[ii];
 
-					if (!MatchType_ValueReceiver(param.GetType().Ptr(), arg->Type.Ptr()))
+					if (context.mode == OverloadResolveContext::Mode::JustTrying)
 					{
-						if (context.mode == OverloadResolveContext::Mode::JustTrying)
-							return false;
-						else
+						if (!CanCoerce(param.GetType(), arg->Type))
 						{
-							// TIM: debugging - do it again
-							MatchType_ValueReceiver(param.GetType().Ptr(), arg->Type.Ptr());
-
-							getSink()->diagnose(arg, Diagnostics::typeMismatch, arg->Type, param.GetType());
-							success = false;
+							return false;
 						}
 					}
+					else
+					{
+						arg = Coerce(param.GetType(), arg);
+					}
 				}
-				return success;
+				return true;
 			}
 
 			bool TryCheckOverloadCandidateDirections(
