@@ -615,6 +615,8 @@ static void EmitFuncDecl(EmitContext* context, RefPtr<FunctionSyntaxNode> decl)
 	}
 	Emit(context, ")");
 
+	EmitSemantics(context, decl);
+
 	if (auto bodyStmt = decl->Body)
 	{
 		EmitBlockStmt(context, bodyStmt);
@@ -699,7 +701,7 @@ void EmitProgram(ProgramSyntaxNode* program)
 			nullptr,
 			nullptr,
 			"main",
-			"vs_5_0",
+			"ps_5_0",
 			0,
 			0,
 			&codeBlob,
