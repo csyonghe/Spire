@@ -329,6 +329,19 @@ namespace Spire
 			return rs;
 		}
 
+		// SwizzleExpr
+
+		RefPtr<SyntaxNode> SwizzleExpr::Accept(SyntaxVisitor * visitor)
+		{
+			// throw "unimplemented";
+			return this;
+		}
+
+		SwizzleExpr * SwizzleExpr::Clone(CloneContext & ctx)
+		{
+			throw "unimplemented";
+		}
+
 		// DerefExpr
 
 		RefPtr<SyntaxNode> DerefExpr::Accept(SyntaxVisitor * visitor)

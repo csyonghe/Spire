@@ -3869,77 +3869,82 @@ namespace Spire
 				// because vectors are also declaration reference types...
 				if (auto baseVecType = baseType->AsVectorType())
 				{
-					Array<int, 4> children;
-					if (expr->MemberName.Length() > 4)
-						expr->Type = ExpressionType::Error;
+					RefPtr<SwizzleExpr> swizExpr = new SwizzleExpr();
+					swizExpr->Position = expr->Position;
+					swizExpr->base = expr->BaseExpression;
+
+					int limitElement = baseVecType->elementCount;
+
+					int elementIndices[4];
+					int elementCount = 0;
+
+					bool elementUsed[4] = { false, false, false, false };
+					bool anyDuplicates = false;
+					bool anyError = false;
+
+					for (int i = 0; i < expr->MemberName.Length(); i++)
+					{
+						auto ch = expr->MemberName[i];
+						int elementIndex = -1;
+						switch (ch)
+						{
+						case 'x': case 'r': elementIndex = 0; break;
+						case 'y': case 'g': elementIndex = 1; break;
+						case 'z': case 'b': elementIndex = 2; break;
+						case 'w': case 'a': elementIndex = 3; break;
+						default:
+							// An invalid character in the swizzle is an error
+							getSink()->diagnose(swizExpr, Diagnostics::unimplemented, "invalid component name for swizzle");
+							anyError = true;
+							continue;
+						}
+
+						// TODO(tfoley): GLSL requires that all component names
+						// come from the same "family"...
+
+						// Make sure the index is in range for the source type
+						if (elementIndex >= limitElement)
+						{
+							getSink()->diagnose(swizExpr, Diagnostics::unimplemented, "swizzle component out of range for type");
+							anyError = true;
+							continue;
+						}
+
+						// Check if we've seen this index before
+						for (int ee = 0; ee < elementCount; ee++)
+						{
+							if (elementIndices[ee] == elementIndex)
+								anyDuplicates = true;
+						}
+
+						// add to our list...
+						elementIndices[elementCount++] = elementIndex;
+					}
+
+					for (int ee = 0; ee < elementCount; ++ee)
+					{
+						swizExpr->elementIndices[ee] = elementIndices[ee];
+					}
+					swizExpr->elementCount = elementCount;
+
+					if (anyError)
+					{
+						swizExpr->Type = ExpressionType::Error;
+					}
 					else
 					{
-						bool error = false;
-
-						for (int i = 0; i < expr->MemberName.Length(); i++)
-						{
-							auto ch = expr->MemberName[i];
-							switch (ch)
-							{
-							case 'x':
-							case 'r':
-								children.Add(0);
-								break;
-							case 'y':
-							case 'g':
-								children.Add(1);
-								break;
-							case 'z':
-							case 'b':
-								children.Add(2);
-								break;
-							case 'w':
-							case 'a':
-								children.Add(3);
-								break;
-							default:
-								error = true;
-								expr->Type = ExpressionType::Error;
-								break;
-							}
-						}
-						int vecLen = GetVectorSize(baseVecType);
-						for (auto m : children)
-						{
-							if (m >= vecLen)
-							{
-								error = true;
-								expr->Type = ExpressionType::Error;
-								break;
-							}
-						}
-						if (!error)
-						{
-							expr->Type = new VectorExpressionType(
-								baseVecType->elementType,
-								children.Count());
-						}
-
-						// compute whether result of swizzle is an l-value
-						//
-						// Note(tfoley): The logic here seems to compute
-						// whether the swizzle ever re-orders components,
-						// but it should actually be checking if there are
-						// any duplicated components.
-						{
-							bool isLValue = true;
-							if (children.Count() > vecLen || children.Count() == 0)
-								isLValue = false;
-							int curMax = children[0];
-							for (int i = 0; i < children.Count(); i++)
-								if (children[i] < curMax)
-								{
-									isLValue = false;
-									curMax = children[i];
-								}
-							expr->Type.IsLeftValue = isLValue;
-						}
+						// TODO(tfoley): would be nice to "re-sugar" type
+						// here if the input type had a sugared name...
+						swizExpr->Type = new VectorExpressionType(
+							baseVecType->elementType,
+							elementCount);
 					}
+
+					// A swizzle can be used as an l-value as long as there
+					// were no duplicates in the list of components
+					swizExpr->Type.IsLeftValue = !anyDuplicates;
+
+					return swizExpr;
 				}
 				else if (auto declRefType = baseType->AsDeclRefType())
 				{

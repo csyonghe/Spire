@@ -1691,6 +1691,17 @@ namespace Spire
 			virtual MemberExpressionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
+		class SwizzleExpr : public ExpressionSyntaxNode
+		{
+		public:
+			RefPtr<ExpressionSyntaxNode> base;
+			int elementCount;
+			int elementIndices[4];
+
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual SwizzleExpr * Clone(CloneContext & ctx) override;
+		};
+
 		// A dereference of a pointer or pointer-like type
 		class DerefExpr : public ExpressionSyntaxNode
 		{

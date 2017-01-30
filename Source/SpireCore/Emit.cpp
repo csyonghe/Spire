@@ -140,6 +140,18 @@ static void EmitExpr(EmitContext* context, RefPtr<ExpressionSyntaxNode> expr)
 		Emit(context, memberExpr->declRef.GetName());
 		return;
 	}
+	else if (auto swizExpr = expr.As<SwizzleExpr>())
+	{
+		EmitExpr(context, swizExpr->base);
+		Emit(context, ".");
+		static const char* kComponentNames[] = { "x", "y", "z", "w" };
+		int elementCount = swizExpr->elementCount;
+		for (int ee = 0; ee < elementCount; ++ee)
+		{
+			Emit(context, kComponentNames[swizExpr->elementIndices[ee]]);
+		}
+		return;
+	}
 	else if (auto varExpr = expr.As<VarExpressionSyntaxNode>())
 	{
 		EmitDeclRef(context, varExpr->declRef);
