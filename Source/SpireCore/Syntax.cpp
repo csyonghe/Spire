@@ -596,62 +596,10 @@ namespace Spire
 			return false;
 		}
 
-        bool ExpressionType::IsVectorType() const
-        {
-            return GetCanonicalType()->IsVectorTypeImpl();
-        }
-
-        bool ExpressionType::IsArray() const
-        {
-            return GetCanonicalType()->IsArrayImpl();
-        }
-
-        bool ExpressionType::IsGenericType(String typeName) const
-        {
-            return GetCanonicalType()->IsGenericTypeImpl(typeName);
-        }
-
-		ArithmeticExpressionType * ExpressionType::AsArithmeticType() const
-		{
-			return GetCanonicalType()->AsArithmeticTypeImpl();
-		}
-
-        BasicExpressionType * ExpressionType::AsBasicType() const
-        {
-            return GetCanonicalType()->AsBasicTypeImpl();
-        }
-
-		VectorExpressionType * ExpressionType::AsVectorType() const
-		{
-			return GetCanonicalType()->AsVectorTypeImpl();
-		}
-
-		MatrixExpressionType * ExpressionType::AsMatrixType() const
-		{
-			return GetCanonicalType()->AsMatrixTypeImpl();
-		}
-
-
-
-        ArrayExpressionType * ExpressionType::AsArrayType() const
-        {
-            return GetCanonicalType()->AsArrayTypeImpl();
-        }
-
-		DeclRefType * ExpressionType::AsDeclRefType() const
-		{
-			return GetCanonicalType()->AsDeclRefTypeImpl();
-		}
-
         NamedExpressionType* ExpressionType::AsNamedType() const
         {
-            return AsNamedTypeImpl();
+			return dynamic_cast<NamedExpressionType*>(const_cast<ExpressionType*>(this));
         }
-
-		TypeExpressionType* ExpressionType::AsTypeType() const
-		{
-			return GetCanonicalType()->AsTypeTypeImpl();
-		}
 
 		RefPtr<Val> ExpressionType::SubstituteImpl(Substitutions* subst, int* ioDiff)
 		{
@@ -700,14 +648,6 @@ namespace Spire
 			return BindableResourceType::NonBindable;
 		}
 
-		bool ExpressionType::IsTexture() const
-		{
-			return As<TextureType>() != nullptr;
-		}
-		bool ExpressionType::IsSampler() const
-		{
-			return As<SamplerStateType>() != nullptr;
-		}
 		bool ExpressionType::IsTextureOrSampler() const
 		{
 			return IsTexture() || IsSampler();
@@ -759,10 +699,6 @@ namespace Spire
             // Note(tfoley): This seems to be just about the only way to clear out a List<T>
             sCanonicalTypes = List<RefPtr<ExpressionType>>();
 		}
-		bool ArrayExpressionType::IsArrayImpl() const
-		{
-			return true;
-		}
 		bool ArrayExpressionType::EqualsImpl(const ExpressionType * type) const
 		{
 			auto arrType = type->AsArrayType();
@@ -805,11 +741,6 @@ namespace Spire
 				return declRef.Equals(declRefType->declRef);
 			}
 			return false;
-		}
-
-		DeclRefType * DeclRefType::AsDeclRefTypeImpl() const
-		{
-			return const_cast<DeclRefType*>(this);
 		}
 
 		ExpressionType* DeclRefType::CreateCanonicalType()
@@ -994,11 +925,6 @@ namespace Spire
             return false;
         }
 
-        NamedExpressionType * NamedExpressionType::AsNamedTypeImpl() const
-        {
-            return const_cast<NamedExpressionType*>(this);
-        }
-
         ExpressionType* NamedExpressionType::CreateCanonicalType()
         {
             return declRef.GetType()->GetCanonicalType();
@@ -1098,11 +1024,6 @@ namespace Spire
 			return false;
 		}
 
-		TypeExpressionType * TypeExpressionType::AsTypeTypeImpl() const
-		{
-			return const_cast<TypeExpressionType*>(this);
-		}
-
 		ExpressionType* TypeExpressionType::CreateCanonicalType()
 		{
 			auto canType = new TypeExpressionType(type->GetCanonicalType());
@@ -1134,12 +1055,6 @@ namespace Spire
 
 		// ArithmeticExpressionType
 
-		ArithmeticExpressionType * ArithmeticExpressionType::AsArithmeticTypeImpl() const
-		{
-			return const_cast<ArithmeticExpressionType*>(this);
-		}
-
-
 		// VectorExpressionType
 
 		String VectorExpressionType::ToString() const
@@ -1163,11 +1078,6 @@ namespace Spire
 			}
 			
 			return false;
-		}
-
-		VectorExpressionType * VectorExpressionType::AsVectorTypeImpl() const
-		{
-			return const_cast<VectorExpressionType*>(this);
 		}
 
 		ExpressionType* VectorExpressionType::CreateCanonicalType()
@@ -1219,10 +1129,6 @@ namespace Spire
 			}
 			
 			return false;
-		}
-		MatrixExpressionType * MatrixExpressionType::AsMatrixTypeImpl() const
-		{
-			return const_cast<MatrixExpressionType*>(this);
 		}
 
 		ExpressionType* MatrixExpressionType::CreateCanonicalType()

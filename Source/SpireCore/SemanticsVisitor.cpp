@@ -2309,6 +2309,9 @@ namespace Spire
 							return false;
 						else
 						{
+							// TIM: debugging - do it again
+							MatchType_ValueReceiver(param.GetType().Ptr(), arg->Type.Ptr());
+
 							getSink()->diagnose(arg, Diagnostics::typeMismatch, arg->Type, param.GetType());
 							success = false;
 						}
