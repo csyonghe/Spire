@@ -4294,6 +4294,15 @@ namespace Spire
 					{
 						swizExpr->Type = ExpressionType::Error;
 					}
+					else if (elementCount == 1)
+					{
+						// single-component swizzle produces a scalar
+						//
+						// Note(tfoley): the official HLSL rules seem to be that it produces
+						// a one-component vector, which is then implicitly convertible to
+						// a scalar, but that seems like it just adds complexity.
+						swizExpr->Type = baseVecType->elementType;
+					}
 					else
 					{
 						// TODO(tfoley): would be nice to "re-sugar" type
