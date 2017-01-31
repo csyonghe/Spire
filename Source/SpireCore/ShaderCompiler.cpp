@@ -385,14 +385,22 @@ namespace Spire
 					if (result.GetErrorCount() > 0)
 						return;
 
+#if 1
+
 					// HACK(tfoley): for right now I just want to pretty-print an AST
 					// into another language, so the whole compiler back-end is just
 					// getting in the way.
 					//
 					// I'm going to bypass it for now and see what I can do:
-					EmitProgram(programSyntaxNode.Ptr());
-					return;
+					String rawProgram = EmitProgram(programSyntaxNode.Ptr());
 
+					StageSource stageSource;
+					stageSource.MainCode = rawProgram;
+					CompiledShaderSource compiled;
+					compiled.Stages[""] = stageSource;
+					result.CompiledSource[""] = compiled;
+					return;
+#else
 
 
 					// if user specified a template shader symbol, instantiate the template now
@@ -578,6 +586,7 @@ namespace Spire
 						return;
 					}
 					context.Program = result.Program;
+#endif
 				}
 				catch (int)
 				{

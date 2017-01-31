@@ -184,7 +184,7 @@ namespace Spire
 			}
 
 // TODO(tfoley): move this somewhere central
-#define SPIRE_UNREACHABLE(msg) assert(!"ureachable code:" msg)
+#define SPIRE_UNREACHABLE(msg) do { assert(!"ureachable code:" msg); exit(1); } while(0)
 
 			RefPtr<ExpressionSyntaxNode> ConstructLookupResultExpr(
 				LookupResultItem const&			item,
@@ -2348,6 +2348,9 @@ namespace Spire
 
 			virtual void VisitExtensionDecl(ExtensionDecl* decl) override
 			{
+				if (decl->IsChecked(DeclCheckState::Checked)) return;
+
+				decl->SetCheckState(DeclCheckState::CheckingHeader);
 				decl->targetType = CheckProperType(decl->targetType);
 
 				// TODO: need to check that the target type names a declaration...
@@ -2375,11 +2378,15 @@ namespace Spire
 					getSink()->diagnose(decl->targetType.exp, Diagnostics::unimplemented, "expected a nominal type here");
 				}
 
+				decl->SetCheckState(DeclCheckState::CheckedHeader);
+
 				// now check the members of the extension
 				for (auto m : decl->Members)
 				{
 					EnsureDecl(m);
 				}
+
+				decl->SetCheckState(DeclCheckState::Checked);
 			}
 
 			virtual void VisitConstructorDecl(ConstructorDecl* decl) override

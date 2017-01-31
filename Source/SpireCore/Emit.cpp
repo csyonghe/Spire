@@ -671,7 +671,7 @@ static void EmitDecl(EmitContext* context, RefPtr<Decl> decl)
 	throw "unimplemented";
 }
 
-void EmitProgram(ProgramSyntaxNode* program)
+String EmitProgram(ProgramSyntaxNode* program)
 {
 	EmitContext context;
 
@@ -681,7 +681,9 @@ void EmitProgram(ProgramSyntaxNode* program)
 
 	String code = context.sb.ProduceString();
 
+	return code;
 
+#if 0
 	// HACK(tfoley): Invoke the D3D HLSL compiler on the result, to validate it
 
 #ifdef _WIN32
@@ -722,7 +724,7 @@ void EmitProgram(ProgramSyntaxNode* program)
 
 	#include <d3dcompiler.h>
 #endif
-
+#endif
 
 }
 

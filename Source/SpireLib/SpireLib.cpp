@@ -677,6 +677,13 @@ namespace SpireLib
 					if (i > 0)
 						source = File::ReadAllText(inputFileName);
 					auto unit = compiler->Parse(result, source, inputFileName, &includeHandler, Options.PreprocessorDefinitions, predefUnit);
+
+					// HACK(tfoley): Assume that the first thing we parse represents the predef unit!
+					if (!predefUnit.SyntaxNode)
+					{
+						predefUnit = unit;
+					}
+
 					units.Add(unit);
 					if (unit.SyntaxNode)
 					{
