@@ -82,10 +82,98 @@ static bool IsBaseExpressionImplicit(EmitContext* context, RefPtr<ExpressionSynt
 	return false;
 }
 
+enum
+{
+	kPrecedence_None,
+	kPrecedence_Comma,
+
+	kPrecedence_Assign,
+	kPrecedence_AddAssign = kPrecedence_Assign,
+	kPrecedence_SubAssign = kPrecedence_Assign,
+	kPrecedence_MulAssign = kPrecedence_Assign,
+	kPrecedence_DivAssign = kPrecedence_Assign,
+	kPrecedence_ModAssign = kPrecedence_Assign,
+	kPrecedence_LshAssign = kPrecedence_Assign,
+	kPrecedence_RshAssign = kPrecedence_Assign,
+	kPrecedence_OrAssign = kPrecedence_Assign,
+	kPrecedence_AndAssign = kPrecedence_Assign,
+	kPrecedence_XorAssign = kPrecedence_Assign,
+
+	kPrecedence_General = kPrecedence_Assign,
+
+	kPrecedence_Conditional, // "ternary"
+	kPrecedence_Or,
+	kPrecedence_And,
+	kPrecedence_BitOr,
+	kPrecedence_BitXor,
+	kPrecedence_BitAnd,
+
+	kPrecedence_Eql,
+	kPrecedence_Neq = kPrecedence_Eql,
+
+	kPrecedence_Less,
+	kPrecedence_Greater = kPrecedence_Less,
+	kPrecedence_Leq = kPrecedence_Less,
+	kPrecedence_Geq = kPrecedence_Less,
+
+	kPrecedence_Lsh,
+	kPrecedence_Rsh = kPrecedence_Lsh,
+
+	kPrecedence_Add,
+	kPrecedence_Sub = kPrecedence_Add,
+
+	kPrecedence_Mul,
+	kPrecedence_Div = kPrecedence_Mul,
+	kPrecedence_Mod = kPrecedence_Mul,
+
+	kPrecedence_Prefix,
+	kPrecedence_Postifx,
+	kPrecedence_Atomic = kPrecedence_Postifx
+};
+
+static void EmitExprWithPrecedence(EmitContext* context, RefPtr<ExpressionSyntaxNode> expr, int outerPrec);
+
+static void EmitPostfixExpr(EmitContext* context, RefPtr<ExpressionSyntaxNode> expr)
+{
+	EmitExprWithPrecedence(context, expr, kPrecedence_Postifx);
+}
+
 static void EmitExpr(EmitContext* context, RefPtr<ExpressionSyntaxNode> expr)
 {
+	EmitExprWithPrecedence(context, expr, kPrecedence_General);
+}
+
+static bool MaybeEmitParens(EmitContext* context, int outerPrec, int prec)
+{
+	if (prec <= outerPrec)
+	{
+		Emit(context, "(");
+		return true;
+	}
+	return false;
+}
+
+static void EmitBinExpr(EmitContext* context, int outerPrec, int prec, char const* op, RefPtr<BinaryExpressionSyntaxNode> binExpr)
+{
+	bool needsClose = MaybeEmitParens(context, outerPrec, prec);
+	EmitExprWithPrecedence(context, binExpr->LeftExpression, prec);
+	Emit(context, " ");
+	Emit(context, op);
+	Emit(context, " ");
+	EmitExprWithPrecedence(context, binExpr->RightExpression, prec);
+	if (needsClose)
+	{
+		Emit(context, ")");
+	}
+}
+
+static void EmitExprWithPrecedence(EmitContext* context, RefPtr<ExpressionSyntaxNode> expr, int outerPrec)
+{
+	bool needClose = false;
 	if (auto appExpr = expr.As<InvokeExpressionSyntaxNode>())
 	{
+		needClose = MaybeEmitParens(context, outerPrec, kPrecedence_Postifx);
+
 		auto funcExpr = appExpr->FunctionExpr;
 		if (auto funcDeclRefExpr = funcExpr.As<DeclRefExpr>())
 		{
@@ -104,7 +192,7 @@ static void EmitExpr(EmitContext* context, RefPtr<ExpressionSyntaxNode> expr)
 		else
 		{
 			// default case: just emit the expression
-			EmitExpr(context, funcExpr);
+			EmitPostfixExpr(context, funcExpr);
 		}
 
 		Emit(context, "(");
@@ -115,10 +203,11 @@ static void EmitExpr(EmitContext* context, RefPtr<ExpressionSyntaxNode> expr)
 			EmitExpr(context, appExpr->Arguments[aa]);
 		}
 		Emit(context, ")");
-		return;
 	}
 	else if (auto memberExpr = expr.As<MemberExpressionSyntaxNode>())
 	{
+		needClose = MaybeEmitParens(context, outerPrec, kPrecedence_Postifx);
+
 		// TODO(tfoley): figure out a good way to reference
 		// declarations that might be generic and/or might
 		// not be generated as lexically nested declarations...
@@ -133,16 +222,17 @@ static void EmitExpr(EmitContext* context, RefPtr<ExpressionSyntaxNode> expr)
 		}
 		else
 		{
-			EmitExpr(context, memberExpr->BaseExpression);
+			EmitExprWithPrecedence(context, memberExpr->BaseExpression, kPrecedence_Postifx);
 			Emit(context, ".");
 		}
 
 		Emit(context, memberExpr->declRef.GetName());
-		return;
 	}
 	else if (auto swizExpr = expr.As<SwizzleExpr>())
 	{
-		EmitExpr(context, swizExpr->base);
+		needClose = MaybeEmitParens(context, outerPrec, kPrecedence_Postifx);
+
+		EmitExprWithPrecedence(context, swizExpr->base, kPrecedence_Postifx);
 		Emit(context, ".");
 		static const char* kComponentNames[] = { "x", "y", "z", "w" };
 		int elementCount = swizExpr->elementCount;
@@ -150,21 +240,22 @@ static void EmitExpr(EmitContext* context, RefPtr<ExpressionSyntaxNode> expr)
 		{
 			Emit(context, kComponentNames[swizExpr->elementIndices[ee]]);
 		}
-		return;
 	}
 	else if (auto varExpr = expr.As<VarExpressionSyntaxNode>())
 	{
+		needClose = MaybeEmitParens(context, outerPrec, kPrecedence_Atomic);
+
 		EmitDeclRef(context, varExpr->declRef);
-		return;
 	}
 	else if (auto derefExpr = expr.As<DerefExpr>())
 	{
 		// TODO(tfoley): dereference shouldn't always be implicit
-		EmitExpr(context, derefExpr->base);
-		return;
+		EmitExprWithPrecedence(context, derefExpr->base, outerPrec);
 	}
 	else if (auto litExpr = expr.As<ConstantExpressionSyntaxNode>())
 	{
+		needClose = MaybeEmitParens(context, outerPrec, kPrecedence_Atomic);
+
 		switch (litExpr->ConstType)
 		{
 		case ConstantExpressionSyntaxNode::ConstantType::Int:
@@ -180,16 +271,14 @@ static void EmitExpr(EmitContext* context, RefPtr<ExpressionSyntaxNode> expr)
 			assert(!"unreachable");
 			break;
 		}
-		return;
 	}
 	else if (auto binExpr = expr.As<BinaryExpressionSyntaxNode>())
 	{
 		// TODO(tfoley): Need to deal with operator precedence
 
-		EmitExpr(context, binExpr->LeftExpression);
 		switch (binExpr->Operator)
 		{
-#define CASE(NAME, OP) case Operator::NAME: Emit(context, #OP); break
+#define CASE(NAME, OP) case Operator::NAME: EmitBinExpr(context, outerPrec, kPrecedence_##NAME, #OP, binExpr); break
 		CASE(Mul, *);
 		CASE(Div, /);
 		CASE(Mod, %);
@@ -224,19 +313,24 @@ static void EmitExpr(EmitContext* context, RefPtr<ExpressionSyntaxNode> expr)
 			assert(!"unreachable");
 			break;
 		}
-		EmitExpr(context, binExpr->RightExpression);
-		return;
 	}
 	else if (auto castExpr = expr.As<TypeCastExpressionSyntaxNode>())
 	{
-		Emit(context, "((");
+		needClose = MaybeEmitParens(context, outerPrec, kPrecedence_Prefix);
+
+		Emit(context, "(");
 		EmitType(context, castExpr->Type);
 		Emit(context, ") ");
 		EmitExpr(context, castExpr->Expression);
-		Emit(context, ")");
-		return;
 	}
-	throw "unimplemented";
+	else
+	{
+		throw "unimplemented";
+	}
+	if (needClose)
+	{
+		Emit(context, ")");
+	}
 }
 
 // Types
