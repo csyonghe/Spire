@@ -96,6 +96,17 @@ __intrinsic float fract(float v);
 __intrinsic vec2 fract(vec2 v);
 __intrinsic vec3 fract(vec3 v);
 __intrinsic vec4 fract(vec4 v);
+
+__intrinsic float  frac(float  v);
+__intrinsic float2 frac(float2 v);
+__intrinsic float3 frac(float3 v);
+__intrinsic float4 frac(float4 v);
+__intrinsic float  lerp(float  x, float  y, float  s);
+__intrinsic float2 lerp(float2 x, float2 y, float2 s);
+__intrinsic float3 lerp(float3 x, float3 y, float3 s);
+__intrinsic float4 lerp(float4 x, float4 y, float4 s);
+
+
 __intrinsic float ceil(float v);
 __intrinsic vec2 ceil(vec2 v);
 __intrinsic vec3 ceil(vec3 v);
