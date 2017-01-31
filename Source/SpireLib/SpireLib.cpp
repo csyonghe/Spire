@@ -635,8 +635,10 @@ namespace SpireLib
 			unitsToInclude.Add(fileName);
 			processedUnits.Add(fileName);
 			auto searchDirs = Options.SearchDirectories;
+			searchDirs.Reverse();
 			searchDirs.Add(Path::GetDirectoryName(fileName));
 			searchDirs.Reverse();
+			includeHandler.searchDirs = searchDirs;
 			for (int i = 0; i < unitsToInclude.Count(); i++)
 			{
 				auto inputFileName = unitsToInclude[i];

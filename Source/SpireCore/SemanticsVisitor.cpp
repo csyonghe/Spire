@@ -2591,6 +2591,10 @@ namespace Spire
 
 				// A system for tracking constraints introduced on generic parameters
 				ConstraintSystem constraintSystem;
+
+				// How much conversion cost should be considered for this overload,
+				// when ranking candidates.
+				ConversionCost conversionCostSum = kConversionCost_None;
 			};
 
 
@@ -2611,10 +2615,17 @@ namespace Spire
 				RefPtr<InvokeExpressionSyntaxNode> appExpr;
 				RefPtr<ExpressionSyntaxNode> baseExpr;
 
+				// Are we still trying out candidates, or are we
+				// checking the chosen one for real?
+				Mode mode = Mode::JustTrying;
+
+				// We store one candidate directly, so that we don't
+				// need to do dynamic allocation on the list every time
 				OverloadCandidate bestCandidateStorage;
 				OverloadCandidate*	bestCandidate = nullptr;
-				bool ambiguous = false;
-				Mode mode = Mode::JustTrying;
+
+				// Full list of all candidates being considered, in the ambiguous case
+				List<OverloadCandidate> bestCandidates;
 			};
 
 			bool TryCheckOverloadCandidateArity(
@@ -2642,8 +2653,8 @@ namespace Spire
 			}
 
 			bool TryCheckOverloadCandidateTypes(
-				OverloadResolveContext&		context,
-				OverloadCandidate const&	candidate)
+				OverloadResolveContext&	context,
+				OverloadCandidate&		candidate)
 			{
 				auto& args = context.appExpr->Arguments;
 				int argCount = args.Count();
@@ -2669,10 +2680,12 @@ namespace Spire
 
 					if (context.mode == OverloadResolveContext::Mode::JustTrying)
 					{
-						if (!CanCoerce(param.GetType(), arg->Type))
+						ConversionCost cost = kConversionCost_None;
+						if (!CanCoerce(param.GetType(), arg->Type, &cost))
 						{
 							return false;
 						}
+						candidate.conversionCostSum += cost;
 					}
 					else
 					{
@@ -2784,6 +2797,24 @@ namespace Spire
 				return context.appExpr;
 			}
 
+			// Implement a comparison operation between overload candidates,
+			// so that the better candidate compares as less-than the other
+			int CompareOverloadCandidates(
+				OverloadCandidate*	left,
+				OverloadCandidate*	right)
+			{
+				// If one candidate got further along in validation, pick it
+				if (left->status != right->status)
+					return int(right->status) - int(left->status);
+
+				// If one candidate is 
+				if (left->conversionCostSum != right->conversionCostSum)
+					return left->conversionCostSum - right->conversionCostSum;
+
+
+				return 0;
+			}
+
 			void AddOverloadCandidate(
 				OverloadResolveContext& context,
 				OverloadCandidate&		candidate)
@@ -2791,27 +2822,82 @@ namespace Spire
 				// Try the candidate out, to see if it is applicable at all.
 				TryCheckOverloadCandidate(context, candidate);
 
-				if (!context.bestCandidate || candidate.status > context.bestCandidate->status)
+				// Filter our existing candidates, to remove any that are worse than our new one
+
+				bool keepThisCandidate = true; // should this candidate be kept?
+
+				int oldCandidateCount = context.bestCandidates.Count();
+				if (context.bestCandidates.Count() != 0)
 				{
-					// This candidate is the best one so far, so lets remember it
-					context.bestCandidateStorage = candidate;
-					context.bestCandidate = &context.bestCandidateStorage;
-					context.ambiguous = false;
+					// We have multiple candidates right now, so filter them.
+					bool anyFiltered = false;
+					// Note that we are querying the list length on every iteration,
+					// because we might remove things.
+					for (int cc = 0; cc < context.bestCandidates.Count(); ++cc)
+					{
+						int cmp = CompareOverloadCandidates(&candidate, &context.bestCandidates[cc]);
+						if (cmp < 0)
+						{
+							// our new candidate is better!
+
+							// remove it from the list (by swapping in a later one)
+							context.bestCandidates.FastRemoveAt(cc);
+							// and then reduce our index so that we re-visit the same index
+							--cc;
+
+							anyFiltered = true;
+						}
+						else if(cmp > 0)
+						{
+							// our candidate is worse!
+							keepThisCandidate = false;
+						}
+					}
+					// It should not be possible that we removed some existing candidate *and*
+					// chose not to keep this candidate (otherwise the better-ness relation
+					// isn't transitive). Therefore we confirm that we either chose to keep
+					// this candidate (in which case filtering is okay), or we didn't filter
+					// anything.
+					assert(keepThisCandidate || !anyFiltered);
 				}
-				else if (candidate.status == OverloadCandidate::Status::Appicable)
+				else if(context.bestCandidate)
 				{
-					// This is the case where we might have to consider more functions...
-					throw "haven't implemented the case where we track multiple applicable overloads";
+					// There's only one candidate so far
+					int cmp = CompareOverloadCandidates(&candidate, context.bestCandidate);
+					if(cmp < 0)
+					{
+						// our new candidate is better!
+						context.bestCandidate = nullptr;
+					}
+					else if (cmp > 0)
+					{
+						// our candidate is worse!
+						keepThisCandidate = false;
+					}
 				}
-				else if (candidate.status == context.bestCandidate->status)
+
+				// If our candidate isn't good enough, then drop it
+				if (!keepThisCandidate)
+					return;
+
+				// Otherwise we want to keep the candidate
+				if (context.bestCandidates.Count() > 0)
 				{
-					// This candidate is just as applicable as the last, but
-					// neither is actually usable.
-					context.ambiguous = true;
+					// There were already multiple candidates, and we are adding one more
+					context.bestCandidates.Add(candidate);
+				}
+				else if (context.bestCandidate)
+				{
+					// There was a unique best candidate, but now we are ambiguous
+					context.bestCandidates.Add(*context.bestCandidate);
+					context.bestCandidates.Add(candidate);
+					context.bestCandidate = nullptr;
 				}
 				else
 				{
-					// This candidate wasn't good enough to keep considering
+					// This is the only candidate worthe keeping track of right now
+					context.bestCandidateStorage = candidate;
+					context.bestCandidate = &context.bestCandidateStorage;
 				}
 			}
 
@@ -3382,15 +3468,54 @@ namespace Spire
 				}
 				AddOverloadCandidates(funcExpr, context);
 
-				if (!context.bestCandidate)
+				if (context.bestCandidates.Count() > 0)
 				{
-					// Nothing at all was found that we could even consider invoking
-					getSink()->diagnose(expr->FunctionExpr, Diagnostics::expectedFunction);
-					expr->Type = ExpressionType::Error;
-					return expr;
-				}
+					// Things were ambiguous.
+					if (context.bestCandidates[0].status != OverloadCandidate::Status::Appicable)
+					{
+						// There were multple equally-good candidates, but none actually usable.
+						// We will construct a diagnostic message to help out.
 
-				if (!context.ambiguous)
+						String funcName;
+						if (auto baseVar = funcExpr.As<VarExpressionSyntaxNode>())
+							funcName = baseVar->Variable;
+						else if(auto baseMemberRef = funcExpr.As<MemberExpressionSyntaxNode>())
+							funcName = baseMemberRef->MemberName;
+
+						StringBuilder argsListBuilder;
+						argsListBuilder << "(";
+						bool first = true;
+						for (auto a : expr->Arguments)
+						{
+							if (!first) argsListBuilder << ", ";
+							argsListBuilder << a->Type->ToString();
+							first = false;
+						}
+						argsListBuilder << ")";
+						String argsList = argsListBuilder.ProduceString();
+
+						if (funcName.Length() != 0)
+						{
+							getSink()->diagnose(expr, Diagnostics::noApplicableOverloadForNameWithArgs, funcName, argsList);
+						}
+						else
+						{
+							getSink()->diagnose(expr, Diagnostics::noApplicableWithArgs, funcName, argsList);
+						}
+
+						// TODO: iterate over the candidates under consideration and print them?
+						expr->Type = ExpressionType::Error;
+						return expr;
+					}
+					else
+					{
+						// There were multiple applicable candidates, so we need to report them.
+						getSink()->diagnose(expr, Diagnostics::unimplemented, "ambiguous overloaded call");
+						expr->Type = ExpressionType::Error;
+						return expr;
+					}
+				}
+				else if (context.bestCandidate)
 				{
 					// There was one best candidate, even if it might not have been
 					// applicable in the end.
@@ -3398,49 +3523,10 @@ namespace Spire
 					// the user the most help we can.
 					return CompleteOverloadCandidate(context, *context.bestCandidate);
 				}
-
-				// Otherwise things were ambiguous, and we need to report it.
-				if (context.bestCandidate->status == OverloadCandidate::Status::Appicable)
-				{
-					// There were multiple applicable candidates, so we need to
-					// report them.
-					getSink()->diagnose(expr, Diagnostics::unimplemented, "ambiguous overloaded call");
-					expr->Type = ExpressionType::Error;
-					return expr;
-				}
 				else
 				{
-					// There were multple equally-good candidates, but none actually usable.
-					// We will construct a diagnostic message to help out.
-
-					String funcName;
-					if (auto baseVar = funcExpr.As<VarExpressionSyntaxNode>())
-						funcName = baseVar->Variable;
-					else if(auto baseMemberRef = funcExpr.As<MemberExpressionSyntaxNode>())
-						funcName = baseMemberRef->MemberName;
-
-					StringBuilder argsListBuilder;
-					argsListBuilder << "(";
-					bool first = true;
-					for (auto a : expr->Arguments)
-					{
-						if (!first) argsListBuilder << ", ";
-						argsListBuilder << a->Type->ToString();
-						first = false;
-					}
-					argsListBuilder << ")";
-					String argsList = argsListBuilder.ProduceString();
-
-					if (funcName.Length() != 0)
-					{
-						getSink()->diagnose(expr, Diagnostics::noApplicableOverloadForNameWithArgs, funcName, argsList);
-					}
-					else
-					{
-						getSink()->diagnose(expr, Diagnostics::noApplicableWithArgs, funcName, argsList);
-					}
-
-					// TODO: iterate over the candidates under consideration and print them?
+					// Nothing at all was found that we could even consider invoking
+					getSink()->diagnose(expr->FunctionExpr, Diagnostics::expectedFunction);
 					expr->Type = ExpressionType::Error;
 					return expr;
 				}
