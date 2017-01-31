@@ -591,6 +591,15 @@ static void EmitVarDecl(EmitContext* context, RefPtr<VarDeclBase> decl)
 
 static void EmitParamDecl(EmitContext* context, RefPtr<ParameterSyntaxNode> decl)
 {
+	if (decl->HasModifier(ModifierFlag::InOut))
+	{
+		Emit(context, "inout ");
+	}
+	else if (decl->HasModifier(ModifierFlag::Out))
+	{
+		Emit(context, "out ");
+	}
+
 	EmitType(context, decl->Type, decl->Name.Content);
 	EmitSemantics(context, decl);
 
