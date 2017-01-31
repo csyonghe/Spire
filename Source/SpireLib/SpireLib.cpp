@@ -165,42 +165,42 @@ namespace SpireLib
 		return resultFiles;
 	}
 
-	List<ShaderLibFile> CompileShaderSource(Spire::Compiler::CompileResult & compileResult,
-		const CoreLib::String & src, const CoreLib::String & fileName, Spire::Compiler::CompileOptions & options)
-	{
-		struct IncludeHandlerImpl : IncludeHandler
-		{
-			List<String> searchDirs;
 
-			virtual bool TryToFindIncludeFile(
-				CoreLib::String const& pathToInclude,
-				CoreLib::String const& pathIncludedFrom,
-				CoreLib::String* outFoundPath,
-				CoreLib::String* outFoundSource) override
+	struct IncludeHandlerImpl : IncludeHandler
+	{
+		List<String> searchDirs;
+
+		virtual bool TryToFindIncludeFile(
+		CoreLib::String const& pathToInclude,
+		CoreLib::String const& pathIncludedFrom,
+		CoreLib::String* outFoundPath,
+		CoreLib::String* outFoundSource) override
+		{
+			String path = Path::Combine(Path::GetDirectoryName(pathIncludedFrom), pathToInclude);
+			if (File::Exists(path))
 			{
-				String path = Path::Combine(Path::GetDirectoryName(pathIncludedFrom), pathToInclude);
+				*outFoundPath = path;
+				*outFoundSource = File::ReadAllText(path);
+				return true;
+			}
+
+			for (auto & dir : searchDirs)
+			{
+				path = Path::Combine(dir, pathToInclude);
 				if (File::Exists(path))
 				{
 					*outFoundPath = path;
 					*outFoundSource = File::ReadAllText(path);
 					return true;
 				}
-
-				for (auto & dir : searchDirs)
-				{
-					path = Path::Combine(dir, pathToInclude);
-					if (File::Exists(path))
-					{
-						*outFoundPath = path;
-						*outFoundSource = File::ReadAllText(path);
-						return true;
-					}
-				}
-				return false;
 			}
+			return false;
+		}
+	};
 
-		};
-
+	List<ShaderLibFile> CompileShaderSource(Spire::Compiler::CompileResult & compileResult,
+		const CoreLib::String & src, const CoreLib::String & fileName, Spire::Compiler::CompileOptions & options)
+	{
 		IncludeHandlerImpl includeHandler;
 		includeHandler.searchDirs = options.SearchDirectories;
 
@@ -472,37 +472,6 @@ namespace SpireLib
 		RefPtr<ShaderCompiler> compiler;
 		CompileUnit predefUnit;
 
-		struct IncludeHandlerImpl : IncludeHandler
-		{
-			List<String> searchDirs;
-
-			virtual bool TryToFindIncludeFile(
-				CoreLib::String const& pathToInclude,
-				CoreLib::String const& pathIncludedFrom,
-				CoreLib::String* outFoundPath,
-				CoreLib::String* outFoundSource) override
-			{
-				String path = Path::Combine(Path::GetDirectoryName(pathIncludedFrom), pathToInclude);
-				if (File::Exists(path))
-				{
-					*outFoundPath = path;
-					*outFoundSource = File::ReadAllText(path);
-					return true;
-				}
-
-				for (auto & dir : searchDirs)
-				{
-					path = Path::Combine(dir, pathToInclude);
-					if (File::Exists(path))
-					{
-						*outFoundPath = path;
-						*outFoundSource = File::ReadAllText(path);
-						return true;
-					}
-				}
-				return false;
-			}
-		};
 		IncludeHandlerImpl includeHandler;
 
 	public:
