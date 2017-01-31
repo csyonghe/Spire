@@ -1104,6 +1104,21 @@ namespace Spire
 
 				// TODO(tfoley): catch error types here, and route appropriately
 
+				// Handle the special case of constraint variables here.
+				//
+				// Basically, if any type constraint variables are involved, we
+				// just record the fact that they have been constrained to be
+				// equal, and then act as if the coercion succeeded.
+				// We'll check the actual result later on, when we solve for
+				// the constraint variables.
+				if (toType->As<ConstraintVarType>() ||fromType->As<ConstraintVarType>() )
+				{
+					RegisterCoercionConstraint(toType, fromType);
+					return true;
+				}
+
+				//
+
 				if (auto toBasicType = toType->AsBasicType())
 				{
 					if (auto fromBasicType = fromType->AsBasicType())
@@ -2401,7 +2416,152 @@ namespace Spire
 				decl->SetCheckState(DeclCheckState::CheckedHeader);
 
 				// TODO(tfoley): check body
+
+				decl->SetCheckState(DeclCheckState::Checked);
 			}
+
+			//
+
+			struct Constraint
+			{
+				Decl*		decl; // the declaration of the thing being constraints
+				RefPtr<Val>	val; // the value to which we are constraining it
+				bool satisfied = false; // Has this constraint been met?
+			};
+
+			// A collection of constraints that will need to be satisified (solved)
+			// in order for checking to suceed.
+			struct ConstraintSystem
+			{
+				List<Constraint> constraints;
+			};
+
+
+			// The current constraint system we are solving
+			ConstraintSystem* currentConstraintSystem = nullptr;
+
+			void PushConstraintSystem(ConstraintSystem* system)
+			{
+				assert(!currentConstraintSystem);
+				currentConstraintSystem = system;
+			}
+
+			void PopConstraintSystem(ConstraintSystem* system)
+			{
+				assert(currentConstraintSystem == system);
+				currentConstraintSystem = nullptr;
+			}
+
+			// Try to solve a system of generic constraints.
+			// The `system` argument provides the constraints.
+			// The `varSubst` argument provides the list of constraint
+			// variables that were created for the system.
+			//
+			// Returns a new substitution representing the values that
+			// we solved for along the way.
+			RefPtr<Substitutions> TrySolveConstraintSystem(
+				ConstraintSystem*		system,
+				RefPtr<Substitutions>	varSubst)
+			{
+				// For now the "solver" is going to be ridiculously simplistic.
+
+				// We will loop over each constraint variable, and then
+				// try to solve the constraints on just that variable.
+				List<RefPtr<Val>> solvedArgs;
+				for (auto varArg : varSubst->args)
+				{
+					if (auto typeVar = dynamic_cast<ConstraintVarType*>(varArg.Ptr()))
+					{
+						RefPtr<ExpressionType> type = nullptr;
+						for (auto& c : system->constraints)
+						{
+							if (c.decl != typeVar->declRef.GetDecl())
+								continue;
+
+							auto cType = c.val.As<ExpressionType>();
+							assert(cType.Ptr());
+
+							if (!type)
+							{
+								type = cType;
+							}
+							else
+							{
+								if (!type->Equals(cType))
+								{
+									// failure!
+									return nullptr;
+								}
+							}
+
+							c.satisfied = true;
+						}
+
+						if (!type)
+						{
+							// failure!
+							return nullptr;
+						}
+						solvedArgs.Add(type);
+					}
+					else if (auto valueVar = dynamic_cast<ConstraintVarInt*>(varArg.Ptr()))
+					{
+						// TODO(tfoley): maybe support more than integers some day?
+						RefPtr<IntVal> val = nullptr;
+						for (auto& c : system->constraints)
+						{
+							if (c.decl != valueVar->declRef.GetDecl())
+								continue;
+
+							auto cVal = c.val.As<IntVal>();
+							assert(cVal.Ptr());
+
+							if (!val)
+							{
+								val = cVal;
+							}
+							else
+							{
+								if (val->value != cVal->value)
+								{
+									// failure!
+									return nullptr;
+								}
+							}
+
+							c.satisfied = true;
+						}
+
+						if (!val)
+						{
+							// failure!
+							return nullptr;
+						}
+						solvedArgs.Add(val);
+					}
+					else
+					{
+						// ignore anything that isn't a generic parameter
+					}
+				}
+
+				// Make sure we haven't constructed any spurious constraints
+				// that we aren't able to satisfy:
+				for (auto c : system->constraints)
+				{
+					if (!c.satisfied)
+					{
+						return nullptr;
+					}
+				}
+
+				RefPtr<Substitutions> newSubst = new Substitutions();
+				newSubst->genericDecl = varSubst->genericDecl;
+				newSubst->outer = varSubst->outer;
+				newSubst->args = solvedArgs;
+				return newSubst;
+			}
+
 
 			//
 
@@ -2428,6 +2588,9 @@ namespace Spire
 
 				// The type of the result expression if this candidate is selected
 				RefPtr<ExpressionType>	resultType;
+
+				// A system for tracking constraints introduced on generic parameters
+				ConstraintSystem constraintSystem;
 			};
 
 
@@ -2527,24 +2690,65 @@ namespace Spire
 				return true;
 			}
 
+			// Try to solve for the values of any generic parameters,
+			// in the case where we are applying a generic with implicit parameters
+			bool TrySolveOverloadGenericConstraints(
+				OverloadResolveContext&		context,
+				OverloadCandidate&			candidate)
+			{
+				// If the declaration isn't generic, then there is nothing to solve
+				auto declRef = candidate.item.declRef;
+				if (!declRef.GetParent().As<GenericDeclRef>())
+					return true;
+
+				// Note(tfoley): We aren't currently tracking whether generic arguments
+				// were provided explicitly or implicitly, so we just guess here:
+				// if there were any constraints generated, then it must be implicit.
+				//
+				// TODO: do this right.
+
+				if (!candidate.constraintSystem.constraints.Count())
+					return true;
+
+				auto subst = candidate.item.declRef.substitutions;
+
+				auto newSubst = TrySolveConstraintSystem(&candidate.constraintSystem, subst);
+
+				if (!newSubst)
+					return false;
+
+				// We apply the actual substitutions here
+				candidate.item.declRef.substitutions = newSubst;
+				return true;
+			}
+
 			// Try to check an overload candidate, but bail out
 			// if any step fails
 			void TryCheckOverloadCandidate(
 				OverloadResolveContext&		context,
 				OverloadCandidate&			candidate)
 			{
+				PushConstraintSystem(&candidate.constraintSystem);
+
 				if (!TryCheckOverloadCandidateArity(context, candidate))
-					return;
+					goto done;
 
 				candidate.status = OverloadCandidate::Status::ArityChecked;
 				if (!TryCheckOverloadCandidateTypes(context, candidate))
-					return;
+					goto done;
+
+				if (!TrySolveOverloadGenericConstraints(context, candidate))
+					goto done;
+
 
 				candidate.status = OverloadCandidate::Status::TypeChecked;
 				if (!TryCheckOverloadCandidateDirections(context, candidate))
-					return;
+					goto done;
 
 				candidate.status = OverloadCandidate::Status::Appicable;
+
+			done:
+				PopConstraintSystem(&candidate.constraintSystem);
 			}
 
 			// Take an overload candidate that previously got through
@@ -2560,18 +2764,23 @@ namespace Spire
 				context.mode = OverloadResolveContext::Mode::ForReal;
 				context.appExpr->Type = ExpressionType::Error;
 
+				PushConstraintSystem(&candidate.constraintSystem);
+
 				if (!TryCheckOverloadCandidateArity(context, candidate))
-					return context.appExpr;
+					goto done;
 
 				if (!TryCheckOverloadCandidateTypes(context, candidate))
-					return context.appExpr;
+					goto done;
 
 				if (!TryCheckOverloadCandidateDirections(context, candidate))
-					return context.appExpr;
+					goto done;
 
 				context.appExpr->FunctionExpr = ConstructLookupResultExpr(
 					candidate.item, context.baseExpr, context.appExpr->FunctionExpr);
 				context.appExpr->Type = candidate.resultType;
+
+			done:
+				PopConstraintSystem(&candidate.constraintSystem);
 				return context.appExpr;
 			}
 
@@ -2696,19 +2905,38 @@ namespace Spire
 				return parentGeneric;
 			}
 
-			struct Constraint
-			{
-				Decl*		decl; // the declaration of the thing being constraints
-				RefPtr<Val>	val; // the value to which we are constraining it
-				bool satisfied = false; // Has this constraint been met?
-			};
 
-			// A collection of constraints that will need to be satisified (solved)
-			// in order for checking to suceed.
-			struct ConstraintSystem
+			// Record the fact that a type coercion occured, so we can solve
+			// for it in our constraint system.
+			//
+			// Note: for right now we only store type equality constraints,
+			// so we can't solve for a type variable that needs to be implicitly
+			// convertible from two different types.
+			void RegisterCoercionConstraint(
+				RefPtr<ExpressionType>			toType,
+				RefPtr<ExpressionType>			fromType)
 			{
-				List<Constraint> constraints;
-			};
+				assert(this->currentConstraintSystem);
+
+				if (auto toConstraintVar = toType->As<ConstraintVarType>())
+				{
+					Constraint constraint;
+
+					// TODO(tfoley): should these be `DeclRef`s?
+					constraint.decl = toConstraintVar->declRef.GetDecl(); 
+					constraint.val = fromType;
+					currentConstraintSystem->constraints.Add(constraint);
+				}
+
+				if (auto fromConstraintVar = fromType->As<ConstraintVarType>())
+				{
+					// Note: mirrors the above case
+					Constraint constraint;
+					constraint.decl = fromConstraintVar->declRef.GetDecl(); 
+					constraint.val = toType;
+					currentConstraintSystem->constraints.Add(constraint);
+				}
+			}
 
 			// Try to find a unification for two values
 			bool TryUnifyVals(
@@ -2997,6 +3225,34 @@ namespace Spire
 				}
 			}
 
+			// Given a generic declaration, create constraint-solver variables
+			// for its parameters, and then substitute those into the inner declaration.
+			DeclRef CreateGenericConstraintSolverVariables(GenericDeclRef genericDeclRef)
+			{
+				RefPtr<Substitutions> subst = new Substitutions();
+				subst->genericDecl = genericDeclRef.GetDecl();
+				subst->outer = genericDeclRef.substitutions;
+
+				for (auto m : genericDeclRef.GetMembers())
+				{
+					if (auto genericTypeParam = m.As<GenericTypeParamDeclRef>())
+					{
+						auto typeVar = new ConstraintVarType(genericTypeParam);
+						subst->args.Add(typeVar);
+					}
+					else if (auto genericValParam = m.As<GenericValueParamDeclRef>())
+					{
+						// TODO(tfoley): support things other than integers?
+						auto valVar = new ConstraintVarInt(genericValParam);
+						subst->args.Add(valVar);
+					}
+				}
+
+				return DeclRef(genericDeclRef.GetInner(), subst);
+			}
+
+
+
 			void AddAggTypeOverloadCandidates(
 				LookupResultItem		typeItem,
 				RefPtr<ExpressionType>	type,
@@ -3022,6 +3278,20 @@ namespace Spire
 
 						// now work through this candidate...
 						AddCtorOverloadCandidate(typeItem, type, ctorDeclRef, context);
+					}
+
+					// Also check for generic constructors
+					for (auto genericDeclRef : extDeclRef.GetMembersOfType<GenericDeclRef>())
+					{
+						if (auto ctorDecl = genericDeclRef.GetDecl()->inner.As<ConstructorDecl>())
+						{
+							DeclRef innerRef = CreateGenericConstraintSolverVariables(genericDeclRef);
+							ConstructorDeclRef innerCtorRef = innerRef.As<ConstructorDeclRef>();
+
+							AddCtorOverloadCandidate(typeItem, type, innerCtorRef, context);
+
+							// TODO(tfoley): need a way to do the solving step for the constraint system
+						}
 					}
 				}
 			}

@@ -392,6 +392,13 @@ namespace Spire
 					sb << ");\n";
 				}
 
+				// initialize from another vector of the same size
+				//
+				// TODO(tfoley): this overlaps with implicit conversions.
+				// We should look for a way that we can define implicit
+				// conversions directly in the stdlib instead...
+				sb << "__generic<U> __init(vector<U," << N << ">);\n";
+
 				sb << "}\n";
 			}
 

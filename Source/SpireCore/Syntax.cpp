@@ -1543,5 +1543,31 @@ namespace Spire
 				return value == intVal->value;
 			return false;
 		}
+
+		// ConstraintVarType
+
+		String ConstraintVarType::ToString() const
+		{
+			// TODO: need a better answer than this, since we might have
+			// multiple constraint variables all referring to the same declaration
+			return GetDeclRef().GetName();
+		}
+
+		bool ConstraintVarType::EqualsImpl(const ExpressionType * type) const
+		{
+			return this == type->GetCanonicalType();
+		}
+
+		ExpressionType* ConstraintVarType::CreateCanonicalType()
+		{
+			return this;
+		}
+
+		// ConstraintVarInt
+
+		bool ConstraintVarInt::EqualsVal(Val* val)
+		{
+			return this == val;
+		}
 	}
 }
