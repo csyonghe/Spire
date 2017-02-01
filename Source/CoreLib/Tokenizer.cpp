@@ -615,9 +615,14 @@ namespace CoreLib
 					pos++;
 					break;
 				case State::SingleComment:
-					if (curChar == '\n')
+					if(curChar == '\r' || curChar == '\n')
+					{
 						state = State::Start;
-					pos++;
+					}
+					else
+					{
+						pos++;
+					}
 					break;
 				case State::MultiComment:
 					if (curChar == '*' && nextChar == '/')
