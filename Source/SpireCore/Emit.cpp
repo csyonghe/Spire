@@ -675,6 +675,8 @@ static void EmitVarDecl(EmitContext* context, RefPtr<VarDeclBase> decl)
 
 	EmitType(context, decl->Type, decl->Name.Content);
 
+    EmitSemantics(context, decl);
+
 	if (auto initExpr = decl->Expr)
 	{
 		Emit(context, " = ");

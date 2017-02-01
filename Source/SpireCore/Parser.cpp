@@ -921,6 +921,8 @@ namespace Spire
                 decl->Name = declaratorInfo.nameToken;
                 decl->Type = TypeExp(declaratorInfo.typeSpec);
 
+				ParseOptSemantics(parser, decl.Ptr());
+
                 if (AdvanceIf(parser, TokenType::OpAssign))
                 {
                     decl->Expr = parser->ParseExpression();
