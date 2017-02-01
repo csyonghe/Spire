@@ -618,11 +618,9 @@ namespace CoreLib
 					if(curChar == '\r' || curChar == '\n')
 					{
 						state = State::Start;
+						tokenFlags |= TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace;
 					}
-					else
-					{
-						pos++;
-					}
+					pos++;
 					break;
 				case State::MultiComment:
 					if (curChar == '*' && nextChar == '/')
