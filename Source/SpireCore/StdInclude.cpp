@@ -422,11 +422,12 @@ namespace Spire
 			static const struct {
 				char const*			name;
 				TextureType::Shape	baseShape;
+				int					coordCount;
 			} kBaseTextureTypes[] = {
-				{ "Texture1D",				TextureType::Shape1D },
-				{ "Texture2D",				TextureType::Shape2D },
-				{ "Texture3D",				TextureType::Shape3D },
-				{ "TextureCube",			TextureType::ShapeCube },
+				{ "Texture1D",		TextureType::Shape1D,	1 },
+				{ "Texture2D",		TextureType::Shape2D,	2 },
+				{ "Texture3D",		TextureType::Shape3D,	3 },
+				{ "TextureCube",	TextureType::ShapeCube,	3 },
 			};
 			static const int kBaseTextureTypeCount = sizeof(kBaseTextureTypes) / sizeof(kBaseTextureTypes[0]);
 			for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
@@ -461,6 +462,19 @@ namespace Spire
 
 						// TODO(tfoley): properly list operations and their signatures
 						sb << "T Load(int3 u);\n";
+
+						if( !isMultisample )
+						{
+							sb << "T Sample(SamplerState s, ";
+							sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location);\n";
+
+							if( baseShape != TextureType::ShapeCube )
+							{
+								sb << "T Sample(SamplerState s, ";
+								sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
+								sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
+							}
+						}
 
 						sb << "\n};\n";
 					}

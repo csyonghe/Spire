@@ -3466,6 +3466,10 @@ namespace Spire
 				{
 					context.baseExpr = funcMemberExpr->BaseExpression;
 				}
+				else if(auto funcOverloadExpr = funcExpr.As<OverloadedExpr>())
+				{
+					context.baseExpr = funcOverloadExpr->base;
+				}
 				AddOverloadCandidates(funcExpr, context);
 
 				if (context.bestCandidates.Count() > 0)
@@ -4020,6 +4024,7 @@ namespace Spire
 					if (lookupResult.isOverloaded())
 					{
 						auto overloadedExpr = new OverloadedExpr();
+						overloadedExpr->Position = expr->Position;
 						overloadedExpr->Type = ExpressionType::Overloaded;
 						overloadedExpr->lookupResult2 = lookupResult;
 						return overloadedExpr;
@@ -4336,6 +4341,7 @@ namespace Spire
 						{
 							auto overloadedExpr = new OverloadedExpr();
 							overloadedExpr->Position = expr->Position;
+							overloadedExpr->Type = ExpressionType::Overloaded;
 							overloadedExpr->base = expr->BaseExpression;
 							overloadedExpr->lookupResult2 = lookupResult;
 							return overloadedExpr;
