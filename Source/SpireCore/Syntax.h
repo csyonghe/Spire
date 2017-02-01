@@ -1145,6 +1145,10 @@ namespace Spire
 			explicit TypeExp(RefPtr<ExpressionSyntaxNode> exp)
 				: exp(exp)
 			{}
+			TypeExp(RefPtr<ExpressionSyntaxNode> exp, RefPtr<ExpressionType> type)
+				: exp(exp)
+				, type(type)
+			{}
 
 			RefPtr<ExpressionSyntaxNode> exp;
 			RefPtr<ExpressionType> type;

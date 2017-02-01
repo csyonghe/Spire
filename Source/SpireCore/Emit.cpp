@@ -167,6 +167,24 @@ static void EmitBinExpr(EmitContext* context, int outerPrec, int prec, char cons
 	}
 }
 
+static void EmitUnaryExpr(
+	EmitContext* context,
+	int outerPrec,
+	int prec,
+	char const* preOp,
+	char const* postOp,
+	RefPtr<UnaryExpressionSyntaxNode> binExpr)
+{
+	bool needsClose = MaybeEmitParens(context, outerPrec, prec);
+	Emit(context, preOp);
+	EmitExprWithPrecedence(context, binExpr->Expression, prec);
+	Emit(context, postOp);
+	if (needsClose)
+	{
+		Emit(context, ")");
+	}
+}
+
 static void EmitExprWithPrecedence(EmitContext* context, RefPtr<ExpressionSyntaxNode> expr, int outerPrec)
 {
 	bool needClose = false;
@@ -241,6 +259,15 @@ static void EmitExprWithPrecedence(EmitContext* context, RefPtr<ExpressionSyntax
 			Emit(context, kComponentNames[swizExpr->elementIndices[ee]]);
 		}
 	}
+	else if (auto indexExpr = expr.As<IndexExpressionSyntaxNode>())
+	{
+		needClose = MaybeEmitParens(context, outerPrec, kPrecedence_Postifx);
+
+		EmitExprWithPrecedence(context, indexExpr->BaseExpression, kPrecedence_Postifx);
+		Emit(context, "[");
+		EmitExpr(context, indexExpr->IndexExpression);
+		Emit(context, "]");
+	}
 	else if (auto varExpr = expr.As<VarExpressionSyntaxNode>())
 	{
 		needClose = MaybeEmitParens(context, outerPrec, kPrecedence_Atomic);
@@ -274,8 +301,6 @@ static void EmitExprWithPrecedence(EmitContext* context, RefPtr<ExpressionSyntax
 	}
 	else if (auto binExpr = expr.As<BinaryExpressionSyntaxNode>())
 	{
-		// TODO(tfoley): Need to deal with operator precedence
-
 		switch (binExpr->Operator)
 		{
 #define CASE(NAME, OP) case Operator::NAME: EmitBinExpr(context, outerPrec, kPrecedence_##NAME, #OP, binExpr); break
@@ -314,6 +339,27 @@ static void EmitExprWithPrecedence(EmitContext* context, RefPtr<ExpressionSyntax
 			break;
 		}
 	}
+	else if (auto unaryExpr = expr.As<UnaryExpressionSyntaxNode>())
+	{
+		switch (unaryExpr->Operator)
+		{
+#define PREFIX(NAME, OP) case Operator::NAME: EmitUnaryExpr(context, outerPrec, kPrecedence_Prefix, #OP, "", unaryExpr); break
+#define POSTFIX(NAME, OP) case Operator::NAME: EmitUnaryExpr(context, outerPrec, kPrecedence_Postfix, "", #OP, unaryExpr); break
+
+		PREFIX(Neg, -);
+		PREFIX(Not, ~);
+		PREFIX(BitNot, ~);
+		PREFIX(PreInc, ++);
+		PREFIX(PreDec, --);
+		PREFIX(PostInc, ++);
+		PREFIX(PostDec, --);
+#undef PREFIX
+#undef POSTFIX
+		default:
+			assert(!"unreachable");
+			break;
+		}
+	}
 	else if (auto castExpr = expr.As<TypeCastExpressionSyntaxNode>())
 	{
 		needClose = MaybeEmitParens(context, outerPrec, kPrecedence_Prefix);
@@ -338,15 +384,19 @@ static void EmitExprWithPrecedence(EmitContext* context, RefPtr<ExpressionSyntax
 // represents a declarator for use in emitting types
 struct EDeclarator
 {
-	enum class Kind
+	enum class Flavor
 	{
 		Name,
+		Array,
 	};
-	Kind kind;
+	Flavor flavor;
 	EDeclarator* next = nullptr;
 
-	// Used for `Kind::Name`
+	// Used for `Flavor::Name`
 	String name;
+
+	// Used for `Flavor::Array`
+	int elementCount;
 };
 
 static void EmitDeclarator(EmitContext* context, EDeclarator* declarator)
@@ -355,10 +405,20 @@ static void EmitDeclarator(EmitContext* context, EDeclarator* declarator)
 
 	Emit(context, " ");
 
-	switch (declarator->kind)
+	switch (declarator->flavor)
 	{
-	case EDeclarator::Kind::Name:
+	case EDeclarator::Flavor::Name:
 		Emit(context, declarator->name);
+		break;
+
+	case EDeclarator::Flavor::Array:
+		EmitDeclarator(context, declarator->next);
+		Emit(context, "[");
+		if(auto elementCount = declarator->elementCount)
+		{
+			Emit(context, elementCount);
+		}
+		Emit(context, "]");
 		break;
 
 	default:
@@ -462,6 +522,16 @@ static void EmitType(EmitContext* context, RefPtr<ExpressionType> type, EDeclara
 		EmitDeclarator(context, declarator);
 		return;
 	}
+	else if( auto arrayType = type->As<ArrayExpressionType>() )
+	{
+		EDeclarator arrayDeclarator;
+		arrayDeclarator.next = declarator;
+		arrayDeclarator.flavor = EDeclarator::Flavor::Array;
+		arrayDeclarator.elementCount = arrayType->ArrayLength;
+
+		EmitType(context, arrayType->BaseType, &arrayDeclarator);
+		return;
+	}
 
 	throw "unimplemented";
 }
@@ -469,7 +539,7 @@ static void EmitType(EmitContext* context, RefPtr<ExpressionType> type, EDeclara
 static void EmitType(EmitContext* context, RefPtr<ExpressionType> type, String const& name)
 {
 	EDeclarator nameDeclarator;
-	nameDeclarator.kind = EDeclarator::Kind::Name;
+	nameDeclarator.flavor = EDeclarator::Flavor::Name;
 	nameDeclarator.name = name;
 	EmitType(context, type, &nameDeclarator);
 }
@@ -481,13 +551,22 @@ static void EmitType(EmitContext* context, RefPtr<ExpressionType> type)
 
 // Statements
 
-static void EmitBlockStmt(EmitContext* context, RefPtr<BlockStatementSyntaxNode> stmt)
+// Emit a statement as a `{}`-enclosed block statement, but avoid adding redundant
+// curly braces if the statement is itself a block statement.
+static void EmitBlockStmt(EmitContext* context, RefPtr<StatementSyntaxNode> stmt)
 {
 	// TODO(tfoley): support indenting
 	Emit(context, "{\n");
-	for (auto s : stmt->Statements)
+	if( auto blockStmt = stmt.As<BlockStatementSyntaxNode>() )
 	{
-		EmitStmt(context, s);
+		for (auto s : blockStmt->Statements)
+		{
+			EmitStmt(context, s);
+		}
+	}
+	else
+	{
+		EmitStmt(context, stmt);
 	}
 	Emit(context, "}\n");
 }
@@ -519,6 +598,19 @@ static void EmitStmt(EmitContext* context, RefPtr<StatementSyntaxNode> stmt)
 	else if (auto declStmt = stmt.As<VarDeclrStatementSyntaxNode>())
 	{
 		EmitDecl(context, declStmt->decl);
+		return;
+	}
+	else if (auto ifStmt = stmt.As<IfStatementSyntaxNode>())
+	{
+		Emit(context, "if(");
+		EmitExpr(context, ifStmt->Predicate);
+		Emit(context, ")\n");
+		EmitBlockStmt(context, ifStmt->PositiveStatement);
+		if(auto elseStmt = ifStmt->NegativeStatement)
+		{
+			Emit(context, "\nelse\n");
+			EmitBlockStmt(context, elseStmt);
+		}
 		return;
 	}
 

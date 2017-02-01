@@ -183,9 +183,6 @@ namespace Spire
 				return derefExpr;
 			}
 
-// TODO(tfoley): move this somewhere central
-#define SPIRE_UNREACHABLE(msg) do { assert(!"ureachable code:" msg); exit(1); } while(0)
-
 			RefPtr<ExpressionSyntaxNode> ConstructLookupResultExpr(
 				LookupResultItem const&			item,
 				RefPtr<ExpressionSyntaxNode>	baseExpr,
@@ -1911,7 +1908,7 @@ namespace Spire
 						elementCount = CheckIntegerConstantExpression(expr->IndexExpression.Ptr());
 					}
 
-					auto elementType = baseTypeType->type;
+					auto elementType = CoerceToUsableType(TypeExp(expr->BaseExpression, baseTypeType->type));
 					auto arrayType = new ArrayExpressionType();
 					arrayType->BaseType = elementType;
 					arrayType->ArrayLength = elementCount;

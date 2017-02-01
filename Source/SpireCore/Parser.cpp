@@ -740,6 +740,47 @@ namespace Spire
             return name;
         }
 
+		// A "declarator" as used in C-style languages
+		struct Declarator : RefObject
+		{
+			// Different cases of declarator appear as "flavors" here
+			enum class Flavor
+			{
+				Name,
+				Pointer,
+				Array,
+			};
+			Flavor flavor;
+		};
+
+		// The most common case of declarator uses a simple name
+		struct NameDeclarator : Declarator
+		{
+			Token nameToken;
+		};
+
+		// A declarator that declares a pointer type
+		struct PointerDeclarator : Declarator
+		{
+			// location of the `*` token
+			CodePosition starLoc;
+
+			RefPtr<Declarator>				inner;
+		};
+
+		// A declarator that declares an array type
+		struct ArrayDeclarator : Declarator
+		{
+			RefPtr<Declarator>				inner;
+
+			// location of the `[` token
+			CodePosition openBracketLoc;
+
+			// The expression that yields the element count, or NULL
+			RefPtr<ExpressionSyntaxNode>	elementCountExpr;
+		};
+
+		// "Unwrapped" information about a declarator
         struct DeclaratorInfo
         {
             RefPtr<RateSyntaxNode>			rate;
@@ -933,6 +974,126 @@ namespace Spire
             }
         }
 
+		static RefPtr<Declarator> ParseSimpleDeclarator(
+			Parser* parser)
+		{
+			switch( parser->tokenReader.PeekTokenType() )
+			{
+			case TokenType::Identifier:
+				{
+					auto nameDeclarator = new NameDeclarator();
+					nameDeclarator->flavor = Declarator::Flavor::Name;
+					nameDeclarator->nameToken = ParseDeclName(parser);
+					return nameDeclarator;
+				}
+				break;
+
+			default:
+				// an empty declarator is allowed
+				return nullptr;
+			}
+		}
+
+		static RefPtr<Declarator> ParsePointerDeclarator(
+			Parser* parser)
+		{
+			if( parser->tokenReader.PeekTokenType() == TokenType::OpMul )
+			{
+				auto ptrDeclarator = new PointerDeclarator();
+				ptrDeclarator->starLoc = parser->tokenReader.PeekLoc();
+				ptrDeclarator->flavor = Declarator::Flavor::Pointer;
+
+				parser->ReadToken(TokenType::OpMul);
+				ptrDeclarator->inner = ParsePointerDeclarator(parser);
+				return ptrDeclarator;
+			}
+			else
+			{
+				return ParseSimpleDeclarator(parser);
+			}
+		}
+
+		static RefPtr<Declarator> ParseArrayDeclarator(
+			Parser* parser)
+		{
+			RefPtr<Declarator> declarator = ParseSimpleDeclarator(parser);
+			while(parser->tokenReader.PeekTokenType() == TokenType::LBracket)
+			{
+
+				auto arrayDeclarator = new ArrayDeclarator();
+				arrayDeclarator->openBracketLoc = parser->tokenReader.PeekLoc();
+				arrayDeclarator->flavor = Declarator::Flavor::Array;
+				arrayDeclarator->inner = declarator;
+
+				parser->ReadToken(TokenType::LBracket);
+				if( parser->tokenReader.PeekTokenType() != TokenType::RBracket )
+				{
+					arrayDeclarator->elementCountExpr = parser->ParseExpression();
+				}
+				parser->ReadToken(TokenType::RBracket);
+
+				declarator = arrayDeclarator;
+			}
+			return declarator;
+		}
+
+		// Parse a declarator (or at least as much of one as we support)
+		static RefPtr<Declarator> ParseDeclarator(
+			Parser* parser)
+		{
+			return ParseArrayDeclarator(parser);
+		}
+
+		static void UnwrapDeclarator(
+			RefPtr<Declarator>	declarator,
+			DeclaratorInfo*		ioInfo)
+		{
+			while( declarator )
+			{
+				switch(declarator->flavor)
+				{
+				case Declarator::Flavor::Name:
+					{
+						auto nameDeclarator = (NameDeclarator*) declarator.Ptr();
+						ioInfo->nameToken = nameDeclarator->nameToken;
+						return;
+					}
+					break;
+
+				case Declarator::Flavor::Pointer:
+					{
+						auto ptrDeclarator = (PointerDeclarator*) declarator.Ptr();
+
+						// TODO(tfoley): we don't support pointers for now
+						// ioInfo->typeSpec = new PointerTypeExpr(ioInfo->typeSpec);
+
+						declarator = ptrDeclarator->inner;
+					}
+					break;
+
+				case Declarator::Flavor::Array:
+					{
+						// TODO(tfoley): we don't support pointers for now
+						auto arrayDeclarator = (ArrayDeclarator*) declarator.Ptr();
+
+						auto arrayTypeExpr = new IndexExpressionSyntaxNode();
+						arrayTypeExpr->Position = arrayDeclarator->openBracketLoc;
+						arrayTypeExpr->BaseExpression = ioInfo->typeSpec;
+						arrayTypeExpr->IndexExpression = arrayDeclarator->elementCountExpr;
+						ioInfo->typeSpec = arrayTypeExpr;
+
+						declarator = arrayDeclarator->inner;
+					}
+					break;
+
+				default:
+					SPIRE_UNREACHABLE("all cases handled");
+					break;
+				}
+			}
+		}
+
+
         static RefPtr<Decl> ParseDeclaratorDecl(
             Parser*         parser,
             ContainerDecl*  containerDecl)
@@ -948,11 +1109,15 @@ namespace Spire
                 declaratorInfo.rate = parser->ParseRate();
             }
             declaratorInfo.typeSpec = parser->ParseType();
-            declaratorInfo.nameToken = ParseDeclName(parser);
 
-            // TODO(tfoley): handle array-ness here...
 
-            // Look at the token after the name to disambiguate
+			RefPtr<Declarator> declarator = ParseDeclarator(parser);
+			UnwrapDeclarator(declarator, &declaratorInfo);
+
+            // Look at the token after the declarator to disambiguate
+			//
+			// Note(tfoley): the correct approach would be to parse function parameters
+			// as part of a function declarator, and then disambiguate on that result.
             switch (parser->tokenReader.PeekTokenType())
             {
             case TokenType::LParent:

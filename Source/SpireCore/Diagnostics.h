@@ -221,11 +221,16 @@ namespace Spire
     (sink)->diagnose(Spire::Compiler::CodePosition(__LINE__, 0, 0, __FILE__), Spire::Compiler::Diagnostics::internalCompilerError)
 #define SPIRE_UNIMPLEMENTED(sink, pos, what) \
     (sink)->diagnose(Spire::Compiler::CodePosition(__LINE__, 0, 0, __FILE__), Spire::Compiler::Diagnostics::unimplemented, what)
+
+#define SPIRE_UNREACHABLE(msg) do { assert(!"ureachable code:" msg); exit(1); } while(0)
 #else
 #define SPIRE_INTERNAL_ERROR(sink, pos) \
     (sink)->diagnose(pos, Spire::Compiler::Diagnostics::internalCompilerError)
 #define SPIRE_UNIMPLEMENTED(sink, pos, what) \
     (sink)->diagnose(pos, Spire::Compiler::Diagnostics::unimplemented, what)
+
+// TODO: find something that will perform better
+#define SPIRE_UNREACHABLE(msg) exit(1)
 #endif
 
 #endif
