@@ -122,6 +122,22 @@ int wmain(int argc, wchar_t* argv[])
 						options.PreprocessorDefinitions[String::FromWString(defineStr)] = String();
 					}
 				}
+				else if (argStr[1] == 'I')
+				{
+					// The value to be defined might be part of the same option, as in:
+					//     -IFOO
+					// or it might come separately, as in:
+					//     -I FOO
+					// (see handling of `-D` above)
+					wchar_t const* includeDirStr = arg + 2;
+					if (includeDirStr[0] == 0)
+					{
+						// Need to read another argument from the command line
+						includeDirStr = tryReadCommandLineArgumentRaw(arg, &argCursor, argEnd);
+					}
+
+					options.SearchDirectories.Add(String::FromWString(includeDirStr));
+				}
 				else if (argStr == "--")
 				{
 					// The `--` option causes us to stop trying to parse options,
