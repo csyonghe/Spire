@@ -1569,5 +1569,39 @@ namespace Spire
 		{
 			return this == val;
 		}
+
+		// SwitchStmt
+
+
+		RefPtr<SyntaxNode> SwitchStmt::Accept(SyntaxVisitor * visitor)
+		{
+			throw "unimplemented";
+		}
+
+		SwitchStmt * SwitchStmt::Clone(CloneContext & ctx)
+		{
+			throw "unimplemented";
+		}
+
+		RefPtr<SyntaxNode> CaseStmt::Accept(SyntaxVisitor * visitor)
+		{
+			throw "unimplemented";
+		}
+
+		CaseStmt * CaseStmt::Clone(CloneContext & ctx)
+		{
+			throw "unimplemented";
+		}
+
+		RefPtr<SyntaxNode> DefaultStmt::Accept(SyntaxVisitor * visitor)
+		{
+			throw "unimplemented";
+		}
+
+		DefaultStmt * DefaultStmt::Clone(CloneContext & ctx)
+		{
+			throw "unimplemented";
+		}
+
 	}
 }

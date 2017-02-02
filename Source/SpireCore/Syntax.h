@@ -2007,6 +2007,47 @@ namespace Spire
 			virtual IfStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
+		class SwitchStmt : public StatementSyntaxNode
+		{
+		public:
+			RefPtr<ExpressionSyntaxNode> condition;
+			RefPtr<BlockStatementSyntaxNode> body;
+
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual SwitchStmt * Clone(CloneContext & ctx) override;
+		};
+
+		// a `case` or `default` statement inside a `switch`
+		//
+		// Note(tfoley): A correct AST for a C-like language would treat
+		// these as a labelled statement, and so they would contain a
+		// sub-statement. I'm leaving that out for now for simplicity.
+		class CaseStmtBase : public StatementSyntaxNode
+		{
+		public:
+		};
+
+		// a `case` statement inside a `switch`
+		class CaseStmt : public CaseStmtBase
+		{
+		public:
+			RefPtr<ExpressionSyntaxNode> expr;
+
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual CaseStmt * Clone(CloneContext & ctx) override;
+		};
+
+		// a `default` statement inside a `switch`
+		class DefaultStmt : public CaseStmtBase
+		{
+		public:
+			RefPtr<ExpressionSyntaxNode> expr;
+
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual DefaultStmt * Clone(CloneContext & ctx) override;
+		};
+
+
 		class ForStatementSyntaxNode : public ScopeStmt
 		{
 		public:

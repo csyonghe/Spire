@@ -1880,6 +1880,36 @@ namespace Spire
 			return rs;
 		}
 
+		static RefPtr<StatementSyntaxNode> ParseSwitchStmt(Parser* parser)
+		{
+			RefPtr<SwitchStmt> stmt = new SwitchStmt();
+			parser->FillPosition(stmt.Ptr());
+			parser->ReadToken("switch");
+			parser->ReadToken(TokenType::LParent);
+			stmt->condition = parser->ParseExpression();
+			parser->ReadToken(TokenType::RParent);
+			stmt->body = parser->ParseBlockStatement();
+			return stmt;
+		}
+
+		static RefPtr<StatementSyntaxNode> ParseCaseStmt(Parser* parser)
+		{
+			RefPtr<CaseStmt> stmt = new CaseStmt();
+			parser->FillPosition(stmt.Ptr());
+			parser->ReadToken("case");
+			stmt->expr = parser->ParseExpression();
+			parser->ReadToken(TokenType::Colon);
+			return stmt;
+		}
+
+		static RefPtr<StatementSyntaxNode> ParseDefaultStmt(Parser* parser)
+		{
+			RefPtr<DefaultStmt> stmt = new DefaultStmt();
+			parser->FillPosition(stmt.Ptr());
+			parser->ReadToken("default");
+			parser->ReadToken(TokenType::Colon);
+			return stmt;
+		}
 
 		RefPtr<StatementSyntaxNode> Parser::ParseStatement()
 		{
@@ -1911,6 +1941,12 @@ namespace Spire
 				ReadToken("discard");
 				ReadToken(TokenType::Semicolon);
 			}
+			else if (LookAheadToken("switch"))
+				statement = ParseSwitchStmt(this);
+			else if (LookAheadToken("case"))
+				statement = ParseCaseStmt(this);
+			else if (LookAheadToken("default"))
+				statement = ParseDefaultStmt(this);
 			else if (LookAheadToken(TokenType::Identifier))
 			{
 				Token* startPos = tokenReader.mCursor;
