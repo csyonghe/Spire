@@ -2096,6 +2096,9 @@ namespace Spire
 
 		RefPtr<ParameterSyntaxNode> Parser::ParseParameter()
 		{
+			// TODO(tfoley): This really ought to just use the same
+			// logic as other variable-parsing code...
+
 			RefPtr<ParameterSyntaxNode> parameter = new ParameterSyntaxNode();
             parameter->modifiers = ParseModifiers(this);
 			parameter->Type = ParseTypeExp();
@@ -2108,6 +2111,10 @@ namespace Spire
 				parameter->Name.Content = "_anonymousParam" + String(anonymousParamCounter++);
 			FillPosition(parameter.Ptr());
 			ParseOptSemantics(this, parameter.Ptr());
+			if (AdvanceIf(this, TokenType::OpAssign))
+			{
+				parameter->Expr = ParseExpression();
+			}
 			return parameter;
 		}
 
