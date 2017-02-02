@@ -1302,6 +1302,18 @@ static void HandleElseDirective(PreprocessorDirectiveContext* context)
 // Handle a `#elif` directive
 static void HandleElifDirective(PreprocessorDirectiveContext* context)
 {
+	// HACK(tfoley): handle an empty `elif` like an `else` directive
+	//
+	// This is the behavior expected by at least one input program.
+	// We will eventually want to be pedantic about this.
+	// even if t
+	if (PeekRawTokenType(context) == TokenType::EndOfFile)
+	{
+		GetSink(context)->diagnose(GetDirectiveLoc(context), Diagnostics::directiveExpectsExpression, GetDirectiveName(context));
+		HandleElseDirective(context);
+		return;
+	}
+
     PreprocessorExpressionValue value = ParseAndEvaluateExpression(context);
 
     PreprocessorInputStream* inputStream = context->preprocessor->inputStream;

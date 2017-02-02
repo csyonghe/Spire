@@ -63,6 +63,7 @@ DIAGNOSTIC(10001, Error, illegalCharacterLiteral, "Illegal character literial.")
 DIAGNOSTIC(15000, Error, endOfFileInPreprocessorConditional, "end of file encountered during preprocessor conditional")
 DIAGNOSTIC(15001, Error, directiveWithoutIf, "'$0' directive without '#if'")
 DIAGNOSTIC(15002, Error, directiveAfterElse , "'$0' directive without '#if'")
+
 DIAGNOSTIC(-1, Note, seeDirective, "see '$0' directive")
 
 // 151xx - directive parsing
@@ -78,6 +79,8 @@ DIAGNOSTIC(15200, Error, expectedTokenInPreprocessorExpression, "expected '$0' i
 DIAGNOSTIC(15201, Error, syntaxErrorInPreprocessorExpression, "syntax error in preprocessor expression");
 DIAGNOSTIC(15202, Error, divideByZeroInPreprocessorExpression, "division by zero in preprocessor expression");
 DIAGNOSTIC(15203, Error, expectedTokenInDefinedExpression, "expected '$0' in 'defined' expression");
+DIAGNOSTIC(15204, Warning, directiveExpectsExpression, "'$0' directive requires an expression");
+
 DIAGNOSTIC(-1, Note, seeOpeningToken, "see opening '$0'")
 
 // 153xx - #include
