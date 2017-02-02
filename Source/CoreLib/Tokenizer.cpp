@@ -410,6 +410,24 @@ namespace CoreLib
 						pos += 2;
 						state = State::MultiComment;
 					}
+					else if (curChar == '.')
+					{
+						if (IsDigit(nextChar))
+						{
+							state = State::Int;
+							tokenLine = line;
+							tokenCol = col;
+						}
+						else
+						{
+							state = State::Operator;
+							tokenLine = line;
+							tokenCol = col;
+
+							tokenBuilder.Append(curChar);
+							pos++;
+						}
+					}
 					else if (IsPunctuation(curChar))
 					{
 						state = State::Operator;
