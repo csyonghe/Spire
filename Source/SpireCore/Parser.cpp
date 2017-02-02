@@ -124,7 +124,7 @@ namespace Spire
 			RefPtr<StructSyntaxNode>					ParseStruct();
 			RefPtr<StatementSyntaxNode>					ParseStatement();
 			RefPtr<BlockStatementSyntaxNode>			ParseBlockStatement();
-			RefPtr<VarDeclrStatementSyntaxNode>			ParseVarDeclrStatement();
+			RefPtr<VarDeclrStatementSyntaxNode>			ParseVarDeclrStatement(Modifiers modifiers);
 			RefPtr<IfStatementSyntaxNode>				ParseIfStatement();
 			RefPtr<ForStatementSyntaxNode>				ParseForStatement();
 			RefPtr<WhileStatementSyntaxNode>			ParseWhileStatement();
@@ -1913,11 +1913,13 @@ namespace Spire
 
 		RefPtr<StatementSyntaxNode> Parser::ParseStatement()
 		{
+			auto modifiers = ParseModifiers(this);
+
 			RefPtr<StatementSyntaxNode> statement;
 			if (LookAheadToken(TokenType::LBrace))
 				statement = ParseBlockStatement();
-			else if (IsTypeKeyword() || LookAheadToken("const"))
-				statement = ParseVarDeclrStatement();
+			else if (IsTypeKeyword())
+				statement = ParseVarDeclrStatement(modifiers);
 			else if (LookAheadToken("if"))
 				statement = ParseIfStatement();
 			else if (LookAheadToken("for"))
@@ -1949,21 +1951,41 @@ namespace Spire
 				statement = ParseDefaultStmt(this);
 			else if (LookAheadToken(TokenType::Identifier))
 			{
+				// We might be looking at a local declaration, or an
+				// expression statement, and we need to figure out which.
+				//
+				// We'll solve this with backtracking for now.
+
 				Token* startPos = tokenReader.mCursor;
-				bool isVarDeclr = false;
+
+				// Try to parse a type (knowing that the type grammar is
+				// a subset of the expression grammar, and so this should
+				// always succeed).
 				RefPtr<ExpressionSyntaxNode> type = ParseType();
+				// We don't actually care about the type, though, so
+				// don't retain it
+				type = nullptr;
+
+				// If the next token after we parsed a type looks like
+				// we are going to declare a variable, then lets guess
+				// that this is a declaration.
+				//
+				// TODO(tfoley): this wouldn't be robust for more
+				// general kinds of declarators (notably pointer declarators),
+				// so we'll need to be careful about this.
 				if (LookAheadToken(TokenType::Identifier))
 				{
-					type = nullptr;
+					// Reset the cursor and try to parse a declaration now.
+					// Note: the declaration will consume any modifiers
+					// that had been in place on the statement.
 					tokenReader.mCursor = startPos;
-					statement = ParseVarDeclrStatement();
-					isVarDeclr = true;
+					statement = ParseVarDeclrStatement(modifiers);
+					return statement;
 				}
-				if (!isVarDeclr)
-				{
-                    tokenReader.mCursor = startPos;
-					statement = ParseExpressionStatement();
-				}
+
+				// Fallback: reset and parse an expression
+				tokenReader.mCursor = startPos;
+				statement = ParseExpressionStatement();
 			}
 			else if (LookAheadToken(TokenType::Semicolon))
 			{
@@ -1975,6 +1997,16 @@ namespace Spire
 			{
                 Unexpected(this);
 			}
+
+			if (statement)
+			{
+				// Install any modifiers onto the statement.
+				// Note: this path is bypassed in the case of a
+				// declaration statement, so we don't end up
+				// doubling up the modifiers.
+				statement->modifiers = modifiers;
+			}
+
 			return statement;
 		}
 
@@ -2002,12 +2034,13 @@ namespace Spire
 			return blockStatement;
 		}
 
-		RefPtr<VarDeclrStatementSyntaxNode> Parser::ParseVarDeclrStatement()
+		RefPtr<VarDeclrStatementSyntaxNode> Parser::ParseVarDeclrStatement(
+			Modifiers modifiers)
 		{
 			RefPtr<VarDeclrStatementSyntaxNode>varDeclrStatement = new VarDeclrStatementSyntaxNode();
 		
 			FillPosition(varDeclrStatement.Ptr());
-            auto decl = ParseDecl(this, currentScope.Ptr());
+            auto decl = ParseDeclWithModifiers(this, currentScope.Ptr(), modifiers);
             varDeclrStatement->decl = decl;
 			return varDeclrStatement;
 		}
@@ -2040,7 +2073,7 @@ namespace Spire
 			ReadToken(TokenType::LParent);
 			if (IsTypeKeyword())
 			{
-                stmt->InitialStatement = ParseVarDeclrStatement();
+                stmt->InitialStatement = ParseVarDeclrStatement(Modifiers());
 			}
 			else
 			{

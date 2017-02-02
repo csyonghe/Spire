@@ -812,17 +812,11 @@ namespace Spire
 			Checked,
 		};
 
-		class Decl : public SyntaxNode
+		// A syntax node which can have modifiers appled
+		class ModifiableSyntaxNode : public SyntaxNode
 		{
 		public:
-			ContainerDecl*  ParentDecl;
-			Token Name;
 			Modifiers modifiers;
-			DeclCheckState checkState = DeclCheckState::Unchecked;
-
-			// The next declaration defined in the same container with the same name
-			Decl* nextInContainerWithSameName = nullptr;
-
 			bool HasModifier(ModifierFlags flags) { return (modifiers.flags & flags) == flags; }
 
 			template<typename T>
@@ -836,6 +830,18 @@ namespace Spire
 					return m;
 				return nullptr;
 			}
+		};
+
+		class Decl : public ModifiableSyntaxNode
+		{
+		public:
+			ContainerDecl*  ParentDecl;
+			Token Name;
+			DeclCheckState checkState = DeclCheckState::Unchecked;
+
+			// The next declaration defined in the same container with the same name
+			Decl* nextInContainerWithSameName = nullptr;
+
 
 			FilteredModifierList<SimpleAttribute> GetLayoutAttributes() { return GetModifiersOfType<SimpleAttribute>(); }
 
@@ -1340,7 +1346,7 @@ namespace Spire
 		};
 
 
-		class StatementSyntaxNode : public SyntaxNode
+		class StatementSyntaxNode : public ModifiableSyntaxNode
 		{
 		public:
 			virtual StatementSyntaxNode* Clone(CloneContext & ctx) = 0;
