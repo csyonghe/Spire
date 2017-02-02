@@ -517,6 +517,13 @@ namespace CoreLib
 						tokenBuilder.Append(curChar);
 						pos++;
 					}
+					// Allow `u` or `U` suffix to indicate unsigned literal
+					// TODO(tfoley): handle more general suffixes on literals
+					else if (curChar == 'u' || curChar == 'U')
+					{
+						tokenBuilder.Append(curChar);
+						pos++;
+					}
 					else
 					{
 						if (derivative == LexDerivative::Line)
