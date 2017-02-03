@@ -2047,8 +2047,6 @@ namespace Spire
 		class DefaultStmt : public CaseStmtBase
 		{
 		public:
-			RefPtr<ExpressionSyntaxNode> expr;
-
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual DefaultStmt * Clone(CloneContext & ctx) override;
 		};
@@ -2369,6 +2367,24 @@ namespace Spire
 					stmt->PositiveStatement = stmt->PositiveStatement->Accept(this).As<StatementSyntaxNode>();
 				if (stmt->NegativeStatement)
 					stmt->NegativeStatement = stmt->NegativeStatement->Accept(this).As<StatementSyntaxNode>();
+				return stmt;
+			}
+			virtual RefPtr<SwitchStmt> VisitSwitchStmt(SwitchStmt* stmt)
+			{
+				if (stmt->condition)
+					stmt->condition = stmt->condition->Accept(this).As<ExpressionSyntaxNode>();
+				if (stmt->body)
+					stmt->body = stmt->body->Accept(this).As<BlockStatementSyntaxNode>();
+				return stmt;
+			}
+			virtual RefPtr<CaseStmt> VisitCaseStmt(CaseStmt* stmt)
+			{
+				if (stmt->expr)
+					stmt->expr = stmt->expr->Accept(this).As<ExpressionSyntaxNode>();
+				return stmt;
+			}
+			virtual RefPtr<DefaultStmt> VisitDefaultStmt(DefaultStmt* stmt)
+			{
 				return stmt;
 			}
 			virtual RefPtr<StatementSyntaxNode> VisitReturnStatement(ReturnStatementSyntaxNode* stmt)

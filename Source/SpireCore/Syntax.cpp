@@ -1575,7 +1575,7 @@ namespace Spire
 
 		RefPtr<SyntaxNode> SwitchStmt::Accept(SyntaxVisitor * visitor)
 		{
-			throw "unimplemented";
+			return visitor->VisitSwitchStmt(this);
 		}
 
 		SwitchStmt * SwitchStmt::Clone(CloneContext & ctx)
@@ -1585,7 +1585,7 @@ namespace Spire
 
 		RefPtr<SyntaxNode> CaseStmt::Accept(SyntaxVisitor * visitor)
 		{
-			throw "unimplemented";
+			return visitor->VisitCaseStmt(this);
 		}
 
 		CaseStmt * CaseStmt::Clone(CloneContext & ctx)
@@ -1595,7 +1595,7 @@ namespace Spire
 
 		RefPtr<SyntaxNode> DefaultStmt::Accept(SyntaxVisitor * visitor)
 		{
-			throw "unimplemented";
+			return visitor->VisitDefaultStmt(this);
 		}
 
 		DefaultStmt * DefaultStmt::Clone(CloneContext & ctx)
