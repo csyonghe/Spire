@@ -106,6 +106,10 @@ __intrinsic float2 lerp(float2 x, float2 y, float2 s);
 __intrinsic float3 lerp(float3 x, float3 y, float3 s);
 __intrinsic float4 lerp(float4 x, float4 y, float4 s);
 
+__intrinsic float  saturate(float  v);
+__intrinsic float2 saturate(float2 v);
+__intrinsic float3 saturate(float3 v);
+__intrinsic float4 saturate(float4 v);
 
 __intrinsic float ceil(float v);
 __intrinsic vec2 ceil(vec2 v);
@@ -468,10 +472,17 @@ namespace Spire
 							sb << "T Sample(SamplerState s, ";
 							sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location);\n";
 
+							sb << "T SampleBias(SamplerState s, ";
+							sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, float bias);\n";
+
 							if( baseShape != TextureType::ShapeCube )
 							{
 								sb << "T Sample(SamplerState s, ";
 								sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
+								sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
+
+								sb << "T Sample(SamplerState s, ";
+								sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, float bias, ";
 								sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
 							}
 						}
