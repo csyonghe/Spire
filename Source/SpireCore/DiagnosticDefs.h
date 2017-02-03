@@ -251,6 +251,10 @@ DIAGNOSTIC(39999, Error, expectedIntegerConstantNotConstant, "expression does no
 DIAGNOSTIC(39999, Error, noApplicableOverloadForNameWithArgs, "no overload for '$0' applicable to arguments of type $1")
 DIAGNOSTIC(39999, Error, noApplicableWithArgs, "no overload applicable to arguments of type $1")
 
+DIAGNOSTIC(39999, Error, caseOutsideSwitch, "'case' not allowed outside of a 'switch' statement")
+DIAGNOSTIC(39999, Error, defaultOutsideSwitch, "'default' not allowed outside of a 'switch' statement")
+
+
 //
 // 4xxxx - IL code generation.
 //

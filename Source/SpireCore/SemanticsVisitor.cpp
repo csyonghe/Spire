@@ -62,7 +62,10 @@ namespace Spire
 			ImportOperatorDefSyntaxNode * currentImportOperator = nullptr;
 			ShaderComponentSymbol * currentComp = nullptr;
 			ComponentSyntaxNode * currentCompNode = nullptr;
-			List<SyntaxNode *> loops;
+
+			// lexical outer statements
+			List<StatementSyntaxNode*> outerStmts;
+
 			SymbolTable * symbolTable;
 		public:
 			SemanticsVisitor(SymbolTable * symbols, DiagnosticSink * pErr)
@@ -1733,21 +1736,55 @@ namespace Spire
 				}
 				return stmt;
 			}
+
+			template<typename T>
+			T* FindOuterStmt()
+			{
+				int outerStmtCount = outerStmts.Count();
+				for (int ii = outerStmtCount - 1; ii >= 0; --ii)
+				{
+					auto outerStmt = outerStmts[ii];
+					auto found = dynamic_cast<T*>(outerStmt);
+					if (found)
+						return found;
+				}
+				return nullptr;
+			}
+
 			virtual RefPtr<StatementSyntaxNode> VisitBreakStatement(BreakStatementSyntaxNode *stmt) override
 			{
-				if (!loops.Count())
+				auto outer = FindOuterStmt<BreakableStmt>();
+				if (!outer)
+				{
 					getSink()->diagnose(stmt, Diagnostics::breakOutsideLoop);
+				}
+				stmt->parentStmt = outer;
 				return stmt;
 			}
 			virtual RefPtr<StatementSyntaxNode> VisitContinueStatement(ContinueStatementSyntaxNode *stmt) override
 			{
-				if (!loops.Count())
+				auto outer = FindOuterStmt<LoopStmt>();
+				if (!outer)
+				{
 					getSink()->diagnose(stmt, Diagnostics::continueOutsideLoop);
+				}
+				stmt->parentStmt = outer;
 				return stmt;
 			}
+
+			void PushOuterStmt(StatementSyntaxNode* stmt)
+			{
+				outerStmts.Add(stmt);
+			}
+
+			void PopOuterStmt(StatementSyntaxNode* stmt)
+			{
+				outerStmts.RemoveAt(outerStmts.Count() - 1);
+			}
+
 			virtual RefPtr<StatementSyntaxNode> VisitDoWhileStatement(DoWhileStatementSyntaxNode *stmt) override
 			{
-				loops.Add(stmt);
+				PushOuterStmt(stmt);
 				if (stmt->Predicate != NULL)
 					stmt->Predicate = stmt->Predicate->Accept(this).As<ExpressionSyntaxNode>();
 				if (!stmt->Predicate->Type->Equals(ExpressionType::Error.Ptr()) &&
@@ -1758,12 +1795,12 @@ namespace Spire
 				}
 				stmt->Statement->Accept(this);
 
-				loops.RemoveAt(loops.Count() - 1);
+				PopOuterStmt(stmt);
 				return stmt;
 			}
 			virtual RefPtr<StatementSyntaxNode> VisitForStatement(ForStatementSyntaxNode *stmt) override
 			{
-				loops.Add(stmt);
+				PushOuterStmt(stmt);
 				if (stmt->InitialStatement)
 				{
 					stmt->InitialStatement = stmt->InitialStatement->Accept(this).As<StatementSyntaxNode>();
@@ -1784,7 +1821,46 @@ namespace Spire
 				}
 				stmt->Statement->Accept(this);
 
-				loops.RemoveAt(loops.Count() - 1);
+				PopOuterStmt(stmt);
+				return stmt;
+			}
+			virtual RefPtr<SwitchStmt> VisitSwitchStmt(SwitchStmt* stmt) override
+			{
+				PushOuterStmt(stmt);
+				// TODO(tfoley): need to coerce condition to an integral type...
+				stmt->condition = CheckExpr(stmt->condition);
+				stmt->body->Accept(this);
+				PopOuterStmt(stmt);
+				return stmt;
+			}
+			virtual RefPtr<CaseStmt> VisitCaseStmt(CaseStmt* stmt) override
+			{
+				auto expr = CheckExpr(stmt->expr);
+				auto switchStmt = FindOuterStmt<SwitchStmt>();
+
+				if (!switchStmt)
+				{
+					getSink()->diagnose(stmt, Diagnostics::caseOutsideSwitch);
+				}
+				else
+				{
+					// TODO: need to do some basic matching to ensure the type
+					// for the `case` is consistent with the type for the `switch`...
+				}
+
+				stmt->expr = expr;
+				stmt->parentStmt = switchStmt;
+
+				return stmt;
+			}
+			virtual RefPtr<DefaultStmt> VisitDefaultStmt(DefaultStmt* stmt) override
+			{
+				auto switchStmt = FindOuterStmt<SwitchStmt>();
+				if (!switchStmt)
+				{
+					getSink()->diagnose(stmt, Diagnostics::defaultOutsideSwitch);
+				}
+				stmt->parentStmt = switchStmt;
 				return stmt;
 			}
 			virtual RefPtr<StatementSyntaxNode> VisitIfStatement(IfStatementSyntaxNode *stmt) override
@@ -1883,7 +1959,7 @@ namespace Spire
 
 			virtual RefPtr<StatementSyntaxNode> VisitWhileStatement(WhileStatementSyntaxNode *stmt) override
 			{
-				loops.Add(stmt);
+				PushOuterStmt(stmt);
 				stmt->Predicate = stmt->Predicate->Accept(this).As<ExpressionSyntaxNode>();
 				if (!stmt->Predicate->Type->Equals(ExpressionType::Error.Ptr()) &&
 					!stmt->Predicate->Type->Equals(ExpressionType::Int.Ptr()) &&
@@ -1891,7 +1967,7 @@ namespace Spire
 					getSink()->diagnose(stmt, Diagnostics::whilePredicateTypeError2);
 
 				stmt->Statement->Accept(this);
-				loops.RemoveAt(loops.Count() - 1);
+				PopOuterStmt(stmt);
 				return stmt;
 			}
 			virtual RefPtr<StatementSyntaxNode> VisitExpressionStatement(ExpressionStatementSyntaxNode *stmt) override

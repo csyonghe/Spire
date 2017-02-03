@@ -2013,7 +2013,11 @@ namespace Spire
 			virtual IfStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class SwitchStmt : public StatementSyntaxNode
+		// A statement that can be escaped with a `break`
+		class BreakableStmt : public ScopeStmt
+		{};
+
+		class SwitchStmt : public BreakableStmt
 		{
 		public:
 			RefPtr<ExpressionSyntaxNode> condition;
@@ -2023,12 +2027,21 @@ namespace Spire
 			virtual SwitchStmt * Clone(CloneContext & ctx) override;
 		};
 
+		// A statement that is expected to appear lexically nested inside
+		// some other construct, and thus needs to keep track of the
+		// outer statement that it is associated with...
+		class ChildStmt : public StatementSyntaxNode
+		{
+		public:
+			StatementSyntaxNode* parentStmt = nullptr;
+		};
+
 		// a `case` or `default` statement inside a `switch`
 		//
 		// Note(tfoley): A correct AST for a C-like language would treat
 		// these as a labelled statement, and so they would contain a
 		// sub-statement. I'm leaving that out for now for simplicity.
-		class CaseStmtBase : public StatementSyntaxNode
+		class CaseStmtBase : public ChildStmt
 		{
 		public:
 		};
@@ -2051,8 +2064,11 @@ namespace Spire
 			virtual DefaultStmt * Clone(CloneContext & ctx) override;
 		};
 
+		// A statement that represents a loop, and can thus be escaped with a `continue`
+		class LoopStmt : public BreakableStmt
+		{};
 
-		class ForStatementSyntaxNode : public ScopeStmt
+		class ForStatementSyntaxNode : public LoopStmt
 		{
 		public:
 			RefPtr<StatementSyntaxNode> InitialStatement;
@@ -2062,7 +2078,7 @@ namespace Spire
 			virtual ForStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class WhileStatementSyntaxNode : public StatementSyntaxNode
+		class WhileStatementSyntaxNode : public LoopStmt
 		{
 		public:
 			RefPtr<ExpressionSyntaxNode> Predicate;
@@ -2071,7 +2087,7 @@ namespace Spire
 			virtual WhileStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class DoWhileStatementSyntaxNode : public StatementSyntaxNode
+		class DoWhileStatementSyntaxNode : public LoopStmt
 		{
 		public:
 			RefPtr<StatementSyntaxNode> Statement;
@@ -2080,14 +2096,22 @@ namespace Spire
 			virtual DoWhileStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class BreakStatementSyntaxNode : public StatementSyntaxNode
+		// The case of child statements that do control flow relative
+		// to their parent statement.
+		class JumpStmt : public ChildStmt
+		{
+		public:
+			StatementSyntaxNode* parentStmt = nullptr;
+		};
+
+		class BreakStatementSyntaxNode : public JumpStmt
 		{
 		public:
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual BreakStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
 
-		class ContinueStatementSyntaxNode : public StatementSyntaxNode
+		class ContinueStatementSyntaxNode : public JumpStmt
 		{
 		public:
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
