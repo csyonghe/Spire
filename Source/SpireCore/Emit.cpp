@@ -369,6 +369,16 @@ static void EmitExprWithPrecedence(EmitContext* context, RefPtr<ExpressionSyntax
 		Emit(context, ") ");
 		EmitExpr(context, castExpr->Expression);
 	}
+	else if (auto selectExpr = expr.As<SelectExpressionSyntaxNode>())
+	{
+		needClose = MaybeEmitParens(context, outerPrec, kPrecedence_Conditional);
+
+		EmitExprWithPrecedence(context, selectExpr->SelectorExpr, kPrecedence_Conditional);
+		Emit(context, " ? ");
+		EmitExprWithPrecedence(context, selectExpr->Expr0, kPrecedence_Conditional);
+		Emit(context, " : ");
+		EmitExprWithPrecedence(context, selectExpr->Expr1, kPrecedence_Conditional);
+	}
 	else
 	{
 		throw "unimplemented";
@@ -611,6 +621,71 @@ static void EmitStmt(EmitContext* context, RefPtr<StatementSyntaxNode> stmt)
 			Emit(context, "\nelse\n");
 			EmitBlockStmt(context, elseStmt);
 		}
+		return;
+	}
+	else if (auto forStmt = stmt.As<ForStatementSyntaxNode>())
+	{
+		// TODO: emit attributes like `[unroll]`
+
+		Emit(context, "for(");
+		if (auto initStmt = forStmt->InitialStatement)
+		{
+			EmitStmt(context, initStmt);
+		}
+		else
+		{
+			Emit(context, ";");
+		}
+		if (auto testExp = forStmt->PredicateExpression)
+		{
+			EmitExpr(context, testExp);
+		}
+		Emit(context, ";");
+		if (auto incrExpr = forStmt->SideEffectExpression)
+		{
+			EmitExpr(context, incrExpr);
+		}
+		Emit(context, ")\n");
+		EmitBlockStmt(context, forStmt->Statement);
+		return;
+	}
+	else if (auto discardStmt = stmt.As<DiscardStatementSyntaxNode>())
+	{
+		Emit(context, "discard;\n");
+		return;
+	}
+	else if (auto emptyStmt = stmt.As<EmptyStatementSyntaxNode>())
+	{
+		return;
+	}
+	else if (auto switchStmt = stmt.As<SwitchStmt>())
+	{
+		Emit(context, "switch(");
+		EmitExpr(context, switchStmt->condition);
+		Emit(context, ")\n");
+		EmitBlockStmt(context, switchStmt->body);
+		return;
+	}
+	else if (auto caseStmt = stmt.As<CaseStmt>())
+	{
+		Emit(context, "case ");
+		EmitExpr(context, caseStmt->expr);
+		Emit(context, ":{}\n");
+		return;
+	}
+	else if (auto defaultStmt = stmt.As<DefaultStmt>())
+	{
+		Emit(context, "default:{}\n");
+		return;
+	}
+	else if (auto breakStmt = stmt.As<BreakStatementSyntaxNode>())
+	{
+		Emit(context, "break;\n");
+		return;
+	}
+	else if (auto continueStmt = stmt.As<ContinueStatementSyntaxNode>())
+	{
+		Emit(context, "continue;\n");
 		return;
 	}
 
