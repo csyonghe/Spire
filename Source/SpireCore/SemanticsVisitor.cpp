@@ -4461,6 +4461,99 @@ namespace Spire
 				}
 			}
 
+			RefPtr<ExpressionSyntaxNode> CheckSwizzleExpr(
+				MemberExpressionSyntaxNode*	memberRefExpr,
+				RefPtr<ExpressionType>		baseElementType,
+				int							baseElementCount)
+			{
+				RefPtr<SwizzleExpr> swizExpr = new SwizzleExpr();
+				swizExpr->Position = memberRefExpr->Position;
+				swizExpr->base = memberRefExpr->BaseExpression;
+
+				int limitElement = baseElementCount;
+
+				int elementIndices[4];
+				int elementCount = 0;
+
+				bool elementUsed[4] = { false, false, false, false };
+				bool anyDuplicates = false;
+				bool anyError = false;
+
+				for (int i = 0; i < memberRefExpr->MemberName.Length(); i++)
+				{
+					auto ch = memberRefExpr->MemberName[i];
+					int elementIndex = -1;
+					switch (ch)
+					{
+					case 'x': case 'r': elementIndex = 0; break;
+					case 'y': case 'g': elementIndex = 1; break;
+					case 'z': case 'b': elementIndex = 2; break;
+					case 'w': case 'a': elementIndex = 3; break;
+					default:
+						// An invalid character in the swizzle is an error
+						getSink()->diagnose(swizExpr, Diagnostics::unimplemented, "invalid component name for swizzle");
+						anyError = true;
+						continue;
+					}
+
+					// TODO(tfoley): GLSL requires that all component names
+					// come from the same "family"...
+
+					// Make sure the index is in range for the source type
+					if (elementIndex >= limitElement)
+					{
+						getSink()->diagnose(swizExpr, Diagnostics::unimplemented, "swizzle component out of range for type");
+						anyError = true;
+						continue;
+					}
+
+					// Check if we've seen this index before
+					for (int ee = 0; ee < elementCount; ee++)
+					{
+						if (elementIndices[ee] == elementIndex)
+							anyDuplicates = true;
+					}
+
+					// add to our list...
+					elementIndices[elementCount++] = elementIndex;
+				}
+
+				for (int ee = 0; ee < elementCount; ++ee)
+				{
+					swizExpr->elementIndices[ee] = elementIndices[ee];
+				}
+				swizExpr->elementCount = elementCount;
+
+				if (anyError)
+				{
+					swizExpr->Type = ExpressionType::Error;
+				}
+				else if (elementCount == 1)
+				{
+					// single-component swizzle produces a scalar
+					//
+					// Note(tfoley): the official HLSL rules seem to be that it produces
+					// a one-component vector, which is then implicitly convertible to
+					// a scalar, but that seems like it just adds complexity.
+					swizExpr->Type = baseElementType;
+				}
+				else
+				{
+					// TODO(tfoley): would be nice to "re-sugar" type
+					// here if the input type had a sugared name...
+					swizExpr->Type = new VectorExpressionType(
+						baseElementType,
+						elementCount);
+				}
+
+				// A swizzle can be used as an l-value as long as there
+				// were no duplicates in the list of components
+				swizExpr->Type.IsLeftValue = !anyDuplicates;
+
+				return swizExpr;
+			}
+
+
 			virtual RefPtr<ExpressionSyntaxNode> VisitMemberExpression(MemberExpressionSyntaxNode * expr) override
 			{
 				expr->BaseExpression = CheckExpr(expr->BaseExpression);
@@ -4473,91 +4566,18 @@ namespace Spire
 				// because vectors are also declaration reference types...
 				if (auto baseVecType = baseType->AsVectorType())
 				{
-					RefPtr<SwizzleExpr> swizExpr = new SwizzleExpr();
-					swizExpr->Position = expr->Position;
-					swizExpr->base = expr->BaseExpression;
-
-					int limitElement = baseVecType->elementCount;
-
-					int elementIndices[4];
-					int elementCount = 0;
-
-					bool elementUsed[4] = { false, false, false, false };
-					bool anyDuplicates = false;
-					bool anyError = false;
-
-					for (int i = 0; i < expr->MemberName.Length(); i++)
-					{
-						auto ch = expr->MemberName[i];
-						int elementIndex = -1;
-						switch (ch)
-						{
-						case 'x': case 'r': elementIndex = 0; break;
-						case 'y': case 'g': elementIndex = 1; break;
-						case 'z': case 'b': elementIndex = 2; break;
-						case 'w': case 'a': elementIndex = 3; break;
-						default:
-							// An invalid character in the swizzle is an error
-							getSink()->diagnose(swizExpr, Diagnostics::unimplemented, "invalid component name for swizzle");
-							anyError = true;
-							continue;
-						}
-
-						// TODO(tfoley): GLSL requires that all component names
-						// come from the same "family"...
-
-						// Make sure the index is in range for the source type
-						if (elementIndex >= limitElement)
-						{
-							getSink()->diagnose(swizExpr, Diagnostics::unimplemented, "swizzle component out of range for type");
-							anyError = true;
-							continue;
-						}
-
-						// Check if we've seen this index before
-						for (int ee = 0; ee < elementCount; ee++)
-						{
-							if (elementIndices[ee] == elementIndex)
-								anyDuplicates = true;
-						}
-
-						// add to our list...
-						elementIndices[elementCount++] = elementIndex;
-					}
-
-					for (int ee = 0; ee < elementCount; ++ee)
-					{
-						swizExpr->elementIndices[ee] = elementIndices[ee];
-					}
-					swizExpr->elementCount = elementCount;
-
-					if (anyError)
-					{
-						swizExpr->Type = ExpressionType::Error;
-					}
-					else if (elementCount == 1)
-					{
-						// single-component swizzle produces a scalar
-						//
-						// Note(tfoley): the official HLSL rules seem to be that it produces
-						// a one-component vector, which is then implicitly convertible to
-						// a scalar, but that seems like it just adds complexity.
-						swizExpr->Type = baseVecType->elementType;
-					}
-					else
-					{
-						// TODO(tfoley): would be nice to "re-sugar" type
-						// here if the input type had a sugared name...
-						swizExpr->Type = new VectorExpressionType(
-							baseVecType->elementType,
-							elementCount);
-					}
-
-					// A swizzle can be used as an l-value as long as there
-					// were no duplicates in the list of components
-					swizExpr->Type.IsLeftValue = !anyDuplicates;
-
-					return swizExpr;
+					return CheckSwizzleExpr(
+						expr,
+						baseVecType->elementType,
+						baseVecType->elementCount);
+				}
+				else if(auto baseScalarType = baseType->AsBasicType())
+				{
+					// Treat scalar like a 1-element vector when swizzling
+					return CheckSwizzleExpr(
+						expr,
+						baseScalarType,
+						1);
 				}
 				else if (auto declRefType = baseType->AsDeclRefType())
 				{
