@@ -2737,28 +2737,73 @@ namespace Spire
 				List<OverloadCandidate> bestCandidates;
 			};
 
+			struct ParamCounts
+			{
+				int required;
+				int allowed;
+			};
+
+			// count the number of parameters required/allowed for a callable
+			ParamCounts CountParameters(FilteredMemberRefList<ParamDeclRef> params)
+			{
+				ParamCounts counts = { 0, 0 };
+				for (auto param : params)
+				{
+					counts.allowed++;
+
+					// No initializer means no default value
+					//
+					// TODO(tfoley): The logic here is currently broken in two ways:
+					//
+					// 1. We are assuming that once one parameter has a default, then all do.
+					//    This can/should be validated earlier, so that we can assume it here.
+					//
+					// 2. We are not handling the possibility of multiple declarations for
+					//    a single function, where we'd need to merge default parameters across
+					//    all the declarations.
+					if (!param.GetDecl()->Expr)
+					{
+						counts.required++;
+					}
+				}
+				return counts;
+			}
+
 			bool TryCheckOverloadCandidateArity(
 				OverloadResolveContext&		context,
 				OverloadCandidate const&	candidate)
 			{
 				int argCount = context.appExpr->Arguments.Count();
-				int paramCount = 0;
+				ParamCounts paramCounts = { 0, 0 };
 				switch (candidate.flavor)
 				{
 				case OverloadCandidate::Flavor::Func:
-					paramCount = candidate.item.declRef.As<FuncDeclBaseRef>().GetParameters().Count();
+					paramCounts = CountParameters(candidate.item.declRef.As<FuncDeclBaseRef>().GetParameters());
 					break;
 
 				case OverloadCandidate::Flavor::ComponentFunc:
-					paramCount = candidate.item.declRef.As<ComponentDeclRef>().GetParameters().Count();
+					paramCounts = CountParameters(candidate.item.declRef.As<ComponentDeclRef>().GetParameters());
 					break;
 				}
-				if (argCount != paramCount && context.mode != OverloadResolveContext::Mode::JustTrying)
+
+				if (argCount >= paramCounts.required && argCount <= paramCounts.allowed)
+					return true;
+
+				// Emit an error message if we are checking this call for real
+				if (context.mode != OverloadResolveContext::Mode::JustTrying)
 				{
-					getSink()->diagnose(context.appExpr, Diagnostics::unimplemented, "parameter and argument count mismatch");
+					if (argCount < paramCounts.required)
+					{
+						getSink()->diagnose(context.appExpr, Diagnostics::unimplemented, "not enough arguments for call");
+					}
+					else
+					{
+						assert(argCount > paramCounts.allowed);
+						getSink()->diagnose(context.appExpr, Diagnostics::unimplemented, "too many arguments for call");
+					}
 				}
 
-				return argCount == paramCount;
+				return false;
 			}
 
 			bool TryCheckOverloadCandidateTypes(
@@ -2779,8 +2824,10 @@ namespace Spire
 					params = candidate.item.declRef.As<ComponentDeclRef>().GetParameters().ToArray();
 					break;
 				}
-				int paramCount = params.Count();
-				assert(argCount == paramCount);
+
+				// Note(tfoley): We might have fewer arguments than parameters in the
+				// case where one or more parameters had defaults.
+				assert(argCount <= params.Count());
 
 				for (int ii = 0; ii < argCount; ++ii)
 				{
