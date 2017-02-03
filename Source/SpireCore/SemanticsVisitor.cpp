@@ -1418,6 +1418,7 @@ namespace Spire
 				{
 					symbolTable->globalDecls.AddIfNotExists(s->Name.Content, s.Ptr());
 				}
+
 				for (auto & s : program->GetTypeDefs())
 					VisitTypeDefDecl(s.Ptr());
 				for (auto & s : program->GetStructs())
@@ -1437,6 +1438,7 @@ namespace Spire
 					if (!func->IsChecked(DeclCheckState::Checked))
 					{
 						VisitFunctionDeclaration(func.Ptr());
+#if TIMREMOVED
 						if (funcNames.Contains(func->InternalName))
 						{
 							StringBuilder argList;
@@ -1454,6 +1456,7 @@ namespace Spire
 						}
 						else
 							funcNames.Add(func->InternalName);
+#endif
 					}
 				}
 				for (auto & func : program->GetFunctions())
@@ -1576,6 +1579,112 @@ namespace Spire
 				return functionNode;
 			}
 
+			// Check if two functions have the same signature for the purposes
+			// of overload resolution.
+			bool DoFunctionSignaturesMatch(
+				FunctionSyntaxNode* fst,
+				FunctionSyntaxNode* snd)
+			{
+				// TODO(tfoley): This function won't do anything sensible for generics,
+				// so we need to figure out a plan for that...
+
+				// TODO(tfoley): This copies the parameter array, which is bad for performance.
+				auto fstParams = fst->GetParameters().ToArray();
+				auto sndParams = snd->GetParameters().ToArray();
+
+				// If the functions have different numbers of parameters, then
+				// their signatures trivially don't match.
+				auto fstParamCount = fstParams.Count();
+				auto sndParamCount = sndParams.Count();
+				if (fstParamCount != sndParamCount)
+					return false;
+
+				for (int ii = 0; ii < fstParamCount; ++ii)
+				{
+					auto fstParam = fstParams[ii];
+					auto sndParam = sndParams[ii];
+
+					// If a given parameter type doesn't match, then signatures don't match
+					if (!fstParam->Type.Equals(sndParam->Type))
+						return false;
+
+					// If one parameter is `out` and the other isn't, then they don't match
+					//
+					// Note(tfoley): we don't consider `out` and `inout` as distinct here,
+					// because there is no way for overload resolution to pick between them.
+					if (fstParam->HasModifier(ModifierFlag::Out) != sndParam->HasModifier(ModifierFlag::Out))
+						return false;
+				}
+
+				// Note(tfoley): return type doesn't enter into it, because we can't take
+				// calling context into account during overload resolution.
+
+				return true;
+			}
+
+			void ValidateFunctionRedeclaration(FunctionSyntaxNode* funcDecl)
+			{
+				auto parentDecl = funcDecl->ParentDecl;
+				assert(parentDecl);
+				if (!parentDecl) return;
+
+				// Look at previously-declared functions with the same name,
+				// in the same container
+				BuildMemberDictionary(parentDecl);
+
+				for (auto prevDecl = funcDecl->nextInContainerWithSameName; prevDecl; prevDecl = prevDecl->nextInContainerWithSameName)
+				{
+					// Look through generics to the declaration underneath
+					auto prevGenericDecl = dynamic_cast<GenericDecl*>(prevDecl);
+					if (prevGenericDecl)
+						prevDecl = prevGenericDecl->inner.Ptr();
+
+					// We only care about previously-declared functions
+					// Note(tfoley): although we should really error out if the
+					// name is already in use for something else, like a variable...
+					auto prevFuncDecl = dynamic_cast<FunctionSyntaxNode*>(prevDecl);
+					if (!prevFuncDecl)
+						continue;
+
+					// If the parameter signatures don't match, then don't worry
+					if (!DoFunctionSignaturesMatch(funcDecl, prevFuncDecl))
+						continue;
+
+					// If we get this far, then we've got two declarations in the same
+					// scope, with the same name and signature.
+					//
+					// They might just be redeclarations, which we would want to allow.
+
+					// First, check if the return types match.
+					// TODO(tfolye): this code won't work for generics
+					if (!funcDecl->ReturnType.Equals(prevFuncDecl->ReturnType))
+					{
+						// Bad dedeclaration
+						getSink()->diagnose(funcDecl, Diagnostics::unimplemented, "redeclaration has a different return type");
+
+						// Don't bother emitting other errors at this point
+						break;
+					}
+
+					// TODO(tfoley): track the fact that there is redeclaration going on,
+					// so that we can detect it and react accordingly during overload resolution
+					// (e.g., by only considering one declaration as the canonical one...)
+
+					// If both have a body, then there is trouble
+					if (funcDecl->Body && prevFuncDecl->Body)
+					{
+						// Redefinition
+						getSink()->diagnose(funcDecl, Diagnostics::unimplemented, "function redefinition");
+
+						// Don't bother emitting other errors
+						break;
+					}
+
+					// TODO(tfoley): If both specific default argument expressions
+					// for the same value, then that is an error too...
+				}
+			}
+
 			void VisitFunctionDeclaration(FunctionSyntaxNode *functionNode)
 			{
 				if (functionNode->IsChecked(DeclCheckState::CheckedHeader)) return;
@@ -1611,6 +1720,9 @@ namespace Spire
 				overloadList->Add(symbol);
 				this->function = NULL;
 				functionNode->SetCheckState(DeclCheckState::CheckedHeader);
+
+				// One last bit of validation: check if we are redeclaring an existing function
+				ValidateFunctionRedeclaration(functionNode);
 			}
 
 			virtual RefPtr<StatementSyntaxNode> VisitBlockStatement(BlockStatementSyntaxNode *stmt) override
@@ -3721,6 +3833,10 @@ namespace Spire
 
 			void BuildMemberDictionary(ContainerDecl* decl)
 			{
+				// Don't rebuild if already built
+				if (decl->memberDictionaryIsValid)
+					return;
+
 				decl->transparentMembers.Clear();
 
 				for (auto m : decl->Members)
