@@ -825,6 +825,20 @@ static void EmitConstantBufferDecl(
 	}
 }
 
+// Shared emit logic for variable declarations (used for parameters, locals, globals, fields)
+static void EmitVarDeclCommon(EmitContext* context, RefPtr<VarDeclBase> decl)
+{
+	EmitType(context, decl->Type, decl->Name.Content);
+
+	EmitSemantics(context, decl);
+
+	if (auto initExpr = decl->Expr)
+	{
+		Emit(context, " = ");
+		EmitExpr(context, initExpr);
+	}
+}
+
 static void EmitVarDecl(EmitContext* context, RefPtr<VarDeclBase> decl)
 {
 	// As a special case, a variable using the `Constantbuffer<T>` type
@@ -839,16 +853,8 @@ static void EmitVarDecl(EmitContext* context, RefPtr<VarDeclBase> decl)
 		return;
 	}
 
+	EmitVarDeclCommon(context, decl);
 
-	EmitType(context, decl->Type, decl->Name.Content);
-
-    EmitSemantics(context, decl);
-
-	if (auto initExpr = decl->Expr)
-	{
-		Emit(context, " = ");
-		EmitExpr(context, initExpr);
-	}
 	Emit(context, ";\n");
 }
 
@@ -863,10 +869,8 @@ static void EmitParamDecl(EmitContext* context, RefPtr<ParameterSyntaxNode> decl
 		Emit(context, "out ");
 	}
 
-	EmitType(context, decl->Type, decl->Name.Content);
-	EmitSemantics(context, decl);
 
-	// TODO(tfoley): handle case where parameter has a default value...
+	EmitVarDeclCommon(context, decl);
 }
 
 static void EmitFuncDecl(EmitContext* context, RefPtr<FunctionSyntaxNode> decl)
