@@ -581,6 +581,25 @@ static void EmitBlockStmt(EmitContext* context, RefPtr<StatementSyntaxNode> stmt
 	Emit(context, "}\n");
 }
 
+static void EmitLoopAttributes(EmitContext* context, RefPtr<StatementSyntaxNode> decl)
+{
+	// TODO(tfoley): There really ought to be a semantic checking step for attributes,
+	// that turns abstract syntax into a concrete hierarchy of attribute types (e.g.,
+	// a specific `LoopModifier` or `UnrollModifier`).
+
+	for(auto attr : decl->GetModifiersOfType<SimpleAttribute>())
+	{
+		if(attr->Key == "loop")
+		{
+			Emit(context, "[loop]");
+		}
+		else if(attr->Key == "unroll")
+		{
+			Emit(context, "[unroll]");
+		}
+	}
+}
+
 static void EmitStmt(EmitContext* context, RefPtr<StatementSyntaxNode> stmt)
 {
 	if (auto blockStmt = stmt.As<BlockStatementSyntaxNode>())
@@ -625,7 +644,7 @@ static void EmitStmt(EmitContext* context, RefPtr<StatementSyntaxNode> stmt)
 	}
 	else if (auto forStmt = stmt.As<ForStatementSyntaxNode>())
 	{
-		// TODO: emit attributes like `[unroll]`
+		EmitLoopAttributes(context, forStmt);
 
 		Emit(context, "for(");
 		if (auto initStmt = forStmt->InitialStatement)
@@ -670,7 +689,7 @@ static void EmitStmt(EmitContext* context, RefPtr<StatementSyntaxNode> stmt)
 	{
 		Emit(context, "case ");
 		EmitExpr(context, caseStmt->expr);
-		Emit(context, ":{}\n");
+		Emit(context, ":\n");
 		return;
 	}
 	else if (auto defaultStmt = stmt.As<DefaultStmt>())
