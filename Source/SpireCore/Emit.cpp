@@ -757,7 +757,17 @@ static void EmitDeclRef(EmitContext* context, DeclRef declRef)
 
 // Declarations
 
-static void EmitSemantic(EmitContext* context, RefPtr<HLSLSemantic> semantic)
+typedef unsigned int ESemanticMask;
+enum
+{
+	kESemanticMask_None = 0,
+
+	kESemanticMask_NoPackOffset = 1 << 0,
+
+	kESemanticMask_Default = kESemanticMask_NoPackOffset,
+};
+
+static void EmitSemantic(EmitContext* context, RefPtr<HLSLSemantic> semantic, ESemanticMask mask)
 {
 	if (auto simple = semantic.As<HLSLSimpleSemantic>())
 	{
@@ -775,6 +785,20 @@ static void EmitSemantic(EmitContext* context, RefPtr<HLSLSemantic> semantic)
 		}
 		Emit(context, ")");
 	}
+	else if(auto packOffsetSemantic = semantic.As<HLSLPackOffsetSemantic>())
+	{
+		if(mask & kESemanticMask_NoPackOffset)
+			return;
+
+		Emit(context, ": packoffset(");
+		Emit(context, packOffsetSemantic->registerName.Content);
+		if(packOffsetSemantic->componentMask.Type != TokenType::Unknown)
+		{
+			Emit(context, ".");
+			Emit(context, packOffsetSemantic->componentMask.Content);
+		}
+		Emit(context, ")");
+	}
 	else
 	{
 		assert(!"unimplemented");
@@ -782,7 +806,7 @@ static void EmitSemantic(EmitContext* context, RefPtr<HLSLSemantic> semantic)
 }
 
 
-static void EmitSemantics(EmitContext* context, RefPtr<Decl> decl)
+static void EmitSemantics(EmitContext* context, RefPtr<Decl> decl, ESemanticMask mask = kESemanticMask_Default )
 {
 	for (auto mod = decl->modifiers.first; mod; mod = mod->next)
 	{
@@ -790,7 +814,7 @@ static void EmitSemantics(EmitContext* context, RefPtr<Decl> decl)
 		if (!semantic)
 			continue;
 
-		EmitSemantic(context, semantic);
+		EmitSemantic(context, semantic, mask);
 	}
 }
 
@@ -837,7 +861,7 @@ static void EmitConstantBufferDecl(
 		Emit(context, "cbuffer ");
 		Emit(context, declRefType->declRef.GetName());
 
-		EmitSemantics(context, varDecl);
+		EmitSemantics(context, varDecl, kESemanticMask_None);
 
 		Emit(context, "\n{\n");
 		if (auto structRef = declRefType->declRef.As<StructDeclRef>())
