@@ -347,7 +347,7 @@ static void EmitExprWithPrecedence(EmitContext* context, RefPtr<ExpressionSyntax
 #define POSTFIX(NAME, OP) case Operator::NAME: EmitUnaryExpr(context, outerPrec, kPrecedence_Postfix, "", #OP, unaryExpr); break
 
 		PREFIX(Neg, -);
-		PREFIX(Not, ~);
+		PREFIX(Not, !);
 		PREFIX(BitNot, ~);
 		PREFIX(PreInc, ++);
 		PREFIX(PreDec, --);
