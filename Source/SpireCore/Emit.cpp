@@ -764,6 +764,17 @@ static void EmitSemantic(EmitContext* context, RefPtr<HLSLSemantic> semantic)
 		Emit(context, ": ");
 		Emit(context, simple->name.Content);
 	}
+	else if(auto registerSemantic = semantic.As<HLSLRegisterSemantic>())
+	{
+		Emit(context, ": register(");
+		Emit(context, registerSemantic->registerName.Content);
+		if(registerSemantic->componentMask.Type != TokenType::Unknown)
+		{
+			Emit(context, ".");
+			Emit(context, registerSemantic->componentMask.Content);
+		}
+		Emit(context, ")");
+	}
 	else
 	{
 		assert(!"unimplemented");
@@ -825,7 +836,9 @@ static void EmitConstantBufferDecl(
 	{
 		Emit(context, "cbuffer ");
 		Emit(context, declRefType->declRef.GetName());
-		// TODO: semantics
+
+		EmitSemantics(context, varDecl);
+
 		Emit(context, "\n{\n");
 		if (auto structRef = declRefType->declRef.As<StructDeclRef>())
 		{
