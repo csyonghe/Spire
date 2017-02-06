@@ -173,6 +173,11 @@ __intrinsic float length(vec2 v);
 __intrinsic float length(vec3 v);
 __intrinsic float length(vec4 v);
 
+__intrinsic bool any(bool  v);
+__intrinsic bool any(bool2 v);
+__intrinsic bool any(bool3 v);
+__intrinsic bool any(bool4 v);
+
 __intrinsic void alphaTest(float alpha, float threshold);
 __intrinsic vec3 mix(vec3 v0, vec3 v1, float t);
 __intrinsic vec4 mix(vec4 v0, vec4 v1, float t);
