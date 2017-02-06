@@ -25,6 +25,14 @@ String tryReadCommandLineArgument(wchar_t const* option, wchar_t***ioCursor, wch
 	return String::FromWString(tryReadCommandLineArgumentRaw(option, ioCursor, end));
 }
 
+Profile TranslateProfileName(char const* name)
+{
+#define PROFILE(TAG, NAME, STAGE, VERSION)	if(strcmp(name, #NAME) == 0) return Profile::TAG;
+#define PROFILE_ALIAS(TAG, NAME)			if(strcmp(name, #NAME) == 0) return Profile::TAG;
+#include "SpireCore/ProfileDefs.h"
+
+	return Profile::Unknown;
+}
 
 int wmain(int argc, wchar_t* argv[])
 {
@@ -55,7 +63,7 @@ int wmain(int argc, wchar_t* argv[])
 					options.SymbolToCompile = tryReadCommandLineArgument(arg, &argCursor, argEnd);
 				else if (argStr == "-schedule")
 					options.ScheduleFileName = tryReadCommandLineArgument(arg, &argCursor, argEnd);
-				else if (argStr == "-backend")
+				else if (argStr == "-backend" || argStr == "-target")
 				{
 					String name = tryReadCommandLineArgument(arg, &argCursor, argEnd);
 					if (name == "glsl")
@@ -78,10 +86,62 @@ int wmain(int argc, wchar_t* argv[])
 					{
 						options.Target = CodeGenTarget::SPIRV;
 					}
+					else if (name == "dxbc")
+					{
+						options.Target = CodeGenTarget::DXBytecode;
+					}
+					else if (name == "dxbc-assembly")
+					{
+						options.Target = CodeGenTarget::DXBytecodeAssembly;
+					}
 					else
 					{
 						fprintf(stderr, "unknown code generation target '%S'\n", name.ToWString());
 					}
+				}
+				// A "profile" specifies both a specific target stage and a general level
+				// of capability required by the program.
+				else if (argStr == "-profile")
+				{
+					String name = tryReadCommandLineArgument(arg, &argCursor, argEnd);
+
+					Profile profile = TranslateProfileName(name.begin());
+					if( profile.raw == Profile::Unknown )
+					{
+						fprintf(stderr, "unknown profile '%s'\n", name);
+					}
+					else
+					{
+						options.profile = profile;
+					}
+				}
+				else if (argStr == "-entry")
+				{
+					String name = tryReadCommandLineArgument(arg, &argCursor, argEnd);
+
+					EntryPointOption entry;
+					entry.name = name;
+					entry.profile = Profile::Unknown;
+
+					// TODO(tfoley): Allow user to fold a specification of a profile into the entry-point name,
+					// for the case where they might be compiling multiple entry points in one invocation...
+
+					options.entryPoints.Add(entry);
+				}
+				else if (argStr == "-stage")
+				{
+					String name = tryReadCommandLineArgument(arg, &argCursor, argEnd);
+					StageTarget stage = StageTarget::Unknown;
+					if (name == "vertex") { stage = StageTarget::VertexShader; }
+					else if (name == "fragment") { stage = StageTarget::FragmentShader; }
+					else if (name == "hull") { stage = StageTarget::HullShader; }
+					else if (name == "domain") { stage = StageTarget::DomainShader; }
+					else if (name == "compute") { stage = StageTarget::ComputeShader; }
+					else
+					{
+						fprintf(stderr, "unknown stage '%S'\n", name.ToWString());
+					}
+					options.stage = stage;
 				}
 				else if (argStr == "-genchoice")
 					options.Mode = CompilerMode::GenerateChoice;
@@ -172,6 +232,27 @@ int wmain(int argc, wchar_t* argv[])
 			fprintf(stderr, "error: multiple input files specified\n");
 			exit(1);
 		}
+
+		// For any entry points that were given without an explicit profile, we can now apply
+		// the profile that was given to them.
+		if( options.entryPoints.Count() != 0 )
+		{
+			if( options.profile.raw == Profile::Unknown )
+			{
+				fprintf(stderr, "error: no profile specified; use the '-profile <profile name>' option");
+				exit(1);
+			}
+
+			for( auto& e : options.entryPoints )
+			{
+				if( e.profile.raw == Profile::Unknown )
+				{
+					e.profile = options.profile;
+				}
+			}
+		}
+
+		//
 
 		String fileName = String::FromWString(inputPaths[0]);
 

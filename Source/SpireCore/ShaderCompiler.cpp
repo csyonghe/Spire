@@ -17,6 +17,15 @@
 
 #include "Emit.h"
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <Windows.h>
+#undef WIN32_LEAN_AND_MEAN
+#undef NOMINMAX
+#include <d3dcompiler.h>
+#endif
+
 #ifdef CreateDirectory
 #undef CreateDirectory
 #endif
@@ -367,6 +376,155 @@ namespace Spire
                 rs.SyntaxNode = ParseProgram(tokens, result.GetErrorWriter(), fileName, predefUnit.SyntaxNode.Ptr());
 				return rs;
 			}
+
+			String EmitHLSL(RefPtr<ProgramSyntaxNode> program, CompileOptions const& options)
+			{
+				// TODO(tfoley): probably need a way to customize the emit logic...
+				return EmitProgram(program.Ptr());
+			}
+
+			void* GetD3DCompilerDLL()
+			{
+			#ifdef _WIN32
+				// TODO(tfoley): let user specify version of d3dcompiler DLL to use.
+				static HMODULE d3dCompiler =  LoadLibraryA("d3dcompiler_47");
+				// TODO(tfoley): handle case where we can't find it gracefully
+				assert(d3dCompiler);
+				return d3dCompiler;
+			#else
+				return nullptr;
+			#endif
+			}
+
+			char const* GetHLSLProfileName(Profile profile)
+			{
+				switch(profile.raw)
+				{
+				#define PROFILE(TAG, NAME, STAGE, VERSION) case Profile::TAG: return #NAME;
+				#include "ProfileDefs.h"
+
+				default:
+					// TODO: emit an error here!
+					return "unknown";
+				}
+			}
+
+			List<uint8_t> EmitDXBytecode(RefPtr<ProgramSyntaxNode> program, CompileOptions const& options)
+			{
+			#ifdef _WIN32
+				if(options.entryPoints.Count() != 1)
+				{
+					if(options.entryPoints.Count() == 0)
+					{
+						// TODO(tfoley): need to write diagnostics into this whole thing...
+						fprintf(stderr, "no entry point specified\n");
+					}
+					else
+					{
+						fprintf(stderr, "multiple entry points specified\n");
+					}
+					return List<uint8_t>();
+				}
+
+				static pD3DCompile D3DCompile_ = nullptr;
+				if (!D3DCompile_)
+				{
+					HMODULE d3dCompiler = (HMODULE)GetD3DCompilerDLL();
+					assert(d3dCompiler);
+
+					D3DCompile_ = (pD3DCompile)GetProcAddress(d3dCompiler, "D3DCompile");
+					assert(D3DCompile_);
+				}
+
+				String hlslCode = EmitHLSL(program, options);
+
+				ID3DBlob* codeBlob;
+				ID3DBlob* diagnosticsBlob;
+				HRESULT hr = D3DCompile_(
+					hlslCode.begin(),
+					hlslCode.Length(),
+					"spire",
+					nullptr,
+					nullptr,
+					options.entryPoints[0].name.begin(),
+					GetHLSLProfileName(options.entryPoints[0].profile),
+					0,
+					0,
+					&codeBlob,
+					&diagnosticsBlob);
+				List<uint8_t> data;
+				if (codeBlob)
+				{
+					data.AddRange((uint8_t const*)codeBlob->GetBufferPointer(), codeBlob->GetBufferSize());
+					codeBlob->Release();
+				}
+				if (diagnosticsBlob)
+				{
+					// TODO(tfoley): need a better policy for how we translate diagnostics
+					// back into the Spire world (although we should always try to generate
+					// HLSL that doesn't produce any diagnostics...)
+					String diagnostics = (char const*) diagnosticsBlob->GetBufferPointer();
+					fprintf(stderr, "%s", diagnostics.begin());
+					diagnosticsBlob->Release();
+				}
+				if (FAILED(hr))
+				{
+					int f = 9;
+				}
+				return data;
+
+			#else
+				assert(!"can't actually emit DX bytecode on this host")
+				return "";
+			#endif
+			}
+
+			String EmitDXBytecodeAssembly(RefPtr<ProgramSyntaxNode> program, CompileOptions const& options)
+			{
+			#ifdef _WIN32
+				static pD3DDisassemble D3DDisassemble_ = nullptr;
+				if (!D3DDisassemble_)
+				{
+					HMODULE d3dCompiler = (HMODULE)GetD3DCompilerDLL();
+					assert(d3dCompiler);
+
+					D3DDisassemble_ = (pD3DDisassemble)GetProcAddress(d3dCompiler, "D3DDisassemble");
+					assert(D3DDisassemble_);
+				}
+
+				List<uint8_t> dxbc = EmitDXBytecode(program, options);
+				if (!dxbc.Count())
+				{
+					return "";
+				}
+
+				ID3DBlob* codeBlob;
+				HRESULT hr = D3DDisassemble_(
+					&dxbc[0],
+					dxbc.Count(),
+					0,
+					nullptr,
+					&codeBlob);
+
+				String result;
+				if (codeBlob)
+				{
+					result = String((char const*) codeBlob->GetBufferPointer());
+					codeBlob->Release();
+				}
+				if (FAILED(hr))
+				{
+					// TODO(tfoley): need to figure out what to diagnose here...
+					int f = 9;
+				}
+				return result;
+
+			#else
+				assert(!"can't actually emit DX bytecode assembly on this host")
+				return "";
+			#endif
+			}
+
 			virtual void Compile(CompileResult & result, CompilationContext & context, List<CompileUnit> & units, const CompileOptions & options) override
 			{
 				RefPtr<ProgramSyntaxNode> programSyntaxNode = new ProgramSyntaxNode();
@@ -392,6 +550,39 @@ namespace Spire
 					// getting in the way.
 					//
 					// I'm going to bypass it for now and see what I can do:
+
+					switch (options.Target)
+					{
+					case CodeGenTarget::HLSL:
+						{
+							String hlslProgram = EmitHLSL(programSyntaxNode, options);
+
+							StageSource stageSource;
+							stageSource.MainCode = hlslProgram;
+							CompiledShaderSource compiled;
+							compiled.Stages[""] = stageSource;
+							result.CompiledSource[""] = compiled;
+							return;
+						}
+						break;
+
+					case CodeGenTarget::DXBytecodeAssembly:
+						{
+							String hlslProgram = EmitDXBytecodeAssembly(programSyntaxNode.Ptr(), options);
+
+							// HACK(tfoley): just print it out since that is what people probably expect.
+							// TODO: need a way to control where output gets routed across all possible targets.
+							fprintf(stdout, "%s", hlslProgram.begin());
+							return;
+						}
+						break;
+
+					default:
+						throw "unimplemented";
+						return;
+					}
+
+
 					String rawProgram = EmitProgram(programSyntaxNode.Ptr());
 
 					StageSource stageSource;

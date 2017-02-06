@@ -726,7 +726,8 @@ static void EmitVal(EmitContext* context, RefPtr<Val> val)
 	}
 	else
 	{
-		assert(!"unimplemented");
+		// Note(tfoley): ignore unhandled cases for semantics for now...
+//		assert(!"unimplemented");
 	}
 }
 

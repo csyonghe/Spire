@@ -379,6 +379,7 @@
     <ClInclude Include="GetDependencyVisitor.h" />
     <ClInclude Include="Naming.h" />
     <ClInclude Include="Preprocessor.h" />
+    <ClInclude Include="ProfileDefs.h" />
     <ClInclude Include="SamplerUsageAnalysis.h" />
     <ClInclude Include="Schedule.h" />
     <ClInclude Include="IL.h" />
