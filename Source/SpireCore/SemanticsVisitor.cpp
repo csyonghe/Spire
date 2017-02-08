@@ -1390,6 +1390,42 @@ namespace Spire
 				compSym->Implementations.Add(compImpl);
 			}
 
+			void CheckVarDeclCommon(RefPtr<VarDeclBase> varDecl)
+			{
+				// Check the type, if one was given
+				TypeExp type = CheckUsableType(varDecl->Type);
+
+				// TODO: Additional validation rules on types should go here,
+				// but we need to deal with the fact that some cases might be
+				// allowed in one context (e.g., an unsized array parameter)
+				// but not in othters (e.g., an unsized array field in a struct).
+
+				// Check the initializers, if one was given
+				RefPtr<ExpressionSyntaxNode> initExpr = CheckTerm(varDecl->Expr);
+
+				// If a type was given, ...
+				if (type.Ptr())
+				{
+					// then coerce any initializer to the type
+					if (initExpr)
+					{
+						initExpr = Coerce(type, initExpr);
+					}
+				}
+				else
+				{
+					// TODO: infer a type from the initializers
+					if (!initExpr)
+					{
+						getSink()->diagnose(varDecl, Diagnostics::unimplemented, "variable declaration with no type must have initializer");
+					}
+					else
+					{
+						getSink()->diagnose(varDecl, Diagnostics::unimplemented, "type inference for variable declaration");
+					}
+				}
+			}
+
 			virtual RefPtr<GenericDecl> VisitGenericDecl(GenericDecl* genericDecl) override
 			{
 				// check the parameters
@@ -1402,7 +1438,7 @@ namespace Spire
 					else if (auto valParam = m.As<GenericValueParamDecl>())
 					{
 						// TODO: some real checking here...
-						valParam->Type = CheckUsableType(valParam->Type);
+						CheckVarDeclCommon(valParam);
 					}
 				}
 
