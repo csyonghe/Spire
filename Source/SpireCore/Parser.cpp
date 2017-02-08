@@ -543,6 +543,15 @@ namespace Spire
             return typeDefDecl;
         }
 
+		// Add a modifier to a list of modifiers being built
+		static void AddModifier(RefPtr<Modifier>** ioModifierLink, RefPtr<Modifier> modifier)
+		{
+			RefPtr<Modifier>*& modifierLink = *ioModifierLink;
+
+			*modifierLink = modifier;
+			modifierLink = &modifier->next;
+		}
+
         static Modifiers ParseModifiers(Parser* parser)
         {
             Modifiers modifiers;
@@ -602,8 +611,7 @@ namespace Spire
                     RefPtr<LayoutModifier> modifier = new LayoutModifier();
                     modifier->LayoutString = layoutSB.ProduceString();
 
-                    *modifierLink = modifier;
-                    modifierLink = &modifier->next;
+					AddModifier(&modifierLink, modifier);
 				}
 				else if (AdvanceIf(parser, "specialize"))
 				{
@@ -619,8 +627,7 @@ namespace Spire
 							parser->ReadToken(TokenType::Comma);
 						}
 					}
-					*modifierLink = modifier;
-					modifierLink = &modifier->next;
+					AddModifier(&modifierLink, modifier);
 				}
                 else if (AdvanceIf(parser, "inline"))
 				{
@@ -656,8 +663,7 @@ namespace Spire
                     modifier->Key = name;
                     modifier->Value = valueToken;
 
-                    *modifierLink = modifier;
-                    modifierLink = &modifier->next;
+					AddModifier(&modifierLink, modifier);
                 }
                 else if (AdvanceIf(parser, "__intrinsic"))
                 {
@@ -670,8 +676,7 @@ namespace Spire
 					modifier->tag = BaseType(StringToInt(parser->ReadToken(TokenType::IntLiterial).Content));
 					parser->ReadToken(TokenType::RParent);
 
-					*modifierLink = modifier;
-					modifierLink = &modifier->next;
+					AddModifier(&modifierLink, modifier);
 				}
 				else if (AdvanceIf(parser,"__magic_type"))
 				{
@@ -684,8 +689,17 @@ namespace Spire
 					}
 					parser->ReadToken(TokenType::RParent);
 
-					*modifierLink = modifier;
-					modifierLink = &modifier->next;
+					AddModifier(&modifierLink, modifier);
+				}
+				else if (AdvanceIf(parser, "row_major"))
+				{
+					RefPtr<HLSLRowMajorLayoutModifier> modifier = new HLSLRowMajorLayoutModifier();
+					AddModifier(&modifierLink, modifier);
+				}
+				else if (AdvanceIf(parser, "column_major"))
+				{
+					RefPtr<HLSLColumnMajorLayoutModifier> modifier = new HLSLColumnMajorLayoutModifier();
+					AddModifier(&modifierLink, modifier);
 				}
                 else
                 {

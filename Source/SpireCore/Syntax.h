@@ -2174,6 +2174,28 @@ namespace Spire
 			uint32_t tag;
 		};
 
+		// Modifiers that affect the storage layout for matrices
+		class MatrixLayoutModifier : public Modifier {};
+
+		// Modifiers that specify row- and column-major layout, respectively
+		class RowMajorLayoutModifier : public MatrixLayoutModifier {};
+		class ColumnMajorLayoutModifier : public MatrixLayoutModifier {};
+
+		// The HLSL flavor of those modifiers
+		class HLSLRowMajorLayoutModifier : public RowMajorLayoutModifier {};
+		class HLSLColumnMajorLayoutModifier : public ColumnMajorLayoutModifier {};
+
+		// The GLSL flavor of those modifiers
+		//
+		// Note(tfoley): The GLSL versions of these modifiers are "backwards"
+		// in the sense that when a GLSL programmer requests row-major layout,
+		// we actually interpret that as requesting column-major. This makes
+		// sense because we interpret matrix conventions backwards from how
+		// GLSL specifies them.
+		class GLSLRowMajorLayoutModifier : public ColumnMajorLayoutModifier {};
+		class GLSLColumnMajorLayoutModifier : public RowMajorLayoutModifier {};
+
+
 		//
 
 		// A generic declaration, parameterized on types/values
