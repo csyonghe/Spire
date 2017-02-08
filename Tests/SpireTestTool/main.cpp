@@ -7,6 +7,12 @@ using namespace CoreLib::IO;
 
 #include "os.h"
 
+
+#ifdef _WIN32
+#define SPIRE_TEST_SUPPORT_HLSL 1
+#include <d3dcompiler.h>
+#endif
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,9 +24,6 @@ struct Options
 
 	// only run test cases with names that have this prefix
 	char const* testPrefix = nullptr;
-
-	// should we use the DX shader compiler to generate gold output for comparison?
-	bool generateHLSLBaselines = false;
 
 	// generate extra output (notably: command lines we run)
 	bool shouldBeVerbose = false;
@@ -59,10 +62,6 @@ void parseOptions(int* argc, char** argv)
 				*writeCursor++ = arg;
 			}
 			break;
-		}
-		else if( strcmp(arg, "-generate-hlsl-baselines") == 0 )
-		{
-			options.generateHLSLBaselines = true;
 		}
 		else if( strcmp(arg, "-v") == 0 )
 		{
@@ -287,10 +286,6 @@ TestResult runTestImpl(
 	return result;
 }
 
-#ifdef _WIN32
-#include <d3dcompiler.h>
-#endif
-
 String tryGrabArg(OSProcessSpawner* spawner, char const* opt, char const* defaultVal = "")
 {
 	char const* cursor = spawner->commandLine_.Buffer();
@@ -314,10 +309,10 @@ String tryGrabArg(OSProcessSpawner* spawner, char const* opt, char const* defaul
 	}
 }
 
+#ifdef SPIRE_TEST_SUPPORT_HLSL
 void generateHLSLBaseline(
 	String	filePath)
 {
-#ifdef _WIN32
 	// Note(tfoley): the approach here is really hacky, but it is better to have this at least a *bit* automated...
 	//
 	// TODO(tfoley): consider having the shader compiler driver support a pass-through mode where
@@ -427,14 +422,14 @@ void generateHLSLBaseline(
 	catch (CoreLib::IO::IOException)
 	{
 	}
-
-#endif
 }
 
 TestResult runHLSLTestImpl(
 	String	filePath)
 {
-	if( options.generateHLSLBaselines )
+	// We will use the Microsoft compiler to generate out expected output here
+	String expectedOutputPath = filePath + ".expected";
+	if(!CoreLib::IO::File::Exists(expectedOutputPath))
 	{
 		generateHLSLBaseline(filePath);
 	}
@@ -476,7 +471,6 @@ TestResult runHLSLTestImpl(
 
 	String actualOutput = actualOutputBuilder.ProduceString();
 
-	String expectedOutputPath = filePath + ".expected";
 	String expectedOutput;
 	try
 	{
@@ -513,7 +507,7 @@ TestResult runHLSLTestImpl(
 
 	return result;
 }
-
+#endif
 
 struct TestContext
 {
@@ -562,6 +556,7 @@ void runTestsInDirectory(
 	}
 }
 
+#ifdef SPIRE_TEST_SUPPORT_HLSL
 void runHLSLTestsInDirectory(
 	TestContext*		context,
 	String				directoryPath)
@@ -571,6 +566,7 @@ void runHLSLTestsInDirectory(
 		runTest(context, file, runHLSLTestImpl);
 	}
 }
+#endif
 
 //
 
@@ -589,7 +585,9 @@ int main(
 	runTestsInDirectory(&context, "Tests/Diagnostics/");
 	runTestsInDirectory(&context, "Tests/Preprocessor/");
 
+#ifdef SPIRE_TEST_SUPPORT_HLSL
 	runHLSLTestsInDirectory(&context, "Tests/HLSL/DXSDK/");
+#endif
 
 	if (!context.totalTestCount)
 	{
