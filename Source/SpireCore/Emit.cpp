@@ -763,14 +763,23 @@ static void EmitModifiers(EmitContext* context, RefPtr<Decl> decl)
 {
 	for (auto mod = decl->modifiers.first; mod; mod = mod->next)
 	{
-		if (auto rowMajorMod = mod.As<RowMajorLayoutModifier>())
-		{
-			Emit(context, "row_major ");
-		}
-		else if (auto rowMajorMod = mod.As<ColumnMajorLayoutModifier>())
-		{
-			Emit(context, "column_major ");
-		}
+		if (0) {}
+
+		#define CASE(TYPE, KEYWORD) \
+			else if(auto mod_##TYPE = mod.As<TYPE>()) Emit(context, #KEYWORD " ")
+
+		CASE(RowMajorLayoutModifier, row_major);
+		CASE(ColumnMajorLayoutModifier, column_major);
+		CASE(HLSLNoInterpolationModifier, nointerpolation);
+		CASE(HLSLPreciseModifier, precise);
+		CASE(HLSLEffectSharedModifier, shared);
+		CASE(HLSLGroupSharedModifier, groupshared);
+		CASE(HLSLStaticModifier, static);
+		CASE(HLSLUniformModifier, uniform);
+		CASE(HLSLVolatileModifier, volatile);
+
+		#undef CASE
+
 		else
 		{
 			// skip any extra modifiers

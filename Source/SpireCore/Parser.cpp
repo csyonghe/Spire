@@ -691,6 +691,25 @@ namespace Spire
 
 					AddModifier(&modifierLink, modifier);
 				}
+
+				#define CASE(KEYWORD, TYPE)						\
+					else if(AdvanceIf(parser, #KEYWORD)) do {	\
+						AddModifier(&modifierLink, new TYPE());	\
+					} while(0)
+
+				CASE(row_major, HLSLRowMajorLayoutModifier);
+				CASE(column_major, HLSLColumnMajorLayoutModifier);
+
+				CASE(nointerpolation, HLSLNoInterpolationModifier);
+				CASE(precise, HLSLPreciseModifier);
+				CASE(shared, HLSLEffectSharedModifier);
+				CASE(groupshared, HLSLGroupSharedModifier);
+				CASE(static, HLSLStaticModifier);
+				CASE(uniform, HLSLUniformModifier);
+				CASE(volatile, HLSLVolatileModifier);
+
+				#undef CASE
+
 				else if (AdvanceIf(parser, "row_major"))
 				{
 					RefPtr<HLSLRowMajorLayoutModifier> modifier = new HLSLRowMajorLayoutModifier();
@@ -701,6 +720,7 @@ namespace Spire
 					RefPtr<HLSLColumnMajorLayoutModifier> modifier = new HLSLColumnMajorLayoutModifier();
 					AddModifier(&modifierLink, modifier);
 				}
+
                 else
                 {
                     // Done with modifier list

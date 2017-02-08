@@ -2208,6 +2208,31 @@ namespace Spire
 		class GLSLRowMajorLayoutModifier : public ColumnMajorLayoutModifier {};
 		class GLSLColumnMajorLayoutModifier : public RowMajorLayoutModifier {};
 
+		// More HLSL Keyword
+
+		// HLSL `nointerpolation` modifier
+		class HLSLNoInterpolationModifier : public Modifier {};
+
+		// HLSL `precise` modifier
+		class HLSLPreciseModifier : public Modifier {};
+
+		// HLSL `shared` modifier (which is used by the effect system,
+		// and shouldn't be confused with `groupshared`)
+		class HLSLEffectSharedModifier : public Modifier {};
+
+		// HLSL `groupshared` modifier
+		class HLSLGroupSharedModifier : public Modifier {};
+
+		// HLSL `static` modifier (probably doesn't need to be
+		// treated as HLSL-specific)
+		class HLSLStaticModifier : public Modifier {};
+
+		// HLSL `uniform` modifier (distinct meaning from GLSL
+		// use of the keyword)
+		class HLSLUniformModifier : public Modifier {};
+
+		// HLSL `volatile` modifier (ignored)
+		class HLSLVolatileModifier : public Modifier {};
 
 		//
 
