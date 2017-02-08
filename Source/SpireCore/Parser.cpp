@@ -1356,6 +1356,7 @@ namespace Spire
 			parser->PushScope(decl.Ptr());
 			parser->ReadToken("__generic");
 			parser->ReadToken(TokenType::OpLess);
+			parser->genericDepth++;
 			while (!parser->LookAheadToken(TokenType::OpGreater))
 			{
 				AddMember(decl, ParseGenericParamDecl(parser));
@@ -1365,6 +1366,7 @@ namespace Spire
 
 				parser->ReadToken(TokenType::Comma);
 			}
+			parser->genericDepth--;
 			parser->ReadToken(TokenType::OpGreater);
 
 			decl->inner = ParseDecl(parser, decl.Ptr());
