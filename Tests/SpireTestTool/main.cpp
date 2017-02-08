@@ -548,12 +548,25 @@ void runTest(
 
 void runTestsInDirectory(
 	TestContext*		context,
+	String				directoryPath,
+	TestResult(*runFunc)(String),
+	char const* pattern)
+{
+	for (auto file : osFindFilesInDirectoryMatchingPattern(directoryPath, pattern))
+	{
+		runTest(context, file, runFunc);
+	}
+	for (auto subdir : osFindChildDirectories(directoryPath))
+	{
+		runTestsInDirectory(context, subdir, runFunc, pattern);
+	}
+}
+
+void runTestsInDirectory(
+	TestContext*		context,
 	String				directoryPath)
 {
-	for (auto file : osFindFilesInDirectoryMatchingPattern(directoryPath, "*.spire"))
-	{
-		runTest(context, file, runTestImpl);
-	}
+	runTestsInDirectory(context, directoryPath, &runTestImpl, "*.spire");
 }
 
 #ifdef SPIRE_TEST_SUPPORT_HLSL
@@ -561,10 +574,8 @@ void runHLSLTestsInDirectory(
 	TestContext*		context,
 	String				directoryPath)
 {
-	for (auto file : osFindFilesInDirectoryMatchingPattern(directoryPath, "*.hlsl"))
-	{
-		runTest(context, file, runHLSLTestImpl);
-	}
+	runTestsInDirectory(context, directoryPath, &runHLSLTestImpl, "*.hlsl");
+	runTestsInDirectory(context, directoryPath, &runHLSLTestImpl, "*.fx");
 }
 #endif
 
@@ -591,7 +602,7 @@ int main(
 
 	if (!context.totalTestCount)
 	{
-		printf("no tests run");
+		printf("no tests run\n");
 		return 0;
 	}
 
