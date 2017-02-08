@@ -99,6 +99,13 @@ namespace Spire
 			Profile profile;
 		};
 
+		enum class PassThroughMode
+		{
+			None,	// don't pass through: use Spire compiler
+			HLSL,	// pass through HLSL to `D3DCompile` API
+//			GLSL,	// pass through GLSL to `glslang` library
+		};
+
 		class CompileOptions
 		{
 		public:
@@ -117,6 +124,9 @@ namespace Spire
 
 			// the code generation profile we've been asked to use
 			Profile profile;
+
+			// should we just pass the input to another compiler?
+			PassThroughMode passThrough = PassThroughMode::None;
 		};
 
 		class CompileUnit
@@ -149,6 +159,13 @@ namespace Spire
 				CompilationContext context;
 				Compile(result, context, units, options);
 			}
+
+			virtual void PassThrough(
+				CompileResult &			result, 
+				String const&			sourceText,
+				String const&			sourcePath,
+				const CompileOptions &	options) = 0;
+
 		};
 
 		ShaderCompiler * CreateShaderCompiler();

@@ -214,6 +214,17 @@ namespace SpireLib
 		auto searchDirs = options.SearchDirectories;
 		searchDirs.Add(Path::GetDirectoryName(fileName));
 		searchDirs.Reverse();
+
+
+		// If we are being asked to do pass-through, then we need to do that here...
+		if (options.passThrough != PassThroughMode::None)
+		{
+			compiler->PassThrough(compileResult, src, fileName, options);
+			return List<ShaderLibFile>();
+		}
+
+
+
 		CompileUnit predefUnit;
 		predefUnit = compiler->Parse(compileResult, SpireStdLib::GetCode(), "stdlib", &includeHandler, options.PreprocessorDefinitions, predefUnit);
 		for (int i = 0; i < unitsToInclude.Count(); i++)

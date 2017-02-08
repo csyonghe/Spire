@@ -377,23 +377,33 @@ namespace Spire
 				return rs;
 			}
 
-			String EmitHLSL(RefPtr<ProgramSyntaxNode> program, CompileOptions const& options)
+			// Actual context for compilation... :(
+			struct ExtraContext
 			{
-				// TODO(tfoley): probably need a way to customize the emit logic...
-				return EmitProgram(program.Ptr());
-			}
+				CompileOptions const* options = nullptr;
 
-			void* GetD3DCompilerDLL()
+				CompileResult* compileResult = nullptr;
+
+				RefPtr<ProgramSyntaxNode> programSyntax;
+
+				String sourceText;
+				String sourcePath;
+
+				CompileOptions const& getOptions() { return *options; }
+			};
+
+
+			String EmitHLSL(ExtraContext& context)
 			{
-			#ifdef _WIN32
-				// TODO(tfoley): let user specify version of d3dcompiler DLL to use.
-				static HMODULE d3dCompiler =  LoadLibraryA("d3dcompiler_47");
-				// TODO(tfoley): handle case where we can't find it gracefully
-				assert(d3dCompiler);
-				return d3dCompiler;
-			#else
-				return nullptr;
-			#endif
+				if (context.getOptions().passThrough != PassThroughMode::None)
+				{
+					return context.sourceText;
+				}
+				else
+				{
+					// TODO(tfoley): probably need a way to customize the emit logic...
+					return EmitProgram(context.programSyntax.Ptr());
+				}
 			}
 
 			char const* GetHLSLProfileName(Profile profile)
@@ -409,23 +419,20 @@ namespace Spire
 				}
 			}
 
-			List<uint8_t> EmitDXBytecode(RefPtr<ProgramSyntaxNode> program, CompileOptions const& options)
+#ifdef _WIN32
+			void* GetD3DCompilerDLL()
 			{
-			#ifdef _WIN32
-				if(options.entryPoints.Count() != 1)
-				{
-					if(options.entryPoints.Count() == 0)
-					{
-						// TODO(tfoley): need to write diagnostics into this whole thing...
-						fprintf(stderr, "no entry point specified\n");
-					}
-					else
-					{
-						fprintf(stderr, "multiple entry points specified\n");
-					}
-					return List<uint8_t>();
-				}
+				// TODO(tfoley): let user specify version of d3dcompiler DLL to use.
+				static HMODULE d3dCompiler =  LoadLibraryA("d3dcompiler_47");
+				// TODO(tfoley): handle case where we can't find it gracefully
+				assert(d3dCompiler);
+				return d3dCompiler;
+			}
 
+			List<uint8_t> EmitDXBytecodeForEntryPoint(
+				ExtraContext&				context,
+				EntryPointOption const&		entryPoint)
+			{
 				static pD3DCompile D3DCompile_ = nullptr;
 				if (!D3DCompile_)
 				{
@@ -436,18 +443,18 @@ namespace Spire
 					assert(D3DCompile_);
 				}
 
-				String hlslCode = EmitHLSL(program, options);
+				String hlslCode = EmitHLSL(context);
 
 				ID3DBlob* codeBlob;
 				ID3DBlob* diagnosticsBlob;
 				HRESULT hr = D3DCompile_(
 					hlslCode.begin(),
 					hlslCode.Length(),
-					"spire",
+					context.sourcePath.begin(),
 					nullptr,
 					nullptr,
-					options.entryPoints[0].name.begin(),
-					GetHLSLProfileName(options.entryPoints[0].profile),
+					entryPoint.name.begin(),
+					GetHLSLProfileName(entryPoint.profile),
 					0,
 					0,
 					&codeBlob,
@@ -472,16 +479,32 @@ namespace Spire
 					int f = 9;
 				}
 				return data;
-
-			#else
-				assert(!"can't actually emit DX bytecode on this host")
-				return "";
-			#endif
 			}
 
-			String EmitDXBytecodeAssembly(RefPtr<ProgramSyntaxNode> program, CompileOptions const& options)
+			List<uint8_t> EmitDXBytecode(
+				ExtraContext&				context)
 			{
-			#ifdef _WIN32
+				if(context.getOptions().entryPoints.Count() != 1)
+				{
+					if(context.getOptions().entryPoints.Count() == 0)
+					{
+						// TODO(tfoley): need to write diagnostics into this whole thing...
+						fprintf(stderr, "no entry point specified\n");
+					}
+					else
+					{
+						fprintf(stderr, "multiple entry points specified\n");
+					}
+					return List<uint8_t>();
+				}
+
+				return EmitDXBytecodeForEntryPoint(context, context.getOptions().entryPoints[0]);
+			}
+
+			String EmitDXBytecodeAssemblyForEntryPoint(
+				ExtraContext&				context,
+				EntryPointOption const&		entryPoint)
+			{
 				static pD3DDisassemble D3DDisassemble_ = nullptr;
 				if (!D3DDisassemble_)
 				{
@@ -492,7 +515,7 @@ namespace Spire
 					assert(D3DDisassemble_);
 				}
 
-				List<uint8_t> dxbc = EmitDXBytecode(program, options);
+				List<uint8_t> dxbc = EmitDXBytecodeForEntryPoint(context, entryPoint);
 				if (!dxbc.Count())
 				{
 					return "";
@@ -518,12 +541,69 @@ namespace Spire
 					int f = 9;
 				}
 				return result;
-
-			#else
-				assert(!"can't actually emit DX bytecode assembly on this host")
-				return "";
-			#endif
 			}
+
+
+			String EmitDXBytecodeAssembly(
+				ExtraContext&				context)
+			{
+				if(context.getOptions().entryPoints.Count() == 0)
+				{
+					// TODO(tfoley): need to write diagnostics into this whole thing...
+					fprintf(stderr, "no entry point specified\n");
+					return "";
+				}
+
+				StringBuilder sb;
+				for (auto entryPoint : context.getOptions().entryPoints)
+				{
+					sb << EmitDXBytecodeAssemblyForEntryPoint(context, entryPoint);
+				}
+				return sb.ProduceString();
+			}
+#endif
+
+			void DoNewEmitLogic(ExtraContext& context)
+			{
+				switch (context.getOptions().Target)
+				{
+				case CodeGenTarget::HLSL:
+					{
+						String hlslProgram = EmitHLSL(context);
+
+						if (context.compileResult)
+						{
+							StageSource stageSource;
+							stageSource.MainCode = hlslProgram;
+							CompiledShaderSource compiled;
+							compiled.Stages[""] = stageSource;
+							context.compileResult->CompiledSource[""] = compiled;
+						}
+						else
+						{
+							fprintf(stdout, "%s", hlslProgram.begin());
+						}
+						return;
+					}
+					break;
+
+				case CodeGenTarget::DXBytecodeAssembly:
+					{
+						String hlslProgram = EmitDXBytecodeAssembly(context);
+
+						// HACK(tfoley): just print it out since that is what people probably expect.
+						// TODO: need a way to control where output gets routed across all possible targets.
+						fprintf(stdout, "%s", hlslProgram.begin());
+						return;
+					}
+					break;
+
+				default:
+					throw "unimplemented";
+					return;
+				}
+			}
+
 
 			virtual void Compile(CompileResult & result, CompilationContext & context, List<CompileUnit> & units, const CompileOptions & options) override
 			{
@@ -551,46 +631,16 @@ namespace Spire
 					//
 					// I'm going to bypass it for now and see what I can do:
 
-					switch (options.Target)
-					{
-					case CodeGenTarget::HLSL:
-						{
-							String hlslProgram = EmitHLSL(programSyntaxNode, options);
+					ExtraContext extra;
+					extra.options = &options;
+					extra.programSyntax = programSyntaxNode;
+					extra.sourcePath = "spire"; // don't have this any more!
+					extra.sourcePath = "";
+					extra.compileResult = &result;
 
-							StageSource stageSource;
-							stageSource.MainCode = hlslProgram;
-							CompiledShaderSource compiled;
-							compiled.Stages[""] = stageSource;
-							result.CompiledSource[""] = compiled;
-							return;
-						}
-						break;
-
-					case CodeGenTarget::DXBytecodeAssembly:
-						{
-							String hlslProgram = EmitDXBytecodeAssembly(programSyntaxNode.Ptr(), options);
-
-							// HACK(tfoley): just print it out since that is what people probably expect.
-							// TODO: need a way to control where output gets routed across all possible targets.
-							fprintf(stdout, "%s", hlslProgram.begin());
-							return;
-						}
-						break;
-
-					default:
-						throw "unimplemented";
-						return;
-					}
-
-
-					String rawProgram = EmitProgram(programSyntaxNode.Ptr());
-
-					StageSource stageSource;
-					stageSource.MainCode = rawProgram;
-					CompiledShaderSource compiled;
-					compiled.Stages[""] = stageSource;
-					result.CompiledSource[""] = compiled;
+					DoNewEmitLogic(extra);
 					return;
+
 #else
 
 
@@ -812,6 +862,23 @@ namespace Spire
 					SpireStdLib::Finalize();
 				}
 			}
+
+			virtual void PassThrough(
+				CompileResult &			result,
+				String const&			sourceText,
+				String const&			sourcePath,
+				const CompileOptions &	options) override
+			{
+				ExtraContext extra;
+				extra.options = &options;
+				extra.sourcePath = sourcePath;
+				extra.sourceText = sourceText;
+
+				DoNewEmitLogic(extra);
+				return;
+
+			}
+
 		};
 
 		ShaderCompiler * CreateShaderCompiler()

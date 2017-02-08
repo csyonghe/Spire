@@ -121,10 +121,13 @@ int wmain(int argc, wchar_t* argv[])
 
 					EntryPointOption entry;
 					entry.name = name;
-					entry.profile = Profile::Unknown;
 
 					// TODO(tfoley): Allow user to fold a specification of a profile into the entry-point name,
 					// for the case where they might be compiling multiple entry points in one invocation...
+					//
+					// For now, just use the last profile set on the command-line to specify this
+
+					entry.profile = options.profile;
 
 					options.entryPoints.Add(entry);
 				}
@@ -142,6 +145,17 @@ int wmain(int argc, wchar_t* argv[])
 						fprintf(stderr, "unknown stage '%S'\n", name.ToWString());
 					}
 					options.stage = stage;
+				}
+				else if (argStr == "-pass-through")
+				{
+					String name = tryReadCommandLineArgument(arg, &argCursor, argEnd);
+					PassThroughMode passThrough = PassThroughMode::None;
+					if (name == "fxc") { passThrough = PassThroughMode::HLSL; }
+					else
+					{
+						fprintf(stderr, "unknown pass-through target '%S'\n", name.ToWString());
+					}
+					options.passThrough = passThrough;
 				}
 				else if (argStr == "-genchoice")
 					options.Mode = CompilerMode::GenerateChoice;

@@ -27,6 +27,9 @@ struct Options
 
 	// generate extra output (notably: command lines we run)
 	bool shouldBeVerbose = false;
+
+	// force generation of baselines for HLSL tests
+	bool generateHLSLBaselines = false;
 };
 Options options;
 
@@ -66,6 +69,10 @@ void parseOptions(int* argc, char** argv)
 		else if( strcmp(arg, "-v") == 0 )
 		{
 			options.shouldBeVerbose = true;
+		}
+		else if( strcmp(arg, "-generate-hlsl-baselines") == 0 )
+		{
+			options.generateHLSLBaselines = true;
 		}
 		else
 		{
@@ -196,14 +203,14 @@ void gatherOptionsFromTestFile(
 	}
 }
 
-OSError spawnAndWait(String	testPath, OSProcessSpawner* spawner)
+OSError spawnAndWait(String	testPath, OSProcessSpawner& spawner)
 {
 	if( options.shouldBeVerbose )
 	{
-		fprintf(stderr, "%s\n", spawner->commandLine_.Buffer());
+		fprintf(stderr, "%s\n", spawner.commandLine_.Buffer());
 	}
 
-	OSError err = spawner->spawnAndWaitForCompletion();
+	OSError err = spawner.spawnAndWaitForCompletion();
 	if (err != kOSError_None)
 	{
 		error("failed to run test '%S'", testPath.ToWString());
@@ -211,26 +218,8 @@ OSError spawnAndWait(String	testPath, OSProcessSpawner* spawner)
 	return err;
 }
 
-TestResult runTestImpl(
-	String	filePath)
+String getOutput(OSProcessSpawner& spawner)
 {
-	// need to execute the stand-alone Spire compiler on the file, and compare its output to what we expect
-
-	OSProcessSpawner spawner;
-
-	spawner.pushExecutableName("Source/Debug/SpireCompiler.exe");
-	spawner.pushArgument(filePath);
-
-	gatherOptionsFromTestFile(filePath, &spawner);
-
-	if (spawnAndWait(filePath, &spawner) != kOSError_None)
-	{
-		return kTestResult_Fail;
-	}
-
-	// We ignore output to stdout, and only worry about what the compiler
-	// wrote to stderr.
-
 	OSProcessSpawner::ResultCode resultCode = spawner.getResultCode();
 
 	String standardOuptut = spawner.getStandardOutput();
@@ -246,7 +235,28 @@ TestResult runTestImpl(
 	actualOutputBuilder.Append(standardOuptut);
 	actualOutputBuilder.Append("}\n");
 
-	String actualOutput = actualOutputBuilder.ProduceString();
+	return actualOutputBuilder.ProduceString();
+}
+
+
+TestResult runTestImpl(
+	String	filePath)
+{
+	// need to execute the stand-alone Spire compiler on the file, and compare its output to what we expect
+
+	OSProcessSpawner spawner;
+
+	spawner.pushExecutableName("Source/Debug/SpireCompiler.exe");
+	spawner.pushArgument(filePath);
+
+	gatherOptionsFromTestFile(filePath, &spawner);
+
+	if (spawnAndWait(filePath, spawner) != kOSError_None)
+	{
+		return kTestResult_Fail;
+	}
+
+	String actualOutput = getOutput(spawner);
 
 	String expectedOutputPath = filePath + ".expected";
 	String expectedOutput;
@@ -258,18 +268,17 @@ TestResult runTestImpl(
 	{
 	}
 
-	TestResult result = kTestResult_Pass;
-
 	// If no expected output file was found, then we
 	// expect everything to be empty
 	if (expectedOutput.Length() == 0)
 	{
-		if (resultCode != 0)				result = kTestResult_Fail;
-		if (standardError.Length() != 0)	result = kTestResult_Fail;
-		if (standardOuptut.Length() != 0)	result = kTestResult_Fail;
+		expectedOutput = "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n";
 	}
+
+	TestResult result = kTestResult_Pass;
+
 	// Otherwise we compare to the expected output
-	else if (actualOutput != expectedOutput)
+	if (actualOutput != expectedOutput)
 	{
 		result = kTestResult_Fail;
 	}
@@ -286,134 +295,27 @@ TestResult runTestImpl(
 	return result;
 }
 
-String tryGrabArg(OSProcessSpawner* spawner, char const* opt, char const* defaultVal = "")
-{
-	char const* cursor = spawner->commandLine_.Buffer();
-	for(;;)
-	{
-		cursor = strstr(cursor, opt);
-		if(!cursor) return defaultVal;
-
-		cursor += strlen(opt);
-		if(*cursor && !isspace(*cursor)) continue;
-
-		while(*cursor && isspace(*cursor)) ++cursor;
-		char const* argBegin = cursor;
-		
-		while(*cursor && !isspace(*cursor)) ++cursor;
-		char const* argEnd = cursor;
-
-		StringBuilder sb;
-		sb.Append(argBegin, argEnd - argBegin);
-		return sb.ProduceString();
-	}
-}
-
 #ifdef SPIRE_TEST_SUPPORT_HLSL
 void generateHLSLBaseline(
 	String	filePath)
 {
-	// Note(tfoley): the approach here is really hacky, but it is better to have this at least a *bit* automated...
-	//
-	// TODO(tfoley): consider having the shader compiler driver support a pass-through mode where
-	// it just hands off the input program to the HLSL compiler as-is, and the only real work it
-	// does is massaging arguments from the Spire-expected form over to the D3DCompile API...
-
 	OSProcessSpawner spawner;
-	spawner.pushExecutableName("fxc.exe");
+	spawner.pushExecutableName("Source/Debug/SpireCompiler.exe");
+	spawner.pushArgument(filePath);
+
 	gatherOptionsFromTestFile(filePath, &spawner);
 
-	String entryPointName = tryGrabArg(&spawner, "-entry", "main");
-	String profileName = tryGrabArg(&spawner, "-profile");
+	spawner.pushArgument("-target");
+	spawner.pushArgument("dxbc-assembly");
+	spawner.pushArgument("-pass-through");
+	spawner.pushArgument("fxc");
 
-	// TODO(tfoley): let user specify version of d3dcompiler DLL to use.
-	static HMODULE d3dCompiler =  LoadLibraryA("d3dcompiler_47");
-	assert(d3dCompiler);
-
-	static pD3DCompile D3DCompile_ = nullptr;
-	if (!D3DCompile_)
-	{
-		D3DCompile_ = (pD3DCompile)GetProcAddress(d3dCompiler, "D3DCompile");
-		assert(D3DCompile_);
-	}
-
-	String hlslCode;
-	try
-	{
-		hlslCode = CoreLib::IO::File::ReadAllText(filePath);
-	}
-	catch (CoreLib::IO::IOException)
-	{
-	}
-
-
-	ID3DBlob* codeBlob;
-	ID3DBlob* diagnosticsBlob;
-	HRESULT hr = D3DCompile_(
-		hlslCode.begin(),
-		hlslCode.Length(),
-		filePath.begin(),
-		nullptr,
-		nullptr,
-		entryPointName.begin(),
-		profileName.begin(),
-		0,
-		0,
-		&codeBlob,
-		&diagnosticsBlob);
-	String standardError;
-	if (diagnosticsBlob)
-	{
-		// TODO(tfoley): need a better policy for how we translate diagnostics
-		// back into the Spire world (although we should always try to generate
-		// HLSL that doesn't produce any diagnostics...)
-		standardError = (char const*) diagnosticsBlob->GetBufferPointer();
-		diagnosticsBlob->Release();
-	}
-	if (FAILED(hr))
+	if (spawnAndWait(filePath, spawner) != kOSError_None)
 	{
 		return;
 	}
 
-	static pD3DDisassemble D3DDisassemble_ = nullptr;
-	if (!D3DDisassemble_)
-	{
-		D3DDisassemble_ = (pD3DDisassemble)GetProcAddress(d3dCompiler, "D3DDisassemble");
-		assert(D3DDisassemble_);
-	}
-
-	ID3DBlob* asmBlob;
-	hr = D3DDisassemble_(
-		codeBlob->GetBufferPointer(),
-		codeBlob->GetBufferSize(),
-		0,
-		nullptr,
-		&asmBlob);
-
-	codeBlob->Release();
-
-	String asmText;
-	if (asmBlob)
-	{
-		asmText = String((char const*) asmBlob->GetBufferPointer());
-		asmBlob->Release();
-	}
-	if (FAILED(hr))
-	{
-		return;
-	}
-
-	// TODO(tfoley): write out the expected file now...
-	StringBuilder expectedOutputBuilder;
-	expectedOutputBuilder.Append("result code = 0\n");
-	expectedOutputBuilder.Append("standard error = {\n");
-	expectedOutputBuilder.Append(standardError);
-	expectedOutputBuilder.Append("}\nstandard output = {\n");
-	expectedOutputBuilder.Append(asmText);
-	expectedOutputBuilder.Append("}\n");
-
-	String expectedOutput = expectedOutputBuilder.ProduceString();
-
+	String expectedOutput = getOutput(spawner);
 	String expectedOutputPath = filePath + ".expected";
 	try
 	{
@@ -429,7 +331,7 @@ TestResult runHLSLTestImpl(
 {
 	// We will use the Microsoft compiler to generate out expected output here
 	String expectedOutputPath = filePath + ".expected";
-	if(!CoreLib::IO::File::Exists(expectedOutputPath))
+	if(options.generateHLSLBaselines || !CoreLib::IO::File::Exists(expectedOutputPath))
 	{
 		generateHLSLBaseline(filePath);
 	}
@@ -446,7 +348,7 @@ TestResult runHLSLTestImpl(
 	spawner.pushArgument("-target");
 	spawner.pushArgument("dxbc-assembly");
 
-	if (spawnAndWait(filePath, &spawner) != kOSError_None)
+	if (spawnAndWait(filePath, spawner) != kOSError_None)
 	{
 		return kTestResult_Fail;
 	}
