@@ -575,7 +575,7 @@ void runHLSLTestsInDirectory(
 	String				directoryPath)
 {
 	runTestsInDirectory(context, directoryPath, &runHLSLTestImpl, "*.hlsl");
-	runTestsInDirectory(context, directoryPath, &runHLSLTestImpl, "*.fx");
+//	runTestsInDirectory(context, directoryPath, &runHLSLTestImpl, "*.fx");
 }
 #endif
 
