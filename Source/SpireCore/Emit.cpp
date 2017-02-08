@@ -758,6 +758,27 @@ static void EmitDeclRef(EmitContext* context, DeclRef declRef)
 
 // Declarations
 
+// Emit any modifiers that should go in front of a declaration
+static void EmitModifiers(EmitContext* context, RefPtr<Decl> decl)
+{
+	for (auto mod = decl->modifiers.first; mod; mod = mod->next)
+	{
+		if (auto rowMajorMod = mod.As<RowMajorLayoutModifier>())
+		{
+			Emit(context, "row_major ");
+		}
+		else if (auto rowMajorMod = mod.As<ColumnMajorLayoutModifier>())
+		{
+			Emit(context, "column_major ");
+		}
+		else
+		{
+			// skip any extra modifiers
+		}
+	}
+}
+
+
 typedef unsigned int ESemanticMask;
 enum
 {
@@ -848,6 +869,29 @@ static void EmitStructDecl(EmitContext* context, RefPtr<StructSyntaxNode> decl)
 	Emit(context, "};\n");
 }
 
+// Shared emit logic for variable declarations (used for parameters, locals, globals, fields)
+static void EmitVarDeclCommon(EmitContext* context, VarDeclBaseRef declRef)
+{
+	EmitModifiers(context, declRef.GetDecl());
+
+	EmitType(context, declRef.GetType(), declRef.GetName());
+
+	EmitSemantics(context, declRef.GetDecl());
+
+	// TODO(tfoley): technically have to apply substitution here too...
+	if (auto initExpr = declRef.GetDecl()->Expr)
+	{
+		Emit(context, " = ");
+		EmitExpr(context, initExpr);
+	}
+}
+
+// Shared emit logic for variable declarations (used for parameters, locals, globals, fields)
+static void EmitVarDeclCommon(EmitContext* context, RefPtr<VarDeclBase> decl)
+{
+	EmitVarDeclCommon(context, DeclRef(decl.Ptr(), nullptr).As<VarDeclBaseRef>());
+}
+
 static void EmitConstantBufferDecl(
 	EmitContext*				context,
 	RefPtr<VarDeclBase>			varDecl,
@@ -869,8 +913,7 @@ static void EmitConstantBufferDecl(
 		{
 			for (auto field : structRef.GetMembersOfType<FieldDeclRef>())
 			{
-				EmitType(context, field.GetType(), field.GetName());
-				// TODO: semantics
+				EmitVarDeclCommon(context, field);
 				Emit(context, ";\n");
 			}
 		}
@@ -879,20 +922,6 @@ static void EmitConstantBufferDecl(
 	else
 	{
 		assert(!"unexpected");
-	}
-}
-
-// Shared emit logic for variable declarations (used for parameters, locals, globals, fields)
-static void EmitVarDeclCommon(EmitContext* context, RefPtr<VarDeclBase> decl)
-{
-	EmitType(context, decl->Type, decl->Name.Content);
-
-	EmitSemantics(context, decl);
-
-	if (auto initExpr = decl->Expr)
-	{
-		Emit(context, " = ");
-		EmitExpr(context, initExpr);
 	}
 }
 
