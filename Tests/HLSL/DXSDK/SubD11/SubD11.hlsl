@@ -1,3 +1,4 @@
+//SPIRE_TEST_OPTS:-target dxbc-assembly -profile vs_4_0 -entry PatchSkinningVS -entry MeshSkinningVS -profile hs_4_0 -entry SubDToBezierHS -entry SubDToBezierHS4444 -profile ds_4_0 -entry BezierEvalDS -profile ps_4_0 -entry SmoothPS -entry SolidColorPS
 //--------------------------------------------------------------------------------------
 // File: SubD11.hlsl
 //

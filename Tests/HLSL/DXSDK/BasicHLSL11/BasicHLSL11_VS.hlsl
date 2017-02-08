@@ -1,3 +1,4 @@
+//SPIRE_TEST_OPTS:-target dxbc-assembly -profile vs_4_0 -entry VSMain
 //--------------------------------------------------------------------------------------
 // File: BasicHLSL11_VS.hlsl
 //

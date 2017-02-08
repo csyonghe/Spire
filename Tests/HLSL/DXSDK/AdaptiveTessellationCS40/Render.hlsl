@@ -1,3 +1,4 @@
+//SPIRE_TEST_OPTS:-profile vs_4_0 -entry RenderBaseVS -profile ps_4_0 -entry RenderPS -target dxbc-assembly
 //--------------------------------------------------------------------------------------
 // File: Render.hlsl
 //

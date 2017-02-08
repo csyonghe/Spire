@@ -1,3 +1,4 @@
+//SPIRE_TEST_OPTS:-target dxbc-assembly -profile vs_4_0 -entry BezierVS -profile hs_4_0 -entry BezierHS -profile ds_4_0 -entry BezierDS -profile ps_4_0 -entry BezierPS -entry SolidColorPS
 //--------------------------------------------------------------------------------------
 // File: SimpleBezier11.hlsl
 //

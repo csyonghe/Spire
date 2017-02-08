@@ -1,3 +1,4 @@
+//SPIRE_TEST_OPTS:-target dxbc-assembly -profile cs_4_0 -entry CSNumVerticesIndices
 //--------------------------------------------------------------------------------------
 // File: TessellatorCS40_NumVerticesIndicesCS.hlsl
 //

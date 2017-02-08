@@ -1,3 +1,4 @@
+//SPIRE_TEST_OPTS:-target dxbc-assembly -profile cs_4_0 -entry CSTessellationIndices
 //--------------------------------------------------------------------------------------
 // File: TessellatorCS40_TessellateIndicesCS.hlsl
 //

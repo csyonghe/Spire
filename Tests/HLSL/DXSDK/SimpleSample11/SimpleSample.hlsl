@@ -1,3 +1,4 @@
+//SPIRE_TEST_OPTS:-target dxbc-assembly -profile vs_4_0 -entry RenderSceneVS -profile ps_4_0 -entry RenderScenePS
 //--------------------------------------------------------------------------------------
 // File: SimpleSample.hlsl
 //

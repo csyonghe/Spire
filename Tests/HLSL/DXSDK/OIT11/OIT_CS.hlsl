@@ -1,3 +1,4 @@
+//SPIRE_TEST_OPTS:-target dxbc-assembly -profile cs_4_0 -entry VSParticleDraw -profile gs_4_0 -entry GSParticleDraw -profile ps_4_0 -entry PSParticleDraw
 //-----------------------------------------------------------------------------
 // File: OIT_CS.hlsl
 //

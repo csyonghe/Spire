@@ -1,3 +1,4 @@
+//SPIRE_TEST_OPTS:-target dxbc-assembly -profile vs_4_0 -entry QuadVS -profile ps_4_0 -entry PSFinalPass -entry PSFinalPassForCPUReduction
 //--------------------------------------------------------------------------------------
 // File: FinalPass.hlsl
 //

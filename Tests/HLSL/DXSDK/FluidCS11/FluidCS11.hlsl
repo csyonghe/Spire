@@ -1,3 +1,4 @@
+//SPIRE_TEST_OPTS:-target dxbc-assembly -profile cs_4_0 -entry BuildGridCS -entry ClearGridIndicesCS -entry BuildGridIndicesCS -entry RearrangeParticlesCS -entry DensityCS_Simple -entry DensityCS_Shared -entry DensityCS_Grid -entry ForceCS_Simple -entry ForceCS_Shared -entry ForceCS_Grid -entry IntegrateCS
 //--------------------------------------------------------------------------------------
 // File: FluidCS11.hlsl
 //
