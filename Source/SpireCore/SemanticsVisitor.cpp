@@ -486,6 +486,22 @@ namespace Spire
 				return term->Accept(this).As<ExpressionSyntaxNode>();
 			}
 
+			RefPtr<ExpressionSyntaxNode> CreateErrorExpr(ExpressionSyntaxNode* expr)
+			{
+				expr->Type = ExpressionType::Error;
+				return expr;
+			}
+
+			bool IsErrorExpr(RefPtr<ExpressionSyntaxNode> expr)
+			{
+				// TODO: we may want other cases here...
+
+				if (expr->Type->Equals(ExpressionType::Error))
+					return true;
+
+				return false;
+			}
+
 			RefPtr<ExpressionSyntaxNode> VisitGenericType(GenericTypeSyntaxNode * typeNode) override
 			{
 				auto& base = typeNode->base;
@@ -513,14 +529,18 @@ namespace Spire
 				}
 				else
 #endif
+				if (IsErrorExpr(base))
+				{
+					return CreateErrorExpr(typeNode);
+				}
+
 				{
 					auto baseDeclRefExpr = base.As<DeclRefExpr>();
 
 					if (!baseDeclRefExpr)
 					{
-						getSink()->diagnose(typeNode, Diagnostics::unimplemented, "unexpected base term in generic app");
-						typeResult = ExpressionType::Error;
-						return typeNode;
+						getSink()->diagnose(typeNode, Diagnostics::expectedAGeneric, base->Type);
+						return CreateErrorExpr(typeNode);
 					}
 					auto declRef = baseDeclRefExpr->declRef;
 
@@ -563,9 +583,8 @@ namespace Spire
 					else
 					{
 						// TODO: correct diagnostic here!
-						getSink()->diagnose(typeNode, Diagnostics::unimplemented, "unexpected base term in generic app");
-						typeResult = ExpressionType::Error;
-						return typeNode;
+						getSink()->diagnose(typeNode, Diagnostics::expectedAGeneric, base->Type);
+						return CreateErrorExpr(typeNode);
 					}
 				}
 			}

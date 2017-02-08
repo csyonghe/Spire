@@ -254,6 +254,8 @@ DIAGNOSTIC(39999, Error, noApplicableWithArgs, "no overload applicable to argume
 DIAGNOSTIC(39999, Error, caseOutsideSwitch, "'case' not allowed outside of a 'switch' statement")
 DIAGNOSTIC(39999, Error, defaultOutsideSwitch, "'default' not allowed outside of a 'switch' statement")
 
+DIAGNOSTIC(39999, Error, expectedAGeneric, "expected a generic when using '<...>' (found: '$0')")
+
 
 //
 // 4xxxx - IL code generation.

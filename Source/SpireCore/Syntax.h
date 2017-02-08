@@ -639,10 +639,23 @@ namespace Spire
 		// TODO(tfoley): check that these are actually working right...
 		class PatchType : public PointerLikeType {};
 		class StorageBufferType : public ArrayLikeType {};
-		class StructuredBufferType : public ArrayLikeType {};
-		class RWStructuredBufferType : public ArrayLikeType {};
 		class UniformBufferType : public PointerLikeType {};
 		class PackedBufferType : public ArrayLikeType {};
+
+		// HLSL buffer-type resources
+
+		class HLSLBufferType : public ArrayLikeType {};
+		class HLSLByteAddressBufferType : public ArrayLikeType {};
+		class HLSLStructuredBufferType : public ArrayLikeType {};
+		class HLSLRWBufferType : public ArrayLikeType {};
+		class HLSLRWByteAddressBufferType : public ArrayLikeType {};
+		class HLSLRWStructuredBufferType : public ArrayLikeType {};
+
+		class HLSLAppendStructuredBufferType : public BuiltinGenericType {};
+		class HLSLConsumeStructuredBufferType : public BuiltinGenericType {};
+
+		class HLSLInputPatchType : public ArrayLikeType {};
+		class HLSLOutputPatchType : public ArrayLikeType {};
 
 		// Type for HLSL `cbuffer` declarations, and `ConstantBuffer<T>`
 		class ConstantBufferType : public PointerLikeType {};

@@ -2,6 +2,47 @@
 #include "Syntax.h"
 
 const char * LibIncludeString = R"(
+
+__generic<T> __magic_type(HLSLAppendStructuredBufferType) struct AppendStructuredBuffer
+{
+};
+
+__generic<T> __magic_type(HLSLBufferType) struct Buffer
+{
+};
+
+__generic<T> __magic_type(HLSLByteAddressBufferType) struct ByteAddressBuffer
+{
+};
+
+__generic<T> __magic_type(HLSLStructuredBufferType) struct StructuredBuffer
+{
+};
+
+__generic<T> __magic_type(HLSLConsumeStructuredBufferType) struct ConsumeStructuredBuffer
+{
+};
+
+__generic<T> __magic_type(HLSLInputPatchType) struct InputPatch
+{
+};
+
+__generic<T> __magic_type(HLSLOutputPatchType) struct OutputPatch
+{
+};
+
+__generic<T> __magic_type(HLSLRWBufferType) struct RWBuffer
+{
+};
+
+__generic<T> __magic_type(HLSLRWByteAddressBufferType) struct RWByteAddressBuffer
+{
+};
+
+__generic<T> __magic_type(HLSLRWStructuredBufferType) struct RWStructuredBuffer
+{
+};
+
 __intrinsic float dFdx(float v);
 __intrinsic float dFdy(float v);
 __intrinsic float fwidth(float v);
@@ -428,6 +469,7 @@ namespace Spire
 			sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerState) << ") struct SamplerState {};";
 			sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerComparisonState) << ") struct SamplerComparisonState {};";
 
+			// TODO(tfoley): Need to handle `RW*` variants of texture types as well...
 			static const struct {
 				char const*			name;
 				TextureType::Shape	baseShape;
@@ -503,10 +545,9 @@ namespace Spire
 			sb << "__generic<T> __magic_type(TextureBuffer) struct TextureBuffer {};\n";
 
 			sb << "__generic<T> __magic_type(PackedBuffer) struct PackedBuffer {};\n";
-			sb << "__generic<T> __magic_type(StructuredBuffer) struct StructuredBuffer {};\n";
-			sb << "__generic<T> __magic_type(RWStructuredBuffer) struct RWStructuredBuffer {};\n";
 			sb << "__generic<T> __magic_type(Uniform) struct Uniform {};\n";
 			sb << "__generic<T> __magic_type(Patch) struct Patch {};\n";
+
 
 			// Synthesize matrix-vector, vector-matrix, and matrix-matrix multiply operations
 			// TODO(tfoley): just make these generic

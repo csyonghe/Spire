@@ -892,10 +892,21 @@ namespace Spire
 				CASE(TextureBuffer, TextureBufferType)
 
 				CASE(PackedBuffer, PackedBufferType)
-				CASE(StructuredBuffer, StructuredBufferType)
-				CASE(RWStructuredBuffer, RWStructuredBufferType)
 				CASE(Uniform, UniformBufferType)
 				CASE(Patch, PatchType)
+
+				CASE(HLSLBufferType, HLSLBufferType)
+				CASE(HLSLByteAddressBufferType, HLSLByteAddressBufferType)
+				CASE(HLSLStructuredBufferType, HLSLStructuredBufferType)
+				CASE(HLSLRWBufferType, HLSLRWBufferType)
+				CASE(HLSLRWByteAddressBufferType, HLSLRWByteAddressBufferType)
+				CASE(HLSLRWStructuredBufferType, HLSLRWStructuredBufferType)
+				CASE(HLSLAppendStructuredBufferType, HLSLAppendStructuredBufferType)
+				CASE(HLSLConsumeStructuredBufferType, HLSLConsumeStructuredBufferType)
+				CASE(HLSLInputPatchType, HLSLInputPatchType)
+				CASE(HLSLOutputPatchType, HLSLOutputPatchType)
+
+				#undef CASE
 
 				else
 				{
