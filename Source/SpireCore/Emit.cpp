@@ -780,6 +780,27 @@ static void EmitModifiers(EmitContext* context, RefPtr<Decl> decl)
 
 		#undef CASE
 
+		// TODO: eventually we should be checked these modifiers, but for
+		// now we can emit them unchecked, I guess
+		else if (auto uncheckedAttr = mod.As<HLSLUncheckedAttribute>())
+		{
+			Emit(context, "[");
+			Emit(context, uncheckedAttr->nameToken.Content);
+			auto& args = uncheckedAttr->args;
+			auto argCount = args.Count();
+			if (argCount != 0)
+			{
+				Emit(context, "(");
+				for (int aa = 0; aa < argCount; ++aa)
+				{
+					if (aa != 0) Emit(context, ", ");
+					EmitExpr(context, args[aa]);
+				}
+				Emit(context, ")");
+			}
+			Emit(context, "]");
+		}
+
 		else
 		{
 			// skip any extra modifiers
@@ -970,6 +991,8 @@ static void EmitParamDecl(EmitContext* context, RefPtr<ParameterSyntaxNode> decl
 
 static void EmitFuncDecl(EmitContext* context, RefPtr<FunctionSyntaxNode> decl)
 {
+	EmitModifiers(context, decl);
+
 	// TODO: if a function returns an array type, or something similar that
 	// isn't allowed by declarator syntax and/or language rules, we could
 	// hypothetically wrap things in a `typedef` and work around it.
