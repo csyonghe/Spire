@@ -2300,24 +2300,6 @@ namespace Spire
 			SPIRE_DECLARE_DECL_REF(GenericTypeParamDecl);
 		};
 
-		class ConstraintVarType : public ExpressionType
-		{
-		public:
-			ConstraintVarType(GenericTypeParamDeclRef declRef)
-				: declRef(declRef)
-			{}
-
-			GenericTypeParamDeclRef declRef;
-			GenericTypeParamDeclRef const& GetDeclRef() const { return declRef; }
-
-			virtual String ToString() const override;
-
-		protected:
-			virtual bool EqualsImpl(const ExpressionType * type) const override;
-			virtual ExpressionType* CreateCanonicalType() override;
-		};
-
-
 		class GenericValueParamDecl : public VarDeclBase
 		{
 		public:
@@ -2328,19 +2310,6 @@ namespace Spire
 		struct GenericValueParamDeclRef : VarDeclBaseRef
 		{
 			SPIRE_DECLARE_DECL_REF(GenericValueParamDecl);
-		};
-
-		class ConstraintVarInt : public Val
-		{
-		public:
-			ConstraintVarInt(GenericValueParamDeclRef declRef)
-				: declRef(declRef)
-			{}
-
-			GenericValueParamDeclRef declRef;
-			GenericValueParamDeclRef const& GetDeclRef() const { return declRef; }
-
-			virtual bool EqualsVal(Val* val) override;
 		};
 
 		//
