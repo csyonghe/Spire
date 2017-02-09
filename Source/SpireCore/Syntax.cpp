@@ -896,15 +896,26 @@ namespace Spire
 				CASE(Patch, PatchType)
 
 				CASE(HLSLBufferType, HLSLBufferType)
-				CASE(HLSLByteAddressBufferType, HLSLByteAddressBufferType)
 				CASE(HLSLStructuredBufferType, HLSLStructuredBufferType)
 				CASE(HLSLRWBufferType, HLSLRWBufferType)
-				CASE(HLSLRWByteAddressBufferType, HLSLRWByteAddressBufferType)
 				CASE(HLSLRWStructuredBufferType, HLSLRWStructuredBufferType)
 				CASE(HLSLAppendStructuredBufferType, HLSLAppendStructuredBufferType)
 				CASE(HLSLConsumeStructuredBufferType, HLSLConsumeStructuredBufferType)
 				CASE(HLSLInputPatchType, HLSLInputPatchType)
 				CASE(HLSLOutputPatchType, HLSLOutputPatchType)
+
+				#undef CASE
+
+				// "magic" builtin types which have no generic parameters
+				#define CASE(n,T)													\
+					else if(magicMod->name == #n) {									\
+						auto type = new T();										\
+						type->declRef = declRef;									\
+						return type;												\
+					}
+
+				CASE(HLSLByteAddressBufferType, HLSLByteAddressBufferType)
+				CASE(HLSLRWByteAddressBufferType, HLSLRWByteAddressBufferType)
 
 				#undef CASE
 

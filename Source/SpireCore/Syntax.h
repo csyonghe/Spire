@@ -645,11 +645,12 @@ namespace Spire
 		// HLSL buffer-type resources
 
 		class HLSLBufferType : public ArrayLikeType {};
-		class HLSLByteAddressBufferType : public ArrayLikeType {};
-		class HLSLStructuredBufferType : public ArrayLikeType {};
 		class HLSLRWBufferType : public ArrayLikeType {};
-		class HLSLRWByteAddressBufferType : public ArrayLikeType {};
+		class HLSLStructuredBufferType : public ArrayLikeType {};
 		class HLSLRWStructuredBufferType : public ArrayLikeType {};
+
+		class HLSLByteAddressBufferType : public DeclRefType {};
+		class HLSLRWByteAddressBufferType : public DeclRefType {};
 
 		class HLSLAppendStructuredBufferType : public BuiltinGenericType {};
 		class HLSLConsumeStructuredBufferType : public BuiltinGenericType {};

@@ -11,7 +11,7 @@ __generic<T> __magic_type(HLSLBufferType) struct Buffer
 {
 };
 
-__generic<T> __magic_type(HLSLByteAddressBufferType) struct ByteAddressBuffer
+__magic_type(HLSLByteAddressBufferType) struct ByteAddressBuffer
 {
 };
 
@@ -35,7 +35,7 @@ __generic<T> __magic_type(HLSLRWBufferType) struct RWBuffer
 {
 };
 
-__generic<T> __magic_type(HLSLRWByteAddressBufferType) struct RWByteAddressBuffer
+__magic_type(HLSLRWByteAddressBufferType) struct RWByteAddressBuffer
 {
 };
 
