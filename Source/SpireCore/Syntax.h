@@ -1747,11 +1747,18 @@ namespace Spire
 			virtual DerefExpr * Clone(CloneContext & ctx) override;
 		};
 
-		class InvokeExpressionSyntaxNode : public ExpressionSyntaxNode
+		// A base expression being applied to arguments: covers
+		// both ordinary `()` function calls and `<>` generic application
+		class AppExprBase : public ExpressionSyntaxNode
 		{
 		public:
 			RefPtr<ExpressionSyntaxNode> FunctionExpr;
 			List<RefPtr<ExpressionSyntaxNode>> Arguments;
+		};
+
+		class InvokeExpressionSyntaxNode : public AppExprBase
+		{
+		public:
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual InvokeExpressionSyntaxNode * Clone(CloneContext & ctx) override;
 		};
@@ -2163,20 +2170,14 @@ namespace Spire
 		// `ExpressionSyntaxNode` and a forward reference just isn't good enough
 		// for `RefPtr`.
 		//
-		class GenericTypeSyntaxNode : public ExpressionSyntaxNode
+		class GenericAppExpr : public AppExprBase
 		{
 		public:
-			// The base expression
-			RefPtr<ExpressionSyntaxNode> base;
-
-			// Additional expression arguments after the first (type) argument.
-			List<RefPtr<ExpressionSyntaxNode>> Args;
-
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-			virtual GenericTypeSyntaxNode * Clone(CloneContext & ctx) override
+			virtual GenericAppExpr * Clone(CloneContext & ctx) override
 			{
-				auto rs = CloneSyntaxNodeFields(new GenericTypeSyntaxNode(*this), ctx);
-				for (auto& arg : rs->Args)
+				auto rs = CloneSyntaxNodeFields(new GenericAppExpr(*this), ctx);
+				for (auto& arg : rs->Arguments)
 					arg = arg->Clone(ctx);
 				return rs;
 			}
@@ -2321,6 +2322,20 @@ namespace Spire
 		struct GenericValueParamDeclRef : VarDeclBaseRef
 		{
 			SPIRE_DECLARE_DECL_REF(GenericValueParamDecl);
+		};
+
+		// The logical "value" of a rererence to a generic value parameter
+		class GenericParamIntVal : public IntVal
+		{
+		public:
+			GenericValueParamDeclRef declRef;
+
+			GenericParamIntVal(GenericValueParamDeclRef declRef)
+				: declRef(declRef)
+			{}
+
+			virtual bool EqualsVal(Val* val) override;
+			virtual String ToString() const override;
 		};
 
 		//
@@ -2570,7 +2585,7 @@ namespace Spire
 			{
 				return param;
 			}
-			virtual RefPtr<ExpressionSyntaxNode> VisitGenericType(GenericTypeSyntaxNode* type)
+			virtual RefPtr<ExpressionSyntaxNode> VisitGenericApp(GenericAppExpr* type)
 			{
 				return type;
 			}

@@ -1362,10 +1362,10 @@ namespace Spire
 
 			// Construct a type expression that represents the type for the variable,
 			// which is the wrapper type applied to the data type
-			auto bufferVarTypeExpr = new GenericTypeSyntaxNode();
+			auto bufferVarTypeExpr = new GenericAppExpr();
 			bufferVarTypeExpr->Position = bufferVarDecl->Position;
-			bufferVarTypeExpr->base = bufferWrapperTypeExpr;
-			bufferVarTypeExpr->Args.Add(bufferDataTypeExpr);
+			bufferVarTypeExpr->FunctionExpr = bufferWrapperTypeExpr;
+			bufferVarTypeExpr->Arguments.Add(bufferDataTypeExpr);
 
 			bufferVarDecl->Type.exp = bufferVarTypeExpr;
 
@@ -2291,17 +2291,17 @@ namespace Spire
 
 			if (LookAheadToken(TokenType::OpLess))
 			{
-				RefPtr<GenericTypeSyntaxNode> gtype = new GenericTypeSyntaxNode();
+				RefPtr<GenericAppExpr> gtype = new GenericAppExpr();
 				FillPosition(gtype.Ptr()); // set up scope for lookup
 				gtype->Position = typeName.Position;
-				gtype->base = rs;
+				gtype->FunctionExpr = rs;
 				ReadToken(TokenType::OpLess);
 				this->genericDepth++;
 				// For now assume all generics have at least one argument
-				gtype->Args.Add(ParseGenericArg(this));
+				gtype->Arguments.Add(ParseGenericArg(this));
 				while (AdvanceIf(this, TokenType::Comma))
 				{
-					gtype->Args.Add(ParseGenericArg(this));
+					gtype->Arguments.Add(ParseGenericArg(this));
 				}
 				this->genericDepth--;
 				ReadToken(TokenType::OpGreater);

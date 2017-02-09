@@ -735,9 +735,9 @@ namespace Spire
 			else
 				return BaseType->ToString() + "[]";
 		}
-		RefPtr<SyntaxNode> GenericTypeSyntaxNode::Accept(SyntaxVisitor * visitor)
+		RefPtr<SyntaxNode> GenericAppExpr::Accept(SyntaxVisitor * visitor)
 		{
-			return visitor->VisitGenericType(this);
+			return visitor->VisitGenericApp(this);
 		}
 
 		// DeclRefType
@@ -1399,6 +1399,22 @@ namespace Spire
 
 		GenericValueParamDecl * GenericValueParamDecl::Clone(CloneContext & ctx) {
 			throw "unimplemented";
+		}
+
+		// GenericParamIntVal
+
+		bool GenericParamIntVal::EqualsVal(Val* val)
+		{
+			if (auto genericParamVal = dynamic_cast<GenericParamIntVal*>(val))
+			{
+				return declRef.Equals(genericParamVal->declRef);
+			}
+			return false;
+		}
+
+		String GenericParamIntVal::ToString() const
+		{
+			return declRef.GetName();
 		}
 
 		// ExtensionDecl

@@ -383,10 +383,9 @@ namespace Spire
 			// the name of a non-proper type, and then have the compiler fill
 			// in the default values for its type arguments (e.g., a variable
 			// given type `Texture2D` will actually have type `Texture2D<float4>`).
-			TypeExp CoerceToProperType(TypeExp const& typeExp)
+			bool CoerceToProperTypeImpl(TypeExp const& typeExp, RefPtr<ExpressionType>* outProperType)
 			{
-				TypeExp result = typeExp;
-				ExpressionType* type = result.type.Ptr();
+				ExpressionType* type = typeExp.type.Ptr();
 				if (auto genericDeclRefType = type->As<GenericDeclRefType>())
 				{
 					// We are using a reference to a generic declaration as a concrete
@@ -406,25 +405,33 @@ namespace Spire
 						{
 							if (!typeParam->initType.exp)
 							{
-								getSink()->diagnose(result.exp.Ptr(), Diagnostics::unimplemented, "can't fill in default for generic type parameter");
-								result.type = ExpressionType::Error;
-								return result;
+								if (outProperType)
+								{
+									getSink()->diagnose(typeExp.exp.Ptr(), Diagnostics::unimplemented, "can't fill in default for generic type parameter");
+									*outProperType = ExpressionType::Error;
+								}
+								return false;
 							}
 
 							// TODO: this is one place where syntax should get cloned!
-							args.Add(typeParam->initType.exp);
+							if(outProperType)
+								args.Add(typeParam->initType.exp);
 						}
 						else if (auto valParam = member.As<GenericValueParamDecl>())
 						{
 							if (!valParam->Expr)
 							{
-								getSink()->diagnose(result.exp.Ptr(), Diagnostics::unimplemented, "can't fill in default for generic type parameter");
-								result.type = ExpressionType::Error;
-								return result;
+								if (outProperType)
+								{
+									getSink()->diagnose(typeExp.exp.Ptr(), Diagnostics::unimplemented, "can't fill in default for generic type parameter");
+									*outProperType = ExpressionType::Error;
+								}
+								return false;
 							}
 
 							// TODO: this is one place where syntax should get cloned!
-							args.Add(valParam->Expr);
+							if(outProperType)
+								args.Add(valParam->Expr);
 						}
 						else
 						{
@@ -432,14 +439,35 @@ namespace Spire
 						}
 					}
 
-					result.type = InstantiateGenericType(genericDeclRef, args);
-					return result;
+					if (outProperType)
+					{
+						*outProperType = InstantiateGenericType(genericDeclRef, args);
+					}
+					return true;
 				}
 				else
 				{
-					// default case: we expect this to be a proper type
-					return result;
+					// default case: we expect this to already be a proper type
+					if (outProperType)
+					{
+						*outProperType = type;
+					}
+					return true;
 				}
+			}
+
+
+
+			TypeExp CoerceToProperType(TypeExp const& typeExp)
+			{
+				TypeExp result = typeExp;
+				CoerceToProperTypeImpl(typeExp, &result.type);
+				return result;
+			}
+
+			bool CanCoerceToProperType(TypeExp const& typeExp)
+			{
+				return CoerceToProperTypeImpl(typeExp, nullptr);
 			}
 
 			// Check a type, and coerce it to be proper
@@ -501,92 +529,20 @@ namespace Spire
 				return false;
 			}
 
-			RefPtr<ExpressionSyntaxNode> VisitGenericType(GenericTypeSyntaxNode * typeNode) override
+			// Capture the "base" expression in case this is a member reference
+			RefPtr<ExpressionSyntaxNode> GetBaseExpr(RefPtr<ExpressionSyntaxNode> expr)
 			{
-				auto& base = typeNode->base;
-				base = CheckTerm(base);
-				auto& args = typeNode->Args;
-				for (auto& arg : typeNode->Args)
+				if (auto memberExpr = expr.As<MemberExpressionSyntaxNode>())
 				{
-					arg = CheckTerm(arg);
+					return memberExpr->BaseExpression;
 				}
-
-#if TIMREMOVED
-				// Certain generic types have baked-in support here
-				if (typeNode->GenericTypeName == "PackedBuffer" ||
-					typeNode->GenericTypeName == "StructuredBuffer" ||
-					typeNode->GenericTypeName == "RWStructuredBuffer" ||
-					typeNode->GenericTypeName == "Uniform" ||
-					typeNode->GenericTypeName == "Patch" ||
-					typeNode->GenericTypeName == "PackedBuffer")
+				else if(auto overloadedExpr = expr.As<OverloadedExpr>())
 				{
-					RefPtr<GenericExpressionType> rs = new GenericExpressionType();
-					rs->BaseType = typeResult;
-					rs->GenericTypeName = typeNode->GenericTypeName;
-					typeResult = rs;
-					return typeNode;
+					return overloadedExpr->base;
 				}
-				else
-#endif
-				if (IsErrorExpr(base))
-				{
-					return CreateErrorExpr(typeNode);
-				}
-
-				{
-					auto baseDeclRefExpr = base.As<DeclRefExpr>();
-
-					if (!baseDeclRefExpr)
-					{
-						getSink()->diagnose(typeNode, Diagnostics::expectedAGeneric, base->Type);
-						return CreateErrorExpr(typeNode);
-					}
-					auto declRef = baseDeclRefExpr->declRef;
-
-					if (auto genericDeclRef = declRef.As<GenericDeclRef>())
-					{
-						int argCount = typeNode->Args.Count();
-						int argIndex = 0;
-						for (RefPtr<Decl> member : genericDeclRef.GetDecl()->Members)
-						{
-							if (auto typeParam = member.As<GenericTypeParamDecl>())
-							{
-								if (argIndex == argCount)
-								{
-									// Too few arguments!
-
-								}
-
-								// TODO: checking!
-							}
-							else if (auto valParam = member.As<GenericValueParamDecl>())
-							{
-								// TODO: checking
-							}
-							else
-							{
-
-							}
-						}
-						if (argIndex != argCount)
-						{
-							// Too many arguments!
-						}
-
-						// Now instantiate the declaration given those arguments
-						auto type = InstantiateGenericType(genericDeclRef, args);
-						typeResult = type;
-						typeNode->Type = new TypeExpressionType(type);
-						return typeNode;
-					}
-					else
-					{
-						// TODO: correct diagnostic here!
-						getSink()->diagnose(typeNode, Diagnostics::expectedAGeneric, base->Type);
-						return CreateErrorExpr(typeNode);
-					}
-				}
+				return nullptr;
 			}
+
 		public:
 			RefPtr<ImportOperatorDefSyntaxNode> VisitImportOperatorDef(ImportOperatorDefSyntaxNode* op) override
 			{
@@ -2150,6 +2106,16 @@ namespace Spire
 					return GetIntVal(constExp);
 				}
 
+				// it is possible that we are referring to a generic value param
+				if (auto declRefExpr = dynamic_cast<DeclRefExpr*>(exp))
+				{
+					if (auto genericValParamRef = declRefExpr->declRef.As<GenericValueParamDeclRef>())
+					{
+						// TODO(tfoley): handle the case of non-`int` value parameters...
+						return new GenericParamIntVal(genericValParamRef);
+					}
+				}
+
 				getSink()->diagnose(exp, Diagnostics::expectedIntegerConstantNotConstant);
 				return nullptr;
 			}
@@ -2921,6 +2887,7 @@ namespace Spire
 				{
 					Func,
 					ComponentFunc,
+					Generic,
 				};
 				Flavor flavor;
 
@@ -2962,7 +2929,7 @@ namespace Spire
 					ForReal,
 				};
 
-				RefPtr<InvokeExpressionSyntaxNode> appExpr;
+				RefPtr<AppExprBase> appExpr;
 				RefPtr<ExpressionSyntaxNode> baseExpr;
 
 				// Are we still trying out candidates, or are we
@@ -3010,6 +2977,32 @@ namespace Spire
 				return counts;
 			}
 
+			// count the number of parameters required/allowed for a generic
+			ParamCounts CountParameters(GenericDeclRef genericRef)
+			{
+				ParamCounts counts = { 0, 0 };
+				for (auto m : genericRef.GetDecl()->Members)
+				{
+					if (auto typeParam = m.As<GenericTypeParamDecl>())
+					{
+						counts.allowed++;
+						if (!typeParam->initType.Ptr())
+						{
+							counts.required++;
+						}
+					}
+					else if (auto valParam = m.As<GenericValueParamDecl>())
+					{
+						counts.allowed++;
+						if (!valParam->Expr)
+						{
+							counts.required++;
+						}
+					}
+				}
+				return counts;
+			}
+
 			bool TryCheckOverloadCandidateArity(
 				OverloadResolveContext&		context,
 				OverloadCandidate const&	candidate)
@@ -3024,6 +3017,14 @@ namespace Spire
 
 				case OverloadCandidate::Flavor::ComponentFunc:
 					paramCounts = CountParameters(candidate.item.declRef.As<ComponentDeclRef>().GetParameters());
+					break;
+
+				case OverloadCandidate::Flavor::Generic:
+					paramCounts = CountParameters(candidate.item.declRef.As<GenericDeclRef>());
+					break;
+
+				default:
+					assert(!"unexpected");
 					break;
 				}
 
@@ -3047,6 +3048,62 @@ namespace Spire
 				return false;
 			}
 
+			bool TryCheckGenericOverloadCandidateTypes(
+				OverloadResolveContext&	context,
+				OverloadCandidate&		candidate)
+			{
+				auto& args = context.appExpr->Arguments;
+				int argCount = args.Count();
+
+				auto genericDeclRef = candidate.item.declRef.As<GenericDeclRef>();
+
+				int aa = 0;
+				for (auto memberRef : genericDeclRef.GetMembers())
+				{
+					if (auto typeParamRef = memberRef.As<GenericTypeParamDeclRef>())
+					{
+						auto arg = args[aa++];
+
+						if (context.mode == OverloadResolveContext::Mode::JustTrying)
+						{
+							if (!CanCoerceToProperType(TypeExp(arg)))
+							{
+								return false;
+							}
+						}
+						else
+						{
+							TypeExp typeExp = CoerceToProperType(TypeExp(arg));
+						}
+					}
+					else if (auto valParamRef = memberRef.As<GenericValueParamDeclRef>())
+					{
+						auto arg = args[aa++];
+
+						if (context.mode == OverloadResolveContext::Mode::JustTrying)
+						{
+							ConversionCost cost = kConversionCost_None;
+							if (!CanCoerce(valParamRef.GetType(), arg->Type, &cost))
+							{
+								return false;
+							}
+							candidate.conversionCostSum += cost;
+						}
+						else
+						{
+							arg = Coerce(valParamRef.GetType(), arg);
+							auto val = ExtractGenericArgInteger(arg);
+						}
+					}
+					else
+					{
+						continue;
+					}
+				}
+
+				return true;
+			}
+
 			bool TryCheckOverloadCandidateTypes(
 				OverloadResolveContext&	context,
 				OverloadCandidate&		candidate)
@@ -3063,6 +3120,13 @@ namespace Spire
 
 				case OverloadCandidate::Flavor::ComponentFunc:
 					params = candidate.item.declRef.As<ComponentDeclRef>().GetParameters().ToArray();
+					break;
+
+				case OverloadCandidate::Flavor::Generic:
+					return TryCheckGenericOverloadCandidateTypes(context, candidate);
+
+				default:
+					assert(!"unexpected");
 					break;
 				}
 
@@ -3120,6 +3184,41 @@ namespace Spire
 				candidate.status = OverloadCandidate::Status::Appicable;
 			}
 
+			// Create the representation of a given generic applied to some arguments
+			RefPtr<ExpressionSyntaxNode> CreateGenericDeclRef(
+				RefPtr<ExpressionSyntaxNode>	baseExpr,
+				RefPtr<AppExprBase>				appExpr)
+			{
+				auto baseDeclRefExpr = baseExpr.As<DeclRefExpr>();
+				if (!baseDeclRefExpr)
+				{
+					assert(!"unexpected");
+					return CreateErrorExpr(appExpr.Ptr());
+				}
+				auto baseGenericRef = baseDeclRefExpr->declRef.As<GenericDeclRef>();
+				if (!baseGenericRef)
+				{
+					assert(!"unexpected");
+					return CreateErrorExpr(appExpr.Ptr());
+				}
+
+				RefPtr<Substitutions> subst = new Substitutions();
+				subst->genericDecl = baseGenericRef.GetDecl();
+				subst->outer = baseGenericRef.substitutions;
+
+				for (auto arg : appExpr->Arguments)
+				{
+					subst->args.Add(ExtractGenericArgVal(arg));
+				}
+
+				DeclRef innerDeclRef(baseGenericRef.GetInner(), subst);
+
+				return ConstructDeclRefExpr(
+					innerDeclRef,
+					nullptr,
+					appExpr);
+			}
+
 			// Take an overload candidate that previously got through
 			// `TryCheckOverloadCandidate` above, and try to finish
 			// up the work and turn it into a real expression.
@@ -3134,20 +3233,39 @@ namespace Spire
 				context.appExpr->Type = ExpressionType::Error;
 
 				if (!TryCheckOverloadCandidateArity(context, candidate))
-					goto done;
+					goto error;
 
 				if (!TryCheckOverloadCandidateTypes(context, candidate))
-					goto done;
+					goto error;
 
 				if (!TryCheckOverloadCandidateDirections(context, candidate))
-					goto done;
+					goto error;
 
-				context.appExpr->FunctionExpr = ConstructLookupResultExpr(
-					candidate.item, context.baseExpr, context.appExpr->FunctionExpr);
-				context.appExpr->Type = candidate.resultType;
+				{
+					auto baseExpr = ConstructLookupResultExpr(
+						candidate.item, context.baseExpr, context.appExpr->FunctionExpr);
 
-			done:
-				return context.appExpr;
+					switch(candidate.flavor)
+					{
+					case OverloadCandidate::Flavor::ComponentFunc:
+					case OverloadCandidate::Flavor::Func:
+						context.appExpr->FunctionExpr = baseExpr;
+						context.appExpr->Type = candidate.resultType;
+						break;
+
+					case OverloadCandidate::Flavor::Generic:
+						return CreateGenericDeclRef(baseExpr, context.appExpr);
+						break;
+
+					default:
+						assert(!"unexpected");
+						break;
+					}
+				}
+
+
+			error:
+				return CreateErrorExpr(context.appExpr.Ptr());
 			}
 
 			// Implement a comparison operation between overload candidates,
@@ -3770,6 +3888,204 @@ namespace Spire
 					return expr;
 				}
 			}
+
+			void AddGenericOverloadCandidate(
+				LookupResultItem		baseItem,
+				OverloadResolveContext&	context)
+			{
+				if (auto genericDeclRef = baseItem.declRef.As<GenericDeclRef>())
+				{
+					EnsureDecl(genericDeclRef.GetDecl());
+
+					OverloadCandidate candidate;
+					candidate.flavor = OverloadCandidate::Flavor::Generic;
+					candidate.item = baseItem;
+					candidate.resultType = nullptr;
+
+					AddOverloadCandidate(context, candidate);
+				}
+			}
+
+			void AddGenericOverloadCandidates(
+				RefPtr<ExpressionSyntaxNode>	baseExpr,
+				OverloadResolveContext&			context)
+			{
+				if(auto baseDeclRefExpr = baseExpr.As<DeclRefExpr>())
+				{
+					auto declRef = baseDeclRefExpr->declRef;
+					AddGenericOverloadCandidate(LookupResultItem(declRef), context);
+				}
+				else if (auto overloadedExpr = baseExpr.As<OverloadedExpr>())
+				{
+					// We are referring to a bunch of declarations, each of which might be generic
+					LookupResult result;
+					for (auto item : overloadedExpr->lookupResult2.items)
+					{
+						AddGenericOverloadCandidate(item, context);
+					}
+				}
+				else
+				{
+					// any other cases?
+				}
+			}
+
+			RefPtr<ExpressionSyntaxNode> VisitGenericApp(GenericAppExpr * genericAppExpr) override
+			{
+				// We are applying a generic to arguments, but there might be multiple generic
+				// declarations with the same name, so this becomes a specialized case of
+				// overload resolution.
+
+
+				// Start by checking the base expression and arguments.
+				auto& baseExpr = genericAppExpr->FunctionExpr;
+				baseExpr = CheckTerm(baseExpr);
+				auto& args = genericAppExpr->Arguments;
+				for (auto& arg : args)
+				{
+					arg = CheckTerm(arg);
+				}
+
+				// If there was an error in the base expression,  or in any of
+				// the arguments, then just bail.
+				if (IsErrorExpr(baseExpr))
+				{
+					return CreateErrorExpr(genericAppExpr);
+				}
+				for (auto argExpr : args)
+				{
+					if (IsErrorExpr(argExpr))
+					{
+						return CreateErrorExpr(genericAppExpr);
+					}
+				}
+
+				// Otherwise, let's start looking at how to find an overload...
+
+				OverloadResolveContext context;
+				context.appExpr = genericAppExpr;
+				context.baseExpr = GetBaseExpr(baseExpr);
+
+				AddGenericOverloadCandidates(baseExpr, context);
+
+				if (context.bestCandidates.Count() > 0)
+				{
+					// Things were ambiguous.
+					if (context.bestCandidates[0].status != OverloadCandidate::Status::Appicable)
+					{
+						// There were multple equally-good candidates, but none actually usable.
+						// We will construct a diagnostic message to help out.
+
+						// TODO(tfoley): print a reasonable message here...
+
+						getSink()->diagnose(genericAppExpr, Diagnostics::unimplemented, "no applicable generic");
+
+						return CreateErrorExpr(genericAppExpr);
+					}
+					else
+					{
+						// There were multiple viable candidates, but that isn't an error: we just need
+						// to complete all of them and create an overloaded expression as a result.
+
+						LookupResult result;
+						for (auto candidate : context.bestCandidates)
+						{
+							auto candidateExpr = CompleteOverloadCandidate(context, candidate);
+
+							throw "what now?";
+						}
+
+						auto overloadedExpr = new OverloadedExpr();
+
+						return overloadedExpr;
+					}
+				}
+				else if (context.bestCandidate)
+				{
+					// There was one best candidate, even if it might not have been
+					// applicable in the end.
+					// We will report errors for this one candidate, then, to give
+					// the user the most help we can.
+					return CompleteOverloadCandidate(context, *context.bestCandidate);
+				}
+				else
+				{
+					// Nothing at all was found that we could even consider invoking
+					getSink()->diagnose(genericAppExpr, Diagnostics::unimplemented, "expected a generic");
+					return CreateErrorExpr(genericAppExpr);
+				}
+
+
+
+#if TIMREMOVED
+
+				if (IsErrorExpr(base))
+				{
+					return CreateErrorExpr(typeNode);
+				}
+				else if(auto baseDeclRefExpr = base.As<DeclRefExpr>())
+				{
+					auto declRef = baseDeclRefExpr->declRef;
+
+					if (auto genericDeclRef = declRef.As<GenericDeclRef>())
+					{
+						int argCount = typeNode->Args.Count();
+						int argIndex = 0;
+						for (RefPtr<Decl> member : genericDeclRef.GetDecl()->Members)
+						{
+							if (auto typeParam = member.As<GenericTypeParamDecl>())
+							{
+								if (argIndex == argCount)
+								{
+									// Too few arguments!
+
+								}
+
+								// TODO: checking!
+							}
+							else if (auto valParam = member.As<GenericValueParamDecl>())
+							{
+								// TODO: checking
+							}
+							else
+							{
+
+							}
+						}
+						if (argIndex != argCount)
+						{
+							// Too many arguments!
+						}
+
+						// Now instantiate the declaration given those arguments
+						auto type = InstantiateGenericType(genericDeclRef, args);
+						typeResult = type;
+						typeNode->Type = new TypeExpressionType(type);
+						return typeNode;
+					}
+				}
+				else if (auto overloadedExpr = base.As<OverloadedExpr>())
+				{
+					// We are referring to a bunch of declarations, each of which might be generic
+					LookupResult result;
+					for (auto item : overloadedExpr->lookupResult2.items)
+					{
+						auto applied = TryApplyGeneric(item, typeNode);
+						if (!applied)
+							continue;
+
+						AddToLookupResult(result, appliedItem);
+					}
+				}
+
+				// TODO: correct diagnostic here!
+				getSink()->diagnose(typeNode, Diagnostics::expectedAGeneric, base->Type);
+				return CreateErrorExpr(typeNode);
+#endif
+			}
+
+
+
 
 			RefPtr<ExpressionSyntaxNode> CheckExpr(RefPtr<ExpressionSyntaxNode> expr)
 			{
