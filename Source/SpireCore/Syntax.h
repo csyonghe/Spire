@@ -2234,6 +2234,16 @@ namespace Spire
 		// HLSL `volatile` modifier (ignored)
 		class HLSLVolatileModifier : public Modifier {};
 
+		// An HLSL `[name(arg0, ...)]` style attribute, which hasn't undergone any
+		// semantic analysis.
+		// After analysis, this might be transformed into a more specific case.
+		class HLSLUncheckedAttribute : public Modifier
+		{
+		public:
+			Token nameToken;
+			List<RefPtr<ExpressionSyntaxNode>> args;
+		};
+
 		//
 
 		// A generic declaration, parameterized on types/values

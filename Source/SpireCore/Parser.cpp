@@ -552,6 +552,64 @@ namespace Spire
 			modifierLink = &modifier->next;
 		}
 
+		static void ParseSquareBracketAttributes(Parser* parser, RefPtr<Modifier>** ioModifierLink)
+		{
+			parser->ReadToken(TokenType::LBracket);
+			for(;;)
+			{
+				auto nameToken = parser->ReadToken(TokenType::Identifier);
+				if (AdvanceIf(parser, TokenType::Colon))
+				{
+					// Spire-style `[key:value]` attribute
+					Token valueToken = parser->ReadToken(TokenType::StringLiterial);
+
+					RefPtr<SimpleAttribute> modifier = new SimpleAttribute();
+					modifier->Key = nameToken.Content;
+					modifier->Value = valueToken;
+
+					AddModifier(ioModifierLink, modifier);
+				}
+				else if (AdvanceIf(parser, TokenType::LParent))
+				{
+					// HLSL-style `[name(arg0, ...)]` attribute
+					RefPtr<HLSLUncheckedAttribute> modifier = new HLSLUncheckedAttribute();
+					modifier->nameToken = nameToken;
+
+					while (!AdvanceIfMatch(parser, TokenType::RParent))
+					{
+						auto arg = parser->ParseExpression();
+						if (arg)
+						{
+							modifier->args.Add(arg);
+						}
+
+						if (AdvanceIfMatch(parser, TokenType::RParent))
+							break;
+
+						parser->ReadToken(TokenType::Comma);
+					}
+
+					AddModifier(ioModifierLink, modifier);
+				}
+				else
+				{
+					// default case, just `[key]`
+
+					// For now we parse this into the Spire-defined AST node,
+					// but we might eventually want to make the HLSL case the default
+					RefPtr<SimpleAttribute> modifier = new SimpleAttribute();
+					modifier->Key = nameToken.Content;
+					AddModifier(ioModifierLink, modifier);
+				}
+
+
+				if (AdvanceIfMatch(parser, TokenType::RBracket))
+					break;
+
+				parser->ReadToken(TokenType::Comma);
+			}
+		}
+
         static Modifiers ParseModifiers(Parser* parser)
         {
             Modifiers modifiers;
@@ -649,22 +707,10 @@ namespace Spire
 				{
 					modifiers.flags |= ModifierFlag::Extern;
 				}
-                else if (AdvanceIf(parser, TokenType::LBracket))
-                {
-                    auto name = parser->ReadToken(TokenType::Identifier).Content;
-                    Token valueToken;
-                    if (AdvanceIf(parser, TokenType::Colon))
-                    {
-                        valueToken = parser->ReadToken(TokenType::StringLiterial);
-                    }
-                    parser->ReadToken(TokenType::RBracket);
-
-                    RefPtr<SimpleAttribute> modifier = new SimpleAttribute();
-                    modifier->Key = name;
-                    modifier->Value = valueToken;
-
-					AddModifier(&modifierLink, modifier);
-                }
+				else if (parser->tokenReader.PeekTokenType() == TokenType::LBracket)
+				{
+					ParseSquareBracketAttributes(parser, &modifierLink);
+				}
                 else if (AdvanceIf(parser, "__intrinsic"))
                 {
                     modifiers.flags |= ModifierFlag::Intrinsic;
