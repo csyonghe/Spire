@@ -229,6 +229,7 @@ namespace Spire
 			Float = 32,
 			UInt = 512,
 			Bool = 128,
+			UInt64 = 8192,
 #if 0
 			Texture2D = 48,
 			TextureCube = 49,
@@ -1326,6 +1327,21 @@ namespace Spire
 			FilteredMemberRefList<FieldDeclRef> GetFields() const { return GetMembersOfType<FieldDeclRef>(); }
 		};
 
+		// A trait which other types can conform to
+		class TraitDecl : public AggTypeDecl
+		{
+		public:
+			List<TypeExp> bases;
+
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual ExtensionDecl* Clone(CloneContext & ctx) override;
+		};
+
+		struct TraitDeclRef : public AggTypeDeclRef
+		{
+			SPIRE_DECLARE_DECL_REF(TraitDeclRef);
+		};
+
 		// A declaration that represents a simple (non-aggregate) type
 		class SimpleTypeDecl : public Decl
 		{
@@ -2300,6 +2316,10 @@ namespace Spire
 		class GenericTypeParamDecl : public SimpleTypeDecl
 		{
 		public:
+			// The bound for the type parameter represents a trait that any
+			// type used as this parameter must conform to
+			TypeExp bound;
+
 			// The "initializer" for the parameter represents a default value
 			TypeExp initType;
 
@@ -2653,6 +2673,9 @@ namespace Spire
 			{}
 
 			virtual void VisitConstructorDecl(ConstructorDecl* decl)
+			{}
+
+			virtual void VisitTraitDecl(TraitDecl* decl)
 			{}
 		};
 	}

@@ -1421,6 +1421,10 @@ namespace Spire
 				// default case is a type parameter
 				auto paramDecl = new GenericTypeParamDecl();
 				paramDecl->Name = parser->ReadToken(TokenType::Identifier);
+				if (AdvanceIf(parser, TokenType::Colon))
+				{
+					paramDecl->bound = parser->ParseTypeExp();
+				}
 				if (AdvanceIf(parser, TokenType::OpAssign))
 				{
 					paramDecl->initType = parser->ParseTypeExp();
@@ -1467,6 +1471,27 @@ namespace Spire
 			decl->targetType = parser->ParseTypeExp();
 			parser->ReadToken(TokenType::LBrace);
             ParseDeclBody(parser, decl.Ptr(), TokenType::RBrace);
+			return decl;
+		}
+
+		static RefPtr<TraitDecl> ParseTraitDecl(Parser* parser)
+		{
+			RefPtr<TraitDecl> decl = new TraitDecl();
+			parser->FillPosition(decl.Ptr());
+			parser->ReadToken("__trait");
+			decl->Name = parser->ReadToken(TokenType::Identifier);
+
+			if (AdvanceIf(parser, TokenType::Colon))
+			{
+				do
+				{
+					auto base = parser->ParseTypeExp();
+					decl->bases.Add(base);
+				} while (AdvanceIf(parser, TokenType::Comma));
+			}
+
+			parser->ReadToken(TokenType::LBrace);
+			ParseDeclBody(parser, decl.Ptr(), TokenType::RBrace);
 			return decl;
 		}
 
@@ -1532,6 +1557,8 @@ namespace Spire
 				decl = ParseExtensionDecl(parser);
 			else if (parser->LookAheadToken("__init"))
 				decl = ParseConstructorDecl(parser);
+			else if (parser->LookAheadToken("__trait"))
+				decl = ParseTraitDecl(parser);
             else if (AdvanceIf(parser, TokenType::Semicolon))
             {
                 // empty declaration

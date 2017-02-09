@@ -510,6 +510,7 @@ namespace Spire
 
 			RefPtr<ExpressionSyntaxNode> CheckTerm(RefPtr<ExpressionSyntaxNode> term)
 			{
+				if (!term) return nullptr;
 				return term->Accept(this).As<ExpressionSyntaxNode>();
 			}
 
@@ -1385,6 +1386,9 @@ namespace Spire
 						getSink()->diagnose(varDecl, Diagnostics::unimplemented, "type inference for variable declaration");
 					}
 				}
+
+				varDecl->Type = type;
+				varDecl->Expr = initExpr;
 			}
 
 			virtual RefPtr<GenericDecl> VisitGenericDecl(GenericDecl* genericDecl) override
@@ -3251,6 +3255,7 @@ namespace Spire
 					case OverloadCandidate::Flavor::Func:
 						context.appExpr->FunctionExpr = baseExpr;
 						context.appExpr->Type = candidate.resultType;
+						return context.appExpr;
 						break;
 
 					case OverloadCandidate::Flavor::Generic:
