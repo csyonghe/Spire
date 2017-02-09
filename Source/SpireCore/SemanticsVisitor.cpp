@@ -278,7 +278,7 @@ namespace Spire
 				return ExpectAType(exp);
 			}
 
-			int ExtractGenericArgInteger(RefPtr<ExpressionSyntaxNode> exp)
+			RefPtr<IntVal> ExtractGenericArgInteger(RefPtr<ExpressionSyntaxNode> exp)
 			{
 				return CheckIntegerConstantExpression(exp.Ptr());
 			}
@@ -301,8 +301,7 @@ namespace Spire
 				}
 				else
 				{
-					int val = ExtractGenericArgInteger(exp);
-					return new IntVal(val);
+					return ExtractGenericArgInteger(exp);
 				}
 			}
 
@@ -1965,6 +1964,35 @@ namespace Spire
 				return stmt;
 			}
 
+			int GetMinBound(RefPtr<IntVal> val)
+			{
+				if (auto constantVal = val.As<ConstantIntVal>())
+					return constantVal->value;
+
+				// TODO(tfoley): Need to track intervals so that this isn't just a lie...
+				return 1;
+			}
+
+			void ValidateArraySizeForVariable(Variable* varDecl)
+			{
+				auto arrayType = varDecl->Type->AsArrayType();
+				if (!arrayType) return;
+
+				auto elementCount = arrayType->ArrayLength;
+				if (!elementCount)
+				{
+					getSink()->diagnose(varDecl, Diagnostics::invalidArraySize);
+					return;
+				}
+
+				// TODO(tfoley): How to handle the case where bound isn't known?
+				if (GetMinBound(elementCount) <= 0)
+				{
+					getSink()->diagnose(varDecl, Diagnostics::invalidArraySize);
+					return;
+				}
+			}
+
 			virtual RefPtr<Variable> VisitDeclrVariable(Variable* varDecl)
 			{
 				TypeExp typeExp = CheckUsableType(varDecl->Type);
@@ -1989,8 +2017,10 @@ namespace Spire
 				varDecl->Type = typeExp;
 				if (varDecl->Type.Equals(ExpressionType::Void.Ptr()))
 					getSink()->diagnose(varDecl, Diagnostics::invalidTypeVoid);
-				if (varDecl->Type.type->IsArray() && varDecl->Type.type->AsArrayType()->ArrayLength <= 0)
-					getSink()->diagnose(varDecl, Diagnostics::invalidArraySize);
+
+				// If this is an array variable, then make sure it is an okay array type...
+				ValidateArraySizeForVariable(varDecl);
+
 				if (varDecl->Expr != NULL)
 				{
 					varDecl->Expr = varDecl->Expr->Accept(this).As<ExpressionSyntaxNode>();
@@ -2099,23 +2129,29 @@ namespace Spire
 				return expr;
 			}
 
+			IntVal* GetIntVal(ConstantExpressionSyntaxNode* expr)
+			{
+				// TODO(tfoley): don't keep allocating here!
+				return new ConstantIntVal(expr->IntValue);
+			}
+
 			// Check that an expression resolves to an integer constant, and get its value
-			int CheckIntegerConstantExpression(ExpressionSyntaxNode* exp, int defaultValue = 0)
+			RefPtr<IntVal> CheckIntegerConstantExpression(ExpressionSyntaxNode* exp)
 			{
 				if (!exp->Type.type->Equals(ExpressionType::Int))
 				{
 					getSink()->diagnose(exp, Diagnostics::expectedIntegerConstantWrongType, exp->Type);
-					return defaultValue;
+					return nullptr;
 				}
 
 				// TODO(tfoley): more serious constant folding here
 				if (auto constExp = dynamic_cast<ConstantExpressionSyntaxNode*>(exp))
 				{
-					return constExp->IntValue;
+					return GetIntVal(constExp);
 				}
 
 				getSink()->diagnose(exp, Diagnostics::expectedIntegerConstantNotConstant);
-				return defaultValue;
+				return nullptr;
 			}
 
 			virtual RefPtr<ExpressionSyntaxNode> VisitIndexExpression(IndexExpressionSyntaxNode *expr) override
@@ -2132,7 +2168,7 @@ namespace Spire
 					// We are trying to "index" into a type, so we have an expression like `float[2]`
 					// which should be interpreted as resolving to an array type.
 
-					int elementCount = 0;
+					RefPtr<IntVal> elementCount = nullptr;
 					if (expr->IndexExpression)
 					{
 						elementCount = CheckIntegerConstantExpression(expr->IndexExpression.Ptr());
@@ -2719,13 +2755,15 @@ namespace Spire
 					else if (auto valParam = m.As<GenericValueParamDecl>())
 					{
 						// TODO(tfoley): maybe support more than integers some day?
-						RefPtr<IntVal> val = nullptr;
+						// TODO(tfoley): figure out how this needs to interact with
+						// compile-time integers that aren't just constants...
+						RefPtr<ConstantIntVal> val = nullptr;
 						for (auto& c : system->constraints)
 						{
 							if (c.decl != valParam.Ptr())
 								continue;
 
-							auto cVal = c.val.As<IntVal>();
+							auto cVal = c.val.As<ConstantIntVal>();
 							assert(cVal.Ptr());
 
 							if (!val)
@@ -3322,9 +3360,9 @@ namespace Spire
 				}
 
 				// if both values are integers, then compare them
-				if (auto fstIntVal = fst.As<IntVal>())
+				if (auto fstIntVal = fst.As<ConstantIntVal>())
 				{
-					if (auto sndIntVal = snd.As<IntVal>())
+					if (auto sndIntVal = snd.As<ConstantIntVal>())
 					{
 						return fstIntVal->value == sndIntVal->value;
 					}
@@ -4508,7 +4546,7 @@ namespace Spire
 					// here if the input type had a sugared name...
 					swizExpr->Type = new VectorExpressionType(
 						baseElementType,
-						elementCount);
+						new ConstantIntVal(elementCount));
 				}
 
 				// A swizzle can be used as an l-value as long as there
@@ -4516,6 +4554,22 @@ namespace Spire
 				swizExpr->Type.IsLeftValue = !anyDuplicates;
 
 				return swizExpr;
+			}
+
+			RefPtr<ExpressionSyntaxNode> CheckSwizzleExpr(
+				MemberExpressionSyntaxNode*	memberRefExpr,
+				RefPtr<ExpressionType>		baseElementType,
+				RefPtr<IntVal>				baseElementCount)
+			{
+				if (auto constantElementCount = baseElementCount.As<ConstantIntVal>())
+				{
+					return CheckSwizzleExpr(memberRefExpr, baseElementType, constantElementCount->value);
+				}
+				else
+				{
+					getSink()->diagnose(memberRefExpr, Diagnostics::unimplemented, "swizzle on vector of unknown size");
+					return CreateErrorExpr(memberRefExpr);
+				}
 			}
 
 

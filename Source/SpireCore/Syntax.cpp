@@ -696,7 +696,7 @@ namespace Spire
 
 			RefPtr<BasicExpressionType> floatType = new BasicExpressionType(BaseType::Float);
 			Float = floatType;
-			Float2 = new VectorExpressionType(floatType, 2);
+			Float2 = new VectorExpressionType(floatType, new ConstantIntVal(2));
 			Void = new BasicExpressionType(BaseType::Void);
 			Error = new BasicExpressionType(BaseType::Error);
 			Overloaded = new OverloadGroupType();
@@ -730,8 +730,8 @@ namespace Spire
         }
 		CoreLib::Basic::String ArrayExpressionType::ToString() const
 		{
-			if (ArrayLength > 0)
-				return BaseType->ToString() + "[" + String(ArrayLength) + "]";
+			if (ArrayLength)
+				return BaseType->ToString() + "[" + ArrayLength->ToString() + "]";
 			else
 				return BaseType->ToString() + "[]";
 		}
@@ -822,11 +822,11 @@ namespace Spire
 			return type;
 		}
 
-		static int ExtractGenericArgInteger(RefPtr<Val> val)
+		static RefPtr<IntVal> ExtractGenericArgInteger(RefPtr<Val> val)
 		{
 			auto intVal = val.As<IntVal>();
 			assert(intVal.Ptr());
-			return intVal->value;
+			return intVal;
 		}
 
 		// TODO: need to figure out how to unify this with the logic
@@ -1095,7 +1095,7 @@ namespace Spire
 		String VectorExpressionType::ToString() const
 		{
 			StringBuilder sb;
-			sb << "vector<" << elementType->ToString() << "," << elementCount << ">";
+			sb << "vector<" << elementType->ToString() << "," << elementCount->ToString() << ">";
 			return sb.ProduceString();
 		}
 
@@ -1109,7 +1109,7 @@ namespace Spire
 			if (auto vecType = type->AsVectorType())
 			{
 				return elementType->Equals(vecType->elementType)
-					&& elementCount == vecType->elementCount;
+					&& elementCount->EqualsVal(vecType->elementCount.Ptr());
 			}
 			
 			return false;
@@ -1145,7 +1145,7 @@ namespace Spire
 		String MatrixExpressionType::ToString() const
 		{
 			StringBuilder sb;
-			sb << "matrix<" << elementType->ToString() << "," << rowCount << "," << colCount << ">";
+			sb << "matrix<" << elementType->ToString() << "," << rowCount->ToString() << "," << colCount->ToString() << ">";
 			return sb.ProduceString();
 		}
 
@@ -1159,8 +1159,8 @@ namespace Spire
 			if (auto matType = type->AsMatrixType())
 			{
 				return elementType->Equals(matType->elementType)
-					&& rowCount == matType->rowCount
-					&& colCount == matType->colCount;
+					&& rowCount->EqualsVal(matType->rowCount.Ptr())
+					&& colCount->EqualsVal(matType->colCount.Ptr());
 			}
 			
 			return false;
@@ -1557,17 +1557,21 @@ namespace Spire
 			return this;
 		}
 
-		// Intval
+		// ConstantIntVal
 
-		bool IntVal::EqualsVal(Val* val)
+		bool ConstantIntVal::EqualsVal(Val* val)
 		{
-			if (auto intVal = dynamic_cast<IntVal*>(val))
+			if (auto intVal = dynamic_cast<ConstantIntVal*>(val))
 				return value == intVal->value;
 			return false;
 		}
 
-		// SwitchStmt
+		String ConstantIntVal::ToString() const
+		{
+			return String(value);
+		}
 
+		// SwitchStmt
 
 		RefPtr<SyntaxNode> SwitchStmt::Accept(SyntaxVisitor * visitor)
 		{

@@ -175,6 +175,16 @@ LayoutRulesImpl* GetLayoutRulesImpl(LayoutRule rule)
     }
 }
 
+static int GetElementCount(RefPtr<IntVal> val)
+{
+	if (auto constantVal = val.As<ConstantIntVal>())
+	{
+		return constantVal->value;
+	}
+	assert(!"unexpected");
+	return 0;
+}
+
 LayoutInfo GetLayout(ExpressionType* inType, LayoutRulesImpl* rules)
 {
 	RefPtr<ExpressionType> type = inType;
@@ -186,7 +196,7 @@ LayoutInfo GetLayout(ExpressionType* inType, LayoutRulesImpl* rules)
     {
         return rules->GetArrayLayout(
             GetLayout(arrayType->BaseType.Ptr(), rules),
-            arrayType->ArrayLength);
+            GetElementCount(arrayType->ArrayLength));
     }
 	else if (auto declRefType = type->As<DeclRefType>())
 	{

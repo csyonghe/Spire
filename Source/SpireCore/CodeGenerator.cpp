@@ -1409,6 +1409,16 @@ namespace Spire
 				return ilStructType;
 			}
 
+			int GetIntVal(RefPtr<IntVal> val)
+			{
+				if (auto constantVal = val.As<ConstantIntVal>())
+				{
+					return constantVal->value;
+				}
+				assert(!"unexpected");
+				return 0;
+			}
+
 			RefPtr<ILType> TranslateExpressionType(ExpressionType * type)
 			{
 				if (auto basicType = type->AsBasicType())
@@ -1424,7 +1434,7 @@ namespace Spire
 				else if (auto vecType = type->AsVectorType())
 				{
 					auto elementType = vecType->elementType->AsBasicType();
-					int elementCount = vecType->elementCount;
+					int elementCount = GetIntVal(vecType->elementCount);
 					assert(elementType);
 
 					static const struct {
@@ -1458,8 +1468,8 @@ namespace Spire
 				else if (auto matType = type->AsMatrixType())
 				{
 					auto elementType = matType->elementType->AsBasicType();
-					int rowCount = matType->rowCount;
-					int colCount = matType->colCount;
+					int rowCount = GetIntVal(matType->rowCount);
+					int colCount =  GetIntVal(matType->colCount);
 					assert(elementType);
 
 					static const struct {
@@ -1514,7 +1524,7 @@ namespace Spire
 				{
 					auto nArrType = new ILArrayType();
 					nArrType->BaseType = TranslateExpressionType(arrType->BaseType.Ptr());
-					nArrType->ArrayLength = arrType->ArrayLength;
+					nArrType->ArrayLength = arrType->ArrayLength ? GetIntVal(arrType->ArrayLength) : 0;
 					return nArrType;
 				}
 #if TIMREMOVED

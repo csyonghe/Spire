@@ -417,8 +417,8 @@ namespace Spire
 			}
 			else if (auto arr = type.As<ArrayExpressionType>())
 			{
-				if (arr->ArrayLength > 0)
-					return PrintType(arr->BaseType, recordReplaceStr) + "[" + arr->ArrayLength + "]";
+				if (arr->ArrayLength)
+					return PrintType(arr->BaseType, recordReplaceStr) + "[" + arr->ArrayLength->ToString() + "]";
 				else
 					return PrintType(arr->BaseType, recordReplaceStr) + "[]";
 			}

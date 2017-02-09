@@ -391,6 +391,20 @@ static void EmitExprWithPrecedence(EmitContext* context, RefPtr<ExpressionSyntax
 
 // Types
 
+// Extract the actual value of a compile-time integer
+static int GetIntVal(RefPtr<IntVal> val)
+{
+	if (auto constantVal = val.As<ConstantIntVal>())
+		return constantVal->value;
+	assert(!"unexpected");
+	return 0;
+}
+
+void Emit(EmitContext* context, RefPtr<IntVal> val)
+{
+	Emit(context, GetIntVal(val));
+}
+
 // represents a declarator for use in emitting types
 struct EDeclarator
 {
@@ -537,7 +551,7 @@ static void EmitType(EmitContext* context, RefPtr<ExpressionType> type, EDeclara
 		EDeclarator arrayDeclarator;
 		arrayDeclarator.next = declarator;
 		arrayDeclarator.flavor = EDeclarator::Flavor::Array;
-		arrayDeclarator.elementCount = arrayType->ArrayLength;
+		arrayDeclarator.elementCount = GetIntVal(arrayType->ArrayLength);
 
 		EmitType(context, arrayType->BaseType, &arrayDeclarator);
 		return;
@@ -722,7 +736,7 @@ static void EmitVal(EmitContext* context, RefPtr<Val> val)
 	}
 	else if (auto intVal = val.As<IntVal>())
 	{
-		Emit(context, intVal->value);
+		Emit(context, intVal);
 	}
 	else
 	{

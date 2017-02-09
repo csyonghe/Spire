@@ -279,20 +279,30 @@ namespace Spire
 			virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff);
 
 			virtual bool EqualsVal(Val* val) = 0;
+			virtual String ToString() const = 0;
 		};
 
-		// Trivial case of a value that is a constant integer
+		// A compile-time integer (may not have a specific concrete value)
 		class IntVal : public Val
+		{
+		};
+
+		// Trivial case of a value that is just a constant integer
+		class ConstantIntVal : public IntVal
 		{
 		public:
 			int value;
 
-			IntVal(int value)
+			ConstantIntVal(int value)
 				: value(value)
 			{}
 
 			virtual bool EqualsVal(Val* val) override;
+			virtual String ToString() const override;
 		};
+
+		// TODO(tfoley): classes for more general compile-time integers,
+		// including references to template parameters
 
 		// A type, representing a classifier for some term in the AST.
 		//
@@ -668,7 +678,7 @@ namespace Spire
 		{
 		public:
 			RefPtr<ExpressionType> BaseType;
-			int ArrayLength = 0;
+			RefPtr<IntVal> ArrayLength;
 			virtual CoreLib::Basic::String ToString() const override;
 		protected:
 			virtual bool EqualsImpl(const ExpressionType * type) const override;
@@ -704,7 +714,7 @@ namespace Spire
 		public:
 			VectorExpressionType(
 				RefPtr<ExpressionType>	elementType,
-				int						elementCount)
+				RefPtr<IntVal>			elementCount)
 				: elementType(elementType)
 				, elementCount(elementCount)
 			{}
@@ -714,11 +724,7 @@ namespace Spire
 			RefPtr<ExpressionType>	elementType;
 
 			// The number of elements
-			//
-			// TODO(tfoley): If we start allowing generics, then this might
-			// need to be a symbolic "constant" expression, and not just
-			// a literal value.
-			int						elementCount;
+			RefPtr<IntVal>			elementCount;
 
 			virtual String ToString() const override;
 			virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
@@ -735,8 +741,8 @@ namespace Spire
 		public:
 			MatrixExpressionType(
 				RefPtr<ExpressionType>	elementType,
-				int						rowCount,
-				int						colCount)
+				RefPtr<IntVal>			rowCount,
+				RefPtr<IntVal>			colCount)
 				: elementType(elementType)
 				, rowCount(rowCount)
 				, colCount(colCount)
@@ -744,14 +750,14 @@ namespace Spire
 
 			// The type of vector elements.
 			// As an invariant, this should be a basic type or an alias.
-			RefPtr<ExpressionType>	elementType;
+			RefPtr<ExpressionType>			elementType;
 
 			// The type of the matrix rows
 			RefPtr<VectorExpressionType>	rowType;
 
 			// The number of rows and columns
-			int								rowCount;
-			int								colCount;
+			RefPtr<IntVal>					rowCount;
+			RefPtr<IntVal>					colCount;
 
 			virtual String ToString() const override;
 			virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
@@ -767,8 +773,13 @@ namespace Spire
 			return vecType->elementType->AsBasicType()->BaseType;
 		}
 
-		inline int GetVectorSize(VectorExpressionType* vecType) {
-			return vecType->elementCount;
+		inline int GetVectorSize(VectorExpressionType* vecType)
+		{
+			auto constantVal = vecType->elementCount.As<ConstantIntVal>();
+			if (constantVal)
+				return constantVal->value;
+			// TODO: what to do in this case?
+			return 0;
 		}
 
 		class Type
