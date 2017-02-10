@@ -6,7 +6,25 @@ namespace Spire
 {
 	namespace Compiler
 	{
-		const int MaxExprLevel = 12;
+			enum Precedence : int
+		{
+			Invalid = -1,
+			Comma,
+			Assignment,
+			TernaryConditional,
+			LogicalOr,
+			LogicalAnd,
+			BitOr,
+			BitXor,
+			BitAnd,
+			EqualityComparison,
+			RelationalComparison,
+			BitShift,
+			Additive,
+			Multiplicative,
+			Prefix,
+			Postfix,
+		};
 
 		// TODO: implement two pass parsing for file reference and struct type recognition
 
@@ -133,7 +151,12 @@ namespace Spire
 			RefPtr<ContinueStatementSyntaxNode>			ParseContinueStatement();
 			RefPtr<ReturnStatementSyntaxNode>			ParseReturnStatement();
 			RefPtr<ExpressionStatementSyntaxNode>		ParseExpressionStatement();
-			RefPtr<ExpressionSyntaxNode>				ParseExpression(int level = 0);
+			RefPtr<ExpressionSyntaxNode>				ParseExpression(Precedence level = Precedence::Comma);
+
+			// Parse an expression that might be used in an initializer or argument context, so we should avoid operator-comma
+			inline RefPtr<ExpressionSyntaxNode>			ParseInitExpr() { return ParseExpression(Precedence::Assignment); }
+			inline RefPtr<ExpressionSyntaxNode>			ParseArgExpr()  { return ParseExpression(Precedence::Assignment); }
+
 			RefPtr<ExpressionSyntaxNode>				ParseLeafExpression();
 			RefPtr<ParameterSyntaxNode>					ParseParameter();
 			RefPtr<ExpressionSyntaxNode>				ParseType();
@@ -577,7 +600,7 @@ namespace Spire
 
 					while (!AdvanceIfMatch(parser, TokenType::RParent))
 					{
-						auto arg = parser->ParseExpression();
+						auto arg = parser->ParseArgExpr();
 						if (arg)
 						{
 							modifier->args.Add(arg);
@@ -678,7 +701,7 @@ namespace Spire
 					{
 						while (!AdvanceIfMatch(parser, TokenType::RParent))
 						{
-							auto expr = parser->ParseExpression();
+							auto expr = parser->ParseArgExpr();
 							modifier->Values.Add(expr);
 							if (AdvanceIf(parser, TokenType::RParent))
 								break;
@@ -1024,7 +1047,7 @@ namespace Spire
                 {
                     if (AdvanceIf(parser, TokenType::OpAssign))
                     {
-                        decl->Expression = parser->ParseExpression();
+                        decl->Expression = parser->ParseInitExpr();
                     }
                     // TODO(tfoley): support the block case here
                     parser->ReadToken(TokenType::Semicolon);
@@ -1412,7 +1435,7 @@ namespace Spire
 				}
 				if (AdvanceIf(parser, TokenType::OpAssign))
 				{
-					paramDecl->Expr = parser->ParseExpression();
+					paramDecl->Expr = parser->ParseInitExpr();
 				}
 				return paramDecl;
 			}
@@ -1841,7 +1864,7 @@ namespace Spire
 				{
 					RefPtr<ImportArgumentSyntaxNode> arg = new ImportArgumentSyntaxNode();
 					FillPosition(arg.Ptr());
-					auto expr = ParseExpression();
+					auto expr = ParseArgExpr();
 					if (LookAheadToken(TokenType::Colon))
 					{
 						if (auto varExpr = dynamic_cast<VarExpressionSyntaxNode*>(expr.Ptr()))
@@ -1852,7 +1875,7 @@ namespace Spire
 						else
 							sink->diagnose(tokenReader.PeekLoc(), Diagnostics::unexpectedColon);
 						ReadToken(TokenType::Colon);
-						arg->Expression = ParseExpression();
+						arg->Expression = ParseArgExpr();
 					}
 					else
 						arg->Expression = expr;
@@ -2294,14 +2317,14 @@ namespace Spire
 			ParseOptSemantics(this, parameter.Ptr());
 			if (AdvanceIf(this, TokenType::OpAssign))
 			{
-				parameter->Expr = ParseExpression();
+				parameter->Expr = ParseInitExpr();
 			}
 			return parameter;
 		}
 
 		RefPtr<ExpressionSyntaxNode> ParseGenericArg(Parser* parser)
 		{
-			return parser->ParseExpression();
+			return parser->ParseArgExpr();
 		}
 
 		RefPtr<ExpressionSyntaxNode> Parser::ParseType()
@@ -2363,18 +2386,25 @@ namespace Spire
 			Left, Right
 		};
 
-		Associativity GetAssociativityFromLevel(int level)
+
+
+		Associativity GetAssociativityFromLevel(Precedence level)
 		{
-			if (level == 0)
+			if (level == Precedence::Assignment)
 				return Associativity::Right;
 			else
 				return Associativity::Left;
 		}
 
-		int GetOpLevel(Parser* parser, CoreLib::Text::TokenType type)
+
+
+
+		Precedence GetOpLevel(Parser* parser, CoreLib::Text::TokenType type)
 		{
 			switch(type)
 			{
+			case TokenType::Comma:
+				return Precedence::Comma;
 			case TokenType::OpAssign:
 			case TokenType::OpMulAssign:
 			case TokenType::OpDivAssign:
@@ -2386,41 +2416,41 @@ namespace Spire
 			case TokenType::OpOrAssign:
 			case TokenType::OpAndAssign:
 			case TokenType::OpXorAssign:
-				return 0;
+				return Precedence::Assignment;
 			case TokenType::OpOr:
-				return 2;
+				return Precedence::LogicalOr;
 			case TokenType::OpAnd:
-				return 3;
+				return Precedence::LogicalAnd;
 			case TokenType::OpBitOr:
-				return 4;
+				return Precedence::BitOr;
 			case TokenType::OpBitXor:
-				return 5;
+				return Precedence::BitXor;
 			case TokenType::OpBitAnd:
-				return 6;
+				return Precedence::BitAnd;
 			case TokenType::OpEql:
 			case TokenType::OpNeq:
-				return 7;
+				return Precedence::EqualityComparison;
 			case TokenType::OpGreater:
 			case TokenType::OpGeq:
 				// Don't allow these ops inside a generic argument
-				if (parser->genericDepth > 0) return -1;
+				if (parser->genericDepth > 0) return Precedence::Invalid;
 			case TokenType::OpLeq:
 			case TokenType::OpLess:
-				return 8;
+				return Precedence::RelationalComparison;
 			case TokenType::OpRsh:
 				// Don't allow this op inside a generic argument
-				if (parser->genericDepth > 0) return -1;
+				if (parser->genericDepth > 0) return Precedence::Invalid;
 			case TokenType::OpLsh:
-				return 9;
+				return Precedence::BitShift;
 			case TokenType::OpAdd:
 			case TokenType::OpSub:
-				return 10;
+				return Precedence::Additive;
 			case TokenType::OpMul:
 			case TokenType::OpDiv:
 			case TokenType::OpMod:
-				return 11;
+				return Precedence::Multiplicative;
 			default:
-				return -1;
+				return Precedence::Invalid;
 			}
 		}
 
@@ -2428,6 +2458,8 @@ namespace Spire
 		{
 			switch(token.Type)
 			{
+			case TokenType::Comma:
+				return Operator::Sequence;
 			case TokenType::OpAssign:
 				return Operator::Assign;
 			case TokenType::OpAddAssign:
@@ -2499,14 +2531,14 @@ namespace Spire
 			}
 		}
 
-		RefPtr<ExpressionSyntaxNode> Parser::ParseExpression(int level)
+		RefPtr<ExpressionSyntaxNode> Parser::ParseExpression(Precedence level)
 		{
-			if (level == MaxExprLevel)
+			if (level == Precedence::Prefix)
 				return ParseLeafExpression();
-			if (level == 1)
+			if (level == Precedence::TernaryConditional)
 			{
 				// parse select clause
-				auto condition = ParseExpression(level + 1);
+				auto condition = ParseExpression(Precedence(level + 1));
 				if (LookAheadToken(TokenType::QuestionMark))
 				{
 					RefPtr<SelectExpressionSyntaxNode> select = new SelectExpressionSyntaxNode();
@@ -2525,7 +2557,7 @@ namespace Spire
 			{
 				if (GetAssociativityFromLevel(level) == Associativity::Left)
 				{
-					auto left = ParseExpression(level + 1);
+					auto left = ParseExpression(Precedence(level + 1));
 					while (GetOpLevel(this, tokenReader.PeekTokenType()) == level)
 					{
 						RefPtr<BinaryExpressionSyntaxNode> tmp = new BinaryExpressionSyntaxNode();
@@ -2533,14 +2565,14 @@ namespace Spire
 						FillPosition(tmp.Ptr());
 						Token opToken = tokenReader.AdvanceToken();
 						tmp->Operator = GetOpFromToken(opToken);
-						tmp->RightExpression = ParseExpression(level + 1);
+						tmp->RightExpression = ParseExpression(Precedence(level + 1));
 						left = tmp;
 					}
 					return left;
 				}
 				else
 				{
-					auto left = ParseExpression(level + 1);
+					auto left = ParseExpression(Precedence(level + 1));
 					if (GetOpLevel(this, tokenReader.PeekTokenType()) == level)
 					{
 						RefPtr<BinaryExpressionSyntaxNode> tmp = new BinaryExpressionSyntaxNode();
@@ -2565,7 +2597,7 @@ namespace Spire
 				FillPosition(project.Ptr());
 				ReadToken("project");
 				ReadToken(TokenType::LParent);
-				project->BaseExpression = ParseExpression();
+				project->BaseExpression = ParseArgExpr();
 				ReadToken(TokenType::RParent);
 				return project;
 			}
@@ -2601,7 +2633,7 @@ namespace Spire
 					FillPosition(tcexpr.Ptr());
 					tcexpr->TargetType = ParseTypeExp();
 					ReadToken(TokenType::RParent);
-					tcexpr->Expression = ParseExpression();
+					tcexpr->Expression = ParseExpression(Precedence::Multiplicative); // Note(tfoley): need to double-check this
 					expr = tcexpr;
 				}
 				else
@@ -2692,7 +2724,7 @@ namespace Spire
 					while (!tokenReader.IsAtEnd())
 					{
 						if (!LookAheadToken(TokenType::RParent))
-							invokeExpr->Arguments.Add(ParseExpression());
+							invokeExpr->Arguments.Add(ParseArgExpr());
 						else
 						{
 							break;

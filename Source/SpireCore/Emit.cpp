@@ -334,6 +334,7 @@ static void EmitExprWithPrecedence(EmitContext* context, RefPtr<ExpressionSyntax
 		CASE(AndAssign, &=);
 		CASE(XorAssign, ^=);
 #undef CASE
+		case Operator::Sequence: EmitBinExpr(context, outerPrec, kPrecedence_Comma, ",", binExpr); break;
 		default:
 			assert(!"unreachable");
 			break;

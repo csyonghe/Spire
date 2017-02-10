@@ -1680,6 +1680,7 @@ namespace Spire
 			BitAnd, BitXor, BitOr,
 			And,
 			Or,
+			Sequence,
 			Assign = 200, AddAssign, SubAssign, MulAssign, DivAssign, ModAssign,
 			LshAssign, RshAssign, OrAssign, AndAssign, XorAssign
 		};
