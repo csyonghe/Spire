@@ -317,7 +317,7 @@ static void EmitExprWithPrecedence(EmitContext* context, RefPtr<ExpressionSyntax
 		CASE(Less, <);
 		CASE(Geq, >=);
 		CASE(Leq, <=);
-		CASE(BitAnd, &=);
+		CASE(BitAnd, &);
 		CASE(BitXor, ^);
 		CASE(BitOr, |);
 		CASE(And, &&);
