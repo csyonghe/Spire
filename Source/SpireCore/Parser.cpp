@@ -926,76 +926,25 @@ namespace Spire
 			ParseOptSemantics(parser, decl.Ptr());
         }
 
-        static void ParseFuncDeclHeader(
-            Parser*                     parser,
-            DeclaratorInfo const&       declaratorInfo,
-            RefPtr<ComponentSyntaxNode> decl)
-        {
-            parser->PushScope(decl.Ptr());
-
-            parser->anonymousParamCounter = 0;
-            parser->FillPosition(decl.Ptr());
-            decl->Position = declaratorInfo.nameToken.Position;
-
-            decl->Name = declaratorInfo.nameToken;
-            decl->Type = TypeExp(declaratorInfo.typeSpec);
-            parser->ReadToken(TokenType::LParent);
-            while (!AdvanceIfMatch(parser, TokenType::RParent))
-            {
-				AddMember(decl, parser->ParseParameter());
-                if (AdvanceIf(parser, TokenType::RParent))
-                    break;
-                parser->ReadToken(TokenType::Comma);
-            }
-			ParseOptSemantics(parser, decl.Ptr());
-        }
-
         static RefPtr<Decl> ParseFuncDecl(
             Parser*                 parser,
             ContainerDecl*          containerDecl,
             DeclaratorInfo const&   declaratorInfo)
         {
-            if (dynamic_cast<ShaderDeclBase*>(containerDecl))
+            RefPtr<FunctionSyntaxNode> decl = new FunctionSyntaxNode();
+            ParseFuncDeclHeader(parser, declaratorInfo, decl);
+
+            if (AdvanceIf(parser, TokenType::Semicolon))
             {
-                // inside a shader, we create a component decl
-                RefPtr<ComponentSyntaxNode> decl = new ComponentSyntaxNode();
-                ParseFuncDeclHeader(parser, declaratorInfo, decl);
-
-                //
-                decl->Rate = declaratorInfo.rate;
-                //
-
-                if (AdvanceIf(parser, TokenType::Semicolon))
-                {
-                    // empty body
-                }
-                else
-                {
-                    decl->BlockStatement = parser->ParseBlockStatement();
-                }
-
-                parser->PopScope();
-                return decl;
+                // empty body
             }
             else
             {
-                // everywhere else, we create an ordinary `FunctionSyntaxNode`
-
-                RefPtr<FunctionSyntaxNode> decl = new FunctionSyntaxNode();
-                ParseFuncDeclHeader(parser, declaratorInfo, decl);
-
-                if (AdvanceIf(parser, TokenType::Semicolon))
-                {
-                    // empty body
-                }
-                else
-                {
-                    decl->Body = parser->ParseBlockStatement();
-                }
-
-                parser->PopScope();
-                return decl;
+                decl->Body = parser->ParseBlockStatement();
             }
+
+            parser->PopScope();
+            return decl;
         }
 
         static RefPtr<VarDeclBase> CreateVarDeclForContext(
@@ -1047,49 +996,10 @@ namespace Spire
             ContainerDecl*          containerDecl,
             DeclaratorInfo const&   declaratorInfo)
         {
-            if (dynamic_cast<ShaderDeclBase*>(containerDecl))
-            {
-                // inside a shader, we create a component decl
-                RefPtr<ComponentSyntaxNode> decl = new ComponentSyntaxNode();
-                parser->FillPosition(decl.Ptr());
-                decl->Position = declaratorInfo.nameToken.Position;
-
-                //
-                decl->Rate = declaratorInfo.rate;
-                //
-
-                decl->Name = declaratorInfo.nameToken;
-                decl->Type = TypeExp(declaratorInfo.typeSpec);
-
-				ParseOptSemantics(parser, decl.Ptr());
-
-                // Note(tfoley): this case is the one place where a component
-                // declaration differents in any meaningful way from an
-                // ordinary variable declaration.
-                if (parser->tokenReader.PeekTokenType() == TokenType::LBrace)
-                {
-                    decl->BlockStatement = parser->ParseBlockStatement();
-                }
-                else
-                {
-                    if (AdvanceIf(parser, TokenType::OpAssign))
-                    {
-                        decl->Expression = parser->ParseInitExpr();
-                    }
-                    // TODO(tfoley): support the block case here
-                    parser->ReadToken(TokenType::Semicolon);
-                }
-
-                return decl;
-            }
-            else
-            {
-                // everywhere else, we create an ordinary `VarDeclBase`
-                RefPtr<VarDeclBase> decl = CreateVarDeclForContext(containerDecl);
-				ParseVarDeclCommon(parser, decl, declaratorInfo);
-                parser->ReadToken(TokenType::Semicolon);
-                return decl;
-            }
+			RefPtr<VarDeclBase> decl = CreateVarDeclForContext(containerDecl);
+			ParseVarDeclCommon(parser, decl, declaratorInfo);
+			parser->ReadToken(TokenType::Semicolon);
+			return decl;
         }
 
 		static RefPtr<Declarator> ParseSimpleDeclarator(
@@ -1218,16 +1128,11 @@ namespace Spire
         {
             DeclaratorInfo declaratorInfo;
 
-            // For now we just parse <type-spec> <decl-name>
-            //
-            // TODO(tfoley): Actual C-style declarator-based parsed.
-            //
             if (parser->tokenReader.PeekTokenType() == TokenType::At)
             {
                 declaratorInfo.rate = parser->ParseRate();
             }
             declaratorInfo.typeSpec = parser->ParseType();
-
 
 			RefPtr<Declarator> declarator = ParseDeclarator(parser);
 			UnwrapDeclarator(declarator, &declaratorInfo);
