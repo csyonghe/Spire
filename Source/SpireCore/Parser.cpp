@@ -2142,7 +2142,9 @@ namespace Spire
 			}
 			else
 			{
-                Unexpected(this);
+				// Default case should always fall back to parsing an expression,
+				// and then let that detect any errors
+				statement = ParseExpressionStatement();
 			}
 
 			if (statement)
