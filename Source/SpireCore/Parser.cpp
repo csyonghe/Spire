@@ -2176,7 +2176,10 @@ namespace Spire
 			RefPtr<ScopeDecl> scopeDecl = new ScopeDecl();
 			RefPtr<ForStatementSyntaxNode> stmt = new ForStatementSyntaxNode();
             stmt->scopeDecl = scopeDecl;
-			PushScope(scopeDecl.Ptr());
+
+			// Note(tfoley): HLSL implements `for` with incorrect scoping.
+			// We need an option to turn on this behavior in a kind of "legacy" mode
+//			PushScope(scopeDecl.Ptr());
 			FillPosition(stmt.Ptr());
 			ReadToken("for");
 			ReadToken(TokenType::LParent);
@@ -2202,7 +2205,7 @@ namespace Spire
 				stmt->SideEffectExpression = ParseExpression();
 			ReadToken(TokenType::RParent);
 			stmt->Statement = ParseStatement();
-			PopScope();
+//			PopScope();
 			return stmt;
 		}
 
