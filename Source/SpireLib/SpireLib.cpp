@@ -548,8 +548,11 @@ namespace SpireLib
 							return nullptr;
 						}
 						auto newParam = param->Clone(cloneCtx);
-						newParam->modifiers.first = nullptr;
-						newParam->modifiers.flags = ModifierFlag::Public;
+
+						auto publicModifier = new PublicModifier();
+						publicModifier->next = newParam->modifiers.first;
+						newParam->modifiers.first = publicModifier;
+
 						param->BlockStatement = nullptr;
 						auto expr = new ConstantExpressionSyntaxNode();
 						if (param->Type.Equals(ExpressionType::Bool))

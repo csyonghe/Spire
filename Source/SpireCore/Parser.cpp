@@ -172,11 +172,18 @@ namespace Spire
 			ContainerDecl*				containerDecl,
 			CoreLib::Text::TokenType	closingToken);
 
+		static RefPtr<Modifier> ParseOptSemantics(
+			Parser* parser);
+
 		static void ParseOptSemantics(
 			Parser* parser,
 			Decl*	decl);
 
-		static RefPtr<Decl> ParseDecl(
+		static RefPtr<DeclBase> ParseDecl(
+			Parser*			parser,
+			ContainerDecl*	containerDecl);
+
+		static RefPtr<Decl> ParseSingleDecl(
 			Parser*			parser,
 			ContainerDecl*	containerDecl);
 
@@ -639,39 +646,46 @@ namespace Spire
             RefPtr<Modifier>* modifierLink = &modifiers.first;
             for (;;)
             {
-                if (AdvanceIf(parser, "in"))
-                {
-                    modifiers.flags |= ModifierFlag::In;
-                }
-                else if (AdvanceIf(parser, "input"))
-                {
-                    modifiers.flags |= ModifierFlag::Input;
-                }
-                else if (AdvanceIf(parser, "out"))
-                {
-                    modifiers.flags |= ModifierFlag::Out;
-                }
-                else if (AdvanceIf(parser, "inout"))
-                {
-                    modifiers.flags |= ModifierFlag::InOut;
-                }
-                else if (AdvanceIf(parser, "uniform"))
-                {
-                    modifiers.flags |= ModifierFlag::Uniform;
-                }
-                else if (AdvanceIf(parser, "const"))
-                {
-                    modifiers.flags |= ModifierFlag::Const;
-                }
-                else if (AdvanceIf(parser, "instance"))
-                {
-                    modifiers.flags |= ModifierFlag::Instance;
-                }
-                else if (AdvanceIf(parser, "__builtin"))
-                {
-                    modifiers.flags |= ModifierFlag::Builtin;
-                }
-                else if (AdvanceIf(parser, "layout"))
+				CodePosition loc = parser->tokenReader.PeekLoc();
+
+				if (0) {}
+
+			#define CASE(KEYWORD, TYPE)						\
+				else if(AdvanceIf(parser, #KEYWORD)) do {		\
+					RefPtr<TYPE> modifier = new TYPE();		\
+					modifier->Position = loc;				\
+					AddModifier(&modifierLink, modifier);	\
+				} while(0)
+
+				CASE(in, InModifier);
+				CASE(input, InputModifier);
+				CASE(out, OutModifier);
+				CASE(inout, InOutModifier);
+				CASE(const, ConstModifier);
+				CASE(instance, InstanceModifier);
+				CASE(__builtin, BuiltinModifier);
+
+				CASE(__intrinsic, IntrinsicModifier);
+				CASE(inline, InlineModifier);
+				CASE(public, PublicModifier);
+				CASE(require, RequireModifier);
+				CASE(param, ParamModifier);
+				CASE(extern, ExternModifier);
+
+				CASE(row_major, HLSLRowMajorLayoutModifier);
+				CASE(column_major, HLSLColumnMajorLayoutModifier);
+
+				CASE(nointerpolation, HLSLNoInterpolationModifier);
+				CASE(precise, HLSLPreciseModifier);
+				CASE(shared, HLSLEffectSharedModifier);
+				CASE(groupshared, HLSLGroupSharedModifier);
+				CASE(static, HLSLStaticModifier);
+				CASE(uniform, HLSLUniformModifier);
+				CASE(volatile, HLSLVolatileModifier);
+
+				#undef CASE
+
+				else if (AdvanceIf(parser, "layout"))
 				{
 					parser->ReadToken(TokenType::LParent);
 					StringBuilder layoutSB;
@@ -710,34 +724,10 @@ namespace Spire
 					}
 					AddModifier(&modifierLink, modifier);
 				}
-                else if (AdvanceIf(parser, "inline"))
-				{
-					modifiers.flags |= ModifierFlag::Inline;
-				}
-				else if (AdvanceIf(parser, "public"))
-				{
-					modifiers.flags |= ModifierFlag::Public;
-				}
-				else if (AdvanceIf(parser, "require"))
-				{
-					modifiers.flags |= ModifierFlag::Require;
-				}
-				else if (AdvanceIf(parser, "param"))
-				{
-					modifiers.flags |= ModifierFlag::Param;
-				}
-				else if (AdvanceIf(parser, "extern"))
-				{
-					modifiers.flags |= ModifierFlag::Extern;
-				}
 				else if (parser->tokenReader.PeekTokenType() == TokenType::LBracket)
 				{
 					ParseSquareBracketAttributes(parser, &modifierLink);
 				}
-                else if (AdvanceIf(parser, "__intrinsic"))
-                {
-                    modifiers.flags |= ModifierFlag::Intrinsic;
-                }
 				else if (AdvanceIf(parser,"__builtin_type"))
 				{
 					RefPtr<BuiltinTypeModifier> modifier = new BuiltinTypeModifier();
@@ -760,36 +750,6 @@ namespace Spire
 
 					AddModifier(&modifierLink, modifier);
 				}
-
-				#define CASE(KEYWORD, TYPE)						\
-					else if(AdvanceIf(parser, #KEYWORD)) do {	\
-						AddModifier(&modifierLink, new TYPE());	\
-					} while(0)
-
-				CASE(row_major, HLSLRowMajorLayoutModifier);
-				CASE(column_major, HLSLColumnMajorLayoutModifier);
-
-				CASE(nointerpolation, HLSLNoInterpolationModifier);
-				CASE(precise, HLSLPreciseModifier);
-				CASE(shared, HLSLEffectSharedModifier);
-				CASE(groupshared, HLSLGroupSharedModifier);
-				CASE(static, HLSLStaticModifier);
-				CASE(uniform, HLSLUniformModifier);
-				CASE(volatile, HLSLVolatileModifier);
-
-				#undef CASE
-
-				else if (AdvanceIf(parser, "row_major"))
-				{
-					RefPtr<HLSLRowMajorLayoutModifier> modifier = new HLSLRowMajorLayoutModifier();
-					AddModifier(&modifierLink, modifier);
-				}
-				else if (AdvanceIf(parser, "column_major"))
-				{
-					RefPtr<HLSLColumnMajorLayoutModifier> modifier = new HLSLColumnMajorLayoutModifier();
-					AddModifier(&modifierLink, modifier);
-				}
-
                 else
                 {
                     // Done with modifier list
@@ -889,6 +849,8 @@ namespace Spire
             RefPtr<RateSyntaxNode>			rate;
             RefPtr<ExpressionSyntaxNode>	typeSpec;
             Token							nameToken;
+			RefPtr<Modifier>				semantics;
+			RefPtr<ExpressionSyntaxNode>	initializer;
         };
 
 		// Add a member declaration to its container, and ensure that its
@@ -964,13 +926,27 @@ namespace Spire
             }
         }
 
-		static void ParseVarDeclCommon(
+		// Add modifiers to the end of the modifier list for a declaration
+		void AddModifiers(Decl* decl, RefPtr<Modifier> modifiers)
+		{
+			if (!modifiers)
+				return;
+
+			RefPtr<Modifier>* link = &decl->modifiers.first;
+			while (*link)
+			{
+				link = &(*link)->next;
+			}
+			*link = modifiers;
+		}
+
+		// Set up a variable declaration based on what we saw in its declarator...
+		static void CompleteVarDecl(
 			Parser*					parser,
 			RefPtr<VarDeclBase>		decl,
 			DeclaratorInfo const&	declaratorInfo)
 		{
 			parser->FillPosition(decl.Ptr());
-			decl->Position = declaratorInfo.nameToken.Position;
 
 			if( declaratorInfo.nameToken.Type == TokenType::Unknown )
 			{
@@ -979,28 +955,15 @@ namespace Spire
 			}
 			else
 			{
+				decl->Position = declaratorInfo.nameToken.Position;
 				decl->Name = declaratorInfo.nameToken;
 			}
 			decl->Type = TypeExp(declaratorInfo.typeSpec);
 
-			ParseOptSemantics(parser, decl.Ptr());
+			AddModifiers(decl.Ptr(), declaratorInfo.semantics);
 
-			if (AdvanceIf(parser, TokenType::OpAssign))
-			{
-				decl->Expr = parser->ParseExpression();
-			}
+			decl->Expr = declaratorInfo.initializer;
 		}
-
-        static RefPtr<Decl> ParseVarDecl(
-            Parser*                 parser,
-            ContainerDecl*          containerDecl,
-            DeclaratorInfo const&   declaratorInfo)
-        {
-			RefPtr<VarDeclBase> decl = CreateVarDeclForContext(containerDecl);
-			ParseVarDeclCommon(parser, decl, declaratorInfo);
-			parser->ReadToken(TokenType::Semicolon);
-			return decl;
-        }
 
 		static RefPtr<Declarator> ParseDeclarator(Parser* parser);
 
@@ -1068,6 +1031,9 @@ namespace Spire
 						continue;
 					}
 
+				case TokenType::LParent:
+					break;
+
 				default:
 					break;
 				}
@@ -1099,6 +1065,36 @@ namespace Spire
 			{
 				return ParseDirectAbstractDeclarator(parser);
 			}
+		}
+
+		// A declarator plus optional semantics and initializer
+		struct InitDeclarator
+		{
+			RefPtr<Declarator>				declarator;
+			RefPtr<Modifier>				semantics;
+			RefPtr<ExpressionSyntaxNode>	initializer;
+		};
+
+		// Parse a declarator plus optional semantics
+		static InitDeclarator ParseSemanticDeclarator(
+			Parser* parser)
+		{
+			InitDeclarator result;
+			result.declarator = ParseDeclarator(parser);
+			result.semantics = ParseOptSemantics(parser);
+			return result;
+		}
+
+		// Parse a declarator plus optional semantics and initializer
+		static InitDeclarator ParseInitDeclarator(
+			Parser* parser)
+		{
+			InitDeclarator result = ParseSemanticDeclarator(parser);
+			if (AdvanceIf(parser, TokenType::OpAssign))
+			{
+				result.initializer = parser->ParseInitExpr();
+			}
+			return result;
 		}
 
 		static void UnwrapDeclarator(
@@ -1150,37 +1146,108 @@ namespace Spire
 			}
 		}
 
+		static void UnwrapDeclarator(
+			InitDeclarator const&	initDeclarator,
+			DeclaratorInfo*			ioInfo)
+		{
+			UnwrapDeclarator(initDeclarator.declarator, ioInfo);
+			ioInfo->semantics = initDeclarator.semantics;
+			ioInfo->initializer = initDeclarator.initializer;
+		}
 
-        static RefPtr<Decl> ParseDeclaratorDecl(
+
+        static RefPtr<DeclBase> ParseDeclaratorDecl(
             Parser*         parser,
             ContainerDecl*  containerDecl)
         {
-            DeclaratorInfo declaratorInfo;
+			CodePosition startPosition = parser->tokenReader.PeekLoc();
 
+			RefPtr<RateSyntaxNode> rate;
             if (parser->tokenReader.PeekTokenType() == TokenType::At)
             {
-                declaratorInfo.rate = parser->ParseRate();
+                rate = parser->ParseRate();
             }
-            declaratorInfo.typeSpec = parser->ParseType();
+			auto typeSpec = parser->ParseType();
+            
 
-			RefPtr<Declarator> declarator = ParseDeclarator(parser);
-			UnwrapDeclarator(declarator, &declaratorInfo);
+			InitDeclarator initDeclarator = ParseInitDeclarator(parser);
 
-            // Look at the token after the declarator to disambiguate
+			DeclaratorInfo declaratorInfo;
+			declaratorInfo.rate = rate;
+			declaratorInfo.typeSpec = typeSpec;
+
+
+			// Rather than parse function declarators properly for now,
+			// we'll just do a quick disambiguation here. This won't
+			// matter unless we actually decide to support function-type parameters,
+			// using C syntax.
 			//
-			// Note(tfoley): the correct approach would be to parse function parameters
-			// as part of a function declarator, and then disambiguate on that result.
-            switch (parser->tokenReader.PeekTokenType())
-            {
-            case TokenType::LParent:
-                // It must be a function
-                return ParseFuncDecl(parser, containerDecl, declaratorInfo);
+			if( parser->tokenReader.PeekTokenType() == TokenType::LParent
 
-            default:
-                // Assume it is a variable-like declaration
-                return ParseVarDecl(parser, containerDecl, declaratorInfo);
-            }
-        }
+				// Only parse as a function if we didn't already see mutually-exclusive
+				// constructs when parsing the declarator.
+				&& !initDeclarator.initializer
+				&& !initDeclarator.semantics)
+			{
+				// Looks like a function, so parse it like one.
+				UnwrapDeclarator(initDeclarator, &declaratorInfo);
+				return ParseFuncDecl(parser, containerDecl, declaratorInfo);
+			}
+
+			// Otherwise we are looking at a variable declaration, which could be one in a sequence...
+
+			if( AdvanceIf(parser, TokenType::Semicolon) )
+			{
+				// easy case: we only had a single declaration!
+				UnwrapDeclarator(initDeclarator, &declaratorInfo);
+				RefPtr<VarDeclBase> firstDecl = CreateVarDeclForContext(containerDecl);
+				CompleteVarDecl(parser, firstDecl, declaratorInfo);
+				return firstDecl;
+			}
+
+			// Otherwise we have multiple declarations in a sequence, and these
+			// declarations need to somehow share both the type spec and modifiers.
+			//
+			// If there are any errors in the type specifier, we only want to hear
+			// about it once, so we need to share structure rather than just
+			// clone syntax.
+
+			auto sharedTypeSpec = new SharedTypeExpr();
+			sharedTypeSpec->Position = typeSpec->Position;
+			sharedTypeSpec->base = TypeExp(typeSpec);
+
+			// Otherwise we are looking at a sequence of declarations.
+			RefPtr<DeclGroup> declGroup = new DeclGroup();
+			declGroup->Position = startPosition;
+
+			for(;;)
+			{
+				declaratorInfo.rate = rate;
+				declaratorInfo.typeSpec = sharedTypeSpec;
+				UnwrapDeclarator(initDeclarator, &declaratorInfo);
+
+				RefPtr<VarDeclBase> varDecl = CreateVarDeclForContext(containerDecl);
+				CompleteVarDecl(parser, varDecl, declaratorInfo);
+
+				declGroup->decls.Add(varDecl);
+
+				// end of the sequence?
+				if(AdvanceIf(parser, TokenType::Semicolon))
+					return declGroup;
+
+				// ad-hoc recovery, to avoid infinite loops
+				if( parser->isRecovering )
+				{
+					parser->ReadToken(TokenType::Semicolon);
+					return declGroup;
+				}
+
+				parser->ReadToken(TokenType::Comma);
+
+				// expect another variable declaration...
+				initDeclarator = ParseInitDeclarator(parser);
+			}
+		}
 
 		//
 		// layout-semantic ::= (register | packoffset) '(' register-name component-mask? ')'
@@ -1231,14 +1298,14 @@ namespace Spire
 		//
 		// opt-semantics ::= (':' semantic)*
 		//
-		static void ParseOptSemantics(
-			Parser* parser,
-			Decl*	decl)
+		static RefPtr<Modifier> ParseOptSemantics(
+			Parser* parser)
 		{
 			if (!AdvanceIf(parser, TokenType::Colon))
-				return;
+				return nullptr;
 
-			RefPtr<Modifier>* link = &decl->modifiers.first;
+			RefPtr<Modifier> result;
+			RefPtr<Modifier>* link = &result;
 			assert(!*link);
 
 			for (;;)
@@ -1257,7 +1324,7 @@ namespace Spire
 				case TokenType::Comma:
 				case TokenType::RParent:
 				case TokenType::EndOfFile:
-					return;
+					return result;
 
 				default:
 					break;
@@ -1265,6 +1332,15 @@ namespace Spire
 
 				parser->ReadToken(TokenType::Colon);
 			}
+
+		}
+
+
+		static void ParseOptSemantics(
+			Parser* parser,
+			Decl*	decl)
+		{
+			AddModifiers(decl, ParseOptSemantics(parser));
 		}
 
 		static RefPtr<Decl> ParseHLSLBufferDecl(
@@ -1352,7 +1428,9 @@ namespace Spire
 			// All HLSL buffer declarations are "transparent" in that their
 			// members are implicitly made visible in the parent scope.
 			// We achieve this by applying the transparent modifier to the variable.
-			bufferVarDecl->modifiers.flags |= ModifierFlag::Transparent;
+			auto transparentModifier = new TransparentModifier();
+			transparentModifier->next = bufferVarDecl->modifiers.first;
+			bufferVarDecl->modifiers.first = transparentModifier;
 
 			// Because we are constructing two declarations, we have a thorny
 			// issue that were are only supposed to return one.
@@ -1425,7 +1503,7 @@ namespace Spire
 			parser->genericDepth--;
 			parser->ReadToken(TokenType::OpGreater);
 
-			decl->inner = ParseDecl(parser, decl.Ptr());
+			decl->inner = ParseSingleDecl(parser, decl.Ptr());
 
 			// A generic decl hijacks the name of the declaration
 			// it wraps, so that lookup can find it.
@@ -1493,12 +1571,30 @@ namespace Spire
 			return decl;
 		}
 
-        static RefPtr<Decl> ParseDeclWithModifiers(
+		// Finish up work on a declaration that was parsed
+		static void CompleteDecl(
+			Parser*				parser,
+			RefPtr<Decl>		decl,
+			ContainerDecl*		containerDecl,
+			Modifiers			modifiers)
+		{
+			// Add any modifiers we parsed before the declaration to the list
+			// of modifiers on the declaration itself.
+			AddModifiers(decl.Ptr(), modifiers.first);
+
+			// Make sure the decl is properly nested inside its lexical parent
+			if (containerDecl)
+			{
+				AddMember(containerDecl, decl);
+			}
+		}
+
+        static RefPtr<DeclBase> ParseDeclWithModifiers(
             Parser*             parser,
             ContainerDecl*      containerDecl,
             Modifiers			modifiers )
         {
-            RefPtr<Decl> decl;
+            RefPtr<DeclBase> decl;
 
             // TODO: actual dispatch!
 			if (parser->LookAheadToken("shader") || parser->LookAheadToken("module"))
@@ -1540,33 +1636,60 @@ namespace Spire
 
             if (decl)
             {
-				// Combine the explicit modifiers with any extra stuff that came from the parsed declaration
-				decl->modifiers.flags |= modifiers.flags;
-
-				RefPtr<Modifier>* modifierLink = &modifiers.first;
-				while (*modifierLink)
+				if( auto dd = decl.As<Decl>() )
 				{
-					modifierLink = &(*modifierLink)->next;
+					CompleteDecl(parser, dd, containerDecl, modifiers);
 				}
+				else if(auto declGroup = decl.As<DeclGroup>())
+				{
+					// We are going to add the same modifiers to *all* of these declarations,
+					// so we want to give later passes a way to detect which modifiers
+					// were shared, vs. which ones are specific to a single declaration.
 
-				*modifierLink = decl->modifiers.first;
-				decl->modifiers.first = modifiers.first;
+					auto sharedModifiers = new SharedModifiers();
+					sharedModifiers->next = modifiers.first;
+					modifiers.first = sharedModifiers;
 
-				if (containerDecl)
-                {
-					AddMember(containerDecl, decl);
-                }
+					for( auto dd : declGroup->decls )
+					{
+						CompleteDecl(parser, dd, containerDecl, modifiers);
+					}
+				}
             }
             return decl;
         }
 
-        static RefPtr<Decl> ParseDecl(
+        static RefPtr<DeclBase> ParseDecl(
             Parser*         parser,
             ContainerDecl*  containerDecl)
         {
             Modifiers modifiers = ParseModifiers(parser);
             return ParseDeclWithModifiers(parser, containerDecl, modifiers);
         }
+
+		static RefPtr<Decl> ParseSingleDecl(
+			Parser*			parser,
+			ContainerDecl*	containerDecl)
+		{
+			auto declBase = ParseDecl(parser, containerDecl);
+			if(!declBase)
+				return nullptr;
+			if( auto decl = declBase.As<Decl>() )
+			{
+				return decl;
+			}
+			else if( auto declGroup = declBase.As<DeclGroup>() )
+			{
+				if( declGroup->decls.Count() == 1 )
+				{
+					return declGroup->decls[0];
+				}
+			}
+
+			parser->sink->diagnose(declBase->Position, Diagnostics::unimplemented, "didn't expect multiple declarations here");
+			return nullptr;
+		}
+
 
         // Parse a body consisting of declarations
         static void ParseDeclBody(
@@ -1576,12 +1699,7 @@ namespace Spire
         {
             while(!AdvanceIfMatch(parser, closingToken))
             {
-                RefPtr<Decl> decl = ParseDecl(parser, containerDecl);
-                if (decl)
-                {
-                    decl->ParentDecl = containerDecl;
-                    //containerDecl->Members.Add(decl);
-                }
+                ParseDecl(parser, containerDecl);
                 TryRecover(parser);
             }
         }
@@ -1618,7 +1736,10 @@ namespace Spire
 			{
 				for (auto m : program->Members)
 				{
-					m->modifiers.flags |= ModifierFlag::FromStdlib;
+					auto fromStdLibModifier = new FromStdLibModifier();
+
+					fromStdLibModifier->next = m->modifiers.first;
+					m->modifiers.first = fromStdLibModifier;
 				}
 			}
 
@@ -2257,11 +2378,11 @@ namespace Spire
 			DeclaratorInfo declaratorInfo;
 			declaratorInfo.typeSpec = ParseType();
 
-			RefPtr<Declarator> declarator = ParseDeclarator(this);
-			UnwrapDeclarator(declarator, &declaratorInfo);
+			InitDeclarator initDeclarator = ParseInitDeclarator(this);
+			UnwrapDeclarator(initDeclarator, &declaratorInfo);
 
 			// Assume it is a variable-like declarator
-			ParseVarDeclCommon(this, parameter, declaratorInfo);
+			CompleteVarDecl(this, parameter, declaratorInfo);
 			return parameter;
 		}
 

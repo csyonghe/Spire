@@ -306,9 +306,9 @@ namespace Spire
 
             ParameterQualifier GetParamQualifier(ParameterSyntaxNode* paramDecl)
             {
-                if (paramDecl->modifiers.flags && ModifierFlag::InOut)
+				if(paramDecl->HasModifier<InOutModifier>())
                     return ParameterQualifier::InOut;
-                else if (paramDecl->modifiers.flags && ModifierFlag::Out)
+				else if(paramDecl->HasModifier<OutModifier>())
                     return ParameterQualifier::Out;
                 else
                     return ParameterQualifier::In;
@@ -1167,7 +1167,7 @@ namespace Spire
 						funcName = funcType->Func->SyntaxNode->IsExtern() ? funcType->Func->SyntaxNode->Name.Content : funcType->Func->SyntaxNode->InternalName;
 						for (auto & param : funcType->Func->SyntaxNode->GetParameters())
 						{
-							if (param->HasModifier(ModifierFlag::Out))
+							if (param->HasModifier<OutModifier>())
 							{
 								hasSideEffect = true;
 								break;
@@ -1181,7 +1181,7 @@ namespace Spire
 						funcName = GetComponentFunctionName(funcComp->SyntaxNode.Ptr());
 						for (auto & param : funcComp->SyntaxNode->GetParameters())
 						{
-							if (param->HasModifier(ModifierFlag::Out))
+							if (param->HasModifier<OutModifier>())
 							{
 								hasSideEffect = true;
 								break;

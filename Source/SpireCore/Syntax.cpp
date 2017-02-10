@@ -1632,6 +1632,17 @@ namespace Spire
 			throw "unimplemented";
 		}
 
+		// SharedTypeExpr
+
+		RefPtr<SyntaxNode> SharedTypeExpr::Accept(SyntaxVisitor * visitor)
+		{
+			return visitor->VisitSharedTypeExpr(this);
+		}
+
+		SharedTypeExpr * SharedTypeExpr::Clone(CloneContext & ctx)
+		{
+			throw "unimplemented";
+		}
 
 	}
 }

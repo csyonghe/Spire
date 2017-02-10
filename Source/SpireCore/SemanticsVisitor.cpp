@@ -909,7 +909,12 @@ namespace Spire
 								CloneContext ctx;
 								auto newComp = comp->Clone(ctx);
 								shaderSym->SyntaxNode->Members.Add(newComp);
-								newComp->modifiers.flags |= Public;
+								
+								// Make it public here
+								auto publicModifier = new PublicModifier();
+								publicModifier->next = newComp->modifiers.first;
+								newComp->modifiers.first = publicModifier;
+
 								AddNewComponentSymbol(shaderSym->Components, shaderSym->FunctionComponents, newComp);
 							}
 						}
@@ -1616,7 +1621,7 @@ namespace Spire
 					//
 					// Note(tfoley): we don't consider `out` and `inout` as distinct here,
 					// because there is no way for overload resolution to pick between them.
-					if (fstParam->HasModifier(ModifierFlag::Out) != sndParam->HasModifier(ModifierFlag::Out))
+					if (fstParam->HasModifier<OutModifier>() != sndParam->HasModifier<OutModifier>())
 						return false;
 				}
 
@@ -4021,7 +4026,6 @@ namespace Spire
 				}
 
 
-
 #if TIMREMOVED
 
 				if (IsErrorExpr(base))
@@ -4089,6 +4093,16 @@ namespace Spire
 #endif
 			}
 
+			RefPtr<ExpressionSyntaxNode> VisitSharedTypeExpr(SharedTypeExpr* expr) override
+			{
+				if (!expr->Type.Ptr())
+				{
+					expr->base = CheckProperType(expr->base);
+					expr->Type = expr->base.exp->Type;
+				}
+				return expr;
+			}
+
 
 
 
@@ -4137,7 +4151,7 @@ namespace Spire
 						{
 							for (int i = 0; i < (*params).Count(); i++)
 							{
-								if ((*params)[i]->HasModifier(ModifierFlag::Out))
+								if ((*params)[i]->HasModifier<OutModifier>())
 								{
 									if (i < expr->Arguments.Count() && expr->Arguments[i]->Type->AsBasicType() &&
 										!expr->Arguments[i]->Type.IsLeftValue)
@@ -4291,7 +4305,7 @@ namespace Spire
 					auto name = m->Name.Content;
 
 					// Add any transparent members to a separate list for lookup
-					if (m->HasModifier(ModifierFlag::Transparent))
+					if (m->HasModifier<TransparentModifier>())
 					{
 						TransparentMemberInfo info;
 						info.decl = m.Ptr();

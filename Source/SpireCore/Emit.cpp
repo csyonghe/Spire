@@ -20,6 +20,7 @@ struct EmitContext
 //
 
 static void EmitDecl(EmitContext* context, RefPtr<Decl> decl);
+static void EmitDecl(EmitContext* context, RefPtr<DeclBase> declBase);
 static void EmitType(EmitContext* context, RefPtr<ExpressionType> type, String const& name);
 static void EmitType(EmitContext* context, RefPtr<ExpressionType> type);
 static void EmitExpr(EmitContext* context, RefPtr<ExpressionSyntaxNode> expr);
@@ -991,11 +992,11 @@ static void EmitVarDecl(EmitContext* context, RefPtr<VarDeclBase> decl)
 
 static void EmitParamDecl(EmitContext* context, RefPtr<ParameterSyntaxNode> decl)
 {
-	if (decl->HasModifier(ModifierFlag::InOut))
+	if (decl->HasModifier<InOutModifier>())
 	{
 		Emit(context, "inout ");
 	}
-	else if (decl->HasModifier(ModifierFlag::Out))
+	else if (decl->HasModifier<OutModifier>())
 	{
 		Emit(context, "out ");
 	}
@@ -1047,7 +1048,7 @@ static void EmitDecl(EmitContext* context, RefPtr<Decl> decl)
 	//
 	// TODO(tfoley): We probably need to relax this eventually,
 	// since different targets might have different sets of builtins.
-	if (decl->HasModifier(ModifierFlag::FromStdlib))
+	if (decl->HasModifier<FromStdLibModifier>())
 		return;
 
 	if (auto typeDefDecl = decl.As<TypeDefDecl>())
@@ -1078,6 +1079,23 @@ static void EmitDecl(EmitContext* context, RefPtr<Decl> decl)
 	}
 
 	throw "unimplemented";
+}
+
+static void EmitDecl(EmitContext* context, RefPtr<DeclBase> declBase)
+{
+	if( auto decl = declBase.As<Decl>() )
+	{
+		EmitDecl(context, decl);
+	}
+	else if(auto declGroup = declBase.As<DeclGroup>())
+	{
+		for(auto d : declGroup->decls)
+			EmitDecl(context, d);
+	}
+	else
+	{
+		throw "unimplemented";
+	}
 }
 
 String EmitProgram(ProgramSyntaxNode* program)

@@ -15,6 +15,7 @@ namespace Spire
 		class SyntaxVisitor;
 		class FunctionSyntaxNode;
 
+#if 0
 		// We use a unified representation for modifiers on all declarations.
 		// (Eventually this will also apply to statements that support attributes)
 		//
@@ -50,6 +51,7 @@ namespace Spire
 			Transparent = 1 << 15,
 			FromStdlib = 1 << 16,
 		};
+#endif
 		//
 		// Other modifiers may have more elaborate data, and so
 		// are represented as heap-allocated objects, in a linked
@@ -58,8 +60,55 @@ namespace Spire
 		class Modifier : public RefObject
 		{
 		public:
+			// Next modifier in linked list of modifiers on same piece of syntax
 			RefPtr<Modifier> next;
+
+			// Source code location where modifier was written
+			//
+			// TODO(tfoley): `Modifier` should probably extend `SyntaxNode` at some
+			// point, but I'm avoiding it for now because `SyntaxNode` has additional
+			// baggage I don't want to have to deal with.
+			CodePosition Position;
 		};
+
+#define SIMPLE_MODIFIER(NAME) \
+		class NAME##Modifier : public Modifier {}
+
+		SIMPLE_MODIFIER(Uniform);
+		SIMPLE_MODIFIER(In);
+		SIMPLE_MODIFIER(Out);
+		SIMPLE_MODIFIER(Const);
+		SIMPLE_MODIFIER(Instance);
+		SIMPLE_MODIFIER(Builtin);
+		SIMPLE_MODIFIER(Inline);
+		SIMPLE_MODIFIER(Public);
+		SIMPLE_MODIFIER(Require);
+		SIMPLE_MODIFIER(Param);
+		SIMPLE_MODIFIER(Extern);
+		SIMPLE_MODIFIER(Input);
+		SIMPLE_MODIFIER(Intrinsic);
+		SIMPLE_MODIFIER(Transparent);
+		SIMPLE_MODIFIER(FromStdLib);
+
+#undef SIMPLE_MODIFIER
+
+		class InOutModifier : public OutModifier {};
+
+		// This is a special sentinel modifier that gets added
+		// to the list when we have multiple variable declarations
+		// all sharing the same modifiers:
+		//
+		//     static uniform int a : FOO, *b : register(x0);
+		//
+		// In this case both `a` and `b` share the syntax
+		// for part of their modifier list, but then have
+		// their own modifiers as well:
+		//
+		//     a: SemanticModifier("FOO") --> SharedModifiers --> StaticModifier --> UniformModifier
+		//                                 /
+		//     b: RegisterModifier("x0")  /
+		//
+		class SharedModifiers : public Modifier {};
 
 		// A `layout` modifier
 		class LayoutModifier : public Modifier
@@ -114,9 +163,6 @@ namespace Spire
 		{
 			// The first modifier in the linked list of heap-allocated modifiers
 			RefPtr<Modifier> first;
-
-			// The bit-flags for the common modifiers
-			ModifierFlags flags = ModifierFlag::None;
 		};
 
 		// Helper class for iterating over a list of heap-allocated modifiers
@@ -843,7 +889,6 @@ namespace Spire
 		{
 		public:
 			Modifiers modifiers;
-			bool HasModifier(ModifierFlags flags) { return (modifiers.flags & flags) == flags; }
 
 			template<typename T>
 			FilteredModifierList<T> GetModifiersOfType() { return FilteredModifierList<T>(modifiers.first.Ptr()); }
@@ -856,9 +901,19 @@ namespace Spire
 					return m;
 				return nullptr;
 			}
+
+			template<typename T>
+			bool HasModifier() { return FindModifier<T>() != nullptr; }
 		};
 
-		class Decl : public ModifiableSyntaxNode
+		// An intermediate type to represent either a single declaration, or a group of declarations
+		class DeclBase : public ModifiableSyntaxNode
+		{
+		public:
+			virtual DeclBase * Clone(CloneContext & ctx) = 0;
+		};
+
+		class Decl : public DeclBase
 		{
 		public:
 			ContainerDecl*  ParentDecl;
@@ -884,6 +939,16 @@ namespace Spire
 			}
 
 			virtual Decl * Clone(CloneContext & ctx) = 0;
+		};
+
+		// A group of declarations that should be treated as a unit
+		class DeclGroup : public DeclBase
+		{
+		public:
+			List<RefPtr<Decl>> decls;
+
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override { throw "unimplemented"; }
+			virtual DeclGroup * Clone(CloneContext & ctx) override { throw "unimplemented"; }
 		};
 
 		template<typename T>
@@ -1497,9 +1562,9 @@ namespace Spire
 		{
 		public:
 			String InternalName;
-			bool IsInline() { return HasModifier(ModifierFlag::Inline); }
-			bool IsExtern() { return HasModifier(ModifierFlag::Extern); }
-			bool HasSideEffect() { return !HasModifier(ModifierFlag::Intrinsic); }
+			bool IsInline() { return HasModifier<InlineModifier>(); }
+			bool IsExtern() { return HasModifier<ExternModifier>(); }
+			bool HasSideEffect() { return !HasModifier<IntrinsicModifier>(); }
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			FunctionSyntaxNode()
 			{
@@ -1821,7 +1886,7 @@ namespace Spire
 		class VarDeclrStatementSyntaxNode : public StatementSyntaxNode
 		{
 		public:
-			RefPtr<Decl> decl;
+			RefPtr<DeclBase> decl;
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
 			virtual VarDeclrStatementSyntaxNode * Clone(CloneContext & ctx) override;
 		};
@@ -1853,12 +1918,12 @@ namespace Spire
 		class ComponentSyntaxNode : public ContainerDecl
 		{
 		public:
-			bool IsOutput() { return HasModifier(ModifierFlag::Out); }
-			bool IsPublic() { return HasModifier(ModifierFlag::Public); }
-			bool IsInline() { return HasModifier(ModifierFlag::Inline) || IsComponentFunction(); }
-			bool IsRequire() { return HasModifier(ModifierFlag::Require); }
-			bool IsInput() { return HasModifier(ModifierFlag::Extern); }
-			bool IsParam() { return HasModifier(ModifierFlag::Param); }
+			bool IsOutput() { return HasModifier<OutModifier>(); }
+			bool IsPublic() { return HasModifier<PublicModifier>(); }
+			bool IsInline() { return HasModifier<InlineModifier>() || IsComponentFunction(); }
+			bool IsRequire() { return HasModifier<RequireModifier>(); }
+			bool IsInput() { return HasModifier<ExternModifier>(); }
+			bool IsParam() { return HasModifier<ParamModifier>(); }
 			TypeExp Type;
 			RefPtr<RateSyntaxNode> Rate;
 			RefPtr<BlockStatementSyntaxNode> BlockStatement;
@@ -1887,7 +1952,7 @@ namespace Spire
 		class WorldSyntaxNode : public SimpleTypeDecl
 		{
 		public:
-			bool IsAbstract() { return HasModifier(ModifierFlag::Input); }
+			bool IsAbstract() { return HasModifier<InputModifier>(); }
 			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor *) override { return this; }
 			virtual WorldSyntaxNode * Clone(CloneContext & ctx) override;
 		};
@@ -1951,7 +2016,7 @@ namespace Spire
 		{
 		public:
 			bool IsInplace = false;
-			bool IsPublic() { return HasModifier(ModifierFlag::Public); }
+			bool IsPublic() { return HasModifier<PublicModifier>(); }
 			Token ShaderName;
 			Token ObjectName;
 			List<RefPtr<ImportArgumentSyntaxNode>> Arguments;
@@ -2199,6 +2264,19 @@ namespace Spire
 				return rs;
 			}
 		};
+
+		// An expression representing re-use of the syntax for a type in more
+		// than once conceptually-distinct declaration
+		class SharedTypeExpr : public ExpressionSyntaxNode
+		{
+		public:
+			// The underlying type expression that we want to share
+			TypeExp base;
+
+			virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+			virtual SharedTypeExpr * Clone(CloneContext & ctx) override;
+		};
+
 
 		// A modifier that indicates a built-in base type (e.g., `float`)
 		class BuiltinTypeModifier : public Modifier
@@ -2678,6 +2756,11 @@ namespace Spire
 
 			virtual void VisitTraitDecl(TraitDecl* decl)
 			{}
+
+			virtual RefPtr<ExpressionSyntaxNode> VisitSharedTypeExpr(SharedTypeExpr* typeExpr)
+			{
+				return typeExpr;
+			}
 		};
 	}
 }
