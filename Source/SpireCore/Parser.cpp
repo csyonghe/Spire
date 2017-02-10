@@ -1002,9 +1002,12 @@ namespace Spire
 			return decl;
         }
 
-		static RefPtr<Declarator> ParseSimpleDeclarator(
+		static RefPtr<Declarator> ParseDeclarator(Parser* parser);
+
+		static RefPtr<Declarator> ParseDirectAbstractDeclarator(
 			Parser* parser)
 		{
+			RefPtr<Declarator> declarator;
 			switch( parser->tokenReader.PeekTokenType() )
 			{
 			case TokenType::Identifier:
@@ -1012,7 +1015,28 @@ namespace Spire
 					auto nameDeclarator = new NameDeclarator();
 					nameDeclarator->flavor = Declarator::Flavor::Name;
 					nameDeclarator->nameToken = ParseDeclName(parser);
-					return nameDeclarator;
+					declarator = nameDeclarator;
+				}
+				break;
+
+			case TokenType::LParent:
+				{
+					// Note(tfoley): This is a point where disambiguation is required.
+					// We could be looking at an abstract declarator for a function-type
+					// parameter:
+					//
+					//     void F( int(int) );
+					//
+					// Or we could be looking at the use of parenthesese in an ordinary
+					// declarator:
+					//
+					//     void (*f)(int);
+					//
+					// The difference really doesn't matter right now, but we err in
+					// the direction of assuming the second case.
+					parser->ReadToken(TokenType::LParent);
+					declarator = ParseDeclarator(parser);
+					parser->ReadToken(TokenType::RParent);
 				}
 				break;
 
@@ -1020,9 +1044,42 @@ namespace Spire
 				// an empty declarator is allowed
 				return nullptr;
 			}
+
+			// postifx additions
+			for( ;;)
+			{
+				switch( parser->tokenReader.PeekTokenType() )
+				{
+				case TokenType::LBracket:
+					{
+						auto arrayDeclarator = new ArrayDeclarator();
+						arrayDeclarator->openBracketLoc = parser->tokenReader.PeekLoc();
+						arrayDeclarator->flavor = Declarator::Flavor::Array;
+						arrayDeclarator->inner = declarator;
+
+						parser->ReadToken(TokenType::LBracket);
+						if( parser->tokenReader.PeekTokenType() != TokenType::RBracket )
+						{
+							arrayDeclarator->elementCountExpr = parser->ParseExpression();
+						}
+						parser->ReadToken(TokenType::RBracket);
+
+						declarator = arrayDeclarator;
+						continue;
+					}
+
+				default:
+					break;
+				}
+
+				break;
+			}
+
+			return declarator;
 		}
 
-		static RefPtr<Declarator> ParsePointerDeclarator(
+		// Parse a declarator (or at least as much of one as we support)
+		static RefPtr<Declarator> ParseDeclarator(
 			Parser* parser)
 		{
 			if( parser->tokenReader.PeekTokenType() == TokenType::OpMul )
@@ -1032,44 +1089,16 @@ namespace Spire
 				ptrDeclarator->flavor = Declarator::Flavor::Pointer;
 
 				parser->ReadToken(TokenType::OpMul);
-				ptrDeclarator->inner = ParsePointerDeclarator(parser);
+
+				// TODO(tfoley): allow qualifiers like `const` here?
+
+				ptrDeclarator->inner = ParseDeclarator(parser);
 				return ptrDeclarator;
 			}
 			else
 			{
-				return ParseSimpleDeclarator(parser);
+				return ParseDirectAbstractDeclarator(parser);
 			}
-		}
-
-		static RefPtr<Declarator> ParseArrayDeclarator(
-			Parser* parser)
-		{
-			RefPtr<Declarator> declarator = ParseSimpleDeclarator(parser);
-			while(parser->tokenReader.PeekTokenType() == TokenType::LBracket)
-			{
-
-				auto arrayDeclarator = new ArrayDeclarator();
-				arrayDeclarator->openBracketLoc = parser->tokenReader.PeekLoc();
-				arrayDeclarator->flavor = Declarator::Flavor::Array;
-				arrayDeclarator->inner = declarator;
-
-				parser->ReadToken(TokenType::LBracket);
-				if( parser->tokenReader.PeekTokenType() != TokenType::RBracket )
-				{
-					arrayDeclarator->elementCountExpr = parser->ParseExpression();
-				}
-				parser->ReadToken(TokenType::RBracket);
-
-				declarator = arrayDeclarator;
-			}
-			return declarator;
-		}
-
-		// Parse a declarator (or at least as much of one as we support)
-		static RefPtr<Declarator> ParseDeclarator(
-			Parser* parser)
-		{
-			return ParseArrayDeclarator(parser);
 		}
 
 		static void UnwrapDeclarator(
