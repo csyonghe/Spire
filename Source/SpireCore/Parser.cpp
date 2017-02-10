@@ -1015,6 +1015,33 @@ namespace Spire
             }
         }
 
+		static void ParseVarDeclCommon(
+			Parser*					parser,
+			RefPtr<VarDeclBase>		decl,
+			DeclaratorInfo const&	declaratorInfo)
+		{
+			parser->FillPosition(decl.Ptr());
+			decl->Position = declaratorInfo.nameToken.Position;
+
+			if( declaratorInfo.nameToken.Type == TokenType::Unknown )
+			{
+				// HACK(tfoley): we always give a name, even if the declarator didn't include one... :(
+				decl->Name.Content = "_anonymous_" + String(parser->anonymousParamCounter++);
+			}
+			else
+			{
+				decl->Name = declaratorInfo.nameToken;
+			}
+			decl->Type = TypeExp(declaratorInfo.typeSpec);
+
+			ParseOptSemantics(parser, decl.Ptr());
+
+			if (AdvanceIf(parser, TokenType::OpAssign))
+			{
+				decl->Expr = parser->ParseExpression();
+			}
+		}
+
         static RefPtr<Decl> ParseVarDecl(
             Parser*                 parser,
             ContainerDecl*          containerDecl,
@@ -1059,20 +1086,8 @@ namespace Spire
             {
                 // everywhere else, we create an ordinary `VarDeclBase`
                 RefPtr<VarDeclBase> decl = CreateVarDeclForContext(containerDecl);
-                parser->FillPosition(decl.Ptr());
-                decl->Position = declaratorInfo.nameToken.Position;
-
-                decl->Name = declaratorInfo.nameToken;
-                decl->Type = TypeExp(declaratorInfo.typeSpec);
-
-				ParseOptSemantics(parser, decl.Ptr());
-
-                if (AdvanceIf(parser, TokenType::OpAssign))
-                {
-                    decl->Expr = parser->ParseExpression();
-                }
+				ParseVarDeclCommon(parser, decl, declaratorInfo);
                 parser->ReadToken(TokenType::Semicolon);
-
                 return decl;
             }
         }
@@ -2300,25 +2315,17 @@ namespace Spire
 
 		RefPtr<ParameterSyntaxNode> Parser::ParseParameter()
 		{
-			// TODO(tfoley): This really ought to just use the same
-			// logic as other variable-parsing code...
-
 			RefPtr<ParameterSyntaxNode> parameter = new ParameterSyntaxNode();
-            parameter->modifiers = ParseModifiers(this);
-			parameter->Type = ParseTypeExp();
-			if (LookAheadToken(TokenType::Identifier))
-			{
-				Token name = ReadToken(TokenType::Identifier);
-				parameter->Name = name;
-			}
-			else
-				parameter->Name.Content = "_anonymousParam" + String(anonymousParamCounter++);
-			FillPosition(parameter.Ptr());
-			ParseOptSemantics(this, parameter.Ptr());
-			if (AdvanceIf(this, TokenType::OpAssign))
-			{
-				parameter->Expr = ParseInitExpr();
-			}
+			parameter->modifiers = ParseModifiers(this);
+
+			DeclaratorInfo declaratorInfo;
+			declaratorInfo.typeSpec = ParseType();
+
+			RefPtr<Declarator> declarator = ParseDeclarator(this);
+			UnwrapDeclarator(declarator, &declaratorInfo);
+
+			// Assume it is a variable-like declarator
+			ParseVarDeclCommon(this, parameter, declaratorInfo);
 			return parameter;
 		}
 
