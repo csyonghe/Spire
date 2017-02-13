@@ -17,8 +17,11 @@ namespace CoreLib
 		}
 		String operator+(const char * op1, const String & op2)
 		{
-			if(!op2.buffer)
+			if(!op2.buffer)		// no string 2 - return first
 				return String(op1);
+
+            if (!op1)			// no base string?!  return the second string
+                return op2;
 
 			return StringConcat(op1, (int)strlen(op1), op2.buffer.Ptr(), op2.length);
 		}
