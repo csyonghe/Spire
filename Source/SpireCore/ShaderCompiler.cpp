@@ -462,7 +462,7 @@ namespace Spire
 				List<uint8_t> data;
 				if (codeBlob)
 				{
-					data.AddRange((uint8_t const*)codeBlob->GetBufferPointer(), codeBlob->GetBufferSize());
+					data.AddRange((uint8_t const*)codeBlob->GetBufferPointer(), (int)codeBlob->GetBufferSize());
 					codeBlob->Release();
 				}
 				if (diagnosticsBlob)
