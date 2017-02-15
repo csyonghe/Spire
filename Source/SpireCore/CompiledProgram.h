@@ -10,6 +10,8 @@ namespace Spire
 {
     namespace Compiler
     {
+        struct ReflectionBlob;
+
         class ShaderMetaData
         {
         public:
@@ -40,6 +42,7 @@ namespace Spire
             String ScheduleFile;
             RefPtr<ILProgram> Program;
             EnumerableDictionary<String, CompiledShaderSource> CompiledSource; // shader -> stage -> code
+            ReflectionBlob* reflectionBlob = nullptr;
             void PrintDiagnostics()
             {
                 for (int i = 0; i < sink.diagnostics.Count(); i++)
@@ -54,6 +57,10 @@ namespace Spire
             }
             CompileResult()
             {}
+            ~CompileResult()
+            {
+                if(reflectionBlob) free(reflectionBlob);
+            }
             DiagnosticSink * GetErrorWriter()
             {
                 return &sink;

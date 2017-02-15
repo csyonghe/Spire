@@ -376,8 +376,10 @@
     <ClInclude Include="Diagnostics.h" />
     <ClInclude Include="Emit.h" />
     <ClInclude Include="Naming.h" />
+    <ClInclude Include="ParameterBinding.h" />
     <ClInclude Include="Preprocessor.h" />
     <ClInclude Include="ProfileDefs.h" />
+    <ClInclude Include="Reflection.h" />
     <ClInclude Include="SamplerUsageAnalysis.h" />
     <ClInclude Include="IL.h" />
     <ClInclude Include="Lexer.h" />
@@ -401,7 +403,9 @@
     <ClCompile Include="ILGenerator.cpp" />
     <ClCompile Include="KeyHoleMatching.cpp" />
     <ClCompile Include="Naming.cpp" />
+    <ClCompile Include="ParameterBinding.cpp" />
     <ClCompile Include="Preprocessor.cpp" />
+    <ClCompile Include="Reflection.cpp" />
     <ClCompile Include="SamplerUsageAnalysis.cpp" />
     <ClCompile Include="IL.cpp" />
     <ClCompile Include="Lexer.cpp" />

@@ -4,6 +4,7 @@
 #include "../CoreLib/LibIO.h"
 #include "ShaderCompiler.h"
 #include "Lexer.h"
+#include "ParameterBinding.h"
 #include "Parser.h"
 #include "Preprocessor.h"
 #include "SyntaxVisitors.h"
@@ -12,6 +13,7 @@
 #include "../CoreLib/Tokenizer.h"
 #include "Naming.h"
 
+#include "Reflection.h"
 #include "Emit.h"
 
 #ifdef _WIN32
@@ -238,6 +240,16 @@ namespace Spire
 
             void DoNewEmitLogic(ExtraContext& context)
             {
+                // Do reflection stuff first
+
+                if( context.compileResult )
+                {
+                    GenerateParameterBindings(context.programSyntax.Ptr());
+                    context.compileResult->reflectionBlob = ReflectionBlob::Create(context.programSyntax);
+                }
+
+                //
+
                 switch (context.getOptions().Target)
                 {
                 case CodeGenTarget::HLSL:
@@ -260,6 +272,45 @@ namespace Spire
                     }
                     break;
 
+                case CodeGenTarget::DXBytecode:
+                    {
+                        auto code = EmitDXBytecode(context);
+                        if (context.compileResult)
+                        {
+                            StringBuilder sb;
+                            sb.Append((char*) code.begin(), code.Count());
+
+                            String codeString = sb.ProduceString();
+
+                            StageSource stageSource;
+                            stageSource.MainCode = codeString;
+                            CompiledShaderSource compiled;
+                            compiled.Stages[""] = stageSource;
+                            context.compileResult->CompiledSource[""] = compiled;
+                        }
+                        else
+                        {
+                            int col = 0;
+                            for(auto ii : code)
+                            {
+                                if(col != 0) fputs(" ", stdout);
+                                fprintf(stdout, "%02X", ii);
+                                col++;
+                                if(col == 8)
+                                {
+                                    fputs("\n", stdout);
+                                    col = 0;
+                                }
+                            }
+                            if(col != 0)
+                            {
+                                fputs("\n", stdout);
+                            }
+                        }
+                        return;
+                    }
+                    break;
+
                 case CodeGenTarget::DXBytecodeAssembly:
                     {
                         String hlslProgram = EmitDXBytecodeAssembly(context);
@@ -269,6 +320,10 @@ namespace Spire
                         fprintf(stdout, "%s", hlslProgram.begin());
                         return;
                     }
+                    break;
+
+                // Note(tfoley): We currently hit this case when compiling the stdlib
+                case CodeGenTarget::Unknown:
                     break;
 
                 default:

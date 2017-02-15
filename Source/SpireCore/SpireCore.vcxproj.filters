@@ -72,6 +72,12 @@
     <ClInclude Include="ProfileDefs.h">
       <Filter>Front End</Filter>
     </ClInclude>
+    <ClInclude Include="Reflection.h">
+      <Filter>Front End</Filter>
+    </ClInclude>
+    <ClInclude Include="ParameterBinding.h">
+      <Filter>Front End</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Lexer.cpp">
@@ -132,6 +138,12 @@
       <Filter>Front End</Filter>
     </ClCompile>
     <ClCompile Include="ILGenerator.cpp">
+      <Filter>Front End</Filter>
+    </ClCompile>
+    <ClCompile Include="Reflection.cpp">
+      <Filter>Front End</Filter>
+    </ClCompile>
+    <ClCompile Include="ParameterBinding.cpp">
       <Filter>Front End</Filter>
     </ClCompile>
   </ItemGroup>

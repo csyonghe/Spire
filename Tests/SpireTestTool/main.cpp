@@ -499,7 +499,7 @@ int main(
     runTestsInDirectory(&context, "Tests/Preprocessor/");
 
 #ifdef SPIRE_TEST_SUPPORT_HLSL
-    runHLSLTestsInDirectory(&context, "Tests/HLSL/DXSDK/");
+    runHLSLTestsInDirectory(&context, "Tests/HLSL/");
 #endif
 
     if (!context.totalTestCount)

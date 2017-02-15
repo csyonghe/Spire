@@ -1658,6 +1658,18 @@ namespace Spire
             return this;
         }
 
+        // IntVal
+
+        int GetIntVal(RefPtr<IntVal> val)
+        {
+            if (auto constantVal = val.As<ConstantIntVal>())
+            {
+                return constantVal->value;
+            }
+            assert(!"unexpected");
+            return 0;
+        }
+
         // ConstantIntVal
 
         bool ConstantIntVal::EqualsVal(Val* val)

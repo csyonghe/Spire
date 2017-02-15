@@ -592,6 +592,31 @@ namespace Spire
                 SPIRE_UNREACHABLE("all cases handled");
             }
 
+            bool ValuesAreEqual(
+                RefPtr<IntVal> left,
+                RefPtr<IntVal> right)
+            {
+                if(left == right) return true;
+
+                if(auto leftConst = left.As<ConstantIntVal>())
+                {
+                    if(auto rightConst = left.As<ConstantIntVal>())
+                    {
+                        return leftConst->value == rightConst->value;
+                    }
+                }
+
+                if(auto leftVar = left.As<GenericParamIntVal>())
+                {
+                    if(auto rightVar = right.As<GenericParamIntVal>())
+                    {
+                        return leftVar->declRef.Equals(rightVar->declRef);
+                    }
+                }
+
+                return false;
+            }
+
             // Central engine for implementing implicit coercion logic
             bool TryCoerceImpl(
                 RefPtr<ExpressionType>			toType,		// the target type for conversion
@@ -650,7 +675,7 @@ namespace Spire
                         // Conversion between vector types.
 
                         // If element counts don't match, then bail:
-                        if (toVectorType->elementCount != fromVectorType->elementCount)
+                        if (!ValuesAreEqual(toVectorType->elementCount, fromVectorType->elementCount))
                             return false;
 
                         // Otherwise, if we can convert the element types, we are golden
@@ -713,6 +738,14 @@ namespace Spire
                     nullptr))
                 {
                     getSink()->diagnose(fromExpr->Position, Diagnostics::typeMismatch, toType, fromExpr->Type);
+
+                    // HACK(tfoley): Do it again so I can step in with the debugger!
+                    TryCoerceImpl(
+                    toType,
+                    &expr,
+                    fromExpr->Type.Ptr(),
+                    fromExpr.Ptr(),
+                    nullptr);
                 }
                 return expr;
             }

@@ -5,6 +5,8 @@
 #include "Lexer.h"
 #include "IL.h"
 
+#include "../../Spire.h"
+
 #include <assert.h>
 
 namespace Spire
@@ -334,6 +336,10 @@ namespace Spire
         {
         };
 
+        // Try to extract a simple integer value from an `IntVal`.
+        // This fill assert-fail if the object doesn't represent a literal value.
+        int GetIntVal(RefPtr<IntVal> val);
+
         // Trivial case of a value that is just a constant integer
         class ConstantIntVal : public IntVal
         {
@@ -621,26 +627,28 @@ namespace Spire
             enum
             {
                 // Mask for the overall "shape" of the texture
-                ShapeMask		= 0x0F,
+                ShapeMask		= SPIRE_TEXTURE_BASE_SHAPE_MASK,
 
                 // Flag for whether the shape has "array-ness"
-                ArrayFlag		= 0x80,
+                ArrayFlag		= SPIRE_TEXTURE_ARRAY_FLAG,
 
                 // Whether or not the texture stores multiple samples per pixel
-                MultisampleFlag	= 0x10,
+                MultisampleFlag	= SPIRE_TEXTURE_MULTISAMPLE_FLAG,
+                ReadWriteFlag = SPIRE_TEXTURE_READ_WRITE_FLAG,
+                RasterOrderedFlag = SPIRE_TEXTURE_RASTER_ORDERED_FLAG,
 
                 // Whether or not this is a shadow texture
                 //
                 // TODO(tfoley): is this even meaningful/used?
-                ShadowFlag		= 0x20, 
+                ShadowFlag		= 0x80, 
             };
 
             enum Shape : uint8_t
             {
-                Shape1D			= 0x01,
-                Shape2D			= 0x02,
-                Shape3D			= 0x03,
-                ShapeCube		= 0x04,
+                Shape1D			= SPIRE_TEXTURE_1D,
+                Shape2D			= SPIRE_TEXTURE_2D,
+                Shape3D			= SPIRE_TEXTURE_3D,
+                ShapeCube		= SPIRE_TEXTURE_CUBE,
 
                 Shape1DArray	= Shape1D | ArrayFlag,
                 Shape2DArray	= Shape2D | ArrayFlag,

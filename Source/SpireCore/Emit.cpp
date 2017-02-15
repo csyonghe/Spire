@@ -384,15 +384,6 @@ static void EmitExprWithPrecedence(EmitContext* context, RefPtr<ExpressionSyntax
 
 // Types
 
-// Extract the actual value of a compile-time integer
-static int GetIntVal(RefPtr<IntVal> val)
-{
-    if (auto constantVal = val.As<ConstantIntVal>())
-        return constantVal->value;
-    assert(!"unexpected");
-    return 0;
-}
-
 void Emit(EmitContext* context, RefPtr<IntVal> val)
 {
     Emit(context, GetIntVal(val));
@@ -941,7 +932,7 @@ static void EmitConstantBufferDecl(
     if (auto declRefType = dataType->As<DeclRefType>())
     {
         Emit(context, "cbuffer ");
-        Emit(context, declRefType->declRef.GetName());
+        Emit(context, varDecl->Name.Content);
 
         EmitSemantics(context, varDecl, kESemanticMask_None);
 
