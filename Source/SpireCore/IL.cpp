@@ -264,7 +264,6 @@ namespace Spire
             reader.Read("<");
             RefPtr<ILVectorType> vecType = new ILVectorType();
             vecType->BaseType = BaseTypeFromString(reader);
-            auto rs = BaseTypeFromString(reader);
             reader.Read(",");
             vecType->Size = reader.ReadInt();
             reader.Read(">");
@@ -276,7 +275,6 @@ namespace Spire
             reader.Read("<");
             RefPtr<ILMatrixType> vecType = new ILMatrixType();
             vecType->BaseType = BaseTypeFromString(reader);
-            auto rs = BaseTypeFromString(reader);
             reader.Read(",");
             vecType->Size[0] = reader.ReadInt();
             reader.Read(",");

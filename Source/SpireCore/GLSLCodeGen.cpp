@@ -218,7 +218,6 @@ namespace Spire
             String GetTextureType(ILType * textureType)
             {
                 auto texType = dynamic_cast<ILTextureType*>(textureType);
-                const char * textureName = nullptr;
                 StringBuilder sb;
                 switch (texType->Flavor.Fields.Shape)
                 {
@@ -247,7 +246,6 @@ namespace Spire
             String GetSamplerType(ILType * textureType)
             {
                 auto texType = dynamic_cast<ILTextureType*>(textureType);
-                const char * textureName = nullptr;
                 StringBuilder sb;
                 switch (texType->Flavor.Fields.Shape)
                 {

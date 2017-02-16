@@ -134,6 +134,7 @@ namespace Spire
                         throw NotImplementedException();
                     }
                 }
+                throw NotImplementedException();
             }
 
             ILConstOperand * CreateConstant(bool b)
