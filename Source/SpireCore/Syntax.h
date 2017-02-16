@@ -1525,12 +1525,6 @@ namespace Spire
             virtual BlockStatementSyntaxNode * Clone(CloneContext & ctx) override;
         };
 
-        // TODO(tfoley): Only used by IL at this point
-        enum class ParameterQualifier
-        {
-            In, Out, InOut, Uniform
-        };
-
         class ParameterSyntaxNode : public VarDeclBase
         {
         public:
