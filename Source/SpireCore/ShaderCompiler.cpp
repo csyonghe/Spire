@@ -8,7 +8,6 @@
 #include "Preprocessor.h"
 #include "SyntaxVisitors.h"
 #include "StdInclude.h"
-#include "Schedule.h"
 #include "CodeGenBackend.h"
 #include "../CoreLib/Tokenizer.h"
 #include "Closure.h"
@@ -90,7 +89,7 @@ namespace Spire
                After all references are resolved, all unreferenced definitions (dead code) are eliminated, 
                resulting a shader variant ready for code generation.
             */
-            RefPtr<ShaderIR> GenerateShaderVariantIR(CompileResult & cresult, ShaderClosure * shader, Schedule & schedule, SymbolTable * symbolTable)
+            RefPtr<ShaderIR> GenerateShaderVariantIR(CompileResult & cresult, ShaderClosure * shader, SymbolTable * symbolTable)
             {
                 RefPtr<ShaderIR> result = new ShaderIR();
                 result->Shader = shader;
@@ -105,59 +104,6 @@ namespace Spire
                             if (impl->SrcPinnedWorlds.Contains(w) || impl->SyntaxNode->IsInline() || impl->ExportWorlds.Contains(w) || impl->SyntaxNode->IsInput())
                             {
                                 comp.Value->Type->PinnedWorlds.Add(w);
-                            }
-                        }
-                    }
-                }
-                // apply choices
-                Dictionary<String, ShaderComponentSymbol*> choiceComps;
-                for (auto & comp : shader->AllComponents)
-                {
-                    for (auto & choiceName : comp.Value.Symbol->ChoiceNames)
-                        choiceComps[choiceName] = comp.Value.Symbol;
-                }
-                HashSet<ShaderComponentImplSymbol*> pinnedImpl;
-                for (auto & choice : schedule.Choices)
-                {
-                    ShaderComponentSymbol * comp = nullptr;
-                    if (choiceComps.TryGetValue(choice.Key, comp))
-                    {
-                        comp->Type->PinnedWorlds.Clear();
-                        for (auto & selectedDef : choice.Value)
-                        {
-                            if (comp->Type->ConstrainedWorlds.Contains(selectedDef->WorldName))
-                            {
-                                comp->Type->PinnedWorlds.Add(selectedDef->WorldName);
-                                // find specified impl
-                                for (auto & impl : comp->Implementations)
-                                {
-                                    if (impl->Worlds.Contains(selectedDef->WorldName))
-                                        pinnedImpl.Add(impl.Ptr());
-                                }
-                            }
-                            else
-                            {
-                                cresult.GetErrorWriter()->diagnose(selectedDef.Ptr()->Position, Diagnostics::worldIsNotAValidChoiceForKey, selectedDef->WorldName, choice.Key);
-                            }
-                        }
-                    }
-                }
-                for (auto & attribs : schedule.AddtionalAttributes)
-                {
-                    ShaderComponentSymbol * comp = nullptr;
-                    if (choiceComps.TryGetValue(attribs.Key, comp))
-                    {
-                        // apply attributes
-                        for (auto & impl : comp->Implementations)
-                        {
-                            for (auto & attrib : attribs.Value)
-                            {
-                                auto modifier = new SimpleAttribute();
-                                modifier->Key = attrib.Key;
-                                modifier->Value.Content = attrib.Value;
-
-                                modifier->next = impl->SyntaxNode->modifiers.first;
-                                impl->SyntaxNode->modifiers.first = modifier;
                             }
                         }
                     }
@@ -234,14 +180,9 @@ namespace Spire
                             {
                                 auto def = createComponentDef(w);
                                 result->Definitions.Add(def);
-                                bool existingDefIsPinned = false;
-                                if (defs.ContainsKey(w))
-                                    existingDefIsPinned = pinnedImpl.Contains(impls[w]());
-                                if (!existingDefIsPinned)
-                                {
-                                    defs[w] = def.Ptr();
-                                    impls[w] = impl.Ptr();
-                                }
+                                
+                                defs[w] = def.Ptr();
+                                impls[w] = impl.Ptr();
                             }
                         }
                     }

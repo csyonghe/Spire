@@ -44,10 +44,5 @@ namespace Spire
                 }
             }
         }
-        ShaderChoiceValue ShaderChoiceValue::Parse(String str)
-        {
-            return ShaderChoiceValue(str);
-        }
-        
-}
+    }
 }

@@ -381,7 +381,6 @@
     <ClInclude Include="Preprocessor.h" />
     <ClInclude Include="ProfileDefs.h" />
     <ClInclude Include="SamplerUsageAnalysis.h" />
-    <ClInclude Include="Schedule.h" />
     <ClInclude Include="IL.h" />
     <ClInclude Include="Lexer.h" />
     <ClInclude Include="Parser.h" />
@@ -413,7 +412,6 @@
     <ClCompile Include="NewSpirVCodeGen.cpp" />
     <ClCompile Include="Preprocessor.cpp" />
     <ClCompile Include="SamplerUsageAnalysis.cpp" />
-    <ClCompile Include="Schedule.cpp" />
     <ClCompile Include="IL.cpp" />
     <ClCompile Include="Lexer.cpp" />
     <ClCompile Include="ShaderCompiler.cpp" />

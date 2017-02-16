@@ -121,6 +121,15 @@ namespace Spire
             String Name;
         };
 
+        class ILGlobalVariable
+        {
+        public:
+            RefPtr<ILType> Type;
+            String Name;
+            bool IsConst = false;
+            RefPtr<CFGNode> Code;
+        };
+
         class ILProgram
         {
         public:
@@ -130,43 +139,7 @@ namespace Spire
             EnumerableDictionary<String, RefPtr<ILFunction>> Functions;
             List<RefPtr<ILStructType>> Structs;
             EnumerableDictionary<String, RefPtr<ILModuleParameterSet>> ModuleParamSets;
-
-        };
-
-        class ShaderChoiceValue
-        {
-        public:
-            String WorldName;
-            ShaderChoiceValue() = default;
-            ShaderChoiceValue(String world)
-            {
-                WorldName = world;
-            }
-            static ShaderChoiceValue Parse(String str);
-            String ToString()
-            {
-                return WorldName;
-            }
-            bool operator == (const ShaderChoiceValue & val)
-            {
-                return WorldName == val.WorldName;
-            }
-            bool operator != (const ShaderChoiceValue & val)
-            {
-                return WorldName != val.WorldName;
-            }
-            int GetHashCode()
-            {
-                return WorldName.GetHashCode();
-            }
-        };
-
-        class ShaderChoice
-        {
-        public:
-            String ChoiceName;
-            String DefaultValue;
-            List<ShaderChoiceValue> Options;
+            EnumerableDictionary<String, RefPtr<ILGlobalVariable>> GlobalVars;
         };
 
         class ShaderMetaData
@@ -198,7 +171,6 @@ namespace Spire
             DiagnosticSink sink;
             String ScheduleFile;
             RefPtr<ILProgram> Program;
-            List<ShaderChoice> Choices;
             EnumerableDictionary<String, CompiledShaderSource> CompiledSource; // shader -> stage -> code
             void PrintDiagnostics()
             {

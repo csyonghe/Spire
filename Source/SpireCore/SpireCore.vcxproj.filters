@@ -39,9 +39,6 @@
     <ClInclude Include="SymbolTable.h">
       <Filter>Front End</Filter>
     </ClInclude>
-    <ClInclude Include="Schedule.h">
-      <Filter>Front End</Filter>
-    </ClInclude>
     <ClInclude Include="CompiledProgram.h">
       <Filter>Back End</Filter>
     </ClInclude>
@@ -114,9 +111,6 @@
       <Filter>Back End</Filter>
     </ClCompile>
     <ClCompile Include="SymbolTable.cpp">
-      <Filter>Front End</Filter>
-    </ClCompile>
-    <ClCompile Include="Schedule.cpp">
       <Filter>Front End</Filter>
     </ClCompile>
     <ClCompile Include="GLSLCodeGen.cpp">
