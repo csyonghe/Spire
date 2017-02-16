@@ -672,8 +672,8 @@ namespace Spire
                 }
                 if (!useVulkanBinding)
                 {
-                    for (auto & shader : program->Shaders)
-                        for (auto & pset : shader->ModuleParamSets)
+                    for (auto & ss : program->Shaders)
+                        for (auto & pset : ss->ModuleParamSets)
                             for (auto & p : pset.Value->Parameters)
                                 if (p.Value->Type->IsSamplerState())
                                     p.Value->BindingPoints.Clear();

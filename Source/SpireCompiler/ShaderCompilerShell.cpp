@@ -108,7 +108,7 @@ int wmain(int argc, wchar_t* argv[])
                     Profile profile = TranslateProfileName(name.begin());
                     if( profile.raw == Profile::Unknown )
                     {
-                        fprintf(stderr, "unknown profile '%s'\n", name);
+                        fprintf(stderr, "unknown profile '%s'\n", name.begin());
                     }
                     else
                     {

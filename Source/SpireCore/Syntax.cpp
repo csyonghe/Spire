@@ -331,26 +331,26 @@ namespace Spire
 
         // SwizzleExpr
 
-        RefPtr<SyntaxNode> SwizzleExpr::Accept(SyntaxVisitor * visitor)
+        RefPtr<SyntaxNode> SwizzleExpr::Accept(SyntaxVisitor * /*visitor*/)
         {
             // throw "unimplemented";
             return this;
         }
 
-        SwizzleExpr * SwizzleExpr::Clone(CloneContext & ctx)
+        SwizzleExpr * SwizzleExpr::Clone(CloneContext & /*ctx*/)
         {
             throw "unimplemented";
         }
 
         // DerefExpr
 
-        RefPtr<SyntaxNode> DerefExpr::Accept(SyntaxVisitor * visitor)
+        RefPtr<SyntaxNode> DerefExpr::Accept(SyntaxVisitor * /*visitor*/)
         {
             // throw "unimplemented";
             return this;
         }
 
-        DerefExpr * DerefExpr::Clone(CloneContext & ctx)
+        DerefExpr * DerefExpr::Clone(CloneContext & /*ctx*/)
         {
             throw "unimplemented";
         }
@@ -416,13 +416,13 @@ namespace Spire
 
         // OverloadedExpr
 
-        RefPtr<SyntaxNode> OverloadedExpr::Accept(SyntaxVisitor * visitor)
+        RefPtr<SyntaxNode> OverloadedExpr::Accept(SyntaxVisitor * /*visitor*/)
         {
 //			throw "unimplemented";
             return this;
         }
 
-        OverloadedExpr * OverloadedExpr::Clone(CloneContext & ctx)
+        OverloadedExpr * OverloadedExpr::Clone(CloneContext & /*ctx*/)
         {
             throw "unimplemented";
         }
@@ -876,7 +876,7 @@ namespace Spire
                 {
                     assert(subst && subst->args.Count() >= 1);
                     auto textureType = new TextureType(
-                        magicMod->tag,
+                        TextureType::Flavor(magicMod->tag),
                         ExtractGenericArgType(subst->args[0]));
                     textureType->declRef = declRef;
                     return textureType;
@@ -940,7 +940,7 @@ namespace Spire
             return "overload group";
         }
 
-        bool OverloadGroupType::EqualsImpl(const ExpressionType * type) const
+        bool OverloadGroupType::EqualsImpl(const ExpressionType * /*type*/) const
         {
             return false;
         }
@@ -1378,29 +1378,29 @@ namespace Spire
             return visitor->VisitGenericDecl(this);
         }
 
-        GenericDecl * GenericDecl::Clone(CloneContext & ctx) {
+        GenericDecl * GenericDecl::Clone(CloneContext & /*ctx*/) {
             throw "unimplemented";
         }
 
         // GenericTypeParamDecl
 
-        RefPtr<SyntaxNode> GenericTypeParamDecl::Accept(SyntaxVisitor * visitor) {
+        RefPtr<SyntaxNode> GenericTypeParamDecl::Accept(SyntaxVisitor * /*visitor*/) {
             //throw "unimplemented";
             return this;
         }
 
-        GenericTypeParamDecl * GenericTypeParamDecl::Clone(CloneContext & ctx) {
+        GenericTypeParamDecl * GenericTypeParamDecl::Clone(CloneContext & /*ctx*/) {
             throw "unimplemented";
         }
 
         // GenericValueParamDecl
 
-        RefPtr<SyntaxNode> GenericValueParamDecl::Accept(SyntaxVisitor * visitor) {
+        RefPtr<SyntaxNode> GenericValueParamDecl::Accept(SyntaxVisitor * /*visitor*/) {
             //throw "unimplemented";
             return this;
         }
 
-        GenericValueParamDecl * GenericValueParamDecl::Clone(CloneContext & ctx) {
+        GenericValueParamDecl * GenericValueParamDecl::Clone(CloneContext & /*ctx*/) {
             throw "unimplemented";
         }
 
@@ -1428,7 +1428,7 @@ namespace Spire
             return this;
         }
 
-        ExtensionDecl* ExtensionDecl::Clone(CloneContext & ctx)
+        ExtensionDecl* ExtensionDecl::Clone(CloneContext & /*ctx*/)
         {
             throw "unimplemented";
         }
@@ -1441,14 +1441,14 @@ namespace Spire
             return this;
         }
 
-        ConstructorDecl* ConstructorDecl::Clone(CloneContext & ctx)
+        ConstructorDecl* ConstructorDecl::Clone(CloneContext & /*ctx*/)
         {
             throw "unimplemented";
         }
 
         // Substitutions
 
-        RefPtr<Substitutions> Substitutions::SubstituteImpl(Substitutions* subst, int* ioDiff)
+        RefPtr<Substitutions> Substitutions::SubstituteImpl(Substitutions* subst, int* /*ioDiff*/)
         {
             if (!this) return nullptr;
 
@@ -1507,7 +1507,7 @@ namespace Spire
             return type->Substitute(substitutions.Ptr()).As<ExpressionType>();
         }
 
-        DeclRef DeclRef::SubstituteImpl(Substitutions* subst, int* ioDiff)
+        DeclRef DeclRef::SubstituteImpl(Substitutions* subst, int* /*ioDiff*/)
         {
             if (!substitutions) return *this;
 
@@ -1570,7 +1570,7 @@ namespace Spire
             return SubstituteImpl(subst, &diff);
         }
 
-        RefPtr<Val> Val::SubstituteImpl(Substitutions* subst, int* ioDiff)
+        RefPtr<Val> Val::SubstituteImpl(Substitutions* /*subst*/, int* /*ioDiff*/)
         {
             // Default behavior is to not substitute at all
             return this;
@@ -1597,7 +1597,7 @@ namespace Spire
             return visitor->VisitSwitchStmt(this);
         }
 
-        SwitchStmt * SwitchStmt::Clone(CloneContext & ctx)
+        SwitchStmt * SwitchStmt::Clone(CloneContext & /*ctx*/)
         {
             throw "unimplemented";
         }
@@ -1607,7 +1607,7 @@ namespace Spire
             return visitor->VisitCaseStmt(this);
         }
 
-        CaseStmt * CaseStmt::Clone(CloneContext & ctx)
+        CaseStmt * CaseStmt::Clone(CloneContext & /*ctx*/)
         {
             throw "unimplemented";
         }
@@ -1617,7 +1617,7 @@ namespace Spire
             return visitor->VisitDefaultStmt(this);
         }
 
-        DefaultStmt * DefaultStmt::Clone(CloneContext & ctx)
+        DefaultStmt * DefaultStmt::Clone(CloneContext & /*ctx*/)
         {
             throw "unimplemented";
         }
@@ -1630,7 +1630,7 @@ namespace Spire
             return this;
         }
 
-        ExtensionDecl* TraitDecl::Clone(CloneContext & ctx)
+        ExtensionDecl* TraitDecl::Clone(CloneContext & /*ctx*/)
         {
             throw "unimplemented";
         }
@@ -1642,7 +1642,7 @@ namespace Spire
             return visitor->VisitSharedTypeExpr(this);
         }
 
-        SharedTypeExpr * SharedTypeExpr::Clone(CloneContext & ctx)
+        SharedTypeExpr * SharedTypeExpr::Clone(CloneContext & /*ctx*/)
         {
             throw "unimplemented";
         }
