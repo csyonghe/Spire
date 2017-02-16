@@ -14,19 +14,13 @@ namespace Spire
         enum ILBaseType
         {
             Void = 0,
-            Int = 16, Int2 = 17, Int3 = 18, Int4 = 19,
-            Float = 32, Float2 = 33, Float3 = 34, Float4 = 35,
-            Float3x3 = 40, Float4x4 = 47,
-            Texture2D = 48,
-            TextureCube = 49,
-            Texture2DArray = 50,
-            Texture2DShadow = 51,
-            TextureCubeShadow = 52,
-            Texture2DArrayShadow = 53,
-            Texture3D = 54,
-            Bool = 128, Bool2 = 129, Bool3 = 130, Bool4 = 131,
-            UInt = 512, UInt2 = 513, UInt3 = 514, UInt4 = 515,
-            SamplerState = 4096, SamplerComparisonState = 4097
+            Bool,
+            Int,
+            UInt,
+            Float,
+            UInt64,
+            SamplerState,
+            SamplerComparisonState
         };
         int SizeofBaseType(ILBaseType type);
         int RoundToAlignment(int offset, int alignment);
@@ -37,6 +31,13 @@ namespace Spire
             NonBindable, Texture, Sampler, Buffer, StorageBuffer
         };
         int GetMaxResourceBindings(BindableResourceType type);
+
+        class ILBasicType;
+        class ILVectorType;
+        class ILMatrixType;
+        class ILTextureType;
+        class ILPointerLikeType;
+        class ILArrayLikeType;
 
         class ILType : public RefObject
         {
@@ -63,7 +64,14 @@ namespace Spire
             bool IsTexture();
             bool IsSamplerState();
             bool IsNonShadowTexture();
-            int GetVectorSize();
+
+            ILBasicType* AsBasicType();
+            ILVectorType* AsVectorType();
+            ILMatrixType* AsMatrixType();
+            ILTextureType* AsTextureType();
+            ILPointerLikeType* AsPointerLikeType();
+            ILArrayLikeType* AsArrayLikeType();
+
             virtual BindableResourceType GetBindableResourceType() = 0;
             virtual ILType * Clone() = 0;
             virtual String ToString() = 0;
@@ -100,6 +108,8 @@ namespace Spire
             }
         };
 
+        const char * ILBaseTypeToString(ILBaseType type);
+
         class ILBasicType : public ILType
         {
         public:
@@ -122,22 +132,7 @@ namespace Spire
 
             virtual BindableResourceType GetBindableResourceType() override
             {
-                switch (Type)
-                {
-                case ILBaseType::Texture2D:
-                case ILBaseType::TextureCube:
-                case ILBaseType::Texture2DArray:
-                case ILBaseType::Texture2DShadow:
-                case ILBaseType::TextureCubeShadow:
-                case ILBaseType::Texture2DArrayShadow:
-                case ILBaseType::Texture3D:
-                    return BindableResourceType::Texture;
-                case ILBaseType::SamplerState:
-                case ILBaseType::SamplerComparisonState:
-                    return BindableResourceType::Sampler;
-                default:
-                    return BindableResourceType::NonBindable;
-                }
+                return BindableResourceType::NonBindable;
             }
 
             virtual ILType * Clone() override
@@ -152,64 +147,272 @@ namespace Spire
             }
             virtual String ToString() override
             {
-                if (Type == ILBaseType::Int)
-                    return "int";
-                else if (Type == ILBaseType::UInt)
-                    return "uint";
-                else if (Type == ILBaseType::UInt2)
-                    return "uvec2";
-                else if (Type == ILBaseType::UInt3)
-                    return "uvec3";
-                else if (Type == ILBaseType::UInt4)
-                    return "uvec4";
-                else if (Type == ILBaseType::Int2)
-                    return "ivec2";
-                else if (Type == ILBaseType::Int3)
-                    return "ivec3";
-                else if (Type == ILBaseType::Int4)
-                    return "ivec4";
-                else if (Type == ILBaseType::Float)
-                    return "float";
-                else if (Type == ILBaseType::Float2)
-                    return "vec2";
-                else if (Type == ILBaseType::Float3)
-                    return "vec3";
-                else if (Type == ILBaseType::Float4)
-                    return "vec4";
-                else if (Type == ILBaseType::Float3x3)
-                    return "mat3";
-                else if (Type == ILBaseType::Float4x4)
-                    return "mat4";
-                else if (Type == ILBaseType::Texture2D)
-                    return "sampler2D";
-                else if (Type == ILBaseType::TextureCube)
-                    return "samplerCube";
-                else if (Type == ILBaseType::Texture2DArray)
-                    return "sampler2DArray";
-                else if (Type == ILBaseType::Texture2DShadow)
-                    return "sampler2DShadow";
-                else if (Type == ILBaseType::TextureCubeShadow)
-                    return "samplerCubeShadow";
-                else if (Type == ILBaseType::Texture2DArrayShadow)
-                    return "sampler2DArrayShadow";
-                else if (Type == ILBaseType::Texture3D)
-                    return "sampler3D";
-                else if (Type == ILBaseType::Bool)
-                    return "bool";
-                else if (Type == ILBaseType::Bool2)
-                    return "bvec2";
-                else if (Type == ILBaseType::Bool3)
-                    return "bvec3";
-                else if (Type == ILBaseType::Bool4)
-                    return "bvec4";
-                else if (Type == ILBaseType::SamplerState)
-                    return "SamplerState";
-                else if (Type == ILBaseType::SamplerComparisonState)
-                    return "SamplerComparisonState";
-                else if (Type == ILBaseType::Void)
-                    return "void";
-                else
-                    return "?unknown";
+                return ILBaseTypeToString(Type);
+            }
+        };
+
+        class ILVectorType : public ILType
+        {
+        public:
+            ILBaseType BaseType = ILBaseType::Float;
+            int Size = 4;
+            ILVectorType() = default;
+            ILVectorType(ILBaseType baseType, int size)
+            {
+                BaseType = baseType;
+                Size = size;
+            }
+            virtual bool Equals(ILType* type) override
+            {
+                auto btype = dynamic_cast<ILVectorType*>(type);
+                if (!btype)
+                    return false;
+                return BaseType == btype->BaseType;
+            }
+            virtual ILType * Clone() override
+            {
+                auto rs = new ILVectorType();
+                rs->BaseType = BaseType;
+                rs->Size = Size;
+                return rs;
+            }
+            virtual void Serialize(StringBuilder & sb) override
+            {
+                sb << "vector<";
+                sb << ILBaseTypeToString(BaseType);
+                sb << ", " << Size << ">";
+            }
+            virtual String ToString() override
+            {
+                return ILBaseTypeToString(BaseType) + String(Size);
+            }
+            virtual BindableResourceType GetBindableResourceType() override
+            {
+                return BindableResourceType::NonBindable;
+            }
+        };
+
+        class ILMatrixType : public ILType
+        {
+        public:
+            ILBaseType BaseType = ILBaseType::Float;
+            int Size[2] = { 4, 4 };
+            ILMatrixType() = default;
+            ILMatrixType(ILBaseType baseType, int size0, int size1)
+            {
+                BaseType = baseType;
+                Size[0] = size0;
+                Size[1] = size1;
+            }
+            virtual bool Equals(ILType* type) override
+            {
+                auto btype = dynamic_cast<ILVectorType*>(type);
+                if (!btype)
+                    return false;
+                return BaseType == btype->BaseType;
+            }
+            virtual ILType * Clone() override
+            {
+                auto rs = new ILMatrixType();
+                rs->BaseType = BaseType;
+                rs->Size[0] = Size[0];
+                rs->Size[1] = Size[1];
+                return rs;
+            }
+            virtual void Serialize(StringBuilder & sb) override
+            {
+                sb << "matrix<";
+                sb << ILBaseTypeToString(BaseType);
+                sb << ", " << Size[0] << ", " << Size[1] << ">";
+            }
+            virtual String ToString() override
+            {
+                return (StringBuilder() << ILBaseTypeToString(BaseType) << Size[0] << "x" << Size[1]).ProduceString();
+            }
+            virtual BindableResourceType GetBindableResourceType() override
+            {
+                return BindableResourceType::NonBindable;
+            }
+        };
+
+        enum class ILTextureShape
+        {
+            Texture1D, Texture2D, Texture3D, TextureCube
+        };
+
+        const char * ILTextureShapeToString(ILTextureShape shape);
+
+        union ILTextureFlavor
+        {
+            struct TextureFlavorBits
+            {
+                ILTextureShape Shape : 2;
+                bool IsMultisample : 1;
+                bool IsArray : 1;
+                bool IsShadow : 1;
+            } Fields;
+            uint32_t Bits;
+        };
+
+        class ILTextureType : public ILType
+        {
+        public:
+            ILTextureFlavor Flavor;
+            RefPtr<ILType> BaseType;
+            ILTextureType()
+            {
+                Flavor.Fields.IsArray = false;
+                Flavor.Fields.IsMultisample = false;
+                Flavor.Fields.IsShadow = false;
+                Flavor.Fields.Shape = ILTextureShape::Texture2D;
+            }
+            virtual bool Equals(ILType* type) override
+            {
+                auto btype = dynamic_cast<ILTextureType*>(type);
+                if (!btype)
+                    return false;
+                return Flavor.Bits == btype->Flavor.Bits && BaseType && BaseType->Equals(btype->BaseType.Ptr());
+            }
+            virtual ILType * Clone() override
+            {
+                auto rs = new ILTextureType();
+                rs->BaseType = BaseType->Clone();
+                rs->Flavor = Flavor;
+                return rs;
+            }
+            virtual void Serialize(StringBuilder & sb) override
+            {
+                sb << "texture<";
+                BaseType->Serialize(sb);
+                sb << ", ";
+                sb << (unsigned int)Flavor.Bits << ">";
+            }
+            virtual String ToString() override
+            {
+                StringBuilder sb;
+                sb << ILTextureShapeToString(Flavor.Fields.Shape);
+                if (Flavor.Fields.IsMultisample)
+                    sb << "MS";
+                if (Flavor.Fields.IsArray)
+                    sb << "Array";
+                if (Flavor.Fields.IsShadow)
+                    sb << "Shadow";
+                return sb.ProduceString();
+            }
+            virtual BindableResourceType GetBindableResourceType() override
+            {
+                return BindableResourceType::Texture;
+            }
+        };
+
+        enum ILArrayLikeTypeName
+        {
+            Buffer, RWBuffer, StructuredBuffer, RWStructuredBuffer
+        };
+
+        enum ILPointerLikeTypeName
+        {
+            ConstantBuffer
+        };
+
+        class ILArrayLikeType : public ILType
+        {
+        public:
+            RefPtr<ILType> BaseType;
+            ILArrayLikeTypeName Name;
+            virtual bool Equals(ILType* type) override
+            {
+                auto btype = dynamic_cast<ILArrayLikeType*>(type);
+                if (!btype)
+                    return false;
+                return BaseType->Equals(btype->BaseType.Ptr());
+            }
+            virtual ILType * Clone() override
+            {
+                auto rs = new ILArrayLikeType();
+                rs->BaseType = BaseType->Clone();
+                rs->Name = Name;
+                return rs;
+            }
+            virtual void Serialize(StringBuilder & sb) override
+            {
+                sb << "array_like(";
+                BaseType->Serialize(sb);
+                sb << ", " << (int)Name << ")";
+            }
+            virtual String ToString() override
+            {
+                StringBuilder sb;
+                switch (Name)
+                {
+                case ILArrayLikeTypeName::Buffer:
+                    sb << "Buffer";
+                    break;
+                case ILArrayLikeTypeName::RWBuffer:
+                    sb << "RWBuffer";
+                    break;
+                case ILArrayLikeTypeName::RWStructuredBuffer:
+                    sb << "RWStructuredBuffer";
+                    break;
+                case ILArrayLikeTypeName::StructuredBuffer:
+                    sb << "StructuredBuffer";
+                    break;
+                default:
+                    sb << "unkown";
+                    break;
+                }
+                sb << "<" << BaseType->ToString() << ">";
+                return sb.ProduceString();
+            }
+            virtual BindableResourceType GetBindableResourceType() override
+            {
+                return BindableResourceType::StorageBuffer;
+            }
+        };
+
+        class ILPointerLikeType : public ILType
+        {
+        public:
+            RefPtr<ILType> BaseType;
+            ILPointerLikeTypeName Name;
+            virtual bool Equals(ILType* type) override
+            {
+                auto btype = dynamic_cast<ILPointerLikeType*>(type);
+                if (!btype)
+                    return false;
+                return BaseType->Equals(btype->BaseType.Ptr());
+            }
+            virtual ILType * Clone() override
+            {
+                auto rs = new ILPointerLikeType();
+                rs->BaseType = BaseType->Clone();
+                rs->Name = Name;
+                return rs;
+            }
+            virtual void Serialize(StringBuilder & sb) override
+            {
+                sb << "ptr_like(";
+                BaseType->Serialize(sb);
+                sb << ", " << (int)Name << ")";
+            }
+            virtual String ToString() override
+            {
+                StringBuilder sb;
+                switch (Name)
+                {
+                case ILPointerLikeTypeName::ConstantBuffer:
+                    sb << "ConstantBuffer";
+                    break;
+                default:
+                    sb << "unkown";
+                    break;
+                }
+                sb << "<" << BaseType->ToString() << ">";
+                return sb.ProduceString();
+            }
+            virtual BindableResourceType GetBindableResourceType() override
+            {
+                return BindableResourceType::Buffer;
             }
         };
 
@@ -223,7 +426,7 @@ namespace Spire
                 auto btype = dynamic_cast<ILArrayType*>(type);
                 if (!btype)
                     return false;
-                return BaseType->Equals(btype->BaseType.Ptr());;
+                return BaseType->Equals(btype->BaseType.Ptr());
             }
             virtual ILType * Clone() override
             {
@@ -653,32 +856,31 @@ namespace Spire
                     return String(FloatValues[0]) + "f";
                 else if (Type->IsInt())
                     return String(IntValues[0]);
-                else if (auto baseType = dynamic_cast<ILBasicType*>(Type.Ptr()))
+                else if (auto baseType = dynamic_cast<ILVectorType*>(Type.Ptr()))
                 {
                     StringBuilder sb(256);
-                    if (baseType->Type == ILBaseType::Float2)
-                        sb << "vec2(" << FloatValues[0] << "f, " << FloatValues[1] << "f)";
-                    else if (baseType->Type == ILBaseType::Float3)
-                        sb << "vec3(" << FloatValues[0] << "f, " << FloatValues[1] << "f, " << FloatValues[2] << "f)";
-                    else if (baseType->Type == ILBaseType::Float4)
-                        sb << "vec4(" << FloatValues[0] << "f, " << FloatValues[1] << "f, " << FloatValues[2] << "f, " << FloatValues[3] << "f)";
-                    else if (baseType->Type == ILBaseType::Float3x3)
-                        sb << "mat3(...)";
-                    else if (baseType->Type == ILBaseType::Float4x4)
-                        sb << "mat4(...)";
-                    else if (baseType->Type == ILBaseType::Int2)
-                        sb << "ivec2(" << IntValues[0] << ", " << IntValues[1] << ")";
-                    else if (baseType->Type == ILBaseType::Int3)
-                        sb << "ivec3(" << IntValues[0] << ", " << IntValues[1] << ", " << IntValues[2] << ")";
-                    else if (baseType->Type == ILBaseType::Int4)
-                        sb << "ivec4(" << IntValues[0] << ", " << IntValues[1] << ", " << IntValues[2] << ", " << IntValues[3] << ")";
-                    else if (baseType->Type == ILBaseType::UInt2)
-                        sb << "uvec2(" << IntValues[0] << ", " << IntValues[1] << ")";
-                    else if (baseType->Type == ILBaseType::UInt3)
-                        sb << "uvec3(" << IntValues[0] << ", " << IntValues[1] << ", " << IntValues[2] << ")";
-                    else if (baseType->Type == ILBaseType::UInt4)
-                        sb << "uvec4(" << IntValues[0] << ", " << IntValues[1] << ", " << IntValues[2] << ", " << IntValues[3] << ")";
-                    return sb.ToString();
+                    sb << baseType->ToString() << "(";
+                    for (int i = 0; i < baseType->Size; i++)
+                    {
+                        if (baseType->BaseType == ILBaseType::Float)
+                        {
+                            sb << FloatValues[i];
+                            sb << "f";
+                        }
+                        else if (baseType->BaseType == ILBaseType::UInt)
+                        {
+                            sb << IntValues[i];
+                            sb << "u";
+                        }
+                        else if (baseType->BaseType == ILBaseType::Bool)
+                        {
+                            sb << (IntValues[i] == 0 ? "false" : "true");
+                        }
+                        if (i != baseType->Size - 1)
+                            sb << ", ";
+                    }
+                    sb << ")";
+                    return sb.ProduceString();
                 }
                 else
                     throw InvalidOperationException("Illegal constant.");
@@ -1710,34 +1912,13 @@ namespace Spire
                 {
                     Type = genType->BaseType->Clone();
                 }
-                else if (auto baseType = dynamic_cast<ILBasicType *>(v0->Type.Ptr()))
+                else if (auto baseType = dynamic_cast<ILVectorType *>(v0->Type.Ptr()))
                 {
-                    switch (baseType->Type)
-                    {
-                    case ILBaseType::Float2:
-                    case ILBaseType::Float3:
-                    case ILBaseType::Float4:
-                        Type = new ILBasicType(ILBaseType::Float);
-                        break;
-                    case ILBaseType::Float3x3:
-                        Type = new ILBasicType(ILBaseType::Float3);
-                        break;
-                    case ILBaseType::Float4x4:
-                        Type = new ILBasicType(ILBaseType::Float4);
-                        break;
-                    case ILBaseType::Int2:
-                    case ILBaseType::Int3:
-                    case ILBaseType::Int4:
-                        Type = new ILBasicType(ILBaseType::Int);
-                        break;
-                    case ILBaseType::UInt2:
-                    case ILBaseType::UInt3:
-                    case ILBaseType::UInt4:
-                        Type = new ILBasicType(ILBaseType::UInt);
-                        break;
-                    default:
-                        throw InvalidOperationException("Unsupported aggregate type.");
-                    }
+                    Type = new ILBasicType(baseType->BaseType);
+                }
+                else if (auto matrixType = dynamic_cast<ILMatrixType*>(v0->Type.Ptr()))
+                {
+                    Type = new ILVectorType(matrixType->BaseType, matrixType->Size[1]);
                 }
                 else if (auto structType = dynamic_cast<ILStructType*>(v0->Type.Ptr()))
                 {
@@ -1748,6 +1929,8 @@ namespace Spire
                         throw InvalidProgramException("member field access offset out of bounds.");
                     Type = structType->Members[cv1->IntValues[0]].Type;
                 }
+                else
+                    throw InvalidOperationException("Unsupported aggregate type.");
             }
             virtual String ToString() override
             {

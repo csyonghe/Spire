@@ -54,26 +54,9 @@ struct DefaultLayoutRulesImpl : LayoutRulesImpl
         case ILBaseType::UInt:
         case ILBaseType::Float:
             return{ 4, 4 };
-
-        case ILBaseType::Int2:      return GetVectorLayout(GetScalarLayout(ILBaseType::Int),    2);
-        case ILBaseType::UInt2:     return GetVectorLayout(GetScalarLayout(ILBaseType::UInt),   2);
-        case ILBaseType::Float2:    return GetVectorLayout(GetScalarLayout(ILBaseType::Float),  2);
-        case ILBaseType::Int3:      return GetVectorLayout(GetScalarLayout(ILBaseType::Int),    3);
-        case ILBaseType::UInt3:     return GetVectorLayout(GetScalarLayout(ILBaseType::UInt),   3);
-        case  ILBaseType::Float3:   return GetVectorLayout(GetScalarLayout(ILBaseType::Float),  3);
-        case ILBaseType::Int4:      return GetVectorLayout(GetScalarLayout(ILBaseType::Int),    4);
-        case ILBaseType::UInt4:     return GetVectorLayout(GetScalarLayout(ILBaseType::UInt),   4);
-        case ILBaseType::Float4:    return GetVectorLayout(GetScalarLayout(ILBaseType::Float),  4);
-
-        case ILBaseType::Float3x3:  return GetMatrixLayout(GetScalarLayout(ILBaseType::Float),  3, 3);
-        case ILBaseType::Float4x4:  return GetMatrixLayout(GetScalarLayout(ILBaseType::Float),  4, 4);
-
-        case ILBaseType::Texture2D:
-        case ILBaseType::Texture2DShadow:
-        case ILBaseType::TextureCube:
-        case ILBaseType::TextureCubeShadow:
+        case ILBaseType::SamplerComparisonState:
+        case ILBaseType::SamplerState:
             return{ 8, 8 };
-
         default:
             assert(!"unimplemented");
             return{ 0, 1 };
@@ -226,6 +209,26 @@ LayoutInfo GetLayout(ILType* type, LayoutRulesImpl* rules)
     if (auto basicType = dynamic_cast<ILBasicType*>(type))
     {
         return rules->GetScalarLayout(basicType->Type);
+    }
+    else if (auto vectorType = dynamic_cast<ILVectorType*>(type))
+    {
+        return rules->GetVectorLayout(rules->GetScalarLayout(vectorType->BaseType), vectorType->Size);
+    }
+    else if (auto matrixType = dynamic_cast<ILMatrixType*>(type))
+    {
+        return rules->GetVectorLayout(rules->GetScalarLayout(matrixType->BaseType), matrixType->Size[1]);
+    }
+    else if (auto textureType = dynamic_cast<TextureType*>(type))
+    {
+        return{ 8, 8 };
+    }
+    else if (auto ptrLike = dynamic_cast<ILPointerLikeType*>(type))
+    {
+        return{ 8, 8 };
+    }
+    else if (auto arrayLike = dynamic_cast<ILArrayLikeType*>(type))
+    {
+        return{ 8, 8 };
     }
     else if (auto arrayType = dynamic_cast<ILArrayType*>(type))
     {

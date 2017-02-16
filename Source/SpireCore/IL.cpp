@@ -10,53 +10,17 @@ namespace Spire
     {
         using namespace CoreLib::IO;
 
-        RefPtr<ILType> BaseTypeFromString(CoreLib::Text::TokenReader & parser)
+        ILBaseType BaseTypeFromString(CoreLib::Text::TokenReader & parser)
         {
             if (parser.LookAhead("int"))
-                return new ILBasicType(ILBaseType::Int);
-            else if (parser.LookAhead("uint"))
-                return new ILBasicType(ILBaseType::UInt);
-            else if (parser.LookAhead("uvec2"))
-                return new ILBasicType(ILBaseType::UInt2);
-            else if (parser.LookAhead("uvec3"))
-                return new ILBasicType(ILBaseType::UInt3);
-            else if (parser.LookAhead("uvec4"))
-                return new ILBasicType(ILBaseType::UInt4);
+                return ILBaseType::Int;
             if (parser.LookAhead("float"))
-                return new ILBasicType(ILBaseType::Float);
-            if (parser.LookAhead("vec2"))
-                return new ILBasicType(ILBaseType::Float2);
-            if (parser.LookAhead("vec3"))
-                return new ILBasicType(ILBaseType::Float3);
-            if (parser.LookAhead("vec4"))
-                return new ILBasicType(ILBaseType::Float4);
-            if (parser.LookAhead("ivec2"))
-                return new ILBasicType(ILBaseType::Int2);
-            if (parser.LookAhead("mat3"))
-                return new ILBasicType(ILBaseType::Float3x3);
-            if (parser.LookAhead("mat4"))
-                return new ILBasicType(ILBaseType::Float4x4);
-            if (parser.LookAhead("ivec3"))
-                return new ILBasicType(ILBaseType::Int3);
-            if (parser.LookAhead("ivec4"))
-                return new ILBasicType(ILBaseType::Int4);
-            if (parser.LookAhead("sampler2D") || parser.LookAhead("Texture2D"))
-                return new ILBasicType(ILBaseType::Texture2D);
-            if (parser.LookAhead("samplerCube") || parser.LookAhead("TextureCube"))
-                return new ILBasicType(ILBaseType::TextureCube);
-            if (parser.LookAhead("sampler2DArray") || parser.LookAhead("Texture2DArray"))
-                return new ILBasicType(ILBaseType::Texture2DArray);
-            if (parser.LookAhead("sampler2DShadow") || parser.LookAhead("Texture2DShadow"))
-                return new ILBasicType(ILBaseType::Texture2DShadow);
-            if (parser.LookAhead("samplerCubeShadow") || parser.LookAhead("TextureCubeShadow"))
-                return new ILBasicType(ILBaseType::TextureCubeShadow);
-            if (parser.LookAhead("sampler2DArrayShadow") || parser.LookAhead("Texture2DArrayShadow"))
-                return new ILBasicType(ILBaseType::Texture2DArrayShadow);
-            if (parser.LookAhead("sampler3D") || parser.LookAhead("Texture3D"))
-                return new ILBasicType(ILBaseType::Texture3D);
+                return ILBaseType::Float;
             if (parser.LookAhead("bool"))
-                return new ILBasicType(ILBaseType::Bool);
-            return nullptr;
+                return ILBaseType::Bool;
+            if (parser.LookAhead("void"))
+                return ILBaseType::Void;
+            return ILBaseType::Void;
         }
 
         int RoundToAlignment(int offset, int alignment)
@@ -84,48 +48,47 @@ namespace Spire
             return 0;
         }
 
+        const char * ILBaseTypeToString(ILBaseType type)
+        {
+            switch (type)
+            {
+            case ILBaseType::Int:
+                return "int";
+            case ILBaseType::UInt:
+                return "uint";
+            case ILBaseType::Bool:
+                return "bool";
+            case ILBaseType::Void:
+                return "void";
+            default:
+                return "?unkowntype";
+            }
+        }
+
+        const char * ILTextureShapeToString(ILTextureShape shape)
+        {
+            switch (shape)
+            {
+            case ILTextureShape::Texture1D:
+                return "Texture1D";
+            case ILTextureShape::Texture2D:
+                return "Texture2D";
+            case ILTextureShape::Texture3D:
+                return "Texture3D";
+            case ILTextureShape::TextureCube:
+                return "TextureCube";
+            }
+            return nullptr;
+        }
+
         int SizeofBaseType(ILBaseType type)
         {
             if (type == ILBaseType::Int)
                 return 4;
             if (type == ILBaseType::UInt)
                 return 4;
-            if (type == ILBaseType::UInt2)
-                return 8;
-            if (type == ILBaseType::UInt3)
-                return 12;
-            if (type == ILBaseType::UInt4)
-                return 16;
-            else if (type == ILBaseType::Int2)
-                return 8;
-            else if (type == ILBaseType::Int3)
-                return 12;
-            else if (type == ILBaseType::Int4)
-                return 16;
             else if (type == ILBaseType::Float)
                 return 4;
-            else if (type == ILBaseType::Float2)
-                return 8;
-            else if (type == ILBaseType::Float3)
-                return 12;
-            else if (type == ILBaseType::Float4)
-                return 16;
-            else if (type == ILBaseType::Float3x3)
-                return 48;
-            else if (type == ILBaseType::Float4x4)
-                return 64;
-            else if (type == ILBaseType::Texture2D)
-                return 8;
-            else if (type == ILBaseType::TextureCube)
-                return 8;
-            else if (type == ILBaseType::Texture2DArray)
-                return 8;
-            else if (type == ILBaseType::Texture2DShadow)
-                return 8;
-            else if (type == ILBaseType::TextureCubeShadow)
-                return 8;
-            else if (type == ILBaseType::Texture2DArrayShadow)
-                return 8;
             else if (type == ILBaseType::Bool)
                 return 4;
             else
@@ -163,9 +126,7 @@ namespace Spire
         {
             auto basicType = dynamic_cast<ILBasicType*>(this);
             if (basicType)
-                return basicType->Type == ILBaseType::Int || basicType->Type == ILBaseType::Int2 || basicType->Type == ILBaseType::Int3 || basicType->Type == ILBaseType::Int4
-                || basicType->Type == ILBaseType::UInt || basicType->Type == ILBaseType::UInt2 || basicType->Type == ILBaseType::UInt3 || basicType->Type == ILBaseType::UInt4 ||
-                basicType->Type == ILBaseType::Bool;
+                return basicType->Type == ILBaseType::Int || basicType->Type == ILBaseType::UInt || basicType->Type == ILBaseType::Bool;
             else
                 return false;
         }
@@ -190,67 +151,93 @@ namespace Spire
 
         bool ILType::IsBoolVector()
         {
-            auto basicType = dynamic_cast<ILBasicType*>(this);
+            auto basicType = dynamic_cast<ILVectorType*>(this);
             if (basicType)
-                return basicType->Type == ILBaseType::Bool2 || basicType->Type == ILBaseType::Bool3 || basicType->Type == ILBaseType::Bool4;
+                return basicType->BaseType == ILBaseType::Bool;
             else
                 return false;
         }
 
         bool ILType::IsIntVector()
         {
-            auto basicType = dynamic_cast<ILBasicType*>(this);
+            auto basicType = dynamic_cast<ILVectorType*>(this);
             if (basicType)
-                return basicType->Type == ILBaseType::Int2 || basicType->Type == ILBaseType::Int3 || basicType->Type == ILBaseType::Int4;
+                return basicType->BaseType == ILBaseType::Int;
             else
                 return false;
         }
 
         bool ILType::IsUIntVector()
         {
-            auto basicType = dynamic_cast<ILBasicType*>(this);
+            auto basicType = dynamic_cast<ILVectorType*>(this);
             if (basicType)
-                return basicType->Type == ILBaseType::UInt2 || basicType->Type == ILBaseType::UInt3 || basicType->Type == ILBaseType::UInt4;
+                return basicType->BaseType == ILBaseType::UInt;
             else
                 return false;
         }
 
         bool ILType::IsFloatVector()
         {
-            auto basicType = dynamic_cast<ILBasicType*>(this);
+            auto basicType = dynamic_cast<ILVectorType*>(this);
             if (basicType)
-                return basicType->Type == ILBaseType::Float2 || basicType->Type == ILBaseType::Float3 || basicType->Type == ILBaseType::Float4 ||
-                basicType->Type == ILBaseType::Float3x3 || basicType->Type == ILBaseType::Float4x4;
+                return basicType->BaseType == ILBaseType::Float;
             else
                 return false;
         }
 
         bool ILType::IsFloatMatrix()
         {
-            auto basicType = dynamic_cast<ILBasicType*>(this);
+            auto basicType = dynamic_cast<ILMatrixType*>(this);
             if (basicType)
-                return basicType->Type == ILBaseType::Float3x3 || basicType->Type == ILBaseType::Float4x4;
+                return basicType->BaseType == ILBaseType::Float;
             else
                 return false;
         }
 
         bool ILType::IsNonShadowTexture()
         {
-            auto basicType = dynamic_cast<ILBasicType*>(this);
+            auto basicType = dynamic_cast<ILTextureType*>(this);
             if (basicType)
-                return basicType->Type == ILBaseType::Texture2D || basicType->Type == ILBaseType::TextureCube || basicType->Type == ILBaseType::Texture2DArray ||
-                basicType->Type == ILBaseType::Texture3D;
+                return !basicType->Flavor.Fields.IsShadow;
             else
                 return false;
         }
 
+        ILBasicType * ILType::AsBasicType()
+        {
+            return dynamic_cast<ILBasicType*>(this);
+        }
+
+        ILVectorType * ILType::AsVectorType()
+        {
+            return dynamic_cast<ILVectorType*>(this);
+        }
+
+        ILMatrixType * ILType::AsMatrixType()
+        {
+            return dynamic_cast<ILMatrixType*>(this);
+        }
+
+        ILTextureType * ILType::AsTextureType()
+        {
+            return dynamic_cast<ILTextureType*>(this);
+        }
+
+        ILPointerLikeType * ILType::AsPointerLikeType()
+        {
+            return dynamic_cast<ILPointerLikeType*>(this);
+        }
+
+        ILArrayLikeType * ILType::AsArrayLikeType()
+        {
+            return dynamic_cast<ILArrayLikeType*>(this);
+        }
+
         bool ILType::IsTexture()
         {
-            auto basicType = dynamic_cast<ILBasicType*>(this);
+            auto basicType = dynamic_cast<ILTextureType*>(this);
             if (basicType)
-                return basicType->Type == ILBaseType::Texture2D || basicType->Type == ILBaseType::TextureCube || basicType->Type == ILBaseType::Texture2DArray ||
-                basicType->Type == ILBaseType::Texture2DShadow || basicType->Type == ILBaseType::TextureCubeShadow || basicType->Type == ILBaseType::Texture2DArrayShadow ||
-                basicType->Type == ILBaseType::Texture3D;
+                return true;
             else
                 return false;
         }
@@ -264,41 +251,38 @@ namespace Spire
                 return false;
         }
 
-        int ILType::GetVectorSize()
-        {
-            if (auto basicType = dynamic_cast<ILBasicType*>(this))
-            {
-                switch (basicType->Type)
-                {
-                case ILBaseType::Int2:
-                case ILBaseType::Float2:
-                case ILBaseType::UInt2:
-                    return 2;
-                case ILBaseType::Int3:
-                case ILBaseType::Float3:
-                case ILBaseType::UInt3:
-                    return 3;
-                case ILBaseType::Int4:
-                case ILBaseType::Float4:
-                case ILBaseType::UInt4:
-                    return 4;
-                case ILBaseType::Float3x3:
-                    return 9;
-                case ILBaseType::Float4x4:
-                    return 16;
-                default:
-                    return 1;
-                }
-            }
-            return 1;
-        }
-
         RefPtr<ILType> DeserializeBasicType(CoreLib::Text::TokenReader & reader)
         {
             reader.Read("basic");
-            auto rs = BaseTypeFromString(reader);
+            auto rs = new ILBasicType(BaseTypeFromString(reader));
             reader.ReadWord();
             return rs;
+        }
+        RefPtr<ILVectorType> DeserializeVectorType(CoreLib::Text::TokenReader & reader)
+        {
+            reader.Read("vector");
+            reader.Read("<");
+            RefPtr<ILVectorType> vecType = new ILVectorType();
+            vecType->BaseType = BaseTypeFromString(reader);
+            auto rs = BaseTypeFromString(reader);
+            reader.Read(",");
+            vecType->Size = reader.ReadInt();
+            reader.Read(">");
+            return vecType;
+        }
+        RefPtr<ILMatrixType> DeserializeMatrixType(CoreLib::Text::TokenReader & reader)
+        {
+            reader.Read("matrix");
+            reader.Read("<");
+            RefPtr<ILMatrixType> vecType = new ILMatrixType();
+            vecType->BaseType = BaseTypeFromString(reader);
+            auto rs = BaseTypeFromString(reader);
+            reader.Read(",");
+            vecType->Size[0] = reader.ReadInt();
+            reader.Read(",");
+            vecType->Size[1] = reader.ReadInt();
+            reader.Read(">");
+            return vecType;
         }
         RefPtr<ILType> DeserializeStructType(CoreLib::Text::TokenReader & reader)
         {
@@ -328,6 +312,39 @@ namespace Spire
             reader.Read(")");
             return rs;
         }
+        RefPtr<ILType> DeserializeArrayLikeType(CoreLib::Text::TokenReader & reader)
+        {
+            reader.Read("array_like");
+            reader.Read("<");
+            RefPtr<ILArrayLikeType> rs = new ILArrayLikeType();
+            rs->BaseType = ILType::Deserialize(reader);
+            reader.Read(",");
+            rs->Name = (ILArrayLikeTypeName)reader.ReadInt();
+            reader.Read(">");
+            return rs;
+        }
+        RefPtr<ILType> DeserializePointerLikeType(CoreLib::Text::TokenReader & reader)
+        {
+            reader.Read("ptr_like");
+            reader.Read("<");
+            RefPtr<ILArrayLikeType> rs = new ILArrayLikeType();
+            rs->BaseType = ILType::Deserialize(reader);
+            reader.Read(",");
+            rs->Name = (ILArrayLikeTypeName)reader.ReadInt();
+            reader.Read(">");
+            return rs;
+        }
+        RefPtr<ILType> DeserializeTextureType(CoreLib::Text::TokenReader & reader)
+        {
+            reader.Read("texture");
+            reader.Read("<");
+            RefPtr<ILTextureType> rs = new ILTextureType();
+            rs->BaseType = ILType::Deserialize(reader);
+            reader.Read(",");
+            rs->Flavor.Bits = reader.ReadUInt();
+            reader.Read(">");
+            return rs;
+        }
         RefPtr<ILType> DeserializeGenericType(CoreLib::Text::TokenReader & reader)
         {
             reader.Read("generic");
@@ -353,6 +370,16 @@ namespace Spire
                 return DeserializeStructType(reader);
             else if (reader.LookAhead("array"))
                 return DeserializeArrayType(reader);
+            else if (reader.LookAhead("array_like"))
+                return DeserializeArrayLikeType(reader);
+            else if (reader.LookAhead("ptr_like"))
+                return DeserializePointerLikeType(reader);
+            else if (reader.LookAhead("texture"))
+                return DeserializeTextureType(reader);
+            else if (reader.LookAhead("vector"))
+                return DeserializeVectorType(reader);
+            else if (reader.LookAhead("matrix"))
+                return DeserializeMatrixType(reader);
             else if (reader.LookAhead("generic"))
                 return DeserializeGenericType(reader);
             else if (reader.LookAhead("record"))

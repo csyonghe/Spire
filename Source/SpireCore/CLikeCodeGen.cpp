@@ -77,44 +77,46 @@ namespace Spire
                     ctx.Body << (c->IntValues[0]);
                 else if (type->IsBool())
                     ctx.Body << ((c->IntValues[0] != 0) ? "true" : "false");
-                else if (auto baseType = dynamic_cast<ILBasicType*>(type))
+                else if (auto baseType = dynamic_cast<ILVectorType*>(type))
                 {
                     PrintType(ctx.Body, baseType);
                     ctx.Body << "(";
-
-                    if (baseType->Type == ILBaseType::Float2)
-                        ctx.Body << makeFloat(c->FloatValues[0]) << ", " << makeFloat(c->FloatValues[1]);
-                    else if (baseType->Type == ILBaseType::Float3)
-                        ctx.Body << makeFloat(c->FloatValues[0]) << ", " << makeFloat(c->FloatValues[1]) << ", " << makeFloat(c->FloatValues[2]);
-                    else if (baseType->Type == ILBaseType::Float4)
-                        ctx.Body << makeFloat(c->FloatValues[0]) << ", " << makeFloat(c->FloatValues[1]) << ", " << makeFloat(c->FloatValues[2]) << ", " << makeFloat(c->FloatValues[3]);
-                    else if (baseType->Type == ILBaseType::Float3x3)
+                    for (int i = 0; i < baseType->Size; i++)
                     {
-                        ctx.Body << "mat3(";
-                        for (int i = 0; i < 9; i++)
-                        {
+                        if (baseType->BaseType == ILBaseType::Float)
                             ctx.Body << makeFloat(c->FloatValues[i]);
-                            if (i != 8)
-                                ctx.Body << ", ";
-                        }
-                        ctx.Body;
+                        else if (baseType->BaseType == ILBaseType::Int)
+                            ctx.Body << c->IntValues[i];
+                        else if (baseType->BaseType == ILBaseType::Bool)
+                            ctx.Body << (c->IntValues[i] ? "true" : "false");
+                        else if (baseType->BaseType == ILBaseType::UInt)
+                            ctx.Body << c->IntValues[i] << "u";
+                        else if (baseType->BaseType == ILBaseType::UInt64)
+                            ctx.Body << c->IntValues[i];
+                        if (i != baseType->Size - 1)
+                            ctx.Body << ", ";
                     }
-                    else if (baseType->Type == ILBaseType::Float4x4)
+                    ctx.Body << ")";
+                }
+                else if (auto matrixType = dynamic_cast<ILMatrixType*>(type))
+                {
+                    PrintType(ctx.Body, matrixType);
+                    ctx.Body << "(";
+                    for (int i = 0; i < matrixType->Size[0] * matrixType->Size[1]; i++)
                     {
-                        for (int i = 0; i < 16; i++)
-                        {
+                        if (matrixType->BaseType == ILBaseType::Float)
                             ctx.Body << makeFloat(c->FloatValues[i]);
-                            if (i != 15)
-                                ctx.Body << ", ";
-                        }
+                        else if (matrixType->BaseType == ILBaseType::Int)
+                            ctx.Body << c->IntValues[i];
+                        else if (matrixType->BaseType == ILBaseType::Bool)
+                            ctx.Body << (c->IntValues[i] ? "true" : "false");
+                        else if (matrixType->BaseType == ILBaseType::UInt)
+                            ctx.Body << c->IntValues[i] << "u";
+                        else if (matrixType->BaseType == ILBaseType::UInt64)
+                            ctx.Body << c->IntValues[i];
+                        if (i != matrixType->Size[0] * matrixType->Size[1] - 1)
+                            ctx.Body << ", ";
                     }
-                    else if (baseType->Type == ILBaseType::Int2)
-                        ctx.Body << c->IntValues[0] << ", " << c->IntValues[1];
-                    else if (baseType->Type == ILBaseType::Int3)
-                        ctx.Body << c->IntValues[0] << ", " << c->IntValues[1] << ", " << c->IntValues[2];
-                    else if (baseType->Type == ILBaseType::Int4)
-                        ctx.Body << c->IntValues[0] << ", " << c->IntValues[1] << ", " << c->IntValues[2] << ", " << c->IntValues[3];
-
                     ctx.Body << ")";
                 }
                 else
@@ -184,7 +186,8 @@ namespace Spire
             {
                 PrintOp(ctx, op0);
                 bool printDefault = true;
-                if (op0->Type->GetVectorSize() <= 4 && op0->Type->IsVector())
+                auto vecType = op0->Type->AsVectorType();
+                if (vecType)
                 {
                     if (auto c = dynamic_cast<ILConstOperand*>(op1))
                     {
@@ -881,13 +884,13 @@ namespace Spire
                 if (input.Attributes.ContainsKey("TessCoord"))
                 {
                     info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::TessCoord;
-                    if (!(input.Type->IsFloatVector() && input.Type->GetVectorSize() <= 3))
+                    if (!(input.Type->IsFloatVector() && input.Type->AsVectorType()->Size <= 3))
                         getSink()->diagnose(input.Position, Diagnostics::invalidTessCoordType);
                 }
                 else if (input.Attributes.ContainsKey("FragCoord"))
                 {
                     info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::FragCoord;
-                    if (!(input.Type->IsFloatVector() && input.Type->GetVectorSize() == 4))
+                    if (!(input.Type->IsFloatVector() && input.Type->AsVectorType()->Size == 4))
                         getSink()->diagnose(input.Position, Diagnostics::invalidFragCoordType);
                 }
                 else if (input.Attributes.ContainsKey("InvocationId"))
@@ -985,7 +988,7 @@ namespace Spire
                 ILOperand * operand;
                 if (world->Components.TryGetValue(positionVar.Value, operand))
                 {
-                    if (operand->Type->IsFloatVector() && operand->Type->GetVectorSize() == 4)
+                    if (operand->Type->IsFloatVector() && operand->Type->AsVectorType()->Size == 4)
                     {
                         PrintRasterPositionOutputWrite(ctx, operand);
                     }

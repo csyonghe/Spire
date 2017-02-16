@@ -1295,7 +1295,12 @@ namespace Spire
                 for (auto & member : recType->Members)
                 {
                     memberOffsets[member.Key] = recTypeSize;
-                    recTypeSize += member.Value.Type->GetVectorSize();
+                    if (member.Value.Type->IsScalar())
+                        recTypeSize++;
+                    else if (auto vec = member.Value.Type->AsVectorType())
+                        recTypeSize += vec->Size;
+                    else if (auto mat = member.Value.Type->AsMatrixType())
+                        recTypeSize += mat->Size[0] * mat->Size[1];
                 }
                 for (int i = 0; i < size; i++)
                 {

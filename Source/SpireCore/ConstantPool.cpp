@@ -28,40 +28,16 @@ namespace Spire
                     value = CreateConstant(0.0f);
                 else if (type->IsInt())
                     value = CreateConstant(0);
-                else if (auto baseType = dynamic_cast<ILBasicType*>(type))
+                else if (type->IsUInt())
+                    value = CreateConstant(0, ILBaseType::UInt);
+                else if (type->IsBool())
+                    value = CreateConstant(0, ILBaseType::Bool);
+                else if (auto vectorType = dynamic_cast<ILVectorType*>(type))
                 {
-                    if (baseType->Type == ILBaseType::Int2)
-                    {
-                        value = CreateConstant(0, 2);
-                    }
-                    else if (baseType->Type == ILBaseType::Int3)
-                    {
-                        value = CreateConstant(0, 3);
-                    }
-                    else if (baseType->Type == ILBaseType::Int4)
-                    {
-                        value = CreateConstant(0, 4);
-                    }
-                    else if (baseType->Type == ILBaseType::Float2)
-                    {
-                        value = CreateConstant(0.0f, 2);
-                    }
-                    else if (baseType->Type == ILBaseType::Float3)
-                    {
-                        value = CreateConstant(0.0f, 3);
-                    }
-                    else if (baseType->Type == ILBaseType::Float4)
-                    {
-                        value = CreateConstant(0.0f, 4);
-                    }
-                    else if (baseType->Type == ILBaseType::Float3x3)
-                    {
-                        value = CreateConstant(0.0f, 9);
-                    }
-                    else if (baseType->Type == ILBaseType::Float4x4)
-                    {
-                        value = CreateConstant(0.0f, 16);
-                    }
+                    if (vectorType->BaseType == ILBaseType::Float)
+                        value = CreateConstant(0.0f, vectorType->Size);
+                    else if (vectorType->BaseType == ILBaseType::Int)
+                        value = CreateConstant(0, vectorType->Size);
                     else
                         throw NotImplementedException("default value for this type is not implemented.");
                 }
@@ -76,7 +52,7 @@ namespace Spire
                 if (intConsts.TryGetValue(key, rs))
                     return rs;
                 rs = new ILConstOperand();
-                rs->Type = new ILBasicType(ILBaseType::Int2);
+                rs->Type = new ILVectorType(ILBaseType::Int, 2);
                 rs->IntValues[0] = val;
                 rs->IntValues[1] = val2;
                 intConsts[key] = rs;
@@ -92,7 +68,7 @@ namespace Spire
                 if (intConsts.TryGetValue(key, rs))
                     return rs;
                 rs = new ILConstOperand();
-                rs->Type = new ILBasicType(ILBaseType::Int3);
+                rs->Type = new ILVectorType(ILBaseType::Int, 3);
                 rs->IntValues[0] = val;
                 rs->IntValues[1] = val2;
                 rs->IntValues[2] = val3;
@@ -110,7 +86,7 @@ namespace Spire
                 if (intConsts.TryGetValue(key, rs))
                     return rs;
                 rs = new ILConstOperand();
-                rs->Type = new ILBasicType(ILBaseType::Int4);
+                rs->Type = new ILVectorType(ILBaseType::Int, 4);
                 rs->IntValues[0] = val;
                 rs->IntValues[1] = val2;
                 rs->IntValues[2] = val3;
@@ -124,37 +100,41 @@ namespace Spire
 
             ILConstOperand * CreateConstant(ILConstOperand * c)
             {
-                auto baseType = dynamic_cast<ILBasicType*>(c->Type.Ptr())->Type;
-                switch (baseType)
+                if (auto basicType = dynamic_cast<ILBasicType*>(c->Type.Ptr()))
                 {
-                case ILBaseType::Float:
-                    return CreateConstant(c->FloatValues[0]);
-                case ILBaseType::Float2:
-                    return CreateConstant(c->FloatValues[0], c->FloatValues[1]);
-                case ILBaseType::Float3:
-                    return CreateConstant(c->FloatValues[0], c->FloatValues[1], c->FloatValues[2]);
-                case ILBaseType::Float4:
-                    return CreateConstant(c->FloatValues[0], c->FloatValues[1], c->FloatValues[2], c->FloatValues[3]);
-                case ILBaseType::Int:
-                    return CreateConstant(c->IntValues[0]);
-                case ILBaseType::Int2:
-                    return CreateConstantIntVec(c->IntValues[0], c->IntValues[1]);
-                case ILBaseType::Int3:
-                    return CreateConstantIntVec(c->IntValues[0], c->IntValues[1], c->IntValues[2]);
-                case ILBaseType::Int4:
-                    return CreateConstantIntVec(c->IntValues[0], c->IntValues[1], c->IntValues[2], c->IntValues[3]);
-                default:
-                    if (constants.IndexOf(c) != -1)
-                        return c;
-                    else
+                    switch (basicType->Type)
                     {
-                        auto rs = new ILConstOperand(*c);
-                        constants.Add(rs);
-                        return rs;
+                    case ILBaseType::Float:
+                        return CreateConstant(c->FloatValues[0]);
+                    case ILBaseType::Int:
+                        return CreateConstant(c->IntValues[0]);
+                    default:
+                        throw NotImplementedException();
+                    }
+                }
+                else if (auto vectorType = dynamic_cast<ILVectorType*>(c->Type.Ptr()))
+                {
+                    switch (basicType->Type)
+                    {
+                    case ILBaseType::Float:
+                        if (vectorType->Size == 2)
+                            return CreateConstant(c->FloatValues[0], c->FloatValues[1]);
+                        if (vectorType->Size == 3)
+                            return CreateConstant(c->FloatValues[0], c->FloatValues[1], c->FloatValues[2]);
+                        if (vectorType->Size == 4)
+                            return CreateConstant(c->FloatValues[0], c->FloatValues[1], c->FloatValues[2], c->FloatValues[3]);
+                    case ILBaseType::Int:
+                        if (vectorType->Size == 2)
+                            return CreateConstantIntVec(c->IntValues[0], c->IntValues[1]);
+                        if (vectorType->Size == 3)
+                            return CreateConstantIntVec(c->IntValues[0], c->IntValues[1], c->IntValues[2]);
+                        if (vectorType->Size == 4)
+                            return CreateConstantIntVec(c->IntValues[0], c->IntValues[1], c->IntValues[2], c->IntValues[3]);
+                    default:
+                        throw NotImplementedException();
                     }
                 }
             }
-
 
             ILConstOperand * CreateConstant(bool b)
             {
@@ -164,37 +144,34 @@ namespace Spire
                     return falseConst.Ptr();
             }
 
+            ILConstOperand * CreateConstant(int val, ILBaseType bt)
+            {
+                ILConstOperand * rs = 0;
+                if (intConsts.TryGetValue(ConstKey<int>(val, (int)bt*16 + 1), rs))
+                    return rs;
+                rs = new ILConstOperand();
+                rs->Type = new ILBasicType(bt);
+                rs->IntValues[0] = val;
+                intConsts[ConstKey<int>(val, (int)bt * 16 + 1)] = rs;
+                rs->Name = rs->ToString();
+                constants.Add(rs);
+                return rs;
+            }
+
             ILConstOperand * CreateConstant(int val, int size = 0)
             {
                 ILConstOperand * rs = 0;
                 if (intConsts.TryGetValue(ConstKey<int>(val, size), rs))
                     return rs;
                 rs = new ILConstOperand();
-                ILBaseType baseType;
-                switch (size)
-                {
-                case 0:
-                case 1:
-                    baseType = ILBaseType::Int;
-                    break;
-                case 2:
-                    baseType = ILBaseType::Int2;
-                    break;
-                case 3:
-                    baseType = ILBaseType::Int3;
-                    break;
-                case 4:
-                    baseType = ILBaseType::Int4;
-                    break;
-                default:
-                    throw InvalidOperationException("Invalid vector size.");
-                }
-                rs->Type = new ILBasicType(baseType);
+                if (size <= 1)
+                    rs->Type = new ILBasicType(ILBaseType::Int);
+                else
+                    rs->Type = new ILVectorType(ILBaseType::Int, size);
                 rs->IntValues[0] = val;
                 intConsts[ConstKey<int>(val, size)] = rs;
                 rs->Name = rs->ToString();
                 constants.Add(rs);
-
                 return rs;
             }
 
@@ -208,32 +185,10 @@ namespace Spire
                     throw InvalidOperationException("Attempting to create NAN constant.");
                 }
                 rs = new ILConstOperand();
-                ILBaseType baseType;
-                switch (size)
-                {
-                case 0:
-                case 1:
-                    baseType = ILBaseType::Float;
-                    break;
-                case 2:
-                    baseType = ILBaseType::Float2;
-                    break;
-                case 3:
-                    baseType = ILBaseType::Float3;
-                    break;
-                case 4:
-                    baseType = ILBaseType::Float4;
-                    break;
-                case 9:
-                    baseType = ILBaseType::Float3x3;
-                    break;
-                case 16:
-                    baseType = ILBaseType::Float4x4;
-                    break;
-                default:
-                    throw InvalidOperationException("Invalid vector size.");
-                }
-                rs->Type = new ILBasicType(baseType);
+                if (size <= 1)
+                    rs->Type = new ILBasicType(ILBaseType::Float);
+                else
+                    rs->Type = new ILVectorType(ILBaseType::Float, size);
                 for (int i = 0; i < 16; i++)
                     rs->FloatValues[i] = val;
                 floatConsts[ConstKey<float>(val, size)] = rs;
@@ -254,7 +209,7 @@ namespace Spire
                 if (floatConsts.TryGetValue(key, rs))
                     return rs;
                 rs = new ILConstOperand();
-                rs->Type = new ILBasicType(ILBaseType::Float2);
+                rs->Type = new ILVectorType(ILBaseType::Float, 2);
                 rs->FloatValues[0] = val;
                 rs->FloatValues[1] = val2;
                 floatConsts[key] = rs;
@@ -275,7 +230,7 @@ namespace Spire
                 if (floatConsts.TryGetValue(key, rs))
                     return rs;
                 rs = new ILConstOperand();
-                rs->Type = new ILBasicType(ILBaseType::Float3);
+                rs->Type = new ILVectorType(ILBaseType::Float, 3);
                 rs->FloatValues[0] = val;
                 rs->FloatValues[1] = val2;
                 rs->FloatValues[2] = val3;
@@ -298,7 +253,7 @@ namespace Spire
                 if (floatConsts.TryGetValue(key, rs))
                     return rs;
                 rs = new ILConstOperand();
-                rs->Type = new ILBasicType(ILBaseType::Float4);
+                rs->Type = new ILVectorType(ILBaseType::Float, 4);
                 rs->FloatValues[0] = val;
                 rs->FloatValues[1] = val2;
                 rs->FloatValues[2] = val3;

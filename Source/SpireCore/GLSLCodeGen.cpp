@@ -184,7 +184,10 @@ namespace Spire
                         for (auto & member : recType->Members)
                         {
                             memberOffsets[member.Key] = recTypeSize;
-                            recTypeSize += member.Value.Type->GetVectorSize();
+                            if (auto vec = member.Value.Type->AsVectorType())
+                                recTypeSize += vec->Size;
+                            else if (auto mat = member.Value.Type->AsMatrixType())
+                                recTypeSize += mat->Size[0] * mat->Size[1];
                         }
                         for (int i = 0; i < size; i++)
                         {
@@ -212,64 +215,62 @@ namespace Spire
                     PrintOp(ctx, proj->Operand.Ptr(), true);
             }
 
-            const char * GetTextureType(ILType * textureType)
+            String GetTextureType(ILType * textureType)
             {
-                auto baseType = dynamic_cast<ILBasicType*>(textureType)->Type;
+                auto texType = dynamic_cast<ILTextureType*>(textureType);
                 const char * textureName = nullptr;
-                switch (baseType)
+                StringBuilder sb;
+                switch (texType->Flavor.Fields.Shape)
                 {
-                case ILBaseType::Texture2D:
-                    textureName = "texture2D";
+                case ILTextureShape::Texture1D:
+                    sb << "texture1D";
                     break;
-                case ILBaseType::Texture2DArray:
-                    textureName = "texture2DArray";
+                case ILTextureShape::Texture2D:
+                    sb << "texture2D";
                     break;
-                case ILBaseType::Texture2DArrayShadow:
-                    textureName = "texture2DArray";
+                case ILTextureShape::Texture3D:
+                    sb << "texture3D";
                     break;
-                case ILBaseType::TextureCube:
-                    textureName = "textureCube";
+                case ILTextureShape::TextureCube:
+                    sb << "textureCube";
                     break;
-                case ILBaseType::TextureCubeShadow:
-                    textureName = "textureCube";
-                    break;
-                case ILBaseType::Texture3D:
-                    textureName = "texture3D";
-                    break;
-                default:
-                    throw NotImplementedException();
                 }
-                return textureName;
+                if (texType->Flavor.Fields.IsMultisample)
+                    sb << "MS";
+                if (texType->Flavor.Fields.IsArray)
+                    sb << "Array";
+                if (texType->Flavor.Fields.IsShadow)
+                    sb << "Shadow";
+                return sb.ProduceString();
             }
 
-            const char * GetSamplerType(ILType * textureType)
+            String GetSamplerType(ILType * textureType)
             {
-                auto baseType = dynamic_cast<ILBasicType*>(textureType)->Type;
-                const char * samplerName = nullptr;
-                switch (baseType)
+                auto texType = dynamic_cast<ILTextureType*>(textureType);
+                const char * textureName = nullptr;
+                StringBuilder sb;
+                switch (texType->Flavor.Fields.Shape)
                 {
-                case ILBaseType::Texture2D:
-                    samplerName = "sampler2D";
+                case ILTextureShape::Texture1D:
+                    sb << "sampler1D";
                     break;
-                case ILBaseType::Texture2DArray:
-                    samplerName = "sampler2DArray";
+                case ILTextureShape::Texture2D:
+                    sb << "sampler2D";
                     break;
-                case ILBaseType::Texture2DArrayShadow:
-                    samplerName = "sampler2DArrayShadow";
+                case ILTextureShape::Texture3D:
+                    sb << "sampler3D";
                     break;
-                case ILBaseType::TextureCube:
-                    samplerName = "samplerCube";
+                case ILTextureShape::TextureCube:
+                    sb << "samplerCube";
                     break;
-                case ILBaseType::TextureCubeShadow:
-                    samplerName = "samplerCubeShadow";
-                    break;
-                case ILBaseType::Texture3D:
-                    samplerName = "sampler3D";
-                    break;
-                default:
-                    throw NotImplementedException();
                 }
-                return samplerName;
+                if (texType->Flavor.Fields.IsMultisample)
+                    sb << "MS";
+                if (texType->Flavor.Fields.IsArray)
+                    sb << "Array";
+                if (texType->Flavor.Fields.IsShadow)
+                    sb << "Shadow";
+                return sb.ProduceString();
             }
 
             void PrintTypeName(StringBuilder& sb, ILType* type) override
@@ -394,12 +395,15 @@ namespace Spire
                     else
                         ctx.Body << "texture(";
                     printSamplerArgument(instr->Arguments[0].Ptr(), instr->Arguments[1].Ptr());
-                    auto baseType = dynamic_cast<ILBasicType*>(instr->Arguments[0]->Type.Ptr());
-                    if (baseType)
+                    auto texType = dynamic_cast<ILTextureType*>(instr->Arguments[0]->Type.Ptr());
+                    if (texType)
                     {
-                        if (baseType->Type == ILBaseType::Texture2DShadow)
+                        if (texType->Flavor.Fields.Shape == ILTextureShape::Texture1D && !texType->Flavor.Fields.IsArray)
+                            ctx.Body << "vec2(";
+                        else if (texType->Flavor.Fields.Shape == ILTextureShape::Texture2D && !texType->Flavor.Fields.IsArray)
                             ctx.Body << "vec3(";
-                        else if (baseType->Type == ILBaseType::TextureCubeShadow || baseType->Type == ILBaseType::Texture2DArrayShadow)
+                        else if (texType->Flavor.Fields.Shape == ILTextureShape::Texture3D || (texType->Flavor.Fields.Shape == ILTextureShape::Texture2D && texType->Flavor.Fields.IsArray) ||
+                            (texType->Flavor.Fields.Shape == ILTextureShape::TextureCube && !texType->Flavor.Fields.IsArray) )
                             ctx.Body << "vec4(";
                         PrintOp(ctx, instr->Arguments[2].Ptr());
                         ctx.Body << ", ";
@@ -1064,7 +1068,10 @@ namespace Spire
                 for (auto & member : recType->Members)
                 {
                     memberOffsets[member.Key] = recTypeSize;
-                    recTypeSize += member.Value.Type->GetVectorSize();
+                    if (auto vec = member.Value.Type->AsVectorType())
+                        recTypeSize += vec->Size;
+                    else if (auto mat = member.Value.Type->AsMatrixType())
+                        recTypeSize += mat->Size[0] * mat->Size[1];
                 }
                 for (int i = 0; i < size; i++)
                 {

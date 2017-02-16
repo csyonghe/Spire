@@ -271,11 +271,11 @@ namespace Spire
         enum class BaseType
         {
             Void = 0,
-            Int = 16,
-            Float = 32,
-            UInt = 512,
-            Bool = 128,
-            UInt64 = 8192,
+            Bool,
+            Int,
+            UInt,
+            Float,
+            UInt64,
 #if 0
             Texture2D = 48,
             TextureCube = 49,
