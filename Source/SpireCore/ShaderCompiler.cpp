@@ -417,7 +417,7 @@ namespace Spire
                 }
                 if (FAILED(hr))
                 {
-                    int f = 9;
+                    // TODO(tfoley): What to do on failure?
                 }
                 return data;
             }
@@ -479,7 +479,6 @@ namespace Spire
                 if (FAILED(hr))
                 {
                     // TODO(tfoley): need to figure out what to diagnose here...
-                    int f = 9;
                 }
                 return result;
             }
@@ -555,7 +554,7 @@ namespace Spire
                 }
 
                 SymbolTable & symTable = context.Symbols;
-                auto & shaderClosures = context.ShaderClosures;
+//                auto & shaderClosures = context.ShaderClosures;
                 
                 RefPtr<SyntaxVisitor> visitor = CreateSemanticsVisitor(&symTable, result.GetErrorWriter());
                 try
@@ -805,7 +804,7 @@ namespace Spire
             }
 
             virtual void PassThrough(
-                CompileResult &			result,
+                CompileResult &			/*result*/,
                 String const&			sourceText,
                 String const&			sourcePath,
                 const CompileOptions &	options) override

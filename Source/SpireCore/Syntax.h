@@ -613,7 +613,8 @@ namespace Spire
 
             // Bits representing the kind of texture type we are looking at
             // (e.g., `Texture2DMS` vs. `TextureCubeArray`)
-            uint16_t flavor;
+            typedef uint16_t Flavor;
+            Flavor flavor;
             enum
             {
                 // Mask for the overall "shape" of the texture
@@ -652,7 +653,7 @@ namespace Spire
             bool isShadow() const { return (flavor & ShadowFlag) != 0; }
 
             TextureType(
-                uint16_t flavor,
+                Flavor flavor,
                 RefPtr<ExpressionType> elementType)
                 : elementType(elementType)
                 , flavor(flavor)
@@ -850,7 +851,7 @@ namespace Spire
         {
         protected:
             template<typename T>
-            T* CloneSyntaxNodeFields(T * target, CloneContext & ctx)
+            T* CloneSyntaxNodeFields(T * target, CloneContext & /*ctx*/)
             {
                 target->Position = this->Position;
                 target->Tags = this->Tags;
@@ -897,9 +898,7 @@ namespace Spire
             template<typename T>
             T* FindModifier()
             {
-                for (auto m : GetModifiersOfType<T>())
-                    return m;
-                return nullptr;
+                return *GetModifiersOfType<T>().begin();
             }
 
             template<typename T>
@@ -947,8 +946,8 @@ namespace Spire
         public:
             List<RefPtr<Decl>> decls;
 
-            virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override { throw "unimplemented"; }
-            virtual DeclGroup * Clone(CloneContext & ctx) override { throw "unimplemented"; }
+            virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * /*visitor*/) override { throw "unimplemented"; }
+            virtual DeclGroup * Clone(CloneContext & /*ctx*/) override { throw "unimplemented"; }
         };
 
         template<typename T>
@@ -2793,13 +2792,13 @@ namespace Spire
                 return result;
             }
 
-            virtual void VisitExtensionDecl(ExtensionDecl* decl)
+            virtual void VisitExtensionDecl(ExtensionDecl* /*decl*/)
             {}
 
-            virtual void VisitConstructorDecl(ConstructorDecl* decl)
+            virtual void VisitConstructorDecl(ConstructorDecl* /*decl*/)
             {}
 
-            virtual void VisitTraitDecl(TraitDecl* decl)
+            virtual void VisitTraitDecl(TraitDecl* /*decl*/)
             {}
 
             virtual RefPtr<ExpressionSyntaxNode> VisitSharedTypeExpr(SharedTypeExpr* typeExpr)

@@ -891,7 +891,7 @@ namespace Spire
 
         static RefPtr<Decl> ParseFuncDecl(
             Parser*                 parser,
-            ContainerDecl*          containerDecl,
+            ContainerDecl*          /*containerDecl*/,
             DeclaratorInfo const&   declaratorInfo)
         {
             RefPtr<FunctionSyntaxNode> decl = new FunctionSyntaxNode();
@@ -1574,7 +1574,7 @@ namespace Spire
 
         // Finish up work on a declaration that was parsed
         static void CompleteDecl(
-            Parser*				parser,
+            Parser*				/*parser*/,
             RefPtr<Decl>		decl,
             ContainerDecl*		containerDecl,
             Modifiers			modifiers)
@@ -1653,9 +1653,9 @@ namespace Spire
                     sharedModifiers->next = modifiers.first;
                     modifiers.first = sharedModifiers;
 
-                    for( auto dd : declGroup->decls )
+                    for( auto subDecl : declGroup->decls )
                     {
-                        CompleteDecl(parser, dd, containerDecl, modifiers);
+                        CompleteDecl(parser, subDecl, containerDecl, modifiers);
                     }
                 }
             }

@@ -63,7 +63,7 @@ static void Emit(EmitContext* context, double value)
 
 // Determine if an expression should not be emitted when it is the base of
 // a member reference expression.
-static bool IsBaseExpressionImplicit(EmitContext* context, RefPtr<ExpressionSyntaxNode> expr)
+static bool IsBaseExpressionImplicit(EmitContext* /*context*/, RefPtr<ExpressionSyntaxNode> expr)
 {
     // HACK(tfoley): For now, anything with a constant-buffer type should be
     // left implicit.

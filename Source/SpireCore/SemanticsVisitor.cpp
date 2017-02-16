@@ -1783,7 +1783,7 @@ namespace Spire
                 outerStmts.Add(stmt);
             }
 
-            void PopOuterStmt(StatementSyntaxNode* stmt)
+            void PopOuterStmt(StatementSyntaxNode* /*stmt*/)
             {
                 outerStmts.RemoveAt(outerStmts.Count() - 1);
             }
@@ -2328,7 +2328,7 @@ namespace Spire
                 return invoke;
             }
 
-            RefPtr<ExpressionSyntaxNode> ResolveFunctionOverload(InvokeExpressionSyntaxNode * invoke, VarExpressionSyntaxNode* varExpr, List<RefPtr<ExpressionSyntaxNode>> & arguments)
+            RefPtr<ExpressionSyntaxNode> ResolveFunctionOverload(InvokeExpressionSyntaxNode * /*invoke*/, VarExpressionSyntaxNode* /*varExpr*/, List<RefPtr<ExpressionSyntaxNode>> & /*arguments*/)
             {
 #if TIMREMOVED
                 if (currentShader)
@@ -2529,7 +2529,7 @@ namespace Spire
             // by a symbol with a `FuncType` type.
             RefPtr<ExpressionSyntaxNode> ResolveFunctionApp(
                 RefPtr<FuncType>			funcType,
-                InvokeExpressionSyntaxNode*	appExpr)
+                InvokeExpressionSyntaxNode*	/*appExpr*/)
             {
                 // TODO(tfoley): Actual checking logic needs to go here...
 #if 0
@@ -3062,7 +3062,6 @@ namespace Spire
                 OverloadCandidate&		candidate)
             {
                 auto& args = context.appExpr->Arguments;
-                int argCount = args.Count();
 
                 auto genericDeclRef = candidate.item.declRef.As<GenericDeclRef>();
 
@@ -3166,8 +3165,8 @@ namespace Spire
             }
 
             bool TryCheckOverloadCandidateDirections(
-                OverloadResolveContext&		context,
-                OverloadCandidate const&	candidate)
+                OverloadResolveContext&		/*context*/,
+                OverloadCandidate const&	/*candidate*/)
             {
                 // TODO(tfoley): check `in` and `out` markers, as needed.
                 return true;
@@ -3307,7 +3306,6 @@ namespace Spire
 
                 bool keepThisCandidate = true; // should this candidate be kept?
 
-                int oldCandidateCount = context.bestCandidates.Count();
                 if (context.bestCandidates.Count() != 0)
                 {
                     // We have multiple candidates right now, so filter them.
@@ -3398,8 +3396,8 @@ namespace Spire
             }
 
             void AddComponentFuncOverloadCandidate(
-                RefPtr<ShaderComponentSymbol>	componentFuncSym,
-                OverloadResolveContext&			context)
+                RefPtr<ShaderComponentSymbol>	/*componentFuncSym*/,
+                OverloadResolveContext&			/*context*/)
             {
 #if 0
                 auto componentFuncDecl = componentFuncSym->Implementations.First()->SyntaxNode.Ptr();
@@ -3416,8 +3414,8 @@ namespace Spire
             }
 
             void AddFuncOverloadCandidate(
-                RefPtr<FuncType>		funcType,
-                OverloadResolveContext&	context)
+                RefPtr<FuncType>		/*funcType*/,
+                OverloadResolveContext&	/*context*/)
             {
 #if 0
                 if (funcType->decl)
@@ -4001,13 +3999,11 @@ namespace Spire
                         for (auto candidate : context.bestCandidates)
                         {
                             auto candidateExpr = CompleteOverloadCandidate(context, candidate);
-
-                            throw "what now?";
                         }
 
-                        auto overloadedExpr = new OverloadedExpr();
-
-                        return overloadedExpr;
+                        throw "what now?";
+//                        auto overloadedExpr = new OverloadedExpr();
+//                        return overloadedExpr;
                     }
                 }
                 else if (context.bestCandidate)
