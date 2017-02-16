@@ -125,9 +125,12 @@ namespace Spire
 		{
 		public:
 			RefPtr<ConstantPool> ConstantPool = new Compiler::ConstantPool();
-			List<RefPtr<ILShader>> Shaders;
+			List<RefPtr<ILShader>> Shaders; // not used
+
 			EnumerableDictionary<String, RefPtr<ILFunction>> Functions;
 			List<RefPtr<ILStructType>> Structs;
+            EnumerableDictionary<String, RefPtr<ILModuleParameterSet>> ModuleParamSets;
+
 		};
 
 		class ShaderChoiceValue

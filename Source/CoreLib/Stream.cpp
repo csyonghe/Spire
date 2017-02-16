@@ -114,7 +114,11 @@ namespace CoreLib
 				throw ArgumentException("Invalid file share mode.");
 				break;
 			}
-			handle = _wfsopen(fileName.ToWString(), mode, shFlag);
+            if (share == CoreLib::IO::FileShare::None)
+#pragma warning(suppress:4996)
+                handle = _wfopen(fileName.ToWString(), mode);
+            else
+			    handle = _wfsopen(fileName.ToWString(), mode, shFlag);
 #else
 			handle = fopen(fileName.Buffer(), modeMBCS);
 #endif

@@ -140,6 +140,7 @@ namespace Spire
 			RefPtr<ImportOperatorDefSyntaxNode>			ParseImportOperator();
 			RefPtr<FunctionSyntaxNode>					ParseFunction(bool parseBody = true);
 			RefPtr<StructSyntaxNode>					ParseStruct();
+            RefPtr<ClassSyntaxNode>					    ParseClass();
 			RefPtr<StatementSyntaxNode>					ParseStatement();
 			RefPtr<BlockStatementSyntaxNode>			ParseBlockStatement();
 			RefPtr<VarDeclrStatementSyntaxNode>			ParseVarDeclrStatement(Modifiers modifiers);
@@ -1605,6 +1606,8 @@ namespace Spire
 				decl = parser->ParsePipeline();
 			else if (parser->LookAheadToken("struct"))
 				decl = parser->ParseStruct();
+            else if (parser->LookAheadToken("class"))
+                decl = parser->ParseClass();
 			else if (parser->LookAheadToken("typedef"))
 				decl = ParseTypeDef(parser);
 			else if (parser->LookAheadToken("using"))
@@ -2081,6 +2084,18 @@ namespace Spire
             ParseDeclBody(this, rs.Ptr(), TokenType::RBrace);
 			return rs;
 		}
+
+        RefPtr<ClassSyntaxNode> Parser::ParseClass()
+        {
+            RefPtr<ClassSyntaxNode> rs = new ClassSyntaxNode();
+            FillPosition(rs.Ptr());
+            ReadToken("class");
+            rs->Name = ReadToken(TokenType::Identifier);
+            typeNames.Add(rs->Name.Content);
+            ReadToken(TokenType::LBrace);
+            ParseDeclBody(this, rs.Ptr(), TokenType::RBrace);
+            return rs;
+        }
 
 		static RefPtr<StatementSyntaxNode> ParseSwitchStmt(Parser* parser)
 		{

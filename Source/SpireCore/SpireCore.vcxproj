@@ -406,6 +406,7 @@
     <ClCompile Include="GetDependencyVisitor.cpp" />
     <ClCompile Include="GLSLCodeGen.cpp" />
     <ClCompile Include="HLSLCodeGen.cpp" />
+    <ClCompile Include="ILGenerator.cpp" />
     <ClCompile Include="InsertImplicitImportOperator.cpp" />
     <ClCompile Include="KeyHoleMatching.cpp" />
     <ClCompile Include="Naming.cpp" />

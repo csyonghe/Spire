@@ -173,6 +173,9 @@
     <ClCompile Include="Emit.cpp">
       <Filter>Front End</Filter>
     </ClCompile>
+    <ClCompile Include="ILGenerator.cpp">
+      <Filter>Front End</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="NatvisFile.natvis" />

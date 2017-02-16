@@ -1392,6 +1392,51 @@ namespace Spire
 			FilteredMemberRefList<FieldDeclRef> GetFields() const { return GetMembersOfType<FieldDeclRef>(); }
 		};
 
+        class ClassSyntaxNode : public AggTypeDecl
+        {
+        public:
+            FilteredMemberList<StructField> GetFields()
+            {
+                return GetMembersOfType<StructField>();
+            }
+            virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+            StructField* FindField(String name)
+            {
+                for (auto field : GetFields())
+                {
+                    if (field->Name.Content == name)
+                        return field.Ptr();
+                }
+                return nullptr;
+            }
+            int FindFieldIndex(String name)
+            {
+                int index = 0;
+                for (auto field : GetFields())
+                {
+                    if (field->Name.Content == name)
+                        return index;
+                    index++;
+                }
+                return -1;
+            }
+            virtual ClassSyntaxNode * Clone(CloneContext & ctx) override
+            {
+                auto rs = CloneSyntaxNodeFields(new ClassSyntaxNode(*this), ctx);
+                rs->Members.Clear();
+                for (auto & m : Members)
+                    rs->Members.Add(m->Clone(ctx));
+                return rs;
+            }
+        };
+
+        struct ClassDeclRef : public AggTypeDeclRef
+        {
+            SPIRE_DECLARE_DECL_REF(ClassSyntaxNode);
+
+            FilteredMemberRefList<FieldDeclRef> GetFields() const { return GetMembersOfType<FieldDeclRef>(); }
+        };
+
 		// A trait which other types can conform to
 		class TraitDecl : public AggTypeDecl
 		{
@@ -2488,6 +2533,12 @@ namespace Spire
 					f = f->Accept(this).As<Decl>();
 				return s;
 			}
+            virtual RefPtr<ClassSyntaxNode> VisitClass(ClassSyntaxNode * s)
+            {
+                for (auto & f : s->Members)
+                    f = f->Accept(this).As<Decl>();
+                return s;
+            }
 			virtual RefPtr<GenericDecl> VisitGenericDecl(GenericDecl * decl)
 			{
 				for (auto & m : decl->Members)

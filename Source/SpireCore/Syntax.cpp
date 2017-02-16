@@ -552,7 +552,10 @@ namespace Spire
 		{
 			return visitor->VisitStruct(this);
 		}
-
+        RefPtr<SyntaxNode> ClassSyntaxNode::Accept(SyntaxVisitor * visitor)
+        {
+            return visitor->VisitClass(this);
+        }
         RefPtr<SyntaxNode> TypeDefDecl::Accept(SyntaxVisitor * visitor)
         {
             return visitor->VisitTypeDefDecl(this);
