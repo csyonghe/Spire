@@ -6,13 +6,13 @@
 
 namespace Spire
 {
-	namespace Compiler
-	{
-		using namespace CoreLib::Basic;
+    namespace Compiler
+    {
+        using namespace CoreLib::Basic;
 
-		class ProgramSyntaxNode;
+        class ProgramSyntaxNode;
 
-		String EmitProgram(ProgramSyntaxNode* program);
-	}
+        String EmitProgram(ProgramSyntaxNode* program);
+    }
 }
 #endif

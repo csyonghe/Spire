@@ -1302,17 +1302,17 @@ static void HandleElseDirective(PreprocessorDirectiveContext* context)
 // Handle a `#elif` directive
 static void HandleElifDirective(PreprocessorDirectiveContext* context)
 {
-	// HACK(tfoley): handle an empty `elif` like an `else` directive
-	//
-	// This is the behavior expected by at least one input program.
-	// We will eventually want to be pedantic about this.
-	// even if t
-	if (PeekRawTokenType(context) == TokenType::EndOfFile)
-	{
-		GetSink(context)->diagnose(GetDirectiveLoc(context), Diagnostics::directiveExpectsExpression, GetDirectiveName(context));
-		HandleElseDirective(context);
-		return;
-	}
+    // HACK(tfoley): handle an empty `elif` like an `else` directive
+    //
+    // This is the behavior expected by at least one input program.
+    // We will eventually want to be pedantic about this.
+    // even if t
+    if (PeekRawTokenType(context) == TokenType::EndOfFile)
+    {
+        GetSink(context)->diagnose(GetDirectiveLoc(context), Diagnostics::directiveExpectsExpression, GetDirectiveName(context));
+        HandleElseDirective(context);
+        return;
+    }
 
     PreprocessorExpressionValue value = ParseAndEvaluateExpression(context);
 
@@ -1587,8 +1587,8 @@ static void HandleVersionDirective(PreprocessorDirectiveContext* context)
 // Handle an invalid directive
 static void HandleInvalidDirective(PreprocessorDirectiveContext* context)
 {
-	GetSink(context)->diagnose(GetDirectiveLoc(context), Diagnostics::unknownPreprocessorDirective, GetDirectiveName(context));
-	SkipToEndOfLine(context);
+    GetSink(context)->diagnose(GetDirectiveLoc(context), Diagnostics::unknownPreprocessorDirective, GetDirectiveName(context));
+    SkipToEndOfLine(context);
 }
 
 // Callback interface used by preprocessor directives
@@ -1637,7 +1637,7 @@ static const PreprocessorDirective kDirectives[] =
 };
 
 static const PreprocessorDirective kInvalidDirective = {
-	NULL, &HandleInvalidDirective, 0,
+    NULL, &HandleInvalidDirective, 0,
 };
 
 // Look up the directive with the given name.

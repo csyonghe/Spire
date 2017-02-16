@@ -466,73 +466,73 @@ __generic<T : __BuiltinFloatingPointType, let N : int, let M : int> __intrinsic 
 // Tessellation factor fixup routines
 
 __intrinsic void Process2DQuadTessFactorsAvg(
-	in  float4 RawEdgeFactors,
-	in  float2 InsideScale,
-	out float4 RoundedEdgeTessFactors,
-	out float2 RoundedInsideTessFactors,
-	out float2 UnroundedInsideTessFactors);
+    in  float4 RawEdgeFactors,
+    in  float2 InsideScale,
+    out float4 RoundedEdgeTessFactors,
+    out float2 RoundedInsideTessFactors,
+    out float2 UnroundedInsideTessFactors);
 
 __intrinsic void Process2DQuadTessFactorsMax(
-	in  float4 RawEdgeFactors,
-	in  float2 InsideScale,
-	out float4 RoundedEdgeTessFactors,
-	out float2 RoundedInsideTessFactors,
-	out float2 UnroundedInsideTessFactors);
+    in  float4 RawEdgeFactors,
+    in  float2 InsideScale,
+    out float4 RoundedEdgeTessFactors,
+    out float2 RoundedInsideTessFactors,
+    out float2 UnroundedInsideTessFactors);
 
 __intrinsic void Process2DQuadTessFactorsMin(
-	in  float4 RawEdgeFactors,
-	in  float2 InsideScale,
-	out float4 RoundedEdgeTessFactors,
-	out float2 RoundedInsideTessFactors,
-	out float2 UnroundedInsideTessFactors);
+    in  float4 RawEdgeFactors,
+    in  float2 InsideScale,
+    out float4 RoundedEdgeTessFactors,
+    out float2 RoundedInsideTessFactors,
+    out float2 UnroundedInsideTessFactors);
 
 __intrinsic void ProcessIsolineTessFactors(
-	in  float RawDetailFactor,
-	in  float RawDensityFactor,
-	out float RoundedDetailFactor,
-	out float RoundedDensityFactor);
+    in  float RawDetailFactor,
+    in  float RawDensityFactor,
+    out float RoundedDetailFactor,
+    out float RoundedDensityFactor);
 
 __intrinsic void ProcessQuadTessFactorsAvg(
-	in  float4 RawEdgeFactors,
-	in  float InsideScale,
-	out float4 RoundedEdgeTessFactors,
-	out float2 RoundedInsideTessFactors,
-	out float2 UnroundedInsideTessFactors);
+    in  float4 RawEdgeFactors,
+    in  float InsideScale,
+    out float4 RoundedEdgeTessFactors,
+    out float2 RoundedInsideTessFactors,
+    out float2 UnroundedInsideTessFactors);
 
 __intrinsic void ProcessQuadTessFactorsMax(
-	in  float4 RawEdgeFactors,
-	in  float InsideScale,
-	out float4 RoundedEdgeTessFactors,
-	out float2 RoundedInsideTessFactors,
-	out float2 UnroundedInsideTessFactors);
+    in  float4 RawEdgeFactors,
+    in  float InsideScale,
+    out float4 RoundedEdgeTessFactors,
+    out float2 RoundedInsideTessFactors,
+    out float2 UnroundedInsideTessFactors);
 
 __intrinsic void ProcessQuadTessFactorsMin(
-	in  float4 RawEdgeFactors,
-	in  float InsideScale,
-	out float4 RoundedEdgeTessFactors,
-	out float2 RoundedInsideTessFactors,
-	out float2 UnroundedInsideTessFactors);
+    in  float4 RawEdgeFactors,
+    in  float InsideScale,
+    out float4 RoundedEdgeTessFactors,
+    out float2 RoundedInsideTessFactors,
+    out float2 UnroundedInsideTessFactors);
 
 __intrinsic void ProcessTriTessFactorsAvg(
-	in  float3 RawEdgeFactors,
-	in  float InsideScale,
-	out float3 RoundedEdgeTessFactors,
-	out float RoundedInsideTessFactor,
-	out float UnroundedInsideTessFactor);
+    in  float3 RawEdgeFactors,
+    in  float InsideScale,
+    out float3 RoundedEdgeTessFactors,
+    out float RoundedInsideTessFactor,
+    out float UnroundedInsideTessFactor);
 
 __intrinsic void ProcessTriTessFactorsMax(
-	in  float3 RawEdgeFactors,
-	in  float InsideScale,
-	out float3 RoundedEdgeTessFactors,
-	out float RoundedInsideTessFactor,
-	out float UnroundedInsideTessFactor);
+    in  float3 RawEdgeFactors,
+    in  float InsideScale,
+    out float3 RoundedEdgeTessFactors,
+    out float RoundedInsideTessFactor,
+    out float UnroundedInsideTessFactor);
 
 __intrinsic void ProcessTriTessFactorsMin(
-	in  float3 RawEdgeFactors,
-	in  float InsideScale,
-	out float3 RoundedEdgeTessFactors,
-	out float RoundedInsideTessFactors,
-	out float UnroundedInsideTessFactors);
+    in  float3 RawEdgeFactors,
+    in  float InsideScale,
+    out float3 RoundedEdgeTessFactors,
+    out float RoundedInsideTessFactors,
+    out float UnroundedInsideTessFactors);
 
 // Degrees to radians
 __generic<T : __BuiltinFloatingPointType> __intrinsic T radians(T x);
@@ -1021,383 +1021,383 @@ using namespace CoreLib::Basic;
 
 namespace Spire
 {
-	namespace Compiler
-	{
-		String SpireStdLib::code;
+    namespace Compiler
+    {
+        String SpireStdLib::code;
 
-		String SpireStdLib::GetCode()
-		{
-			if (code.Length() > 0)
-				return code;
-			StringBuilder sb;
-			// generate operator overloads
-			Operator floatUnaryOps[] = { Operator::Neg, Operator::Not, Operator::PreInc, Operator::PreDec };
-			Operator intUnaryOps[] = { Operator::Neg, Operator::Not, Operator::BitNot, Operator::PreInc, Operator::PreDec};
-			Operator floatOps[] = { Operator::Mul, Operator::Div,
-				Operator::Add, Operator::Sub, Operator::And, Operator::Or,
-				Operator::Eql, Operator::Neq, Operator::Greater, Operator::Less, Operator::Geq, Operator::Leq };
-			Operator intOps[] = {  Operator::Mul, Operator::Div, Operator::Mod,
-				Operator::Add, Operator::Sub,
-				Operator::Lsh, Operator::Rsh,
-				Operator::Eql, Operator::Neq, Operator::Greater, Operator::Less, Operator::Geq, Operator::Leq,
-				Operator::BitAnd, Operator::BitXor, Operator::BitOr,
-				Operator::And,
-				Operator::Or };
-			String floatTypes[] = { "float", "vec2", "vec3", "vec4" };
-			String intTypes[] = { "int", "ivec2", "ivec3", "ivec4" };
-			String uintTypes[] = { "uint", "uvec2", "uvec3", "uvec4" };
+        String SpireStdLib::GetCode()
+        {
+            if (code.Length() > 0)
+                return code;
+            StringBuilder sb;
+            // generate operator overloads
+            Operator floatUnaryOps[] = { Operator::Neg, Operator::Not, Operator::PreInc, Operator::PreDec };
+            Operator intUnaryOps[] = { Operator::Neg, Operator::Not, Operator::BitNot, Operator::PreInc, Operator::PreDec};
+            Operator floatOps[] = { Operator::Mul, Operator::Div,
+                Operator::Add, Operator::Sub, Operator::And, Operator::Or,
+                Operator::Eql, Operator::Neq, Operator::Greater, Operator::Less, Operator::Geq, Operator::Leq };
+            Operator intOps[] = {  Operator::Mul, Operator::Div, Operator::Mod,
+                Operator::Add, Operator::Sub,
+                Operator::Lsh, Operator::Rsh,
+                Operator::Eql, Operator::Neq, Operator::Greater, Operator::Less, Operator::Geq, Operator::Leq,
+                Operator::BitAnd, Operator::BitXor, Operator::BitOr,
+                Operator::And,
+                Operator::Or };
+            String floatTypes[] = { "float", "vec2", "vec3", "vec4" };
+            String intTypes[] = { "int", "ivec2", "ivec3", "ivec4" };
+            String uintTypes[] = { "uint", "uvec2", "uvec3", "uvec4" };
 
-			// Generate declarations for all the base types
+            // Generate declarations for all the base types
 
-			static const struct {
-				char const* name;
-				BaseType	tag;
-			} kBaseTypes[] = {
-				{ "void",	BaseType::Void },
-				{ "int",	BaseType::Int },
-				{ "float",	BaseType::Float },
-				{ "uint",	BaseType::UInt },
-				{ "bool",	BaseType::Bool },
-				{ "uint64_t", BaseType::UInt64 },
+            static const struct {
+                char const* name;
+                BaseType	tag;
+            } kBaseTypes[] = {
+                { "void",	BaseType::Void },
+                { "int",	BaseType::Int },
+                { "float",	BaseType::Float },
+                { "uint",	BaseType::UInt },
+                { "bool",	BaseType::Bool },
+                { "uint64_t", BaseType::UInt64 },
 #if 0
-				{ "Texture2D",				BaseType::Texture2D },
-				{ "TextureCube",			BaseType::TextureCube },
-				{ "Texture2DArray",			BaseType::Texture2DArray },
-				{ "Texture2DShadow",		BaseType::Texture2DShadow },
-				{ "TextureCubeShadow",		BaseType::TextureCubeShadow },
-				{ "Texture2DArrayShadow",	BaseType::Texture2DArrayShadow },
-				{ "Texture3D",				BaseType::Texture3D },
-				{ "SamplerState",			BaseType::SamplerState },
-				{ "SamplerComparisonState",	BaseType::SamplerComparisonState },
+                { "Texture2D",				BaseType::Texture2D },
+                { "TextureCube",			BaseType::TextureCube },
+                { "Texture2DArray",			BaseType::Texture2DArray },
+                { "Texture2DShadow",		BaseType::Texture2DShadow },
+                { "TextureCubeShadow",		BaseType::TextureCubeShadow },
+                { "Texture2DArrayShadow",	BaseType::Texture2DArrayShadow },
+                { "Texture3D",				BaseType::Texture3D },
+                { "SamplerState",			BaseType::SamplerState },
+                { "SamplerComparisonState",	BaseType::SamplerComparisonState },
 #endif
-			};
-			static const int kBaseTypeCount = sizeof(kBaseTypes) / sizeof(kBaseTypes[0]);
-			for (int tt = 0; tt < kBaseTypeCount; ++tt)
-			{
-				sb << "__builtin_type(" << int(kBaseTypes[tt].tag) << ") struct " << kBaseTypes[tt].name << " {};\n";
-			}
+            };
+            static const int kBaseTypeCount = sizeof(kBaseTypes) / sizeof(kBaseTypes[0]);
+            for (int tt = 0; tt < kBaseTypeCount; ++tt)
+            {
+                sb << "__builtin_type(" << int(kBaseTypes[tt].tag) << ") struct " << kBaseTypes[tt].name << " {};\n";
+            }
 
-			// Declare ad hoc aliases for some types, just to get things compiling
-			//
-			// TODO(tfoley): At the very least, `double` should be treated as a distinct type.
-			sb << "typedef float double;\n";
-			sb << "typedef float half;\n";
+            // Declare ad hoc aliases for some types, just to get things compiling
+            //
+            // TODO(tfoley): At the very least, `double` should be treated as a distinct type.
+            sb << "typedef float double;\n";
+            sb << "typedef float half;\n";
 
-			// Declare vector and matrix types
+            // Declare vector and matrix types
 
-			sb << "__generic<T = float, let N : int = 4> __magic_type(Vector) struct vector\n{\n";
-			sb << "    __init(T value);\n"; // initialize from single scalar
-			sb << "}\n";
-			sb << "__generic<T = float, let R : int = 4, let C : int = 4> __magic_type(Matrix) struct matrix {}\n";
+            sb << "__generic<T = float, let N : int = 4> __magic_type(Vector) struct vector\n{\n";
+            sb << "    __init(T value);\n"; // initialize from single scalar
+            sb << "}\n";
+            sb << "__generic<T = float, let R : int = 4, let C : int = 4> __magic_type(Matrix) struct matrix {}\n";
 
-			static const struct {
-				char const* name;
-				char const* glslPrefix;
-			} kTypes[] =
-			{
-				{"float", ""},
-				{"int", "i"},
-				{"uint", "u"},
-				{"bool", "b"},
-			};
-			static const int kTypeCount = sizeof(kTypes) / sizeof(kTypes[0]);
+            static const struct {
+                char const* name;
+                char const* glslPrefix;
+            } kTypes[] =
+            {
+                {"float", ""},
+                {"int", "i"},
+                {"uint", "u"},
+                {"bool", "b"},
+            };
+            static const int kTypeCount = sizeof(kTypes) / sizeof(kTypes[0]);
 
-			for (int tt = 0; tt < kTypeCount; ++tt)
-			{
-				// Declare HLSL vector types
-				for (int ii = 1; ii <= 4; ++ii)
-				{
-					sb << "typedef vector<" << kTypes[tt].name << "," << ii << "> " << kTypes[tt].name << ii << ";\n";
-				}
+            for (int tt = 0; tt < kTypeCount; ++tt)
+            {
+                // Declare HLSL vector types
+                for (int ii = 1; ii <= 4; ++ii)
+                {
+                    sb << "typedef vector<" << kTypes[tt].name << "," << ii << "> " << kTypes[tt].name << ii << ";\n";
+                }
 
-				// Declare HLSL matrix types
-				for (int rr = 2; rr <= 4; ++rr)
-				for (int cc = 2; cc <= 4; ++cc)
-				{
-					sb << "typedef matrix<" << kTypes[tt].name << "," << rr << "," << cc << "> " << kTypes[tt].name << rr << "x" << cc << ";\n";
-				}
+                // Declare HLSL matrix types
+                for (int rr = 2; rr <= 4; ++rr)
+                for (int cc = 2; cc <= 4; ++cc)
+                {
+                    sb << "typedef matrix<" << kTypes[tt].name << "," << rr << "," << cc << "> " << kTypes[tt].name << rr << "x" << cc << ";\n";
+                }
 
-				// Declare GLSL aliases for HLSL types
-				for (int vv = 2; vv <= 4; ++vv)
-				{
-					sb << "typedef " << kTypes[tt].name << vv << " " << kTypes[tt].glslPrefix << "vec" << vv << ";\n";
-					sb << "typedef " << kTypes[tt].name << vv << "x" << vv << " " << kTypes[tt].glslPrefix << "mat" << vv << ";\n";
-				}
-				for (int rr = 2; rr <= 4; ++rr)
-				for (int cc = 2; cc <= 4; ++cc)
-				{
-					sb << "typedef " << kTypes[tt].name << rr << "x" << cc << " " << kTypes[tt].glslPrefix << "mat" << rr << "x" << cc << ";\n";
-				}
-			}
+                // Declare GLSL aliases for HLSL types
+                for (int vv = 2; vv <= 4; ++vv)
+                {
+                    sb << "typedef " << kTypes[tt].name << vv << " " << kTypes[tt].glslPrefix << "vec" << vv << ";\n";
+                    sb << "typedef " << kTypes[tt].name << vv << "x" << vv << " " << kTypes[tt].glslPrefix << "mat" << vv << ";\n";
+                }
+                for (int rr = 2; rr <= 4; ++rr)
+                for (int cc = 2; cc <= 4; ++cc)
+                {
+                    sb << "typedef " << kTypes[tt].name << rr << "x" << cc << " " << kTypes[tt].glslPrefix << "mat" << rr << "x" << cc << ";\n";
+                }
+            }
 
-			static const char* kComponentNames[]{ "x", "y", "z", "w" };
-			static const char* kVectorNames[]{ "", "x", "xy", "xyz", "xyzw" };
+            static const char* kComponentNames[]{ "x", "y", "z", "w" };
+            static const char* kVectorNames[]{ "", "x", "xy", "xyz", "xyzw" };
 
-			// Need to add constructors to the types above
-			for (int N = 2; N <= 4; ++N)
-			{
-				sb << "__generic<T> __extension vector<T, " << N << ">\n{\n";
+            // Need to add constructors to the types above
+            for (int N = 2; N <= 4; ++N)
+            {
+                sb << "__generic<T> __extension vector<T, " << N << ">\n{\n";
 
-				// initialize from N scalars
-				sb << "__init(";
-				for (int ii = 0; ii < N; ++ii)
-				{
-					if (ii != 0) sb << ", ";
-					sb << "T " << kComponentNames[ii];
-				}
-				sb << ");\n";
+                // initialize from N scalars
+                sb << "__init(";
+                for (int ii = 0; ii < N; ++ii)
+                {
+                    if (ii != 0) sb << ", ";
+                    sb << "T " << kComponentNames[ii];
+                }
+                sb << ");\n";
 
-				// Initialize from an M-vector and then scalars
-				for (int M = 2; M < N; ++M)
-				{
-					sb << "__init(vector<T," << M << "> " << kVectorNames[M];
-					for (int ii = M; ii < N; ++ii)
-					{
-						sb << ", T " << kComponentNames[ii];
-					}
-					sb << ");\n";
-				}
+                // Initialize from an M-vector and then scalars
+                for (int M = 2; M < N; ++M)
+                {
+                    sb << "__init(vector<T," << M << "> " << kVectorNames[M];
+                    for (int ii = M; ii < N; ++ii)
+                    {
+                        sb << ", T " << kComponentNames[ii];
+                    }
+                    sb << ");\n";
+                }
 
-				// initialize from another vector of the same size
-				//
-				// TODO(tfoley): this overlaps with implicit conversions.
-				// We should look for a way that we can define implicit
-				// conversions directly in the stdlib instead...
-				sb << "__generic<U> __init(vector<U," << N << ">);\n";
+                // initialize from another vector of the same size
+                //
+                // TODO(tfoley): this overlaps with implicit conversions.
+                // We should look for a way that we can define implicit
+                // conversions directly in the stdlib instead...
+                sb << "__generic<U> __init(vector<U," << N << ">);\n";
 
-				sb << "}\n";
-			}
-
-
-			// Declare built-in texture and sampler types
-
-			sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerState) << ") struct SamplerState {};";
-			sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerComparisonState) << ") struct SamplerComparisonState {};";
-
-			// TODO(tfoley): Need to handle `RW*` variants of texture types as well...
-			static const struct {
-				char const*			name;
-				TextureType::Shape	baseShape;
-				int					coordCount;
-			} kBaseTextureTypes[] = {
-				{ "Texture1D",		TextureType::Shape1D,	1 },
-				{ "Texture2D",		TextureType::Shape2D,	2 },
-				{ "Texture3D",		TextureType::Shape3D,	3 },
-				{ "TextureCube",	TextureType::ShapeCube,	3 },
-			};
-			static const int kBaseTextureTypeCount = sizeof(kBaseTextureTypes) / sizeof(kBaseTextureTypes[0]);
-			for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
-			{
-				char const* name = kBaseTextureTypes[tt].name;
-				TextureType::Shape baseShape = kBaseTextureTypes[tt].baseShape;
-
-				for (int isArray = 0; isArray < 2; ++isArray)
-				{
-					// Arrays of 3D textures aren't allowed
-					if (isArray && baseShape == TextureType::Shape3D) continue;
-
-					for (int isMultisample = 0; isMultisample < 2; ++isMultisample)
-					for (int isShadow = 0; isShadow < 2; ++isShadow)
-					{
-						// TODO: any constraints to enforce on what gets to be multisampled?
-
-						unsigned flavor = baseShape;
-						if (isArray)		flavor |= TextureType::ArrayFlag;
-						if (isMultisample)	flavor |= TextureType::MultisampleFlag;
-						if (isShadow)		flavor |= TextureType::ShadowFlag;
-
-						// emit a generic signature
-						// TODO: allow for multisample count to come in as well...
-						sb << "__generic<T = float4> ";
-
-						sb << "__magic_type(Texture," << int(flavor) << ") struct " << name;
-						if (isMultisample) sb << "MS";
-						if (isArray) sb << "Array";
-						if (isShadow) sb << "Shadow";
-						sb << "\n{";
-
-						// TODO(tfoley): properly list operations and their signatures
-						sb << "T Load(int3 u);\n";
-
-						if( !isMultisample )
-						{
-							sb << "T Sample(SamplerState s, ";
-							sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location);\n";
-
-							sb << "T SampleBias(SamplerState s, ";
-							sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, float bias);\n";
-
-							if( baseShape != TextureType::ShapeCube )
-							{
-								sb << "T Sample(SamplerState s, ";
-								sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
-								sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
-
-								sb << "T Sample(SamplerState s, ";
-								sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, float bias, ";
-								sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
-							}
-						}
-
-						sb << "\n};\n";
-					}
-				}
-			}
-
-			// Declare additional built-in generic types
-
-			sb << "__generic<T> __magic_type(ConstantBuffer) struct ConstantBuffer {};\n";
-			sb << "__generic<T> __magic_type(TextureBuffer) struct TextureBuffer {};\n";
-
-			sb << "__generic<T> __magic_type(PackedBuffer) struct PackedBuffer {};\n";
-			sb << "__generic<T> __magic_type(Uniform) struct Uniform {};\n";
-			sb << "__generic<T> __magic_type(Patch) struct Patch {};\n";
+                sb << "}\n";
+            }
 
 
-			// Synthesize matrix-vector, vector-matrix, and matrix-matrix multiply operations
-			// TODO(tfoley): just make these generic
+            // Declare built-in texture and sampler types
 
-			// matrix-vector
-			for (int rr = 2; rr <= 4; ++rr)
-			for (int kk = 2; kk <= 4; ++kk)
-			{
-				sb << "__intrinsic float" << rr << " mul("
-					<< "float" << rr << "x" << kk << " left,"
-					<< "float" << kk << " right);\n";
-			}
+            sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerState) << ") struct SamplerState {};";
+            sb << "__magic_type(SamplerState," << int(SamplerStateType::Flavor::SamplerComparisonState) << ") struct SamplerComparisonState {};";
 
-			// vector-matrix
-			for (int cc = 2; cc <= 4; ++cc)
-			for (int kk = 2; kk <= 4; ++kk)
-			{
-				sb << "__intrinsic float" << cc << " mul("
-					<< "float" << kk << " left,"
-					<< "float" << kk << "x" << cc << " right);\n";
-			}
+            // TODO(tfoley): Need to handle `RW*` variants of texture types as well...
+            static const struct {
+                char const*			name;
+                TextureType::Shape	baseShape;
+                int					coordCount;
+            } kBaseTextureTypes[] = {
+                { "Texture1D",		TextureType::Shape1D,	1 },
+                { "Texture2D",		TextureType::Shape2D,	2 },
+                { "Texture3D",		TextureType::Shape3D,	3 },
+                { "TextureCube",	TextureType::ShapeCube,	3 },
+            };
+            static const int kBaseTextureTypeCount = sizeof(kBaseTextureTypes) / sizeof(kBaseTextureTypes[0]);
+            for (int tt = 0; tt < kBaseTextureTypeCount; ++tt)
+            {
+                char const* name = kBaseTextureTypes[tt].name;
+                TextureType::Shape baseShape = kBaseTextureTypes[tt].baseShape;
 
-			// matrix-matrix
-			for (int rr = 2; rr <= 4; ++rr)
-			for (int kk = 2; kk <= 4; ++kk)
-			for (int cc = 2; cc <= 4; ++cc)
-			{
-				sb << "__intrinsic float" << rr << "x" << cc << " mul("
-					<< "float" << rr << "x" << kk << " left,"
-					<< "float" << kk << "x" << cc << " right);\n";
-			}
+                for (int isArray = 0; isArray < 2; ++isArray)
+                {
+                    // Arrays of 3D textures aren't allowed
+                    if (isArray && baseShape == TextureType::Shape3D) continue;
+
+                    for (int isMultisample = 0; isMultisample < 2; ++isMultisample)
+                    for (int isShadow = 0; isShadow < 2; ++isShadow)
+                    {
+                        // TODO: any constraints to enforce on what gets to be multisampled?
+
+                        unsigned flavor = baseShape;
+                        if (isArray)		flavor |= TextureType::ArrayFlag;
+                        if (isMultisample)	flavor |= TextureType::MultisampleFlag;
+                        if (isShadow)		flavor |= TextureType::ShadowFlag;
+
+                        // emit a generic signature
+                        // TODO: allow for multisample count to come in as well...
+                        sb << "__generic<T = float4> ";
+
+                        sb << "__magic_type(Texture," << int(flavor) << ") struct " << name;
+                        if (isMultisample) sb << "MS";
+                        if (isArray) sb << "Array";
+                        if (isShadow) sb << "Shadow";
+                        sb << "\n{";
+
+                        // TODO(tfoley): properly list operations and their signatures
+                        sb << "T Load(int3 u);\n";
+
+                        if( !isMultisample )
+                        {
+                            sb << "T Sample(SamplerState s, ";
+                            sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location);\n";
+
+                            sb << "T SampleBias(SamplerState s, ";
+                            sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, float bias);\n";
+
+                            if( baseShape != TextureType::ShapeCube )
+                            {
+                                sb << "T Sample(SamplerState s, ";
+                                sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, ";
+                                sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
+
+                                sb << "T Sample(SamplerState s, ";
+                                sb << "float" << kBaseTextureTypes[tt].coordCount + isArray << " location, float bias, ";
+                                sb << "int" << kBaseTextureTypes[tt].coordCount << " offset);\n";
+                            }
+                        }
+
+                        sb << "\n};\n";
+                    }
+                }
+            }
+
+            // Declare additional built-in generic types
+
+            sb << "__generic<T> __magic_type(ConstantBuffer) struct ConstantBuffer {};\n";
+            sb << "__generic<T> __magic_type(TextureBuffer) struct TextureBuffer {};\n";
+
+            sb << "__generic<T> __magic_type(PackedBuffer) struct PackedBuffer {};\n";
+            sb << "__generic<T> __magic_type(Uniform) struct Uniform {};\n";
+            sb << "__generic<T> __magic_type(Patch) struct Patch {};\n";
 
 
-			sb << "__intrinsic vec3 operator * (vec3, mat3);\n";
-			sb << "__intrinsic vec3 operator * (mat3, vec3);\n";
+            // Synthesize matrix-vector, vector-matrix, and matrix-matrix multiply operations
+            // TODO(tfoley): just make these generic
 
-			sb << "__intrinsic vec4 operator * (vec4, mat4);\n";
-			sb << "__intrinsic vec4 operator * (mat4, vec4);\n";
+            // matrix-vector
+            for (int rr = 2; rr <= 4; ++rr)
+            for (int kk = 2; kk <= 4; ++kk)
+            {
+                sb << "__intrinsic float" << rr << " mul("
+                    << "float" << rr << "x" << kk << " left,"
+                    << "float" << kk << " right);\n";
+            }
 
-			sb << "__intrinsic mat3 operator * (mat3, mat3);\n";
-			sb << "__intrinsic mat4 operator * (mat4, mat4);\n";
+            // vector-matrix
+            for (int cc = 2; cc <= 4; ++cc)
+            for (int kk = 2; kk <= 4; ++kk)
+            {
+                sb << "__intrinsic float" << cc << " mul("
+                    << "float" << kk << " left,"
+                    << "float" << kk << "x" << cc << " right);\n";
+            }
 
-			sb << "__intrinsic bool operator && (bool, bool);\n";
-			sb << "__intrinsic bool operator || (bool, bool);\n";
+            // matrix-matrix
+            for (int rr = 2; rr <= 4; ++rr)
+            for (int kk = 2; kk <= 4; ++kk)
+            for (int cc = 2; cc <= 4; ++cc)
+            {
+                sb << "__intrinsic float" << rr << "x" << cc << " mul("
+                    << "float" << rr << "x" << kk << " left,"
+                    << "float" << kk << "x" << cc << " right);\n";
+            }
 
-			for (auto type : intTypes)
-			{
-				sb << "__intrinsic bool operator && (bool, " << type << ");\n";
-				sb << "__intrinsic bool operator || (bool, " << type << ");\n";
-				sb << "__intrinsic bool operator && (" << type << ", bool);\n";
-				sb << "__intrinsic bool operator || (" << type << ", bool);\n";
-			}
 
-			for (auto op : intUnaryOps)
-			{
-				String opName = GetOperatorFunctionName(op);
-				for (int i = 0; i < 4; i++)
-				{
-					auto itype = intTypes[i];
-					auto utype = uintTypes[i];
-					for (int j = 0; j < 2; j++)
-					{
-						auto retType = (op == Operator::Not) ? "bool" : j == 0 ? itype : utype;
-						sb << "__intrinsic " << retType << " operator " << opName << "(" << (j == 0 ? itype : utype) << ");\n";
-					}
-				}
-			}
+            sb << "__intrinsic vec3 operator * (vec3, mat3);\n";
+            sb << "__intrinsic vec3 operator * (mat3, vec3);\n";
 
-			for (auto op : floatUnaryOps)
-			{
-				String opName = GetOperatorFunctionName(op);
-				for (int i = 0; i < 4; i++)
-				{
-					auto type = floatTypes[i];
-					auto retType = (op == Operator::Not) ? "bool" : type;
-					sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ");\n";
-				}
-			}
+            sb << "__intrinsic vec4 operator * (vec4, mat4);\n";
+            sb << "__intrinsic vec4 operator * (mat4, vec4);\n";
 
-			for (auto op : floatOps)
-			{
-				String opName = GetOperatorFunctionName(op);
-				for (int i = 0; i < 4; i++)
-				{
-					auto type = floatTypes[i];
-					auto itype = intTypes[i];
-					auto utype = uintTypes[i];
-					auto retType = ((op >= Operator::Eql && op <= Operator::Leq) || op == Operator::And || op == Operator::Or) ? "bool" : type;
-					sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << type << ");\n";
-					sb << "__intrinsic " << retType << " operator " << opName << "(" << itype << ", " << type << ");\n";
-					sb << "__intrinsic " << retType << " operator " << opName << "(" << utype << ", " << type << ");\n";
-					sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << itype << ");\n";
-					sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << utype << ");\n";
-					if (i > 0)
-					{
-						sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << floatTypes[0] << ");\n";
-						sb << "__intrinsic " << retType << " operator " << opName << "(" << floatTypes[0] << ", " << type << ");\n";
+            sb << "__intrinsic mat3 operator * (mat3, mat3);\n";
+            sb << "__intrinsic mat4 operator * (mat4, mat4);\n";
 
-						sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << intTypes[0] << ");\n";
-						sb << "__intrinsic " << retType << " operator " << opName << "(" << intTypes[0] << ", " << type << ");\n";
+            sb << "__intrinsic bool operator && (bool, bool);\n";
+            sb << "__intrinsic bool operator || (bool, bool);\n";
 
-						sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << uintTypes[0] << ");\n";
-						sb << "__intrinsic " << retType << " operator " << opName << "(" << uintTypes[0] << ", " << type << ");\n";
-					}
-				}
-			}
+            for (auto type : intTypes)
+            {
+                sb << "__intrinsic bool operator && (bool, " << type << ");\n";
+                sb << "__intrinsic bool operator || (bool, " << type << ");\n";
+                sb << "__intrinsic bool operator && (" << type << ", bool);\n";
+                sb << "__intrinsic bool operator || (" << type << ", bool);\n";
+            }
 
-			for (auto op : intOps)
-			{
-				String opName = GetOperatorFunctionName(op);
-				for (int i = 0; i < 4; i++)
-				{
-					auto type = intTypes[i];
-					auto utype = uintTypes[i];
-					auto retType = ((op >= Operator::Eql && op <= Operator::Leq) || op == Operator::And || op == Operator::Or) ? "bool" : type;
-					sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << type << ");\n";
-					sb << "__intrinsic " << retType << " operator " << opName << "(" << utype << ", " << type << ");\n";
-					sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << utype << ");\n";
-					sb << "__intrinsic " << retType << " operator " << opName << "(" << utype << ", " << utype << ");\n";
-					if (i > 0)
-					{
-						sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << intTypes[0] << ");\n";
-						sb << "__intrinsic " << retType << " operator " << opName << "(" << intTypes[0] << ", " << type << ");\n";
+            for (auto op : intUnaryOps)
+            {
+                String opName = GetOperatorFunctionName(op);
+                for (int i = 0; i < 4; i++)
+                {
+                    auto itype = intTypes[i];
+                    auto utype = uintTypes[i];
+                    for (int j = 0; j < 2; j++)
+                    {
+                        auto retType = (op == Operator::Not) ? "bool" : j == 0 ? itype : utype;
+                        sb << "__intrinsic " << retType << " operator " << opName << "(" << (j == 0 ? itype : utype) << ");\n";
+                    }
+                }
+            }
 
-						sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << uintTypes[0] << ");\n";
-						sb << "__intrinsic " << retType << " operator " << opName << "(" << uintTypes[0] << ", " << type << ");\n";
-					}
-				}
-			}
+            for (auto op : floatUnaryOps)
+            {
+                String opName = GetOperatorFunctionName(op);
+                for (int i = 0; i < 4; i++)
+                {
+                    auto type = floatTypes[i];
+                    auto retType = (op == Operator::Not) ? "bool" : type;
+                    sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ");\n";
+                }
+            }
 
-			int chunkCount = sizeof(LibIncludeStringChunks) / sizeof(LibIncludeStringChunks[0]);
-			for (int cc = 0; cc < chunkCount; ++cc)
-			{
-				sb << LibIncludeStringChunks[cc];
-			}
+            for (auto op : floatOps)
+            {
+                String opName = GetOperatorFunctionName(op);
+                for (int i = 0; i < 4; i++)
+                {
+                    auto type = floatTypes[i];
+                    auto itype = intTypes[i];
+                    auto utype = uintTypes[i];
+                    auto retType = ((op >= Operator::Eql && op <= Operator::Leq) || op == Operator::And || op == Operator::Or) ? "bool" : type;
+                    sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << type << ");\n";
+                    sb << "__intrinsic " << retType << " operator " << opName << "(" << itype << ", " << type << ");\n";
+                    sb << "__intrinsic " << retType << " operator " << opName << "(" << utype << ", " << type << ");\n";
+                    sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << itype << ");\n";
+                    sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << utype << ");\n";
+                    if (i > 0)
+                    {
+                        sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << floatTypes[0] << ");\n";
+                        sb << "__intrinsic " << retType << " operator " << opName << "(" << floatTypes[0] << ", " << type << ");\n";
 
-			code = sb.ProduceString();
-			return code;
-		}
+                        sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << intTypes[0] << ");\n";
+                        sb << "__intrinsic " << retType << " operator " << opName << "(" << intTypes[0] << ", " << type << ");\n";
 
-		void SpireStdLib::Finalize()
-		{
-			code = nullptr;
-		}
+                        sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << uintTypes[0] << ");\n";
+                        sb << "__intrinsic " << retType << " operator " << opName << "(" << uintTypes[0] << ", " << type << ");\n";
+                    }
+                }
+            }
 
-	}
+            for (auto op : intOps)
+            {
+                String opName = GetOperatorFunctionName(op);
+                for (int i = 0; i < 4; i++)
+                {
+                    auto type = intTypes[i];
+                    auto utype = uintTypes[i];
+                    auto retType = ((op >= Operator::Eql && op <= Operator::Leq) || op == Operator::And || op == Operator::Or) ? "bool" : type;
+                    sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << type << ");\n";
+                    sb << "__intrinsic " << retType << " operator " << opName << "(" << utype << ", " << type << ");\n";
+                    sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << utype << ");\n";
+                    sb << "__intrinsic " << retType << " operator " << opName << "(" << utype << ", " << utype << ");\n";
+                    if (i > 0)
+                    {
+                        sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << intTypes[0] << ");\n";
+                        sb << "__intrinsic " << retType << " operator " << opName << "(" << intTypes[0] << ", " << type << ");\n";
+
+                        sb << "__intrinsic " << retType << " operator " << opName << "(" << type << ", " << uintTypes[0] << ");\n";
+                        sb << "__intrinsic " << retType << " operator " << opName << "(" << uintTypes[0] << ", " << type << ");\n";
+                    }
+                }
+            }
+
+            int chunkCount = sizeof(LibIncludeStringChunks) / sizeof(LibIncludeStringChunks[0]);
+            for (int cc = 0; cc < chunkCount; ++cc)
+            {
+                sb << LibIncludeStringChunks[cc];
+            }
+
+            code = sb.ProduceString();
+            return code;
+        }
+
+        void SpireStdLib::Finalize()
+        {
+            code = nullptr;
+        }
+
+    }
 }
 

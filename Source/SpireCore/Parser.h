@@ -6,14 +6,14 @@
 
 namespace Spire
 {
-	namespace Compiler
-	{
+    namespace Compiler
+    {
         RefPtr<ProgramSyntaxNode> ParseProgram(
             TokenSpan const&    tokens,
             DiagnosticSink*     sink,
             String const&       fileName,
-			ProgramSyntaxNode*	predefUnit);
-	}
+            ProgramSyntaxNode*	predefUnit);
+    }
 }
 
 #endif

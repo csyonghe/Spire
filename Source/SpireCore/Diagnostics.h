@@ -6,10 +6,10 @@
 
 namespace Spire
 {
-	namespace Compiler
-	{
-		using namespace CoreLib::Basic;
-		using namespace CoreLib::Text;
+    namespace Compiler
+    {
+        using namespace CoreLib::Basic;
+        using namespace CoreLib::Text;
 
         enum class Severity
         {
@@ -43,41 +43,41 @@ namespace Spire
             char const* messageFormat;
         };
 
-		class Diagnostic
-		{
-		public:
-			String Message;
-			CodePosition Position;
-			int ErrorID;
+        class Diagnostic
+        {
+        public:
+            String Message;
+            CodePosition Position;
+            int ErrorID;
             Severity severity;
 
-			Diagnostic()
-			{
-				ErrorID = -1;
-			}
-			Diagnostic(
+            Diagnostic()
+            {
+                ErrorID = -1;
+            }
+            Diagnostic(
                 const String & msg,
                 int id,
-				const CodePosition & pos,
+                const CodePosition & pos,
                 Severity severity)
                 : severity(severity)
-			{
-				Message = msg;
-				ErrorID = id;
-				Position = pos;
-			}
-		};
+            {
+                Message = msg;
+                ErrorID = id;
+                Position = pos;
+            }
+        };
 
         class Decl;
         class Type;
         class ExpressionType;
         class ILType;
         class StageAttribute;
-		struct TypeExp;
-		struct QualType;
+        struct TypeExp;
+        struct QualType;
 
         void printDiagnosticArg(StringBuilder& sb, char const* str);
-		void printDiagnosticArg(StringBuilder& sb, int val);
+        void printDiagnosticArg(StringBuilder& sb, int val);
         void printDiagnosticArg(StringBuilder& sb, CoreLib::Basic::String const& str);
         void printDiagnosticArg(StringBuilder& sb, Decl* decl);
         void printDiagnosticArg(StringBuilder& sb, Type* type);
@@ -134,16 +134,16 @@ namespace Spire
             List<Diagnostic> diagnostics;
             int errorCount = 0;
 /*
-			void Error(int id, const String & msg, const CodePosition & pos)
-			{
-				diagnostics.Add(Diagnostic(msg, id, pos, Severity::Error));
+            void Error(int id, const String & msg, const CodePosition & pos)
+            {
+                diagnostics.Add(Diagnostic(msg, id, pos, Severity::Error));
                 errorCount++;
-			}
+            }
 
-			void Warning(int id, const String & msg, const CodePosition & pos)
-			{
-				diagnostics.Add(Diagnostic(msg, id, pos, Severity::Warning));
-			}
+            void Warning(int id, const String & msg, const CodePosition & pos)
+            {
+                diagnostics.Add(Diagnostic(msg, id, pos, Severity::Warning));
+            }
 */
             int GetErrorCount() { return errorCount; }
 
@@ -213,7 +213,7 @@ namespace Spire
 #define DIAGNOSTIC(id, severity, name, messageFormat) extern const DiagnosticInfo name;
 #include "DiagnosticDefs.h"
         }
-	}
+    }
 }
 
 #ifdef _DEBUG

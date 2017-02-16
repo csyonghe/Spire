@@ -5,11 +5,11 @@
 
 namespace Spire
 {
-	namespace Compiler
-	{
-		CoreLib::String EscapeCodeName(CoreLib::String str);
+    namespace Compiler
+    {
+        CoreLib::String EscapeCodeName(CoreLib::String str);
 
-	}
+    }
 }
 
 #endif

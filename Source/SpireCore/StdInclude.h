@@ -5,17 +5,17 @@
 
 namespace Spire
 {
-	namespace Compiler
-	{
-		class SpireStdLib
-		{
-		private:
-			static CoreLib::String code;
-		public:
-			static CoreLib::String GetCode();
-			static void Finalize();
-		};
-	}
+    namespace Compiler
+    {
+        class SpireStdLib
+        {
+        private:
+            static CoreLib::String code;
+        public:
+            static CoreLib::String GetCode();
+            static void Finalize();
+        };
+    }
 }
 
 #endif

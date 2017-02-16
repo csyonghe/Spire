@@ -7,16 +7,16 @@
 
 namespace Spire
 {
-	namespace Compiler
-	{
-		class Schedule
-		{
-		public:
-			CoreLib::EnumerableDictionary<CoreLib::String, CoreLib::List<RefPtr<ChoiceValueSyntaxNode>>> Choices;
-			CoreLib::EnumerableDictionary<CoreLib::String, CoreLib::EnumerableDictionary<CoreLib::String, CoreLib::String>> AddtionalAttributes;
-			static Schedule Parse(CoreLib::String source, CoreLib::String fileName, DiagnosticSink * sink);
-		};
-	}
+    namespace Compiler
+    {
+        class Schedule
+        {
+        public:
+            CoreLib::EnumerableDictionary<CoreLib::String, CoreLib::List<RefPtr<ChoiceValueSyntaxNode>>> Choices;
+            CoreLib::EnumerableDictionary<CoreLib::String, CoreLib::EnumerableDictionary<CoreLib::String, CoreLib::String>> AddtionalAttributes;
+            static Schedule Parse(CoreLib::String source, CoreLib::String fileName, DiagnosticSink * sink);
+        };
+    }
 }
 
 #endif

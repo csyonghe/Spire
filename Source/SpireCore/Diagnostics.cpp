@@ -17,7 +17,7 @@ void printDiagnosticArg(StringBuilder& sb, char const* str)
 
 void printDiagnosticArg(StringBuilder& sb, int str)
 {
-	sb << str;
+    sb << str;
 }
 
 void printDiagnosticArg(StringBuilder& sb, CoreLib::Basic::String const& str)
@@ -42,12 +42,12 @@ void printDiagnosticArg(StringBuilder& sb, ExpressionType* type)
 
 void printDiagnosticArg(StringBuilder& sb, TypeExp const& type)
 {
-	sb << type.type->ToString();
+    sb << type.type->ToString();
 }
 
 void printDiagnosticArg(StringBuilder& sb, QualType const& type)
 {
-	sb << type.type->ToString();
+    sb << type.type->ToString();
 }
 
 void printDiagnosticArg(StringBuilder& sb, ILType* type)
@@ -87,7 +87,7 @@ CodePosition const& getDiagnosticPos(ShaderClosure* shader)
 
 CodePosition const& getDiagnosticPos(TypeExp const& typeExp)
 {
-	return typeExp.exp->Position;
+    return typeExp.exp->Position;
 }
 
 // Take the format string for a diagnostic message, along with its arguments, and turn it into a

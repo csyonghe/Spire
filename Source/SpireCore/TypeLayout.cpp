@@ -11,11 +11,11 @@ namespace Compiler {
 
 size_t RoundToAlignment(size_t offset, size_t alignment)
 {
-	size_t remainder = offset % alignment;
-	if (remainder == 0)
-		return offset;
-	else
-		return offset + (alignment - remainder);
+    size_t remainder = offset % alignment;
+    if (remainder == 0)
+        return offset;
+    else
+        return offset + (alignment - remainder);
 }
 
 static size_t RoundUpToPowerOfTwo( size_t value )
@@ -37,7 +37,7 @@ struct DefaultLayoutRulesImpl : LayoutRulesImpl
         case BaseType::Int:
         case BaseType::UInt:
         case BaseType::Float:
-		case BaseType::Bool:
+        case BaseType::Bool:
             return{ 4, 4 };
 
         default:
@@ -177,17 +177,17 @@ LayoutRulesImpl* GetLayoutRulesImpl(LayoutRule rule)
 
 static int GetElementCount(RefPtr<IntVal> val)
 {
-	if (auto constantVal = val.As<ConstantIntVal>())
-	{
-		return constantVal->value;
-	}
-	assert(!"unexpected");
-	return 0;
+    if (auto constantVal = val.As<ConstantIntVal>())
+    {
+        return constantVal->value;
+    }
+    assert(!"unexpected");
+    return 0;
 }
 
 LayoutInfo GetLayout(ExpressionType* inType, LayoutRulesImpl* rules)
 {
-	RefPtr<ExpressionType> type = inType;
+    RefPtr<ExpressionType> type = inType;
     if (auto basicType = type->As<BasicExpressionType>())
     {
         return rules->GetScalarLayout(basicType->BaseType);
@@ -198,11 +198,11 @@ LayoutInfo GetLayout(ExpressionType* inType, LayoutRulesImpl* rules)
             GetLayout(arrayType->BaseType.Ptr(), rules),
             GetElementCount(arrayType->ArrayLength));
     }
-	else if (auto declRefType = type->As<DeclRefType>())
-	{
-		auto declRef = declRefType->declRef;
-		if (auto structDeclRef = declRef.As<StructDeclRef>())
-		{
+    else if (auto declRefType = type->As<DeclRefType>())
+    {
+        auto declRef = declRefType->declRef;
+        if (auto structDeclRef = declRef.As<StructDeclRef>())
+        {
             LayoutInfo info = rules->BeginStructLayout();
 
             for (auto field : structDeclRef.GetFields())
@@ -213,12 +213,12 @@ LayoutInfo GetLayout(ExpressionType* inType, LayoutRulesImpl* rules)
 
             rules->EndStructLayout(&info);
             return info;
-		}
-	}
+        }
+    }
 
-	// catch-all case in case nothing matched
-	assert(!"unimplemented");
-	return{ 0, 1 };
+    // catch-all case in case nothing matched
+    assert(!"unimplemented");
+    return{ 0, 1 };
 }
 
 LayoutInfo GetLayout(ILType* type, LayoutRulesImpl* rules)

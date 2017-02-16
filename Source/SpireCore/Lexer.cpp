@@ -7,8 +7,8 @@ using namespace CoreLib::Text;
 
 namespace Spire
 {
-	namespace Compiler
-	{
+    namespace Compiler
+    {
         static Token GetEndOfFileToken()
         {
             return Token(TokenType::EndOfFile, "", 0, 0, 0, "");
@@ -79,29 +79,29 @@ namespace Spire
         }
 
 
-		TokenList Lexer::Parse(const String & fileName, const String & str, DiagnosticSink * sink)
-		{
+        TokenList Lexer::Parse(const String & fileName, const String & str, DiagnosticSink * sink)
+        {
             TokenList tokenList;
-			tokenList.mTokens = CoreLib::Text::TokenizeText(fileName, str, [&](CoreLib::Text::TokenizeErrorType errType, CoreLib::Text::CodePosition pos)
-			{
-				auto curChar = str[pos.Pos];
-				switch (errType)
-				{
-				case CoreLib::Text::TokenizeErrorType::InvalidCharacter:
-					sink->diagnose(pos, Diagnostics::illegalCharacter, String((unsigned char)curChar, 16));
-					break;
-				case CoreLib::Text::TokenizeErrorType::InvalidEscapeSequence:
-					sink->diagnose(pos, Diagnostics::illegalCharacterLiteral);
-					break;
-				default:
-					break;
-				}
-			});
+            tokenList.mTokens = CoreLib::Text::TokenizeText(fileName, str, [&](CoreLib::Text::TokenizeErrorType errType, CoreLib::Text::CodePosition pos)
+            {
+                auto curChar = str[pos.Pos];
+                switch (errType)
+                {
+                case CoreLib::Text::TokenizeErrorType::InvalidCharacter:
+                    sink->diagnose(pos, Diagnostics::illegalCharacter, String((unsigned char)curChar, 16));
+                    break;
+                case CoreLib::Text::TokenizeErrorType::InvalidEscapeSequence:
+                    sink->diagnose(pos, Diagnostics::illegalCharacterLiteral);
+                    break;
+                default:
+                    break;
+                }
+            });
 
             // Add an end-of-file token so that we can reference it in diagnostic messages
             tokenList.mTokens.Add(Token(TokenType::EndOfFile, "", 0, 0, 0, fileName, TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace));
 
             return tokenList;
-		}
-	}
+        }
+    }
 }

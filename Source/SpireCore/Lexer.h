@@ -6,9 +6,9 @@
 
 namespace Spire
 {
-	namespace Compiler
-	{
-		using namespace CoreLib::Basic;
+    namespace Compiler
+    {
+        using namespace CoreLib::Basic;
 
         struct TokenList
         {
@@ -61,13 +61,13 @@ namespace Spire
             Token* mEnd;
         };
 
-		
-		class Lexer
-		{
-		public:
-			TokenList Parse(const String & fileName, const String & str, DiagnosticSink * sink);
-		};
-	}
+        
+        class Lexer
+        {
+        public:
+            TokenList Parse(const String & fileName, const String & str, DiagnosticSink * sink);
+        };
+    }
 }
 
 #endif
