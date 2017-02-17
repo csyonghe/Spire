@@ -2672,6 +2672,12 @@ namespace Spire
                     stmt->BaseExpression = stmt->BaseExpression->Accept(this).As<ExpressionSyntaxNode>();
                 return stmt;
             }
+			virtual RefPtr<ExpressionSyntaxNode> VisitSwizzleExpression(SwizzleExpr * expr)
+			{
+				if (expr->base)
+					expr->base->Accept(this);
+				return expr;
+			}
             virtual RefPtr<ExpressionSyntaxNode> VisitInvokeExpression(InvokeExpressionSyntaxNode* stmt)
             {
                 stmt->FunctionExpr->Accept(this);

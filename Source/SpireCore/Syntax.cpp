@@ -331,15 +331,16 @@ namespace Spire
 
         // SwizzleExpr
 
-        RefPtr<SyntaxNode> SwizzleExpr::Accept(SyntaxVisitor * /*visitor*/)
+        RefPtr<SyntaxNode> SwizzleExpr::Accept(SyntaxVisitor * visitor)
         {
-            // throw "unimplemented";
-            return this;
+			return visitor->VisitSwizzleExpression(this);
         }
 
-        SwizzleExpr * SwizzleExpr::Clone(CloneContext & /*ctx*/)
+        SwizzleExpr * SwizzleExpr::Clone(CloneContext & ctx)
         {
-            throw "unimplemented";
+			auto rs = CloneSyntaxNodeFields(new SwizzleExpr(*this), ctx);
+			rs->base = base->Clone(ctx);
+			return rs;
         }
 
         // DerefExpr

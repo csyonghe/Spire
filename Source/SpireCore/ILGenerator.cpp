@@ -561,6 +561,11 @@ namespace Spire
                     expr->Access == ExpressionAccess::Read);
                 return expr;
             }
+			virtual RefPtr<ExpressionSyntaxNode> VisitSwizzleExpression(SwizzleExpr * expr) override
+			{
+
+				return expr;
+			}
             virtual RefPtr<ExpressionSyntaxNode> VisitMemberExpression(MemberExpressionSyntaxNode * expr) override
             {
                 RefPtr<Object> refObj;

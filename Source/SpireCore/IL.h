@@ -1348,11 +1348,14 @@ namespace Spire
                 }
             };
 
-            String ToString() {
+            String ToString() 
+			{
+				NameAllInstructions();
                 StringBuilder sb;
                 bool first = true;
                 auto pintr = begin();
-                while (pintr != end()) {
+                while (pintr != end())
+				{
                     if (!first)
                         sb << EndLine;
                     first = false;
@@ -2878,6 +2881,7 @@ namespace Spire
             List<RefPtr<ILStructType>> Structs;
             EnumerableDictionary<String, RefPtr<ILModuleParameterSet>> ModuleParamSets;
             EnumerableDictionary<String, RefPtr<ILGlobalVariable>> GlobalVars;
+			String ToString();
         };
     }
 }

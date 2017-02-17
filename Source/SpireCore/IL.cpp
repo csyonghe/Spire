@@ -723,5 +723,32 @@ namespace Spire
         {
             visitor->VisitProjectInstruction(this);
         }
+		String ILProgram::ToString()
+		{
+			
+			StringBuilder sb;
+			for (auto & s : Structs)
+			{
+				sb << s->ToString() << "\n";
+			}
+			for (auto & v : GlobalVars)
+			{
+				sb << v.Value->Type->ToString() << " " << v.Key;
+				if (v.Value->Code)
+				{
+					sb << " {\n";
+					sb << v.Value->Code->ToString() << "\n}\n";
+				}
+			}
+			for (auto & f : Functions)
+			{
+				sb << "func " << f.Key << "(";
+				for (auto & param : f.Value->Parameters)
+					sb << param.Value.Type->ToString() << " " << param.Key << ", ";
+				sb << ") : " << f.Value->ReturnType->ToString();
+				sb << "\n{\n" << f.Value->Code->ToString() << "\n}\n";
+			}
+			return sb.ProduceString();
+		}
 }
 }
