@@ -563,7 +563,19 @@ namespace Spire
             }
 			virtual RefPtr<ExpressionSyntaxNode> VisitSwizzleExpression(SwizzleExpr * expr) override
 			{
-
+				RefPtr<Object> refObj;
+				expr->base->Access = expr->Access;
+				expr->base->Accept(this);
+				auto base = PopStack();
+				StringBuilder swizzleStr;
+				for (int i = 0; i < expr->elementCount; i++)
+					swizzleStr << ('x' + i);
+				auto rs = new SwizzleInstruction();
+				rs->Type = TranslateExpressionType(expr->Type.Ptr());
+				rs->SwizzleString = swizzleStr.ToString();
+				rs->Operand = base;
+				codeWriter.Insert(rs);
+				PushStack(rs);
 				return expr;
 			}
             virtual RefPtr<ExpressionSyntaxNode> VisitMemberExpression(MemberExpressionSyntaxNode * expr) override
@@ -572,36 +584,7 @@ namespace Spire
                 expr->BaseExpression->Access = expr->Access;
                 expr->BaseExpression->Accept(this);
                 auto base = PopStack();
-                auto generateSingleMember = [&](char memberName)
-                {
-                    int idx = 0;
-                    if (memberName == 'y' || memberName == 'g')
-                        idx = 1;
-                    else if (memberName == 'z' || memberName == 'b')
-                        idx = 2;
-                    else if (memberName == 'w' || memberName == 'a')
-                        idx = 3;
-
-                    GenerateIndexExpression(base, program->ConstantPool->CreateConstant(idx),
-                        expr->Access == ExpressionAccess::Read);
-                };
-                if (expr->BaseExpression->Type->IsVectorType())
-                {
-                    if (expr->MemberName.Length() == 1)
-                    {
-                        generateSingleMember(expr->MemberName[0]);
-                    }
-                    else
-                    {
-                        auto rs = new SwizzleInstruction();
-                        rs->Type = TranslateExpressionType(expr->Type.Ptr());
-                        rs->SwizzleString = expr->MemberName;
-                        rs->Operand = base;
-                        codeWriter.Insert(rs);
-                        PushStack(rs);
-                    }
-                }
-                else if (auto declRefType = expr->BaseExpression->Type->AsDeclRefType())
+                if (auto declRefType = expr->BaseExpression->Type->AsDeclRefType())
                 {
                     if (auto structDecl = declRefType->declRef.As<StructDeclRef>())
                     {
