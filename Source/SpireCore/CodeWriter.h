@@ -163,25 +163,11 @@ namespace Spire
             //		return instr;
             //	}
             //}
-            AllocVarInstruction * AllocVar(RefPtr<ILType> & type, ILOperand * size)
+            AllocVarInstruction * AllocVar(RefPtr<ILType> & type)
             {
-                auto arrType = dynamic_cast<ILArrayType*>(type.Ptr());
-                if (arrType)
-                {
-                    // check: size must be constant 1. Do not support array of array in IL level.
-                    auto s = dynamic_cast<ILConstOperand*>(size);
-                    if (!s || s->IntValues[0] != 1)
-                        throw ArgumentException("AllocVar(arrayType, size): size must be constant 1.");
-                    auto instr = new AllocVarInstruction(arrType->BaseType, constantPool->CreateConstant(arrType->ArrayLength));
-                    cfgNode.Last()->InsertTail(instr);
-                    return instr;
-                }
-                else
-                {
-                    auto instr = new AllocVarInstruction(type, size);
-                    cfgNode.Last()->InsertTail(instr);
-                    return instr;
-                }
+                auto instr = new AllocVarInstruction(type);
+                cfgNode.Last()->InsertTail(instr);
+                return instr;
             }
             /*GLeaInstruction * GLea(ILType * type, const String & name)
             {

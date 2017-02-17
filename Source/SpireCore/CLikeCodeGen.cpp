@@ -400,12 +400,7 @@ namespace Spire
 
         void CLikeCodeGen::PrintAllocVarInstr(CodeGenContext & ctx, AllocVarInstruction * instr)
         {
-            if (dynamic_cast<ILConstOperand*>(instr->Size.Ptr()))
-            {
-                ctx.DefineVariable(instr);
-            }
-            else
-                throw InvalidProgramException("size operand of allocVar instr is not an intermediate.");
+            ctx.DefineVariable(instr);
         }
 
         void CLikeCodeGen::PrintFetchArgInstrExpr(CodeGenContext & ctx, FetchArgInstruction * instr)

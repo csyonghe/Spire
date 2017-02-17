@@ -375,6 +375,12 @@ namespace Spire
         public:
             RefPtr<ILType> BaseType;
             ILPointerLikeTypeName Name;
+            ILPointerLikeType() = default;
+            ILPointerLikeType(ILPointerLikeTypeName name, RefPtr<ILType> baseType)
+            {
+                Name = name;
+                BaseType = baseType;
+            }
             virtual bool Equals(ILType* type) override
             {
                 auto btype = dynamic_cast<ILPointerLikeType*>(type);
@@ -1170,26 +1176,20 @@ namespace Spire
         class AllocVarInstruction : public LeaInstruction
         {
         public:
-            UseReference Size;
-            AllocVarInstruction(ILType * type, ILOperand * count)
-                : Size(this)
+            AllocVarInstruction(ILType * type)
             {
                 this->Type = type;
-                this->Size = count;
             }
-            AllocVarInstruction(RefPtr<ILType> & type, ILOperand * count)
-                : Size(this)
+            AllocVarInstruction(RefPtr<ILType> & type)
             {
                 auto ptrType = type->Clone();
                 if (!type)
                     throw ArgumentException("type cannot be null.");
                 this->Type = ptrType;
-                this->Size = count;
             }
             AllocVarInstruction(const AllocVarInstruction & other)
-                :LeaInstruction(other), Size(this)
+                :LeaInstruction(other)
             {
-                Size = other.Size.Ptr();
             }
             virtual bool IsDeterministic() override
             {
@@ -1197,15 +1197,7 @@ namespace Spire
             }
             virtual String ToString() override
             {
-                return Name + " = VAR " + Type->ToString() + ", " + Size.ToString();
-            }
-            virtual OperandIterator begin() override
-            {
-                return &Size;
-            }
-            virtual OperandIterator end() override
-            {
-                return &Size + 1;
+                return Name + " = VAR " + Type->ToString();
             }
             virtual String GetOperatorString() override
             {

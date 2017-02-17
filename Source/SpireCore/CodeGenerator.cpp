@@ -66,17 +66,8 @@ namespace Spire
             {
                 AllocVarInstruction * varOp = 0;
                 RefPtr<ILType> type = TranslateExpressionType(etype);
-                auto arrType = dynamic_cast<ILArrayType*>(type.Ptr());
-
-                if (arrType)
-                {
-                    varOp = codeWriter.AllocVar(arrType->BaseType, result.Program->ConstantPool->CreateConstant(arrType->ArrayLength));
-                }
-                else
-                {
-                    assert(type);
-                    varOp = codeWriter.AllocVar(type, result.Program->ConstantPool->CreateConstant(0));
-                }
+                assert(type);
+                varOp = codeWriter.AllocVar(type);
                 return varOp;
             }
             FetchArgInstruction * FetchArg(ExpressionType * etype, int argId)
