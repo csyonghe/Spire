@@ -266,6 +266,14 @@ namespace Spire
                 Flavor.Fields.IsShadow = false;
                 Flavor.Fields.Shape = ILTextureShape::Texture2D;
             }
+			ILTextureType(RefPtr<ILType> baseType, ILTextureShape shape, bool isMultisample, bool isArray, bool isShadow)
+			{
+				Flavor.Fields.Shape = shape;
+				Flavor.Fields.IsMultisample = isMultisample;
+				Flavor.Fields.IsArray = isArray;
+				Flavor.Fields.IsShadow = isShadow;
+				BaseType = baseType;
+			}
             virtual bool Equals(ILType* type) override
             {
                 auto btype = dynamic_cast<ILTextureType*>(type);

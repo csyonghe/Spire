@@ -52,29 +52,37 @@ namespace Spire
                 return 0;
             }
 
-            RefPtr<ILType> TranslateExpressionType(ExpressionType * type)
-            {
-                if (auto basicType = type->AsBasicType())
-                {
-                    auto base = new ILBasicType();
-                    base->Type = (ILBaseType)basicType->BaseType;
-                    return base;
-                }
-                else if (auto vecType = type->AsVectorType())
-                {
-                    auto elementType = vecType->elementType->AsBasicType();
-                    int elementCount = GetIntVal(vecType->elementCount);
-                    assert(elementType);
-                    return new ILVectorType((ILBaseType)elementType->BaseType, elementCount);
-                }
-                else if (auto matType = type->AsMatrixType())
-                {
-                    auto elementType = matType->elementType->AsBasicType();
-                    int rowCount = GetIntVal(matType->rowCount);
-                    int colCount = GetIntVal(matType->colCount);
-                    assert(elementType);
-                    return new ILMatrixType((ILBaseType)elementType->BaseType, rowCount, colCount);
-                }
+			RefPtr<ILType> TranslateExpressionType(ExpressionType * type)
+			{
+				if (auto basicType = type->AsBasicType())
+				{
+					auto base = new ILBasicType();
+					base->Type = (ILBaseType)basicType->BaseType;
+					return base;
+				}
+				else if (auto vecType = type->AsVectorType())
+				{
+					auto elementType = vecType->elementType->AsBasicType();
+					int elementCount = GetIntVal(vecType->elementCount);
+					assert(elementType);
+					return new ILVectorType((ILBaseType)elementType->BaseType, elementCount);
+				}
+				else if (auto matType = type->AsMatrixType())
+				{
+					auto elementType = matType->elementType->AsBasicType();
+					int rowCount = GetIntVal(matType->rowCount);
+					int colCount = GetIntVal(matType->colCount);
+					assert(elementType);
+					return new ILMatrixType((ILBaseType)elementType->BaseType, rowCount, colCount);
+				}
+				else if (auto texType = type->As<TextureType>())
+				{
+					return new ILTextureType(TranslateExpressionType(texType->elementType.Ptr()),
+						(ILTextureShape)texType->GetBaseShape(),
+						texType->isMultisample(),
+						texType->IsArray(),
+						texType->isShadow());
+				}
                 else if (auto cbufferType = type->As<ConstantBufferType>())
                 {
                     auto ilType = new ILPointerLikeType(ILPointerLikeTypeName::ConstantBuffer, TranslateExpressionType(cbufferType->elementType.Ptr()));
@@ -119,14 +127,24 @@ namespace Spire
         public:
             virtual RefPtr<ProgramSyntaxNode> VisitProgram(ProgramSyntaxNode * prog) override
             {
-                for (auto s : prog->GetStructs())
+				for (auto s : prog->GetStructs())
+				{
+					if (s->HasModifier<IntrinsicModifier>())
+						continue;
                     s->Accept(this);
-                for (auto v : prog->GetMembersOfType<VarDeclrStatementSyntaxNode>())
-                {
+				}
+                for (auto v : prog->GetMembersOfType<Variable>())
+				{
+					if (v->HasModifier<IntrinsicModifier>())
+						continue;
                     v->Accept(this);
                 }
-                for (auto f : prog->GetFunctions())
+				for (auto f : prog->GetFunctions())
+				{
+					if (f->HasModifier<IntrinsicModifier>())
+						continue;
                     f->Accept(this);
+				}
             }
             virtual RefPtr<StructSyntaxNode> VisitStruct(StructSyntaxNode * st) override
             {
