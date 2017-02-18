@@ -10,7 +10,12 @@ namespace Spire
         class ILGenerator : public SyntaxVisitor
         {
         public:
-            RefPtr<ILProgram> program = new ILProgram();
+            ILProgram * program = nullptr;
+            ILGenerator(ILProgram * result, DiagnosticSink * sink)
+                : SyntaxVisitor(sink)
+            {
+                program = result;
+            }
         private:
             Dictionary<StructSyntaxNode*, RefPtr<ILStructType>> structTypes;
             ScopeDictionary<String, ILOperand*> variables;
@@ -145,6 +150,7 @@ namespace Spire
 						continue;
                     f->Accept(this);
 				}
+                return prog;
             }
             virtual RefPtr<StructSyntaxNode> VisitStruct(StructSyntaxNode * st) override
             {
@@ -777,5 +783,10 @@ namespace Spire
                 return expr;
             }
         };
+
+        SyntaxVisitor * CreateILCodeGenerator(DiagnosticSink * err, ILProgram * program)
+        {
+            return new ILGenerator(program, err);
+        }
     }
 }

@@ -1492,5 +1492,6 @@ namespace Spire
         {
             return new CodeGenerator(symbols, result.GetErrorWriter(), result);
         }
+        
     }
 }

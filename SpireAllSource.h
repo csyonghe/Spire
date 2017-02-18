@@ -26,6 +26,7 @@
 #include "Source/SpireCore/NewSpirVCodeGen.cpp"
 #include "Source/SpireCore/Parser.cpp"
 #include "Source/SpireCore/Preprocessor.cpp"
+#include "Source/SpireCore/ILGenerator.cpp"
 #include "Source/SpireCore/SemanticsVisitor.cpp"
 #include "Source/SpireCore/ShaderCompiler.cpp"
 #include "Source/SpireCore/SpirVCodeGen.cpp"
