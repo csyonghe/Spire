@@ -8,24 +8,6 @@ namespace Spire
 {
 	namespace Compiler
 	{
-        // Scope
-
-        Decl* Scope::LookUp(String const& name)
-        {
-            Scope* scope = this;
-            while (scope)
-            {
-                for (auto m : scope->containerDecl->Members)
-                {
-                    if (m->Name.Content == name)
-                        return m.Ptr();
-                }
-
-                scope = scope->Parent.Ptr();
-            }
-            return nullptr;
-        }
-
         // Decl
 
         bool Decl::FindSimpleAttribute(String const& key, Token& outValue)
@@ -79,11 +61,7 @@ namespace Spire
 			auto basicType = dynamic_cast<const BasicExpressionType*>(type);
 			if (basicType == nullptr)
 				return false;
-			return (basicType->BaseType == BaseType &&
-				basicType->Func == Func &&
-				basicType->Shader == Shader &&
-				basicType->structDecl == structDecl &&
-				basicType->RecordTypeName == RecordTypeName);
+			return basicType->BaseType == BaseType;
 		}
 
         ExpressionType* BasicExpressionType::CreateCanonicalType()
@@ -91,30 +69,6 @@ namespace Spire
             // A basic type is already canonical, in our setup
             return this;
         }
-
-		BindableResourceType BasicExpressionType::GetBindableResourceType() const
-		{
-			switch (BaseType)
-			{
-			case Compiler::BaseType::Texture2DArray:
-			case Compiler::BaseType::Texture2DArrayShadow:
-			case Compiler::BaseType::Texture2D:
-			case Compiler::BaseType::Texture2DShadow:
-			case Compiler::BaseType::Texture3D:
-			case Compiler::BaseType::TextureCube:
-			case Compiler::BaseType::TextureCubeShadow:
-				return BindableResourceType::Texture;
-			case Compiler::BaseType::SamplerState:
-			case Compiler::BaseType::SamplerComparisonState:
-				return BindableResourceType::Sampler;
-			}
-			return BindableResourceType::NonBindable;
-		}
-
-		bool BasicExpressionType::IsVectorTypeImpl() const
-		{
-			return IsVector(BaseType);
-		}
 
 		CoreLib::Basic::String BasicExpressionType::ToString() const
 		{
@@ -134,74 +88,8 @@ namespace Spire
 			case Compiler::BaseType::Float:
 				res.Append("float");
 				break;
-			case Compiler::BaseType::Int2:
-				res.Append("ivec2");
-				break;
-			case Compiler::BaseType::UInt2:
-				res.Append("uvec2");
-				break;
-			case Compiler::BaseType::Float2:
-				res.Append("vec2");
-				break;
-			case Compiler::BaseType::Int3:
-				res.Append("ivec3");
-				break;
-			case Compiler::BaseType::UInt3:
-				res.Append("uvec3");
-				break;
-			case Compiler::BaseType::Float3:
-				res.Append("vec3");
-				break;
-			case Compiler::BaseType::Int4:
-				res.Append("ivec4");
-				break;
-			case Compiler::BaseType::UInt4:
-				res.Append("uvec4");
-				break;
-			case Compiler::BaseType::Float4:
-				res.Append("vec4");
-				break;
-			case Compiler::BaseType::Float3x3:
-				res.Append("mat3");
-				break;
-			case Compiler::BaseType::Float4x4:
-				res.Append("mat4");
-				break;
-			case Compiler::BaseType::Texture2DArray:
-				res.Append("sampler2DArray");
-				break;
-			case Compiler::BaseType::Texture2DArrayShadow:
-				res.Append("sampler2DArrayShadow");
-				break;
-			case Compiler::BaseType::Texture2D:
-				res.Append("sampler2D");
-				break;
-			case Compiler::BaseType::Texture2DShadow:
-				res.Append("sampler2DShadow");
-				break;
-			case Compiler::BaseType::Texture3D:
-				res.Append("sampler3D");
-				break;
-			case Compiler::BaseType::TextureCube:
-				res.Append("samplerCube");
-				break;
-			case Compiler::BaseType::TextureCubeShadow:
-				res.Append("samplerCubeShadow");
-				break;
-			case Compiler::BaseType::Function:
-				res.Append(Func->SyntaxNode->InternalName);
-				break;
-			case Compiler::BaseType::Shader:
-				res.Append(Shader->SyntaxNode->Name.Content);
-				break;
 			case Compiler::BaseType::Void:
 				res.Append("void");
-				break;
-			case Compiler::BaseType::Record:
-				res.Append(RecordTypeName);
-				break;
-			case Compiler::BaseType::SamplerState:
-				res.Append("SamplerState");
 				break;
 			case Compiler::BaseType::Error:
 				res.Append("<errtype>");
@@ -211,13 +99,6 @@ namespace Spire
 			}
 			return res.ProduceString();
 		}
-
-		ExpressionType * BasicExpressionType::Clone()
-		{
-			BasicExpressionType * rs = new BasicExpressionType(*this);
-			return rs;
-		}
-
 
 		RefPtr<SyntaxNode> ProgramSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
@@ -242,7 +123,7 @@ namespace Spire
 			{
 				member = member->Clone(ctx);
 			}
-			rs->ReturnTypeNode = ReturnTypeNode->Clone(ctx);
+			rs->ReturnType = ReturnType.Clone(ctx);
 			rs->Body = Body->Clone(ctx);
 			return rs;
 		}
@@ -429,7 +310,8 @@ namespace Spire
 		{
 			auto rs = CloneSyntaxNodeFields(new IndexExpressionSyntaxNode(*this), ctx);
 			rs->BaseExpression = BaseExpression->Clone(ctx);
-			rs->IndexExpression = IndexExpression->Clone(ctx);
+			if(IndexExpression)
+				rs->IndexExpression = IndexExpression->Clone(ctx);
 			return rs;
 		}
 		RefPtr<SyntaxNode> IndexExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
@@ -446,6 +328,35 @@ namespace Spire
 			rs->BaseExpression = BaseExpression->Clone(ctx);
 			return rs;
 		}
+
+		// SwizzleExpr
+
+		RefPtr<SyntaxNode> SwizzleExpr::Accept(SyntaxVisitor * visitor)
+		{
+			// throw "unimplemented";
+			return this;
+		}
+
+		SwizzleExpr * SwizzleExpr::Clone(CloneContext & ctx)
+		{
+			throw "unimplemented";
+		}
+
+		// DerefExpr
+
+		RefPtr<SyntaxNode> DerefExpr::Accept(SyntaxVisitor * visitor)
+		{
+			// throw "unimplemented";
+			return this;
+		}
+
+		DerefExpr * DerefExpr::Clone(CloneContext & ctx)
+		{
+			throw "unimplemented";
+		}
+
+		//
+
 		RefPtr<SyntaxNode> InvokeExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
 			return visitor->VisitInvokeExpression(this);
@@ -468,7 +379,7 @@ namespace Spire
 		TypeCastExpressionSyntaxNode * TypeCastExpressionSyntaxNode::Clone(CloneContext & ctx)
 		{
 			auto rs = CloneSyntaxNodeFields(new TypeCastExpressionSyntaxNode(*this), ctx);
-			rs->TargetType = TargetType->Clone(ctx);
+			rs->TargetType = TargetType.Clone(ctx);
 			rs->Expression = Expression->Clone(ctx);
 			return rs;
 		}
@@ -502,6 +413,22 @@ namespace Spire
 		{
 			return CloneSyntaxNodeFields(new VarExpressionSyntaxNode(*this), ctx);
 		}
+
+		// OverloadedExpr
+
+		RefPtr<SyntaxNode> OverloadedExpr::Accept(SyntaxVisitor * visitor)
+		{
+//			throw "unimplemented";
+			return this;
+		}
+
+		OverloadedExpr * OverloadedExpr::Clone(CloneContext & ctx)
+		{
+			throw "unimplemented";
+		}
+
+		//
+
 		RefPtr<SyntaxNode> ParameterSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
 			return visitor->VisitParameter(this);
@@ -509,13 +436,9 @@ namespace Spire
 		ParameterSyntaxNode * ParameterSyntaxNode::Clone(CloneContext & ctx)
 		{
 			auto rs = CloneSyntaxNodeFields(new ParameterSyntaxNode(*this), ctx);
-			rs->TypeNode = TypeNode->Clone(ctx);
+			rs->Type = Type.Clone(ctx);
 			rs->Expr = Expr->Clone(ctx);
 			return rs;
-		}
-		RefPtr<SyntaxNode> BasicTypeSyntaxNode::Accept(SyntaxVisitor * visitor)
-		{
-			return visitor->VisitBasicType(this);
 		}
 		RefPtr<SyntaxNode> ComponentSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
@@ -524,7 +447,7 @@ namespace Spire
 		ComponentSyntaxNode * ComponentSyntaxNode::Clone(CloneContext & ctx)
 		{
 			auto rs = CloneSyntaxNodeFields(new ComponentSyntaxNode(*this), ctx);
-			rs->TypeNode = TypeNode->Clone(ctx);
+			rs->Type = Type.Clone(ctx);
 			if (Rate)
 				rs->Rate = Rate->Clone(ctx);
 			if (BlockStatement)
@@ -649,10 +572,20 @@ namespace Spire
 			auto rs = CloneSyntaxNodeFields(new DiscardStatementSyntaxNode(*this), ctx);
 			return rs;
 		}
+
+		// BasicExpressionType
+
+		BasicExpressionType* BasicExpressionType::GetScalarType() const
+		{
+			return const_cast<BasicExpressionType*>(this);
+		}
+
 		bool BasicExpressionType::IsIntegralImpl() const
 		{
 			return (BaseType == Compiler::BaseType::Int || BaseType == Compiler::BaseType::UInt || BaseType == Compiler::BaseType::Bool);
 		}
+
+		//
 
         bool ExpressionType::IsIntegral() const
         {
@@ -669,152 +602,115 @@ namespace Spire
 			return Equals(type.Ptr());
 		}
 
-        bool ExpressionType::IsVectorType() const
-        {
-            return GetCanonicalType()->IsVectorTypeImpl();
-        }
-
-        bool ExpressionType::IsArray() const
-        {
-            return GetCanonicalType()->IsArrayImpl();
-        }
-
-        bool ExpressionType::IsGenericType(String typeName) const
-        {
-            return GetCanonicalType()->IsGenericTypeImpl(typeName);
-        }
-
-        BasicExpressionType * ExpressionType::AsBasicType() const
-        {
-            return GetCanonicalType()->AsBasicTypeImpl();
-        }
-
-        ArrayExpressionType * ExpressionType::AsArrayType() const
-        {
-            return GetCanonicalType()->AsArrayTypeImpl();
-        }
-
-        GenericExpressionType * ExpressionType::AsGenericType() const
-        {
-            return GetCanonicalType()->AsGenericTypeImpl();
-        }
+		bool ExpressionType::EqualsVal(Val* val)
+		{
+			if (auto type = dynamic_cast<ExpressionType*>(val))
+				return const_cast<ExpressionType*>(this)->Equals(type);
+			return false;
+		}
 
         NamedExpressionType* ExpressionType::AsNamedType() const
         {
-            return AsNamedTypeImpl();
+			return dynamic_cast<NamedExpressionType*>(const_cast<ExpressionType*>(this));
         }
+
+		RefPtr<Val> ExpressionType::SubstituteImpl(Substitutions* subst, int* ioDiff)
+		{
+			int diff = 0;
+			auto canSubst = GetCanonicalType()->SubstituteImpl(subst, &diff);
+
+			// If nothing changed, then don't drop any sugar that is applied
+			if (!diff)
+				return this;
+
+			// If the canonical type changed, then we return a canonical type,
+			// rather than try to re-construct any amount of sugar
+			(*ioDiff)++;
+			return canSubst;
+		}
+
 
         ExpressionType* ExpressionType::GetCanonicalType() const
         {
+			if (!this) return nullptr;
             ExpressionType* et = const_cast<ExpressionType*>(this);
             if (!et->canonicalType)
             {
                 // TODO(tfoley): worry about thread safety here?
                 et->canonicalType = et->CreateCanonicalType();
+				assert(et->canonicalType);
             }
             return et->canonicalType;
         }
 
-		bool ExpressionType::IsTexture() const
+		BindableResourceType ExpressionType::GetBindableResourceType() const
 		{
-			auto basicType = AsBasicType();
-			if (basicType)
-				return basicType->BaseType == BaseType::Texture2D ||
-				basicType->BaseType == BaseType::TextureCube ||
-				basicType->BaseType == BaseType::Texture2DArray ||
-				basicType->BaseType == BaseType::Texture2DShadow ||
-				basicType->BaseType == BaseType::TextureCubeShadow ||
-				basicType->BaseType == BaseType::Texture2DArrayShadow ||
-				basicType->BaseType == BaseType::Texture3D;
-			return false;
+			if (auto textureType = As<TextureType>())
+				return BindableResourceType::Texture;
+			else if (auto samplerType = As<SamplerStateType>())
+				return BindableResourceType::Sampler;
+			else if(auto storageBufferType = As<StorageBufferType>())
+			{
+				return BindableResourceType::StorageBuffer;
+			}
+			else if(auto uniformBufferType = As<UniformBufferType>())
+			{
+				return BindableResourceType::Buffer;
+			}
+
+			return BindableResourceType::NonBindable;
 		}
+
 		bool ExpressionType::IsTextureOrSampler() const
 		{
-			auto basicType = AsBasicType();
-			if (basicType)
-				return basicType->BaseType == BaseType::Texture2D ||
-					basicType->BaseType == BaseType::TextureCube ||
-					basicType->BaseType == BaseType::Texture2DArray ||
-					basicType->BaseType == BaseType::Texture2DShadow ||
-					basicType->BaseType == BaseType::TextureCubeShadow ||
-					basicType->BaseType == BaseType::Texture2DArrayShadow ||
-					basicType->BaseType == BaseType::Texture3D ||
-					basicType->BaseType == BaseType::SamplerState;
-			return false;
+			return IsTexture() || IsSampler();
 		}
 		bool ExpressionType::IsStruct() const
 		{
-			auto basicType = AsBasicType();
-			if (basicType)
-				return basicType->structDecl != nullptr;
-			return false;
+			auto declRefType = AsDeclRefType();
+			if (!declRefType) return false;
+			auto structDeclRef = declRefType->declRef.As<StructDeclRef>();
+			if (!structDeclRef) return false;
+			return true;
 		}
 		bool ExpressionType::IsShader() const
 		{
-			auto basicType = AsBasicType();
-			if (basicType)
-				return basicType->Shader != nullptr;
-			return false;
+			return this->As<ShaderType>() != nullptr;
 		}
 
 		RefPtr<ExpressionType> ExpressionType::Bool;
 		RefPtr<ExpressionType> ExpressionType::UInt;
-		RefPtr<ExpressionType> ExpressionType::UInt2;
-		RefPtr<ExpressionType> ExpressionType::UInt3;
-		RefPtr<ExpressionType> ExpressionType::UInt4;
 		RefPtr<ExpressionType> ExpressionType::Int;
-		RefPtr<ExpressionType> ExpressionType::Int2;
-		RefPtr<ExpressionType> ExpressionType::Int3;
-		RefPtr<ExpressionType> ExpressionType::Int4;
 		RefPtr<ExpressionType> ExpressionType::Float;
 		RefPtr<ExpressionType> ExpressionType::Float2;
-		RefPtr<ExpressionType> ExpressionType::Float3;
-		RefPtr<ExpressionType> ExpressionType::Float4;
 		RefPtr<ExpressionType> ExpressionType::Void;
 		RefPtr<ExpressionType> ExpressionType::Error;
+		RefPtr<ExpressionType> ExpressionType::Overloaded;
         List<RefPtr<ExpressionType>> ExpressionType::sCanonicalTypes;
 
 		void ExpressionType::Init()
 		{
 			Bool = new BasicExpressionType(BaseType::Bool);
 			UInt = new BasicExpressionType(BaseType::UInt);
-			UInt2 = new BasicExpressionType(BaseType::UInt2);
-			UInt3 = new BasicExpressionType(BaseType::UInt3);
-			UInt4 = new BasicExpressionType(BaseType::UInt4);
 			Int = new BasicExpressionType(BaseType::Int);
-			Int2 = new BasicExpressionType(BaseType::Int2);
-			Int3 = new BasicExpressionType(BaseType::Int3);
-			Int4 = new BasicExpressionType(BaseType::Int4);
-			Float = new BasicExpressionType(BaseType::Float);
-			Float2 = new BasicExpressionType(BaseType::Float2);
-			Float3 = new BasicExpressionType(BaseType::Float3);
-			Float4 = new BasicExpressionType(BaseType::Float4);
+
+			RefPtr<BasicExpressionType> floatType = new BasicExpressionType(BaseType::Float);
+			Float = floatType;
+			Float2 = new VectorExpressionType(floatType, new ConstantIntVal(2));
 			Void = new BasicExpressionType(BaseType::Void);
 			Error = new BasicExpressionType(BaseType::Error);
+			Overloaded = new OverloadGroupType();
 		}
 		void ExpressionType::Finalize()
 		{
 			Bool = nullptr;
 			UInt = nullptr;
-			UInt2 = nullptr;
-			UInt3 = nullptr;
-			UInt4 = nullptr;
 			Int = nullptr;
-			Int2 = nullptr;
-			Int3 = nullptr;
-			Int4 = nullptr;
 			Float = nullptr;
-			Float2 = nullptr;
-			Float3 = nullptr;
-			Float4 = nullptr;
 			Void = nullptr;
 			Error = nullptr;
             // Note(tfoley): This seems to be just about the only way to clear out a List<T>
             sCanonicalTypes = List<RefPtr<ExpressionType>>();
-		}
-		bool ArrayExpressionType::IsArrayImpl() const
-		{
-			return true;
 		}
 		bool ArrayExpressionType::EqualsImpl(const ExpressionType * type) const
 		{
@@ -834,78 +730,229 @@ namespace Spire
         }
 		CoreLib::Basic::String ArrayExpressionType::ToString() const
 		{
-			if (ArrayLength > 0)
-				return BaseType->ToString() + "[" + String(ArrayLength) + "]";
+			if (ArrayLength)
+				return BaseType->ToString() + "[" + ArrayLength->ToString() + "]";
 			else
 				return BaseType->ToString() + "[]";
 		}
-		ExpressionType * ArrayExpressionType::Clone()
+		RefPtr<SyntaxNode> GenericAppExpr::Accept(SyntaxVisitor * visitor)
 		{
-			auto rs = new ArrayExpressionType(*this);
-			rs->BaseType = BaseType->Clone();
-			return rs;
+			return visitor->VisitGenericApp(this);
 		}
-		RefPtr<SyntaxNode> ArrayTypeSyntaxNode::Accept(SyntaxVisitor * visitor)
+
+		// DeclRefType
+
+		String DeclRefType::ToString() const
 		{
-			return visitor->VisitArrayType(this);
+			return declRef.GetName();
 		}
-		RefPtr<SyntaxNode> GenericTypeSyntaxNode::Accept(SyntaxVisitor * visitor)
+
+		bool DeclRefType::EqualsImpl(const ExpressionType * type) const
 		{
-			return visitor->VisitGenericType(this);
-		}
-		bool GenericExpressionType::EqualsImpl(const ExpressionType * type) const
-		{
-			if (auto gtype = type->AsGenericType())
-				return GenericTypeName == gtype->GenericTypeName && gtype->BaseType->Equals(BaseType.Ptr());
-			
+			if (auto declRefType = type->AsDeclRefType())
+			{
+				return declRef.Equals(declRefType->declRef);
+			}
 			return false;
 		}
-        ExpressionType* GenericExpressionType::CreateCanonicalType()
-        {
-            auto canonicalBaseType = BaseType->GetCanonicalType();
-            auto canonicalGenericType = new GenericExpressionType();
-            sCanonicalTypes.Add(canonicalGenericType);
-            canonicalGenericType->BaseType = canonicalBaseType;
-            canonicalGenericType->GenericTypeName = GenericTypeName;
-            return canonicalGenericType;
-        }
-		BindableResourceType GenericExpressionType::GetBindableResourceType() const
+
+		ExpressionType* DeclRefType::CreateCanonicalType()
 		{
-			if (GenericTypeName == "StructuredBuffer" || GenericTypeName == "RWStructuredBuffer")
-				return BindableResourceType::StorageBuffer;
-			else if (GenericTypeName == "Uniform")
-				return BindableResourceType::Buffer;
-			return BindableResourceType::NonBindable;
+			// A declaration reference is already canonical
+			return this;
 		}
-		CoreLib::Basic::String GenericExpressionType::ToString() const
+
+		RefPtr<Val> DeclRefType::SubstituteImpl(Substitutions* subst, int* ioDiff)
 		{
-			return GenericTypeName + "<" + BaseType->ToString() + ">";
+			if (!subst) return this;
+
+			// the case we especially care about is when this type references a declaration
+			// of a generic parameter, since that is what we might be substituting...
+			if (auto genericTypeParamDecl = dynamic_cast<GenericTypeParamDecl*>(declRef.GetDecl()))
+			{
+				// search for a substitution that might apply to us
+				for (auto s = subst; s; s = s->outer.Ptr())
+				{
+					// the generic decl associated with the substitution list must be
+					// the generic decl that declared this parameter
+					auto genericDecl = s->genericDecl;
+					if (genericDecl != genericTypeParamDecl->ParentDecl)
+						continue;
+
+					int index = 0;
+					for (auto m : genericDecl->Members)
+					{
+						if (m.Ptr() == genericTypeParamDecl)
+						{
+							// We've found it, so return the corresponding specialization argument
+							(*ioDiff)++;
+							return s->args[index];
+						}
+						else if(auto typeParam = m.As<GenericTypeParamDecl>())
+						{
+							index++;
+						}
+						else if(auto valParam = m.As<GenericValueParamDecl>())
+						{
+							index++;
+						}
+						else
+						{
+						}
+					}
+
+				}
+			}
+
+
+			int diff = 0;
+			DeclRef substDeclRef = declRef.SubstituteImpl(subst, &diff);
+
+			if (!diff)
+				return this;
+
+			// Re-construct the type in case we are using a specialized sub-class
+			return DeclRefType::Create(substDeclRef);
 		}
-		ExpressionType * GenericExpressionType::Clone()
+
+		static RefPtr<ExpressionType> ExtractGenericArgType(RefPtr<Val> val)
 		{
-			auto rs = new GenericExpressionType(*this);
-			rs->BaseType = BaseType->Clone();
-			return rs;
+			auto type = val.As<ExpressionType>();
+			assert(type.Ptr());
+			return type;
+		}
+
+		static RefPtr<IntVal> ExtractGenericArgInteger(RefPtr<Val> val)
+		{
+			auto intVal = val.As<IntVal>();
+			assert(intVal.Ptr());
+			return intVal;
+		}
+
+		// TODO: need to figure out how to unify this with the logic
+		// in the generic case...
+		DeclRefType* DeclRefType::Create(DeclRef declRef)
+		{
+			if (auto builtinMod = declRef.GetDecl()->FindModifier<BuiltinTypeModifier>())
+			{
+				auto type = new BasicExpressionType(builtinMod->tag);
+				type->declRef = declRef;
+				return type;
+			}
+			else if (auto magicMod = declRef.GetDecl()->FindModifier<MagicTypeModifier>())
+			{
+				Substitutions* subst = declRef.substitutions.Ptr();
+
+				if (magicMod->name == "SamplerState")
+				{
+					auto type = new SamplerStateType();
+					type->declRef = declRef;
+					type->flavor = SamplerStateType::Flavor(magicMod->tag);
+					return type;
+				}
+				else if (magicMod->name == "Vector")
+				{
+					assert(subst && subst->args.Count() == 2);
+					auto vecType = new VectorExpressionType(
+						ExtractGenericArgType(subst->args[0]),
+						ExtractGenericArgInteger(subst->args[1]));
+					vecType->declRef = declRef;
+					return vecType;
+				}
+				else if (magicMod->name == "Matrix")
+				{
+					assert(subst && subst->args.Count() == 3);
+					auto matType = new MatrixExpressionType(
+						ExtractGenericArgType(subst->args[0]),
+						ExtractGenericArgInteger(subst->args[1]),
+						ExtractGenericArgInteger(subst->args[2]));
+					matType->declRef = declRef;
+					return matType;
+				}
+				else if (magicMod->name == "Texture")
+				{
+					assert(subst && subst->args.Count() >= 1);
+					auto textureType = new TextureType(
+						magicMod->tag,
+						ExtractGenericArgType(subst->args[0]));
+					textureType->declRef = declRef;
+					return textureType;
+				}
+
+				#define CASE(n,T)													\
+					else if(magicMod->name == #n) {									\
+						assert(subst && subst->args.Count() == 1);					\
+						auto type = new T();										\
+						type->elementType = ExtractGenericArgType(subst->args[0]);	\
+						type->declRef = declRef;									\
+						return type;												\
+					}
+
+				CASE(ConstantBuffer, ConstantBufferType)
+				CASE(TextureBuffer, TextureBufferType)
+
+				CASE(PackedBuffer, PackedBufferType)
+				CASE(Uniform, UniformBufferType)
+				CASE(Patch, PatchType)
+
+				CASE(HLSLBufferType, HLSLBufferType)
+				CASE(HLSLStructuredBufferType, HLSLStructuredBufferType)
+				CASE(HLSLRWBufferType, HLSLRWBufferType)
+				CASE(HLSLRWStructuredBufferType, HLSLRWStructuredBufferType)
+				CASE(HLSLAppendStructuredBufferType, HLSLAppendStructuredBufferType)
+				CASE(HLSLConsumeStructuredBufferType, HLSLConsumeStructuredBufferType)
+				CASE(HLSLInputPatchType, HLSLInputPatchType)
+				CASE(HLSLOutputPatchType, HLSLOutputPatchType)
+
+				#undef CASE
+
+				// "magic" builtin types which have no generic parameters
+				#define CASE(n,T)													\
+					else if(magicMod->name == #n) {									\
+						auto type = new T();										\
+						type->declRef = declRef;									\
+						return type;												\
+					}
+
+				CASE(HLSLByteAddressBufferType, HLSLByteAddressBufferType)
+				CASE(HLSLRWByteAddressBufferType, HLSLRWByteAddressBufferType)
+
+				#undef CASE
+
+				else
+				{
+					throw "unimplemented";
+				}
+			}
+			else
+			{
+				return new DeclRefType(declRef);
+			}
+		}
+
+		// OverloadGroupType
+
+		String OverloadGroupType::ToString() const
+		{
+			return "overload group";
+		}
+
+		bool OverloadGroupType::EqualsImpl(const ExpressionType * type) const
+		{
+			return false;
+		}
+
+		ExpressionType* OverloadGroupType::CreateCanonicalType()
+		{
+			return  this;
 		}
 
         // NamedExpressionType
 
         String NamedExpressionType::ToString() const
         {
-            return decl->Name.Content;
+			return declRef.GetName();
         }
-
-        ExpressionType * NamedExpressionType::Clone()
-        {
-            NamedExpressionType* result = new NamedExpressionType();
-            result->decl = decl;
-            return result;
-        }
-
-		BindableResourceType NamedExpressionType::GetBindableResourceType() const
-		{
-			return GetCanonicalType()->GetBindableResourceType();
-		}
 
         bool NamedExpressionType::EqualsImpl(const ExpressionType * /*type*/) const
         {
@@ -913,15 +960,255 @@ namespace Spire
             return false;
         }
 
-        NamedExpressionType * NamedExpressionType::AsNamedTypeImpl() const
-        {
-            return const_cast<NamedExpressionType*>(this);
-        }
-
         ExpressionType* NamedExpressionType::CreateCanonicalType()
         {
-            return decl->Type->GetCanonicalType();
+            return declRef.GetType()->GetCanonicalType();
         }
+
+		// FuncType
+
+		String FuncType::ToString() const
+		{
+			// TODO: a better approach than this
+			if (Func)
+				return Func->SyntaxNode->InternalName;
+			else if (Component)
+				return Component->Name;
+			else
+				return "/* unknown FuncType */";
+		}
+
+		bool FuncType::EqualsImpl(const ExpressionType * type) const
+		{
+			if (auto funcType = type->As<FuncType>())
+			{
+				return Func == funcType->Func
+					&& Component == funcType->Component;
+			}
+			return false;
+		}
+
+		ExpressionType* FuncType::CreateCanonicalType()
+		{
+			return this;
+		}
+
+		// ShaderType
+
+		String ShaderType::ToString() const
+		{
+			return Shader->SyntaxNode->Name.Content;
+		}
+
+		bool ShaderType::EqualsImpl(const ExpressionType * type) const
+		{
+			if (auto shaderType = type->As<ShaderType>())
+			{
+				// TODO(tfoley): This does not compare the shader closure,
+				// because the original implementation in `BasicExpressionType`
+				// didn't either. It isn't clear whether that would be right or wrong.
+				return Shader == shaderType->Shader;
+			}
+			return false;
+		}
+
+		ExpressionType* ShaderType::CreateCanonicalType()
+		{
+			return this;
+		}
+
+		// ImportOperatorGenericParamType
+
+		String ImportOperatorGenericParamType::ToString() const
+		{
+			return GenericTypeVar;
+		}
+
+		bool ImportOperatorGenericParamType::EqualsImpl(const ExpressionType * type) const
+		{
+			if (auto genericType = type->As<ImportOperatorGenericParamType>())
+			{
+				// TODO(tfoley): This does not compare the shader closure,
+				// because the original implementation in `BasicExpressionType`
+				// didn't either. It isn't clear whether that would be right or wrong.
+				return GenericTypeVar == genericType->GenericTypeVar;
+			}
+			return false;
+		}
+
+		ExpressionType* ImportOperatorGenericParamType::CreateCanonicalType()
+		{
+			return this;
+		}
+
+		// TypeExpressionType
+
+		String TypeExpressionType::ToString() const
+		{
+			StringBuilder sb;
+			sb << "typeof(" << type->ToString() << ")";
+			return sb.ProduceString();
+		}
+
+		bool TypeExpressionType::EqualsImpl(const ExpressionType * t) const
+		{
+			if (auto typeType = t->AsTypeType())
+			{
+				return t->Equals(typeType->type);
+			}
+			return false;
+		}
+
+		ExpressionType* TypeExpressionType::CreateCanonicalType()
+		{
+			auto canType = new TypeExpressionType(type->GetCanonicalType());
+			sCanonicalTypes.Add(canType);
+			return canType;
+		}
+
+		// GenericDeclRefType
+
+		String GenericDeclRefType::ToString() const
+		{
+			// TODO: what is appropriate here?
+			return "<GenericDeclRef>";
+		}
+
+		bool GenericDeclRefType::EqualsImpl(const ExpressionType * type) const
+		{
+			if (auto genericDeclRefType = type->As<GenericDeclRefType>())
+			{
+				return declRef.Equals(genericDeclRefType->declRef);
+			}
+			return false;
+		}
+
+		ExpressionType* GenericDeclRefType::CreateCanonicalType()
+		{
+			return this;
+		}
+
+		// ArithmeticExpressionType
+
+		// VectorExpressionType
+
+		String VectorExpressionType::ToString() const
+		{
+			StringBuilder sb;
+			sb << "vector<" << elementType->ToString() << "," << elementCount->ToString() << ">";
+			return sb.ProduceString();
+		}
+
+		BasicExpressionType* VectorExpressionType::GetScalarType() const
+		{
+			return elementType->AsBasicType();
+		}
+
+		bool VectorExpressionType::EqualsImpl(const ExpressionType * type) const
+		{
+			if (auto vecType = type->AsVectorType())
+			{
+				return elementType->Equals(vecType->elementType)
+					&& elementCount->EqualsVal(vecType->elementCount.Ptr());
+			}
+			
+			return false;
+		}
+
+		ExpressionType* VectorExpressionType::CreateCanonicalType()
+		{
+			auto canElementType = elementType->GetCanonicalType();
+			auto canType = new VectorExpressionType(canElementType, elementCount);
+			canType->declRef = declRef;
+			sCanonicalTypes.Add(canType);
+			return canType;
+		}
+
+		RefPtr<Val> VectorExpressionType::SubstituteImpl(Substitutions* subst, int* ioDiff)
+		{
+			int diff = 0;
+			auto substDeclRef = declRef.SubstituteImpl(subst, &diff);
+			auto substElementType = elementType->SubstituteImpl(subst, &diff).As<ExpressionType>();
+
+			if (!diff)
+				return this;
+
+			(*ioDiff)++;
+			auto substType = new VectorExpressionType(substElementType, elementCount);
+			substType->declRef = substDeclRef;
+			return substType;
+		}
+
+
+		// MatrixExpressionType
+
+		String MatrixExpressionType::ToString() const
+		{
+			StringBuilder sb;
+			sb << "matrix<" << elementType->ToString() << "," << rowCount->ToString() << "," << colCount->ToString() << ">";
+			return sb.ProduceString();
+		}
+
+		BasicExpressionType* MatrixExpressionType::GetScalarType() const
+		{
+			return elementType->AsBasicType();
+		}
+
+		bool MatrixExpressionType::EqualsImpl(const ExpressionType * type) const
+		{
+			if (auto matType = type->AsMatrixType())
+			{
+				return elementType->Equals(matType->elementType)
+					&& rowCount->EqualsVal(matType->rowCount.Ptr())
+					&& colCount->EqualsVal(matType->colCount.Ptr());
+			}
+			
+			return false;
+		}
+
+		ExpressionType* MatrixExpressionType::CreateCanonicalType()
+		{
+			auto canElementType = elementType->GetCanonicalType();
+			auto canType = new MatrixExpressionType(canElementType, rowCount, colCount);
+			canType->declRef = declRef;
+			sCanonicalTypes.Add(canType);
+			return canType;
+		}
+
+
+		RefPtr<Val> MatrixExpressionType::SubstituteImpl(Substitutions* subst, int* ioDiff)
+		{
+			int diff = 0;
+			auto substDeclRef = declRef.SubstituteImpl(subst, &diff);
+			auto substElementType = elementType->SubstituteImpl(subst, &diff).As<ExpressionType>();
+
+			if (!diff)
+				return this;
+
+			(*ioDiff)++;
+			auto substType = new MatrixExpressionType(substElementType, rowCount, colCount);
+			substType->declRef = substDeclRef;
+			return substType;
+		}
+
+		// TextureType
+
+		RefPtr<Val> TextureType::SubstituteImpl(Substitutions* subst, int* ioDiff)
+		{
+			int diff = 0;
+			auto substDeclRef = declRef.SubstituteImpl(subst, &diff);
+			auto substElementType = elementType->SubstituteImpl(subst, &diff).As<ExpressionType>();
+
+			if (!diff)
+				return this;
+
+			(*ioDiff)++;
+			auto substType = new TextureType(flavor, substElementType);
+			substType->declRef = substDeclRef;
+			return substType;
+		}
+
+		//
 
 		RefPtr<SyntaxNode> ImportExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
 		{
@@ -941,10 +1228,13 @@ namespace Spire
 		{
 			return new StageSyntaxNode(*this);
 		}
+
+		//
+
+
 		RefPtr<ComponentSyntaxNode> SyntaxVisitor::VisitComponent(ComponentSyntaxNode * comp)
 		{
-			if (comp->TypeNode)
-				comp->TypeNode = comp->TypeNode->Accept(this).As<TypeSyntaxNode>();
+			comp->Type = comp->Type.Accept(this);
 			if (comp->Expression)
 				comp->Expression = comp->Expression->Accept(this).As<ExpressionSyntaxNode>();
 			if (comp->BlockStatement)
@@ -1058,5 +1348,301 @@ namespace Spire
 			auto rs = CloneSyntaxNodeFields(new TemplateShaderParameterSyntaxNode(*this), ctx);
 			return rs;
 		}
-}
+
+		// TypeExp
+
+		TypeExp TypeExp::Clone(CloneContext& context)
+		{
+			TypeExp result;
+			if (exp)
+				result.exp = exp->Clone(context);
+			return result;
+		}
+
+		TypeExp TypeExp::Accept(SyntaxVisitor* visitor)
+		{
+			return visitor->VisitTypeExp(*this);
+		}
+
+		// BuiltinTypeModifier
+
+		// MagicTypeModifier
+
+		// GenericDecl
+
+		RefPtr<SyntaxNode> GenericDecl::Accept(SyntaxVisitor * visitor)
+		{
+			return visitor->VisitGenericDecl(this);
+		}
+
+		GenericDecl * GenericDecl::Clone(CloneContext & ctx) {
+			throw "unimplemented";
+		}
+
+		// GenericTypeParamDecl
+
+		RefPtr<SyntaxNode> GenericTypeParamDecl::Accept(SyntaxVisitor * visitor) {
+			//throw "unimplemented";
+			return this;
+		}
+
+		GenericTypeParamDecl * GenericTypeParamDecl::Clone(CloneContext & ctx) {
+			throw "unimplemented";
+		}
+
+		// GenericValueParamDecl
+
+		RefPtr<SyntaxNode> GenericValueParamDecl::Accept(SyntaxVisitor * visitor) {
+			//throw "unimplemented";
+			return this;
+		}
+
+		GenericValueParamDecl * GenericValueParamDecl::Clone(CloneContext & ctx) {
+			throw "unimplemented";
+		}
+
+		// GenericParamIntVal
+
+		bool GenericParamIntVal::EqualsVal(Val* val)
+		{
+			if (auto genericParamVal = dynamic_cast<GenericParamIntVal*>(val))
+			{
+				return declRef.Equals(genericParamVal->declRef);
+			}
+			return false;
+		}
+
+		String GenericParamIntVal::ToString() const
+		{
+			return declRef.GetName();
+		}
+
+		// ExtensionDecl
+
+		RefPtr<SyntaxNode> ExtensionDecl::Accept(SyntaxVisitor * visitor)
+		{
+			visitor->VisitExtensionDecl(this);
+			return this;
+		}
+
+		ExtensionDecl* ExtensionDecl::Clone(CloneContext & ctx)
+		{
+			throw "unimplemented";
+		}
+
+		// ConstructorDecl
+
+		RefPtr<SyntaxNode> ConstructorDecl::Accept(SyntaxVisitor * visitor)
+		{
+			visitor->VisitConstructorDecl(this);
+			return this;
+		}
+
+		ConstructorDecl* ConstructorDecl::Clone(CloneContext & ctx)
+		{
+			throw "unimplemented";
+		}
+
+		// Substitutions
+
+		RefPtr<Substitutions> Substitutions::SubstituteImpl(Substitutions* subst, int* ioDiff)
+		{
+			if (!this) return nullptr;
+
+			int diff = 0;
+			auto outerSubst = outer->SubstituteImpl(subst, &diff);
+
+			List<RefPtr<Val>> substArgs;
+			for (auto a : args)
+			{
+				substArgs.Add(a->SubstituteImpl(subst, &diff));
+			}
+
+			if (!diff) return this;
+
+			auto substSubst = new Substitutions();
+			substSubst->genericDecl = genericDecl;
+			substSubst->args = substArgs;
+			return substSubst;
+		}
+
+		bool Substitutions::Equals(Substitutions* subst)
+		{
+			// both must be NULL, or non-NULL
+			if (!this || !subst)
+				return !this && !subst;
+
+			if (genericDecl != subst->genericDecl)
+				return false;
+
+			int argCount = args.Count();
+			assert(args.Count() == subst->args.Count());
+			for (int aa = 0; aa < argCount; ++aa)
+			{
+				if (!args[aa]->EqualsVal(subst->args[aa].Ptr()))
+					return false;
+			}
+
+			if (!outer->Equals(subst->outer.Ptr()))
+				return false;
+
+			return true;
+		}
+
+
+		// DeclRef
+
+		RefPtr<ExpressionType> DeclRef::Substitute(RefPtr<ExpressionType> type) const
+		{
+			// No substitutions? Easy.
+			if (!substitutions)
+				return type;
+
+			// Otherwise we need to recurse on the type structure
+			// and apply substitutions where it makes sense
+
+			return type->Substitute(substitutions.Ptr()).As<ExpressionType>();
+		}
+
+		DeclRef DeclRef::SubstituteImpl(Substitutions* subst, int* ioDiff)
+		{
+			if (!substitutions) return *this;
+
+			int diff = 0;
+			RefPtr<Substitutions> substSubst = substitutions->SubstituteImpl(subst, &diff);
+
+			if (!diff)
+				return *this;
+
+			DeclRef substDeclRef;
+			substDeclRef.decl = decl;
+			substDeclRef.substitutions = substSubst;
+			return substDeclRef;
+		}
+
+
+		// Check if this is an equivalent declaration reference to another
+		bool DeclRef::Equals(DeclRef const& declRef) const
+		{
+			if (decl != declRef.decl)
+				return false;
+
+			if (!substitutions->Equals(declRef.substitutions.Ptr()))
+				return false;
+
+			return true;
+		}
+
+		// Convenience accessors for common properties of declarations
+		String const& DeclRef::GetName() const
+		{
+			return decl->Name.Content;
+		}
+
+		DeclRef DeclRef::GetParent() const
+		{
+			auto parentDecl = decl->ParentDecl;
+			if (auto parentGeneric = dynamic_cast<GenericDecl*>(parentDecl))
+			{
+				// We need to strip away one layer of specialization
+				assert(substitutions);
+				return DeclRef(parentGeneric, substitutions->outer);
+			}
+			else
+			{
+				// If the parent isn't a generic, then it must
+				// use the same specializations as this declaration
+				return DeclRef(parentDecl, substitutions);
+			}
+
+		}
+
+		// Val
+
+		RefPtr<Val> Val::Substitute(Substitutions* subst)
+		{
+			if (!this) return nullptr;
+			if (!subst) return this;
+			int diff = 0;
+			return SubstituteImpl(subst, &diff);
+		}
+
+		RefPtr<Val> Val::SubstituteImpl(Substitutions* subst, int* ioDiff)
+		{
+			// Default behavior is to not substitute at all
+			return this;
+		}
+
+		// ConstantIntVal
+
+		bool ConstantIntVal::EqualsVal(Val* val)
+		{
+			if (auto intVal = dynamic_cast<ConstantIntVal*>(val))
+				return value == intVal->value;
+			return false;
+		}
+
+		String ConstantIntVal::ToString() const
+		{
+			return String(value);
+		}
+
+		// SwitchStmt
+
+		RefPtr<SyntaxNode> SwitchStmt::Accept(SyntaxVisitor * visitor)
+		{
+			return visitor->VisitSwitchStmt(this);
+		}
+
+		SwitchStmt * SwitchStmt::Clone(CloneContext & ctx)
+		{
+			throw "unimplemented";
+		}
+
+		RefPtr<SyntaxNode> CaseStmt::Accept(SyntaxVisitor * visitor)
+		{
+			return visitor->VisitCaseStmt(this);
+		}
+
+		CaseStmt * CaseStmt::Clone(CloneContext & ctx)
+		{
+			throw "unimplemented";
+		}
+
+		RefPtr<SyntaxNode> DefaultStmt::Accept(SyntaxVisitor * visitor)
+		{
+			return visitor->VisitDefaultStmt(this);
+		}
+
+		DefaultStmt * DefaultStmt::Clone(CloneContext & ctx)
+		{
+			throw "unimplemented";
+		}
+
+		// TraitDecl
+
+		RefPtr<SyntaxNode> TraitDecl::Accept(SyntaxVisitor * visitor)
+		{
+			visitor->VisitTraitDecl(this);
+			return this;
+		}
+
+		ExtensionDecl* TraitDecl::Clone(CloneContext & ctx)
+		{
+			throw "unimplemented";
+		}
+
+		// SharedTypeExpr
+
+		RefPtr<SyntaxNode> SharedTypeExpr::Accept(SyntaxVisitor * visitor)
+		{
+			return visitor->VisitSharedTypeExpr(this);
+		}
+
+		SharedTypeExpr * SharedTypeExpr::Clone(CloneContext & ctx)
+		{
+			throw "unimplemented";
+		}
+
+	}
 }

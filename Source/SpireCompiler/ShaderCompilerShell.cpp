@@ -6,7 +6,7 @@ using namespace CoreLib::IO;
 using namespace Spire::Compiler;
 
 // Try to read an argument for a command-line option.
-String tryReadCommandLineArgument(wchar_t const* option, wchar_t***ioCursor, wchar_t**end)
+wchar_t const* tryReadCommandLineArgumentRaw(wchar_t const* option, wchar_t***ioCursor, wchar_t**end)
 {
 	wchar_t**& cursor = *ioCursor;
 	if (cursor == end)
@@ -16,8 +16,22 @@ String tryReadCommandLineArgument(wchar_t const* option, wchar_t***ioCursor, wch
 	}
 	else
 	{
-		return String::FromWString(*cursor++);
+		return *cursor++;
 	}
+}
+
+String tryReadCommandLineArgument(wchar_t const* option, wchar_t***ioCursor, wchar_t**end)
+{
+	return String::FromWString(tryReadCommandLineArgumentRaw(option, ioCursor, end));
+}
+
+Profile TranslateProfileName(char const* name)
+{
+#define PROFILE(TAG, NAME, STAGE, VERSION)	if(strcmp(name, #NAME) == 0) return Profile::TAG;
+#define PROFILE_ALIAS(TAG, NAME)			if(strcmp(name, #NAME) == 0) return Profile::TAG;
+#include "SpireCore/ProfileDefs.h"
+
+	return Profile::Unknown;
 }
 
 int wmain(int argc, wchar_t* argv[])
@@ -49,7 +63,7 @@ int wmain(int argc, wchar_t* argv[])
 					options.SymbolToCompile = tryReadCommandLineArgument(arg, &argCursor, argEnd);
 				else if (argStr == "-schedule")
 					options.ScheduleFileName = tryReadCommandLineArgument(arg, &argCursor, argEnd);
-				else if (argStr == "-backend")
+				else if (argStr == "-backend" || argStr == "-target")
 				{
 					String name = tryReadCommandLineArgument(arg, &argCursor, argEnd);
 					if (name == "glsl")
@@ -72,13 +86,132 @@ int wmain(int argc, wchar_t* argv[])
 					{
 						options.Target = CodeGenTarget::SPIRV;
 					}
+					else if (name == "dxbc")
+					{
+						options.Target = CodeGenTarget::DXBytecode;
+					}
+					else if (name == "dxbc-assembly")
+					{
+						options.Target = CodeGenTarget::DXBytecodeAssembly;
+					}
 					else
 					{
 						fprintf(stderr, "unknown code generation target '%S'\n", name.ToWString());
 					}
 				}
+				// A "profile" specifies both a specific target stage and a general level
+				// of capability required by the program.
+				else if (argStr == "-profile")
+				{
+					String name = tryReadCommandLineArgument(arg, &argCursor, argEnd);
+
+					Profile profile = TranslateProfileName(name.begin());
+					if( profile.raw == Profile::Unknown )
+					{
+						fprintf(stderr, "unknown profile '%s'\n", name);
+					}
+					else
+					{
+						options.profile = profile;
+					}
+				}
+				else if (argStr == "-entry")
+				{
+					String name = tryReadCommandLineArgument(arg, &argCursor, argEnd);
+
+					EntryPointOption entry;
+					entry.name = name;
+
+					// TODO(tfoley): Allow user to fold a specification of a profile into the entry-point name,
+					// for the case where they might be compiling multiple entry points in one invocation...
+					//
+					// For now, just use the last profile set on the command-line to specify this
+
+					entry.profile = options.profile;
+
+					options.entryPoints.Add(entry);
+				}
+				else if (argStr == "-stage")
+				{
+					String name = tryReadCommandLineArgument(arg, &argCursor, argEnd);
+					StageTarget stage = StageTarget::Unknown;
+					if (name == "vertex") { stage = StageTarget::VertexShader; }
+					else if (name == "fragment") { stage = StageTarget::FragmentShader; }
+					else if (name == "hull") { stage = StageTarget::HullShader; }
+					else if (name == "domain") { stage = StageTarget::DomainShader; }
+					else if (name == "compute") { stage = StageTarget::ComputeShader; }
+					else
+					{
+						fprintf(stderr, "unknown stage '%S'\n", name.ToWString());
+					}
+					options.stage = stage;
+				}
+				else if (argStr == "-pass-through")
+				{
+					String name = tryReadCommandLineArgument(arg, &argCursor, argEnd);
+					PassThroughMode passThrough = PassThroughMode::None;
+					if (name == "fxc") { passThrough = PassThroughMode::HLSL; }
+					else
+					{
+						fprintf(stderr, "unknown pass-through target '%S'\n", name.ToWString());
+					}
+					options.passThrough = passThrough;
+				}
 				else if (argStr == "-genchoice")
 					options.Mode = CompilerMode::GenerateChoice;
+				else if (argStr[1] == 'D')
+				{
+					// The value to be defined might be part of the same option, as in:
+					//     -DFOO
+					// or it might come separately, as in:
+					//     -D FOO
+					wchar_t const* defineStr = arg + 2;
+					if (defineStr[0] == 0)
+					{
+						// Need to read another argument from the command line
+						defineStr = tryReadCommandLineArgumentRaw(arg, &argCursor, argEnd);
+					}
+					// The string that sets up the define can have an `=` between
+					// the name to be defined and its value, so we search for one.
+					wchar_t const* eqPos = nullptr;
+					for(wchar_t const* dd = defineStr; *dd; ++dd)
+					{
+						if (*dd == '=')
+						{
+							eqPos = dd;
+							break;
+						}
+					}
+
+					// Now set the preprocessor define
+					//
+					if (eqPos)
+					{
+						// If we found an `=`, we split the string...
+						options.PreprocessorDefinitions[String::FromWString(defineStr, eqPos)] = String::FromWString(eqPos+1);
+					}
+					else
+					{
+						// If there was no `=`, then just #define it to an empty string
+						options.PreprocessorDefinitions[String::FromWString(defineStr)] = String();
+					}
+				}
+				else if (argStr[1] == 'I')
+				{
+					// The value to be defined might be part of the same option, as in:
+					//     -IFOO
+					// or it might come separately, as in:
+					//     -I FOO
+					// (see handling of `-D` above)
+					wchar_t const* includeDirStr = arg + 2;
+					if (includeDirStr[0] == 0)
+					{
+						// Need to read another argument from the command line
+						includeDirStr = tryReadCommandLineArgumentRaw(arg, &argCursor, argEnd);
+					}
+
+					options.SearchDirectories.Add(String::FromWString(includeDirStr));
+				}
 				else if (argStr == "--")
 				{
 					// The `--` option causes us to stop trying to parse options,
@@ -113,6 +246,27 @@ int wmain(int argc, wchar_t* argv[])
 			fprintf(stderr, "error: multiple input files specified\n");
 			exit(1);
 		}
+
+		// For any entry points that were given without an explicit profile, we can now apply
+		// the profile that was given to them.
+		if( options.entryPoints.Count() != 0 )
+		{
+			if( options.profile.raw == Profile::Unknown )
+			{
+				fprintf(stderr, "error: no profile specified; use the '-profile <profile name>' option");
+				exit(1);
+			}
+
+			for( auto& e : options.entryPoints )
+			{
+				if( e.profile.raw == Profile::Unknown )
+				{
+					e.profile = options.profile;
+				}
+			}
+		}
+
+		//
 
 		String fileName = String::FromWString(inputPaths[0]);
 

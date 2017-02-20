@@ -63,6 +63,7 @@ DIAGNOSTIC(10001, Error, illegalCharacterLiteral, "Illegal character literial.")
 DIAGNOSTIC(15000, Error, endOfFileInPreprocessorConditional, "end of file encountered during preprocessor conditional")
 DIAGNOSTIC(15001, Error, directiveWithoutIf, "'$0' directive without '#if'")
 DIAGNOSTIC(15002, Error, directiveAfterElse , "'$0' directive without '#if'")
+
 DIAGNOSTIC(-1, Note, seeDirective, "see '$0' directive")
 
 // 151xx - directive parsing
@@ -78,6 +79,8 @@ DIAGNOSTIC(15200, Error, expectedTokenInPreprocessorExpression, "expected '$0' i
 DIAGNOSTIC(15201, Error, syntaxErrorInPreprocessorExpression, "syntax error in preprocessor expression");
 DIAGNOSTIC(15202, Error, divideByZeroInPreprocessorExpression, "division by zero in preprocessor expression");
 DIAGNOSTIC(15203, Error, expectedTokenInDefinedExpression, "expected '$0' in 'defined' expression");
+DIAGNOSTIC(15204, Warning, directiveExpectsExpression, "'$0' directive requires an expression");
+
 DIAGNOSTIC(-1, Note, seeOpeningToken, "see opening '$0'")
 
 // 153xx - #include
@@ -240,6 +243,20 @@ DIAGNOSTIC(36004, Error, templateShaderArgumentDidNotImplementRequiredInterface,
 DIAGNOSTIC(36010, Error, specializeCanOnlyBeUsedOnParam, "'specialize' modifier can only be used on module parameters.");
 DIAGNOSTIC(36011, Error, specializedParameterMustBeInt, "specialized parameters must be a int, uint or bool.");
 DIAGNOSTIC(36012, Error, specializationValuesMustBeConstantLiterial, "specialization candidate values can only be constant literials.");
+
+
+DIAGNOSTIC(39999, Error, expectedIntegerConstantWrongType, "expected integer constant (found: '$0')")
+DIAGNOSTIC(39999, Error, expectedIntegerConstantNotConstant, "expression does not evaluate to a compile-time constant")
+
+DIAGNOSTIC(39999, Error, noApplicableOverloadForNameWithArgs, "no overload for '$0' applicable to arguments of type $1")
+DIAGNOSTIC(39999, Error, noApplicableWithArgs, "no overload applicable to arguments of type $1")
+
+DIAGNOSTIC(39999, Error, caseOutsideSwitch, "'case' not allowed outside of a 'switch' statement")
+DIAGNOSTIC(39999, Error, defaultOutsideSwitch, "'default' not allowed outside of a 'switch' statement")
+
+DIAGNOSTIC(39999, Error, expectedAGeneric, "expected a generic when using '<...>' (found: '$0')")
+
+
 //
 // 4xxxx - IL code generation.
 //

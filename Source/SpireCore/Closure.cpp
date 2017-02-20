@@ -97,8 +97,8 @@ namespace Spire
 						compSyntax->Name.Content = compName;
 						CloneContext cloneCtx;
 						compSyntax->Expression = arg->Expression->Clone(cloneCtx);
-						compSyntax->TypeNode = new BasicTypeSyntaxNode();
-						compSyntax->TypeNode->Position = compSyntax->Position;
+						compSyntax->Type = TypeExp(new VarExpressionSyntaxNode());
+						compSyntax->Type.exp->Position = compSyntax->Position;
 						impl->SyntaxNode = compSyntax;
 						ccomp->Name = compName;
 						ccomp->Type = new Type();
@@ -325,24 +325,28 @@ namespace Spire
 
 			RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode * var) override
 			{
-                if (auto decl = var->Scope->LookUp(var->Variable))
+                if (auto declRef = var->declRef)
                 {
                     // TODO(tfoley): wire up the variable to the declaration
-					if (dynamic_cast<VarDeclBase*>(decl)) // make sure this is a ordinary variable (currently ComponentSyntaxNode is not VarDeclBase)
+					if(declRef.As<VarDeclBaseRef>()) // make sure this is a ordinary variable (currently ComponentSyntaxNode is not VarDeclBase)
 						return var;
                 }
                 // Otherwise look in other places...
-				if (var->Type->AsBasicType() && var->Type->AsBasicType()->Component)
+				// TODO(tfoley): is this really only used for functions?
+				if (auto funcType = var->Type->As<FuncType>())
 				{
-					if (auto comp = shaderClosure->FindComponent(var->Type->AsBasicType()->Component->Name))
+					if (auto funcComponent = funcType->Component)
 					{
-						if (comp->Implementations.First()->SyntaxNode->IsRequire())
-							shaderClosure->RefMap.TryGetValue(comp->Name, comp);
-						var->Tags["ComponentReference"] = new StringObject(comp->UniqueName);
-						AddReference(comp.Ptr(), currentImport, var->Position);
+						if (auto comp = shaderClosure->FindComponent(funcComponent->Name))
+						{
+							if (comp->Implementations.First()->SyntaxNode->IsRequire())
+								shaderClosure->RefMap.TryGetValue(comp->Name, comp);
+							var->Tags["ComponentReference"] = new StringObject(comp->UniqueName);
+							AddReference(comp.Ptr(), currentImport, var->Position);
+						}
+						else
+							throw InvalidProgramException("cannot resolve reference.");
 					}
-					else
-						throw InvalidProgramException("cannot resolve reference.");
 				}
 				if (auto comp = shaderClosure->FindComponent(var->Variable))
 				{
@@ -355,11 +359,16 @@ namespace Spire
 				else if (auto closure = shaderClosure->FindClosure(var->Variable))
 				{
 					ShaderSymbol * originalShader = nullptr;
-					if (var->Type->AsBasicType())
-						originalShader = var->Type->AsBasicType()->Shader;
-					var->Type = new BasicExpressionType(originalShader, closure.Ptr());
+					if (auto originalShaderType = var->Type->As<ShaderType>())
+						originalShader = originalShaderType->Shader;
+					var->Type = new ShaderType(originalShader, closure.Ptr());
 				}
-				else if (!(var->Type->AsBasicType() && var->Type->AsBasicType()->BaseType == BaseType::Function))
+				// HACK(tfoley): For now just ignore cases where this is really a type
+				if (auto typeType = var->Type.type.As<TypeExpressionType>())
+				{
+					// ignore it
+				}
+				else if (!var->Type->As<FuncType>())
 					throw InvalidProgramException("cannot resolve reference.");
 				return var;
 			}
@@ -367,30 +376,33 @@ namespace Spire
 			RefPtr<ExpressionSyntaxNode> VisitMemberExpression(MemberExpressionSyntaxNode * member) override
 			{
 				member->BaseExpression->Accept(this);
-				if (member->BaseExpression->Type->AsBasicType() && member->BaseExpression->Type->AsBasicType()->ShaderClosure)
+				if (auto baseShaderType = member->BaseExpression->Type->As<ShaderType>())
 				{
-					if (auto comp = member->BaseExpression->Type->AsBasicType()->ShaderClosure->FindComponent(member->MemberName))
+					if (auto comp = baseShaderType->ShaderClosure->FindComponent(member->MemberName))
 					{
 						member->Tags["ComponentReference"] = new StringObject(comp->UniqueName);
 						AddReference(comp.Ptr(), currentImport, member->Position);
 					}
-					else if (auto shader = member->BaseExpression->Type->AsBasicType()->ShaderClosure->FindClosure(member->MemberName))
+					else if (auto shader = baseShaderType->ShaderClosure->FindClosure(member->MemberName))
 					{
 						ShaderSymbol * originalShader = nullptr;
-						if (member->Type->AsBasicType())
-							originalShader = member->Type->AsBasicType()->Shader;
-						member->Type = new BasicExpressionType(originalShader, shader.Ptr());
+						if (auto memberShaderType = member->Type->As<ShaderType>())
+							originalShader = memberShaderType->Shader;
+						member->Type = new ShaderType(originalShader, shader.Ptr());
 					}
 				}
-				else if (member->Type->AsBasicType() && member->Type->AsBasicType()->Component)
+				else if (auto funcType = member->Type->As<FuncType>())
 				{
-					if (auto comp = shaderClosure->FindComponent(member->Type->AsBasicType()->Component->Name))
+					if (auto funcComponentSym = funcType->Component)
 					{
-						member->Tags["ComponentReference"] = new StringObject(comp->UniqueName);
-						AddReference(comp.Ptr(), currentImport, member->Position);
+						if (auto comp = shaderClosure->FindComponent(funcComponentSym->Name))
+						{
+							member->Tags["ComponentReference"] = new StringObject(comp->UniqueName);
+							AddReference(comp.Ptr(), currentImport, member->Position);
+						}
+						else
+							throw InvalidProgramException("cannot resolve reference.");
 					}
-					else
-						throw InvalidProgramException("cannot resolve reference.");
 				}
 				return member;
 			}

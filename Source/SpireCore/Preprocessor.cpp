@@ -1302,6 +1302,18 @@ static void HandleElseDirective(PreprocessorDirectiveContext* context)
 // Handle a `#elif` directive
 static void HandleElifDirective(PreprocessorDirectiveContext* context)
 {
+	// HACK(tfoley): handle an empty `elif` like an `else` directive
+	//
+	// This is the behavior expected by at least one input program.
+	// We will eventually want to be pedantic about this.
+	// even if t
+	if (PeekRawTokenType(context) == TokenType::EndOfFile)
+	{
+		GetSink(context)->diagnose(GetDirectiveLoc(context), Diagnostics::directiveExpectsExpression, GetDirectiveName(context));
+		HandleElseDirective(context);
+		return;
+	}
+
     PreprocessorExpressionValue value = ParseAndEvaluateExpression(context);
 
     PreprocessorInputStream* inputStream = context->preprocessor->inputStream;
@@ -1572,6 +1584,12 @@ static void HandleVersionDirective(PreprocessorDirectiveContext* context)
     SkipToEndOfLine(context);
 }
 
+// Handle an invalid directive
+static void HandleInvalidDirective(PreprocessorDirectiveContext* context)
+{
+	GetSink(context)->diagnose(GetDirectiveLoc(context), Diagnostics::unknownPreprocessorDirective, GetDirectiveName(context));
+	SkipToEndOfLine(context);
+}
 
 // Callback interface used by preprocessor directives
 typedef void (*PreprocessorDirectiveCallback)(PreprocessorDirectiveContext* context);
@@ -1618,6 +1636,10 @@ static const PreprocessorDirective kDirectives[] =
     { NULL, NULL },
 };
 
+static const PreprocessorDirective kInvalidDirective = {
+	NULL, &HandleInvalidDirective, 0,
+};
+
 // Look up the directive with the given name.
 static PreprocessorDirective const* FindDirective(String const& name)
 {
@@ -1630,7 +1652,7 @@ static PreprocessorDirective const* FindDirective(String const& name)
         return &kDirectives[ii];
     }
 
-    return NULL;
+    return &kInvalidDirective;
 }
 
 // Process a directive, where the preprocessor has already consumed the
@@ -1660,12 +1682,6 @@ static void HandleDirective(PreprocessorDirectiveContext* context)
 
     // Look up the handler for the directive.
     PreprocessorDirective const* directive = FindDirective(GetDirectiveName(context));
-    if (!directive)
-    {
-        GetSink(context)->diagnose(GetDirectiveLoc(context), Diagnostics::unknownPreprocessorDirective, GetDirectiveName(context));
-        SkipToEndOfLine(context);
-        return;
-    }
 
     // If we are skipping disabled code, and the directive is not one
     // of the small number that need to run even in that case, skip it.

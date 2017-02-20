@@ -410,6 +410,24 @@ namespace CoreLib
 						pos += 2;
 						state = State::MultiComment;
 					}
+					else if (curChar == '.')
+					{
+						if (IsDigit(nextChar))
+						{
+							state = State::Int;
+							tokenLine = line;
+							tokenCol = col;
+						}
+						else
+						{
+							state = State::Operator;
+							tokenLine = line;
+							tokenCol = col;
+
+							tokenBuilder.Append(curChar);
+							pos++;
+						}
+					}
 					else if (IsPunctuation(curChar))
 					{
 						state = State::Operator;
@@ -496,6 +514,13 @@ namespace CoreLib
 					else if (curChar == 'x')
 					{
 						state = State::Hex;
+						tokenBuilder.Append(curChar);
+						pos++;
+					}
+					// Allow `u` or `U` suffix to indicate unsigned literal
+					// TODO(tfoley): handle more general suffixes on literals
+					else if (curChar == 'u' || curChar == 'U')
+					{
 						tokenBuilder.Append(curChar);
 						pos++;
 					}
@@ -615,8 +640,11 @@ namespace CoreLib
 					pos++;
 					break;
 				case State::SingleComment:
-					if (curChar == '\n')
+					if(curChar == '\r' || curChar == '\n')
+					{
 						state = State::Start;
+						tokenFlags |= TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace;
+					}
 					pos++;
 					break;
 				case State::MultiComment:

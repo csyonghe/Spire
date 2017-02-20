@@ -13,17 +13,44 @@ using namespace CoreLib::Basic;
 
 #include <Windows.h>
 
+static bool advance(OSFindFilesResult& result)
+{
+	return FindNextFileW(result.findHandle_, &result.fileData_) != 0;
+}
+
+static bool adjustToValidResult(OSFindFilesResult& result)
+{
+	for (;;)
+	{
+		if ((result.fileData_.dwFileAttributes & result.requiredMask_) != result.requiredMask_)
+			goto skip;
+
+		if ((result.fileData_.dwFileAttributes & result.disallowedMask_) != 0)
+			goto skip;
+
+		if (wcscmp(result.fileData_.cFileName, L".") == 0)
+			goto skip;
+
+		if (wcscmp(result.fileData_.cFileName, L"..") == 0)
+			goto skip;
+
+		result.filePath_ = result.directoryPath_ + String::FromWString(result.fileData_.cFileName);
+		if (result.fileData_.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+			result.filePath_ = result.filePath_ + "/";
+
+		return true;
+
+	skip:
+		if (!advance(result))
+			return false;
+	}
+}
+
+
 bool OSFindFilesResult::findNextFile()
 {
-	BOOL result = FindNextFileW(
-		findHandle_,
-		&fileData_);
-	if (!result)
-		return false;
-
-	filePath_ = directoryPath_ + String::FromWString(fileData_.cFileName);
-
-	return true;
+	if (!advance(*this)) return false;
+	return adjustToValidResult(*this);
 }
 
 OSFindFilesResult osFindFilesInDirectoryMatchingPattern(
@@ -41,17 +68,53 @@ OSFindFilesResult osFindFilesInDirectoryMatchingPattern(
 
 	result.directoryPath_ = directoryPath;
 	result.findHandle_ = findHandle;
+	result.requiredMask_ = 0;
+	result.disallowedMask_ = FILE_ATTRIBUTE_DIRECTORY;
 
 	if (findHandle == INVALID_HANDLE_VALUE)
 	{
+		result.findHandle_ = NULL;
 		result.error_ = kOSError_FileNotFound;
-	}
-	else
-	{
-		result.filePath_ = directoryPath + String::FromWString(result.fileData_.cFileName);
-		result.error_ = kOSError_None;
+		return result;
 	}
 
+	result.error_ = kOSError_None;
+	if (!adjustToValidResult(result))
+	{
+		result.findHandle_ = NULL;
+	}
+	return result;
+}
+
+OSFindFilesResult osFindChildDirectories(
+	CoreLib::Basic::String directoryPath)
+{
+	// TODO: add separator to end of directory path if needed
+
+	String searchPath = directoryPath + "*";
+
+	OSFindFilesResult result;
+	HANDLE findHandle = FindFirstFileW(
+		searchPath.ToWString(),
+		&result.fileData_);
+
+	result.directoryPath_ = directoryPath;
+	result.findHandle_ = findHandle;
+	result.requiredMask_ = FILE_ATTRIBUTE_DIRECTORY;
+	result.disallowedMask_ = 0;
+
+	if (findHandle == INVALID_HANDLE_VALUE)
+	{
+		result.findHandle_ = NULL;
+		result.error_ = kOSError_FileNotFound;
+		return result;
+	}
+
+	result.error_ = kOSError_None;
+	if (!adjustToValidResult(result))
+	{
+		result.findHandle_ = NULL;
+	}
 	return result;
 }
 

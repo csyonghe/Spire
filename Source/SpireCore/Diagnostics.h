@@ -73,6 +73,8 @@ namespace Spire
         class ExpressionType;
         class ILType;
         class StageAttribute;
+		struct TypeExp;
+		struct QualType;
 
         void printDiagnosticArg(StringBuilder& sb, char const* str);
 		void printDiagnosticArg(StringBuilder& sb, int val);
@@ -80,6 +82,8 @@ namespace Spire
         void printDiagnosticArg(StringBuilder& sb, Decl* decl);
         void printDiagnosticArg(StringBuilder& sb, Type* type);
         void printDiagnosticArg(StringBuilder& sb, ExpressionType* type);
+        void printDiagnosticArg(StringBuilder& sb, TypeExp const& type);
+        void printDiagnosticArg(StringBuilder& sb, QualType const& type);
         void printDiagnosticArg(StringBuilder& sb, ILType* type);
         void printDiagnosticArg(StringBuilder& sb, CoreLib::Text::TokenType tokenType);
         void printDiagnosticArg(StringBuilder& sb, Token const& token);
@@ -98,6 +102,7 @@ namespace Spire
         CodePosition const& getDiagnosticPos(SyntaxNode const* syntax);
         CodePosition const& getDiagnosticPos(CoreLib::Text::Token const& token);
         CodePosition const& getDiagnosticPos(ShaderClosure* shader);
+        CodePosition const& getDiagnosticPos(TypeExp const& typeExp);
 
         template<typename T>
         CodePosition getDiagnosticPos(RefPtr<T> const& ptr)
@@ -216,11 +221,16 @@ namespace Spire
     (sink)->diagnose(Spire::Compiler::CodePosition(__LINE__, 0, 0, __FILE__), Spire::Compiler::Diagnostics::internalCompilerError)
 #define SPIRE_UNIMPLEMENTED(sink, pos, what) \
     (sink)->diagnose(Spire::Compiler::CodePosition(__LINE__, 0, 0, __FILE__), Spire::Compiler::Diagnostics::unimplemented, what)
+
+#define SPIRE_UNREACHABLE(msg) do { assert(!"ureachable code:" msg); exit(1); } while(0)
 #else
 #define SPIRE_INTERNAL_ERROR(sink, pos) \
     (sink)->diagnose(pos, Spire::Compiler::Diagnostics::internalCompilerError)
 #define SPIRE_UNIMPLEMENTED(sink, pos, what) \
     (sink)->diagnose(pos, Spire::Compiler::Diagnostics::unimplemented, what)
+
+// TODO: find something that will perform better
+#define SPIRE_UNREACHABLE(msg) exit(1)
 #endif
 
 #endif

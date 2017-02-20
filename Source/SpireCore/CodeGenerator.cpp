@@ -135,6 +135,13 @@ namespace Spire
 			{
 				VisitStruct(st);
 			}
+			virtual void ProcessGlobalVar(VarDeclBase * var) override
+			{
+				// TODO(tfoley): implement this properly
+				AllocVarInstruction * varOp = AllocVar(var->Type.Ptr());
+				varOp->Name = EscapeCodeName(var->Name.Content);
+				variables.Add(var->Name.Content, varOp);
+			}
 
 			void GenerateParameterBindingInfo(ShaderIR * shader)
 			{
@@ -299,9 +306,9 @@ namespace Spire
 
             ParameterQualifier GetParamQualifier(ParameterSyntaxNode* paramDecl)
             {
-                if (paramDecl->modifiers.flags && ModifierFlag::InOut)
+				if(paramDecl->HasModifier<InOutModifier>())
                     return ParameterQualifier::InOut;
-                else if (paramDecl->modifiers.flags && ModifierFlag::Out)
+				else if(paramDecl->HasModifier<OutModifier>())
                     return ParameterQualifier::Out;
                 else
                     return ParameterQualifier::In;
@@ -1132,11 +1139,16 @@ namespace Spire
 							PushStack(rs);
 						}
 					}
-					else if (expr->BaseExpression->Type->IsStruct())
+					else if(auto declRefType = expr->BaseExpression->Type->AsDeclRefType())
 					{
-						int id = expr->BaseExpression->Type->AsBasicType()->structDecl->FindFieldIndex(expr->MemberName);
-						GenerateIndexExpression(base, result.Program->ConstantPool->CreateConstant(id),
-							expr->Access == ExpressionAccess::Read);
+						if (auto structDecl = declRefType->declRef.As<StructDeclRef>())
+						{
+							int id = structDecl.GetDecl()->FindFieldIndex(expr->MemberName);
+							GenerateIndexExpression(base, result.Program->ConstantPool->CreateConstant(id),
+								expr->Access == ExpressionAccess::Read);
+						}
+						else
+							throw NotImplementedException("member expression codegen");
 					}
 					else
 						throw NotImplementedException("member expression codegen");
@@ -1148,28 +1160,28 @@ namespace Spire
 				List<ILOperand*> args;
 				String funcName;
 				bool hasSideEffect = false;
-				if (auto basicType = expr->FunctionExpr->Type->AsBasicType())
+				if (auto funcType = expr->FunctionExpr->Type->As<FuncType>())
 				{
-					if (basicType->Func)
+					if (funcType->Func)
 					{
-						funcName = basicType->Func->SyntaxNode->IsExtern() ? basicType->Func->SyntaxNode->Name.Content : basicType->Func->SyntaxNode->InternalName;
-						for (auto & param : basicType->Func->SyntaxNode->GetParameters())
+						funcName = funcType->Func->SyntaxNode->IsExtern() ? funcType->Func->SyntaxNode->Name.Content : funcType->Func->SyntaxNode->InternalName;
+						for (auto & param : funcType->Func->SyntaxNode->GetParameters())
 						{
-							if (param->HasModifier(ModifierFlag::Out))
+							if (param->HasModifier<OutModifier>())
 							{
 								hasSideEffect = true;
 								break;
 							}
 						}
 					}
-					else if (basicType->Component)
+					else if (funcType->Component)
 					{
 						auto funcCompName = expr->FunctionExpr->Tags["ComponentReference"]().As<StringObject>()->Content;
 						auto funcComp = *(currentShader->DefinitionsByComponent[funcCompName]().TryGetValue(currentComponent->World));
 						funcName = GetComponentFunctionName(funcComp->SyntaxNode.Ptr());
 						for (auto & param : funcComp->SyntaxNode->GetParameters())
 						{
-							if (param->HasModifier(ModifierFlag::Out))
+							if (param->HasModifier<OutModifier>())
 							{
 								hasSideEffect = true;
 								break;
@@ -1212,19 +1224,19 @@ namespace Spire
 			{
 				expr->Expression->Accept(this);
 				auto base = PopStack();
-				if (expr->Expression->Type == expr->Type)
+				if (expr->Expression->Type->Equals(expr->Type))
 				{
 					PushStack(base);
 				}
-				else if (expr->Expression->Type == ExpressionType::Float &&
-					expr->Type == ExpressionType::Int)
+				else if (expr->Expression->Type->Equals(ExpressionType::Float) &&
+					expr->Type->Equals(ExpressionType::Int))
 				{
 					auto instr = new Float2IntInstruction(base);
 					codeWriter.Insert(instr);
 					PushStack(instr);
 				}
-				else if (expr->Expression->Type == ExpressionType::Int &&
-					expr->Type == ExpressionType::Float)
+				else if (expr->Expression->Type->Equals(ExpressionType::Int) &&
+					expr->Type->Equals(ExpressionType::Float))
 				{
 					auto instr = new Int2FloatInstruction(base);
 					codeWriter.Insert(instr);
@@ -1251,7 +1263,7 @@ namespace Spire
 						instr = new AddInstruction();
 					instr->Operands.SetSize(2);
 					instr->Operands[0] = base;
-					if (expr->Type == ExpressionType::Float)
+					if (expr->Type->Equals(ExpressionType::Float))
 						instr->Operands[1] = result.Program->ConstantPool->CreateConstant(1.0f);
 					else
 						instr->Operands[1] = result.Program->ConstantPool->CreateConstant(1);
@@ -1277,7 +1289,7 @@ namespace Spire
 						instr = new AddInstruction();
 					instr->Operands.SetSize(2);
 					instr->Operands[0] = base;
-					if (expr->Type == ExpressionType::Float)
+					if (expr->Type->Equals(ExpressionType::Float))
 						instr->Operands[1] = result.Program->ConstantPool->CreateConstant(1.0f);
 					else
 						instr->Operands[1] = result.Program->ConstantPool->CreateConstant(1);
@@ -1397,45 +1409,134 @@ namespace Spire
 				return ilStructType;
 			}
 
+			int GetIntVal(RefPtr<IntVal> val)
+			{
+				if (auto constantVal = val.As<ConstantIntVal>())
+				{
+					return constantVal->value;
+				}
+				assert(!"unexpected");
+				return 0;
+			}
+
 			RefPtr<ILType> TranslateExpressionType(ExpressionType * type)
 			{
-				RefPtr<ILType> resultType = 0;
 				if (auto basicType = type->AsBasicType())
 				{
-					if (basicType->BaseType == BaseType::Struct)
+					auto base = new ILBasicType();
+					base->Type = (ILBaseType)basicType->BaseType;
+					return base;
+				}
+				else if (auto genericType = type->As<ImportOperatorGenericParamType>())
+				{
+					return genericTypeMappings[genericType->GenericTypeVar]();
+				}
+				else if (auto vecType = type->AsVectorType())
+				{
+					auto elementType = vecType->elementType->AsBasicType();
+					int elementCount = GetIntVal(vecType->elementCount);
+					assert(elementType);
+
+					static const struct {
+						BaseType	elementType;
+						int			elementCount;
+						ILBaseType	ilBaseType;
+					} kMapping[] = {
+						{ BaseType::Float, 2, /*ILBaseType::*/Float2 },
+						{ BaseType::Float, 3, /*ILBaseType::*/Float3 },
+						{ BaseType::Float, 4, /*ILBaseType::*/Float4 },
+						{ BaseType::Int, 2, /*ILBaseType::*/Int2 },
+						{ BaseType::Int, 3, /*ILBaseType::*/Int3 },
+						{ BaseType::Int, 4, /*ILBaseType::*/Int4 },
+						{ BaseType::UInt, 2, /*ILBaseType::*/UInt2 },
+						{ BaseType::UInt, 3, /*ILBaseType::*/UInt3 },
+						{ BaseType::UInt, 4, /*ILBaseType::*/UInt4 },
+					};
+					static const int kMappingCount = sizeof(kMapping) / sizeof(kMapping[0]);
+
+					for (int ii = 0; ii < kMappingCount; ++ii)
 					{
-						resultType = TranslateStructType(basicType->structDecl);
+						if (elementCount != kMapping[ii].elementCount) continue;
+						if (elementType->BaseType != kMapping[ii].elementType) continue;
+
+						auto base = new ILBasicType();
+						base->Type = kMapping[ii].ilBaseType;
+						return base;
 					}
-					else if (basicType->BaseType == BaseType::Record)
+					throw NotImplementedException("vector type");
+				}
+				else if (auto matType = type->AsMatrixType())
+				{
+					auto elementType = matType->elementType->AsBasicType();
+					int rowCount = GetIntVal(matType->rowCount);
+					int colCount =  GetIntVal(matType->colCount);
+					assert(elementType);
+
+					static const struct {
+						BaseType	elementType;
+						int			rowCount;
+						int			colCount;
+						ILBaseType	ilBaseType;
+					} kMapping[] = {
+						{ BaseType::Float, 3, 3, /*ILBaseType::*/Float3x3 },
+						{ BaseType::Float, 4, 4, /*ILBaseType::*/Float4x4 },
+					};
+					static const int kMappingCount = sizeof(kMapping) / sizeof(kMapping[0]);
+
+					for (int ii = 0; ii < kMappingCount; ++ii)
 					{
-						return genericTypeMappings[basicType->RecordTypeName]();
+						if (rowCount != kMapping[ii].rowCount) continue;
+						if (colCount != kMapping[ii].colCount) continue;
+						if (elementType->BaseType != kMapping[ii].elementType) continue;
+
+						auto base = new ILBasicType();
+						base->Type = kMapping[ii].ilBaseType;
+						return base;
 					}
-					else if (basicType->BaseType == BaseType::Generic)
+					throw NotImplementedException("matrix type");
+				}
+
+				else if (auto cbufferType = type->As<ConstantBufferType>())
+				{
+					auto ilType = new ILGenericType();
+					ilType->GenericTypeName = "ConstantBuffer";
+					ilType->BaseType = TranslateExpressionType(cbufferType->elementType.Ptr());
+					return ilType;
+				}
+
+				else if (auto declRefType = type->AsDeclRefType())
+				{
+					auto decl = declRefType->declRef.decl;
+					if (auto worldDecl = dynamic_cast<WorldSyntaxNode*>(decl))
 					{
-						return genericTypeMappings[basicType->GenericTypeVar]();
+						return genericTypeMappings[worldDecl->Name.Content];
+					}
+					else if (auto structDecl = dynamic_cast<StructSyntaxNode*>(decl))
+					{
+						return TranslateStructType(structDecl);
 					}
 					else
 					{
-						auto base = new ILBasicType();
-						base->Type = (ILBaseType)basicType->BaseType;
-						resultType = base;
+						throw NotImplementedException("decl type");
 					}
 				}
 				else if (auto arrType = type->AsArrayType())
 				{
 					auto nArrType = new ILArrayType();
 					nArrType->BaseType = TranslateExpressionType(arrType->BaseType.Ptr());
-					nArrType->ArrayLength = arrType->ArrayLength;
-					resultType = nArrType;
+					nArrType->ArrayLength = arrType->ArrayLength ? GetIntVal(arrType->ArrayLength) : 0;
+					return nArrType;
 				}
+#if TIMREMOVED
 				else if (auto genType = type->AsGenericType())
 				{
 					auto gType = new ILGenericType();
 					gType->GenericTypeName = genType->GenericTypeName;
 					gType->BaseType = TranslateExpressionType(genType->BaseType.Ptr());
-					resultType = gType;
+					return gType;
 				}
-				return resultType;
+#endif
+				throw NotImplementedException("decl type");
 			}
 
 			RefPtr<ILType> TranslateExpressionType(const RefPtr<ExpressionType> & type)

@@ -81,17 +81,17 @@ namespace Spire
 						thruDef->UniqueName = thruDefName;
 						thruDef->UniqueKey = referencedDef->UniqueKey + "@" + node.TargetWorld;
 						thruDef->IsEntryPoint = false;
+						thruDef->Type = srcDef->SyntaxNode->Type;
 						thruDef->SyntaxNode = new ComponentSyntaxNode();
-						thruDef->SyntaxNode->Type = thruDef->Type = srcDef->SyntaxNode->Type;
+						thruDef->SyntaxNode->Type.type = thruDef->Type;
 						thruDef->SyntaxNode->Rate = new RateSyntaxNode();
 						thruDef->SyntaxNode->Rate->Worlds.Add(RateWorld(node.TargetWorld));
 						thruDef->SyntaxNode->Name.Content = thruDefName;
 						CloneContext cloneCtx;
-						thruDef->SyntaxNode->TypeNode = srcDef->SyntaxNode->TypeNode->Clone(cloneCtx);
+						thruDef->SyntaxNode->Type = srcDef->SyntaxNode->Type.Clone(cloneCtx);
 						auto importExpr = new ImportExpressionSyntaxNode();
 						importExpr->Type = thruDef->Type;
 						importExpr->ImportOperatorDef = node.ImportOperator->Clone(cloneCtx);
-						importExpr->ImportOperatorDef->Scope->Parent = thruDef->SyntaxNode->Scope.Ptr();
 						importExpr->ComponentUniqueName = srcDef->UniqueName;
 						for (auto & arg : importExpr->Arguments)
 							arg->Accept(this);

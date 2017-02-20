@@ -81,6 +81,12 @@
     <ClInclude Include="SamplerUsageAnalysis.h">
       <Filter>Back End</Filter>
     </ClInclude>
+    <ClInclude Include="Emit.h">
+      <Filter>Front End</Filter>
+    </ClInclude>
+    <ClInclude Include="ProfileDefs.h">
+      <Filter>Front End</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Lexer.cpp">
@@ -163,6 +169,9 @@
     </ClCompile>
     <ClCompile Include="SamplerUsageAnalysis.cpp">
       <Filter>Back End</Filter>
+    </ClCompile>
+    <ClCompile Include="Emit.cpp">
+      <Filter>Front End</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

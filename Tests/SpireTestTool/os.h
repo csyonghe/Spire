@@ -37,6 +37,8 @@ struct OSFindFilesResult
 #ifdef WIN32
 	HANDLE				findHandle_;
 	WIN32_FIND_DATAW	fileData_;
+	DWORD				requiredMask_;
+	DWORD				disallowedMask_;
 	OSError				error_;
 #else
 #endif
@@ -63,7 +65,10 @@ struct OSFindFilesResult
 
 	Iterator begin()
 	{
-		Iterator result = { this };
+#ifdef WIN32
+		Iterator result = { findHandle_ ? this : NULL };
+#else
+#endif
 		return result;
 	}
 
@@ -78,6 +83,18 @@ struct OSFindFilesResult
 // `pattern` as a simplified regex for files to return (e.g., "*.txt")
 // and return a logical collection of the results
 // that can be iterated with a range-based `for` loop:
+//
+// for( auto subdir : osFindChildDirectories(dir))
+// { ... }
+//
+// Each element in the range is a `CoreLib::Basic::String` representing the
+// path to a subdirecotry of the directory.
+OSFindFilesResult osFindChildDirectories(
+	CoreLib::Basic::String directoryPath);
+
+// Enumerate subdirectories in the given `directoryPath` and return a logical
+// collection of the results that can be iterated with a range-based
+// `for` loop:
 //
 // for( auto file : osFindFilesInDirectoryMatchingPattern(dir, "*.txt"))
 // { ... }

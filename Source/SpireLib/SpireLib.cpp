@@ -165,42 +165,42 @@ namespace SpireLib
 		return resultFiles;
 	}
 
-	List<ShaderLibFile> CompileShaderSource(Spire::Compiler::CompileResult & compileResult,
-		const CoreLib::String & src, const CoreLib::String & fileName, Spire::Compiler::CompileOptions & options)
-	{
-		struct IncludeHandlerImpl : IncludeHandler
-		{
-			List<String> searchDirs;
 
-			virtual bool TryToFindIncludeFile(
-				CoreLib::String const& pathToInclude,
-				CoreLib::String const& pathIncludedFrom,
-				CoreLib::String* outFoundPath,
-				CoreLib::String* outFoundSource) override
+	struct IncludeHandlerImpl : IncludeHandler
+	{
+		List<String> searchDirs;
+
+		virtual bool TryToFindIncludeFile(
+		CoreLib::String const& pathToInclude,
+		CoreLib::String const& pathIncludedFrom,
+		CoreLib::String* outFoundPath,
+		CoreLib::String* outFoundSource) override
+		{
+			String path = Path::Combine(Path::GetDirectoryName(pathIncludedFrom), pathToInclude);
+			if (File::Exists(path))
 			{
-				String path = Path::Combine(Path::GetDirectoryName(pathIncludedFrom), pathToInclude);
+				*outFoundPath = path;
+				*outFoundSource = File::ReadAllText(path);
+				return true;
+			}
+
+			for (auto & dir : searchDirs)
+			{
+				path = Path::Combine(dir, pathToInclude);
 				if (File::Exists(path))
 				{
 					*outFoundPath = path;
 					*outFoundSource = File::ReadAllText(path);
 					return true;
 				}
-
-				for (auto & dir : searchDirs)
-				{
-					path = Path::Combine(dir, pathToInclude);
-					if (File::Exists(path))
-					{
-						*outFoundPath = path;
-						*outFoundSource = File::ReadAllText(path);
-						return true;
-					}
-				}
-				return false;
 			}
+			return false;
+		}
+	};
 
-		};
-
+	List<ShaderLibFile> CompileShaderSource(Spire::Compiler::CompileResult & compileResult,
+		const CoreLib::String & src, const CoreLib::String & fileName, Spire::Compiler::CompileOptions & options)
+	{
 		IncludeHandlerImpl includeHandler;
 		includeHandler.searchDirs = options.SearchDirectories;
 
@@ -214,7 +214,19 @@ namespace SpireLib
 		auto searchDirs = options.SearchDirectories;
 		searchDirs.Add(Path::GetDirectoryName(fileName));
 		searchDirs.Reverse();
-		auto predefUnit = compiler->Parse(compileResult, SpireStdLib::GetCode(), "stdlib", &includeHandler, options.PreprocessorDefinitions);
+
+
+		// If we are being asked to do pass-through, then we need to do that here...
+		if (options.passThrough != PassThroughMode::None)
+		{
+			compiler->PassThrough(compileResult, src, fileName, options);
+			return List<ShaderLibFile>();
+		}
+
+
+
+		CompileUnit predefUnit;
+		predefUnit = compiler->Parse(compileResult, SpireStdLib::GetCode(), "stdlib", &includeHandler, options.PreprocessorDefinitions, predefUnit);
 		for (int i = 0; i < unitsToInclude.Count(); i++)
 		{
 			auto inputFileName = unitsToInclude[i];
@@ -223,7 +235,7 @@ namespace SpireLib
 				String source = src;
 				if (i > 0)
 					source = File::ReadAllText(inputFileName);
-				auto unit = compiler->Parse(compileResult, source, inputFileName, &includeHandler, options.PreprocessorDefinitions);
+				auto unit = compiler->Parse(compileResult, source, inputFileName, &includeHandler, options.PreprocessorDefinitions, predefUnit);
 				units.Add(unit);
 				if (unit.SyntaxNode)
 				{
@@ -469,38 +481,8 @@ namespace SpireLib
 		Array<State, 128> states;
 		List<RefPtr<Spire::Compiler::CompilationContext>> compileContext;
 		RefPtr<ShaderCompiler> compiler;
+		CompileUnit predefUnit;
 
-		struct IncludeHandlerImpl : IncludeHandler
-		{
-			List<String> searchDirs;
-
-			virtual bool TryToFindIncludeFile(
-				CoreLib::String const& pathToInclude,
-				CoreLib::String const& pathIncludedFrom,
-				CoreLib::String* outFoundPath,
-				CoreLib::String* outFoundSource) override
-			{
-				String path = Path::Combine(Path::GetDirectoryName(pathIncludedFrom), pathToInclude);
-				if (File::Exists(path))
-				{
-					*outFoundPath = path;
-					*outFoundSource = File::ReadAllText(path);
-					return true;
-				}
-
-				for (auto & dir : searchDirs)
-				{
-					path = Path::Combine(dir, pathToInclude);
-					if (File::Exists(path))
-					{
-						*outFoundPath = path;
-						*outFoundSource = File::ReadAllText(path);
-						return true;
-					}
-				}
-				return false;
-			}
-		};
 		IncludeHandlerImpl includeHandler;
 
 	public:
@@ -566,11 +548,14 @@ namespace SpireLib
 							return nullptr;
 						}
 						auto newParam = param->Clone(cloneCtx);
-						newParam->modifiers.first = nullptr;
-						newParam->modifiers.flags = ModifierFlag::Public;
+
+						auto publicModifier = new PublicModifier();
+						publicModifier->next = newParam->modifiers.first;
+						newParam->modifiers.first = publicModifier;
+
 						param->BlockStatement = nullptr;
 						auto expr = new ConstantExpressionSyntaxNode();
-						if (param->Type->Equals(ExpressionType::Bool))
+						if (param->Type.Equals(ExpressionType::Bool))
 							expr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Bool;
 						else
 							expr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Int;
@@ -664,8 +649,10 @@ namespace SpireLib
 			unitsToInclude.Add(fileName);
 			processedUnits.Add(fileName);
 			auto searchDirs = Options.SearchDirectories;
+			searchDirs.Reverse();
 			searchDirs.Add(Path::GetDirectoryName(fileName));
 			searchDirs.Reverse();
+			includeHandler.searchDirs = searchDirs;
 			for (int i = 0; i < unitsToInclude.Count(); i++)
 			{
 				auto inputFileName = unitsToInclude[i];
@@ -674,7 +661,14 @@ namespace SpireLib
 					String source = src;
 					if (i > 0)
 						source = File::ReadAllText(inputFileName);
-					auto unit = compiler->Parse(result, source, inputFileName, &includeHandler, Options.PreprocessorDefinitions);
+					auto unit = compiler->Parse(result, source, inputFileName, &includeHandler, Options.PreprocessorDefinitions, predefUnit);
+
+					// HACK(tfoley): Assume that the first thing we parse represents the predef unit!
+					if (!predefUnit.SyntaxNode)
+					{
+						predefUnit = unit;
+					}
+
 					units.Add(unit);
 					if (unit.SyntaxNode)
 					{
@@ -716,7 +710,7 @@ namespace SpireLib
 		Shader * NewShaderFromSource(const char * source, const char * fileName)
 		{
 			Spire::Compiler::CompileResult result;
-			auto unit = compiler->Parse(result, source, fileName, nullptr, Dictionary<String, String>());
+			auto unit = compiler->Parse(result, source, fileName, nullptr, Dictionary<String, String>(), predefUnit);
 			auto list = unit.SyntaxNode->GetMembersOfType<TemplateShaderSyntaxNode>();
 			if (list.Count())
 				return new Shader((*list.begin())->Name.Content, String(source));

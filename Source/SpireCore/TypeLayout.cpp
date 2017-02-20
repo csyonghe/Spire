@@ -40,26 +40,6 @@ struct DefaultLayoutRulesImpl : LayoutRulesImpl
 		case BaseType::Bool:
             return{ 4, 4 };
 
-        case BaseType::Int2:      return GetVectorLayout(GetScalarLayout(BaseType::Int),    2);
-		case BaseType::Bool2:      return GetVectorLayout(GetScalarLayout(BaseType::Bool),  2);
-        case BaseType::UInt2:     return GetVectorLayout(GetScalarLayout(BaseType::UInt),   2);
-        case BaseType::Float2:    return GetVectorLayout(GetScalarLayout(BaseType::Float),  2);
-        case BaseType::Int3:      return GetVectorLayout(GetScalarLayout(BaseType::Int),    3);
-        case BaseType::UInt3:     return GetVectorLayout(GetScalarLayout(BaseType::UInt),   3);
-        case  BaseType::Float3:   return GetVectorLayout(GetScalarLayout(BaseType::Float),  3);
-		case BaseType::Bool3:      return GetVectorLayout(GetScalarLayout(BaseType::Bool),  3);
-        case BaseType::Int4:      return GetVectorLayout(GetScalarLayout(BaseType::Int),    4);
-        case BaseType::UInt4:     return GetVectorLayout(GetScalarLayout(BaseType::UInt),   4);
-        case BaseType::Float4:    return GetVectorLayout(GetScalarLayout(BaseType::Float),  4);
-		case BaseType::Bool4:      return GetVectorLayout(GetScalarLayout(BaseType::Bool),  4);
-
-        case BaseType::Float3x3:  return GetMatrixLayout(GetScalarLayout(BaseType::Float),  3, 3);
-        case BaseType::Float4x4:  return GetMatrixLayout(GetScalarLayout(BaseType::Float),  4, 4);
-
-        case BaseType::Texture2D:
-        case BaseType::TextureCube:
-            return{ 8, 8 };
-
         default:
             assert(!"unimplemented");
             return{ 0, 1 };
@@ -195,43 +175,50 @@ LayoutRulesImpl* GetLayoutRulesImpl(LayoutRule rule)
     }
 }
 
-LayoutInfo GetLayout(ExpressionType* type, LayoutRulesImpl* rules)
+static int GetElementCount(RefPtr<IntVal> val)
 {
-    if (auto basicType = dynamic_cast<BasicExpressionType*>(type))
+	if (auto constantVal = val.As<ConstantIntVal>())
+	{
+		return constantVal->value;
+	}
+	assert(!"unexpected");
+	return 0;
+}
+
+LayoutInfo GetLayout(ExpressionType* inType, LayoutRulesImpl* rules)
+{
+	RefPtr<ExpressionType> type = inType;
+    if (auto basicType = type->As<BasicExpressionType>())
     {
-        if (auto structDecl = basicType->structDecl)
-        {
+        return rules->GetScalarLayout(basicType->BaseType);
+    }
+    else if (auto arrayType = type->As<ArrayExpressionType>())
+    {
+        return rules->GetArrayLayout(
+            GetLayout(arrayType->BaseType.Ptr(), rules),
+            GetElementCount(arrayType->ArrayLength));
+    }
+	else if (auto declRefType = type->As<DeclRefType>())
+	{
+		auto declRef = declRefType->declRef;
+		if (auto structDeclRef = declRef.As<StructDeclRef>())
+		{
             LayoutInfo info = rules->BeginStructLayout();
 
-            for (auto field : structDecl->GetFields())
+            for (auto field : structDeclRef.GetFields())
             {
                 rules->AddStructField(&info,
-                    GetLayout(field->Type.Ptr(), rules));
+                    GetLayout(field.GetType().Ptr(), rules));
             }
 
             rules->EndStructLayout(&info);
             return info;
-        }
-        else
-        {
-            return rules->GetScalarLayout(basicType->BaseType);
-        }
-    }
-    else if (auto arrayType = dynamic_cast<ArrayExpressionType*>(type))
-    {
-        return rules->GetArrayLayout(
-            GetLayout(arrayType->BaseType.Ptr(), rules),
-            arrayType->ArrayLength);
-    }
-    else if (auto genericType = dynamic_cast<GenericExpressionType*>(type))
-    {
-        return GetLayout(genericType->BaseType.Ptr(), rules);
-    }
-    else
-    {
-        assert(!"unimplemented");
-        return{ 0, 1 };
-    }
+		}
+	}
+
+	// catch-all case in case nothing matched
+	assert(!"unimplemented");
+	return{ 0, 1 };
 }
 
 LayoutInfo GetLayout(ILType* type, LayoutRulesImpl* rules)

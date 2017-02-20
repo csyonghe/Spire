@@ -385,7 +385,7 @@ namespace Spire
 					rs = false;
 					break;
 				}
-				if (!impl->SyntaxNode->Type->Equals(cimpl->SyntaxNode->Type.Ptr()))
+				if (!impl->SyntaxNode->Type.Equals(cimpl->SyntaxNode->Type.Ptr()))
 				{
                     err->diagnose(impl->SyntaxNode->Position,
                         Diagnostics::inconsistentSignatureForComponent,
@@ -409,21 +409,18 @@ namespace Spire
 		{
 			if (auto basic = type->AsBasicType())
 			{
-				if (basic->BaseType == BaseType::Generic)
-					return recordReplaceStr;
-				else
-					return basic->ToString();
+				return basic->ToString();
+			}
+			else if (auto genericParamType = type->As<ImportOperatorGenericParamType>())
+			{
+				return recordReplaceStr;
 			}
 			else if (auto arr = type.As<ArrayExpressionType>())
 			{
-				if (arr->ArrayLength > 0)
-					return PrintType(arr->BaseType, recordReplaceStr) + "[" + arr->ArrayLength + "]";
+				if (arr->ArrayLength)
+					return PrintType(arr->BaseType, recordReplaceStr) + "[" + arr->ArrayLength->ToString() + "]";
 				else
 					return PrintType(arr->BaseType, recordReplaceStr) + "[]";
-			}
-			else if (auto gen = type.As<GenericExpressionType>())
-			{
-				return gen->GenericTypeName + "<" + PrintType(gen->BaseType, recordReplaceStr) + ">";
 			}
 			return "";
 		}
@@ -444,7 +441,7 @@ namespace Spire
 				auto func = Functions.TryGetValue(funcName);
 				if (!func)
 					return false;
-				if ((*func)->SyntaxNode->ReturnType->ToString() != retType)
+				if ((*func)->SyntaxNode->ReturnType.type->ToString() != retType)
 					return false;
 			}
 			return true;

@@ -92,6 +92,15 @@ namespace CoreLib
 #endif
 		}
 
+		String String::FromWString(const wchar_t * wstr, const wchar_t * wend)
+		{
+#ifdef _WIN32
+			return CoreLib::IO::Encoding::UTF16->ToString((const char*)wstr, (int)((wend - wstr) * sizeof(wchar_t)));
+#else
+			return CoreLib::IO::Encoding::UTF32->ToString((const char*)wstr, (int)((wend - wstr) * sizeof(wchar_t)));
+#endif
+		}
+
 		String String::FromWChar(const wchar_t ch)
 		{
 #ifdef _WIN32
