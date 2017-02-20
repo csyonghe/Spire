@@ -749,11 +749,13 @@ namespace Spire
 			for (auto & v : GlobalVars)
 			{
 				sb << v.Value->Type->ToString() << " " << v.Key;
-				if (v.Value->Code)
-				{
-					sb << " {\n";
-					sb << v.Value->Code->ToString() << "\n}\n";
-				}
+                if (v.Value->Code)
+                {
+                    sb << " {\n";
+                    sb << v.Value->Code->ToString() << "\n}\n";
+                }
+                else
+                    sb << ";\n";
 			}
 			for (auto & f : Functions)
 			{

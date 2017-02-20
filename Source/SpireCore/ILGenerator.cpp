@@ -138,6 +138,7 @@ namespace Spire
 						continue;
                     s->Accept(this);
 				}
+                variables.PushScope();
                 for (auto v : prog->GetMembersOfType<Variable>())
 				{
 					if (v->HasModifier<IntrinsicModifier>() || v->HasModifier<FromStdLibModifier>())
@@ -150,6 +151,7 @@ namespace Spire
 						continue;
                     f->Accept(this);
 				}
+                variables.PopScope();
                 return prog;
             }
             virtual RefPtr<StructSyntaxNode> VisitStruct(StructSyntaxNode * st) override
@@ -337,19 +339,28 @@ namespace Spire
                 codeWriter.Discard();
                 return stmt;
             }
-            AllocVarInstruction * AllocVar(ExpressionType * etype)
+            AllocVarInstruction * AllocVar(String name, ExpressionType * etype, CodePosition pos)
             {
                 AllocVarInstruction * varOp = 0;
                 RefPtr<ILType> type = TranslateExpressionType(etype);
                 assert(type);
-                varOp = codeWriter.AllocVar(type);
+                if (codeWriter.GetCurrentNode())
+                    varOp = codeWriter.AllocVar(type);
+                else
+                {
+                    auto gvar = new ILGlobalVariable(type);
+                    gvar->IsConst = false;
+                    varOp = gvar;
+                    program->GlobalVars[name] = gvar;
+                }
+                varOp->Name = name;
+                varOp->Position = pos;
                 return varOp;
             }
 
             RefPtr<Variable> VisitDeclrVariable(Variable* varDecl)
             {
-                AllocVarInstruction * varOp = AllocVar(varDecl->Type.Ptr());
-                varOp->Name = EscapeCodeName(varDecl->Name.Content);
+                AllocVarInstruction * varOp = AllocVar(EscapeCodeName(varDecl->Name.Content), varDecl->Type.Ptr(), varDecl->Position);
                 variables.Add(varDecl->Name.Content, varOp);
                 if (varDecl->Expr)
                 {

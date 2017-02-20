@@ -20,6 +20,8 @@ namespace Spire
             }
             CFGNode * GetCurrentNode()
             {
+                if (cfgNode.Count() == 0)
+                    return nullptr;
                 return cfgNode.Last().Ptr();
             }
             void PushNode()

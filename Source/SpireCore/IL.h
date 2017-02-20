@@ -2862,26 +2862,41 @@ namespace Spire
             String Name;
         };
 
-        class ILGlobalVariable
+        class ILGlobalVariable : public AllocVarInstruction
         {
         public:
-            RefPtr<ILType> Type;
-            String Name;
             bool IsConst = false;
             RefPtr<CFGNode> Code;
+            ILGlobalVariable(ILType * type)
+                : AllocVarInstruction(type)
+            {
+            }
+            ILGlobalVariable(CoreLib::RefPtr<ILType> & type)
+                : AllocVarInstruction(type)
+            {
+            }
+            virtual ILGlobalVariable * Clone() override
+            {
+                return new ILGlobalVariable(*this);
+            }
         };
 
-        class ILProgram
+        class ILProgram : public RefObject
         {
         public:
             RefPtr<ConstantPool> ConstantPool = new Compiler::ConstantPool();
-            List<RefPtr<ILShader>> Shaders; // not used
-
-            EnumerableDictionary<String, RefPtr<ILFunction>> Functions;
-            List<RefPtr<ILStructType>> Structs;
-            EnumerableDictionary<String, RefPtr<ILModuleParameterSet>> ModuleParamSets;
             EnumerableDictionary<String, RefPtr<ILGlobalVariable>> GlobalVars;
+            EnumerableDictionary<String, RefPtr<ILModuleParameterSet>> ModuleParamSets;
+            List<RefPtr<ILStructType>> Structs;
+            EnumerableDictionary<String, RefPtr<ILFunction>> Functions;
+            List<RefPtr<ILShader>> Shaders; // not used
 			String ToString();
+            ~ILProgram()
+            {
+                Functions = EnumerableDictionary<String, RefPtr<ILFunction>>();
+                Structs = List<RefPtr<ILStructType>>();
+                ModuleParamSets = EnumerableDictionary<String, RefPtr<ILModuleParameterSet>>();
+            }
         };
     }
 }
