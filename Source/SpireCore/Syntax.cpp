@@ -711,8 +711,10 @@ namespace Spire
             UInt = nullptr;
             Int = nullptr;
             Float = nullptr;
+            Float2 = nullptr;
             Void = nullptr;
             Error = nullptr;
+            Overloaded = nullptr;
             // Note(tfoley): This seems to be just about the only way to clear out a List<T>
             sCanonicalTypes = List<RefPtr<ExpressionType>>();
         }
