@@ -572,6 +572,7 @@ namespace Spire
                         return;
                     CompiledShaderSource src;
                     StageSource stageSrc;
+                    src.MetaData.ShaderName = options.outputName;
                     stageSrc.MainCode = program->ToString();
                     src.Stages["all"] = stageSrc;
                     result.CompiledSource["il"] = src;

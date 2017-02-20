@@ -115,6 +115,7 @@ namespace Spire
             EnumerableDictionary<String, String> BackendArguments;
             String ScheduleSource, ScheduleFileName;
             String SymbolToCompile;
+            String outputName;
             List<String> TemplateShaderArguments;
             List<String> SearchDirectories;
             Dictionary<String, String> PreprocessorDefinitions;
