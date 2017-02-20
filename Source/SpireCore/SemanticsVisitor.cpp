@@ -2654,7 +2654,6 @@ namespace Spire
                 decl->SetCheckState(DeclCheckState::CheckedHeader);
 
                 // TODO(tfoley): check body
-
                 decl->SetCheckState(DeclCheckState::Checked);
             }
 

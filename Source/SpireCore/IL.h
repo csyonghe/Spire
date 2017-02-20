@@ -366,7 +366,7 @@ namespace Spire
                     sb << "StructuredBuffer";
                     break;
                 default:
-                    sb << "unkown";
+                    sb << "unknown";
                     break;
                 }
                 sb << "<" << BaseType->ToString() << ">";
@@ -418,7 +418,7 @@ namespace Spire
                     sb << "ConstantBuffer";
                     break;
                 default:
-                    sb << "unkown";
+                    sb << "unknown";
                     break;
                 }
                 sb << "<" << BaseType->ToString() << ">";
@@ -1745,7 +1745,7 @@ namespace Spire
                     if (op != Arguments.Last())
                         sb << ", ";
                 }
-                sb << ")";
+                sb << ") : " << this->Type->ToString();
                 return sb.ProduceString();
             }
             virtual String GetOperatorString() override

@@ -134,19 +134,19 @@ namespace Spire
             {
 				for (auto s : prog->GetStructs())
 				{
-					if (s->HasModifier<IntrinsicModifier>())
+					if (s->HasModifier<IntrinsicModifier>() || s->HasModifier<FromStdLibModifier>())
 						continue;
                     s->Accept(this);
 				}
                 for (auto v : prog->GetMembersOfType<Variable>())
 				{
-					if (v->HasModifier<IntrinsicModifier>())
+					if (v->HasModifier<IntrinsicModifier>() || v->HasModifier<FromStdLibModifier>())
 						continue;
                     v->Accept(this);
                 }
 				for (auto f : prog->GetFunctions())
 				{
-					if (f->HasModifier<IntrinsicModifier>())
+					if (f->HasModifier<IntrinsicModifier>() || f->HasModifier<FromStdLibModifier>())
 						continue;
                     f->Accept(this);
 				}
@@ -609,14 +609,28 @@ namespace Spire
             virtual RefPtr<ExpressionSyntaxNode> VisitInvokeExpression(InvokeExpressionSyntaxNode* expr) override
             {
                 List<ILOperand*> args;
-                String funcName;
                 bool hasSideEffect = false;
-                if (auto funcType = expr->FunctionExpr->Type->As<FuncType>())
+                for (auto arg : expr->Arguments)
                 {
-                    if (funcType->Func)
+                    arg->Accept(this);
+                    args.Add(PopStack());
+                }
+                if (auto funcType = expr->FunctionExpr->Type.Ptr()->As<FuncType>())
+                {
+                    auto instr = new CallInstruction(args.Count());
+                    if (auto ctor = dynamic_cast<ConstructorDecl*>(funcType->declRef.GetDecl()))
                     {
-                        funcName = funcType->Func->SyntaxNode->IsExtern() ? funcType->Func->SyntaxNode->Name.Content : funcType->Func->SyntaxNode->InternalName;
-                        for (auto & param : funcType->Func->SyntaxNode->GetParameters())
+                        RefPtr<ExpressionType> exprType = DeclRefType::Create(DeclRef(ctor->ParentDecl, funcType->declRef.substitutions));
+                        auto rsType = TranslateExpressionType(exprType);
+                        instr->Type = rsType;
+                        instr->Function = "__init";
+                    }
+                    else if (auto func = dynamic_cast<FunctionSyntaxNode*>(funcType->declRef.GetDecl()))
+                    {
+                        auto rsType = funcType->declRef.GetResultType();
+                        instr->Type = TranslateExpressionType(rsType);
+                        instr->Function = func->Name.Content;
+                        for (auto & param : func->GetParameters())
                         {
                             if (param->HasModifier<OutModifier>())
                             {
@@ -625,20 +639,15 @@ namespace Spire
                             }
                         }
                     }
+                    instr->SideEffect = hasSideEffect;
+                    for (int i = 0; i < args.Count(); i++)
+                        instr->Arguments[i] = args[i];
+                    instr->Type = TranslateExpressionType(expr->Type);
+                    codeWriter.Insert(instr);
+                    PushStack(instr);
                 }
-                for (auto arg : expr->Arguments)
-                {
-                    arg->Accept(this);
-                    args.Add(PopStack());
-                }
-                auto instr = new CallInstruction(args.Count());
-                instr->SideEffect = hasSideEffect;
-                instr->Function = funcName;
-                for (int i = 0; i < args.Count(); i++)
-                    instr->Arguments[i] = args[i];
-                instr->Type = TranslateExpressionType(expr->Type);
-                codeWriter.Insert(instr);
-                PushStack(instr);
+                else
+                    throw InvalidProgramException();
                 return expr;
             }
             virtual RefPtr<ExpressionSyntaxNode> VisitTypeCastExpression(TypeCastExpressionSyntaxNode * expr) override

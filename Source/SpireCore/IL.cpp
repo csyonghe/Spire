@@ -18,6 +18,14 @@ namespace Spire
                 return ILBaseType::Float;
             if (parser.LookAhead("bool"))
                 return ILBaseType::Bool;
+            if (parser.LookAhead("uint"))
+                return ILBaseType::UInt;
+            if (parser.LookAhead("uint64"))
+                return ILBaseType::UInt64;
+            if (parser.LookAhead("SamplerState"))
+                return ILBaseType::SamplerState;
+            if (parser.LookAhead("SamplerComparisonState"))
+                return ILBaseType::SamplerComparisonState;
             if (parser.LookAhead("void"))
                 return ILBaseType::Void;
             return ILBaseType::Void;
@@ -58,10 +66,16 @@ namespace Spire
                 return "uint";
             case ILBaseType::Bool:
                 return "bool";
+            case ILBaseType::Float:
+                return "float";
             case ILBaseType::Void:
                 return "void";
+            case ILBaseType::SamplerComparisonState:
+                return "SamplerComparisonState";
+            case ILBaseType::SamplerState:
+                return "SamplerState";
             default:
-                return "?unkowntype";
+                return "?unknowntype";
             }
         }
 
@@ -729,7 +743,8 @@ namespace Spire
 			StringBuilder sb;
 			for (auto & s : Structs)
 			{
-				sb << s->ToString() << "\n";
+                s->Serialize(sb);
+                sb << "\n";
 			}
 			for (auto & v : GlobalVars)
 			{
