@@ -41,7 +41,7 @@ int wmain(int argc, wchar_t* argv[])
         // We need to parse any command-line arguments.
         String outputDir;
         CompileOptions options;
-
+        options.outputName = "out";
         // As we parse the command line, we will rewrite the
         // entries in `argv` to collect any "ordinary" arguments.
         wchar_t const** inputPaths = (wchar_t const**)&argv[1];
@@ -57,8 +57,10 @@ int wmain(int argc, wchar_t* argv[])
                 String argStr = String::FromWString(arg);
 
                 // The argument looks like an option, so try to parse it.
-                if (argStr == "-out")
+                if (argStr == "-outdir")
                     outputDir = tryReadCommandLineArgument(arg, &argCursor, argEnd);
+                if (argStr == "-out")
+                    options.outputName = tryReadCommandLineArgument(arg, &argCursor, argEnd);
                 else if (argStr == "-symbo")
                     options.SymbolToCompile = tryReadCommandLineArgument(arg, &argCursor, argEnd);
                 else if (argStr == "-schedule")
