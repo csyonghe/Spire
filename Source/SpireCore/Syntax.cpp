@@ -1,7 +1,7 @@
 #include "Syntax.h"
 #include "SyntaxVisitors.h"
 #include "SymbolTable.h"
-
+#include <typeinfo>
 #include <assert.h>
 
 namespace Spire
@@ -333,14 +333,14 @@ namespace Spire
 
         RefPtr<SyntaxNode> SwizzleExpr::Accept(SyntaxVisitor * visitor)
         {
-			return visitor->VisitSwizzleExpression(this);
+            return visitor->VisitSwizzleExpression(this);
         }
 
         SwizzleExpr * SwizzleExpr::Clone(CloneContext & ctx)
         {
-			auto rs = CloneSyntaxNodeFields(new SwizzleExpr(*this), ctx);
-			rs->base = base->Clone(ctx);
-			return rs;
+            auto rs = CloneSyntaxNodeFields(new SwizzleExpr(*this), ctx);
+            rs->base = base->Clone(ctx);
+            return rs;
         }
 
         // DerefExpr
@@ -734,6 +734,13 @@ namespace Spire
             canonicalArrayType->ArrayLength = ArrayLength;
             return canonicalArrayType;
         }
+        int ArrayExpressionType::GetHashCode() const
+        {
+            if (ArrayLength)
+                return (BaseType->GetHashCode() * 16777619) ^ ArrayLength->GetHashCode();
+            else
+                return BaseType->GetHashCode();
+        }
         CoreLib::Basic::String ArrayExpressionType::ToString() const
         {
             if (ArrayLength)
@@ -751,6 +758,11 @@ namespace Spire
         String DeclRefType::ToString() const
         {
             return declRef.GetName();
+        }
+
+        int DeclRefType::GetHashCode() const
+        {
+            return (declRef.GetHashCode() * 16777619) ^ typeid(this).hash_code();
         }
 
         bool DeclRefType::EqualsImpl(const ExpressionType * type) const
@@ -950,7 +962,12 @@ namespace Spire
 
         ExpressionType* OverloadGroupType::CreateCanonicalType()
         {
-            return  this;
+            return this;
+        }
+
+        int OverloadGroupType::GetHashCode() const
+        {
+            return (int)(void*)this;
         }
 
         // NamedExpressionType
@@ -969,6 +986,12 @@ namespace Spire
         ExpressionType* NamedExpressionType::CreateCanonicalType()
         {
             return declRef.GetType()->GetCanonicalType();
+        }
+
+        int NamedExpressionType::GetHashCode() const
+        {
+            assert(!"unreachable");
+            return 0;
         }
 
         // FuncType
@@ -1070,6 +1093,12 @@ namespace Spire
             auto canType = new TypeExpressionType(type->GetCanonicalType());
             sCanonicalTypes.Add(canType);
             return canType;
+        }
+
+        int TypeExpressionType::GetHashCode() const
+        {
+            assert(!"unreachable");
+            return 0;
         }
 
         // GenericDeclRefType
@@ -1423,6 +1452,11 @@ namespace Spire
             return declRef.GetName();
         }
 
+        int GenericParamIntVal::GetHashCode() const
+        {
+            return declRef.GetHashCode() ^ 0xFFFF;
+        }
+
         // ExtensionDecl
 
         RefPtr<SyntaxNode> ExtensionDecl::Accept(SyntaxVisitor * visitor)
@@ -1563,6 +1597,17 @@ namespace Spire
 
         }
 
+        int DeclRef::GetHashCode() const
+        {
+            auto rs = PointerHash<1>::GetHashCode(decl);
+            if (substitutions)
+            {
+                rs *= 16777619;
+                rs ^= substitutions->GetHashCode();
+            }
+            return rs;
+        }
+
         // Val
 
         RefPtr<Val> Val::Substitute(Substitutions* subst)
@@ -1591,6 +1636,11 @@ namespace Spire
         String ConstantIntVal::ToString() const
         {
             return String(value);
+        }
+
+        int ConstantIntVal::GetHashCode() const
+        {
+            return value;
         }
 
         // SwitchStmt

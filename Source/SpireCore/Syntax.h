@@ -327,6 +327,11 @@ namespace Spire
 
             virtual bool EqualsVal(Val* val) = 0;
             virtual String ToString() const = 0;
+            virtual int GetHashCode() const = 0;
+            bool operator == (const Val & v)
+            {
+                return EqualsVal(const_cast<Val*>(&v));
+            }
         };
 
         // A compile-time integer (may not have a specific concrete value)
@@ -346,6 +351,7 @@ namespace Spire
 
             virtual bool EqualsVal(Val* val) override;
             virtual String ToString() const override;
+            virtual int GetHashCode() const override;
         };
 
         // TODO(tfoley): classes for more general compile-time integers,
@@ -444,6 +450,20 @@ namespace Spire
 
             // Check if these are equivalent substitutiosn to another set
             bool Equals(Substitutions* subst);
+            bool operator == (const Substitutions & subst)
+            {
+                return Equals(const_cast<Substitutions*>(&subst));
+            }
+            int GetHashCode() const
+            {
+                int rs = 0;
+                for (auto && v : args)
+                {
+                    rs ^= v->GetHashCode();
+                    rs *= 16777619;
+                }
+                return rs;
+            }
         };
 
         // A reference to a declaration, which may include
@@ -475,6 +495,10 @@ namespace Spire
 
             // Check if this is an equivalent declaration reference to another
             bool Equals(DeclRef const& declRef) const;
+            bool operator == (const DeclRef& other) const
+            {
+                return Equals(other);
+            }
 
             // Convenience accessors for common properties of declarations
             String const& GetName() const;
@@ -496,6 +520,8 @@ namespace Spire
             {
                 return decl;
             }
+
+            int GetHashCode() const;
         };
 
         // Helper macro for defining `DeclRef` subtypes
@@ -515,6 +541,7 @@ namespace Spire
         protected:
             virtual bool EqualsImpl(const ExpressionType * type) const override;
             virtual ExpressionType* CreateCanonicalType() override;
+            virtual int GetHashCode() const override;
         };
 
         // A type that takes the form of a reference to some declaration
@@ -534,7 +561,7 @@ namespace Spire
             DeclRefType(DeclRef declRef)
                 : declRef(declRef)
             {}
-
+            virtual int GetHashCode() const override;
             virtual bool EqualsImpl(const ExpressionType * type) const override;
             virtual ExpressionType* CreateCanonicalType() override;
         };
@@ -731,6 +758,7 @@ namespace Spire
         protected:
             virtual bool EqualsImpl(const ExpressionType * type) const override;
             virtual ExpressionType* CreateCanonicalType() override;
+            virtual int GetHashCode() const override;
         };
 
         // The "type" of an expression that resolves to a type.
@@ -752,6 +780,7 @@ namespace Spire
         protected:
             virtual bool EqualsImpl(const ExpressionType * type) const override;
             virtual ExpressionType* CreateCanonicalType() override;
+            virtual int GetHashCode() const override;
         };
 
         class GenericDecl;
@@ -1336,24 +1365,10 @@ namespace Spire
         public:
             // extensions that might apply to this declaration
             ExtensionDecl* candidateExtensions = nullptr;
-        };
-
-        struct AggTypeDeclRef : ContainerDeclRef
-        {
-            SPIRE_DECLARE_DECL_REF(AggTypeDecl);
-
-            ExtensionDecl* GetCandidateExtensions() const { return GetDecl()->candidateExtensions; }
-        };
-
-        class StructSyntaxNode : public AggTypeDecl
-        {
-        public:
             FilteredMemberList<StructField> GetFields()
             {
                 return GetMembersOfType<StructField>();
             }
-            bool IsIntrinsic = false;
-            virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
             StructField* FindField(String name)
             {
                 for (auto field : GetFields())
@@ -1374,6 +1389,20 @@ namespace Spire
                 }
                 return -1;
             }
+        };
+
+        struct AggTypeDeclRef : public ContainerDeclRef
+        {
+            SPIRE_DECLARE_DECL_REF(AggTypeDecl);
+            
+            ExtensionDecl* GetCandidateExtensions() const { return GetDecl()->candidateExtensions; }
+        };
+
+        class StructSyntaxNode : public AggTypeDecl
+        {
+        public:
+            bool IsIntrinsic = false;
+            virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
             virtual StructSyntaxNode * Clone(CloneContext & ctx) override
             {
                 auto rs = CloneSyntaxNodeFields(new StructSyntaxNode(*this), ctx);
@@ -1394,32 +1423,7 @@ namespace Spire
         class ClassSyntaxNode : public AggTypeDecl
         {
         public:
-            FilteredMemberList<StructField> GetFields()
-            {
-                return GetMembersOfType<StructField>();
-            }
-            virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-            StructField* FindField(String name)
-            {
-                for (auto field : GetFields())
-                {
-                    if (field->Name.Content == name)
-                        return field.Ptr();
-                }
-                return nullptr;
-            }
-            int FindFieldIndex(String name)
-            {
-                int index = 0;
-                for (auto field : GetFields())
-                {
-                    if (field->Name.Content == name)
-                        return index;
-                    index++;
-                }
-                return -1;
-            }
-            virtual ClassSyntaxNode * Clone(CloneContext & ctx) override
+            virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;l ClassSyntaxNode * Clone(CloneContext & ctx) override
             {
                 auto rs = CloneSyntaxNodeFields(new ClassSyntaxNode(*this), ctx);
                 rs->Members.Clear();
@@ -1493,6 +1497,7 @@ namespace Spire
         protected:
             virtual bool EqualsImpl(const ExpressionType * type) const override;
             virtual ExpressionType* CreateCanonicalType() override;
+            virtual int GetHashCode() const override;
         };
 
 
@@ -2473,6 +2478,7 @@ namespace Spire
 
             virtual bool EqualsVal(Val* val) override;
             virtual String ToString() const override;
+            virtual int GetHashCode() const override;
         };
 
         //
@@ -2672,12 +2678,12 @@ namespace Spire
                     stmt->BaseExpression = stmt->BaseExpression->Accept(this).As<ExpressionSyntaxNode>();
                 return stmt;
             }
-			virtual RefPtr<ExpressionSyntaxNode> VisitSwizzleExpression(SwizzleExpr * expr)
-			{
-				if (expr->base)
-					expr->base->Accept(this);
-				return expr;
-			}
+            virtual RefPtr<ExpressionSyntaxNode> VisitSwizzleExpression(SwizzleExpr * expr)
+            {
+                if (expr->base)
+                    expr->base->Accept(this);
+                return expr;
+            }
             virtual RefPtr<ExpressionSyntaxNode> VisitInvokeExpression(InvokeExpressionSyntaxNode* stmt)
             {
                 stmt->FunctionExpr->Accept(this);
