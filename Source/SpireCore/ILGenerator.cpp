@@ -17,11 +17,12 @@ namespace Spire
                 program = result;
             }
         private:
-            Dictionary<StructSyntaxNode*, RefPtr<ILStructType>> structTypes;
+            Dictionary<DeclRef, RefPtr<ILStructType>> structTypes;
+            Dictionary<DeclRef, ILFunction*> functions;
             ScopeDictionary<String, ILOperand*> variables;
             CodeWriter codeWriter;
         private:
-            RefPtr<ILStructType> TranslateStructType(StructSyntaxNode* structDecl)
+            RefPtr<ILStructType> TranslateStructType(AggTypeDecl* structDecl)
             {
                 RefPtr<ILStructType> ilStructType;
 
@@ -32,10 +33,8 @@ namespace Spire
 
                 ilStructType = new ILStructType();
                 ilStructType->TypeName = structDecl->Name.Content;
-                ilStructType->IsIntrinsic = structDecl->IsIntrinsic;
 
-
-                for (auto field : structDecl->GetFields())
+                for (auto field : structDecl->GetMembersOfType<Variable>())
                 {
                     ILStructType::ILStructField ilField;
                     ilField.FieldName = field->Name.Content;
@@ -43,7 +42,7 @@ namespace Spire
                     ilStructType->Members.Add(ilField);
                 }
 
-                structTypes.Add(structDecl, ilStructType);
+                structTypes.Add(DeclRef(structDecl, nullptr), ilStructType);
                 return ilStructType;
             }
 
@@ -57,37 +56,37 @@ namespace Spire
                 return 0;
             }
 
-			RefPtr<ILType> TranslateExpressionType(ExpressionType * type)
-			{
-				if (auto basicType = type->AsBasicType())
-				{
-					auto base = new ILBasicType();
-					base->Type = (ILBaseType)basicType->BaseType;
-					return base;
-				}
-				else if (auto vecType = type->AsVectorType())
-				{
-					auto elementType = vecType->elementType->AsBasicType();
-					int elementCount = GetIntVal(vecType->elementCount);
-					assert(elementType);
-					return new ILVectorType((ILBaseType)elementType->BaseType, elementCount);
-				}
-				else if (auto matType = type->AsMatrixType())
-				{
-					auto elementType = matType->elementType->AsBasicType();
-					int rowCount = GetIntVal(matType->rowCount);
-					int colCount = GetIntVal(matType->colCount);
-					assert(elementType);
-					return new ILMatrixType((ILBaseType)elementType->BaseType, rowCount, colCount);
-				}
-				else if (auto texType = type->As<TextureType>())
-				{
-					return new ILTextureType(TranslateExpressionType(texType->elementType.Ptr()),
-						(ILTextureShape)texType->GetBaseShape(),
-						texType->isMultisample(),
-						texType->IsArray(),
-						texType->isShadow());
-				}
+            RefPtr<ILType> TranslateExpressionType(ExpressionType * type)
+            {
+                if (auto basicType = type->AsBasicType())
+                {
+                    auto base = new ILBasicType();
+                    base->Type = (ILBaseType)basicType->BaseType;
+                    return base;
+                }
+                else if (auto vecType = type->AsVectorType())
+                {
+                    auto elementType = vecType->elementType->AsBasicType();
+                    int elementCount = GetIntVal(vecType->elementCount);
+                    assert(elementType);
+                    return new ILVectorType((ILBaseType)elementType->BaseType, elementCount);
+                }
+                else if (auto matType = type->AsMatrixType())
+                {
+                    auto elementType = matType->elementType->AsBasicType();
+                    int rowCount = GetIntVal(matType->rowCount);
+                    int colCount = GetIntVal(matType->colCount);
+                    assert(elementType);
+                    return new ILMatrixType((ILBaseType)elementType->BaseType, rowCount, colCount);
+                }
+                else if (auto texType = type->As<TextureType>())
+                {
+                    return new ILTextureType(TranslateExpressionType(texType->elementType.Ptr()),
+                        (ILTextureShape)texType->GetBaseShape(),
+                        texType->isMultisample(),
+                        texType->IsArray(),
+                        texType->isShadow());
+                }
                 else if (auto cbufferType = type->As<ConstantBufferType>())
                 {
                     auto ilType = new ILPointerLikeType(ILPointerLikeTypeName::ConstantBuffer, TranslateExpressionType(cbufferType->elementType.Ptr()));
@@ -129,28 +128,114 @@ namespace Spire
                 else
                     return ParameterQualifier::In;
             }
+            
+            FetchArgInstruction * thisArg = nullptr;
+            DeclRef thisDeclRef;
+            void GenerateFunctionHeader(FunctionSyntaxNode * f, ILStructType * thisType)
+            {
+                RefPtr<ILFunction> func = new ILFunction();
+                StringBuilder internalName;
+                if (thisType)
+                    internalName << thisType->TypeName << "@";
+                internalName << f->Name.Content;
+                for (auto & para : f->GetParameters())
+                {
+                    internalName << "@" << para->Type.type->ToString();
+                }
+                f->InternalName = internalName.ProduceString();
+                program->Functions.Add(f->InternalName, func);
+                func->Name = thisType->TypeName + "@" + f->InternalName;
+                func->ReturnType = TranslateExpressionType(f->ReturnType);
+                
+                functions[DeclRef(f, nullptr)] = func.Ptr();
+            }
+            void GenerateFunction(FunctionSyntaxNode * f, ILStructType * thisType)
+            {
+                RefPtr<ILFunction> func = functions[DeclRef(f, nullptr)]();
+                variables.PushScope();
+                codeWriter.PushNode();
+                int id = 0;
+                if (thisType)
+                {
+                    thisArg = codeWriter.FetchArg(thisType, ++id, ParameterQualifier::InOut);
+                    func->Parameters.Add("this", thisArg);
+                    thisArg->Name = "sv_this";
+                    variables.Add("this", thisArg);
+                }
+                for (auto &param : f->GetParameters())
+                {
+                    auto op = codeWriter.FetchArg(TranslateExpressionType(param->Type.Ptr()), ++id, GetParamDirectionQualifier(param.Ptr()));
+                    func->Parameters.Add(param->Name.Content, op);
+                    op->Name = EscapeCodeName(String("p_") + param->Name.Content);
+                    variables.Add(param->Name.Content, op);
+                }
+                f->Body->Accept(this);
+                func->Code = codeWriter.PopNode();
+                variables.PopScope();
+                thisArg = nullptr;
+            }
+            void GenerateMemberFunctionHeader(ClassSyntaxNode * node)
+            {
+                thisDeclRef = DeclRef(node, nullptr);
+                auto thisType = structTypes[thisDeclRef]();
+                for (auto && f : node->GetMembersOfType<FunctionSyntaxNode>())
+                {
+                    GenerateFunctionHeader(f.Ptr(), thisType.Ptr());
+                }
+                thisDeclRef = DeclRef();
+            }
+            void GenerateMemberFunction(ClassSyntaxNode * node)
+            {
+                thisDeclRef = DeclRef(node, nullptr);
+                auto thisType = structTypes[thisDeclRef]();
+                for (auto && f : node->GetMembersOfType<FunctionSyntaxNode>())
+                {
+                    GenerateFunction(f.Ptr(), thisType.Ptr());
+                }
+                thisDeclRef = DeclRef();
+            }
         public:
             virtual RefPtr<ProgramSyntaxNode> VisitProgram(ProgramSyntaxNode * prog) override
             {
-				for (auto s : prog->GetStructs())
-				{
-					if (s->HasModifier<IntrinsicModifier>() || s->HasModifier<FromStdLibModifier>())
-						continue;
+                for (auto&& s : prog->GetStructs())
+                {
+                    if (s->HasModifier<IntrinsicModifier>() || s->HasModifier<FromStdLibModifier>())
+                        continue;
                     s->Accept(this);
-				}
+                }
+                auto classes = prog->GetMembersOfType<ClassSyntaxNode>();
+                for (auto&& c : classes)
+                {
+                    TranslateStructType(c.Ptr());
+                }
+                for (auto&& c : classes)
+                {
+                    GenerateMemberFunctionHeader(c.Ptr());
+                }
                 variables.PushScope();
-                for (auto v : prog->GetMembersOfType<Variable>())
-				{
-					if (v->HasModifier<IntrinsicModifier>() || v->HasModifier<FromStdLibModifier>())
-						continue;
+                for (auto&& v : prog->GetMembersOfType<Variable>())
+                {
+                    if (v->HasModifier<IntrinsicModifier>() || v->HasModifier<FromStdLibModifier>())
+                        continue;
                     v->Accept(this);
                 }
-				for (auto f : prog->GetFunctions())
-				{
-					if (f->HasModifier<IntrinsicModifier>() || f->HasModifier<FromStdLibModifier>())
-						continue;
-                    f->Accept(this);
-				}
+                for (auto&& f : prog->GetFunctions())
+                {
+                    if (f->HasModifier<IntrinsicModifier>() || f->HasModifier<FromStdLibModifier>())
+                        continue;
+                    GenerateFunctionHeader(f.Ptr(), nullptr);
+                }
+
+                for (auto&& c : classes)
+                {
+                    GenerateMemberFunction(c.Ptr());
+                }
+                for (auto&& f : prog->GetFunctions())
+                {
+                    if (f->HasModifier<IntrinsicModifier>() || f->HasModifier<FromStdLibModifier>())
+                        continue;
+                    GenerateFunction(f.Ptr(), nullptr);
+                }
                 variables.PopScope();
                 return prog;
             }
@@ -164,23 +249,7 @@ namespace Spire
             {
                 if (function->IsExtern())
                     return function;
-                RefPtr<ILFunction> func = new ILFunction();
-                program->Functions.Add(function->InternalName, func);
-                func->Name = function->InternalName;
-                func->ReturnType = TranslateExpressionType(function->ReturnType);
-                variables.PushScope();
-                codeWriter.PushNode();
-                int id = 0;
-                for (auto &param : function->GetParameters())
-                {
-                    func->Parameters.Add(param->Name.Content, ILParameter(TranslateExpressionType(param->Type), GetParamDirectionQualifier(param.Ptr())));
-                    auto op = codeWriter.FetchArg(TranslateExpressionType(param->Type.Ptr()), ++id);
-                    op->Name = EscapeCodeName(String("p_") + param->Name.Content);
-                    variables.Add(param->Name.Content, op);
-                }
-                function->Body->Accept(this);
-                func->Code = codeWriter.PopNode();
-                variables.PopScope();
+                GenerateFunction(function, nullptr);
                 return function;
             }
 
@@ -578,23 +647,23 @@ namespace Spire
                     expr->Access == ExpressionAccess::Read);
                 return expr;
             }
-			virtual RefPtr<ExpressionSyntaxNode> VisitSwizzleExpression(SwizzleExpr * expr) override
-			{
-				RefPtr<Object> refObj;
-				expr->base->Access = expr->Access;
-				expr->base->Accept(this);
-				auto base = PopStack();
-				StringBuilder swizzleStr;
-				for (int i = 0; i < expr->elementCount; i++)
-					swizzleStr << ('x' + i);
-				auto rs = new SwizzleInstruction();
-				rs->Type = TranslateExpressionType(expr->Type.Ptr());
-				rs->SwizzleString = swizzleStr.ToString();
-				rs->Operand = base;
-				codeWriter.Insert(rs);
-				PushStack(rs);
-				return expr;
-			}
+            virtual RefPtr<ExpressionSyntaxNode> VisitSwizzleExpression(SwizzleExpr * expr) override
+            {
+                RefPtr<Object> refObj;
+                expr->base->Access = expr->Access;
+                expr->base->Accept(this);
+                auto base = PopStack();
+                StringBuilder swizzleStr;
+                for (int i = 0; i < expr->elementCount; i++)
+                    swizzleStr << ('x' + i);
+                auto rs = new SwizzleInstruction();
+                rs->Type = TranslateExpressionType(expr->Type.Ptr());
+                rs->SwizzleString = swizzleStr.ToString();
+                rs->Operand = base;
+                codeWriter.Insert(rs);
+                PushStack(rs);
+                return expr;
+            }
             virtual RefPtr<ExpressionSyntaxNode> VisitMemberExpression(MemberExpressionSyntaxNode * expr) override
             {
                 RefPtr<Object> refObj;
@@ -629,28 +698,22 @@ namespace Spire
                 if (auto funcType = expr->FunctionExpr->Type.Ptr()->As<FuncType>())
                 {
                     auto instr = new CallInstruction(args.Count());
-                    if (auto ctor = dynamic_cast<ConstructorDecl*>(funcType->declRef.GetDecl()))
+                    ILFunction * func = nullptr;
+                    if (functions.TryGetValue(funcType->declRef, func))
+                    {
+                        auto rsType = funcType->declRef.GetResultType();
+                        instr->Type = TranslateExpressionType(rsType);
+                        instr->Function = func->Name;
+                        instr->HasSideEffect = true;
+                    }
+                    // ad-hoc processing for ctor calls
+                    else if (auto ctor = dynamic_cast<ConstructorDecl*>(funcType->declRef.GetDecl()))
                     {
                         RefPtr<ExpressionType> exprType = DeclRefType::Create(DeclRef(ctor->ParentDecl, funcType->declRef.substitutions));
                         auto rsType = TranslateExpressionType(exprType);
                         instr->Type = rsType;
                         instr->Function = "__init";
                     }
-                    else if (auto func = dynamic_cast<FunctionSyntaxNode*>(funcType->declRef.GetDecl()))
-                    {
-                        auto rsType = funcType->declRef.GetResultType();
-                        instr->Type = TranslateExpressionType(rsType);
-                        instr->Function = func->Name.Content;
-                        for (auto & param : func->GetParameters())
-                        {
-                            if (param->HasModifier<OutModifier>())
-                            {
-                                hasSideEffect = true;
-                                break;
-                            }
-                        }
-                    }
-                    instr->SideEffect = hasSideEffect;
                     for (int i = 0; i < args.Count(); i++)
                         instr->Arguments[i] = args[i];
                     instr->Type = TranslateExpressionType(expr->Type);
@@ -781,6 +844,12 @@ namespace Spire
                 String srcName = name;
                 if (!variables.TryGetValue(srcName, var))
                 {
+                    if (thisDeclRef)
+                    {
+                        int id = ((AggTypeDecl*)thisDeclRef.GetDecl())->FindFieldIndex(name);
+                        GenerateIndexExpression(thisArg, program->ConstantPool->CreateConstant(id), access);
+                        return true;
+                    }
                     return false;
                 }
                 if (access == ExpressionAccess::Read)

@@ -1218,10 +1218,18 @@ namespace Spire
             virtual void Accept(InstructionVisitor * visitor) override;
         };
 
+
+		// TODO(tfoley): Only used by IL at this point
+		enum class ParameterQualifier
+		{
+			In, Out, InOut, Uniform
+		};
+
         class FetchArgInstruction : public LeaInstruction
         {
         public:
             int ArgId;
+			ParameterQualifier Qualifier;
             FetchArgInstruction(RefPtr<ILType> type)
             {
                 this->Type = type;
@@ -2835,28 +2843,10 @@ namespace Spire
             EnumerableDictionary<String, RefPtr<ILStage>> Stages;
         };
 
-        // TODO(tfoley): Only used by IL at this point
-        enum class ParameterQualifier
-        {
-            In, Out, InOut, Uniform
-        };
-
-
-        class ILParameter
+		class ILFunction
         {
         public:
-            RefPtr<ILType> Type;
-            ParameterQualifier Qualifier;
-            ILParameter() = default;
-            ILParameter(RefPtr<ILType> type, ParameterQualifier qualifier = ParameterQualifier::In)
-                : Type(type), Qualifier(qualifier)
-            {}
-        };
-
-        class ILFunction
-        {
-        public:
-            EnumerableDictionary<String, ILParameter> Parameters;
+            EnumerableDictionary<String, FetchArgInstruction*> Parameters;
             RefPtr<ILType> ReturnType;
             RefPtr<CFGNode> Code;
             String Name;
