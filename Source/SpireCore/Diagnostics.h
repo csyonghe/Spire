@@ -101,7 +101,6 @@ namespace Spire
         class ShaderClosure;
         CodePosition const& getDiagnosticPos(SyntaxNode const* syntax);
         CodePosition const& getDiagnosticPos(CoreLib::Text::Token const& token);
-        CodePosition const& getDiagnosticPos(ShaderClosure* shader);
         CodePosition const& getDiagnosticPos(TypeExp const& typeExp);
 
         template<typename T>

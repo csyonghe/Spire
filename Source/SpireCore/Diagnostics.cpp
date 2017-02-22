@@ -2,7 +2,6 @@
 #include "Diagnostics.h"
 
 #include "CompiledProgram.h"
-#include "SymbolTable.h"
 #include "Syntax.h"
 
 #include <assert.h>
@@ -78,11 +77,6 @@ CodePosition const& getDiagnosticPos(SyntaxNode const* syntax)
 CodePosition const& getDiagnosticPos(CoreLib::Text::Token const& token)
 {
     return token.Position;
-}
-
-CodePosition const& getDiagnosticPos(ShaderClosure* shader)
-{
-    return shader->Position;
 }
 
 CodePosition const& getDiagnosticPos(TypeExp const& typeExp)

@@ -486,124 +486,6 @@ namespace Spire
                 else
                     codeWriter.Store(left, right);
             }
-            virtual RefPtr<ExpressionSyntaxNode> VisitBinaryExpression(BinaryExpressionSyntaxNode* expr) override
-            {
-                expr->RightExpression->Accept(this);
-                auto right = PopStack();
-                if (expr->Operator == Operator::Assign)
-                {
-                    expr->LeftExpression->Access = ExpressionAccess::Write;
-                    expr->LeftExpression->Accept(this);
-                    auto left = PopStack();
-                    Assign(left, right);
-                    PushStack(left);
-                }
-                else
-                {
-                    expr->LeftExpression->Access = ExpressionAccess::Read;
-                    expr->LeftExpression->Accept(this);
-                    auto left = PopStack();
-                    BinaryInstruction * rs = 0;
-                    switch (expr->Operator)
-                    {
-                    case Operator::Add:
-                    case Operator::AddAssign:
-                        rs = new AddInstruction();
-                        break;
-                    case Operator::Sub:
-                    case Operator::SubAssign:
-                        rs = new SubInstruction();
-                        break;
-                    case Operator::Mul:
-                    case Operator::MulAssign:
-                        rs = new MulInstruction();
-                        break;
-                    case Operator::Mod:
-                    case Operator::ModAssign:
-                        rs = new ModInstruction();
-                        break;
-                    case Operator::Div:
-                    case Operator::DivAssign:
-                        rs = new DivInstruction();
-                        break;
-                    case Operator::And:
-                        rs = new AndInstruction();
-                        break;
-                    case Operator::Or:
-                        rs = new OrInstruction();
-                        break;
-                    case Operator::BitAnd:
-                    case Operator::AndAssign:
-                        rs = new BitAndInstruction();
-                        break;
-                    case Operator::BitOr:
-                    case Operator::OrAssign:
-                        rs = new BitOrInstruction();
-                        break;
-                    case Operator::BitXor:
-                    case Operator::XorAssign:
-                        rs = new BitXorInstruction();
-                        break;
-                    case Operator::Lsh:
-                    case Operator::LshAssign:
-                        rs = new ShlInstruction();
-                        break;
-                    case Operator::Rsh:
-                    case Operator::RshAssign:
-                        rs = new ShrInstruction();
-                        break;
-                    case Operator::Eql:
-                        rs = new CmpeqlInstruction();
-                        break;
-                    case Operator::Neq:
-                        rs = new CmpneqInstruction();
-                        break;
-                    case Operator::Greater:
-                        rs = new CmpgtInstruction();
-                        break;
-                    case Operator::Geq:
-                        rs = new CmpgeInstruction();
-                        break;
-                    case Operator::Leq:
-                        rs = new CmpleInstruction();
-                        break;
-                    case Operator::Less:
-                        rs = new CmpltInstruction();
-                        break;
-                    default:
-                        throw NotImplementedException("Code gen not implemented for this operator.");
-                    }
-                    rs->Operands.SetSize(2);
-                    rs->Operands[0] = left;
-                    rs->Operands[1] = right;
-                    rs->Type = TranslateExpressionType(expr->Type);
-                    codeWriter.Insert(rs);
-                    switch (expr->Operator)
-                    {
-                    case Operator::AddAssign:
-                    case Operator::SubAssign:
-                    case Operator::MulAssign:
-                    case Operator::DivAssign:
-                    case Operator::ModAssign:
-                    case Operator::LshAssign:
-                    case Operator::RshAssign:
-                    case Operator::AndAssign:
-                    case Operator::OrAssign:
-                    case Operator::XorAssign:
-                    {
-                        expr->LeftExpression->Access = ExpressionAccess::Write;
-                        expr->LeftExpression->Accept(this);
-                        auto target = PopStack();
-                        Assign(target, rs);
-                        break;
-                    }
-                    default:
-                        break;
-                    }
-                    PushStack(rs);
-                }
-                return expr;
-            }
             virtual RefPtr<ExpressionSyntaxNode> VisitConstantExpression(ConstantExpressionSyntaxNode* expr) override
             {
                 ILConstOperand * op;
@@ -689,7 +571,6 @@ namespace Spire
             virtual RefPtr<ExpressionSyntaxNode> VisitInvokeExpression(InvokeExpressionSyntaxNode* expr) override
             {
                 List<ILOperand*> args;
-                bool hasSideEffect = false;
                 for (auto arg : expr->Arguments)
                 {
                     arg->Accept(this);
@@ -704,7 +585,6 @@ namespace Spire
                         auto rsType = funcType->declRef.GetResultType();
                         instr->Type = TranslateExpressionType(rsType);
                         instr->Function = func->Name;
-                        instr->HasSideEffect = true;
                     }
                     // ad-hoc processing for ctor calls
                     else if (auto ctor = dynamic_cast<ConstructorDecl*>(funcType->declRef.GetDecl()))
@@ -752,13 +632,14 @@ namespace Spire
                 }
                 return expr;
             }
-            virtual RefPtr<ExpressionSyntaxNode> VisitUnaryExpression(UnaryExpressionSyntaxNode* expr) override
+
+            virtual RefPtr<ExpressionSyntaxNode> VisitOperatorExpression(OperatorExpressionSyntaxNode* expr) override
             {
                 if (expr->Operator == Operator::PostDec || expr->Operator == Operator::PostInc
                     || expr->Operator == Operator::PreDec || expr->Operator == Operator::PreInc)
                 {
-                    expr->Expression->Access = ExpressionAccess::Read;
-                    expr->Expression->Accept(this);
+                    expr->Arguments[0]->Access = ExpressionAccess::Read;
+                    expr->Arguments[0]->Accept(this);
                     auto base = PopStack();
                     BinaryInstruction * instr;
                     if (expr->Operator == Operator::PostDec)
@@ -774,8 +655,8 @@ namespace Spire
                     instr->Type = TranslateExpressionType(expr->Type);
                     codeWriter.Insert(instr);
 
-                    expr->Expression->Access = ExpressionAccess::Write;
-                    expr->Expression->Accept(this);
+                    expr->Arguments[0]->Access = ExpressionAccess::Write;
+                    expr->Arguments[0]->Accept(this);
                     auto dest = PopStack();
                     auto store = new StoreInstruction(dest, instr);
                     codeWriter.Insert(store);
@@ -783,8 +664,8 @@ namespace Spire
                 }
                 else if (expr->Operator == Operator::PreDec || expr->Operator == Operator::PreInc)
                 {
-                    expr->Expression->Access = ExpressionAccess::Read;
-                    expr->Expression->Accept(this);
+                    expr->Arguments[0]->Access = ExpressionAccess::Read;
+                    expr->Arguments[0]->Accept(this);
                     auto base = PopStack();
                     BinaryInstruction * instr;
                     if (expr->Operator == Operator::PostDec)
@@ -800,16 +681,16 @@ namespace Spire
                     instr->Type = TranslateExpressionType(expr->Type);
                     codeWriter.Insert(instr);
 
-                    expr->Expression->Access = ExpressionAccess::Write;
-                    expr->Expression->Accept(this);
+                    expr->Arguments[0]->Access = ExpressionAccess::Write;
+                    expr->Arguments[0]->Accept(this);
                     auto dest = PopStack();
                     auto store = new StoreInstruction(dest, instr);
                     codeWriter.Insert(store);
                     PushStack(instr);
                 }
-                else
+                else if (expr->Arguments.Count() == 1)
                 {
-                    expr->Expression->Accept(this);
+                    expr->Arguments[0]->Accept(this);
                     auto base = PopStack();
                     auto genUnaryInstr = [&](ILOperand * input)
                     {
@@ -817,7 +698,7 @@ namespace Spire
                         switch (expr->Operator)
                         {
                         case Operator::Not:
-                            input = EnsureBoolType(input, expr->Expression->Type);
+                            input = EnsureBoolType(input, expr->Arguments[0]->Type);
                             rs = new NotInstruction();
                             break;
                         case Operator::Neg:
@@ -836,6 +717,124 @@ namespace Spire
                     };
                     PushStack(genUnaryInstr(base));
                 }
+                else
+                {
+                    expr->Arguments[1]->Accept(this);
+                    auto right = PopStack();
+                    if (expr->Operator == Operator::Assign)
+                    {
+                        expr->Arguments[0]->Access = ExpressionAccess::Write;
+                        expr->Arguments[0]->Accept(this);
+                        auto left = PopStack();
+                        Assign(left, right);
+                        PushStack(left);
+                    }
+                    else
+                    {
+                        expr->Arguments[0]->Access = ExpressionAccess::Read;
+                        expr->Arguments[0]->Accept(this);
+                        auto left = PopStack();
+                        BinaryInstruction * rs = 0;
+                        switch (expr->Operator)
+                        {
+                        case Operator::Add:
+                        case Operator::AddAssign:
+                            rs = new AddInstruction();
+                            break;
+                        case Operator::Sub:
+                        case Operator::SubAssign:
+                            rs = new SubInstruction();
+                            break;
+                        case Operator::Mul:
+                        case Operator::MulAssign:
+                            rs = new MulInstruction();
+                            break;
+                        case Operator::Mod:
+                        case Operator::ModAssign:
+                            rs = new ModInstruction();
+                            break;
+                        case Operator::Div:
+                        case Operator::DivAssign:
+                            rs = new DivInstruction();
+                            break;
+                        case Operator::And:
+                            rs = new AndInstruction();
+                            break;
+                        case Operator::Or:
+                            rs = new OrInstruction();
+                            break;
+                        case Operator::BitAnd:
+                        case Operator::AndAssign:
+                            rs = new BitAndInstruction();
+                            break;
+                        case Operator::BitOr:
+                        case Operator::OrAssign:
+                            rs = new BitOrInstruction();
+                            break;
+                        case Operator::BitXor:
+                        case Operator::XorAssign:
+                            rs = new BitXorInstruction();
+                            break;
+                        case Operator::Lsh:
+                        case Operator::LshAssign:
+                            rs = new ShlInstruction();
+                            break;
+                        case Operator::Rsh:
+                        case Operator::RshAssign:
+                            rs = new ShrInstruction();
+                            break;
+                        case Operator::Eql:
+                            rs = new CmpeqlInstruction();
+                            break;
+                        case Operator::Neq:
+                            rs = new CmpneqInstruction();
+                            break;
+                        case Operator::Greater:
+                            rs = new CmpgtInstruction();
+                            break;
+                        case Operator::Geq:
+                            rs = new CmpgeInstruction();
+                            break;
+                        case Operator::Leq:
+                            rs = new CmpleInstruction();
+                            break;
+                        case Operator::Less:
+                            rs = new CmpltInstruction();
+                            break;
+                        default:
+                            throw NotImplementedException("Code gen not implemented for this operator.");
+                        }
+                        rs->Operands.SetSize(2);
+                        rs->Operands[0] = left;
+                        rs->Operands[1] = right;
+                        rs->Type = TranslateExpressionType(expr->Type);
+                        codeWriter.Insert(rs);
+                        switch (expr->Operator)
+                        {
+                        case Operator::AddAssign:
+                        case Operator::SubAssign:
+                        case Operator::MulAssign:
+                        case Operator::DivAssign:
+                        case Operator::ModAssign:
+                        case Operator::LshAssign:
+                        case Operator::RshAssign:
+                        case Operator::AndAssign:
+                        case Operator::OrAssign:
+                        case Operator::XorAssign:
+                        {
+                            expr->Arguments[0]->Access = ExpressionAccess::Write;
+                            expr->Arguments[0]->Accept(this);
+                            auto target = PopStack();
+                            Assign(target, rs);
+                            break;
+                        }
+                        default:
+                            break;
+                        }
+                        PushStack(rs);
+                    }
+                    return expr;
+                }
                 return expr;
             }
             bool GenerateVarRef(String name, ExpressionAccess access)
@@ -847,7 +846,7 @@ namespace Spire
                     if (thisDeclRef)
                     {
                         int id = ((AggTypeDecl*)thisDeclRef.GetDecl())->FindFieldIndex(name);
-                        GenerateIndexExpression(thisArg, program->ConstantPool->CreateConstant(id), access);
+                        GenerateIndexExpression(thisArg, program->ConstantPool->CreateConstant(id), access == ExpressionAccess::Read);
                         return true;
                     }
                     return false;

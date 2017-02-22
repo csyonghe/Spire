@@ -154,14 +154,14 @@ static bool MaybeEmitParens(EmitContext* context, int outerPrec, int prec)
     return false;
 }
 
-static void EmitBinExpr(EmitContext* context, int outerPrec, int prec, char const* op, RefPtr<BinaryExpressionSyntaxNode> binExpr)
+static void EmitBinExpr(EmitContext* context, int outerPrec, int prec, char const* op, RefPtr<OperatorExpressionSyntaxNode> binExpr)
 {
     bool needsClose = MaybeEmitParens(context, outerPrec, prec);
-    EmitExprWithPrecedence(context, binExpr->LeftExpression, prec);
+    EmitExprWithPrecedence(context, binExpr->Arguments[0], prec);
     Emit(context, " ");
     Emit(context, op);
     Emit(context, " ");
-    EmitExprWithPrecedence(context, binExpr->RightExpression, prec);
+    EmitExprWithPrecedence(context, binExpr->Arguments[1], prec);
     if (needsClose)
     {
         Emit(context, ")");
@@ -174,11 +174,11 @@ static void EmitUnaryExpr(
     int prec,
     char const* preOp,
     char const* postOp,
-    RefPtr<UnaryExpressionSyntaxNode> binExpr)
+    RefPtr<OperatorExpressionSyntaxNode> binExpr)
 {
     bool needsClose = MaybeEmitParens(context, outerPrec, prec);
     Emit(context, preOp);
-    EmitExprWithPrecedence(context, binExpr->Expression, prec);
+    EmitExprWithPrecedence(context, binExpr->Arguments[0], prec);
     Emit(context, postOp);
     if (needsClose)
     {
@@ -300,7 +300,7 @@ static void EmitExprWithPrecedence(EmitContext* context, RefPtr<ExpressionSyntax
             break;
         }
     }
-    else if (auto binExpr = expr.As<BinaryExpressionSyntaxNode>())
+    else if (auto binExpr = expr.As<OperatorExpressionSyntaxNode>())
     {
         switch (binExpr->Operator)
         {
@@ -336,25 +336,16 @@ static void EmitExprWithPrecedence(EmitContext* context, RefPtr<ExpressionSyntax
         CASE(XorAssign, ^=);
 #undef CASE
         case Operator::Sequence: EmitBinExpr(context, outerPrec, kPrecedence_Comma, ",", binExpr); break;
-        default:
-            assert(!"unreachable");
-            break;
-        }
-    }
-    else if (auto unaryExpr = expr.As<UnaryExpressionSyntaxNode>())
-    {
-        switch (unaryExpr->Operator)
-        {
-#define PREFIX(NAME, OP) case Operator::NAME: EmitUnaryExpr(context, outerPrec, kPrecedence_Prefix, #OP, "", unaryExpr); break
-#define POSTFIX(NAME, OP) case Operator::NAME: EmitUnaryExpr(context, outerPrec, kPrecedence_Postfix, "", #OP, unaryExpr); break
+#define PREFIX(NAME, OP) case Operator::NAME: EmitUnaryExpr(context, outerPrec, kPrecedence_Prefix, #OP, "", binExpr); break
+#define POSTFIX(NAME, OP) case Operator::NAME: EmitUnaryExpr(context, outerPrec, kPrecedence_Postfix, "", #OP, binExpr); break
 
-        PREFIX(Neg, -);
-        PREFIX(Not, !);
-        PREFIX(BitNot, ~);
-        PREFIX(PreInc, ++);
-        PREFIX(PreDec, --);
-        PREFIX(PostInc, ++);
-        PREFIX(PostDec, --);
+            PREFIX(Neg, -);
+            PREFIX(Not, !);
+            PREFIX(BitNot, ~);
+            PREFIX(PreInc, ++);
+            PREFIX(PreDec, --);
+            PREFIX(PostInc, ++);
+            PREFIX(PostDec, --);
 #undef PREFIX
 #undef POSTFIX
         default:

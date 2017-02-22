@@ -775,7 +775,7 @@ namespace Spire
             result.ParameterSets = shader->ModuleParamSets;
         }
 
-        CompiledShaderSource CLikeCodeGen::GenerateShader(CompileResult & result, SymbolTable *, ILShader * shader, DiagnosticSink * err)
+        CompiledShaderSource CLikeCodeGen::GenerateShader(CompileResult & result, ILShader * shader, DiagnosticSink * err)
         {
             this->errWriter = err;
 
@@ -1042,7 +1042,7 @@ namespace Spire
                         {
                             sbCode << ", ";
                         }
-                        auto qualifier = (*paramIter).Value.Qualifier;
+                        auto qualifier = (*paramIter).Value->Qualifier;
                         if (qualifier == ParameterQualifier::InOut)
                             sbCode << "inout ";
                         else if (qualifier == ParameterQualifier::Out)

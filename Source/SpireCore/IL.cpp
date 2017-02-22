@@ -761,7 +761,7 @@ namespace Spire
 			{
 				sb << "func " << f.Key << "(";
 				for (auto & param : f.Value->Parameters)
-					sb << param.Value.Type->ToString() << " " << param.Key << ", ";
+					sb << param.Value->Type->ToString() << " " << param.Key << ", ";
 				sb << ") : " << f.Value->ReturnType->ToString();
 				sb << "\n{\n" << f.Value->Code->ToString() << "\n}\n";
 			}

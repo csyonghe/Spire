@@ -290,12 +290,7 @@ namespace Spire
         };
 
         class Decl;
-        class SymbolTable;
-        class ShaderSymbol;
-        class ShaderClosure;
         class StructSyntaxNode;
-        class ShaderComponentSymbol;
-        class FunctionSymbol;
         class BasicExpressionType;
         class ArrayExpressionType;
         class TypeDefDecl;
@@ -413,7 +408,6 @@ namespace Spire
             bool IsTexture() const { return As<TextureType>() != nullptr; }
             bool IsSampler() const { return As<SamplerStateType>() != nullptr; }
             bool IsStruct() const;
-            bool IsShader() const;
             static void Init();
             static void Finalize();
             ExpressionType* GetCanonicalType() const;
@@ -574,25 +568,6 @@ namespace Spire
         };
 
         class FunctionDeclBase;
-
-        // The type of a shader symbol.
-        class ShaderType : public ExpressionType
-        {
-        public:
-            ShaderSymbol * Shader = nullptr;
-            ShaderClosure * ShaderClosure = nullptr;
-
-            ShaderType(ShaderSymbol * shaderSym, Compiler::ShaderClosure * closure)
-            {
-                this->ShaderClosure = closure;
-                this->Shader = shaderSym;
-            }
-
-            virtual String ToString() const override;
-        protected:
-            virtual bool EqualsImpl(const ExpressionType * type) const override;
-            virtual ExpressionType* CreateCanonicalType() override;
-        };
 
         // A reference to the generic type parameter of an import operator
         class ImportOperatorGenericParamType : public ExpressionType
@@ -1423,7 +1398,8 @@ namespace Spire
         class ClassSyntaxNode : public AggTypeDecl
         {
         public:
-            virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;l ClassSyntaxNode * Clone(CloneContext & ctx) override
+            virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+            ClassSyntaxNode * Clone(CloneContext & ctx) override
             {
                 auto rs = CloneSyntaxNodeFields(new ClassSyntaxNode(*this), ctx);
                 rs->Members.Clear();
@@ -1575,18 +1551,14 @@ namespace Spire
         class FuncType : public ExpressionType
         {
         public:
-            ShaderComponentSymbol * Component = nullptr;
-            FunctionSymbol * Func = nullptr;
             FuncDeclBaseRef declRef;
 
             virtual String ToString() const override;
         protected:
             virtual bool EqualsImpl(const ExpressionType * type) const override;
             virtual ExpressionType* CreateCanonicalType() override;
+            virtual int GetHashCode() const override;
         };
-
-
-
 
         // A constructor/initializer to create instances of a type
         class ConstructorDecl : public FunctionDeclBase
@@ -1792,8 +1764,8 @@ namespace Spire
             Assign = 200, AddAssign, SubAssign, MulAssign, DivAssign, ModAssign,
             LshAssign, RshAssign, OrAssign, AndAssign, XorAssign
         };
-
         String GetOperatorFunctionName(Operator op);
+        String OperatorToString(Operator op);
 
         class ImportExpressionSyntaxNode : public ExpressionSyntaxNode
         {
@@ -1814,23 +1786,29 @@ namespace Spire
             virtual ProjectExpressionSyntaxNode * Clone(CloneContext & ctx) override;
         };
 
-        class UnaryExpressionSyntaxNode : public ExpressionSyntaxNode
+        // A base expression being applied to arguments: covers
+        // both ordinary `()` function calls and `<>` generic application
+        class AppExprBase : public ExpressionSyntaxNode
         {
         public:
-            Operator Operator;
-            RefPtr<ExpressionSyntaxNode> Expression;
-            virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-            virtual UnaryExpressionSyntaxNode * Clone(CloneContext & ctx) override;
+            RefPtr<ExpressionSyntaxNode> FunctionExpr;
+            List<RefPtr<ExpressionSyntaxNode>> Arguments;
         };
 
-        class BinaryExpressionSyntaxNode : public ExpressionSyntaxNode
+
+        class InvokeExpressionSyntaxNode : public AppExprBase
+        {
+        public:
+            virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+            virtual InvokeExpressionSyntaxNode * Clone(CloneContext & ctx) override;
+        };
+
+        class OperatorExpressionSyntaxNode : public InvokeExpressionSyntaxNode
         {
         public:
             Operator Operator;
-            RefPtr<ExpressionSyntaxNode> LeftExpression;
-            RefPtr<ExpressionSyntaxNode> RightExpression;
+            void SetOperator(Spire::Compiler::Operator op);
             virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-            virtual BinaryExpressionSyntaxNode * Clone(CloneContext & ctx) override;
         };
 
         class IndexExpressionSyntaxNode : public ExpressionSyntaxNode
@@ -1870,22 +1848,6 @@ namespace Spire
 
             virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
             virtual DerefExpr * Clone(CloneContext & ctx) override;
-        };
-
-        // A base expression being applied to arguments: covers
-        // both ordinary `()` function calls and `<>` generic application
-        class AppExprBase : public ExpressionSyntaxNode
-        {
-        public:
-            RefPtr<ExpressionSyntaxNode> FunctionExpr;
-            List<RefPtr<ExpressionSyntaxNode>> Arguments;
-        };
-
-        class InvokeExpressionSyntaxNode : public AppExprBase
-        {
-        public:
-            virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-            virtual InvokeExpressionSyntaxNode * Clone(CloneContext & ctx) override;
         };
 
         class TypeCastExpressionSyntaxNode : public ExpressionSyntaxNode
@@ -2430,6 +2392,7 @@ namespace Spire
 
         protected:
             virtual bool EqualsImpl(const ExpressionType * type) const override;
+            virtual int GetHashCode() const override;
             virtual ExpressionType* CreateCanonicalType() override;
         };
 
@@ -2652,12 +2615,10 @@ namespace Spire
                 return stmt;
             }
 
-            virtual RefPtr<ExpressionSyntaxNode> VisitBinaryExpression(BinaryExpressionSyntaxNode* expr)
+            virtual RefPtr<ExpressionSyntaxNode> VisitOperatorExpression(OperatorExpressionSyntaxNode* expr)
             {
-                if (expr->LeftExpression)
-                    expr->LeftExpression = expr->LeftExpression->Accept(this).As<ExpressionSyntaxNode>();
-                if (expr->RightExpression)
-                    expr->RightExpression = expr->RightExpression->Accept(this).As<ExpressionSyntaxNode>();
+                for (auto && child : expr->Arguments)
+                    child->Accept(this);
                 return expr;
             }
             virtual RefPtr<ExpressionSyntaxNode> VisitConstantExpression(ConstantExpressionSyntaxNode* expr)
@@ -2713,12 +2674,6 @@ namespace Spire
                     expr->Expr0 = expr->Expr0->Accept(this).As<ExpressionSyntaxNode>();
                 if (expr->Expr1)
                     expr->Expr1 = expr->Expr1->Accept(this).As<ExpressionSyntaxNode>();
-                return expr;
-            }
-            virtual RefPtr<ExpressionSyntaxNode> VisitUnaryExpression(UnaryExpressionSyntaxNode* expr)
-            {
-                if (expr->Expression)
-                    expr->Expression = expr->Expression->Accept(this).As<ExpressionSyntaxNode>();
                 return expr;
             }
             virtual RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode* expr)

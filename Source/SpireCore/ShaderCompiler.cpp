@@ -10,8 +10,6 @@
 #include "StdInclude.h"
 #include "CodeGenBackend.h"
 #include "../CoreLib/Tokenizer.h"
-#include "Closure.h"
-#include "VariantIR.h"
 #include "Naming.h"
 
 #include "Emit.h"
@@ -43,271 +41,6 @@ namespace Spire
         {
         private:
             Dictionary<String, RefPtr<CodeGenBackend>> backends;
-
-            void ResolveAttributes(SymbolTable * symTable)
-            {
-                for (auto & shader : symTable->ShaderDependenceOrder)
-                {
-                    auto comps = shader->GetComponentDependencyOrder();
-                    for (auto & comp : comps)
-                    {
-                        for (auto & impl : comp->Implementations)
-                            for (auto attrib : impl->SyntaxNode->GetLayoutAttributes())
-                            {
-                                try
-                                {
-                                    if (attrib->GetValue().StartsWith("%"))
-                                    {
-                                        CoreLib::Text::TokenReader parser(attrib->GetValue().SubString(1, attrib->GetValue().Length() - 1));
-                                        auto compName = parser.ReadWord();
-                                        parser.Read(".");
-                                        auto compAttrib = parser.ReadWord();
-                                        RefPtr<ShaderComponentSymbol> compSym;
-                                        if (shader->Components.TryGetValue(compName, compSym))
-                                        {
-                                            for (auto & timpl : compSym->Implementations)
-                                            {
-                                                Token attribValue;
-                                                if (timpl->SyntaxNode->FindSimpleAttribute(compAttrib, attribValue))
-                                                    attrib->Value = attribValue;
-                                            }
-                                        }
-                                    }
-                                }
-                                catch (Exception)
-                                {
-                                }
-                            }
-                    }
-                }
-            }
-
-            /* Generate a shader variant by applying mechanic choice rules and the choice file.
-               The choice file provides "preferred" definitions, as represented in ShaderComponentSymbol::Type::PinnedWorlds
-               The process resolves the component references by picking a pinned definition if one is available, or a definition
-               with the preferred import path as defined by import operator ordering.
-               After all references are resolved, all unreferenced definitions (dead code) are eliminated, 
-               resulting a shader variant ready for code generation.
-            */
-            RefPtr<ShaderIR> GenerateShaderVariantIR(CompileResult & cresult, ShaderClosure * shader, SymbolTable * symbolTable)
-            {
-                RefPtr<ShaderIR> result = new ShaderIR();
-                result->Shader = shader;
-                result->SymbolTable = symbolTable;
-                // mark pinned worlds
-                for (auto & comp : shader->Components)
-                {
-                    for (auto & impl : comp.Value->Implementations)
-                    {
-                        for (auto & w : impl->Worlds)
-                        {
-                            if (impl->SrcPinnedWorlds.Contains(w) || impl->SyntaxNode->IsInline() || impl->ExportWorlds.Contains(w) || impl->SyntaxNode->IsInput())
-                            {
-                                comp.Value->Type->PinnedWorlds.Add(w);
-                            }
-                        }
-                    }
-                }
-                // generate definitions
-                Dictionary<ShaderClosure*, ModuleInstanceIR*> moduleInstanceMap;
-                auto createModuleInstance = [&](ShaderClosure * closure)
-                {
-                    ModuleInstanceIR * inst;
-                    if (moduleInstanceMap.TryGetValue(closure, inst))
-                        return inst;
-                    List<String> namePath;
-                    
-                    auto parent = closure;
-                    while (parent)
-                    {
-                        if (parent->Name.Length())
-                            namePath.Add(parent->Name);
-                        else
-                            namePath.Add(parent->ModuleSyntaxNode->Name.Content);
-                        parent = parent->Parent;
-                    }
-                    StringBuilder sbBindingName;
-                    for (int i = namePath.Count() - 2; i >= 0; i--)
-                    {
-                        sbBindingName << namePath[i];
-                        if (i > 0)
-                            sbBindingName << ".";
-                    }
-                    // if this is the root module, its binding name is module name.
-                    if (namePath.Count() == 1)
-                        sbBindingName << namePath[0];
-                    inst = new ModuleInstanceIR();
-                    inst->SyntaxNode = closure->ModuleSyntaxNode;
-                    inst->BindingIndex = closure->BindingIndex;
-                    inst->UsingPosition = closure->UsingPosition;
-                    result->ModuleInstances.Add(inst);
-                    inst->BindingName = sbBindingName.ProduceString();
-                    moduleInstanceMap[closure] = inst;
-                    return inst;
-                };
-                for (auto & comp : shader->AllComponents)
-                {
-                    EnumerableDictionary<String, ComponentDefinitionIR*> defs;
-                    Dictionary<String, ShaderComponentImplSymbol*> impls;
-                    for (auto & impl : comp.Value.Symbol->Implementations)
-                    {
-                        auto createComponentDef = [&](const String & w)
-                        {
-                            RefPtr<ComponentDefinitionIR> def = new ComponentDefinitionIR();
-                            def->OriginalName = comp.Value.Symbol->Name;
-                            def->UniqueKey = comp.Value.Symbol->UniqueKey;
-                            def->UniqueName = comp.Value.Symbol->UniqueName;
-                            def->Type = comp.Value.Symbol->Type->DataType;
-                            def->IsEntryPoint = (impl->ExportWorlds.Contains(w) || impl->SyntaxNode->IsParam() ||
-                                (shader->Pipeline->IsAbstractWorld(w) &&
-                                (impl->SyntaxNode->HasSimpleAttribute("Pinned") || shader->Pipeline->Worlds[w]()->HasSimpleAttribute("Pinned"))));
-                            CloneContext cloneCtx;
-                            def->SyntaxNode = impl->SyntaxNode->Clone(cloneCtx);
-                            def->World = w;
-                            def->ModuleInstance = createModuleInstance(comp.Value.Closure);
-                            return def;
-                        };
-                        // parameter component will only have one defintion that is shared by all worlds
-                        if (impl->SyntaxNode->IsParam())
-                        {
-                            auto def = createComponentDef("<uniform>");
-                            result->Definitions.Add(def);
-                            defs["<uniform>"] = def.Ptr();
-                        }
-                        else
-                        {
-                            for (auto & w : impl->Worlds)
-                            {
-                                auto def = createComponentDef(w);
-                                result->Definitions.Add(def);
-                                
-                                defs[w] = def.Ptr();
-                                impls[w] = impl.Ptr();
-                            }
-                        }
-                    }
-                    result->DefinitionsByComponent[comp.Key] = defs;
-                }
-                bool changed = true;
-                while (changed)
-                {
-                    changed = false;
-                    result->ResolveComponentReference();
-                    result->EliminateDeadCode();
-                    // check circular references
-                    for (auto & def : result->Definitions)
-                    {
-                        if (def->Dependency.Contains(def.Ptr()))
-                        {
-                            cresult.GetErrorWriter()->diagnose(def->SyntaxNode->Position, Diagnostics::componentDefinitionCircularity, def->OriginalName);
-                            return nullptr;
-                        }
-                    }
-                    /*
-                    // eliminate redundant (downstream) definitions, one at a time
-                    auto comps = result->GetComponentDependencyOrder();
-                    for (int i = comps.Count() - 1; i >= 0; i--)
-                    {
-                        auto comp = comps[i];
-                        auto & defs = result->DefinitionsByComponent[comp->UniqueName]();
-                        EnumerableHashSet<ComponentDefinitionIR*> removedDefs;
-                        for (auto & def : defs)
-                            if (!def.Value->IsEntryPoint && !comp->Type->PinnedWorlds.Contains(def.Value->World))
-                            {
-                                for (auto & otherDef : defs)
-                                {
-                                    if (otherDef.Value != def.Value && !removedDefs.Contains(otherDef.Value)
-                                        && shader->Pipeline->IsWorldReachable(otherDef.Value->World, def.Value->World))
-                                    {
-                                        removedDefs.Add(def.Value);
-                                        break;
-                                    }
-                                }
-                            }
-                        if (removedDefs.Count())
-                        {
-                            result->RemoveDefinitions([&](ComponentDefinitionIR* def) {return removedDefs.Contains(def); });
-                            changed = true;
-                        }
-                    }
-                    */
-                }
-                return result;
-            }
-            ShaderSyntaxNode * InstantiateShaderTemplate(DiagnosticSink* sink, SymbolTable* symTable, TemplateShaderSyntaxNode* ts, const List<String>& args)
-            {
-                if (ts->Parameters.Count() > args.Count())
-                {
-                    sink->diagnose(ts->Position, Diagnostics::insufficientTemplateShaderArguments, ts->Name);
-                    return nullptr;
-                }
-                if (ts->Parameters.Count() < args.Count())
-                {
-                    sink->diagnose(ts->Position, Diagnostics::tooManyTemplateShaderArguments, ts->Name);
-                    return nullptr;
-                }
-                // check semantics
-                bool hasErrors = false;
-                for (int i = 0; i < args.Count(); i++)
-                {
-                    auto name = args[i];
-                    if (auto module = symTable->Shaders.TryGetValue(name))
-                    {
-                        if (ts->Parameters[i]->InterfaceName.Content.Length())
-                        {
-                            if ((*module)->SyntaxNode->Name.Content != ts->Parameters[i]->InterfaceName.Content &&
-                                (*module)->SyntaxNode->InterfaceNames.FindFirst([&](const Token & t) { return t.Content == ts->Parameters[i]->InterfaceName.Content; }) == -1)
-                            {
-                                hasErrors = true;
-                                sink->diagnose(ts->Parameters[i]->Position, Diagnostics::templateShaderArgumentDidNotImplementRequiredInterface, name, ts->Parameters[i]->ModuleName, ts->Parameters[i]->InterfaceName);
-                                sink->diagnose((*module)->SyntaxNode->Position, Diagnostics::seeDefinitionOf, (*module)->SyntaxNode->Name);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        hasErrors = true;
-                        sink->diagnose(ts->Parameters[i]->Position, Diagnostics::templateShaderArgumentIsNotDefined, args[i], ts->Parameters[i]->ModuleName.Content);
-                    }
-                }
-                if (hasErrors)
-                    return nullptr;
-                ShaderSyntaxNode * result = new ShaderSyntaxNode();
-                result->Name = ts->Name;
-                StringBuilder nameBuilder;
-                nameBuilder << ts->Name.Content << "<";
-                for (int i = 0; i < args.Count(); i++)
-                {
-                    nameBuilder << args[i];
-                    if (i < args.Count()-1)
-                        nameBuilder << ",";
-                }
-                nameBuilder << ">";
-                result->Name.Content = nameBuilder.ProduceString();
-                result->ParentPipelineName = ts->ParentPipelineName;
-                for (auto & member : ts->Members)
-                {
-                    if (auto import = member.As<ImportSyntaxNode>())
-                    {
-                        int index = ts->Parameters.FindFirst([&](RefPtr<TemplateShaderParameterSyntaxNode> p) { return p->ModuleName.Content == import->ShaderName.Content; });
-                        if (index != -1)
-                        {
-                            CloneContext cloneCtx;
-                            auto newImport = import->Clone(cloneCtx);
-                            auto attribModifier = new SimpleAttribute();
-                            attribModifier->Key = "Binding";
-                            attribModifier->Value.Content = String(index);
-                            newImport->modifiers.first = attribModifier;
-                            newImport->ShaderName.Content = args[index];
-                            result->Members.Add(newImport);
-                            continue;
-                        }
-                    }
-                    result->Members.Add(member);
-                }
-                result->IsModule = false;
-                return result;
-            }
         public:
             virtual CompileUnit Parse(CompileResult & result, String source, String fileName, IncludeHandler* includeHandler, Dictionary<String,String> const& preprocesorDefinitions,
                 CompileUnit predefUnit) override
@@ -545,7 +278,7 @@ namespace Spire
             }
 
 
-            virtual void Compile(CompileResult & result, CompilationContext & context, List<CompileUnit> & units, const CompileOptions & options) override
+            virtual void Compile(CompileResult & result, CompilationContext & /*context*/, List<CompileUnit> & units, const CompileOptions & options) override
             {
                 RefPtr<ProgramSyntaxNode> programSyntaxNode = new ProgramSyntaxNode();
                 for (auto & unit : units)
@@ -553,10 +286,8 @@ namespace Spire
                     programSyntaxNode->Include(unit.SyntaxNode.Ptr());
                 }
 
-                SymbolTable & symTable = context.Symbols;
-//                auto & shaderClosures = context.ShaderClosures;
                 
-                RefPtr<SyntaxVisitor> visitor = CreateSemanticsVisitor(&symTable, result.GetErrorWriter());
+                RefPtr<SyntaxVisitor> visitor = CreateSemanticsVisitor(result.GetErrorWriter());
                 try
                 {
                     programSyntaxNode->Accept(visitor.Ptr());

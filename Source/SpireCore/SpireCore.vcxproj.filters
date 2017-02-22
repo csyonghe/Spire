@@ -36,20 +36,11 @@
     <ClInclude Include="StdInclude.h">
       <Filter>Front End</Filter>
     </ClInclude>
-    <ClInclude Include="SymbolTable.h">
-      <Filter>Front End</Filter>
-    </ClInclude>
     <ClInclude Include="CompiledProgram.h">
       <Filter>Back End</Filter>
     </ClInclude>
     <ClInclude Include="CodeGenBackend.h">
       <Filter>Back End</Filter>
-    </ClInclude>
-    <ClInclude Include="Closure.h">
-      <Filter>Front End</Filter>
-    </ClInclude>
-    <ClInclude Include="VariantIR.h">
-      <Filter>Front End</Filter>
     </ClInclude>
     <ClInclude Include="StringObject.h">
       <Filter>Front End</Filter>
@@ -59,9 +50,6 @@
     </ClInclude>
     <ClInclude Include="CLikeCodeGen.h">
       <Filter>Back End</Filter>
-    </ClInclude>
-    <ClInclude Include="GetDependencyVisitor.h">
-      <Filter>Front End</Filter>
     </ClInclude>
     <ClInclude Include="Diagnostics.h">
       <Filter>Front End</Filter>
@@ -110,9 +98,6 @@
     <ClCompile Include="KeyHoleMatching.cpp">
       <Filter>Back End</Filter>
     </ClCompile>
-    <ClCompile Include="SymbolTable.cpp">
-      <Filter>Front End</Filter>
-    </ClCompile>
     <ClCompile Include="GLSLCodeGen.cpp">
       <Filter>Back End</Filter>
     </ClCompile>
@@ -122,23 +107,11 @@
     <ClCompile Include="CompiledProgram.cpp">
       <Filter>Back End</Filter>
     </ClCompile>
-    <ClCompile Include="Closure.cpp">
-      <Filter>Front End</Filter>
-    </ClCompile>
     <ClCompile Include="SpirVCodeGen.cpp">
       <Filter>Back End</Filter>
     </ClCompile>
     <ClCompile Include="NewSpirVCodeGen.cpp">
       <Filter>Back End</Filter>
-    </ClCompile>
-    <ClCompile Include="CodeGenerator.cpp">
-      <Filter>Front End</Filter>
-    </ClCompile>
-    <ClCompile Include="VariantIR.cpp">
-      <Filter>Front End</Filter>
-    </ClCompile>
-    <ClCompile Include="InsertImplicitImportOperator.cpp">
-      <Filter>Front End</Filter>
     </ClCompile>
     <ClCompile Include="Naming.cpp">
       <Filter>Front End</Filter>
@@ -148,9 +121,6 @@
     </ClCompile>
     <ClCompile Include="CLikeCodeGen.cpp">
       <Filter>Back End</Filter>
-    </ClCompile>
-    <ClCompile Include="GetDependencyVisitor.cpp">
-      <Filter>Front End</Filter>
     </ClCompile>
     <ClCompile Include="Diagnostics.cpp">
       <Filter>Front End</Filter>

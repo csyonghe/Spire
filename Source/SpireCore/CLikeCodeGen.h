@@ -193,7 +193,7 @@ namespace Spire
         public:
             CLikeCodeGen();
             virtual void GenerateShaderMetaData(ShaderMetaData & result, ILProgram* program, ILShader * shader, DiagnosticSink * err);
-            virtual CompiledShaderSource GenerateShader(CompileResult & result, SymbolTable *, ILShader * shader, DiagnosticSink * err) override;
+            virtual CompiledShaderSource GenerateShader(CompileResult & result, ILShader * shader, DiagnosticSink * err) override;
             void GenerateStructs(StringBuilder & sb, ILProgram * program);
             void GenerateReferencedFunctions(StringBuilder & sb, ILProgram * program, ArrayView<ILWorld*> worlds);
             ExternComponentCodeGenInfo ExtractExternComponentInfo(const ILObjectDefinition & input);

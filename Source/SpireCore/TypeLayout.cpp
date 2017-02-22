@@ -2,7 +2,6 @@
 #include "TypeLayout.h"
 
 #include "Syntax.h"
-#include "SymbolTable.h"
 
 #include <assert.h>
 

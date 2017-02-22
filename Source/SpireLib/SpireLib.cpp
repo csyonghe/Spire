@@ -511,119 +511,18 @@ namespace SpireLib
         }
 
         StringBuilder moduleKeyBuilder;
-        SpireModule * SpecializeModule(SpireModule * module, int * params, int numParams, SpireDiagnosticSink * sink)
+        SpireModule * SpecializeModule(SpireModule * /*module*/, int * /*params*/, int /*numParams*/, SpireDiagnosticSink * /*sink*/)
         {
-            moduleKeyBuilder.Clear();
-            moduleKeyBuilder.Append(module->Name);
-            for (auto & param : module->Parameters)
-            {
-                if (param.IsSpecialize)
-                {
-                    int id = -1;
-                    for (int i = 0; i < numParams; i++)
-                    {
-                        moduleKeyBuilder.Append(params[id]);
-                        moduleKeyBuilder.Append('_');
-                    }
-                }
-            }
-            if (auto smodule = states.Last().modules.TryGetValue(moduleKeyBuilder.Buffer()))
-                return smodule->Ptr();
-            RefPtr<ShaderSymbol> originalModule;
-            compileContext.Last()->Symbols.Shaders.TryGetValue(module->Name, originalModule);
-            CompileUnit unit;
-            unit.SyntaxNode = new ProgramSyntaxNode();
-            CloneContext cloneCtx;
-            auto newModule = originalModule->SyntaxNode->Clone(cloneCtx);
-            newModule->Name.Content = moduleKeyBuilder.ToString();
-            int id = 0;
-            for (auto & member : newModule->Members)
-            {
-                if (auto param = member.As<ComponentSyntaxNode>())
-                {
-                    if (auto specialize = param->FindSpecializeModifier())
-                    {
-                        if (id >= numParams)
-                        {
-                            return nullptr;
-                        }
-                        auto newParam = param->Clone(cloneCtx);
-
-                        auto publicModifier = new PublicModifier();
-                        publicModifier->next = newParam->modifiers.first;
-                        newParam->modifiers.first = publicModifier;
-
-                        param->BlockStatement = nullptr;
-                        auto expr = new ConstantExpressionSyntaxNode();
-                        if (param->Type.Equals(ExpressionType::Bool))
-                            expr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Bool;
-                        else
-                            expr->ConstType = ConstantExpressionSyntaxNode::ConstantType::Int;
-                        expr->IntValue = params[id];
-                        newParam->Expression = expr;
-                        newModule->Members.Add(newParam);
-                        param->Name.Content = param->Name.Content + "placeholder";
-                        id++;
-                    }
-                }
-            }
-            unit.SyntaxNode->Members.Add(newModule);
-            List<CompileUnit> units;
-            units.Add(unit);
-            UpdateModuleLibrary(units, sink);
-            return FindModule(newModule->Name.Content);
+            return nullptr;
         }
 
         void UpdateModuleLibrary(List<CompileUnit> & units, SpireDiagnosticSink * sink)
         {
             Spire::Compiler::CompileResult result;
             compiler->Compile(result, *compileContext.Last(), units, Options);
-            for (auto & shader : compileContext.Last()->Symbols.Shaders)
-            {
-                if (!states.Last().modules.ContainsKey(shader.Key))
-                {
-                    RefPtr<SpireModule> newModule = new SpireModule();
-                    auto & meta = *newModule;
-                    meta.Id = SpireModule::IdAllocator++;
-                    meta.Name = shader.Key;
-                    int offset = 0;
-                    for (auto attrib : shader.Value->SyntaxNode->GetModifiersOfType<SimpleAttribute>())
-                        meta.Attribs[attrib->Key] = attrib->Value.Content;
-                    for (auto & comp : shader.Value->Components)
-                    {
-                        if (comp.Value->Implementations.Count() != 1)
-                            continue;
-                        auto impl = comp.Value->Implementations.First();
-                        if (!impl->SyntaxNode->IsRequire() && !impl->SyntaxNode->IsParam())
-                            continue;
-                        ComponentMetaData compMeta;
-                        compMeta.Name = comp.Key;
-                        compMeta.Type = comp.Value->Type->DataType;
-                        compMeta.TypeName = compMeta.Type->ToString();
-                        if (auto specialize = impl->SyntaxNode->FindSpecializeModifier())
-                        {
-                            for (auto val : specialize->Values)
-                            {
-                                compMeta.Values.Add(dynamic_cast<ConstantExpressionSyntaxNode*>(val.Ptr())->IntValue);
-                            }
-                            compMeta.IsSpecialize = true;
-                        }
-                        if (compMeta.Type->GetBindableResourceType() == BindableResourceType::NonBindable)
-                        {
-                            compMeta.Alignment = (int)GetTypeAlignment(compMeta.Type.Ptr(), LayoutRule::Std140);
-                            compMeta.Size = (int)GetTypeSize(compMeta.Type.Ptr(), LayoutRule::Std140);
-                            offset = RoundToAlignment(offset, compMeta.Alignment);
-                            compMeta.Offset = offset;
-                            offset += compMeta.Size;
-                        }
-                        if (impl->SyntaxNode->IsRequire())
-                            meta.Requirements.Add(compMeta);
-                        else
-                            meta.Parameters.Add(compMeta);
-                    }
-                    states.Last().modules.Add(shader.Key, newModule);
-                }
-            }
+            
+            //TODO: update metadata
+
             if (sink)
             {
                 sink->diagnostics.AddRange(result.sink.diagnostics);

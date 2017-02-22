@@ -2639,12 +2639,12 @@ namespace Spire
                     auto left = ParseExpression(Precedence(level + 1));
                     while (GetOpLevel(this, tokenReader.PeekTokenType()) == level)
                     {
-                        RefPtr<BinaryExpressionSyntaxNode> tmp = new BinaryExpressionSyntaxNode();
-                        tmp->LeftExpression = left;
+                        RefPtr<OperatorExpressionSyntaxNode> tmp = new OperatorExpressionSyntaxNode();
+                        tmp->Arguments.Add(left);
                         FillPosition(tmp.Ptr());
                         Token opToken = tokenReader.AdvanceToken();
-                        tmp->Operator = GetOpFromToken(opToken);
-                        tmp->RightExpression = ParseExpression(Precedence(level + 1));
+                        tmp->SetOperator(GetOpFromToken(opToken));
+                        tmp->Arguments.Add(ParseExpression(Precedence(level + 1)));
                         left = tmp;
                     }
                     return left;
@@ -2654,12 +2654,12 @@ namespace Spire
                     auto left = ParseExpression(Precedence(level + 1));
                     if (GetOpLevel(this, tokenReader.PeekTokenType()) == level)
                     {
-                        RefPtr<BinaryExpressionSyntaxNode> tmp = new BinaryExpressionSyntaxNode();
-                        tmp->LeftExpression = left;
+                        RefPtr<OperatorExpressionSyntaxNode> tmp = new OperatorExpressionSyntaxNode();
+                        tmp->Arguments.Add(left);
                         FillPosition(tmp.Ptr());
                         Token opToken = tokenReader.AdvanceToken();
-                        tmp->Operator = GetOpFromToken(opToken);
-                        tmp->RightExpression = ParseExpression(level);
+                        tmp->SetOperator(GetOpFromToken(opToken));
+                        tmp->Arguments.Add(ParseExpression(level));
                         left = tmp;
                     }
                     return left;
@@ -2686,18 +2686,18 @@ namespace Spire
                 LookAheadToken(TokenType::OpBitNot) ||
                 LookAheadToken(TokenType::OpSub))
             {
-                RefPtr<UnaryExpressionSyntaxNode> unaryExpr = new UnaryExpressionSyntaxNode();
+                RefPtr<OperatorExpressionSyntaxNode> unaryExpr = new OperatorExpressionSyntaxNode();
                 Token token = tokenReader.AdvanceToken();
                 FillPosition(unaryExpr.Ptr());
-                unaryExpr->Operator = GetOpFromToken(token);
+                unaryExpr->SetOperator(GetOpFromToken(token));
                 if (unaryExpr->Operator == Operator::PostInc)
-                    unaryExpr->Operator = Operator::PreInc;
+                    unaryExpr->SetOperator(Operator::PreInc);
                 else if (unaryExpr->Operator == Operator::PostDec)
-                    unaryExpr->Operator = Operator::PreDec;
+                    unaryExpr->SetOperator(Operator::PreDec);
                 else if (unaryExpr->Operator == Operator::Sub)
-                    unaryExpr->Operator = Operator::Neg;
+                    unaryExpr->SetOperator(Operator::Neg);
 
-                unaryExpr->Expression = ParseLeafExpression();
+                unaryExpr->Arguments.Add(ParseLeafExpression());
                 rs = unaryExpr;
                 return rs;
             }
@@ -2768,20 +2768,20 @@ namespace Spire
             {
                 if (LookAheadToken(TokenType::OpInc))
                 {
-                    RefPtr<UnaryExpressionSyntaxNode> unaryExpr = new UnaryExpressionSyntaxNode();
+                    RefPtr<OperatorExpressionSyntaxNode> unaryExpr = new OperatorExpressionSyntaxNode();
                     FillPosition(unaryExpr.Ptr());
                     ReadToken(TokenType::OpInc);
-                    unaryExpr->Operator = Operator::PostInc;
-                    unaryExpr->Expression = rs;
+                    unaryExpr->SetOperator(Operator::PostInc);
+                    unaryExpr->Arguments.Add(rs);
                     rs = unaryExpr;
                 }
                 else if (LookAheadToken(TokenType::OpDec))
                 {
-                    RefPtr<UnaryExpressionSyntaxNode> unaryExpr = new UnaryExpressionSyntaxNode();
+                    RefPtr<OperatorExpressionSyntaxNode> unaryExpr = new OperatorExpressionSyntaxNode();
                     FillPosition(unaryExpr.Ptr());
                     ReadToken(TokenType::OpDec);
-                    unaryExpr->Operator = Operator::PostDec;
-                    unaryExpr->Expression = rs;
+                    unaryExpr->SetOperator(Operator::PostDec);
+                    unaryExpr->Arguments.Add(rs);
                     rs = unaryExpr;
                 }
                 else if (LookAheadToken(TokenType::LBracket))

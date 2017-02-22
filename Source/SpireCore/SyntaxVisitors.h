@@ -4,7 +4,7 @@
 #include "Diagnostics.h"
 #include "Syntax.h"
 #include "IL.h"
-#include "SymbolTable.h"
+#include "CompiledProgram.h"
 
 namespace Spire
 {
@@ -21,13 +21,12 @@ namespace Spire
                 : SyntaxVisitor(perr)
             {}
             virtual void ProcessFunction(FunctionSyntaxNode * func) = 0;
-            virtual void ProcessShader(ShaderIR * shader) = 0;
             virtual void ProcessStruct(StructSyntaxNode * st) = 0;
             virtual void ProcessGlobalVar(VarDeclBase * var) = 0;
         };
 
-        SyntaxVisitor * CreateSemanticsVisitor(SymbolTable * symbols, DiagnosticSink * err);
-        ICodeGenerator * CreateCodeGenerator(SymbolTable * symbols, CompileResult & result);
+        SyntaxVisitor * CreateSemanticsVisitor(DiagnosticSink * err);
+        ICodeGenerator * CreateCodeGenerator(CompileResult & result);
         SyntaxVisitor * CreateILCodeGenerator(DiagnosticSink * err, ILProgram * program);
     }
 }

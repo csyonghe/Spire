@@ -139,8 +139,6 @@ namespace Spire
         class CompilationContext
         {
         public:
-            SymbolTable Symbols;
-            EnumerableDictionary<String, RefPtr<ShaderClosure>> ShaderClosures;
             RefPtr<ILProgram> Program;
         };
 

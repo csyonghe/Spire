@@ -192,13 +192,13 @@ namespace CoreLib
 			}
 			int Next() // random between 0 and RandMax (currently 0x7fff)
 			{
-				return (((seed = seed * 214013L + 2531011L) >> 16) & 0x7fff);
+				return ((seed = ((seed << 12) + 150889L) % 714025) & 0x7fff);
 			}
 			int Next(int min, int max) // inclusive min, exclusive max
 			{
-				unsigned int a = ((seed = seed * 214013L + 2531011L) & 0xFFFF0000);
-				unsigned int b = ((seed = seed * 214013L + 2531011L) >> 16);
-				unsigned int r = a + b;
+				unsigned int a = ((seed = ((seed << 12) + 150889L) % 714025) & 0xFFFF);
+				unsigned int b = ((seed = ((seed << 12) + 150889L) % 714025) & 0xFFFF);
+				unsigned int r = (a << 16) + b;
 				return min + r % (max - min);
 			}
 			float NextFloat()

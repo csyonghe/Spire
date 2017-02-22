@@ -369,14 +369,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="CLikeCodeGen.h" />
-    <ClInclude Include="Closure.h" />
     <ClInclude Include="CodeGenBackend.h" />
     <ClInclude Include="CodeWriter.h" />
     <ClInclude Include="CompiledProgram.h" />
     <ClInclude Include="DiagnosticDefs.h" />
     <ClInclude Include="Diagnostics.h" />
     <ClInclude Include="Emit.h" />
-    <ClInclude Include="GetDependencyVisitor.h" />
     <ClInclude Include="Naming.h" />
     <ClInclude Include="Preprocessor.h" />
     <ClInclude Include="ProfileDefs.h" />
@@ -387,26 +385,20 @@
     <ClInclude Include="ScopeDictionary.h" />
     <ClInclude Include="ShaderCompiler.h" />
     <ClInclude Include="StringObject.h" />
-    <ClInclude Include="SymbolTable.h" />
     <ClInclude Include="StdInclude.h" />
     <ClInclude Include="Syntax.h" />
     <ClInclude Include="SyntaxVisitors.h" />
     <ClInclude Include="TypeLayout.h" />
-    <ClInclude Include="VariantIR.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CLikeCodeGen.cpp" />
-    <ClCompile Include="Closure.cpp" />
-    <ClCompile Include="CodeGenerator.cpp" />
     <ClCompile Include="CompiledProgram.cpp" />
     <ClCompile Include="ConstantPool.cpp" />
     <ClCompile Include="Diagnostics.cpp" />
     <ClCompile Include="Emit.cpp" />
-    <ClCompile Include="GetDependencyVisitor.cpp" />
     <ClCompile Include="GLSLCodeGen.cpp" />
     <ClCompile Include="HLSLCodeGen.cpp" />
     <ClCompile Include="ILGenerator.cpp" />
-    <ClCompile Include="InsertImplicitImportOperator.cpp" />
     <ClCompile Include="KeyHoleMatching.cpp" />
     <ClCompile Include="Naming.cpp" />
     <ClCompile Include="NewSpirVCodeGen.cpp" />
@@ -429,11 +421,9 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug_VS2013|x64'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="SymbolTable.cpp" />
     <ClCompile Include="StdInclude.cpp" />
     <ClCompile Include="Syntax.cpp" />
     <ClCompile Include="TypeLayout.cpp" />
-    <ClCompile Include="VariantIR.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\CoreLib\CoreLibBasic.vcxproj">

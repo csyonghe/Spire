@@ -82,7 +82,7 @@ void parseOptions(int* argc, char** argv)
     }
     
     // any arguments left over were positional arguments
-    argCount = writeCursor - argv;
+    argCount = (int)(writeCursor - argv);
     argCursor = argv;
     argEnd = argCursor + argCount;
 
@@ -196,7 +196,7 @@ void gatherOptionsFromTestFile(
             assert(optBegin != optEnd);
 
             StringBuilder sb;
-            sb.Append(optBegin, optEnd - optBegin);
+            sb.Append(optBegin, (int)(optEnd - optBegin));
             ioSpawner->pushArgument(sb.ProduceString());
             break;
         }

@@ -1,6 +1,5 @@
 #include "Syntax.h"
 #include "SyntaxVisitors.h"
-#include "SymbolTable.h"
 #include <typeinfo>
 #include <assert.h>
 
@@ -287,17 +286,6 @@ namespace Spire
                 rs->Expression = Expression->Clone(ctx);
             return rs;
         }
-        RefPtr<SyntaxNode> BinaryExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
-        {
-            return visitor->VisitBinaryExpression(this);
-        }
-        BinaryExpressionSyntaxNode * BinaryExpressionSyntaxNode::Clone(CloneContext & ctx)
-        {
-            auto rs = CloneSyntaxNodeFields(new BinaryExpressionSyntaxNode(*this), ctx);
-            rs->LeftExpression = LeftExpression->Clone(ctx);
-            rs->RightExpression = RightExpression->Clone(ctx);
-            return rs;
-        }
         RefPtr<SyntaxNode> ConstantExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
         {
             return visitor->VisitConstantExpression(this);
@@ -394,16 +382,6 @@ namespace Spire
             rs->SelectorExpr = SelectorExpr->Clone(ctx);
             rs->Expr0 = Expr0->Clone(ctx);
             rs->Expr1 = Expr1->Clone(ctx);
-            return rs;
-        }
-        RefPtr<SyntaxNode> UnaryExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
-        {
-            return visitor->VisitUnaryExpression(this);
-        }
-        UnaryExpressionSyntaxNode * UnaryExpressionSyntaxNode::Clone(CloneContext & ctx)
-        {
-            auto rs = CloneSyntaxNodeFields(new UnaryExpressionSyntaxNode(*this), ctx);
-            rs->Expression = Expression->Clone(ctx);
             return rs;
         }
         RefPtr<SyntaxNode> VarExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
@@ -677,10 +655,6 @@ namespace Spire
             if (!structDeclRef) return false;
             return true;
         }
-        bool ExpressionType::IsShader() const
-        {
-            return this->As<ShaderType>() != nullptr;
-        }
 
         RefPtr<ExpressionType> ExpressionType::Bool;
         RefPtr<ExpressionType> ExpressionType::UInt;
@@ -762,7 +736,7 @@ namespace Spire
 
         int DeclRefType::GetHashCode() const
         {
-            return (declRef.GetHashCode() * 16777619) ^ typeid(this).hash_code();
+            return (declRef.GetHashCode() * 16777619) ^ (int)(typeid(this).hash_code());
         }
 
         bool DeclRefType::EqualsImpl(const ExpressionType * type) const
@@ -967,7 +941,7 @@ namespace Spire
 
         int OverloadGroupType::GetHashCode() const
         {
-            return (int)(void*)this;
+            return (int)(int64_t)(void*)this;
         }
 
         // NamedExpressionType
@@ -999,10 +973,8 @@ namespace Spire
         String FuncType::ToString() const
         {
             // TODO: a better approach than this
-            if (Func)
-                return Func->SyntaxNode->InternalName;
-            else if (Component)
-                return Component->Name;
+            if (declRef)
+                return declRef.GetName();
             else
                 return "/* unknown FuncType */";
         }
@@ -1011,8 +983,7 @@ namespace Spire
         {
             if (auto funcType = type->As<FuncType>())
             {
-                return Func == funcType->Func
-                    && Component == funcType->Component;
+                return declRef == funcType->declRef;
             }
             return false;
         }
@@ -1022,28 +993,9 @@ namespace Spire
             return this;
         }
 
-        // ShaderType
-
-        String ShaderType::ToString() const
+        int FuncType::GetHashCode() const
         {
-            return Shader->SyntaxNode->Name.Content;
-        }
-
-        bool ShaderType::EqualsImpl(const ExpressionType * type) const
-        {
-            if (auto shaderType = type->As<ShaderType>())
-            {
-                // TODO(tfoley): This does not compare the shader closure,
-                // because the original implementation in `BasicExpressionType`
-                // didn't either. It isn't clear whether that would be right or wrong.
-                return Shader == shaderType->Shader;
-            }
-            return false;
-        }
-
-        ExpressionType* ShaderType::CreateCanonicalType()
-        {
-            return this;
+            return declRef.GetHashCode();
         }
 
         // ImportOperatorGenericParamType
@@ -1116,6 +1068,11 @@ namespace Spire
                 return declRef.Equals(genericDeclRefType->declRef);
             }
             return false;
+        }
+
+        int GenericDeclRefType::GetHashCode() const
+        {
+            return declRef.GetHashCode();
         }
 
         ExpressionType* GenericDeclRefType::CreateCanonicalType()
@@ -1340,6 +1297,74 @@ namespace Spire
                 return "||";
             default:
                 return "";
+            }
+        }
+        String OperatorToString(Operator op)
+        {
+            switch (op)
+            {
+            case Spire::Compiler::Operator::Neg:
+                return "-";
+            case Spire::Compiler::Operator::Not:
+                return "!";
+            case Spire::Compiler::Operator::PreInc:
+                return "++";
+            case Spire::Compiler::Operator::PreDec:
+                return "--";
+            case Spire::Compiler::Operator::PostInc:
+                return "++";
+            case Spire::Compiler::Operator::PostDec:
+                return "--";
+            case Spire::Compiler::Operator::Mul:
+            case Spire::Compiler::Operator::MulAssign:
+                return "*";
+            case Spire::Compiler::Operator::Div:
+            case Spire::Compiler::Operator::DivAssign:
+                return "/";
+            case Spire::Compiler::Operator::Mod:
+            case Spire::Compiler::Operator::ModAssign:
+                return "%";
+            case Spire::Compiler::Operator::Add:
+            case Spire::Compiler::Operator::AddAssign:
+                return "+";
+            case Spire::Compiler::Operator::Sub:
+            case Spire::Compiler::Operator::SubAssign:
+                return "-";
+            case Spire::Compiler::Operator::Lsh:
+            case Spire::Compiler::Operator::LshAssign:
+                return "<<";
+            case Spire::Compiler::Operator::Rsh:
+            case Spire::Compiler::Operator::RshAssign:
+                return ">>";
+            case Spire::Compiler::Operator::Eql:
+                return "==";
+            case Spire::Compiler::Operator::Neq:
+                return "!=";
+            case Spire::Compiler::Operator::Greater:
+                return ">";
+            case Spire::Compiler::Operator::Less:
+                return "<";
+            case Spire::Compiler::Operator::Geq:
+                return ">=";
+            case Spire::Compiler::Operator::Leq:
+                return "<=";
+            case Spire::Compiler::Operator::BitAnd:
+            case Spire::Compiler::Operator::AndAssign:
+                return "&";
+            case Spire::Compiler::Operator::BitXor:
+            case Spire::Compiler::Operator::XorAssign:
+                return "^";
+            case Spire::Compiler::Operator::BitOr:
+            case Spire::Compiler::Operator::OrAssign:
+                return "|";
+            case Spire::Compiler::Operator::And:
+                return "&&";
+            case Spire::Compiler::Operator::Or:
+                return "||";
+            case Spire::Compiler::Operator::Assign:
+                return "=";
+            default:
+                return "ERROR";
             }
         }
         RefPtr<SyntaxNode> ProjectExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
@@ -1700,5 +1725,19 @@ namespace Spire
             throw "unimplemented";
         }
 
-    }
+        void OperatorExpressionSyntaxNode::SetOperator(Spire::Compiler::Operator op)
+        {
+            this->Operator = op;
+            auto opExpr = new VarExpressionSyntaxNode();
+            opExpr->Variable = GetOperatorFunctionName(Operator);
+            opExpr->Position = this->Position;
+            this->FunctionExpr = opExpr;
+        }
+
+        RefPtr<SyntaxNode> OperatorExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
+        {
+            return visitor->VisitOperatorExpression(this);
+        }
+
+}
 }
