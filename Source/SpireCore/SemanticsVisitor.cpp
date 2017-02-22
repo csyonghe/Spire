@@ -60,29 +60,9 @@ namespace Spire
             // lexical outer statements
             List<StatementSyntaxNode*> outerStmts;
         public:
-            SemanticsVisitor(SymbolTable * symbols, DiagnosticSink * pErr)
+            SemanticsVisitor(DiagnosticSink * pErr)
                 :SyntaxVisitor(pErr)
             {
-            }
-            // return true if world0 depends on world1 (there exists a series of import operators that converts world1 variables to world0)
-            bool IsWorldDependent(PipelineSymbol * pipeline, String world0, String world1)
-            {
-                HashSet<String> depWorldsSet;
-                List<String> depWorlds;
-                depWorlds.Add(world0);
-                for (int i = 0; i < depWorlds.Count(); i++)
-                {
-                    auto & dep = pipeline->WorldDependency[world0].GetValue();
-                    if (dep.Contains(world1))
-                        return true;
-                    else
-                    {
-                        for (auto w : dep)
-                            if (depWorldsSet.Add(w))
-                                depWorlds.Add(w);
-                    }
-                }
-                return false;
             }
         public:
             // Translate Types
@@ -1328,18 +1308,20 @@ namespace Spire
                 stmt->Expression = stmt->Expression->Accept(this).As<ExpressionSyntaxNode>();
                 return stmt;
             }
-            virtual RefPtr<ExpressionSyntaxNode> VisitBinaryExpression(BinaryExpressionSyntaxNode *expr) override
+            virtual RefPtr<ExpressionSyntaxNode> VisitOperatorExpression(OperatorExpressionSyntaxNode *expr) override
             {
-                expr->LeftExpression = expr->LeftExpression->Accept(this).As<ExpressionSyntaxNode>();
-                expr->RightExpression = expr->RightExpression->Accept(this).As<ExpressionSyntaxNode>();
-                auto & leftType = expr->LeftExpression->Type;
-                auto & rightType = expr->RightExpression->Type;
+                for (int i = 0; i < expr->Arguments.Count(); i++)
+                    expr->Arguments[i] = expr->Arguments[i]->Accept(this).As<ExpressionSyntaxNode>();
+                auto & leftType = expr->Arguments[0]->Type;
+                QualType rightType;
+                if (expr->Arguments.Count() == 2)
+                    rightType = expr->Arguments[1]->Type;
                 RefPtr<ExpressionType> matchedType;
                 auto checkAssign = [&]()
                 {
                     if (!leftType.IsLeftValue &&
                         !leftType->Equals(ExpressionType::Error.Ptr()))
-                        getSink()->diagnose(expr->LeftExpression.Ptr(), Diagnostics::assignNonLValue);
+                        getSink()->diagnose(expr->Arguments[0].Ptr(), Diagnostics::assignNonLValue);
                     if (expr->Operator == Operator::AndAssign ||
                         expr->Operator == Operator::OrAssign ||
                         expr->Operator == Operator::XorAssign ||
@@ -1351,7 +1333,7 @@ namespace Spire
                             getSink()->diagnose(expr, Diagnostics::bitOperationNonIntegral);
                         }
                     }
-                    expr->LeftExpression->Access = ExpressionAccess::Write;
+                    expr->Arguments[0]->Access = ExpressionAccess::Write;
 
                     // TODO(tfoley): Need to actual insert coercion here...
                     if(CanCoerce(leftType, expr->Type))
@@ -1366,24 +1348,7 @@ namespace Spire
                 }
                 else
                 {
-                    List<RefPtr<ExpressionType>> argTypes;
-                    argTypes.Add(leftType);
-                    argTypes.Add(rightType);
-                    List<RefPtr<FunctionSymbol>> * operatorOverloads = symbolTable->FunctionOverloads.TryGetValue(GetOperatorFunctionName(expr->Operator));
-                    auto overload = FindFunctionOverload(*operatorOverloads, [](RefPtr<FunctionSymbol> f)
-                    {
-                        return f->SyntaxNode->GetParameters();
-                    }, argTypes);
-                    if (!overload)
-                    {
-                        expr->Type = ExpressionType::Error;
-                        if (!leftType->Equals(ExpressionType::Error.Ptr()) && !rightType->Equals(ExpressionType::Error.Ptr()))
-                            getSink()->diagnose(expr, Diagnostics::noOverloadFoundForBinOperatorOnTypes, OperatorToString(expr->Operator), leftType, rightType);
-                    }
-                    else
-                    {
-                        expr->Type = overload->SyntaxNode->ReturnType;
-                    }
+                    VisitInvokeExpression(expr);
                     if (expr->Operator > Operator::Assign)
                         checkAssign();
                 }
@@ -2459,24 +2424,6 @@ namespace Spire
                 AddOverloadCandidate(context, candidate);
             }
 
-            void AddComponentFuncOverloadCandidate(
-                RefPtr<ShaderComponentSymbol>	/*componentFuncSym*/,
-                OverloadResolveContext&			/*context*/)
-            {
-#if 0
-                auto componentFuncDecl = componentFuncSym->Implementations.First()->SyntaxNode.Ptr();
-
-                OverloadCandidate candidate;
-                candidate.flavor = OverloadCandidate::Flavor::ComponentFunc;
-                candidate.componentFunc = componentFuncDecl;
-                candidate.resultType = componentFuncDecl->Type;
-
-                AddOverloadCandidate(context, candidate);
-#else
-                throw "unimplemented";
-#endif
-            }
-
             void AddFuncOverloadCandidate(
                 RefPtr<FuncType>		/*funcType*/,
                 OverloadResolveContext&	/*context*/)
@@ -3197,14 +3144,9 @@ namespace Spire
                     {
                         List<RefPtr<ParameterSyntaxNode>> paramsStorage;
                         List<RefPtr<ParameterSyntaxNode>> * params = nullptr;
-                        if (auto funcSym = funcType->Func)
+                        if (auto func = funcType->declRef.GetDecl())
                         {
-                            paramsStorage = funcSym->SyntaxNode->GetParameters().ToArray();
-                            params = &paramsStorage;
-                        }
-                        else if (auto componentFuncSym = funcType->Component)
-                        {
-                            paramsStorage = componentFuncSym->Implementations.First()->SyntaxNode->GetParameters().ToArray();
+                            paramsStorage = func->GetParameters().ToArray();
                             params = &paramsStorage;
                         }
                         if (params)
@@ -3224,97 +3166,6 @@ namespace Spire
                     }
                 }
                 return rs;
-            }
-
-            String OperatorToString(Operator op)
-            {
-                switch (op)
-                {
-                case Spire::Compiler::Operator::Neg:
-                    return "-";
-                case Spire::Compiler::Operator::Not:
-                    return "!";
-                case Spire::Compiler::Operator::PreInc:
-                    return "++";
-                case Spire::Compiler::Operator::PreDec:
-                    return "--";
-                case Spire::Compiler::Operator::PostInc:
-                    return "++";
-                case Spire::Compiler::Operator::PostDec:
-                    return "--";
-                case Spire::Compiler::Operator::Mul:
-                case Spire::Compiler::Operator::MulAssign:
-                    return "*";
-                case Spire::Compiler::Operator::Div:
-                case Spire::Compiler::Operator::DivAssign:
-                    return "/";
-                case Spire::Compiler::Operator::Mod:
-                case Spire::Compiler::Operator::ModAssign:
-                    return "%";
-                case Spire::Compiler::Operator::Add:
-                case Spire::Compiler::Operator::AddAssign:
-                    return "+";
-                case Spire::Compiler::Operator::Sub:
-                case Spire::Compiler::Operator::SubAssign:
-                    return "-";
-                case Spire::Compiler::Operator::Lsh:
-                case Spire::Compiler::Operator::LshAssign:
-                    return "<<";
-                case Spire::Compiler::Operator::Rsh:
-                case Spire::Compiler::Operator::RshAssign:
-                    return ">>";
-                case Spire::Compiler::Operator::Eql:
-                    return "==";
-                case Spire::Compiler::Operator::Neq:
-                    return "!=";
-                case Spire::Compiler::Operator::Greater:
-                    return ">";
-                case Spire::Compiler::Operator::Less:
-                    return "<";
-                case Spire::Compiler::Operator::Geq:
-                    return ">=";
-                case Spire::Compiler::Operator::Leq:
-                    return "<=";
-                case Spire::Compiler::Operator::BitAnd:
-                case Spire::Compiler::Operator::AndAssign:
-                    return "&";
-                case Spire::Compiler::Operator::BitXor:
-                case Spire::Compiler::Operator::XorAssign:
-                    return "^";
-                case Spire::Compiler::Operator::BitOr:
-                case Spire::Compiler::Operator::OrAssign:
-                    return "|";
-                case Spire::Compiler::Operator::And:
-                    return "&&";
-                case Spire::Compiler::Operator::Or:
-                    return "||";
-                case Spire::Compiler::Operator::Assign:
-                    return "=";
-                default:
-                    return "ERROR";
-                }
-            }
-            virtual RefPtr<ExpressionSyntaxNode> VisitUnaryExpression(UnaryExpressionSyntaxNode *expr) override
-            {
-                expr->Expression = expr->Expression->Accept(this).As<ExpressionSyntaxNode>();
-                List<RefPtr<ExpressionType>> argTypes;
-                argTypes.Add(expr->Expression->Type);
-                List<RefPtr<FunctionSymbol>> * operatorOverloads = symbolTable->FunctionOverloads.TryGetValue(GetOperatorFunctionName(expr->Operator));
-                auto overload = FindFunctionOverload(*operatorOverloads, [](RefPtr<FunctionSymbol> f)
-                {
-                    return f->SyntaxNode->GetParameters();
-                }, argTypes);
-                if (!overload)
-                {
-                    expr->Type = ExpressionType::Error;
-                    if (!expr->Expression->Type->Equals(ExpressionType::Error.Ptr()))
-                        getSink()->diagnose(expr, Diagnostics::noApplicationUnaryOperator, OperatorToString(expr->Operator), expr->Expression->Type);
-                }
-                else
-                {
-                    expr->Type = overload->SyntaxNode->ReturnType;
-                }
-                return expr;
             }
 
             bool DeclPassesLookupMask(Decl* decl, LookupMask mask)
@@ -3648,7 +3499,6 @@ namespace Spire
                 if (expr->declRef)
                     return expr;
 
-                ShaderUsing shaderObj;
                 expr->Type = ExpressionType::Error;
 
                 auto lookupResult = LookUp(expr->Variable, expr->scope);
@@ -4086,9 +3936,9 @@ namespace Spire
             SemanticsVisitor & operator = (const SemanticsVisitor &) = delete;
         };
 
-        SyntaxVisitor * CreateSemanticsVisitor(SymbolTable * symbols, DiagnosticSink * err)
+        SyntaxVisitor * CreateSemanticsVisitor(DiagnosticSink * err)
         {
-            return new SemanticsVisitor(symbols, err);
+            return new SemanticsVisitor(err);
         }
 
     }
