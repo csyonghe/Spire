@@ -133,38 +133,12 @@ namespace Spire
                 cfgNode.Last()->InsertTail(instr);
                 return instr;
             }
-            MemberUpdateInstruction * Update(ILOperand * dest, ILOperand * offset, ILOperand * value)
+			MemberAccessInstruction * MemberAccess(ILOperand * dest, ILOperand * offset)
             {
-                auto instr = new MemberUpdateInstruction(dest, offset, value);
+                auto instr = new MemberAccessInstruction(dest, offset);
                 cfgNode.Last()->InsertTail(instr);
                 return instr;
             }
-            MemberLoadInstruction * Retrieve(ILOperand * dest, ILOperand * offset)
-            {
-                auto instr = new MemberLoadInstruction(dest, offset);
-                cfgNode.Last()->InsertTail(instr);
-                return instr;
-            }
-            //AllocVarInstruction * AllocVar(ILType * type, ILOperand * size)
-            //{
-            //	auto arrType = dynamic_cast<ILArrayType*>(type);
-            //	if (arrType)
-            //	{
-            //		// check: size must be constant 1. Do not support array of array in IL level.
-            //		auto s = dynamic_cast<ILConstOperand*>(size);
-            //		if (!s || s->IntValues[0] != 1)
-            //			throw ArgumentException("AllocVar(arrayType, size): size must be constant 1.");
-            //		auto instr = new AllocVarInstruction(arrType->BaseType, program.CreateConstant(arrType->ArrayLength));
-            //		cfgNode->InsertTail(instr);
-            //		return instr;
-            //	}
-            //	else
-            //	{
-            //		auto instr = new AllocVarInstruction(type, size);
-            //		cfgNode->InsertTail(instr);
-            //		return instr;
-            //	}
-            //}
             AllocVarInstruction * AllocVar(RefPtr<ILType> & type)
             {
                 auto instr = new AllocVarInstruction(type);

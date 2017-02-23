@@ -475,10 +475,6 @@ namespace Spire
             if (!Spire::Compiler::Is<AllocVarInstruction>(dest) && !Spire::Compiler::Is<FetchArgInstruction>(dest))
                 throw "invalid address operand";
         }
-        void MemberUpdateInstruction::Accept(InstructionVisitor * visitor)
-        {
-            visitor->VisitMemberUpdateInstruction(this);
-        }
         void SubInstruction::Accept(InstructionVisitor * visitor)
         {
             visitor->VisitSubInstruction(this);
@@ -547,14 +543,6 @@ namespace Spire
         {
             visitor->VisitCmpneqInstruction(this);
         }
-        void Float2IntInstruction::Accept(InstructionVisitor * visitor)
-        {
-            visitor->VisitFloat2IntInstruction(this);
-        }
-        void Int2FloatInstruction::Accept(InstructionVisitor * visitor)
-        {
-            visitor->VisitInt2FloatInstruction(this);
-        }
         void CopyInstruction::Accept(InstructionVisitor * visitor)
         {
             visitor->VisitCopyInstruction(this);
@@ -607,9 +595,9 @@ namespace Spire
         {
             visitor->VisitAddInstruction(this);
         }
-        void MemberLoadInstruction::Accept(InstructionVisitor * visitor)
+        void MemberAccessInstruction::Accept(InstructionVisitor * visitor)
         {
-            visitor->VisitMemberLoadInstruction(this);
+            visitor->VisitMemberAccessInstruction(this);
         }
         AllInstructionsIterator & AllInstructionsIterator::operator++()
         {
@@ -645,31 +633,6 @@ namespace Spire
         AllInstructionsIterator AllInstructionsCollection::end()
         {
             return AllInstructionsIterator(node->end().Current);
-        }
-        String ImportInstruction::ToString()
-        {
-            StringBuilder rs;
-            rs << Name << " = import [" << ComponentName << "](";
-            for (auto & arg : Arguments)
-            {
-                rs << arg->ToString() << ", ";
-            }
-            rs << ")";
-            rs << "\n{";
-            rs << ImportOperator->ToString() << "}\n";
-            return rs.ProduceString();
-        }
-        String ImportInstruction::GetOperatorString()
-        {
-            return "import";
-        }
-        void ImportInstruction::Accept(InstructionVisitor * visitor)
-        {
-            visitor->VisitImportInstruction(this);
-        }
-        void ExportInstruction::Accept(InstructionVisitor * visitor)
-        {
-            visitor->VisitExportInstruction(this);
         }
         ILType * ILStructType::Clone()
         {
@@ -725,17 +688,9 @@ namespace Spire
         {
             visitor->VisitDiscardInstruction(this);
         }
-        void LoadInputInstruction::Accept(InstructionVisitor * visitor)
-        {
-            visitor->VisitLoadInputInstruction(this);
-        }
         void SwizzleInstruction::Accept(InstructionVisitor * visitor)
         {
             visitor->VisitSwizzleInstruction(this);
-        }
-        void ProjectInstruction::Accept(InstructionVisitor * visitor)
-        {
-            visitor->VisitProjectInstruction(this);
         }
 		String ILProgram::ToString()
 		{

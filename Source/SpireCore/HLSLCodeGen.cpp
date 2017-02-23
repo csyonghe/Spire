@@ -180,14 +180,7 @@ namespace Spire
                 }
                 ctx.Body << ")";
             }
-
-            void PrintProjectInstrExpr(CodeGenContext & ctx, ProjectInstruction * proj) override
-            {
-                // project component out of record type. 
-                PrintOp(ctx, proj->Operand.Ptr());
-                ctx.Body << "." << proj->ComponentName;
-            }
-
+			
             void PrintTypeName(StringBuilder& sb, ILType* type) override
             {
                 // Currently, all types are internally named based on their GLSL equivalent, so
@@ -745,12 +738,6 @@ namespace Spire
                     hlslCodeGen->DeclareRecordTypeStruct(ctx, world->OutputType.Ptr());
                 }
 
-                virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) override
-                {
-                    ctx.Body << prefix << "." << instr->ComponentName << " = ";
-                    codeGen->PrintOp(ctx, instr->Operand.Ptr());
-                    ctx.Body << ";\n";
-                }
             };
 
 
@@ -1186,12 +1173,6 @@ namespace Spire
 
                 ctx.GlobalHeader << "};\n";
             }
-            virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) override
-            {
-                ctx.Body << AddWorldNameSuffix(instr->ComponentName, world->Name) << "[" << outputIndex << "] = ";
-                codeGen->PrintOp(ctx, instr->Operand.Ptr());
-                ctx.Body << ";\n";
-            }
         };
 
         // TODO(tfoley): This code has not been ported or tested.
@@ -1208,113 +1189,6 @@ namespace Spire
                     ctx.GlobalHeader << "out ";
                     codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), field.Key);
                     ctx.GlobalHeader << ";\n";
-                }
-            }
-            virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * exportInstr) override
-            {
-                String conversionFunction;
-                int size = 0;
-                String typeName = exportInstr->Type->ToString();
-                if (typeName == "int")
-                {
-                    conversionFunction = "intBitsToFloat";
-                    size = 1;
-                }
-                else if (typeName == "ivec2")
-                {
-                    conversionFunction = "intBitsToFloat";
-                    size = 2;
-                }
-                else if (typeName == "ivec3")
-                {
-                    conversionFunction = "intBitsToFloat";
-                    size = 3;
-                }
-                else if (typeName == "ivec4")
-                {
-                    conversionFunction = "intBitsToFloat";
-                    size = 4;
-                }
-                else if (typeName == "uint")
-                {
-                    conversionFunction = "uintBitsToFloat";
-                    size = 1;
-                }
-                else if (typeName == "uvec2")
-                {
-                    conversionFunction = "uintBitsToFloat";
-                    size = 2;
-                }
-                else if (typeName == "uvec3")
-                {
-                    conversionFunction = "uintBitsToFloat";
-                    size = 3;
-                }
-                else if (typeName == "uvec4")
-                {
-                    conversionFunction = "uintBitsToFloat";
-                    size = 4;
-                }
-                else if (typeName == "float")
-                {
-                    conversionFunction = "";
-                    size = 1;
-                }
-                else if (typeName == "vec2")
-                {
-                    conversionFunction = "";
-                    size = 2;
-                }
-                else if (typeName == "vec3")
-                {
-                    conversionFunction = "";
-                    size = 3;
-                }
-                else if (typeName == "vec4")
-                {
-                    conversionFunction = "";
-                    size = 4;
-                }
-                else if (typeName == "mat3")
-                {
-                    conversionFunction = "";
-                    size = 9;
-                }
-                else if (typeName == "mat4")
-                {
-                    conversionFunction = "";
-                    size = 16;
-                }
-                else
-                {
-                    codeGen->getSink()->diagnose(CodePosition(), Diagnostics::importingFromPackedBufferUnsupported, typeName);
-                }
-                auto recType = world->OutputType.Ptr();
-                int recTypeSize = 0;
-                EnumerableDictionary<String, int> memberOffsets;
-                for (auto & member : recType->Members)
-                {
-                    memberOffsets[member.Key] = recTypeSize;
-                    if (member.Value.Type->IsScalar())
-                        recTypeSize++;
-                    else if (auto vec = member.Value.Type->AsVectorType())
-                        recTypeSize += vec->Size;
-                    else if (auto mat = member.Value.Type->AsMatrixType())
-                        recTypeSize += mat->Size[0] * mat->Size[1];
-                }
-                for (int i = 0; i < size; i++)
-                {
-                    ctx.Body << "sysOutputBuffer.content[gl_InvocationId.x * " << recTypeSize << " + " + memberOffsets[exportInstr->ComponentName]()
-                        << "] = " << conversionFunction << "(";
-                    codeGen->PrintOp(ctx, exportInstr->Operand.Ptr());
-                    if (size <= 4)
-                        ctx.Body << "[" << i << "]";
-                    else
-                    {
-                        int width = size == 9 ? 3 : 4;
-                        ctx.Body << "[" << i / width << "][" << i % width << "]";
-                    }
-                    ctx.Body << ");\n";
                 }
             }
         };

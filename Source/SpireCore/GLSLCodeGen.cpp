@@ -92,129 +92,6 @@ namespace Spire
                 }
             }
 
-            void PrintProjectInstrExpr(CodeGenContext & ctx, ProjectInstruction * proj)
-            {
-                if (auto memberLoadInstr = dynamic_cast<MemberLoadInstruction*>(proj->Operand.Ptr()))
-                {
-                    bool overrideBaseMemberLoad = false;
-                    auto genType = dynamic_cast<ILGenericType*>(memberLoadInstr->Operands[0]->Type.Ptr());
-                    if (genType && genType->GenericTypeName == "PackedBuffer")
-                    {
-                        // load record type from packed buffer
-                        String conversionFunction;
-                        int size = 0;
-                        if (memberLoadInstr->Type->ToString() == "int")
-                        {
-                            conversionFunction = "floatBitsToInt";
-                            size = 1;
-                        }
-                        else if (memberLoadInstr->Type->ToString() == "ivec2")
-                        {
-                            conversionFunction = "floatBitsToInt";
-                            size = 2;
-                        }
-                        else if (memberLoadInstr->Type->ToString() == "ivec3")
-                        {
-                            conversionFunction = "floatBitsToInt";
-                            size = 3;
-                        }
-                        else if (memberLoadInstr->Type->ToString() == "ivec4")
-                        {
-                            conversionFunction = "floatBitsToInt";
-                            size = 4;
-                        }
-                        else if (memberLoadInstr->Type->ToString() == "uint")
-                        {
-                            conversionFunction = "floatBitsToUint";
-                            size = 1;
-                        }
-                        else if (memberLoadInstr->Type->ToString() == "uvec2")
-                        {
-                            conversionFunction = "floatBitsToUint";
-                            size = 2;
-                        }
-                        else if (memberLoadInstr->Type->ToString() == "uvec3")
-                        {
-                            conversionFunction = "floatBitsToUint";
-                            size = 3;
-                        }
-                        else if (memberLoadInstr->Type->ToString() == "uvec4")
-                        {
-                            conversionFunction = "floatBitsToUint";
-                            size = 4;
-                        }
-                        else if (memberLoadInstr->Type->ToString() == "float")
-                        {
-                            conversionFunction = "";
-                            size = 1;
-                        }
-                        else if (memberLoadInstr->Type->ToString() == "vec2")
-                        {
-                            conversionFunction = "";
-                            size = 2;
-                        }
-                        else if (memberLoadInstr->Type->ToString() == "vec3")
-                        {
-                            conversionFunction = "";
-                            size = 3;
-                        }
-                        else if (memberLoadInstr->Type->ToString() == "vec4")
-                        {
-                            conversionFunction = "";
-                            size = 4;
-                        }
-                        else if (memberLoadInstr->Type->ToString() == "mat3")
-                        {
-                            conversionFunction = "";
-                            size = 9;
-                        }
-                        else if (memberLoadInstr->Type->ToString() == "mat4")
-                        {
-                            conversionFunction = "";
-                            size = 16;
-                        }
-                        else
-                        {
-                            errWriter->diagnose(CodePosition(), Diagnostics::importingFromPackedBufferUnsupported, memberLoadInstr->Type);
-                        }
-                        ctx.Body << memberLoadInstr->Type->ToString() << "(";
-                        auto recType = dynamic_cast<ILRecordType*>(genType->BaseType.Ptr());
-                        int recTypeSize = 0;
-                        EnumerableDictionary<String, int> memberOffsets;
-                        for (auto & member : recType->Members)
-                        {
-                            memberOffsets[member.Key] = recTypeSize;
-                            if (auto vec = member.Value.Type->AsVectorType())
-                                recTypeSize += vec->Size;
-                            else if (auto mat = member.Value.Type->AsMatrixType())
-                                recTypeSize += mat->Size[0] * mat->Size[1];
-                        }
-                        for (int i = 0; i < size; i++)
-                        {
-                            ctx.Body << conversionFunction << "(";
-                            PrintOp(ctx, memberLoadInstr->Operands[0].Ptr());
-                            ctx.Body << "[(";
-                            PrintOp(ctx, memberLoadInstr->Operands[1].Ptr());
-                            ctx.Body << ") * " << recTypeSize << " + " << memberOffsets[proj->ComponentName]() << "])";
-                            if (i != size - 1)
-                                ctx.Body << ", ";
-                        }
-                        ctx.Body << ")";
-                        overrideBaseMemberLoad = true;
-                    }
-                    if (!overrideBaseMemberLoad)
-                        PrintOp(ctx, memberLoadInstr, true);
-                    if (genType)
-                    {
-                        if ((genType->GenericTypeName == "StructuredBuffer" || genType->GenericTypeName == "RWStructuredBuffer")
-                            && dynamic_cast<ILRecordType*>(genType->BaseType.Ptr()))
-                            ctx.Body << "." << proj->ComponentName;
-                    }
-                }
-                else
-                    PrintOp(ctx, proj->Operand.Ptr(), true);
-            }
-
             String GetTextureType(ILType * textureType)
             {
                 auto texType = dynamic_cast<ILTextureType*>(textureType);
@@ -919,15 +796,6 @@ namespace Spire
                     location++;
                 }
             }
-            virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) override
-            {
-                if (world->OutputType->Members[instr->ComponentName]().Attributes.ContainsKey("FragDepth"))
-                    ctx.Body << "gl_FragDepth = ";
-                else
-                    ctx.Body << AddWorldNameSuffix(instr->ComponentName, world->OutputType->TypeName) << " = ";
-                codeGen->PrintOp(ctx, instr->Operand.Ptr());
-                ctx.Body << ";\n";
-            }
         };
 
         class ArrayOutputStrategy : public OutputStrategy
@@ -958,12 +826,6 @@ namespace Spire
                     ctx.GlobalHeader<<"]; \n";
                 }
             }
-            virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) override
-            {
-                ctx.Body << AddWorldNameSuffix(instr->ComponentName, world->Name) << "[" << outputIndex << "] = ";
-                codeGen->PrintOp(ctx, instr->Operand.Ptr());
-                ctx.Body << ";\n";
-            }
         };
 
         class PackedBufferOutputStrategy : public OutputStrategy
@@ -979,111 +841,6 @@ namespace Spire
                     ctx.GlobalHeader << "out ";
                     codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), field.Key);
                     ctx.GlobalHeader << ";\n";
-                }
-            }
-            virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * exportInstr) override
-            {
-                String conversionFunction;
-                int size = 0;
-                String typeName = exportInstr->Type->ToString();
-                if (typeName == "int")
-                {
-                    conversionFunction = "intBitsToFloat";
-                    size = 1;
-                }
-                else if (typeName == "ivec2")
-                {
-                    conversionFunction = "intBitsToFloat";
-                    size = 2;
-                }
-                else if (typeName == "ivec3")
-                {
-                    conversionFunction = "intBitsToFloat";
-                    size = 3;
-                }
-                else if (typeName == "ivec4")
-                {
-                    conversionFunction = "intBitsToFloat";
-                    size = 4;
-                }
-                else if (typeName == "uint")
-                {
-                    conversionFunction = "uintBitsToFloat";
-                    size = 1;
-                }
-                else if (typeName == "uvec2")
-                {
-                    conversionFunction = "uintBitsToFloat";
-                    size = 2;
-                }
-                else if (typeName == "uvec3")
-                {
-                    conversionFunction = "uintBitsToFloat";
-                    size = 3;
-                }
-                else if (typeName == "uvec4")
-                {
-                    conversionFunction = "uintBitsToFloat";
-                    size = 4;
-                }
-                else if (typeName == "float")
-                {
-                    conversionFunction = "";
-                    size = 1;
-                }
-                else if (typeName == "vec2")
-                {
-                    conversionFunction = "";
-                    size = 2;
-                }
-                else if (typeName == "vec3")
-                {
-                    conversionFunction = "";
-                    size = 3;
-                }
-                else if (typeName == "vec4")
-                {
-                    conversionFunction = "";
-                    size = 4;
-                }
-                else if (typeName == "mat3")
-                {
-                    conversionFunction = "";
-                    size = 9;
-                }
-                else if (typeName == "mat4")
-                {
-                    conversionFunction = "";
-                    size = 16;
-                }
-                else
-                {
-                    codeGen->getSink()->diagnose(CodePosition(), Diagnostics::importingFromPackedBufferUnsupported, typeName);
-                }
-                auto recType = world->OutputType.Ptr();
-                int recTypeSize = 0;
-                EnumerableDictionary<String, int> memberOffsets;
-                for (auto & member : recType->Members)
-                {
-                    memberOffsets[member.Key] = recTypeSize;
-                    if (auto vec = member.Value.Type->AsVectorType())
-                        recTypeSize += vec->Size;
-                    else if (auto mat = member.Value.Type->AsMatrixType())
-                        recTypeSize += mat->Size[0] * mat->Size[1];
-                }
-                for (int i = 0; i < size; i++)
-                {
-                    ctx.Body << "sysOutputBuffer.content[gl_InvocationId.x * " << recTypeSize << " + " + memberOffsets[exportInstr->ComponentName]()
-                        << "] = " << conversionFunction << "(";
-                    codeGen->PrintOp(ctx, exportInstr->Operand.Ptr());
-                    if (size <= 4)
-                        ctx.Body << "[" << i << "]";
-                    else
-                    {
-                        int width = size == 9 ? 3 : 4;
-                        ctx.Body << "[" << i / width << "][" << i % width << "]";
-                    }
-                    ctx.Body << ");\n";
                 }
             }
         };
