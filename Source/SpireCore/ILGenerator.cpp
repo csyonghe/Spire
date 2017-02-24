@@ -11,10 +11,14 @@ namespace Spire
         {
         public:
             ILProgram * program = nullptr;
-            ILGenerator(ILProgram * result, DiagnosticSink * sink)
-                : SyntaxVisitor(sink)
+			CompileOptions compileOptions;
+			HashSet<String> entryPointNames;
+            ILGenerator(ILProgram * result, DiagnosticSink * sink, CompileOptions options)
+                : SyntaxVisitor(sink), compileOptions(options)
             {
                 program = result;
+				for (auto && entry : options.entryPoints)
+					entryPointNames.Add(entry.name);
             }
         private:
             Dictionary<DeclRef, RefPtr<ILStructType>> structTypes;
@@ -149,7 +153,7 @@ namespace Spire
                 
                 functions[DeclRef(f, nullptr)] = func.Ptr();
             }
-            void GenerateFunction(FunctionSyntaxNode * f, ILStructType * thisType)
+            ILFunction * GenerateFunction(FunctionSyntaxNode * f, ILStructType * thisType)
             {
                 RefPtr<ILFunction> func = functions[DeclRef(f, nullptr)]();
                 variables.PushScope();
@@ -173,6 +177,7 @@ namespace Spire
                 func->Code = codeWriter.PopNode();
                 variables.PopScope();
                 thisArg = nullptr;
+				return func.Ptr();
             }
             void GenerateMemberFunctionHeader(ClassSyntaxNode * node)
             {
@@ -194,6 +199,33 @@ namespace Spire
                 }
                 thisDeclRef = DeclRef();
             }
+			void DefineBindableResourceVariables(CodeWriter & writer, ILOperand * obj, String namePrefix)
+			{
+				auto structType = obj->Type.As<ILStructType>();
+				assert(structType);
+				int memberIndex = 0;
+				for (auto field : structType->Members)
+				{
+					if (field.Type->GetBindableResourceType() != BindableResourceType::NonBindable)
+					{
+						// create global variable
+						auto gvar = new ILGlobalVariable(field.Type);
+						gvar->Name = namePrefix + "_" + field.FieldName;
+						program->GlobalVars.Add(gvar->Name, gvar);
+						//TODO: assign bindings here
+
+						// insert assignment instruction in init func
+						GenerateIndexExpression(obj, program->ConstantPool->CreateConstant(memberIndex));
+						writer.Assign(field.Type.Ptr(), PopStack(), gvar);
+					}
+					else if (field.Type.As<ILStructType>())
+					{
+						GenerateIndexExpression(obj, program->ConstantPool->CreateConstant(memberIndex));
+						DefineBindableResourceVariables(writer, PopStack(), namePrefix + "_" + field.FieldName);
+					}
+					memberIndex++;
+				}
+			}
         public:
             virtual RefPtr<ProgramSyntaxNode> VisitProgram(ProgramSyntaxNode * prog) override
             {
@@ -213,12 +245,31 @@ namespace Spire
                     GenerateMemberFunctionHeader(c.Ptr());
                 }
                 variables.PushScope();
+
+				RefPtr<ILFunction> initFunc = new ILFunction();
+				CodeWriter initFuncCodeWriter;
+				initFunc->Name = "__main_init()";
+				initFunc->ReturnType = new ILBasicType(ILBaseType::Void);
+				initFuncCodeWriter.PushNode();
                 for (auto&& v : prog->GetMembersOfType<Variable>())
                 {
                     if (v->HasModifier<IntrinsicModifier>() || v->HasModifier<FromStdLibModifier>())
                         continue;
-                    v->Accept(this);
+                    if (v->Type->IsClass())
+                    {
+                        auto declRef = v->Type->AsDeclRefType()->declRef;
+                        auto structType = structTypes[declRef]();
+                        ILGlobalVariable * gvar = new ILGlobalVariable(structType.Ptr());
+                        gvar->Name = v->Name.Content;
+                        gvar->Position = v->Position;
+                        DefineBindableResourceVariables(initFuncCodeWriter, gvar, gvar->Name);
+                    }
+                    else
+						v->Accept(this);
                 }
+				initFunc->Code = initFuncCodeWriter.PopNode();
+				program->Functions.Add(initFunc->Name, initFunc);
+
                 for (auto&& f : prog->GetFunctions())
                 {
                     if (f->HasModifier<IntrinsicModifier>() || f->HasModifier<FromStdLibModifier>())
@@ -234,7 +285,14 @@ namespace Spire
                 {
                     if (f->HasModifier<IntrinsicModifier>() || f->HasModifier<FromStdLibModifier>())
                         continue;
-                    GenerateFunction(f.Ptr(), nullptr);
+                    auto func = GenerateFunction(f.Ptr(), nullptr);
+					if (entryPointNames.Contains(f->Name.Content))
+					{
+						auto call = new CallInstruction(0);
+						call->Type = initFunc->ReturnType;
+						call->Function = initFunc->Name;
+						func->Code->InsertHead(call);
+					}
                 }
                 variables.PopScope();
                 return prog;
@@ -447,44 +505,7 @@ namespace Spire
             }
             void Assign(ILOperand * left, ILOperand * right)
             {
-                if (auto add = dynamic_cast<AddInstruction*>(left))
-                {
-                    auto baseOp = add->Operands[0].Ptr();
-                    codeWriter.Update(baseOp, add->Operands[1].Ptr(), right);
-                    add->Erase();
-                }
-                else if (auto swizzle = dynamic_cast<SwizzleInstruction*>(left))
-                {
-                    auto baseOp = swizzle->Operand.Ptr();
-                    int index = 0;
-                    for (int i = 0; i < swizzle->SwizzleString.Length(); i++)
-                    {
-                        switch (swizzle->SwizzleString[i])
-                        {
-                        case 'r':
-                        case 'x':
-                            index = 0;
-                            break;
-                        case 'g':
-                        case 'y':
-                            index = 1;
-                            break;
-                        case 'b':
-                        case 'z':
-                            index = 2;
-                            break;
-                        case 'a':
-                        case 'w':
-                            index = 3;
-                            break;
-                        }
-                        codeWriter.Update(baseOp, program->ConstantPool->CreateConstant(index),
-                            codeWriter.Retrieve(right, program->ConstantPool->CreateConstant(i)));
-                    }
-                    swizzle->Erase();
-                }
-                else
-                    codeWriter.Store(left, right);
+                codeWriter.Store(left, right);
             }
             virtual RefPtr<ExpressionSyntaxNode> VisitConstantExpression(ConstantExpressionSyntaxNode* expr) override
             {
@@ -504,18 +525,11 @@ namespace Spire
                 PushStack(op);
                 return expr;
             }
-            void GenerateIndexExpression(ILOperand * base, ILOperand * idx, bool read)
+            void GenerateIndexExpression(ILOperand * base, ILOperand * idx)
             {
-                if (read)
-                {
-                    auto ldInstr = codeWriter.Retrieve(base, idx);
-                    ldInstr->Attribute = base->Attribute;
-                    PushStack(ldInstr);
-                }
-                else
-                {
-                    PushStack(codeWriter.Add(base, idx));
-                }
+                auto ldInstr = codeWriter.MemberAccess(base, idx);
+                ldInstr->Attribute = base->Attribute;
+                PushStack(ldInstr);
             }
             virtual RefPtr<ExpressionSyntaxNode> VisitIndexExpression(IndexExpressionSyntaxNode* expr) override
             {
@@ -525,8 +539,7 @@ namespace Spire
                 expr->IndexExpression->Access = ExpressionAccess::Read;
                 expr->IndexExpression->Accept(this);
                 auto idx = PopStack();
-                GenerateIndexExpression(base, idx,
-                    expr->Access == ExpressionAccess::Read);
+                GenerateIndexExpression(base, idx);
                 return expr;
             }
             virtual RefPtr<ExpressionSyntaxNode> VisitSwizzleExpression(SwizzleExpr * expr) override
@@ -557,8 +570,7 @@ namespace Spire
                     if (auto structDecl = declRefType->declRef.As<StructDeclRef>())
                     {
                         int id = structDecl.GetDecl()->FindFieldIndex(expr->MemberName);
-                        GenerateIndexExpression(base, program->ConstantPool->CreateConstant(id),
-                            expr->Access == ExpressionAccess::Read);
+                        GenerateIndexExpression(base, program->ConstantPool->CreateConstant(id));
                     }
                     else
                         throw NotImplementedException("member expression codegen");
@@ -604,35 +616,6 @@ namespace Spire
                     throw InvalidProgramException();
                 return expr;
             }
-            virtual RefPtr<ExpressionSyntaxNode> VisitTypeCastExpression(TypeCastExpressionSyntaxNode * expr) override
-            {
-                expr->Expression->Accept(this);
-                auto base = PopStack();
-                if (expr->Expression->Type->Equals(expr->Type))
-                {
-                    PushStack(base);
-                }
-                else if (expr->Expression->Type->Equals(ExpressionType::Float) &&
-                    expr->Type->Equals(ExpressionType::Int))
-                {
-                    auto instr = new Float2IntInstruction(base);
-                    codeWriter.Insert(instr);
-                    PushStack(instr);
-                }
-                else if (expr->Expression->Type->Equals(ExpressionType::Int) &&
-                    expr->Type->Equals(ExpressionType::Float))
-                {
-                    auto instr = new Int2FloatInstruction(base);
-                    codeWriter.Insert(instr);
-                    PushStack(instr);
-                }
-                else
-                {
-                    getSink()->diagnose(expr, Diagnostics::invalidTypeCast, expr->Expression->Type, expr->Type);
-                }
-                return expr;
-            }
-
             virtual RefPtr<ExpressionSyntaxNode> VisitOperatorExpression(OperatorExpressionSyntaxNode* expr) override
             {
                 if (expr->Operator == Operator::PostDec || expr->Operator == Operator::PostInc
@@ -846,19 +829,12 @@ namespace Spire
                     if (thisDeclRef)
                     {
                         int id = ((AggTypeDecl*)thisDeclRef.GetDecl())->FindFieldIndex(name);
-                        GenerateIndexExpression(thisArg, program->ConstantPool->CreateConstant(id), access == ExpressionAccess::Read);
+                        GenerateIndexExpression(thisArg, program->ConstantPool->CreateConstant(id));
                         return true;
                     }
                     return false;
                 }
-                if (access == ExpressionAccess::Read)
-                {
-                    PushStack(var);
-                }
-                else
-                {
-                    PushStack(var);
-                }
+                PushStack(var);
                 return true;
             }
             virtual RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode* expr) override
@@ -872,9 +848,9 @@ namespace Spire
             }
         };
 
-        SyntaxVisitor * CreateILCodeGenerator(DiagnosticSink * err, ILProgram * program)
+        SyntaxVisitor * CreateILCodeGenerator(DiagnosticSink * err, ILProgram * program, CompileOptions * options)
         {
-            return new ILGenerator(program, err);
+            return new ILGenerator(program, err, *options);
         }
     }
 }

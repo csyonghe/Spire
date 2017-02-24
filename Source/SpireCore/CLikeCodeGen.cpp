@@ -182,7 +182,7 @@ namespace Spire
             {
                 throw InvalidOperationException("store instruction cannot appear as expression.");
             }
-            if (instr->Is<MemberLoadInstruction>())
+            if (instr->Is<MemberAccessInstruction>())
             {
                 PrintOp(ctx, op0);
                 bool printDefault = true;
@@ -225,8 +225,6 @@ namespace Spire
                     PrintOp(ctx, op1);
                     ctx.Body << "]";
                 }
-                
-                
                 return;
             }
             const char * op = "";
@@ -340,13 +338,6 @@ namespace Spire
                 return;
             }
             auto varName = ctx.DefineVariable(instr);
-            if (instr->Is<MemberLoadInstruction>())
-            {
-                ctx.Body << varName << " = ";
-                PrintBinaryInstrExpr(ctx, instr);
-                ctx.Body << ";\n";
-                return;
-            }
             ctx.Body << varName << " = ";
             PrintBinaryInstrExpr(ctx, instr);
             ctx.Body << ";\n";
@@ -368,10 +359,6 @@ namespace Spire
             const char * op = "";
             if (instr->Is<BitNotInstruction>())
                 op = "~";
-            else if (instr->Is<Float2IntInstruction>())
-                op = "(int)";
-            else if (instr->Is<Int2FloatInstruction>())
-                op = "(float)";
             else if (instr->Is<CopyInstruction>())
                 op = "";
             else if (instr->Is<NegInstruction>())
@@ -485,111 +472,21 @@ namespace Spire
             ctx.Body << ";\n";
         }
 
-        void CLikeCodeGen::PrintCastF2IInstrExpr(CodeGenContext & ctx, Float2IntInstruction * instr)
-        {
-            ctx.Body << "((int)(";
-            PrintOp(ctx, instr->Operand.Ptr());
-            ctx.Body << "))";
-        }
-        void CLikeCodeGen::PrintCastF2IInstr(CodeGenContext & ctx, Float2IntInstruction * instr)
-        {
-            auto varName = ctx.DefineVariable(instr);
-            ctx.Body << varName;
-            ctx.Body << " = ";
-            PrintCastF2IInstrExpr(ctx, instr);
-            ctx.Body << ";\n";
-        }
-        void CLikeCodeGen::PrintCastI2FInstrExpr(CodeGenContext & ctx, Int2FloatInstruction * instr)
-        {
-            ctx.Body << "((float)(";
-            PrintOp(ctx, instr->Operand.Ptr());
-            ctx.Body << "))";
-        }
-        void CLikeCodeGen::PrintCastI2FInstr(CodeGenContext & ctx, Int2FloatInstruction * instr)
-        {
-            auto varName = ctx.DefineVariable(instr);
-            ctx.Body << varName;
-            ctx.Body << " = ";
-            PrintCastI2FInstrExpr(ctx, instr);
-            ctx.Body << ";\n";
-        }
-
         bool CLikeCodeGen::AppearAsExpression(ILInstruction & instr, bool force)
         {
-            if (instr.Is<LoadInputInstruction>() || instr.Is<ProjectInstruction>())
+            if (instr.Is<MemberAccessInstruction>())
                 return true;
             if (auto arg = instr.As<FetchArgInstruction>())
             {
                 if (arg->ArgId == 0)
                     return false;
             }
-            if (auto import = instr.As<ImportInstruction>())
-            {
-                if ((!useBindlessTexture && import->Type->IsTexture()) 
-                    || import->Type.As<ILArrayType>() 
-                    || import->Type->IsSamplerState()
-                    || import->Type.As<ILGenericType>())
-                    return true;
-            }
-            for (auto &&usr : instr.Users)
-            {
-                if (auto update = dynamic_cast<MemberUpdateInstruction*>(usr))
-                {
-                    if (&instr == update->Operands[0].Ptr())
-                        return false;
-                }
-                else if (dynamic_cast<MemberLoadInstruction*>(usr))
-                    return false;
-                else if (dynamic_cast<ExportInstruction*>(usr))
-                    return false;
-                else if (dynamic_cast<ImportInstruction*>(usr))
-                    return false;
-            }
             if (instr.Is<StoreInstruction>() && force)
                 return true;
 
-            return (instr.Users.Count() <= 1 && !instr.HasSideEffect() && !instr.Is<MemberUpdateInstruction>()
-                && !instr.Is<AllocVarInstruction>() && !instr.Is<ImportInstruction>())
+            return (instr.Users.Count() <= 1 && !instr.HasSideEffect()
+                && !instr.Is<AllocVarInstruction>())
                 || instr.Is<FetchArgInstruction>();
-        }
-
-        void CLikeCodeGen::PrintExportInstr(CodeGenContext &ctx, ExportInstruction * exportInstr)
-        {
-            outputStrategy->ProcessExportInstruction(ctx, exportInstr);
-        }
-
-        void CLikeCodeGen::PrintUpdateInstr(CodeGenContext & ctx, MemberUpdateInstruction * instr)
-        {
-            auto genCode = [&](String varName, ILType * srcType, ILOperand * op1, ILOperand * op2)
-            {
-                ctx.Body << varName;
-                if (auto structType = dynamic_cast<ILStructType*>(srcType))
-                {
-                    ctx.Body << ".";
-                    ctx.Body << structType->Members[dynamic_cast<ILConstOperand*>(op1)->IntValues[0]].FieldName;
-                }
-                else
-                {
-                    ctx.Body << "[";
-                    PrintOp(ctx, op1);
-                    ctx.Body << "]";
-                }
-                ctx.Body << " = ";
-                PrintOp(ctx, op2);
-                ctx.Body << ";\n";
-            };
-            if (auto srcInstr = dynamic_cast<ILInstruction*>(instr->Operands[0].Ptr()))
-            {
-                if (srcInstr->Users.Count() == 1)
-                {
-                    auto srcName = srcInstr->Name;
-                    while (ctx.SubstituteNames.TryGetValue(srcName, srcName));
-                    genCode(srcName, srcInstr->Type.Ptr(), instr->Operands[1].Ptr(), instr->Operands[2].Ptr());
-                    ctx.SubstituteNames[instr->Name] = srcName;
-                    return;
-                }
-            }
-            genCode(instr->Operands[0]->Name, instr->Operands[0]->Type.Ptr(), instr->Operands[1].Ptr(), instr->Operands[2].Ptr());
         }
 
         void CLikeCodeGen::PrintSwizzleInstrExpr(CodeGenContext & ctx, SwizzleInstruction * swizzle)
@@ -598,28 +495,9 @@ namespace Spire
             ctx.Body << "." << swizzle->SwizzleString;
         }
 
-        void CLikeCodeGen::PrintImportInstr(CodeGenContext & ctx, ImportInstruction * importInstr)
-        {
-            currentImportInstr = importInstr;
-                
-            ctx.DefineVariable(importInstr);
-            GenerateCode(ctx, importInstr->ImportOperator.Ptr());
-                
-            currentImportInstr = nullptr;
-        }
-
-        void CLikeCodeGen::PrintImportInstrExpr(CodeGenContext & ctx, ImportInstruction * importInstr)
-        {
-            currentImportInstr = importInstr;
-            PrintOp(ctx, importInstr->ImportOperator->GetLastInstruction()->As<ReturnInstruction>()->Operand.Ptr());
-            currentImportInstr = nullptr;
-        }
-
         void CLikeCodeGen::PrintInstrExpr(CodeGenContext & ctx, ILInstruction & instr)
         {
-            if (auto projInstr = instr.As<ProjectInstruction>())
-                PrintProjectInstrExpr(ctx, projInstr);
-            else if (auto binInstr = instr.As<BinaryInstruction>())
+            if (auto binInstr = instr.As<BinaryInstruction>())
                 PrintBinaryInstrExpr(ctx, binInstr);
             else if (auto unaryInstr = instr.As<UnaryInstruction>())
                 PrintUnaryInstrExpr(ctx, unaryInstr);
@@ -631,16 +509,6 @@ namespace Spire
                 PrintSelectInstrExpr(ctx, select);
             else if (auto call = instr.As<CallInstruction>())
                 PrintCallInstrExpr(ctx, call);
-            else if (auto castf2i = instr.As<Float2IntInstruction>())
-                PrintCastF2IInstrExpr(ctx, castf2i);
-            else if (auto casti2f = instr.As<Int2FloatInstruction>())
-                PrintCastI2FInstrExpr(ctx, casti2f);
-            else if (auto ldInput = instr.As<LoadInputInstruction>())
-                PrintLoadInputInstrExpr(ctx, ldInput);
-            else if (auto import = instr.As<ImportInstruction>())
-                PrintImportInstrExpr(ctx, import);
-            else if (instr.As<MemberUpdateInstruction>())
-                throw InvalidOperationException("member update instruction cannot appear as expression.");
         }
 
         void CLikeCodeGen::PrintInstr(CodeGenContext & ctx, ILInstruction & instr)
@@ -650,8 +518,6 @@ namespace Spire
             {
                 if (auto binInstr = instr.As<BinaryInstruction>())
                     PrintBinaryInstr(ctx, binInstr);
-                else if (auto exportInstr = instr.As<ExportInstruction>())
-                    PrintExportInstr(ctx, exportInstr);
                 else if (auto unaryInstr = instr.As<UnaryInstruction>())
                     PrintUnaryInstr(ctx, unaryInstr);
                 else if (auto allocVar = instr.As<AllocVarInstruction>())
@@ -662,23 +528,9 @@ namespace Spire
                     PrintSelectInstr(ctx, select);
                 else if (auto call = instr.As<CallInstruction>())
                     PrintCallInstr(ctx, call);
-                else if (auto castf2i = instr.As<Float2IntInstruction>())
-                    PrintCastF2IInstr(ctx, castf2i);
-                else if (auto casti2f = instr.As<Int2FloatInstruction>())
-                    PrintCastI2FInstr(ctx, casti2f);
-                else if (auto update = instr.As<MemberUpdateInstruction>())
-                    PrintUpdateInstr(ctx, update);
-                else if (auto importInstr = instr.As<ImportInstruction>())
-                    PrintImportInstr(ctx, importInstr);
                     
             }
         }
-
-        void CLikeCodeGen::PrintLoadInputInstrExpr(CodeGenContext & ctx, LoadInputInstruction * instr)
-        {
-            PrintInputReference(ctx, ctx.Body, instr->InputName);
-        }
-
         void CLikeCodeGen::GenerateCode(CodeGenContext & context, CFGNode * code)
         {
             for (auto & instr : *code)
@@ -730,18 +582,9 @@ namespace Spire
                 }
                 else if (auto ret = instr.As<ReturnInstruction>())
                 {
-                    if (currentImportInstr) 
-                    {
-                        context.Body << currentImportInstr->Name << " = ";
-                        PrintOp(context, ret->Operand.Ptr());
-                        context.Body << ";\n";
-                    }
-                    else
-                    {
-                        context.Body << "return ";
-                        PrintOp(context, ret->Operand.Ptr());
-                        context.Body << ";\n";
-                    }
+                    context.Body << "return ";
+                    PrintOp(context, ret->Operand.Ptr());
+                    context.Body << ";\n";
                 }
                 else if (instr.Is<BreakInstruction>())
                 {
@@ -919,36 +762,7 @@ namespace Spire
         void CLikeCodeGen::PrintInputReference(CodeGenContext & ctx, StringBuilder & sb, String input)
         {
             auto info = extCompInfo[input]();
-
-            // TODO(tfoley): Is there any reason why this isn't just a `switch`?
-            if (auto recType = ExtractRecordType(info.Type.Ptr()))
-            {
-                // TODO(tfoley): hoist this logic up to the top-level if chain?
-                if(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput)
-                {
-                    if(info.IsArray)
-                    {
-                        PrintStandardArrayInputReference(sb, recType, input, currentImportInstr->ComponentName);
-                    }
-                    else
-                    {
-                        PrintStandardInputReference(sb, recType, input, currentImportInstr->ComponentName);
-                    }
-                }
-                else if(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch)
-                {
-                    PrintPatchInputReference(sb, recType, input, currentImportInstr->ComponentName);
-                }
-                else
-                {
-                    // TODO(tfoley): Does this case ever actually trigger?
-                    PrintDefaultInputReference(sb, recType, input, currentImportInstr->ComponentName);
-                }
-            }
-            else
-            {
-                PrintSystemVarReference(ctx, sb, input, info.SystemVar);
-            }
+			PrintSystemVarReference(ctx, sb, input, info.SystemVar);
         }
 
         void CLikeCodeGen::DeclareInput(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader)

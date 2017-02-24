@@ -656,6 +656,15 @@ namespace Spire
             return true;
         }
 
+        bool ExpressionType::IsClass() const
+        {
+            auto declRefType = AsDeclRefType();
+            if (!declRefType) return false;
+            auto classDeclRef = declRefType->declRef.As<ClassDeclRef>();
+            if (!classDeclRef) return false;
+            return true;
+        }
+
         RefPtr<ExpressionType> ExpressionType::Bool;
         RefPtr<ExpressionType> ExpressionType::UInt;
         RefPtr<ExpressionType> ExpressionType::Int;

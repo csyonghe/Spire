@@ -408,6 +408,7 @@ namespace Spire
             bool IsTexture() const { return As<TextureType>() != nullptr; }
             bool IsSampler() const { return As<SamplerStateType>() != nullptr; }
             bool IsStruct() const;
+            bool IsClass() const;
             static void Init();
             static void Finalize();
             ExpressionType* GetCanonicalType() const;

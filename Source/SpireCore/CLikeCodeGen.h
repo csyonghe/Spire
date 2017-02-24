@@ -105,7 +105,6 @@ namespace Spire
             }
 
             virtual void DeclareOutput(CodeGenContext & ctx, ILStage * stage) = 0;
-            virtual void ProcessExportInstruction(CodeGenContext & ctx, ExportInstruction * instr) = 0;
         };
 
         class CLikeCodeGen : public CodeGenBackend
@@ -117,7 +116,6 @@ namespace Spire
             RefPtr<OutputStrategy> outputStrategy;
             Dictionary<String, ExternComponentCodeGenInfo> extCompInfo;
             HashSet<String> intrinsicTextureFunctions;
-            ImportInstruction * currentImportInstr = nullptr;
             bool useBindlessTexture = false;
             DiagnosticSink * errWriter;
 
@@ -148,7 +146,6 @@ namespace Spire
             virtual void PrintMatrixMulInstrExpr(CodeGenContext & ctx, ILOperand* op0, ILOperand* op1);
             virtual void PrintRasterPositionOutputWrite(CodeGenContext & ctx, ILOperand * operand) = 0;
             virtual void PrintTextureCall(CodeGenContext & ctx, CallInstruction * instr) = 0;
-            virtual void PrintProjectInstrExpr(CodeGenContext & ctx, ProjectInstruction * instr) = 0;
 
             // Helpers for printing call instructions
             void PrintDefaultCallInstrArgs(CodeGenContext & ctx, CallInstruction * instr);
@@ -175,19 +172,10 @@ namespace Spire
             void PrintSelectInstr(CodeGenContext & ctx, SelectInstruction * instr);
             void PrintCallInstrExpr(CodeGenContext & ctx, CallInstruction * instr);
             void PrintCallInstr(CodeGenContext & ctx, CallInstruction * instr);
-            void PrintCastF2IInstrExpr(CodeGenContext & ctx, Float2IntInstruction * instr);
-            void PrintCastF2IInstr(CodeGenContext & ctx, Float2IntInstruction * instr);
-            void PrintCastI2FInstrExpr(CodeGenContext & ctx, Int2FloatInstruction * instr);
-            void PrintCastI2FInstr(CodeGenContext & ctx, Int2FloatInstruction * instr);
             bool AppearAsExpression(ILInstruction & instr, bool force);
-            void PrintExportInstr(CodeGenContext &ctx, ExportInstruction * exportInstr);
-            void PrintUpdateInstr(CodeGenContext & ctx, MemberUpdateInstruction * instr);
             void PrintSwizzleInstrExpr(CodeGenContext & ctx, SwizzleInstruction * swizzle);
-            void PrintImportInstr(CodeGenContext & ctx, ImportInstruction * importInstr);
-            void PrintImportInstrExpr(CodeGenContext & ctx, ImportInstruction * importInstr);
             void PrintInstrExpr(CodeGenContext & ctx, ILInstruction & instr);
             void PrintInstr(CodeGenContext & ctx, ILInstruction & instr);
-            void PrintLoadInputInstrExpr(CodeGenContext & ctx, LoadInputInstruction * instr);
             void GenerateCode(CodeGenContext & context, CFGNode * code);
 
         public:

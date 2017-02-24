@@ -1089,97 +1089,6 @@ namespace Spire
 
         class LeaInstruction : public ILInstruction
         {};
-        class ILWorld;
-        class ImportInstruction : public LeaInstruction
-        {
-        public:
-            String ComponentName;
-            RefPtr<CFGNode> ImportOperator;
-
-            List<UseReference> Arguments;
-            virtual OperandIterator begin() override
-            {
-                return Arguments.begin();
-            }
-            virtual OperandIterator end() override
-            {
-                return Arguments.end();
-            }
-            virtual int GetSubBlockCount() override
-            {
-                return 1;
-            }
-            virtual CFGNode * GetSubBlock(int i) override
-            {
-                if (i == 0)
-                    return ImportOperator.Ptr();
-                return nullptr;
-            }
-            ImportInstruction(int argSize = 0)
-                : LeaInstruction()
-            {
-                Arguments.SetSize(argSize);
-                for (auto & use : Arguments)
-                    use.SetUser(this);
-            }
-            ImportInstruction(const ImportInstruction & other)
-                : LeaInstruction(other)
-            {
-                Arguments.SetSize(other.Arguments.Count());
-                for (int i = 0; i < other.Arguments.Count(); i++)
-                {
-                    Arguments[i].SetUser(this);
-                    Arguments[i] = other.Arguments[i].Ptr();
-                }
-            }
-
-            ImportInstruction(int argSize, String compName, RefPtr<CFGNode> importOp, RefPtr<ILType> type)
-                :ImportInstruction(argSize)
-            {
-                this->ComponentName = compName;
-                this->ImportOperator = importOp;
-                this->Type = type;
-            }
-            virtual String ToString() override;
-            virtual String GetOperatorString() override;
-            virtual ImportInstruction * Clone() override
-            {
-                return new ImportInstruction(*this);
-            }
-            virtual void Accept(InstructionVisitor * visitor) override;
-        };
-
-        class LoadInputInstruction : public LeaInstruction
-        {
-        public:
-            String InputName;
-            LoadInputInstruction(RefPtr<ILType> type, String name)
-                : InputName(name)
-            {
-                this->Type = type;
-            }
-            LoadInputInstruction(const LoadInputInstruction & other)
-                :LeaInstruction(other), InputName(other.InputName)
-            {
-            }
-            virtual bool IsDeterministic() override
-            {
-                return true;
-            }
-            virtual String ToString() override
-            {
-                return Name + " = INPUT " + InputName;
-            }
-            virtual String GetOperatorString() override
-            {
-                return "input";
-            }
-            virtual LoadInputInstruction * Clone() override
-            {
-                return new LoadInputInstruction(*this);
-            }
-            virtual void Accept(InstructionVisitor * visitor) override;
-        };
 
         class AllocVarInstruction : public LeaInstruction
         {
@@ -1583,68 +1492,6 @@ namespace Spire
             }
         };
 
-        class MakeRecordInstruction : public ILInstruction
-        {
-        public:
-            RefPtr<ILRecordType> RecordType;
-            List<UseReference> Arguments;
-        };
-
-        class ProjectInstruction : public UnaryInstruction
-        {
-        public:
-            String ComponentName;
-            virtual String ToString() override
-            {
-                StringBuilder sb;
-                sb << Name << " = project ";
-                sb << Operand.ToString();
-                sb << ", " << ComponentName;
-                return sb.ProduceString();
-            }
-            virtual ProjectInstruction * Clone() override
-            {
-                return new ProjectInstruction(*this);
-            }
-            virtual void Accept(InstructionVisitor * visitor) override;
-        };
-
-        class ExportInstruction : public UnaryInstruction
-        {
-        public:
-            String ComponentName;
-            ILWorld * World;
-
-            ExportInstruction() = default;
-            ExportInstruction(const ExportInstruction &) = default;
-
-            ExportInstruction(String compName, ILWorld * srcWorld, ILOperand * value)
-                : UnaryInstruction()
-            {
-                this->Operand = value;
-                this->ComponentName = compName;
-                this->World = srcWorld;
-                this->Type = value->Type;
-            }
-            virtual String ToString() override
-            {
-                return "export [" + ComponentName + "], " + Operand.ToString();
-            }
-            virtual String GetOperatorString() override
-            {
-                return "export [" + ComponentName + "]";
-            }
-            virtual ExportInstruction * Clone() override
-            {
-                return new ExportInstruction(*this);
-            }
-            virtual bool HasSideEffect() override
-            {
-                return true;
-            }
-            virtual void Accept(InstructionVisitor * visitor) override;
-        };
-
         class BinaryInstruction : public ILInstruction
         {
         public:
@@ -1906,12 +1753,12 @@ namespace Spire
             virtual void Accept(InstructionVisitor * visitor) override;
         };
 
-        class MemberLoadInstruction : public BinaryInstruction
+        class MemberAccessInstruction : public BinaryInstruction
         {
         public:
-            MemberLoadInstruction() = default;
-            MemberLoadInstruction(const MemberLoadInstruction &) = default;
-            MemberLoadInstruction(ILOperand * v0, ILOperand * v1)
+			MemberAccessInstruction() = default;
+			MemberAccessInstruction(const MemberAccessInstruction &) = default;
+			MemberAccessInstruction(ILOperand * v0, ILOperand * v1)
             {
                 Operands[0] = v0;
                 Operands[1] = v1;
@@ -1945,15 +1792,15 @@ namespace Spire
             }
             virtual String ToString() override
             {
-                return Name + " = retrieve " + Operands[0].ToString() + ", " + Operands[1].ToString();
+                return Name + " = member " + Operands[0].ToString() + ", " + Operands[1].ToString();
             }
             virtual String GetOperatorString() override
             {
-                return "retrieve";
+                return "member";
             }
-            virtual MemberLoadInstruction * Clone() override
+            virtual MemberAccessInstruction * Clone() override
             {
-                return new MemberLoadInstruction(*this);
+                return new MemberAccessInstruction(*this);
             }
             virtual void Accept(InstructionVisitor * visitor) override;
         };
@@ -2291,64 +2138,7 @@ namespace Spire
             }
             virtual void Accept(InstructionVisitor * visitor) override;
         };
-
-        class CastInstruction : public UnaryInstruction
-        {};
-
-        class Float2IntInstruction : public CastInstruction
-        {
-        public:
-            Float2IntInstruction(){}
-            Float2IntInstruction(const Float2IntInstruction &) = default;
-
-            Float2IntInstruction(ILOperand * op)
-            {
-                Operand = op;
-                Type = new ILBasicType(ILBaseType::Int);
-            }
-        public:
-            virtual String ToString() override
-            {
-                return Name + " = f2i " + Operand.ToString();
-            }
-            virtual String GetOperatorString() override
-            {
-                return "f2i";
-            }
-            virtual Float2IntInstruction * Clone() override
-            {
-                return new Float2IntInstruction(*this);
-            }
-            virtual void Accept(InstructionVisitor * visitor) override;
-        };
-
-        class Int2FloatInstruction : public CastInstruction
-        {
-        public:
-            Int2FloatInstruction(){}
-            Int2FloatInstruction(ILOperand * op)
-            {
-                Operand = op;
-                Type = new ILBasicType(ILBaseType::Float);
-            }
-            Int2FloatInstruction(const Int2FloatInstruction &) = default;
-
-        public:
-            virtual String ToString() override
-            {
-                return Name + " = i2f " + Operand.ToString();
-            }
-            virtual String GetOperatorString() override
-            {
-                return "i2f";
-            }
-            virtual Int2FloatInstruction * Clone() override
-            {
-                return new Int2FloatInstruction(*this);
-            }
-            virtual void Accept(InstructionVisitor * visitor) override;
-        };
-
+        
         class CopyInstruction : public UnaryInstruction
         {
         public:
@@ -2473,64 +2263,6 @@ namespace Spire
             virtual void Accept(InstructionVisitor * visitor) override;
         };
 
-        class MemberUpdateInstruction : public ILInstruction
-        {
-        public:
-            UseReference Operands[3];
-            MemberUpdateInstruction()
-            {
-                Operands[0].SetUser(this);
-                Operands[1].SetUser(this);
-                Operands[2].SetUser(this);
-            }
-            MemberUpdateInstruction(const MemberUpdateInstruction & other)
-                : ILInstruction(other)
-            {
-                Operands[0].SetUser(this);
-                Operands[1].SetUser(this);
-                Operands[2].SetUser(this);
-                Operands[0] = other.Operands[0].Ptr();
-                Operands[1] = other.Operands[1].Ptr();
-                Operands[2] = other.Operands[2].Ptr();
-            }
-            MemberUpdateInstruction(ILOperand * var, ILOperand * offset, ILOperand * value)
-            {
-                Operands[0].SetUser(this);
-                Operands[1].SetUser(this);
-                Operands[2].SetUser(this);
-                Operands[0] = var;
-                Operands[1] = offset;
-                Operands[2] = value;
-                Type = var->Type->Clone();
-            }
-            virtual OperandIterator begin() override
-            {
-                return Operands;
-            }
-            virtual OperandIterator end() override
-            {
-                return Operands + 3;
-            }
-            virtual String ToString() override
-            {
-                return Name + " = update " + Operands[0].ToString() + ", " + Operands[1].ToString() + "," + Operands[2].ToString();
-            }
-            virtual String GetOperatorString() override
-            {
-                return "update";
-            }
-            virtual MemberUpdateInstruction * Clone() override
-            {
-                return new MemberUpdateInstruction(*this);
-            }
-            virtual bool HasSideEffect() override
-            {
-                return true;
-            }
-            virtual void Accept(InstructionVisitor * visitor) override;
-        };
-
-
         class InstructionVisitor : public Object
         {
         public:
@@ -2555,28 +2287,18 @@ namespace Spire
             virtual void VisitCmpleInstruction(CmpleInstruction *){}
             virtual void VisitCmpgtInstruction(CmpgtInstruction *){}
             virtual void VisitCmpgeInstruction(CmpgeInstruction *){}
-
             virtual void VisitLoadInstruction(LoadInstruction *){}
             virtual void VisitStoreInstruction(StoreInstruction *){}
             virtual void VisitCopyInstruction(CopyInstruction *){}
-
             virtual void VisitAllocVarInstruction(AllocVarInstruction *){}
             virtual void VisitFetchArgInstruction(FetchArgInstruction *){}
-            virtual void VisitCastInstruction(CastInstruction *){}
-            virtual void VisitInt2FloatInstruction(Int2FloatInstruction *){}
-            virtual void VisitFloat2IntInstruction(Float2IntInstruction *){}
-            virtual void VisitMemberLoadInstruction(MemberLoadInstruction *){}
-            virtual void VisitMemberUpdateInstruction(MemberUpdateInstruction *) {}
-            virtual void VisitImportInstruction(ImportInstruction*) {}
-            virtual void VisitExportInstruction(ExportInstruction*) {}
+            virtual void VisitMemberAccessInstruction(MemberAccessInstruction *){}
             virtual void VisitSelectInstruction(SelectInstruction *){}
             virtual void VisitCallInstruction(CallInstruction *){}
             virtual void VisitSwitchInstruction(SwitchInstruction *){}
             virtual void VisitDiscardInstruction(DiscardInstruction *) {}
-            virtual void VisitLoadInputInstruction(LoadInputInstruction *) {}
             virtual void VisitPhiInstruction(PhiInstruction *){}
             virtual void VisitSwizzleInstruction(SwizzleInstruction*) {}
-            virtual void VisitProjectInstruction(ProjectInstruction*) {}
         };
 
         class ForInstruction : public ILInstruction

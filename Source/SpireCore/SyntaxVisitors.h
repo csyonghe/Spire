@@ -27,7 +27,8 @@ namespace Spire
 
         SyntaxVisitor * CreateSemanticsVisitor(DiagnosticSink * err);
         ICodeGenerator * CreateCodeGenerator(CompileResult & result);
-        SyntaxVisitor * CreateILCodeGenerator(DiagnosticSink * err, ILProgram * program);
+		class CompileOptions;
+        SyntaxVisitor * CreateILCodeGenerator(DiagnosticSink * err, ILProgram * program, CompileOptions * options);
     }
 }
 

@@ -296,7 +296,7 @@ namespace Spire
 
 #if 1
                     RefPtr<ILProgram> program = new ILProgram();
-                    RefPtr<SyntaxVisitor> codeGen = CreateILCodeGenerator(result.GetErrorWriter(), program.Ptr());
+                    RefPtr<SyntaxVisitor> codeGen = CreateILCodeGenerator(result.GetErrorWriter(), program.Ptr(), const_cast<CompileOptions*>(&options));
                     codeGen->VisitProgram(programSyntaxNode.Ptr());
                     
                     if (result.GetErrorCount() > 0)
