@@ -189,7 +189,60 @@ static void EmitUnaryExpr(
 static void EmitExprWithPrecedence(EmitContext* context, RefPtr<ExpressionSyntaxNode> expr, int outerPrec)
 {
     bool needClose = false;
-    if (auto appExpr = expr.As<InvokeExpressionSyntaxNode>())
+    if (auto binExpr = expr.As<OperatorExpressionSyntaxNode>())
+    {
+        switch (binExpr->Operator)
+        {
+#define CASE(NAME, OP) case Operator::NAME: EmitBinExpr(context, outerPrec, kPrecedence_##NAME, #OP, binExpr); break
+            CASE(Mul, *);
+            CASE(Div, / );
+            CASE(Mod, %);
+            CASE(Add, +);
+            CASE(Sub, -);
+            CASE(Lsh, << );
+            CASE(Rsh, >> );
+            CASE(Eql, == );
+            CASE(Neq, != );
+            CASE(Greater, >);
+            CASE(Less, <);
+            CASE(Geq, >= );
+            CASE(Leq, <= );
+            CASE(BitAnd, &);
+            CASE(BitXor, ^);
+            CASE(BitOr, | );
+            CASE(And, &&);
+            CASE(Or, || );
+            CASE(Assign, =);
+            CASE(AddAssign, +=);
+            CASE(SubAssign, -=);
+            CASE(MulAssign, *=);
+            CASE(DivAssign, /=);
+            CASE(ModAssign, %=);
+            CASE(LshAssign, <<=);
+            CASE(RshAssign, >>=);
+            CASE(OrAssign, |=);
+            CASE(AndAssign, &=);
+            CASE(XorAssign, ^=);
+#undef CASE
+        case Operator::Sequence: EmitBinExpr(context, outerPrec, kPrecedence_Comma, ",", binExpr); break;
+#define PREFIX(NAME, OP) case Operator::NAME: EmitUnaryExpr(context, outerPrec, kPrecedence_Prefix, #OP, "", binExpr); break
+#define POSTFIX(NAME, OP) case Operator::NAME: EmitUnaryExpr(context, outerPrec, kPrecedence_Postfix, "", #OP, binExpr); break
+
+            PREFIX(Neg, -);
+            PREFIX(Not, !);
+            PREFIX(BitNot, ~);
+            PREFIX(PreInc, ++);
+            PREFIX(PreDec, --);
+            PREFIX(PostInc, ++);
+            PREFIX(PostDec, --);
+#undef PREFIX
+#undef POSTFIX
+        default:
+            assert(!"unreachable");
+            break;
+        }
+    }
+    else if (auto appExpr = expr.As<InvokeExpressionSyntaxNode>())
     {
         needClose = MaybeEmitParens(context, outerPrec, kPrecedence_Postifx);
 
@@ -295,59 +348,6 @@ static void EmitExprWithPrecedence(EmitContext* context, RefPtr<ExpressionSyntax
         case ConstantExpressionSyntaxNode::ConstantType::Bool:
             Emit(context, litExpr->IntValue ? "true" : "false");
             break;
-        default:
-            assert(!"unreachable");
-            break;
-        }
-    }
-    else if (auto binExpr = expr.As<OperatorExpressionSyntaxNode>())
-    {
-        switch (binExpr->Operator)
-        {
-#define CASE(NAME, OP) case Operator::NAME: EmitBinExpr(context, outerPrec, kPrecedence_##NAME, #OP, binExpr); break
-        CASE(Mul, *);
-        CASE(Div, /);
-        CASE(Mod, %);
-        CASE(Add, +);
-        CASE(Sub, -);
-        CASE(Lsh, <<);
-        CASE(Rsh, >>);
-        CASE(Eql, ==);
-        CASE(Neq, !=);
-        CASE(Greater, >);
-        CASE(Less, <);
-        CASE(Geq, >=);
-        CASE(Leq, <=);
-        CASE(BitAnd, &);
-        CASE(BitXor, ^);
-        CASE(BitOr, |);
-        CASE(And, &&);
-        CASE(Or, ||);
-        CASE(Assign, =);
-        CASE(AddAssign, +=);
-        CASE(SubAssign, -=);
-        CASE(MulAssign, *=);
-        CASE(DivAssign, /=);
-        CASE(ModAssign, %=);
-        CASE(LshAssign, <<=);
-        CASE(RshAssign, >>=);
-        CASE(OrAssign, |=);
-        CASE(AndAssign, &=);
-        CASE(XorAssign, ^=);
-#undef CASE
-        case Operator::Sequence: EmitBinExpr(context, outerPrec, kPrecedence_Comma, ",", binExpr); break;
-#define PREFIX(NAME, OP) case Operator::NAME: EmitUnaryExpr(context, outerPrec, kPrecedence_Prefix, #OP, "", binExpr); break
-#define POSTFIX(NAME, OP) case Operator::NAME: EmitUnaryExpr(context, outerPrec, kPrecedence_Postfix, "", #OP, binExpr); break
-
-            PREFIX(Neg, -);
-            PREFIX(Not, !);
-            PREFIX(BitNot, ~);
-            PREFIX(PreInc, ++);
-            PREFIX(PreDec, --);
-            PREFIX(PostInc, ++);
-            PREFIX(PostDec, --);
-#undef PREFIX
-#undef POSTFIX
         default:
             assert(!"unreachable");
             break;

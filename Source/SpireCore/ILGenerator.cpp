@@ -38,7 +38,7 @@ namespace Spire
                 ilStructType = new ILStructType();
                 ilStructType->TypeName = structDecl->Name.Content;
 
-                for (auto field : structDecl->GetMembersOfType<Variable>())
+                for (auto field : structDecl->GetMembersOfType<StructField>())
                 {
                     ILStructType::ILStructField ilField;
                     ilField.FieldName = field->Name.Content;
