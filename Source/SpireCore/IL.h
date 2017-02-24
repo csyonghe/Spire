@@ -2823,7 +2823,7 @@ namespace Spire
             }
         };
 
-        class ILModuleParameterSet
+        class ILModuleParameterSet : public RefObject
         {
         public:
             int BufferSize = 0;
@@ -2843,7 +2843,7 @@ namespace Spire
             EnumerableDictionary<String, RefPtr<ILStage>> Stages;
         };
 
-		class ILFunction
+		class ILFunction : public RefObject
         {
         public:
             EnumerableDictionary<String, FetchArgInstruction*> Parameters;

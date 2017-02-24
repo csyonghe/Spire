@@ -1725,11 +1725,12 @@ namespace Spire
             throw "unimplemented";
         }
 
-        void OperatorExpressionSyntaxNode::SetOperator(Spire::Compiler::Operator op)
+        void OperatorExpressionSyntaxNode::SetOperator(ContainerDecl * scope, Spire::Compiler::Operator op)
         {
             this->Operator = op;
             auto opExpr = new VarExpressionSyntaxNode();
             opExpr->Variable = GetOperatorFunctionName(Operator);
+            opExpr->scope = scope;
             opExpr->Position = this->Position;
             this->FunctionExpr = opExpr;
         }

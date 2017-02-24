@@ -2643,7 +2643,7 @@ namespace Spire
                         tmp->Arguments.Add(left);
                         FillPosition(tmp.Ptr());
                         Token opToken = tokenReader.AdvanceToken();
-                        tmp->SetOperator(GetOpFromToken(opToken));
+                        tmp->SetOperator(currentScope.Ptr(), GetOpFromToken(opToken));
                         tmp->Arguments.Add(ParseExpression(Precedence(level + 1)));
                         left = tmp;
                     }
@@ -2658,7 +2658,7 @@ namespace Spire
                         tmp->Arguments.Add(left);
                         FillPosition(tmp.Ptr());
                         Token opToken = tokenReader.AdvanceToken();
-                        tmp->SetOperator(GetOpFromToken(opToken));
+                        tmp->SetOperator(currentScope.Ptr(), GetOpFromToken(opToken));
                         tmp->Arguments.Add(ParseExpression(level));
                         left = tmp;
                     }
@@ -2689,13 +2689,13 @@ namespace Spire
                 RefPtr<OperatorExpressionSyntaxNode> unaryExpr = new OperatorExpressionSyntaxNode();
                 Token token = tokenReader.AdvanceToken();
                 FillPosition(unaryExpr.Ptr());
-                unaryExpr->SetOperator(GetOpFromToken(token));
+                unaryExpr->SetOperator(currentScope.Ptr(), GetOpFromToken(token));
                 if (unaryExpr->Operator == Operator::PostInc)
-                    unaryExpr->SetOperator(Operator::PreInc);
+                    unaryExpr->SetOperator(currentScope.Ptr(), Operator::PreInc);
                 else if (unaryExpr->Operator == Operator::PostDec)
-                    unaryExpr->SetOperator(Operator::PreDec);
+                    unaryExpr->SetOperator(currentScope.Ptr(), Operator::PreDec);
                 else if (unaryExpr->Operator == Operator::Sub)
-                    unaryExpr->SetOperator(Operator::Neg);
+                    unaryExpr->SetOperator(currentScope.Ptr(), Operator::Neg);
 
                 unaryExpr->Arguments.Add(ParseLeafExpression());
                 rs = unaryExpr;
@@ -2771,7 +2771,7 @@ namespace Spire
                     RefPtr<OperatorExpressionSyntaxNode> unaryExpr = new OperatorExpressionSyntaxNode();
                     FillPosition(unaryExpr.Ptr());
                     ReadToken(TokenType::OpInc);
-                    unaryExpr->SetOperator(Operator::PostInc);
+                    unaryExpr->SetOperator(currentScope.Ptr(), Operator::PostInc);
                     unaryExpr->Arguments.Add(rs);
                     rs = unaryExpr;
                 }
@@ -2780,7 +2780,7 @@ namespace Spire
                     RefPtr<OperatorExpressionSyntaxNode> unaryExpr = new OperatorExpressionSyntaxNode();
                     FillPosition(unaryExpr.Ptr());
                     ReadToken(TokenType::OpDec);
-                    unaryExpr->SetOperator(Operator::PostDec);
+                    unaryExpr->SetOperator(currentScope.Ptr(), Operator::PostDec);
                     unaryExpr->Arguments.Add(rs);
                     rs = unaryExpr;
                 }

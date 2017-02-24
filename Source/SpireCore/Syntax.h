@@ -1807,7 +1807,7 @@ namespace Spire
         {
         public:
             Operator Operator;
-            void SetOperator(Spire::Compiler::Operator op);
+            void SetOperator(ContainerDecl * scope, Spire::Compiler::Operator op);
             virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
         };
 

@@ -26,7 +26,7 @@ namespace Spire
             {
                 RefPtr<ILStructType> ilStructType;
 
-                if (structTypes.TryGetValue(structDecl, ilStructType))
+                if (structTypes.TryGetValue(DeclRef(structDecl, nullptr), ilStructType))
                 {
                     return ilStructType;
                 }
@@ -144,7 +144,7 @@ namespace Spire
                 }
                 f->InternalName = internalName.ProduceString();
                 program->Functions.Add(f->InternalName, func);
-                func->Name = thisType->TypeName + "@" + f->InternalName;
+                func->Name = f->InternalName;
                 func->ReturnType = TranslateExpressionType(f->ReturnType);
                 
                 functions[DeclRef(f, nullptr)] = func.Ptr();
