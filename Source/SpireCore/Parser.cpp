@@ -913,7 +913,7 @@ namespace Spire
         static RefPtr<VarDeclBase> CreateVarDeclForContext(
             ContainerDecl*  containerDecl )
         {
-            if (dynamic_cast<StructSyntaxNode*>(containerDecl))
+            if (dynamic_cast<StructSyntaxNode*>(containerDecl) || dynamic_cast<ClassSyntaxNode*>(containerDecl))
             {
                 return new StructField();
             }
