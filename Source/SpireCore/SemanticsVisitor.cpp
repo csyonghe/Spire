@@ -827,7 +827,10 @@ namespace Spire
                 {
                     VisitStruct(s.Ptr());
                 }
-
+				for (auto & s : program->GetClasses())
+				{
+					VisitClass(s.Ptr());
+				}
                 // HACK(tfoley): Visiting all generic declarations here,
                 // because otherwise they won't get visited.
                 for (auto & g : program->GetMembersOfType<GenericDecl>())
@@ -868,6 +871,20 @@ namespace Spire
 
                 return programNode;
             }
+
+			virtual RefPtr<ClassSyntaxNode> VisitClass(ClassSyntaxNode * classNode) override
+			{
+				if (classNode->IsChecked(DeclCheckState::Checked))
+					return classNode;
+				classNode->SetCheckState(DeclCheckState::Checked);
+
+				for (auto field : classNode->GetFields())
+				{
+					field->Type = CheckUsableType(field->Type);
+					field->SetCheckState(DeclCheckState::Checked);
+				}
+				return classNode;
+			}
 
             virtual RefPtr<StructSyntaxNode> VisitStruct(StructSyntaxNode * structNode) override
             {

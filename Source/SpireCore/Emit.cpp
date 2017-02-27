@@ -1068,7 +1068,10 @@ static void EmitDecl(EmitContext* context, RefPtr<Decl> decl)
         // ever emit particular instantiations of them.
         return;
     }
-
+	else if (auto classDecl = decl.As<ClassSyntaxNode>())
+	{
+		return;
+	}
     throw "unimplemented";
 }
 

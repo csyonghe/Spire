@@ -199,7 +199,7 @@ namespace Spire
                 }
                 thisDeclRef = DeclRef();
             }
-			void DefineBindableResourceVariables(CodeWriter & writer, ILOperand * obj, String namePrefix)
+			void DefineBindableResourceVariables(ILOperand * obj, String namePrefix)
 			{
 				auto structType = obj->Type.As<ILStructType>();
 				assert(structType);
@@ -216,12 +216,12 @@ namespace Spire
 
 						// insert assignment instruction in init func
 						GenerateIndexExpression(obj, program->ConstantPool->CreateConstant(memberIndex));
-						writer.Assign(field.Type.Ptr(), PopStack(), gvar);
+						codeWriter.Assign(PopStack(), gvar);
 					}
 					else if (field.Type.As<ILStructType>())
 					{
 						GenerateIndexExpression(obj, program->ConstantPool->CreateConstant(memberIndex));
-						DefineBindableResourceVariables(writer, PopStack(), namePrefix + "_" + field.FieldName);
+						DefineBindableResourceVariables(PopStack(), namePrefix + "_" + field.FieldName);
 					}
 					memberIndex++;
 				}
@@ -247,10 +247,9 @@ namespace Spire
                 variables.PushScope();
 
 				RefPtr<ILFunction> initFunc = new ILFunction();
-				CodeWriter initFuncCodeWriter;
 				initFunc->Name = "__main_init()";
 				initFunc->ReturnType = new ILBasicType(ILBaseType::Void);
-				initFuncCodeWriter.PushNode();
+				codeWriter.PushNode();
                 for (auto&& v : prog->GetMembersOfType<Variable>())
                 {
                     if (v->HasModifier<IntrinsicModifier>() || v->HasModifier<FromStdLibModifier>())
@@ -262,12 +261,13 @@ namespace Spire
                         ILGlobalVariable * gvar = new ILGlobalVariable(structType.Ptr());
                         gvar->Name = v->Name.Content;
                         gvar->Position = v->Position;
-                        DefineBindableResourceVariables(initFuncCodeWriter, gvar, gvar->Name);
+                        DefineBindableResourceVariables(gvar, gvar->Name);
+						program->GlobalVars.Add(gvar->Name, gvar);
                     }
                     else
 						v->Accept(this);
                 }
-				initFunc->Code = initFuncCodeWriter.PopNode();
+				initFunc->Code = codeWriter.PopNode();
 				program->Functions.Add(initFunc->Name, initFunc);
 
                 for (auto&& f : prog->GetFunctions())
@@ -820,7 +820,7 @@ namespace Spire
                 }
                 return expr;
             }
-            bool GenerateVarRef(String name, ExpressionAccess access)
+            bool GenerateVarRef(String name)
             {
                 ILOperand * var = 0;
                 String srcName = name;
@@ -840,7 +840,7 @@ namespace Spire
             virtual RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode* expr) override
             {
                 RefPtr<Object> refObj;
-                if (!GenerateVarRef(expr->Variable, expr->Access))
+                if (!GenerateVarRef(expr->Variable))
                 {
                     throw InvalidProgramException("identifier is neither a variable nor a recognized component.");
                 }

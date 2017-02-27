@@ -35,20 +35,9 @@ namespace Spire
                 cfgNode.SetSize(cfgNode.Count() - 1);
                 return rs;
             }
-            void Assign(ILType * type, ILOperand * dest, ILOperand * src) // handles base type and ILArrayType assignment
+            void Assign(ILOperand * dest, ILOperand * src)
             {
-                auto arrType = dynamic_cast<ILArrayType*>(type);
-                if (arrType)
-                {
-                    for (int i = 0; i < arrType->ArrayLength; i++)
-                    {
-                        auto srcAddr = Add(src, i);
-                        auto destAddr = Add(dest, i);
-                        Store(destAddr, Load(srcAddr));
-                    }
-                }
-                else
-                    Store(dest, Load(src));
+                Store(dest, src);
             }
             ILOperand * Select(ILOperand * cond, ILOperand * v0, ILOperand * v1)
             {

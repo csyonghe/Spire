@@ -2095,9 +2095,9 @@ namespace Spire
             {
                 return GetMembersOfType<InterfaceSyntaxNode>();
             }
-            FilteredMemberList<ShaderSyntaxNode> GetShaders()
+            FilteredMemberList<ClassSyntaxNode> GetClasses()
             {
-                return GetMembersOfType<ShaderSyntaxNode>();
+                return GetMembersOfType<ClassSyntaxNode>();
             }
             FilteredMemberList<StructSyntaxNode> GetStructs()
             {

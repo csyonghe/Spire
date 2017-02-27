@@ -235,9 +235,9 @@ namespace Spire
             }
         };
 
-        enum class ILTextureShape
+        enum class ILTextureShape : uint8_t
         {
-            Texture1D, Texture2D, Texture3D, TextureCube
+            Texture1D = 1, Texture2D = 2, Texture3D = 3, TextureCube = 4
         };
 
         const char * ILTextureShapeToString(ILTextureShape shape);
@@ -246,7 +246,7 @@ namespace Spire
         {
             struct TextureFlavorBits
             {
-                ILTextureShape Shape : 2;
+                ILTextureShape Shape : 3;
                 bool IsMultisample : 1;
                 bool IsArray : 1;
                 bool IsShadow : 1;
