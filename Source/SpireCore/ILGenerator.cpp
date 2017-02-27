@@ -212,6 +212,7 @@ namespace Spire
 						auto gvar = new ILGlobalVariable(field.Type);
 						gvar->Name = namePrefix + "_" + field.FieldName;
 						program->GlobalVars.Add(gvar->Name, gvar);
+						variables.Add(gvar->Name, gvar);
 						//TODO: assign bindings here
 
 						// insert assignment instruction in init func
@@ -247,7 +248,7 @@ namespace Spire
                 variables.PushScope();
 
 				RefPtr<ILFunction> initFunc = new ILFunction();
-				initFunc->Name = "__main_init()";
+				initFunc->Name = "__main_init";
 				initFunc->ReturnType = new ILBasicType(ILBaseType::Void);
 				codeWriter.PushNode();
                 for (auto&& v : prog->GetMembersOfType<Variable>())
@@ -261,6 +262,7 @@ namespace Spire
                         ILGlobalVariable * gvar = new ILGlobalVariable(structType.Ptr());
                         gvar->Name = v->Name.Content;
                         gvar->Position = v->Position;
+						variables.Add(gvar->Name, gvar);
                         DefineBindableResourceVariables(gvar, gvar->Name);
 						program->GlobalVars.Add(gvar->Name, gvar);
                     }
@@ -550,7 +552,7 @@ namespace Spire
                 auto base = PopStack();
                 StringBuilder swizzleStr;
                 for (int i = 0; i < expr->elementCount; i++)
-                    swizzleStr << ('x' + i);
+                    swizzleStr << (char)('x' + i);
                 auto rs = new SwizzleInstruction();
                 rs->Type = TranslateExpressionType(expr->Type.Ptr());
                 rs->SwizzleString = swizzleStr.ToString();
@@ -590,22 +592,52 @@ namespace Spire
                 }
                 if (auto funcType = expr->FunctionExpr->Type.Ptr()->As<FuncType>())
                 {
-                    auto instr = new CallInstruction(args.Count());
-                    ILFunction * func = nullptr;
-                    if (functions.TryGetValue(funcType->declRef, func))
-                    {
-                        auto rsType = funcType->declRef.GetResultType();
-                        instr->Type = TranslateExpressionType(rsType);
-                        instr->Function = func->Name;
-                    }
-                    // ad-hoc processing for ctor calls
-                    else if (auto ctor = dynamic_cast<ConstructorDecl*>(funcType->declRef.GetDecl()))
-                    {
-                        RefPtr<ExpressionType> exprType = DeclRefType::Create(DeclRef(ctor->ParentDecl, funcType->declRef.substitutions));
-                        auto rsType = TranslateExpressionType(exprType);
-                        instr->Type = rsType;
-                        instr->Function = "__init";
-                    }
+					CallInstruction * instr = nullptr;
+					// ad-hoc processing for ctor calls
+					if (auto ctor = dynamic_cast<ConstructorDecl*>(funcType->declRef.GetDecl()))
+					{
+						RefPtr<ExpressionType> exprType = DeclRefType::Create(DeclRef(ctor->ParentDecl, funcType->declRef.substitutions));
+						auto rsType = TranslateExpressionType(exprType);
+						instr = new CallInstruction(args.Count());
+						instr->Type = rsType;
+						instr->Function = "__init";
+					}
+					else
+					{
+						if (auto memberFunc = expr->FunctionExpr.As<MemberExpressionSyntaxNode>())
+						{
+							memberFunc->BaseExpression->Accept(this);
+							auto thisPtr = PopStack();
+							args.Insert(0, thisPtr);
+						}
+						else if (auto varFunc = expr->FunctionExpr.As<VarExpressionSyntaxNode>())
+						{
+							// check if function name is an implcit member, and add this argument if necessary
+							if (auto stype = dynamic_cast<AggTypeDecl*>(varFunc->declRef.decl->ParentDecl))
+							{
+								if (thisArg)
+									args.Insert(0, thisArg);
+							}
+						}
+						instr = new CallInstruction(args.Count());
+						ILFunction * func = nullptr;
+						if (functions.TryGetValue(funcType->declRef, func))
+						{
+							// this is a user-defined function, set instr->Function as internal function name
+							auto rsType = funcType->declRef.GetResultType();
+							instr->Type = TranslateExpressionType(rsType);
+							instr->Function = func->Name;
+						}
+						else
+						{
+							// this is an intrinsic function, set instr->Function as original function name
+							instr->Type = TranslateExpressionType(expr->Type);
+							if (auto member = expr->FunctionExpr.As<MemberExpressionSyntaxNode>())
+								instr->Function = member->MemberName;
+							else
+								instr->Function = expr->FunctionExpr.As<VarExpressionSyntaxNode>()->Variable;
+						}
+					}
                     for (int i = 0; i < args.Count(); i++)
                         instr->Arguments[i] = args[i];
                     instr->Type = TranslateExpressionType(expr->Type);
