@@ -239,7 +239,8 @@ namespace Spire
                 auto classes = prog->GetMembersOfType<ClassSyntaxNode>();
                 for (auto&& c : classes)
                 {
-                    TranslateStructType(c.Ptr());
+                    auto stype = TranslateStructType(c.Ptr());
+					program->Structs.Add(stype);
                 }
                 for (auto&& c : classes)
                 {
