@@ -432,7 +432,10 @@ namespace Spire
 
         void CLikeCodeGen::PrintDefaultCallInstrExpr(CodeGenContext & ctx, CallInstruction * instr, String const& callName)
         {
-            ctx.Body << callName;
+            if (callName == "__init") // special casing for constructors
+                PrintType(ctx.Body, instr->Type.Ptr());
+            else
+                ctx.Body << callName;
             PrintDefaultCallInstrArgs(ctx, instr);
         }
 
