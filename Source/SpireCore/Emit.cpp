@@ -446,7 +446,6 @@ static void EmitType(EmitContext* context, RefPtr<ExpressionType> type, EDeclara
         case BaseType::Float:	Emit(context, "float");		break;
         case BaseType::UInt:	Emit(context, "uint");		break;
         case BaseType::Bool:	Emit(context, "bool");		break;
-        case BaseType::Error:	Emit(context, "<error>");	break;
         default:
             assert(!"unreachable");
             break;

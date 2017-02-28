@@ -90,9 +90,6 @@ namespace Spire
             case Compiler::BaseType::Void:
                 res.Append("void");
                 break;
-            case Compiler::BaseType::Error:
-                res.Append("<errtype>");
-                break;
             default:
                 break;
             }
@@ -665,37 +662,28 @@ namespace Spire
             return true;
         }
 
+#if 0
         RefPtr<ExpressionType> ExpressionType::Bool;
         RefPtr<ExpressionType> ExpressionType::UInt;
         RefPtr<ExpressionType> ExpressionType::Int;
         RefPtr<ExpressionType> ExpressionType::Float;
         RefPtr<ExpressionType> ExpressionType::Float2;
         RefPtr<ExpressionType> ExpressionType::Void;
+#endif
         RefPtr<ExpressionType> ExpressionType::Error;
         RefPtr<ExpressionType> ExpressionType::Overloaded;
+
+        Dictionary<int, RefPtr<ExpressionType>> ExpressionType::sBuiltinTypes;
+        Dictionary<String, Decl*> ExpressionType::sMagicDecls;
         List<RefPtr<ExpressionType>> ExpressionType::sCanonicalTypes;
 
         void ExpressionType::Init()
         {
-            Bool = new BasicExpressionType(BaseType::Bool);
-            UInt = new BasicExpressionType(BaseType::UInt);
-            Int = new BasicExpressionType(BaseType::Int);
-
-            RefPtr<BasicExpressionType> floatType = new BasicExpressionType(BaseType::Float);
-            Float = floatType;
-            Float2 = new VectorExpressionType(floatType, new ConstantIntVal(2));
-            Void = new BasicExpressionType(BaseType::Void);
-            Error = new BasicExpressionType(BaseType::Error);
+            Error = new ErrorType();
             Overloaded = new OverloadGroupType();
         }
         void ExpressionType::Finalize()
         {
-            Bool = nullptr;
-            UInt = nullptr;
-            Int = nullptr;
-            Float = nullptr;
-            Float2 = nullptr;
-            Void = nullptr;
             Error = nullptr;
             Overloaded = nullptr;
             // Note(tfoley): This seems to be just about the only way to clear out a List<T>
@@ -952,6 +940,29 @@ namespace Spire
         {
             return (int)(int64_t)(void*)this;
         }
+
+        // ErrorType
+
+        String ErrorType::ToString() const
+        {
+            return "error";
+        }
+
+        bool ErrorType::EqualsImpl(const ExpressionType * /*type*/) const
+        {
+            return false;
+        }
+
+        ExpressionType* ErrorType::CreateCanonicalType()
+        {
+            return  this;
+        }
+
+        int ErrorType::GetHashCode() const
+        {
+            return (int)(int64_t)(void*)this;
+        }
+
 
         // NamedExpressionType
 
@@ -1810,5 +1821,51 @@ namespace Spire
             return this;
         }
 
+        //
+
+        void RegisterBuiltinDecl(
+            RefPtr<Decl>                decl,
+            RefPtr<BuiltinTypeModifier> modifier)
+        {
+            auto type = DeclRefType::Create(DeclRef(decl.Ptr(), nullptr));
+            ExpressionType::sBuiltinTypes[(int)modifier->tag] = type;
+        }
+
+        void RegisterMagicDecl(
+            RefPtr<Decl>                decl,
+            RefPtr<MagicTypeModifier>   modifier)
+        {
+            ExpressionType::sMagicDecls[decl->Name.Content] = decl.Ptr();
+        }
+
+        ExpressionType* ExpressionType::GetBool()
+        {
+            return sBuiltinTypes[(int)BaseType::Bool].GetValue().Ptr();
+        }
+
+        ExpressionType* ExpressionType::GetFloat()
+        {
+            return sBuiltinTypes[(int)BaseType::Float].GetValue().Ptr();
+        }
+
+        ExpressionType* ExpressionType::GetInt()
+        {
+            return sBuiltinTypes[(int)BaseType::Int].GetValue().Ptr();
+        }
+
+        ExpressionType* ExpressionType::GetUInt()
+        {
+            return sBuiltinTypes[(int)BaseType::UInt].GetValue().Ptr();
+        }
+
+        ExpressionType* ExpressionType::GetVoid()
+        {
+            return sBuiltinTypes[(int)BaseType::Void].GetValue().Ptr();
+        }
+
+        ExpressionType* ExpressionType::GetError()
+        {
+            return ExpressionType::Error.Ptr();
+        }
     }
 }

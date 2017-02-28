@@ -582,7 +582,6 @@ namespace Spire
                     CASE(UInt, Unsigned, Int32);
                     CASE(Float, Float, Int32);
                     CASE(Void, Error, Error);
-                    CASE(Error, Error, Error);
 
                 #undef CASE
 
@@ -768,9 +767,9 @@ namespace Spire
             {
                 if (receiverType->Equals(valueType))
                     return true;
-                if (receiverType->IsIntegral() && valueType->Equals(ExpressionType::Int.Ptr()))
+                if (receiverType->IsIntegral() && valueType->Equals(ExpressionType::GetInt()))
                     return true;
-                if (receiverType->Equals(ExpressionType::Float.Ptr()) && valueType->IsIntegral())
+                if (receiverType->Equals(ExpressionType::GetFloat()) && valueType->IsIntegral())
                     return true;
                 if (receiverType->IsVectorType() && valueType->IsVectorType())
                 {
@@ -850,6 +849,27 @@ namespace Spire
 
             virtual RefPtr<ProgramSyntaxNode> VisitProgram(ProgramSyntaxNode * programNode) override
             {
+                // Try to register all the builtin decls
+                for (auto decl : programNode->Members)
+                {
+                    auto inner = decl;
+                    if (auto genericDecl = decl.As<GenericDecl>())
+                    {
+                        inner = genericDecl->inner;
+                    }
+
+                    if (auto builtinMod = inner->FindModifier<BuiltinTypeModifier>())
+                    {
+                        RegisterBuiltinDecl(decl, builtinMod);
+                    }
+                    if (auto magicMod = inner->FindModifier<MagicTypeModifier>())
+                    {
+                        RegisterMagicDecl(decl, magicMod);
+                    }
+                }
+
+                //
+
                 HashSet<String> funcNames;
                 this->program = programNode;
                 this->function = nullptr;
@@ -1085,7 +1105,7 @@ namespace Spire
                     else
                         paraNames.Add(para->Name.Content);
                     para->Type = CheckUsableType(para->Type);
-                    if (para->Type.Equals(ExpressionType::Void.Ptr()))
+                    if (para->Type.Equals(ExpressionType::GetVoid()))
                         getSink()->diagnose(para, Diagnostics::parameterCannotBeVoid);
                 }
                 this->function = NULL;
@@ -1154,9 +1174,9 @@ namespace Spire
                 PushOuterStmt(stmt);
                 if (stmt->Predicate != NULL)
                     stmt->Predicate = stmt->Predicate->Accept(this).As<ExpressionSyntaxNode>();
-                if (!stmt->Predicate->Type->Equals(ExpressionType::Error.Ptr()) &&
-                    !stmt->Predicate->Type->Equals(ExpressionType::Int.Ptr()) &&
-                    !stmt->Predicate->Type->Equals(ExpressionType::Bool.Ptr()))
+                if (!stmt->Predicate->Type->Equals(ExpressionType::GetError()) &&
+                    !stmt->Predicate->Type->Equals(ExpressionType::GetInt()) &&
+                    !stmt->Predicate->Type->Equals(ExpressionType::GetBool()))
                 {
                     getSink()->diagnose(stmt, Diagnostics::whilePredicateTypeError);
                 }
@@ -1175,9 +1195,9 @@ namespace Spire
                 if (stmt->PredicateExpression)
                 {
                     stmt->PredicateExpression = stmt->PredicateExpression->Accept(this).As<ExpressionSyntaxNode>();
-                    if (!stmt->PredicateExpression->Type->Equals(ExpressionType::Bool.Ptr()) &&
-                        !stmt->PredicateExpression->Type->Equals(ExpressionType::Int.Ptr()) &&
-                        !stmt->PredicateExpression->Type->Equals(ExpressionType::UInt.Ptr()))
+                    if (!stmt->PredicateExpression->Type->Equals(ExpressionType::GetBool()) &&
+                        !stmt->PredicateExpression->Type->Equals(ExpressionType::GetInt()) &&
+                        !stmt->PredicateExpression->Type->Equals(ExpressionType::GetUInt()))
                     {
                         getSink()->diagnose(stmt->PredicateExpression.Ptr(), Diagnostics::forPredicateTypeError);
                     }
@@ -1234,9 +1254,9 @@ namespace Spire
             {
                 if (stmt->Predicate != NULL)
                     stmt->Predicate = stmt->Predicate->Accept(this).As<ExpressionSyntaxNode>();
-                if (!stmt->Predicate->Type->Equals(ExpressionType::Error.Ptr())
-                    && (!stmt->Predicate->Type->Equals(ExpressionType::Int.Ptr()) &&
-                        !stmt->Predicate->Type->Equals(ExpressionType::Bool.Ptr())))
+                if (!stmt->Predicate->Type->Equals(ExpressionType::GetError())
+                    && (!stmt->Predicate->Type->Equals(ExpressionType::GetInt()) &&
+                        !stmt->Predicate->Type->Equals(ExpressionType::GetBool())))
                     getSink()->diagnose(stmt, Diagnostics::ifPredicateTypeError);
 
                 if (stmt->PositiveStatement != NULL)
@@ -1250,7 +1270,7 @@ namespace Spire
             {
                 if (!stmt->Expression)
                 {
-                    if (function && !function->ReturnType.Equals(ExpressionType::Void.Ptr()))
+                    if (function && !function->ReturnType.Equals(ExpressionType::GetVoid()))
                         getSink()->diagnose(stmt, Diagnostics::returnNeedsExpression);
                 }
                 else
@@ -1326,7 +1346,7 @@ namespace Spire
                     }
                 }
                 varDecl->Type = typeExp;
-                if (varDecl->Type.Equals(ExpressionType::Void.Ptr()))
+                if (varDecl->Type.Equals(ExpressionType::GetVoid()))
                     getSink()->diagnose(varDecl, Diagnostics::invalidTypeVoid);
 
                 // If this is an array variable, then make sure it is an okay array type...
@@ -1344,9 +1364,9 @@ namespace Spire
             {
                 PushOuterStmt(stmt);
                 stmt->Predicate = stmt->Predicate->Accept(this).As<ExpressionSyntaxNode>();
-                if (!stmt->Predicate->Type->Equals(ExpressionType::Error.Ptr()) &&
-                    !stmt->Predicate->Type->Equals(ExpressionType::Int.Ptr()) &&
-                    !stmt->Predicate->Type->Equals(ExpressionType::Bool.Ptr()))
+                if (!stmt->Predicate->Type->Equals(ExpressionType::GetError()) &&
+                    !stmt->Predicate->Type->Equals(ExpressionType::GetInt()) &&
+                    !stmt->Predicate->Type->Equals(ExpressionType::GetBool()))
                     getSink()->diagnose(stmt, Diagnostics::whilePredicateTypeError2);
 
                 stmt->Statement->Accept(this);
@@ -1409,13 +1429,13 @@ namespace Spire
                 switch (expr->ConstType)
                 {
                 case ConstantExpressionSyntaxNode::ConstantType::Int:
-                    expr->Type = ExpressionType::Int;
+                    expr->Type = ExpressionType::GetInt();
                     break;
                 case ConstantExpressionSyntaxNode::ConstantType::Bool:
-                    expr->Type = ExpressionType::Bool;
+                    expr->Type = ExpressionType::GetBool();
                     break;
                 case ConstantExpressionSyntaxNode::ConstantType::Float:
-                    expr->Type = ExpressionType::Float;
+                    expr->Type = ExpressionType::GetFloat();
                     break;
                 default:
                     expr->Type = ExpressionType::Error;
@@ -1434,7 +1454,7 @@ namespace Spire
             // Check that an expression resolves to an integer constant, and get its value
             RefPtr<IntVal> CheckIntegerConstantExpression(ExpressionSyntaxNode* exp)
             {
-                if (!exp->Type.type->Equals(ExpressionType::Int))
+                if (!exp->Type.type->Equals(ExpressionType::GetInt()))
                 {
                     getSink()->diagnose(exp, Diagnostics::expectedIntegerConstantWrongType, exp->Type);
                     return nullptr;
@@ -1467,8 +1487,8 @@ namespace Spire
                 auto baseExpr = subscriptExpr->BaseExpression;
                 auto indexExpr = subscriptExpr->IndexExpression;
 
-                if (!indexExpr->Type->Equals(ExpressionType::Int.Ptr()) &&
-                    !indexExpr->Type->Equals(ExpressionType::UInt.Ptr()))
+                if (!indexExpr->Type->Equals(ExpressionType::GetInt()) &&
+                    !indexExpr->Type->Equals(ExpressionType::GetUInt()))
                 {
                     getSink()->diagnose(indexExpr, Diagnostics::subscriptIndexNonInteger);
                     return CreateErrorExpr(subscriptExpr.Ptr());
@@ -2946,16 +2966,19 @@ namespace Spire
             {
                 auto funcExprType = funcExpr->Type;
 
-                if (auto funcDeclRefExpr = funcExpr.As<DeclRefExpr>())
-                {
-                    // The expression referenced a function declaration
-                    AddDeclRefOverloadCandidates(LookupResultItem(funcDeclRefExpr->declRef), context);
-                }
-                else if (auto typeType = funcExprType->As<TypeExpressionType>())
+                if (auto typeType = funcExprType->As<TypeExpressionType>())
                 {
                     // The expression named a type, so we have a constructor call
                     // on our hands.
                     AddTypeOverloadCandidates(typeType->type, context);
+                }
+
+                // Note(tfoley): we aren't using `else` here, so that
+                // we can catch generic declarations in this case:
+                if (auto funcDeclRefExpr = funcExpr.As<DeclRefExpr>())
+                {
+                    // The expression referenced a function declaration
+                    AddDeclRefOverloadCandidates(LookupResultItem(funcDeclRefExpr->declRef), context);
                 }
                 else if (auto funcType = funcExprType->As<FuncType>())
                 {
@@ -3725,8 +3748,8 @@ namespace Spire
             virtual RefPtr<ExpressionSyntaxNode> VisitSelectExpression(SelectExpressionSyntaxNode * expr) override
             {
                 expr->SelectorExpr = expr->SelectorExpr->Accept(this).As<ExpressionSyntaxNode>();
-                if (!expr->SelectorExpr->Type->Equals(ExpressionType::Int.Ptr()) && !expr->SelectorExpr->Type->Equals(ExpressionType::Bool.Ptr())
-                    && !expr->SelectorExpr->Type->Equals(ExpressionType::Error.Ptr()))
+                if (!expr->SelectorExpr->Type->Equals(ExpressionType::GetInt()) && !expr->SelectorExpr->Type->Equals(ExpressionType::GetBool())
+                    && !expr->SelectorExpr->Type->Equals(ExpressionType::GetError()))
                 {
                     expr->Type = ExpressionType::Error;
                     getSink()->diagnose(expr, Diagnostics::selectPrdicateTypeMismatch);

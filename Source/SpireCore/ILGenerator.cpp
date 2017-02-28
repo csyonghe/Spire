@@ -567,7 +567,7 @@ namespace Spire
             }
             ILOperand * EnsureBoolType(ILOperand * op, RefPtr<ExpressionType> type)
             {
-                if (!type->Equals(ExpressionType::Bool.Ptr()))
+                if (!type->Equals(ExpressionType::GetBool()))
                 {
                     auto cmpeq = new CmpneqInstruction();
                     cmpeq->Operands[0] = op;
@@ -776,7 +776,7 @@ namespace Spire
                         instr = new AddInstruction();
                     instr->Operands.SetSize(2);
                     instr->Operands[0] = base;
-                    if (expr->Type->Equals(ExpressionType::Float))
+                    if (expr->Type->Equals(ExpressionType::GetFloat()))
                         instr->Operands[1] = program->ConstantPool->CreateConstant(1.0f);
                     else
                         instr->Operands[1] = program->ConstantPool->CreateConstant(1);
@@ -802,7 +802,7 @@ namespace Spire
                         instr = new AddInstruction();
                     instr->Operands.SetSize(2);
                     instr->Operands[0] = base;
-                    if (expr->Type->Equals(ExpressionType::Float))
+                    if (expr->Type->Equals(ExpressionType::GetFloat()))
                         instr->Operands[1] = program->ConstantPool->CreateConstant(1.0f);
                     else
                         instr->Operands[1] = program->ConstantPool->CreateConstant(1);

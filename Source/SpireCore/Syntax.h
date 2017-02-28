@@ -287,8 +287,8 @@ namespace Spire
             Texture2DArrayShadow = 53,
             Texture3D = 54,
             SamplerState = 4096, SamplerComparisonState = 4097,
-#endif
             Error = 16384,
+#endif
         };
 
         class Decl;
@@ -372,17 +372,33 @@ namespace Spire
         class ExpressionType : public Val
         {
         public:
+#if 0
             static RefPtr<ExpressionType> Bool;
             static RefPtr<ExpressionType> UInt;
             static RefPtr<ExpressionType> Int;
             static RefPtr<ExpressionType> Float;
             static RefPtr<ExpressionType> Float2;
             static RefPtr<ExpressionType> Void;
+#endif
             static RefPtr<ExpressionType> Error;
             static RefPtr<ExpressionType> Overloaded;
+
+            static Dictionary<int, RefPtr<ExpressionType>> sBuiltinTypes;
+            static Dictionary<String, Decl*> sMagicDecls;
+
             // Note: just exists to make sure we can clean up
             // canonical types we create along the way
             static List<RefPtr<ExpressionType>> sCanonicalTypes;
+
+
+
+            static ExpressionType* GetBool();
+            static ExpressionType* GetFloat();
+            static ExpressionType* GetInt();
+            static ExpressionType* GetUInt();
+            static ExpressionType* GetVoid();
+            static ExpressionType* GetError();
+
         public:
             virtual String ToString() const = 0;
 
@@ -535,6 +551,18 @@ namespace Spire
 
         // The type of a reference to an overloaded name
         class OverloadGroupType : public ExpressionType
+        {
+        public:
+            virtual String ToString() const override;
+
+        protected:
+            virtual bool EqualsImpl(const ExpressionType * type) const override;
+            virtual ExpressionType* CreateCanonicalType() override;
+            virtual int GetHashCode() const override;
+        };
+
+        // The type of an expression that was erroneous
+        class ErrorType : public ExpressionType
         {
         public:
             virtual String ToString() const override;
@@ -2791,6 +2819,20 @@ namespace Spire
                 }
             }
         };
+
+        // Note(tfoley): These logically belong to `ExpressionType`,
+        // but order-of-declaration stuff makes that tricky
+        //
+        // TODO(tfoley): These should really belong to the compilation context!
+        //
+        void RegisterBuiltinDecl(
+            RefPtr<Decl>                decl,
+            RefPtr<BuiltinTypeModifier> modifier);
+        void RegisterMagicDecl(
+            RefPtr<Decl>                decl,
+            RefPtr<MagicTypeModifier>   modifier);
+
+
     }
 }
 
