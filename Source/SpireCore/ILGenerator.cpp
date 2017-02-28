@@ -310,7 +310,7 @@ namespace Spire
                         auto declRef = v->Type->AsDeclRefType()->declRef;
                         auto structType = structTypes[declRef]();
                         gvar = new ILGlobalVariable(structType.Ptr());
-                        DefineBindableResourceVariables(gvar, gvar->Name);
+                        DefineBindableResourceVariables(gvar, v->Name.Content);
                     }
                     else
                     {
