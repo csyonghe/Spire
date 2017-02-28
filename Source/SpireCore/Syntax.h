@@ -959,7 +959,7 @@ namespace Spire
         public:
             List<RefPtr<Decl>> decls;
 
-            virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * /*visitor*/) override { throw "unimplemented"; }
+            virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
             virtual DeclGroup * Clone(CloneContext & /*ctx*/) override { throw "unimplemented"; }
         };
 
@@ -2780,6 +2780,14 @@ namespace Spire
             virtual RefPtr<ExpressionSyntaxNode> VisitSharedTypeExpr(SharedTypeExpr* typeExpr)
             {
                 return typeExpr;
+            }
+
+            virtual void VisitDeclGroup(DeclGroup* declGroup)
+            {
+                for (auto decl : declGroup->decls)
+                {
+                    decl->Accept(this);
+                }
             }
         };
     }

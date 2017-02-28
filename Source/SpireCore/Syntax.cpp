@@ -1746,6 +1746,8 @@ namespace Spire
             throw "unimplemented";
         }
 
+        // OperatorExpressionSyntaxNode
+
         void OperatorExpressionSyntaxNode::SetOperator(ContainerDecl * scope, Spire::Compiler::Operator op)
         {
             this->Operator = op;
@@ -1761,5 +1763,13 @@ namespace Spire
             return visitor->VisitOperatorExpression(this);
         }
 
-}
+        // DeclGroup
+
+        RefPtr<SyntaxNode> DeclGroup::Accept(SyntaxVisitor * visitor)
+        {
+            visitor->VisitDeclGroup(this);
+            return this;
+        }
+
+    }
 }
