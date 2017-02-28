@@ -613,6 +613,7 @@ namespace Spire
             this->errWriter = err;
             StringBuilder sbCode;
             CompiledShaderSource rs;
+            PrintHeader(sbCode);
             GenerateStructs(sbCode, program);
             for (auto gvar : program->GlobalVars)
                 PrintGlobalVar(sbCode, gvar.Value.Ptr());

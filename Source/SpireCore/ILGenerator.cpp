@@ -187,7 +187,7 @@ namespace Spire
                 RefPtr<ILFunction> func = new ILFunction();
                 StringBuilder internalName;
                 if (thisType)
-                    internalName << thisType->TypeName << "@";
+                    internalName << thisType->TypeName << "_";
                 internalName << f->Name.Content;
                 for (auto & para : f->GetParameters())
                 {
@@ -304,19 +304,23 @@ namespace Spire
                 {
                     if (v->HasModifier<IntrinsicModifier>() || v->HasModifier<FromStdLibModifier>())
                         continue;
+                    ILGlobalVariable * gvar = nullptr;
                     if (v->Type->IsClass())
                     {
                         auto declRef = v->Type->AsDeclRefType()->declRef;
                         auto structType = structTypes[declRef]();
-                        ILGlobalVariable * gvar = new ILGlobalVariable(structType.Ptr());
-                        gvar->Name = v->Name.Content;
-                        gvar->Position = v->Position;
-						variables.Add(gvar->Name, gvar);
+                        gvar = new ILGlobalVariable(structType.Ptr());
                         DefineBindableResourceVariables(gvar, gvar->Name);
-						program->GlobalVars.Add(gvar->Name, gvar);
                     }
                     else
-						v->Accept(this);
+                    {
+                        auto gvarType = TranslateExpressionType(v->Type);
+                        gvar = new ILGlobalVariable(gvarType.Ptr());
+                    }
+                    gvar->Name = v->Name.Content;
+                    gvar->Position = v->Position;
+                    variables.Add(gvar->Name, gvar);
+                    program->GlobalVars.Add(gvar->Name, gvar);
                 }
 				initFunc->Code = codeWriter.PopNode();
 				program->Functions.Add(initFunc->Name, initFunc);
