@@ -1460,87 +1460,105 @@ namespace Spire
                 return nullptr;
             }
 
-            virtual RefPtr<ExpressionSyntaxNode> VisitIndexExpression(IndexExpressionSyntaxNode *expr) override
+            RefPtr<ExpressionSyntaxNode> CheckSimpleSubscriptExpr(
+                RefPtr<IndexExpressionSyntaxNode>   subscriptExpr,
+                RefPtr<ExpressionType>              elementType)
             {
-                expr->BaseExpression = expr->BaseExpression->Accept(this).As<ExpressionSyntaxNode>();
-                if (expr->IndexExpression)
+                auto baseExpr = subscriptExpr->BaseExpression;
+                auto indexExpr = subscriptExpr->IndexExpression;
+
+                if (!indexExpr->Type->Equals(ExpressionType::Int.Ptr()) &&
+                    !indexExpr->Type->Equals(ExpressionType::UInt.Ptr()))
                 {
-                    expr->IndexExpression = expr->IndexExpression->Accept(this).As<ExpressionSyntaxNode>();
+                    getSink()->diagnose(indexExpr, Diagnostics::subscriptIndexNonInteger);
+                    return CreateErrorExpr(subscriptExpr.Ptr());
                 }
-                if (expr->BaseExpression->Type->Equals(ExpressionType::Error.Ptr()))
-                    expr->Type = ExpressionType::Error;
-                else if (auto baseTypeType = expr->BaseExpression->Type.type.As<TypeExpressionType>())
+
+                subscriptExpr->Type = elementType;
+
+                // TODO(tfoley): need to be more careful about this stuff
+                subscriptExpr->Type.IsLeftValue = baseExpr->Type.IsLeftValue;
+
+                return subscriptExpr;
+            }
+
+            virtual RefPtr<ExpressionSyntaxNode> VisitIndexExpression(IndexExpressionSyntaxNode* subscriptExpr) override
+            {
+                auto baseExpr = subscriptExpr->BaseExpression;
+                baseExpr = CheckExpr(baseExpr);
+
+                RefPtr<ExpressionSyntaxNode> indexExpr = subscriptExpr->IndexExpression;
+                if (indexExpr)
+                {
+                    indexExpr = CheckExpr(indexExpr);
+                }
+
+                subscriptExpr->BaseExpression = baseExpr;
+                subscriptExpr->IndexExpression = indexExpr;
+
+                // If anything went wrong in the base expression,
+                // then just move along...
+                if (IsErrorExpr(baseExpr))
+                    return CreateErrorExpr(subscriptExpr);
+
+                // Otherwise, we need to look at the type of the base expression,
+                // to figure out how subscripting should work.
+                auto baseType = baseExpr->Type.Ptr();
+                if (auto baseTypeType = baseType->As<TypeExpressionType>())
                 {
                     // We are trying to "index" into a type, so we have an expression like `float[2]`
                     // which should be interpreted as resolving to an array type.
 
                     RefPtr<IntVal> elementCount = nullptr;
-                    if (expr->IndexExpression)
+                    if (indexExpr)
                     {
-                        elementCount = CheckIntegerConstantExpression(expr->IndexExpression.Ptr());
+                        elementCount = CheckIntegerConstantExpression(indexExpr.Ptr());
                     }
 
-                    auto elementType = CoerceToUsableType(TypeExp(expr->BaseExpression, baseTypeType->type));
+                    auto elementType = CoerceToUsableType(TypeExp(baseExpr, baseTypeType->type));
                     auto arrayType = new ArrayExpressionType();
                     arrayType->BaseType = elementType;
                     arrayType->ArrayLength = elementCount;
 
                     typeResult = arrayType;
-                    expr->Type = new TypeExpressionType(arrayType);
-                    return expr;
+                    subscriptExpr->Type = new TypeExpressionType(arrayType);
+                    return subscriptExpr;
+                }
+                else if (auto baseArrayType = baseType->As<ArrayExpressionType>())
+                {
+                    return CheckSimpleSubscriptExpr(
+                        subscriptExpr,
+                        baseArrayType->BaseType);
+                }
+                else if (auto baseArrayLikeType = baseType->As<ArrayLikeType>())
+                {
+                    return CheckSimpleSubscriptExpr(
+                        subscriptExpr,
+                        baseArrayLikeType->elementType);
+                }
+                else if (auto vecType = baseType->As<VectorExpressionType>())
+                {
+                    return CheckSimpleSubscriptExpr(
+                        subscriptExpr,
+                        vecType->elementType);
+                }
+                else if (auto matType = baseType->As<MatrixExpressionType>())
+                {
+                    // TODO(tfoley): We shouldn't go and recompute
+                    // row types over and over like this... :(
+                    auto rowType = new VectorExpressionType(
+                        matType->elementType,
+                        matType->colCount);
+
+                    return CheckSimpleSubscriptExpr(
+                        subscriptExpr,
+                        rowType);
                 }
                 else
                 {
-                    auto & baseExprType = expr->BaseExpression->Type;
-
-                    bool isValid = false;
-#if TIMREMOVED
-                    // TODO(tfoley): need to handle the indexing logic for these types...
-                    bool isValid = baseExprType->AsGenericType() &&
-                        (baseExprType->AsGenericType()->GenericTypeName == "StructuredBuffer" ||
-                            baseExprType->AsGenericType()->GenericTypeName == "RWStructuredBuffer" ||
-                            baseExprType->AsGenericType()->GenericTypeName == "PackedBuffer");
-#else
-                    isValid = isValid || baseExprType->As<ArrayLikeType>();
-#endif
-                    isValid = isValid || (baseExprType->AsBasicType()); /*TODO(tfoley): figure this out: */ // && GetVectorSize(baseExprType->AsBasicType()->BaseType) != 0);
-                    isValid = isValid || baseExprType->AsArrayType();
-                    if (!isValid)
-                    {
-                        getSink()->diagnose(expr, Diagnostics::subscriptNonArray);
-                        expr->Type = ExpressionType::Error;
-                    }
-                    if (!expr->IndexExpression->Type->Equals(ExpressionType::Int.Ptr()) &&
-                        !expr->IndexExpression->Type->Equals(ExpressionType::UInt.Ptr()))
-                    {
-                        getSink()->diagnose(expr, Diagnostics::subscriptIndexNonInteger);
-                        expr->Type = ExpressionType::Error;
-                    }
+                    getSink()->diagnose(subscriptExpr, Diagnostics::subscriptNonArray);
+                    return CreateErrorExpr(subscriptExpr);
                 }
-                if (expr->BaseExpression->Type->IsArray())
-                {
-                    expr->Type = expr->BaseExpression->Type->AsArrayType()->BaseType;
-                }
-                else if (auto bufferType = expr->BaseExpression->Type->As<ArrayLikeType>())
-                {
-                    expr->Type = bufferType->elementType;
-                }
-                else if (auto vecType = expr->BaseExpression->Type->AsVectorType())
-                {
-                    expr->Type = vecType->elementType;
-                }
-                else if (auto matType = expr->BaseExpression->Type->AsMatrixType())
-                {
-                    expr->Type = matType->rowType;
-                }
-                else
-                {
-                    // TODO(tfoley): need an error case here...
-                }
-
-                // Result of an index expression is an l-value iff base is.
-                expr->Type.IsLeftValue = expr->BaseExpression->Type.IsLeftValue;
-                return expr;
             }
             bool MatchArguments(FunctionSyntaxNode * functionNode, List <RefPtr<ExpressionSyntaxNode>> &args)
             {
