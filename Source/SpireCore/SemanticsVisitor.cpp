@@ -1994,11 +1994,13 @@ namespace Spire
                     Func,
                     ComponentFunc,
                     Generic,
+                    UnspecializedGeneric,
                 };
                 Flavor flavor;
 
                 enum class Status
                 {
+                    GenericArgumentInferenceFailed,
                     Unchecked,
                     ArityChecked,
                     TypeChecked,
@@ -2334,6 +2336,17 @@ namespace Spire
                 OverloadResolveContext&		context,
                 OverloadCandidate&			candidate)
             {
+                // special case for generic argument inference failure
+                if (candidate.status == OverloadCandidate::Status::GenericArgumentInferenceFailed)
+                {
+                    getSink()->diagnose(
+                        context.appExpr,
+                        Diagnostics::unimplemented,
+                        "generic argument inference failed");
+
+                    goto error;
+                }
+
                 context.mode = OverloadResolveContext::Mode::ForReal;
                 context.appExpr->Type = ExpressionType::Error;
 
@@ -2392,13 +2405,10 @@ namespace Spire
                 return 0;
             }
 
-            void AddOverloadCandidate(
+            void AddOverloadCandidateInner(
                 OverloadResolveContext& context,
                 OverloadCandidate&		candidate)
             {
-                // Try the candidate out, to see if it is applicable at all.
-                TryCheckOverloadCandidate(context, candidate);
-
                 // Filter our existing candidates, to remove any that are worse than our new one
 
                 bool keepThisCandidate = true; // should this candidate be kept?
@@ -2475,6 +2485,17 @@ namespace Spire
                     context.bestCandidateStorage = candidate;
                     context.bestCandidate = &context.bestCandidateStorage;
                 }
+            }
+
+            void AddOverloadCandidate(
+                OverloadResolveContext& context,
+                OverloadCandidate&		candidate)
+            {
+                // Try the candidate out, to see if it is applicable at all.
+                TryCheckOverloadCandidate(context, candidate);
+
+                // Now (potentially) add it to the set of candidate overloads to consider.
+                AddOverloadCandidateInner(context, candidate);
             }
 
             void AddFuncOverloadCandidate(
@@ -2564,12 +2585,30 @@ namespace Spire
                     }
                 }
 
-                // if both values are integers, then compare them
+                // if both values are constant integers, then compare them
                 if (auto fstIntVal = fst.As<ConstantIntVal>())
                 {
                     if (auto sndIntVal = snd.As<ConstantIntVal>())
                     {
                         return fstIntVal->value == sndIntVal->value;
+                    }
+                }
+
+                // Check if both are integer values in general
+                if (auto fstInt = fst.As<IntVal>())
+                {
+                    if (auto sndInt = snd.As<IntVal>())
+                    {
+                        auto fstParam = fstInt.As<GenericParamIntVal>();
+                        auto sndParam = sndInt.As<GenericParamIntVal>();
+
+                        if (fstParam)
+                            TryUnifyIntParam(constraints, fstParam->declRef.GetDecl(), sndInt);
+                        if (sndParam)
+                            TryUnifyIntParam(constraints, sndParam->declRef.GetDecl(), fstInt);
+
+                        if (fstParam || sndParam)
+                            return true;
                     }
                 }
 
@@ -2624,6 +2663,21 @@ namespace Spire
                 return true;
             }
 
+            bool TryUnifyIntParam(
+                ConstraintSystem&               constraints,
+                RefPtr<GenericValueParamDecl>	paramDecl,
+                RefPtr<IntVal>                  val)
+            {
+                // We want to constrain the given parameter to equal the given value.
+                Constraint constraint;
+                constraint.decl = paramDecl.Ptr();
+                constraint.val = val;
+
+                constraints.constraints.Add(constraint);
+
+                return true;
+            }
+
             bool TryUnifyTypes(
                 ConstraintSystem&	constraints,
                 RefPtr<ExpressionType> fst,
@@ -2641,6 +2695,9 @@ namespace Spire
                     if (auto sndDeclRefType = snd->As<DeclRefType>())
                     {
                         auto sndDeclRef = sndDeclRefType->declRef;
+
+                        if (auto typeParamDecl = dynamic_cast<GenericTypeParamDecl*>(sndDeclRef.GetDecl()))
+                            return TryUnifyTypeParam(constraints, typeParamDecl, fst);
 
                         // can't be unified if they refer to differnt declarations.
                         if (fstDeclRef.GetDecl() != sndDeclRef.GetDecl()) return false;
@@ -2848,6 +2905,35 @@ namespace Spire
                     auto type = DeclRefType::Create(aggTypeDeclRef);
                     AddAggTypeOverloadCandidates(item, type, aggTypeDeclRef, context);
                 }
+                else if (auto genericDeclRef = item.declRef.As<GenericDeclRef>())
+                {
+                    // Try to infer generic arguments, based on the context
+                    DeclRef innerRef = SpecializeGenericForOverload(genericDeclRef, context);
+
+                    if (innerRef)
+                    {
+                        // If inference works, then we've now got a
+                        // specialized declaration reference we can apply.
+
+                        LookupResultItem innerItem;
+                        innerItem.breadcrumbs = item.breadcrumbs;
+                        innerItem.declRef = innerRef;
+
+                        AddDeclRefOverloadCandidates(innerItem, context);
+                    }
+                    else
+                    {
+                        // If inference failed, then we need to create
+                        // a candidate that can be used to reflect that fact
+                        // (so we can report a good error)
+                        OverloadCandidate candidate;
+                        candidate.item = item;
+                        candidate.flavor = OverloadCandidate::Flavor::UnspecializedGeneric;
+                        candidate.status = OverloadCandidate::Status::GenericArgumentInferenceFailed;
+
+                        AddOverloadCandidateInner(context, candidate);
+                    }
+                }
                 else
                 {
                     // TODO(tfoley): any other cases needed here?
@@ -2859,16 +2945,17 @@ namespace Spire
                 OverloadResolveContext&			context)
             {
                 auto funcExprType = funcExpr->Type;
-                if (auto typeType = funcExprType->As<TypeExpressionType>())
+
+                if (auto funcDeclRefExpr = funcExpr.As<DeclRefExpr>())
+                {
+                    // The expression referenced a function declaration
+                    AddDeclRefOverloadCandidates(LookupResultItem(funcDeclRefExpr->declRef), context);
+                }
+                else if (auto typeType = funcExprType->As<TypeExpressionType>())
                 {
                     // The expression named a type, so we have a constructor call
                     // on our hands.
                     AddTypeOverloadCandidates(typeType->type, context);
-                }
-                else if (auto funcDeclRefExpr = funcExpr.As<DeclRefExpr>())
-                {
-                    // The expression referenced a function declaration
-                    AddDeclRefOverloadCandidates(LookupResultItem(funcDeclRefExpr->declRef), context);
                 }
                 else if (auto funcType = funcExprType->As<FuncType>())
                 {

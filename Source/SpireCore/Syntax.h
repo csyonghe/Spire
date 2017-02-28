@@ -2451,6 +2451,7 @@ namespace Spire
             virtual bool EqualsVal(Val* val) override;
             virtual String ToString() const override;
             virtual int GetHashCode() const override;
+            virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
         };
 
         //

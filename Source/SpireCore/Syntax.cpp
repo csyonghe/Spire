@@ -1130,12 +1130,13 @@ namespace Spire
             int diff = 0;
             auto substDeclRef = declRef.SubstituteImpl(subst, &diff);
             auto substElementType = elementType->SubstituteImpl(subst, &diff).As<ExpressionType>();
+            auto substElementCount = elementCount->SubstituteImpl(subst, &diff).As<IntVal>();
 
             if (!diff)
                 return this;
 
             (*ioDiff)++;
-            auto substType = new VectorExpressionType(substElementType, elementCount);
+            auto substType = new VectorExpressionType(substElementType, substElementCount);
             substType->declRef = substDeclRef;
             return substType;
         }
@@ -1489,6 +1490,44 @@ namespace Spire
         int GenericParamIntVal::GetHashCode() const
         {
             return declRef.GetHashCode() ^ 0xFFFF;
+        }
+
+        RefPtr<Val> GenericParamIntVal::SubstituteImpl(Substitutions* subst, int* ioDiff)
+        {
+            // search for a substitution that might apply to us
+            for (auto s = subst; s; s = s->outer.Ptr())
+            {
+                // the generic decl associated with the substitution list must be
+                // the generic decl that declared this parameter
+                auto genericDecl = s->genericDecl;
+                if (genericDecl != declRef.GetDecl()->ParentDecl)
+                    continue;
+
+                int index = 0;
+                for (auto m : genericDecl->Members)
+                {
+                    if (m.Ptr() == declRef.GetDecl())
+                    {
+                        // We've found it, so return the corresponding specialization argument
+                        (*ioDiff)++;
+                        return s->args[index];
+                    }
+                    else if(auto typeParam = m.As<GenericTypeParamDecl>())
+                    {
+                        index++;
+                    }
+                    else if(auto valParam = m.As<GenericValueParamDecl>())
+                    {
+                        index++;
+                    }
+                    else
+                    {
+                    }
+                }
+            }
+
+            // Nothing found: don't substittue.
+            return this;
         }
 
         // ExtensionDecl
