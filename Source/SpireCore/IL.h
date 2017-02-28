@@ -1580,7 +1580,7 @@ namespace Spire
         public:
             String Function;
             List<UseReference> Arguments;
-            bool SideEffect = false;
+            bool SideEffect = true;
             virtual OperandIterator begin() override
             {
                 return Arguments.begin();
@@ -2565,12 +2565,31 @@ namespace Spire
             EnumerableDictionary<String, RefPtr<ILStage>> Stages;
         };
 
+        enum class ILStageName
+        {
+            General, Compute, Vertex, Fragment, Hull, Domain, Geometry
+        };
+
+        enum class ILStageVersion
+        {
+            SM_4_0, SM_4_0_DX9_0, SM_4_0_DX9_1, SM_4_0_DX9_3, SM_4_1, SM_5_0,
+        };
+
+        class ILProfile
+        {
+        public:
+            ILStageName Stage = ILStageName::General;
+            ILStageVersion Version = ILStageVersion::SM_5_0;
+        };
+
 		class ILFunction : public RefObject
         {
         public:
             EnumerableDictionary<String, FetchArgInstruction*> Parameters;
             RefPtr<ILType> ReturnType;
             RefPtr<CFGNode> Code;
+            bool IsEntryPoint = false;
+            ILProfile Profile;
             String Name;
         };
 

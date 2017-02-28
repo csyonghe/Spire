@@ -107,12 +107,6 @@
     <ClCompile Include="CompiledProgram.cpp">
       <Filter>Back End</Filter>
     </ClCompile>
-    <ClCompile Include="SpirVCodeGen.cpp">
-      <Filter>Back End</Filter>
-    </ClCompile>
-    <ClCompile Include="NewSpirVCodeGen.cpp">
-      <Filter>Back End</Filter>
-    </ClCompile>
     <ClCompile Include="Naming.cpp">
       <Filter>Front End</Filter>
     </ClCompile>

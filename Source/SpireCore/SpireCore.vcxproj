@@ -401,7 +401,6 @@
     <ClCompile Include="ILGenerator.cpp" />
     <ClCompile Include="KeyHoleMatching.cpp" />
     <ClCompile Include="Naming.cpp" />
-    <ClCompile Include="NewSpirVCodeGen.cpp" />
     <ClCompile Include="Preprocessor.cpp" />
     <ClCompile Include="SamplerUsageAnalysis.cpp" />
     <ClCompile Include="IL.cpp" />
@@ -409,18 +408,6 @@
     <ClCompile Include="ShaderCompiler.cpp" />
     <ClCompile Include="Parser.cpp" />
     <ClCompile Include="SemanticsVisitor.cpp" />
-    <ClCompile Include="SpirVCodeGen.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release_VS2013|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release_VS2013|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugClang|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug_VS2013|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='DebugClang|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug_VS2013|x64'">true</ExcludedFromBuild>
-    </ClCompile>
     <ClCompile Include="StdInclude.cpp" />
     <ClCompile Include="Syntax.cpp" />
     <ClCompile Include="TypeLayout.cpp" />

@@ -11,14 +11,11 @@ namespace Spire
         {
         public:
             ILProgram * program = nullptr;
-			CompileOptions compileOptions;
-			HashSet<String> entryPointNames;
+            CompileOptions compileOptions;
             ILGenerator(ILProgram * result, DiagnosticSink * sink, CompileOptions options)
                 : SyntaxVisitor(sink), compileOptions(options)
             {
                 program = result;
-				for (auto && entry : options.entryPoints)
-					entryPointNames.Add(entry.name);
             }
         private:
             Dictionary<DeclRef, RefPtr<ILStructType>> structTypes;
@@ -26,6 +23,56 @@ namespace Spire
             ScopeDictionary<String, ILOperand*> variables;
             CodeWriter codeWriter;
         private:
+            ILProfile TranslateProfile(Profile profile)
+            {
+                ILProfile result;
+                switch (profile.GetStage())
+                {
+                case Stage::Compute:
+                    result.Stage = ILStageName::Compute;
+                    break;
+                case Stage::Domain:
+                    result.Stage = ILStageName::Domain;
+                    break;
+                case Stage::Fragment:
+                    result.Stage = ILStageName::Fragment;
+                    break;
+                case Stage::Geometry:
+                    result.Stage = ILStageName::Geometry;
+                    break;
+                case Stage::Hull:
+                    result.Stage = ILStageName::Hull;
+                    break;
+                case Stage::Vertex:
+                    result.Stage = ILStageName::Vertex;
+                    break;
+                default:
+                    result.Stage = ILStageName::General;
+                    break;
+                }
+                switch (profile.GetVersion())
+                {
+                case ProfileVersion::DX_4_0:
+                    result.Version = ILStageVersion::SM_4_0;
+                    break;
+                case ProfileVersion::DX_4_0_Level_9_0:
+                    result.Version = ILStageVersion::SM_4_0_DX9_0;
+                    break;
+                case ProfileVersion::DX_4_0_Level_9_1:
+                    result.Version = ILStageVersion::SM_4_0_DX9_1;
+                    break;
+                case ProfileVersion::DX_4_0_Level_9_3:
+                    result.Version = ILStageVersion::SM_4_0_DX9_3;
+                    break;
+                case ProfileVersion::DX_4_1:
+                    result.Version = ILStageVersion::SM_4_1;
+                    break;
+                case ProfileVersion::DX_5_0:
+                default:
+                    result.Version = ILStageVersion::SM_5_0;
+                }
+                return result;
+            }
             RefPtr<ILStructType> TranslateStructType(AggTypeDecl* structDecl)
             {
                 RefPtr<ILStructType> ilStructType;
@@ -135,7 +182,7 @@ namespace Spire
             
             FetchArgInstruction * thisArg = nullptr;
             DeclRef thisDeclRef;
-            void GenerateFunctionHeader(FunctionSyntaxNode * f, ILStructType * thisType)
+            ILFunction* GenerateFunctionHeader(FunctionSyntaxNode * f, ILStructType * thisType)
             {
                 RefPtr<ILFunction> func = new ILFunction();
                 StringBuilder internalName;
@@ -152,6 +199,7 @@ namespace Spire
                 func->ReturnType = TranslateExpressionType(f->ReturnType);
                 
                 functions[DeclRef(f, nullptr)] = func.Ptr();
+                return func.Ptr();
             }
             ILFunction * GenerateFunction(FunctionSyntaxNode * f, ILStructType * thisType)
             {
@@ -277,7 +325,13 @@ namespace Spire
                 {
                     if (f->HasModifier<IntrinsicModifier>() || f->HasModifier<FromStdLibModifier>())
                         continue;
-                    GenerateFunctionHeader(f.Ptr(), nullptr);
+                    auto funcIL = GenerateFunctionHeader(f.Ptr(), nullptr);
+                    for (auto && entry : compileOptions.entryPoints)
+                        if (f->Name.Content == entry.name)
+                        {
+                            funcIL->IsEntryPoint = true;
+                            funcIL->Profile = TranslateProfile(entry.profile);
+                        }
                 }
 
                 for (auto&& c : classes)
@@ -289,7 +343,7 @@ namespace Spire
                     if (f->HasModifier<IntrinsicModifier>() || f->HasModifier<FromStdLibModifier>())
                         continue;
                     auto func = GenerateFunction(f.Ptr(), nullptr);
-					if (entryPointNames.Contains(f->Name.Content))
+					if (func->IsEntryPoint)
 					{
 						auto call = new CallInstruction(0);
 						call->Type = initFunc->ReturnType;

@@ -294,19 +294,36 @@ namespace Spire
                     if (result.GetErrorCount() > 0)
                         return;
 
-#if 1
                     RefPtr<ILProgram> program = new ILProgram();
                     RefPtr<SyntaxVisitor> codeGen = CreateILCodeGenerator(result.GetErrorWriter(), program.Ptr(), const_cast<CompileOptions*>(&options));
                     codeGen->VisitProgram(programSyntaxNode.Ptr());
                     
                     if (result.GetErrorCount() > 0)
                         return;
-                    CompiledShaderSource src;
+
+                    CodeGenBackend * backend = nullptr;
+                    switch (options.Target)
+                    {
+                    case CodeGenTarget::HLSL:
+                        backend = CreateHLSLCodeGen();
+                        break;
+                    case CodeGenTarget::GLSL:
+                        backend = CreateGLSLCodeGen();
+                        break;
+                    case CodeGenTarget::GLSL_Vulkan:
+                        backend = CreateGLSL_VulkanCodeGen();
+                        break;
+                    default:
+                        result.sink.diagnose(CodePosition(), Diagnostics::unimplemented, "specified backend");
+                        return;
+                    }
+
+                    CompiledShaderSource compiledSource = backend->GenerateShader(options, program.Ptr(), &result.sink);
+                    compiledSource.MetaData.ShaderName = options.outputName;
                     StageSource stageSrc;
-                    src.MetaData.ShaderName = options.outputName;
                     stageSrc.MainCode = program->ToString();
-                    src.Stages["all"] = stageSrc;
-                    result.CompiledSource["il"] = src;
+                    compiledSource.Stages["il"] = stageSrc;
+                    result.CompiledSource["code"] = compiledSource;
 
                     // HACK(tfoley): for right now I just want to pretty-print an AST
                     // into another language, so the whole compiler back-end is just
@@ -322,195 +339,6 @@ namespace Spire
                     extra.compileResult = &result;
 
                     DoNewEmitLogic(extra);
-                    return;
-
-#else
-
-
-                    // if user specified a template shader symbol, instantiate the template now
-                    String symbolToCompile = options.SymbolToCompile;
-                    if (symbolToCompile.Length())
-                    {
-                        auto templateShaders = programSyntaxNode->GetMembersOfType<TemplateShaderSyntaxNode>();
-                        for (auto & ts : templateShaders)
-                            if (ts->Name.Content == symbolToCompile)
-                            {
-                                auto shader = InstantiateShaderTemplate(result.GetErrorWriter(), &symTable, ts.Ptr(), options.TemplateShaderArguments);
-                                if (shader)
-                                {
-                                    programSyntaxNode->Members.Add(shader);
-                                    symbolToCompile = shader->Name.Content;
-                                    programSyntaxNode->Accept(visitor.Ptr());
-                                }
-                                break;
-                            }
-                    }
-                    visitor = nullptr;
-                    symTable.EvalFunctionReferenceClosure();
-                    if (result.GetErrorCount() > 0)
-                        return;
-
-                    for (auto & shader : symTable.ShaderDependenceOrder)
-                    {
-                        if (shader->IsAbstract)
-                            continue;
-                        if (!shaderClosures.ContainsKey(shader->SyntaxNode->Name.Content))
-                        {
-                            auto shaderClosure = CreateShaderClosure(result.GetErrorWriter(), &symTable, shader);
-                            FlattenShaderClosure(result.GetErrorWriter(), &symTable, shaderClosure.Ptr());
-                            shaderClosures.Add(shader->SyntaxNode->Name.Content, shaderClosure);
-                        }
-                    }
-                    
-                    ResolveAttributes(&symTable);
-
-                    if (result.GetErrorCount() > 0)
-                        return;
-                    CodeGenBackend * backend = nullptr;
-                    switch(options.Target)
-                    {
-                    case CodeGenTarget::SPIRV:
-                        backend = backends["spirv"]().Ptr();
-                        break;
-                    case CodeGenTarget::GLSL:
-                        backend = backends["glsl"]().Ptr();
-                        break;
-                    case CodeGenTarget::GLSL_Vulkan:
-                        backend = backends["glsl_vk"]().Ptr();
-                        break;
-                    case CodeGenTarget::GLSL_Vulkan_OneDesc:
-                        backend = backends["glsl_vk_onedesc"]().Ptr();
-                        break;
-                    case CodeGenTarget::HLSL:
-                        backend = backends["hlsl"]().Ptr();
-                        break;
-                    default:
-                        // TODO: emit an appropriate diagnostic
-                        return;
-                    }
-
-                    Schedule schedule;
-                    if (options.ScheduleSource != "")
-                    {
-                        schedule = Schedule::Parse(options.ScheduleSource, options.ScheduleFileName, result.GetErrorWriter());
-                    }
-                    for (auto shader : shaderClosures)
-                    {
-                        // generate shader variant from schedule file, and also apply mechanic deduction rules
-                        if (!shader.Value->IR)
-                            shader.Value->IR = GenerateShaderVariantIR(result, shader.Value.Ptr(), schedule, &symTable);
-                    }
-                    if (options.Mode == CompilerMode::ProduceShader)
-                    {
-                        if (result.GetErrorWriter()->GetErrorCount() > 0)
-                            return;
-                        // generate IL code
-                        
-                        RefPtr<ICodeGenerator> codeGen = CreateCodeGenerator(&symTable, result);
-                        if (context.Program)
-                        {
-                            result.Program->Functions = context.Program->Functions;
-                            result.Program->Shaders = context.Program->Shaders;
-                            result.Program->Structs = context.Program->Structs;
-                            result.Program->ConstantPool = context.Program->ConstantPool;
-                        }
-                        for (auto & s : programSyntaxNode->GetStructs())
-                            codeGen->ProcessStruct(s.Ptr());
-
-                        // Generate symbols for any global variables
-                        for (auto & globalVar : programSyntaxNode->GetMembersOfType<VarDeclBase>())
-                            codeGen->ProcessGlobalVar(globalVar.Ptr());
-
-                        for (auto & func : programSyntaxNode->GetFunctions())
-                            codeGen->ProcessFunction(func.Ptr());
-                        for (auto & shader : shaderClosures)
-                        {
-                            InsertImplicitImportOperators(result.GetErrorWriter(), shader.Value->IR.Ptr());
-                        }
-                        if (result.GetErrorCount() > 0)
-                            return;
-                        for (auto & shader : shaderClosures)
-                        {
-                            codeGen->ProcessShader(shader.Value->IR.Ptr());
-                        }
-                        if (result.GetErrorCount() > 0)
-                            return;
-                        // emit target code
-                        EnumerableHashSet<String> symbolsToGen;
-                        for (auto & unit : units)
-                        {
-                            for (auto & shader : unit.SyntaxNode->GetShaders())
-                                if (!shader->IsModule)
-                                    symbolsToGen.Add(shader->Name.Content);
-                            for (auto & func : unit.SyntaxNode->GetFunctions())
-                                symbolsToGen.Add(func->Name.Content);
-                        }
-                        auto IsSymbolToGen = [&](String & shaderName)
-                        {
-                            if (symbolsToGen.Contains(shaderName))
-                                return true;
-                            for (auto & symbol : symbolsToGen)
-                                if (shaderName.StartsWith(symbol))
-                                    return true;
-                            return false;
-                        };
-                        for (auto & shader : result.Program->Shaders)
-                        {
-                            if ((symbolToCompile.Length() == 0 && IsSymbolToGen(shader->Name))
-                                || EscapeCodeName(symbolToCompile) == shader->Name)
-                            {
-                                StringBuilder glslBuilder;
-                                Dictionary<String, String> targetCode;
-                                result.CompiledSource[shader->Name] = backend->GenerateShader(result, &symTable, shader.Ptr(), result.GetErrorWriter());
-                            }
-                        }
-                    }
-                    else if (options.Mode == CompilerMode::GenerateChoice)
-                    {
-                        for (auto shader : shaderClosures)
-                        {
-                            if (options.SymbolToCompile.Length() == 0 || shader.Value->Name == options.SymbolToCompile)
-                            {
-                                auto &worldOrder = shader.Value->Pipeline->GetWorldTopologyOrder();
-                                for (auto & comp : shader.Value->AllComponents)
-                                {
-                                    ShaderChoice choice;
-                                    if (comp.Value.Symbol->ChoiceNames.Count() == 0)
-                                        continue;
-                                    if (comp.Value.Symbol->IsRequire())
-                                        continue;
-                                    choice.ChoiceName = comp.Value.Symbol->ChoiceNames.First();
-                                    for (auto & impl : comp.Value.Symbol->Implementations)
-                                    {
-                                        for (auto w : impl->Worlds)
-                                            if (comp.Value.Symbol->Type->ConstrainedWorlds.Contains(w))
-                                                choice.Options.Add(ShaderChoiceValue(w));
-                                    }
-                                    if (auto defs = shader.Value->IR->DefinitionsByComponent.TryGetValue(comp.Key))
-                                    {
-                                        int latestWorldOrder = -1;
-                                        for (auto & def : *defs)
-                                        {
-                                            int order = worldOrder.IndexOf(def.Key);
-                                            if (latestWorldOrder < order)
-                                            {
-                                                choice.DefaultValue = def.Key;
-                                                latestWorldOrder = order;
-                                            }
-                                        }
-                                    }
-                                    result.Choices.Add(choice);
-                                }
-                            }
-                        }
-                    }
-                    else
-                    {
-                        result.GetErrorWriter()->diagnose(CodePosition(), Diagnostics::unsupportedCompilerMode);
-                        return;
-                    }
-                    context.Program = result.Program;
-#endif
                 }
                 catch (int)
                 {
@@ -531,7 +359,6 @@ namespace Spire
                 compilerInstances++;
                 backends.Add("glsl", CreateGLSLCodeGen());
                 backends.Add("hlsl", CreateHLSLCodeGen());
-                backends.Add("spirv", CreateSpirVCodeGen());
                 backends.Add("glsl_vk", CreateGLSL_VulkanCodeGen());
                 backends.Add("glsl_vk_onedesc", CreateGLSL_VulkanOneDescCodeGen());
             }

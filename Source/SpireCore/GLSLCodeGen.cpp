@@ -17,10 +17,6 @@ namespace Spire
             bool useVulkanBinding = false;
             bool useSingleDescSet = false;
         protected:
-            OutputStrategy * CreateStandardOutputStrategy(ILWorld * world, String layoutPrefix) override;
-            OutputStrategy * CreatePackedBufferOutputStrategy(ILWorld * world) override;
-            OutputStrategy * CreateArrayOutputStrategy(ILWorld * world, bool pIsPatch, int pArraySize, String arrayIndex) override;
-
             void PrintOp(CodeGenContext & ctx, ILOperand * op, bool forceExpression = false) override
             {
                 if (!useVulkanBinding && op->Type->IsSamplerState())
@@ -39,59 +35,6 @@ namespace Spire
                 ctx.Body << ";\n";
             }
             
-            void PrintStandardInputReference(StringBuilder& sb, ILRecordType* recType, String inputName, String componentName) override
-            {
-                String declName = componentName;
-                declName = AddWorldNameSuffix(declName, recType->ToString());
-                sb << declName;
-            }
-
-            void PrintStandardArrayInputReference(StringBuilder& sb, ILRecordType* recType, String inputName, String componentName) override
-            {
-                PrintStandardInputReference(sb, recType, inputName, componentName);
-            }
-
-            void PrintPatchInputReference(StringBuilder& sb, ILRecordType* recType, String inputName, String componentName) override
-            {
-                String declName = componentName;
-                declName = AddWorldNameSuffix(declName, recType->ToString());
-                sb << declName;
-            }
-
-            void PrintDefaultInputReference(StringBuilder& sb, ILRecordType* /*recType*/, String inputName, String componentName) override
-            {
-                String declName = componentName;
-                sb << declName;
-            }
-
-            void PrintSystemVarReference(CodeGenContext & /*ctx*/, StringBuilder& sb, String inputName, ExternComponentCodeGenInfo::SystemVarType systemVar) override
-            {
-                switch(systemVar)
-                {
-                case ExternComponentCodeGenInfo::SystemVarType::FragCoord:
-                    sb << "gl_FragCoord";
-                    break;
-                case ExternComponentCodeGenInfo::SystemVarType::TessCoord:
-                    sb << "gl_TessCoord";
-                    break;
-                case ExternComponentCodeGenInfo::SystemVarType::InvocationId:
-                    sb << "gl_InvocationID";
-                    break;
-                case ExternComponentCodeGenInfo::SystemVarType::ThreadId:
-                    sb << "gl_GlobalInvocationID.x";
-                    break;
-                case ExternComponentCodeGenInfo::SystemVarType::PatchVertexCount:
-                    sb << "gl_PatchVerticesIn";
-                    break;
-                case ExternComponentCodeGenInfo::SystemVarType::PrimitiveId:
-                    sb << "gl_PrimitiveID";
-                    break;
-                default:
-                    sb << inputName;
-                    break;
-                }
-            }
-
             String GetTextureType(ILType * textureType)
             {
                 auto texType = dynamic_cast<ILTextureType*>(textureType);
@@ -296,88 +239,11 @@ namespace Spire
                     throw NotImplementedException("CodeGen for texture function '" + instr->Function + "' is not implemented.");
             }
 
-            void DeclareStandardInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) override
-            {
-                auto info = ExtractExternComponentInfo(input);
-                auto recType = ExtractRecordType(input.Type.Ptr());
-                assert(recType);
-                assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::StandardInput);
-
-                int itemsDeclaredInBlock = 0;
-
-                int index = 0;
-                for (auto & field : recType->Members)
-                {
-                    if (!useVulkanBinding && field.Value.Type->IsSamplerState())
-                        continue;
-                    if (input.Attributes.ContainsKey("VertexInput"))
-                        sb.GlobalHeader << "layout(location = " << index << ") ";
-                    if (!isVertexShader && (input.Attributes.ContainsKey("Flat") || field.Value.Type->IsIntegral()))
-                        sb.GlobalHeader << "flat ";
-                    sb.GlobalHeader << "in ";
-
-                    String declName = field.Key;
-                    declName = AddWorldNameSuffix(declName, recType->ToString());
-
-                    PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
-                    itemsDeclaredInBlock++;
-                    if (info.IsArray)
-                    {
-                        sb.GlobalHeader << "[";
-                        if (info.ArrayLength)
-                            sb.GlobalHeader << String(info.ArrayLength);
-                        sb.GlobalHeader << "]";
-                    }
-                    sb.GlobalHeader << ";\n";
-
-                    index++;
-                }
-            }
-
-            void DeclarePatchInputRecord(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader) override
-            {
-                auto info = ExtractExternComponentInfo(input);
-                auto recType = ExtractRecordType(input.Type.Ptr());
-                assert(recType);
-                assert(info.DataStructure == ExternComponentCodeGenInfo::DataStructureType::Patch);
-
-
-                int itemsDeclaredInBlock = 0;
-
-                int index = 0;
-                for (auto & field : recType->Members)
-                {
-                    if (!useVulkanBinding && field.Value.Type->IsSamplerState())
-                        continue;
-                    if (!isVertexShader && (input.Attributes.ContainsKey("Flat")))
-                        sb.GlobalHeader << "flat ";
-                    sb.GlobalHeader << "patch in ";
-
-                    String declName = field.Key;
-                    declName = AddWorldNameSuffix(declName, recType->ToString());
-
-                    PrintDef(sb.GlobalHeader, field.Value.Type.Ptr(), declName);
-                    itemsDeclaredInBlock++;
-                    if (info.IsArray)
-                    {
-                        sb.GlobalHeader << "[";
-                        if (info.ArrayLength)
-                            sb.GlobalHeader << String(info.ArrayLength);
-                        sb.GlobalHeader << "]";
-                    }
-                    sb.GlobalHeader << ";\n";
-
-                    index++;
-                }
-            }
-
-            void GenerateHeader(StringBuilder & sb, ILStage * stage)
+            virtual void PrintHeader(StringBuilder & sb) override
             {
                 sb << "#version 440\n";
-                if (stage->Attributes.ContainsKey("BindlessTexture"))
+                if (useBindlessTexture)
                     sb << "#extension GL_ARB_bindless_texture: require\n#extension GL_NV_gpu_shader5 : require\n";
-                if (stage->Attributes.ContainsKey("NV_CommandList"))
-                    sb << "#extension GL_NV_command_list: require\n";
             }
 
             void GenerateDomainShaderProlog(CodeGenContext & ctx, ILStage * stage)
@@ -541,13 +407,13 @@ namespace Spire
                 }
             }
 
-            virtual void GenerateShaderMetaData(ShaderMetaData & result, ILProgram* program, ILShader* shader, DiagnosticSink* err) override
+            virtual void GenerateMetaData(ShaderMetaData & result, ILProgram* program, DiagnosticSink* err) override
             {
                 EnumerableDictionary<ILModuleParameterInstance*, List<ILModuleParameterInstance*>> samplerTextures;
-                for (auto & w : shader->Worlds)
+                for (auto & f : program->Functions)
                 {
-                    if (w.Value->Code)
-                        AnalyzeSamplerUsage(samplerTextures, program, w.Value->Code.Ptr(), err);
+                    if (f.Value->IsEntryPoint)
+                        AnalyzeSamplerUsage(samplerTextures, program, f.Value->Code.Ptr(), err);
                 }
                 if (!useVulkanBinding)
                 {
@@ -563,202 +429,7 @@ namespace Spire
                             sampler.Key->BindingPoints.AddRange(tex->BindingPoints);
                     }
                 }
-                CLikeCodeGen::GenerateShaderMetaData(result, program, shader, err);
-            }
-
-            StageSource GenerateSingleWorldShader(ILProgram * program, ILShader * shader, ILStage * stage) override
-            {
-                useBindlessTexture = stage->Attributes.ContainsKey("BindlessTexture");
-                StageSource rs;
-                CodeGenContext ctx;
-                GenerateHeader(ctx.GlobalHeader, stage);
-
-                if (stage->StageType == "DomainShader")
-                    GenerateDomainShaderProlog(ctx, stage);
-
-                GenerateStructs(ctx.GlobalHeader, program);
-                GenerateShaderParameterDefinition(ctx, shader);
-
-                StageAttribute worldName;
-                RefPtr<ILWorld> world = nullptr;
-                if (stage->Attributes.TryGetValue("World", worldName))
-                {
-                    if (!shader->Worlds.TryGetValue(worldName.Value, world))
-                        errWriter->diagnose(worldName.Position, Diagnostics::worldIsNotDefined, worldName.Value);
-                }
-                else
-                    errWriter->diagnose(stage->Position, Diagnostics::stageShouldProvideWorldAttribute, stage->StageType);
-                if (!world)
-                    return rs;
-                GenerateReferencedFunctions(ctx.GlobalHeader, program, MakeArrayView(world.Ptr()));
-                extCompInfo.Clear();
-                for (auto & input : world->Inputs)
-                {
-                    DeclareInput(ctx, input, stage->StageType == "VertexShader");
-                }
-        
-                outputStrategy->DeclareOutput(ctx, stage);
-                ctx.codeGen = this;
-                world->Code->NameAllInstructions();
-                GenerateCode(ctx, world->Code.Ptr());
-                if (stage->StageType == "VertexShader" || stage->StageType == "DomainShader")
-                    GenerateVertexShaderEpilog(ctx, world.Ptr(), stage);
-
-                StringBuilder sb;
-                sb << ctx.GlobalHeader.ProduceString();
-                sb << "void main()\n{\n";
-                sb << ctx.Header.ProduceString() << ctx.Body.ProduceString();
-                sb << "}";
-                rs.MainCode = sb.ProduceString();
-                return rs;
-            }
-
-            StageSource GenerateHullShader(ILProgram * program, ILShader * shader, ILStage * stage) override
-            {
-                useBindlessTexture = stage->Attributes.ContainsKey("BindlessTexture");
-
-                StageSource rs;
-                StageAttribute patchWorldName, controlPointWorldName, cornerPointWorldName, domain, innerLevel, outerLevel, numControlPoints;
-                RefPtr<ILWorld> patchWorld, controlPointWorld, cornerPointWorld;
-                if (!stage->Attributes.TryGetValue("PatchWorld", patchWorldName))
-                {
-                    errWriter->diagnose(stage->Position, Diagnostics::hullShaderRequiresPatchWorld);
-                    return rs;
-                }
-                if (!shader->Worlds.TryGetValue(patchWorldName.Value, patchWorld))
-                    errWriter->diagnose(patchWorldName.Position, Diagnostics::worldIsNotDefined, patchWorldName.Value);
-                if (!stage->Attributes.TryGetValue("ControlPointWorld", controlPointWorldName))
-                {
-                    errWriter->diagnose(stage->Position, Diagnostics::hullShaderRequiresControlPointWorld); 
-                    return rs;
-                }
-                if (!shader->Worlds.TryGetValue(controlPointWorldName.Value, controlPointWorld))
-                    errWriter->diagnose(controlPointWorldName.Position, Diagnostics::worldIsNotDefined, controlPointWorldName.Value);
-                if (!stage->Attributes.TryGetValue("CornerPointWorld", cornerPointWorldName))
-                {
-                    errWriter->diagnose(stage->Position, Diagnostics::hullShaderRequiresCornerPointWorld);
-                    return rs;
-                }
-                if (!shader->Worlds.TryGetValue(cornerPointWorldName.Value, cornerPointWorld))
-                    errWriter->diagnose(cornerPointWorldName.Position, Diagnostics::worldIsNotDefined, cornerPointWorldName.Value);
-                if (!stage->Attributes.TryGetValue("Domain", domain))
-                {
-                    errWriter->diagnose(stage->Position, Diagnostics::hullShaderRequiresDomain);
-                    return rs;
-                }
-                if (domain.Value != "triangles" && domain.Value != "quads")
-                {
-                    errWriter->diagnose(domain.Position, Diagnostics::invalidTessellationDomain);
-                    return rs;
-                }
-                if (!stage->Attributes.TryGetValue("TessLevelOuter", outerLevel))
-                {
-                    errWriter->diagnose(stage->Position, Diagnostics::hullShaderRequiresTessLevelOuter);
-                    return rs;
-                }
-                if (!stage->Attributes.TryGetValue("TessLevelInner", innerLevel))
-                {
-                    errWriter->diagnose(stage->Position, Diagnostics::hullShaderRequiresTessLevelInner);
-                    return rs;
-                }
-                if (!stage->Attributes.TryGetValue("ControlPointCount", numControlPoints))
-                {
-                    errWriter->diagnose(stage->Position, Diagnostics::hullShaderRequiresControlPointCount);
-                    return rs;
-                }
-                CodeGenContext ctx;
-                ctx.codeGen = this;
-                List<ILWorld*> worlds;
-                worlds.Add(patchWorld.Ptr());
-                worlds.Add(controlPointWorld.Ptr());
-                worlds.Add(cornerPointWorld.Ptr());
-                GenerateHeader(ctx.GlobalHeader, stage);
-                ctx.GlobalHeader << "layout(vertices = " << numControlPoints.Value << ") out;\n";
-                GenerateStructs(ctx.GlobalHeader, program);
-                GenerateShaderParameterDefinition(ctx, shader);
-                GenerateReferencedFunctions(ctx.GlobalHeader, program, worlds.GetArrayView());
-                extCompInfo.Clear();
-
-                HashSet<String> declaredInputs;
-
-                patchWorld->Code->NameAllInstructions();
-                outputStrategy = CreateStandardOutputStrategy(patchWorld.Ptr(), "patch");
-                for (auto & input : patchWorld->Inputs)
-                {
-                    if (declaredInputs.Add(input.Name))
-                        DeclareInput(ctx, input, false);
-                }
-                outputStrategy->DeclareOutput(ctx, stage);
-                GenerateCode(ctx, patchWorld->Code.Ptr());
-
-                controlPointWorld->Code->NameAllInstructions();
-                outputStrategy = CreateArrayOutputStrategy(controlPointWorld.Ptr(), false, 0, "gl_InvocationID");
-                for (auto & input : controlPointWorld->Inputs)
-                {
-                    if (declaredInputs.Add(input.Name))
-                        DeclareInput(ctx, input, false);
-                }
-                outputStrategy->DeclareOutput(ctx, stage);
-                GenerateCode(ctx, controlPointWorld->Code.Ptr());
-
-                cornerPointWorld->Code->NameAllInstructions();
-                outputStrategy = CreateArrayOutputStrategy(cornerPointWorld.Ptr(), true, (domain.Value == "triangles" ? 3 : 4), "sysLocalIterator");
-                for (auto & input : cornerPointWorld->Inputs)
-                {
-                    if (declaredInputs.Add(input.Name))
-                        DeclareInput(ctx, input, false);
-                }
-                outputStrategy->DeclareOutput(ctx, stage);
-                ctx.Body << "for (int sysLocalIterator = 0; sysLocalIterator < gl_PatchVerticesIn; sysLocalIterator++)\n{\n";
-                GenerateCode(ctx, cornerPointWorld->Code.Ptr());
-                auto debugStr = cornerPointWorld->Code->ToString();
-                ctx.Body << "}\n";
-
-                // generate epilog
-                bool found = false;
-                for (auto & world : worlds)
-                {
-                    ILOperand * operand;
-                    if (world->Components.TryGetValue(innerLevel.Value, operand))
-                    {
-                        for (int i = 0; i < 2; i++)
-                        {
-                            ctx.Body << "gl_TessLevelInner[" << i << "] = ";
-                            PrintOp(ctx, operand);
-                            ctx.Body << "[" << i << "];\n";
-                        }
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found)
-                    errWriter->diagnose(innerLevel.Position, Diagnostics::componentNotDefined, innerLevel.Value);
-
-                found = false;
-                for (auto & world : worlds)
-                {
-                    ILOperand * operand;
-                    if (world->Components.TryGetValue(outerLevel.Value, operand))
-                    {
-                        for (int i = 0; i < 4; i++)
-                        {
-                            ctx.Body << "gl_TessLevelOuter[" << i << "] = ";
-                            PrintOp(ctx, operand);
-                            ctx.Body << "[" << i << "];\n";
-                        }
-                        found = true;
-                        break;
-                    }
-
-                }
-                if (!found)
-                    errWriter->diagnose(outerLevel.Position, Diagnostics::componentNotDefined, outerLevel.Value);
-
-                StringBuilder sb;
-                sb << ctx.GlobalHeader.ProduceString();
-                sb << "void main()\n{\n" << ctx.Header.ProduceString() << ctx.Body.ProduceString() << "}";
-                rs.MainCode = sb.ProduceString();
-                return rs;
+                CLikeCodeGen::GenerateMetaData(result, program, err);
             }
         public:
             GLSLCodeGen(bool vulkanBinding, bool pUseSingleDescSet)
@@ -767,97 +438,6 @@ namespace Spire
                 useSingleDescSet = pUseSingleDescSet;
             }
         };
-
-
-        class StandardOutputStrategy : public OutputStrategy
-        {
-        private:
-            String declPrefix;
-        public:
-            StandardOutputStrategy(GLSLCodeGen * pCodeGen, ILWorld * world, String prefix)
-                : OutputStrategy(pCodeGen, world), declPrefix(prefix)
-            {}
-            virtual void DeclareOutput(CodeGenContext & ctx, ILStage *) override
-            {
-                int location = 0;
-                for (auto & field : world->OutputType->Members)
-                {
-                    if (field.Value.Attributes.ContainsKey("FragDepth"))
-                        continue;
-                    ctx.GlobalHeader << "layout(location = " << location << ") ";
-                    if (declPrefix.Length())
-                        ctx.GlobalHeader << declPrefix << " ";
-                    if (field.Value.Type->IsIntegral())
-                        ctx.GlobalHeader << "flat ";
-                    ctx.GlobalHeader << "out ";
-                    String declName = field.Key;
-                    codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), AddWorldNameSuffix(declName, world->OutputType->TypeName));
-                    ctx.GlobalHeader << ";\n";
-                    location++;
-                }
-            }
-        };
-
-        class ArrayOutputStrategy : public OutputStrategy
-        {
-        protected:
-            bool isPatch = false;
-            int arraySize = 0;
-        public:
-            String outputIndex;
-            ArrayOutputStrategy(GLSLCodeGen * pCodeGen, ILWorld * world, bool pIsPatch, int pArraySize, String pOutputIndex)
-                : OutputStrategy(pCodeGen, world)
-            {
-                isPatch = pIsPatch;
-                arraySize = pArraySize;
-                outputIndex = pOutputIndex;
-            }
-            virtual void DeclareOutput(CodeGenContext & ctx, ILStage *) override
-            {
-                for (auto & field : world->OutputType->Members)
-                {
-                    if (isPatch)
-                        ctx.GlobalHeader << "patch ";
-                    ctx.GlobalHeader << "out ";
-                    codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), AddWorldNameSuffix(field.Key, world->Name));
-                    ctx.GlobalHeader << "[";
-                    if (arraySize != 0)
-                        ctx.GlobalHeader << arraySize;
-                    ctx.GlobalHeader<<"]; \n";
-                }
-            }
-        };
-
-        class PackedBufferOutputStrategy : public OutputStrategy
-        {
-        public:
-            PackedBufferOutputStrategy(GLSLCodeGen * pCodeGen, ILWorld * world)
-                : OutputStrategy(pCodeGen, world)
-            {}
-            virtual void DeclareOutput(CodeGenContext & ctx, ILStage *) override
-            {
-                for (auto & field : world->OutputType->Members)
-                {
-                    ctx.GlobalHeader << "out ";
-                    codeGen->PrintDef(ctx.GlobalHeader, field.Value.Type.Ptr(), field.Key);
-                    ctx.GlobalHeader << ";\n";
-                }
-            }
-        };
-
-        OutputStrategy * GLSLCodeGen::CreateStandardOutputStrategy(ILWorld * world, String layoutPrefix)
-        {
-            return new StandardOutputStrategy(this, world, layoutPrefix);
-        }
-        OutputStrategy * GLSLCodeGen::CreatePackedBufferOutputStrategy(ILWorld * world)
-        {
-            return new PackedBufferOutputStrategy(this, world);
-        }
-        OutputStrategy * GLSLCodeGen::CreateArrayOutputStrategy(ILWorld * world, bool pIsPatch, int pArraySize, String arrayIndex)
-        {
-            return new ArrayOutputStrategy(this, world, pIsPatch, pArraySize, arrayIndex);
-        }
-
         CodeGenBackend * CreateGLSLCodeGen()
         {
             return new GLSLCodeGen(false, false);

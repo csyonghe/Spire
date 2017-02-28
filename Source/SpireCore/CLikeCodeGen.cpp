@@ -2,6 +2,7 @@
 #include "../CoreLib/Tokenizer.h"
 #include "Syntax.h"
 #include "Naming.h"
+#include "ShaderCompiler.h"
 
 using namespace CoreLib::Basic;
 
@@ -9,26 +10,6 @@ namespace Spire
 {
     namespace Compiler
     {
-        ILRecordType * ExtractRecordType(ILType * type)
-        {
-            if (auto recType = dynamic_cast<ILRecordType*>(type))
-                return recType;
-            else if (auto arrType = dynamic_cast<ILArrayType*>(type))
-                return ExtractRecordType(arrType->BaseType.Ptr());
-            else if (auto genType = dynamic_cast<ILGenericType*>(type))
-                return ExtractRecordType(genType->BaseType.Ptr());
-            else
-                return nullptr;
-        }
-
-        String AddWorldNameSuffix(String name, String suffix)
-        {
-            if (name.EndsWith(suffix))
-                return name;
-            else
-                return EscapeCodeName(name + "_" + suffix);
-        }
-
         void CLikeCodeGen::PrintType(StringBuilder & sbCode, ILType* type)
         {
             PrintTypeName(sbCode, type);
@@ -161,6 +142,13 @@ namespace Spire
             ctx.Body << " * ";
             PrintOp(ctx, op1);
             ctx.Body << ")";
+        }
+
+        void CLikeCodeGen::PrintGlobalVar(StringBuilder & sb, ILGlobalVariable * gvar)
+        {
+            //TODO: emit bindings
+            PrintType(sb, gvar->Type.Ptr());
+            sb << " " << gvar->Name << ";\n";
         }
 
         void CLikeCodeGen::PrintBinaryInstrExpr(CodeGenContext & ctx, BinaryInstruction * instr)
@@ -612,34 +600,30 @@ namespace Spire
             intrinsicTextureFunctions.Add("SampleCmp");
         }
 
-        void CLikeCodeGen::GenerateShaderMetaData(ShaderMetaData & result, ILProgram* /*program*/, ILShader * shader, DiagnosticSink * /*err*/)
+        void CLikeCodeGen::GenerateMetaData(ShaderMetaData & result, ILProgram * program, DiagnosticSink * /*err*/)
         {
-            result.ShaderName = shader->Name;
-            result.ParameterSets = shader->ModuleParamSets;
+            result.ParameterSets = program->ModuleParamSets;
         }
 
-        CompiledShaderSource CLikeCodeGen::GenerateShader(CompileResult & result, ILShader * shader, DiagnosticSink * err)
+        CompiledShaderSource CLikeCodeGen::GenerateShader(const CompileOptions & /*options*/, ILProgram * program, DiagnosticSink * err)
         {
             this->errWriter = err;
-
+            StringBuilder sbCode;
             CompiledShaderSource rs;
-
-            for (auto & stage : shader->Stages)
+            GenerateStructs(sbCode, program);
+            for (auto gvar : program->GlobalVars)
+                PrintGlobalVar(sbCode, gvar.Value.Ptr());
+            for (auto func : program->Functions)
             {
-                StageSource src;
-                if (stage.Value->StageType == "VertexShader" || stage.Value->StageType == "FragmentShader" || stage.Value->StageType == "DomainShader")
-                    src = GenerateVertexFragmentDomainShader(result.Program.Ptr(), shader, stage.Value.Ptr());
-                else if (stage.Value->StageType == "ComputeShader")
-                    src = GenerateComputeShader(result.Program.Ptr(), shader, stage.Value.Ptr());
-                else if (stage.Value->StageType == "HullShader")
-                    src = GenerateHullShader(result.Program.Ptr(), shader, stage.Value.Ptr());
-                else
-                    errWriter->diagnose(stage.Value->Position, Diagnostics::unknownStageType, stage.Value->StageType);
-                rs.Stages[stage.Key] = src;
+                GenerateFunctionDeclaration(sbCode, func.Value.Ptr());
+                sbCode << ";\n";
             }
-                
-            GenerateShaderMetaData(rs.MetaData, result.Program.Ptr(), shader, err);
-                
+            for (auto func : program->Functions)
+                GenerateFunction(sbCode, func.Value.Ptr());
+            StageSource src;
+            src.MainCode = sbCode.ProduceString();
+            rs.Stages.Add("src", src);
+            GenerateMetaData(rs.MetaData, program, err);
             return rs;
         }
 
@@ -658,181 +642,6 @@ namespace Spire
                     sb << "};\n";
                 }
             }
-        }
-
-        void CLikeCodeGen::GenerateReferencedFunctions(StringBuilder & sb, ILProgram * program, ArrayView<ILWorld*> worlds)
-        {
-            EnumerableHashSet<String> refFuncs;
-            for (auto & world : worlds)
-                for (auto & func : world->ReferencedFunctions)
-                    refFuncs.Add(func);
-            for (auto & func : program->Functions)
-            {
-                if (refFuncs.Contains(func.Value->Name))
-                {
-                    GenerateFunctionDeclaration(sb, func.Value.Ptr());
-                    sb << ";\n";
-                }
-            }
-            for (auto & func : program->Functions)
-            {
-                if (refFuncs.Contains(func.Value->Name))
-                    sb << GenerateFunction(func.Value.Ptr());
-            }
-        }
-
-        ExternComponentCodeGenInfo CLikeCodeGen::ExtractExternComponentInfo(const ILObjectDefinition & input)
-        {
-            auto type = input.Type.Ptr();
-            auto recType = ExtractRecordType(type);
-            ExternComponentCodeGenInfo info;
-            info.Type = type;
-            Token bindingVal;
-            if (input.Attributes.TryGetValue("Binding", bindingVal))
-                info.Binding = StringToInt(bindingVal.Content);
-            if (recType)
-            {
-                if (auto genType = dynamic_cast<ILGenericType*>(type))
-                {
-                    if (genType->GenericTypeName == "Patch")
-                    {
-                        type = genType->BaseType.Ptr();
-                        info.DataStructure = ExternComponentCodeGenInfo::DataStructureType::Patch;
-                    }
-                }
-                if (auto arrType = dynamic_cast<ILArrayType*>(type))
-                {
-                    if (info.DataStructure != ExternComponentCodeGenInfo::DataStructureType::StandardInput &&
-                        info.DataStructure != ExternComponentCodeGenInfo::DataStructureType::Patch)
-                    {
-                        errWriter->diagnose(input.Position, Diagnostics::cannotGenerateCodeForExternComponentType, type);
-                    }
-                    type = arrType->BaseType.Ptr();
-                    info.IsArray = true;
-                    info.ArrayLength = arrType->ArrayLength;
-                }
-                if (type != recType)
-                {
-                    errWriter->diagnose(input.Position, Diagnostics::cannotGenerateCodeForExternComponentType, type);
-                }
-            }
-            else
-            {
-                // check for attributes 
-                if (input.Attributes.ContainsKey("TessCoord"))
-                {
-                    info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::TessCoord;
-                    if (!(input.Type->IsFloatVector() && input.Type->AsVectorType()->Size <= 3))
-                        getSink()->diagnose(input.Position, Diagnostics::invalidTessCoordType);
-                }
-                else if (input.Attributes.ContainsKey("FragCoord"))
-                {
-                    info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::FragCoord;
-                    if (!(input.Type->IsFloatVector() && input.Type->AsVectorType()->Size == 4))
-                        getSink()->diagnose(input.Position, Diagnostics::invalidFragCoordType);
-                }
-                else if (input.Attributes.ContainsKey("InvocationId"))
-                {
-                    info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::InvocationId;
-                    if (!input.Type->IsInt())
-                        getSink()->diagnose(input.Position, Diagnostics::invalidInvocationIdType);
-                }
-                else if (input.Attributes.ContainsKey("ThreadId"))
-                {
-                    info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::InvocationId;
-                    if (!input.Type->IsInt())
-                        getSink()->diagnose(input.Position, Diagnostics::invalidThreadIdType);
-                }
-                else if (input.Attributes.ContainsKey("PrimitiveId"))
-                {
-                    info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::PrimitiveId;
-                    if (!input.Type->IsInt())
-                        getSink()->diagnose(input.Position, Diagnostics::invalidPrimitiveIdType);
-                }
-                else if (input.Attributes.ContainsKey("PatchVertexCount"))
-                {
-                    info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::PatchVertexCount;
-                    if (!input.Type->IsInt())
-                        getSink()->diagnose(input.Position, Diagnostics::invalidPatchVertexCountType);
-                }
-            }
-            return info;
-        }
-
-        void CLikeCodeGen::PrintInputReference(CodeGenContext & ctx, StringBuilder & sb, String input)
-        {
-            auto info = extCompInfo[input]();
-			PrintSystemVarReference(ctx, sb, input, info.SystemVar);
-        }
-
-        void CLikeCodeGen::DeclareInput(CodeGenContext & sb, const ILObjectDefinition & input, bool isVertexShader)
-        {
-            auto info = ExtractExternComponentInfo(input);
-            extCompInfo[input.Name] = info;
-            auto recType = ExtractRecordType(input.Type.Ptr());
-            if (recType)
-            {
-                switch(info.DataStructure)
-                {
-                case ExternComponentCodeGenInfo::DataStructureType::StandardInput:
-                    DeclareStandardInputRecord(sb, input, isVertexShader);
-                    return;
-
-                case ExternComponentCodeGenInfo::DataStructureType::Patch:
-                    DeclarePatchInputRecord(sb, input, isVertexShader);
-                    return;
-
-                default:
-                    SPIRE_INTERNAL_ERROR(getSink(), input.Position);
-                    break;
-                }
-            }
-        }
-
-        void CLikeCodeGen::GenerateVertexShaderEpilog(CodeGenContext & ctx, ILWorld * world, ILStage * stage)
-        {
-            StageAttribute positionVar;
-            if (stage->Attributes.TryGetValue("Position", positionVar))
-            {
-                ILOperand * operand;
-                if (world->Components.TryGetValue(positionVar.Value, operand))
-                {
-                    if (operand->Type->IsFloatVector() && operand->Type->AsVectorType()->Size == 4)
-                    {
-                        PrintRasterPositionOutputWrite(ctx, operand);
-                    }
-                    else
-                        errWriter->diagnose(positionVar.Position, Diagnostics::componentHasInvalidTypeForPositionOutput, positionVar.Value);
-                }
-                else
-                    errWriter->diagnose(positionVar.Position, Diagnostics::componentNotDefined, positionVar.Value);
-            }
-        }
-
-        StageSource CLikeCodeGen::GenerateVertexFragmentDomainShader(ILProgram * program, ILShader * shader, ILStage * stage)
-        {
-            RefPtr<ILWorld> world = nullptr;
-            StageAttribute worldName;
-            if (stage->Attributes.TryGetValue("World", worldName))
-            {
-                if (!shader->Worlds.TryGetValue(worldName.Value, world))
-                    errWriter->diagnose(worldName.Position, Diagnostics::worldIsNotDefined, worldName.Value);
-            }
-            outputStrategy = CreateStandardOutputStrategy(world.Ptr(), "");
-            return GenerateSingleWorldShader(program, shader, stage);
-        }
-
-        StageSource CLikeCodeGen::GenerateComputeShader(ILProgram * program, ILShader * shader, ILStage * stage)
-        {
-            RefPtr<ILWorld> world = nullptr;
-            StageAttribute worldName;
-            if (stage->Attributes.TryGetValue("World", worldName))
-            {
-                if (!shader->Worlds.TryGetValue(worldName.Value, world))
-                    errWriter->diagnose(worldName.Position, Diagnostics::worldIsNotDefined, worldName);
-            }
-            outputStrategy = CreatePackedBufferOutputStrategy(world.Ptr());
-            return GenerateSingleWorldShader(program, shader, stage);
         }
 
         void CLikeCodeGen::GenerateFunctionDeclaration(StringBuilder & sbCode, ILFunction * function)
@@ -871,9 +680,8 @@ namespace Spire
             }
             sbCode << ")";
         }
-        String CLikeCodeGen::GenerateFunction(ILFunction * function)
+        void CLikeCodeGen::GenerateFunction(StringBuilder & sbCode, ILFunction * function)
         {
-            StringBuilder sbCode;
             CodeGenContext ctx;
             ctx.codeGen = this;
             ctx.UsedVarNames.Clear();
@@ -891,7 +699,6 @@ namespace Spire
             if (ctx.ReturnVarName.Length())
                 sbCode << "return " << ctx.ReturnVarName << ";\n";
             sbCode << "}\n";
-            return sbCode.ProduceString();
         }
 
         String CodeGenContext::DefineVariable(ILOperand * op)

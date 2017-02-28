@@ -8,17 +8,18 @@ namespace Spire
 {
     namespace Compiler
     {		
+        class CompileOptions;
+
         class CodeGenBackend : public CoreLib::Basic::Object
         {
         public:
-            virtual CompiledShaderSource GenerateShader(CompileResult & result, ILShader * shader, DiagnosticSink * err) = 0;
+            virtual CompiledShaderSource GenerateShader(const CompileOptions & options, ILProgram * program, DiagnosticSink * err) = 0;
         };
 
         CodeGenBackend * CreateGLSLCodeGen();
         CodeGenBackend * CreateGLSL_VulkanCodeGen();
         CodeGenBackend * CreateGLSL_VulkanOneDescCodeGen();
         CodeGenBackend * CreateHLSLCodeGen();
-        CodeGenBackend * CreateSpirVCodeGen();
     }
 }
 
