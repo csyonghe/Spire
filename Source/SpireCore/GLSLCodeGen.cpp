@@ -101,7 +101,7 @@ namespace Spire
                 {
                     if (useVulkanBinding)
                     {
-                        if (dynamic_cast<ILBasicType*>(type)->Type == ILBaseType::SamplerComparisonState)
+                        if (dynamic_cast<ILSamplerStateType*>(type)->IsComparison)
                             sb << "samplerShadow";
                         else
                             sb << "sampler";
@@ -246,30 +246,6 @@ namespace Spire
                     sb << "#extension GL_ARB_bindless_texture: require\n#extension GL_NV_gpu_shader5 : require\n";
             }
 
-            void GenerateDomainShaderProlog(CodeGenContext & ctx, ILStage * stage)
-            {
-                ctx.GlobalHeader << "layout(";
-                StageAttribute val;
-                if (stage->Attributes.TryGetValue("Domain", val))
-                    ctx.GlobalHeader << ((val.Value == "quads") ? "quads" : "triangles");
-                else
-                    ctx.GlobalHeader << "triangles";
-                if (val.Value != "triangles" && val.Value != "quads")
-                    getSink()->diagnose(val.Position, Diagnostics::invalidTessellationDomain);
-                if (stage->Attributes.TryGetValue("Winding", val))
-                {
-                    if (val.Value == "cw")
-                        ctx.GlobalHeader << ", cw";
-                    else
-                        ctx.GlobalHeader << ", ccw";
-                }
-                if (stage->Attributes.TryGetValue("EqualSpacing", val))
-                {
-                    if (val.Value == "1" || val.Value == "true")
-                        ctx.GlobalHeader << ", equal_spacing";
-                }
-                ctx.GlobalHeader << ") in;\n";
-            }
             virtual void PrintParameterReference(StringBuilder& sb, ILModuleParameterInstance * param) override
             {
                 if (param->Type->GetBindableResourceType() == BindableResourceType::NonBindable)
@@ -282,131 +258,7 @@ namespace Spire
                     sb << EscapeCodeName(param->Module->BindingName + "_" + param->Name);
                 }
             }
-            void GenerateShaderParameterDefinition(CodeGenContext & ctx, ILShader * shader)
-            {
-                int oneDescBindingLoc = 0;
-                for (auto module : shader->ModuleParamSets)
-                {
-                    // generate uniform buffer declaration
-                    auto bufferName = EscapeCodeName(module.Value->BindingName);
-                    bool containsOrdinaryParams = false;
-                    for (auto param : module.Value->Parameters)
-                        if (param.Value->BufferOffset != -1)
-                        {
-                            containsOrdinaryParams = true;
-                            break;
-                        }
-                    if (containsOrdinaryParams)
-                    {
-                        if (useVulkanBinding)
-                        {
-                            if (!useSingleDescSet)
-                            {
-                                ctx.GlobalHeader << "layout(std140, set = " << module.Value->DescriptorSetId << ", binding = 0) ";
-                            }
-                            else
-                            {
-                                ctx.GlobalHeader << "layout(std140, set = 0, binding =" << oneDescBindingLoc << ") ";
-                                module.Value->UniformBufferLegacyBindingPoint = oneDescBindingLoc;
-                                oneDescBindingLoc++;
-                            }
-                        }
-                        else
-                            ctx.GlobalHeader << "layout(binding = " << module.Value->DescriptorSetId << ", std140) ";
-                        ctx.GlobalHeader << "uniform buf" << bufferName << "\n{\n";
-                        for (auto param : module.Value->Parameters)
-                        {
-                            if (param.Value->BufferOffset != -1)
-                            {
-                                PrintType(ctx.GlobalHeader, param.Value->Type.Ptr());
-                                ctx.GlobalHeader << " " << param.Value->Name << ";\n";
-                            }
-                        }
-                        ctx.GlobalHeader << "} " << bufferName << ";\n";
-                    }
-                    int slotId = containsOrdinaryParams ? 1 : 0;
-                    for (auto param : module.Value->Parameters)
-                    {
-                        auto bindableType = param.Value->Type->GetBindableResourceType();
-                        if (bindableType != BindableResourceType::NonBindable)
-                        {
-                            switch (bindableType)
-                            {
-                            case BindableResourceType::StorageBuffer:
-                            {
-                                auto genType = param.Value->Type.As<ILGenericType>();
-                                if (!genType)
-                                    continue;
-                                String bufName = EscapeCodeName(module.Value->BindingName + "_" + param.Value->Name);
-                                if (useVulkanBinding)
-                                {
-                                    if (!useSingleDescSet)
-                                        ctx.GlobalHeader << "layout(std430, set = " << module.Value->DescriptorSetId << ", binding = " << slotId << ") ";
-                                    else
-                                    {
-                                        ctx.GlobalHeader << "layout(std430, set = 0, binding = " << oneDescBindingLoc << ") ";
-                                        param.Value->BindingPoints.Clear();
-                                        param.Value->BindingPoints.Add(oneDescBindingLoc);
-                                        oneDescBindingLoc++;
-                                    }
-                                }
-                                else
-                                    ctx.GlobalHeader << "layout(std430, binding = " << param.Value->BindingPoints.First() << ") ";
-                                ctx.GlobalHeader << "buffer buf" << bufName << "\n{\n";
-                                PrintType(ctx.GlobalHeader, genType->BaseType.Ptr());
-                                ctx.GlobalHeader << " " << bufName << "[];\n};\n";
-                                break;
-                            }
-                            case BindableResourceType::Texture:
-                            {
-                                if (useVulkanBinding)
-                                {
-                                    if (!useSingleDescSet)
-                                        ctx.GlobalHeader << "layout(set = " << module.Value->DescriptorSetId << ", binding = " << slotId << ")";
-                                    else
-                                    {
-                                        ctx.GlobalHeader << "layout(set = 0, binding = " << oneDescBindingLoc << ")";
-                                        param.Value->BindingPoints.Clear();
-                                        param.Value->BindingPoints.Add(oneDescBindingLoc);
-                                        oneDescBindingLoc++;
-                                    }
-                                }
-                                else
-                                    ctx.GlobalHeader << "layout(binding = " << param.Value->BindingPoints.First() << ")";
-                                ctx.GlobalHeader << " uniform ";
-                                PrintType(ctx.GlobalHeader, param.Value->Type.Ptr());
-                                ctx.GlobalHeader << " " << EscapeCodeName(module.Value->BindingName + "_" + param.Value->Name) << ";\n";
-                                break;
-                            }
-                            case BindableResourceType::Sampler:
-                            {
-                                if (useVulkanBinding)
-                                {
-                                    if (!useSingleDescSet)
-                                        ctx.GlobalHeader << "layout(set = " << module.Value->DescriptorSetId << ", binding = " << slotId << ")";
-                                    else
-                                    {
-                                        ctx.GlobalHeader << "layout(set = 0, binding = " << oneDescBindingLoc << ")";
-                                        param.Value->BindingPoints.Clear();
-                                        param.Value->BindingPoints.Add(oneDescBindingLoc);
-                                        oneDescBindingLoc++;
-                                    }
-                                    ctx.GlobalHeader << " uniform ";
-                                    PrintType(ctx.GlobalHeader, param.Value->Type.Ptr());
-                                    ctx.GlobalHeader << " " << EscapeCodeName(module.Value->BindingName + "_" + param.Value->Name) << ";\n";
-                                }
-                                break;
-                            }
-                            break;
-                            default:
-                                continue;
-                            }
-                            slotId++;
-                        }
-                    }
-                }
-            }
-
+           
             virtual void GenerateMetaData(ShaderMetaData & result, ILProgram* program, DiagnosticSink* err) override
             {
                 EnumerableDictionary<ILModuleParameterInstance*, List<ILModuleParameterInstance*>> samplerTextures;
@@ -417,11 +269,6 @@ namespace Spire
                 }
                 if (!useVulkanBinding)
                 {
-                    for (auto & ss : program->Shaders)
-                        for (auto & pset : ss->ModuleParamSets)
-                            for (auto & p : pset.Value->Parameters)
-                                if (p.Value->Type->IsSamplerState())
-                                    p.Value->BindingPoints.Clear();
                     for (auto & sampler : samplerTextures)
                     {
                         sampler.Key->BindingPoints.Clear();

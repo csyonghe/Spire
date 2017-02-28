@@ -144,11 +144,26 @@ namespace Spire
             ctx.Body << ")";
         }
 
-        void CLikeCodeGen::PrintGlobalVar(StringBuilder & sb, ILGlobalVariable * gvar)
+        void CLikeCodeGen::PrintGlobalVarBlock(StringBuilder & sb, ILVariableBlock * gvarBlock)
         {
-            //TODO: emit bindings
-            PrintType(sb, gvar->Type.Ptr());
-            sb << " " << gvar->Name << ";\n";
+			if (gvarBlock->Vars.Count())
+			{
+				if (gvarBlock->Type == ILVariableBlockType::Constant)
+				{
+					//TODO: emit bindings
+					sb << "cbuffer {\n";
+				}
+				for (auto gvar : gvarBlock->Vars)
+				{
+					PrintType(sb, gvar.Value->Type.Ptr());
+					sb << " " << gvar.Value->Name << ";\n";
+				}
+				if (gvarBlock->Type == ILVariableBlockType::Constant)
+				{
+					//TODO: emit bindings
+					sb << "};\n";
+				}
+			}
         }
 
         void CLikeCodeGen::PrintBinaryInstrExpr(CodeGenContext & ctx, BinaryInstruction * instr)
@@ -615,8 +630,10 @@ namespace Spire
             CompiledShaderSource rs;
             PrintHeader(sbCode);
             GenerateStructs(sbCode, program);
-            for (auto gvar : program->GlobalVars)
-                PrintGlobalVar(sbCode, gvar.Value.Ptr());
+			for (auto gvar : program->VariableBlocks)
+			{
+                PrintGlobalVarBlock(sbCode, gvar.Ptr());
+			}
             for (auto func : program->Functions)
             {
                 GenerateFunctionDeclaration(sbCode, func.Value.Ptr());

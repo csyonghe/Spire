@@ -80,7 +80,7 @@ namespace Spire
             virtual void PrintMatrixMulInstrExpr(CodeGenContext & ctx, ILOperand* op0, ILOperand* op1);
             virtual void PrintRasterPositionOutputWrite(CodeGenContext & ctx, ILOperand * operand) = 0;
             virtual void PrintTextureCall(CodeGenContext & ctx, CallInstruction * instr) = 0;
-            virtual void PrintGlobalVar(StringBuilder & sb, ILGlobalVariable * gvar);
+            virtual void PrintGlobalVarBlock(StringBuilder & sb, ILVariableBlock * gvarBlock);
             virtual void PrintHeader(StringBuilder & sb) = 0;
 
             // Helpers for printing call instructions

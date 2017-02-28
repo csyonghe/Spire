@@ -87,7 +87,6 @@ namespace Spire
         void printDiagnosticArg(StringBuilder& sb, ILType* type);
         void printDiagnosticArg(StringBuilder& sb, CoreLib::Text::TokenType tokenType);
         void printDiagnosticArg(StringBuilder& sb, Token const& token);
-        void printDiagnosticArg(StringBuilder& sb, StageAttribute const& attr);
 
         template<typename T>
         void printDiagnosticArg(StringBuilder& sb, RefPtr<T> ptr)

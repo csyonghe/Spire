@@ -64,11 +64,6 @@ void printDiagnosticArg(StringBuilder& sb, Token const& token)
     sb << token.Content;
 }
 
-void printDiagnosticArg(StringBuilder& sb, StageAttribute const& attr)
-{
-    sb << attr.Value;
-}
-
 CodePosition const& getDiagnosticPos(SyntaxNode const* syntax)
 {
     return syntax->Position;

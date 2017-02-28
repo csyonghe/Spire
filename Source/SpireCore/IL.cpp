@@ -22,10 +22,6 @@ namespace Spire
                 return ILBaseType::UInt;
             if (parser.LookAhead("uint64"))
                 return ILBaseType::UInt64;
-            if (parser.LookAhead("SamplerState"))
-                return ILBaseType::SamplerState;
-            if (parser.LookAhead("SamplerComparisonState"))
-                return ILBaseType::SamplerComparisonState;
             if (parser.LookAhead("void"))
                 return ILBaseType::Void;
             return ILBaseType::Void;
@@ -70,10 +66,6 @@ namespace Spire
                 return "float";
             case ILBaseType::Void:
                 return "void";
-            case ILBaseType::SamplerComparisonState:
-                return "SamplerComparisonState";
-            case ILBaseType::SamplerState:
-                return "SamplerState";
             default:
                 return "?unknowntype";
             }
@@ -258,11 +250,11 @@ namespace Spire
 
         bool ILType::IsSamplerState()
         {
-            auto basicType = dynamic_cast<ILBasicType*>(this);
-            if (basicType)
-                return basicType->Type == ILBaseType::SamplerState || basicType->Type == ILBaseType::SamplerComparisonState;
-            else
-                return false;
+            auto basicType = dynamic_cast<ILSamplerStateType*>(this);
+			if (basicType)
+				return true;
+			else
+				return false;
         }
 
         RefPtr<ILType> DeserializeBasicType(CoreLib::Text::TokenReader & reader)
@@ -283,6 +275,15 @@ namespace Spire
             reader.Read(">");
             return vecType;
         }
+		RefPtr<ILSamplerStateType> DeserializeSamplerType(CoreLib::Text::TokenReader & reader)
+		{
+			reader.Read("SamplerState");
+			reader.Read("(");
+			auto rs = new ILSamplerStateType();
+			rs->IsComparison = reader.ReadInt() != 0;
+			reader.Read(")");
+			return rs;
+		}
         RefPtr<ILMatrixType> DeserializeMatrixType(CoreLib::Text::TokenReader & reader)
         {
             reader.Read("matrix");
@@ -376,26 +377,28 @@ namespace Spire
         }
         RefPtr<ILType> ILType::Deserialize(CoreLib::Text::TokenReader & reader)
         {
-            if (reader.LookAhead("basic"))
-                return DeserializeBasicType(reader);
-            else if (reader.LookAhead("struct"))
-                return DeserializeStructType(reader);
-            else if (reader.LookAhead("array"))
-                return DeserializeArrayType(reader);
-            else if (reader.LookAhead("array_like"))
-                return DeserializeArrayLikeType(reader);
-            else if (reader.LookAhead("ptr_like"))
-                return DeserializePointerLikeType(reader);
-            else if (reader.LookAhead("texture"))
-                return DeserializeTextureType(reader);
-            else if (reader.LookAhead("vector"))
-                return DeserializeVectorType(reader);
-            else if (reader.LookAhead("matrix"))
-                return DeserializeMatrixType(reader);
-            else if (reader.LookAhead("generic"))
-                return DeserializeGenericType(reader);
-            else if (reader.LookAhead("record"))
-                return DeserializeRecordType(reader);
+			if (reader.LookAhead("basic"))
+				return DeserializeBasicType(reader);
+			else if (reader.LookAhead("struct"))
+				return DeserializeStructType(reader);
+			else if (reader.LookAhead("array"))
+				return DeserializeArrayType(reader);
+			else if (reader.LookAhead("array_like"))
+				return DeserializeArrayLikeType(reader);
+			else if (reader.LookAhead("ptr_like"))
+				return DeserializePointerLikeType(reader);
+			else if (reader.LookAhead("texture"))
+				return DeserializeTextureType(reader);
+			else if (reader.LookAhead("vector"))
+				return DeserializeVectorType(reader);
+			else if (reader.LookAhead("matrix"))
+				return DeserializeMatrixType(reader);
+			else if (reader.LookAhead("generic"))
+				return DeserializeGenericType(reader);
+			else if (reader.LookAhead("record"))
+				return DeserializeRecordType(reader);
+			else if (reader.LookAhead("SamplerState"))
+				return DeserializeSamplerType(reader);
             return nullptr;
         }
 
@@ -701,16 +704,29 @@ namespace Spire
                 s->Serialize(sb);
                 sb << "\n";
 			}
-			for (auto & v : GlobalVars)
+			for (auto & vb : VariableBlocks)
 			{
-				sb << v.Value->Type->ToString() << " " << v.Key;
-                if (v.Value->Code)
-                {
-                    sb << " {\n";
-                    sb << v.Value->Code->ToString() << "\n}\n";
-                }
-                else
-                    sb << ";\n";
+				switch (vb->Type)
+				{
+				case ILVariableBlockType::Constant:
+					sb << "cbuffer {\n";
+					break;
+				default:
+					sb << "vars {\n";
+					break;
+				}
+				for (auto & v : vb->Vars)
+				{
+					sb << v.Value->Type->ToString() << " " << v.Key;
+					if (v.Value->Code)
+					{
+						sb << " {\n";
+						sb << v.Value->Code->ToString() << "\n}\n";
+					}
+					else
+						sb << ";\n";
+				}
+				sb << "}\n";
 			}
 			for (auto & f : Functions)
 			{
@@ -721,6 +737,24 @@ namespace Spire
 				sb << "\n{\n" << f.Value->Code->ToString() << "\n}\n";
 			}
 			return sb.ProduceString();
+		}
+		ILType * ILSamplerStateType::Clone()
+		{
+			return new ILSamplerStateType(*this);
+		}
+		String ILSamplerStateType::ToString()
+		{
+			if (IsComparison)
+				return "SamplerComparisonState";
+			else
+				return "SamplerState";
+		}
+		bool ILSamplerStateType::Equals(ILType * type)
+		{
+			auto sampler = dynamic_cast<ILSamplerStateType*>(type);
+			if (sampler)
+				return sampler->IsComparison == IsComparison;
+			return false;
 		}
 }
 }

@@ -53,9 +53,6 @@ struct DefaultLayoutRulesImpl : LayoutRulesImpl
         case ILBaseType::UInt:
         case ILBaseType::Float:
             return{ 4, 4 };
-        case ILBaseType::SamplerComparisonState:
-        case ILBaseType::SamplerState:
-            return{ 8, 8 };
         default:
             assert(!"unimplemented");
             return{ 0, 1 };

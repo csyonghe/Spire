@@ -19,8 +19,6 @@ namespace Spire
             UInt,
             Float,
             UInt64,
-            SamplerState,
-            SamplerComparisonState
         };
         int SizeofBaseType(ILBaseType type);
         int RoundToAlignment(int offset, int alignment);
@@ -540,6 +538,22 @@ namespace Spire
             }
         };
 
+		class ILSamplerStateType : public ILType
+		{
+		public:
+			bool IsComparison = false;
+			virtual ILType * Clone() override;
+			virtual String ToString() override;
+			virtual bool Equals(ILType * type) override;
+			virtual void Serialize(StringBuilder & sb) override
+			{
+				sb << "SamplerState(" << (IsComparison?"1":"0") << ")";
+			}
+			virtual BindableResourceType GetBindableResourceType() override
+			{
+				return BindableResourceType::Sampler;
+			}
+		};
         class ILOperand;
 
         class UserReferenceSet
@@ -2497,40 +2511,6 @@ namespace Spire
             ~ConstantPool();
         };
 
-        class ILShader;
-
-        class ILWorld : public Object
-        {
-        public:
-            String Name;
-            CodePosition Position;
-            RefPtr<ILRecordType> OutputType;
-            List<ILObjectDefinition> Inputs;
-            RefPtr<CFGNode> Code;
-            EnumerableDictionary<String, ILOperand*> Components;
-            bool IsAbstract = false;
-            EnumerableDictionary<String, CoreLib::Text::Token> Attributes;
-            EnumerableHashSet<String> ReferencedFunctions; // internal names of referenced functions
-            ILShader * Shader = nullptr;
-        };
-
-        class StageAttribute
-        {
-        public:
-            String Name;
-            String Value;
-            CodePosition Position;
-        };
-
-        class ILStage : public Object
-        {
-        public:
-            CodePosition Position;
-            String Name;
-            String StageType;
-            EnumerableDictionary<String, StageAttribute> Attributes;
-        };
-
         class ILModuleParameterSet;
 
         class ILModuleParameterInstance : public ILOperand
@@ -2554,18 +2534,8 @@ namespace Spire
             int UniformBufferLegacyBindingPoint = -1;
             EnumerableDictionary<String, RefPtr<ILModuleParameterInstance>> Parameters;
         };
-
-        class ILShader
-        {
-        public:
-            CodePosition Position;
-            String Name;
-            EnumerableDictionary<String, RefPtr<ILModuleParameterSet>> ModuleParamSets;
-            EnumerableDictionary<String, RefPtr<ILWorld>> Worlds;
-            EnumerableDictionary<String, RefPtr<ILStage>> Stages;
-        };
-
-        enum class ILStageName
+		
+		enum class ILStageName
         {
             General, Compute, Vertex, Fragment, Hull, Domain, Geometry
         };
@@ -2612,19 +2582,47 @@ namespace Spire
             }
         };
 
+		enum class ILVariableBlockType
+		{
+			GlobalVar, Constant
+		};
+
+		class ILBinding
+		{
+		public:
+			// DX11 style binding
+			BindableResourceType BindingType;
+			int ResourceLocalBindingIndex;
+
+			// Vulkan style binding
+			int DescriptorTableIndex;
+			int DescriptorBindingIndex;
+		};
+
+		class ILVariableBlock
+		{
+		public:
+			ILVariableBlockType Type;
+			ILBinding Binding;
+			String Name;
+			CodePosition Position;
+			EnumerableDictionary<String, RefPtr<ILGlobalVariable>> Vars;
+		};
+
         class ILProgram : public RefObject
         {
         public:
             RefPtr<ConstantPool> ConstantPool = new Compiler::ConstantPool();
-            EnumerableDictionary<String, RefPtr<ILGlobalVariable>> GlobalVars;
             EnumerableDictionary<String, RefPtr<ILModuleParameterSet>> ModuleParamSets;
             List<RefPtr<ILStructType>> Structs;
             EnumerableDictionary<String, RefPtr<ILFunction>> Functions;
-            List<RefPtr<ILShader>> Shaders; // not used
+			List<RefPtr<ILVariableBlock>> VariableBlocks;
 			String ToString();
             ~ILProgram()
             {
+				// explicit freeing order
                 Functions = EnumerableDictionary<String, RefPtr<ILFunction>>();
+				VariableBlocks = List<RefPtr<ILVariableBlock>>();
                 Structs = List<RefPtr<ILStructType>>();
                 ModuleParamSets = EnumerableDictionary<String, RefPtr<ILModuleParameterSet>>();
             }
