@@ -378,8 +378,8 @@ namespace Spire
             virtual RefPtr<StructSyntaxNode> VisitStruct(StructSyntaxNode * st) override
             {
                 RefPtr<ILType> structType = TranslateStructType(st);
-				if (auto st = structType.As<ILStructType>())
-					program->Structs.Add(st);
+				if (auto t = structType.As<ILStructType>())
+					program->Structs.Add(t);
                 return st;
             }
             virtual RefPtr<FunctionSyntaxNode> VisitFunction(FunctionSyntaxNode* function) override
