@@ -303,6 +303,8 @@ namespace Spire
                     sb << "Array";
                 if (Flavor.Fields.IsShadow)
                     sb << "Shadow";
+                if (!BaseType->IsFloatVector() || BaseType->AsVectorType()->Size != 4)
+                    sb << "<" << BaseType->ToString() << ">";
                 return sb.ProduceString();
             }
             virtual BindableResourceType GetBindableResourceType() override
@@ -553,6 +555,10 @@ namespace Spire
 			{
 				return BindableResourceType::Sampler;
 			}
+            ILSamplerStateType() = default;
+            ILSamplerStateType(bool isComparison)
+                : IsComparison(isComparison)
+            {}
 		};
         class ILOperand;
 

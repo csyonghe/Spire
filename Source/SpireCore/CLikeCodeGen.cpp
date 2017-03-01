@@ -482,6 +482,8 @@ namespace Spire
         {
             if (instr.Is<MemberAccessInstruction>())
                 return true;
+            if (instr.Is<ILGlobalVariable>())
+                return true;
             if (auto arg = instr.As<FetchArgInstruction>())
             {
                 if (arg->ArgId == 0)

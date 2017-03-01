@@ -73,7 +73,7 @@ namespace Spire
                 }
                 return result;
             }
-            RefPtr<ILType> TranslateStructType(AggTypeDecl* structDecl)
+            RefPtr<ILStructType> TranslateStructType(AggTypeDecl* structDecl)
             {
                 RefPtr<ILStructType> ilStructType;
 
@@ -81,15 +81,6 @@ namespace Spire
                 {
                     return ilStructType;
                 }
-				if (auto magicType = structDecl->FindModifier<MagicTypeModifier>())
-				{
-					if (magicType->name == "SamplerState")
-					{
-						RefPtr<ILSamplerStateType> samplerType = new ILSamplerStateType();
-						samplerType->IsComparison = (magicType->tag == (uint32_t)SamplerStateType::Flavor::SamplerComparisonState);
-						return samplerType;
-					}
-				}
                 ilStructType = new ILStructType();
                 ilStructType->TypeName = structDecl->Name.Content;
 
@@ -145,6 +136,10 @@ namespace Spire
                         texType->isMultisample(),
                         texType->IsArray(),
                         texType->isShadow());
+                }
+                else if (auto samplerType = type->As<SamplerStateType>())
+                {
+                    return new ILSamplerStateType(samplerType->flavor == SamplerStateType::Flavor::SamplerComparisonState);
                 }
                 else if (auto cbufferType = type->As<ConstantBufferType>())
                 {
@@ -255,36 +250,68 @@ namespace Spire
                 }
                 thisDeclRef = DeclRef();
             }
-			void DefineClassFields(ILVariableBlock * cbufferBlock, ILVariableBlock * gvarBlock, ILOperand * obj, String namePrefix)
+			void DefineClassFields(ILVariableBlock * cbufferBlock, ILVariableBlock * gvarBlock, ILOperand * obj, ILStructType * structType, String namePrefix)
 			{
-				auto structType = obj->Type.As<ILStructType>();
 				assert(structType);
 				int memberIndex = 0;
 				for (auto field : structType->Members)
 				{
 					// create global variable
-					auto gvar = new ILGlobalVariable(field.Type);
+					RefPtr<ILGlobalVariable> gvar = new ILGlobalVariable(field.Type);
 					gvar->Name = namePrefix + "_" + field.FieldName;
-					variables.Add(gvar->Name, gvar);
-					if (field.Type->GetBindableResourceType() != BindableResourceType::NonBindable)
-					{
-						gvarBlock->Vars.Add(gvar->Name, gvar);
-						//TODO: assign bindings here
-					}
-					else
-					{
-						cbufferBlock->Vars.Add(gvar->Name, gvar);
-						if (field.Type.As<ILStructType>())
-						{
-							GenerateIndexExpression(obj, program->ConstantPool->CreateConstant(memberIndex));
-							DefineClassFields(cbufferBlock, gvarBlock, PopStack(), namePrefix + "_" + field.FieldName);
-						}
-					}
-					GenerateIndexExpression(obj, program->ConstantPool->CreateConstant(memberIndex));
-					codeWriter.Assign(PopStack(), gvar);
+					variables.Add(gvar->Name, gvar.Ptr());
+                    if (auto fieldStructType = field.Type.As<ILStructType>())
+                    {
+                        GenerateIndexExpression(obj, program->ConstantPool->CreateConstant(memberIndex));
+                        DefineClassFields(cbufferBlock, gvarBlock, PopStack(), fieldStructType.Ptr(), namePrefix + "_" + field.FieldName);
+                    }
+                    else
+                    {
+                        if (field.Type->GetBindableResourceType() != BindableResourceType::NonBindable)
+                        {
+                            gvarBlock->Vars.Add(gvar->Name, gvar);
+                            //TODO: assign bindings here
+                        }
+                        else
+                        {
+                            cbufferBlock->Vars.Add(gvar->Name, gvar);
+                        }
+                        GenerateIndexExpression(obj, program->ConstantPool->CreateConstant(memberIndex));
+                        codeWriter.Assign(PopStack(), gvar.Ptr());
+                    }
 					memberIndex++;
 				}
 			}
+            void DefineCBufferFields(ILVariableBlock * cbufferBlock, ILVariableBlock * gvarBlock, ILStructType * structType)
+            {
+                assert(structType);
+                int memberIndex = 0;
+                for (auto field : structType->Members)
+                {
+                    // create global variable
+                    RefPtr<ILGlobalVariable> gvar = new ILGlobalVariable(field.Type);
+                    gvar->Name = field.FieldName;
+                    variables.Add(gvar->Name, gvar.Ptr());
+                    if (auto fieldStructType = field.Type.As<ILStructType>())
+                    {
+                        gvarBlock->Vars.Add(gvar->Name, gvar);
+                        DefineClassFields(cbufferBlock, gvarBlock, gvar.Ptr(), fieldStructType.Ptr(), field.FieldName);
+                    }
+                    else
+                    {
+                        if (field.Type->GetBindableResourceType() != BindableResourceType::NonBindable)
+                        {
+                            gvarBlock->Vars.Add(gvar->Name, gvar);
+                            //TODO: assign bindings here
+                        }
+                        else
+                        {
+                            cbufferBlock->Vars.Add(gvar->Name, gvar);
+                        }
+                    }
+                    memberIndex++;
+                }
+            }
         public:
             virtual RefPtr<ProgramSyntaxNode> VisitProgram(ProgramSyntaxNode * prog) override
             {
@@ -298,16 +325,18 @@ namespace Spire
                         continue;
                     s->Accept(this);
                 }
+                
                 auto classes = prog->GetMembersOfType<ClassSyntaxNode>();
                 for (auto&& c : classes)
                 {
                     auto stype = TranslateStructType(c.Ptr());
-					program->Structs.Add(stype.As<ILStructType>());
+					program->Structs.Add(stype);
                 }
                 for (auto&& c : classes)
                 {
                     GenerateMemberFunctionHeader(c.Ptr());
                 }
+
                 variables.PushScope();
 
 				RefPtr<ILFunction> initFunc = new ILFunction();
@@ -327,17 +356,28 @@ namespace Spire
 						auto cbufferBlock = new ILVariableBlock();
 						cbufferBlock->Type = ILVariableBlockType::Constant;
 						program->VariableBlocks.Add(cbufferBlock);
-						DefineClassFields(cbufferBlock, globalVarBlock.Ptr(), gvar, v->Name.Content);
+						DefineClassFields(cbufferBlock, globalVarBlock.Ptr(), gvar, structType.Ptr(), v->Name.Content);
+                    }
+                    else if (auto cbuffer = v->Type->As<ConstantBufferType>())
+                    {
+                        auto cbufferBlock = new ILVariableBlock();
+                        cbufferBlock->Type = ILVariableBlockType::Constant;
+                        program->VariableBlocks.Add(cbufferBlock);
+                        DefineCBufferFields(cbufferBlock, globalVarBlock.Ptr(), 
+                            TranslateStructType(dynamic_cast<AggTypeDecl*>(dynamic_cast<DeclRefType*>(cbuffer->elementType.Ptr())->declRef.decl)).Ptr());
                     }
                     else
                     {
                         auto gvarType = TranslateExpressionType(v->Type);
                         gvar = new ILGlobalVariable(gvarType.Ptr());
                     }
-                    gvar->Name = v->Name.Content;
-                    gvar->Position = v->Position;
-                    variables.Add(gvar->Name, gvar);
-                    globalVarBlock->Vars.Add(gvar->Name, gvar);
+                    if (gvar)
+                    {
+                        gvar->Name = v->Name.Content;
+                        gvar->Position = v->Position;
+                        variables.Add(gvar->Name, gvar);
+                        globalVarBlock->Vars.Add(gvar->Name, gvar);
+                    }
                 }
 				initFunc->Code = codeWriter.PopNode();
 				program->Functions.Add(initFunc->Name, initFunc);
@@ -377,9 +417,8 @@ namespace Spire
             }
             virtual RefPtr<StructSyntaxNode> VisitStruct(StructSyntaxNode * st) override
             {
-                RefPtr<ILType> structType = TranslateStructType(st);
-				if (auto t = structType.As<ILStructType>())
-					program->Structs.Add(t);
+                RefPtr<ILStructType> structType = TranslateStructType(st);
+				program->Structs.Add(structType);
                 return st;
             }
             virtual RefPtr<FunctionSyntaxNode> VisitFunction(FunctionSyntaxNode* function) override
@@ -634,10 +673,15 @@ namespace Spire
             {
                 RefPtr<Object> refObj;
                 expr->BaseExpression->Access = expr->Access;
-                expr->BaseExpression->Accept(this);
-                auto base = PopStack();
-                if (auto declRefType = expr->BaseExpression->Type->AsDeclRefType())
+                if (auto deref = expr->BaseExpression.As<DerefExpr>())
                 {
+                    if (!GenerateVarRef(expr->MemberName))
+                        throw InvalidProgramException();
+                }
+                else if (auto declRefType = expr->BaseExpression->Type->AsDeclRefType())
+                {
+                    expr->BaseExpression->Accept(this);
+                    auto base = PopStack();
                     if (auto structDecl = declRefType->declRef.As<StructDeclRef>())
                     {
                         int id = structDecl.GetDecl()->FindFieldIndex(expr->MemberName);
@@ -940,7 +984,6 @@ namespace Spire
             }
             virtual RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode* expr) override
             {
-                RefPtr<Object> refObj;
                 if (!GenerateVarRef(expr->Variable))
                 {
                     throw InvalidProgramException("identifier is neither a variable nor a recognized component.");

@@ -301,7 +301,7 @@ namespace Spire
                     if (result.GetErrorCount() > 0)
                         return;
 
-                    CodeGenBackend * backend = nullptr;
+                    RefPtr<CodeGenBackend> backend = nullptr;
                     switch (options.Target)
                     {
                     case CodeGenTarget::HLSL:
