@@ -525,14 +525,14 @@ static void GenerateReflectionParameter(
         // A uniform parameter inside of a parent buffer.
         parameter->flavor = ReflectionNodeFlavor::Parameter;
         parameter->bindingSpace = 0;
-        parameter->bindingIndex = paramLayout->uniformOffset;
+        parameter->bindingIndex = (ReflectionSize) paramLayout->uniformOffset;
     }
     else
     {
         // A resource parameter
         parameter->flavor = ReflectionNodeFlavor::Parameter;
-        parameter->bindingSpace = paramLayout->resources.space;
-        parameter->bindingIndex = paramLayout->resources.index;
+        parameter->bindingSpace = (ReflectionSize) paramLayout->resources.space;
+        parameter->bindingIndex = (ReflectionSize) paramLayout->resources.index;
     }
 }
 

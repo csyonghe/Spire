@@ -245,7 +245,7 @@ LayoutInfo GetSimpleLayoutImpl(
         if(IsResourceKind(info.kind))
         {
             typeLayout->resources.kind = info.kind;
-            typeLayout->resources.count = info.size;
+            typeLayout->resources.count = (int) info.size;
         }
     }
 

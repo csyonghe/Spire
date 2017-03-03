@@ -11,8 +11,8 @@ namespace Compiler {
 // Information on ranges of registers already claimed/used
 struct UsedRange
 {
-    size_t begin;
-    size_t end;
+    int begin;
+    int end;
 };
 bool operator<(UsedRange left, UsedRange right)
 {
@@ -48,7 +48,7 @@ struct UsedRanges
         ranges.Sort();
     }
 
-    void Add(size_t begin, size_t end)
+    void Add(int begin, int end)
     {
         UsedRange range;
         range.begin = begin;
@@ -58,16 +58,16 @@ struct UsedRanges
 
 
     // Try to find space for `count` entries
-    size_t Allocate(size_t count)
+    int Allocate(int count)
     {
-        size_t begin = 0;
+        int begin = 0;
 
-        size_t rangeCount = ranges.Count();
-        for (size_t rr = 0; rr < rangeCount; ++rr)
+        int rangeCount = ranges.Count();
+        for (int rr = 0; rr < rangeCount; ++rr)
         {
             // try to fit in before this range...
 
-            size_t end = ranges[rr].begin;
+            int end = ranges[rr].begin;
 
             // If there is enough space...
             if (end > begin + count)
@@ -128,8 +128,8 @@ static bool IsGlobalVariableAShaderParameter(
 struct LayoutSemanticInfo
 {
     LayoutResourceKind  kind; // the register kind
-    size_t              space;
-    size_t              index;
+    int                 space;
+    int                 index;
 
     // TODO: need to deal with component-granularity binding...
 };
@@ -172,9 +172,9 @@ LayoutSemanticInfo ExtractLayoutSemanticInfo(
     }
 
     // TODO: need to parse and handle `space` binding
-    size_t space = 0;
+    int space = 0;
 
-    size_t index = 0;
+    int index = 0;
     for (int ii = 1; ii < registerName.Length(); ++ii)
     {
         int c = registerName[ii];
