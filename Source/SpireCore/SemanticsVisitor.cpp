@@ -1451,12 +1451,123 @@ namespace Spire
                 return new ConstantIntVal(expr->IntValue);
             }
 
-            // Check that an expression resolves to an integer constant, and get its value
-            RefPtr<IntVal> CheckIntegerConstantExpression(ExpressionSyntaxNode* exp)
+            RefPtr<IntVal> TryConstantFoldExpr(
+                RefPtr<InvokeExpressionSyntaxNode> invokeExpr)
+            {
+                // We need all the operands to the expression
+
+                // Check if the callee is an operation that is amenable to constant-folding.
+                //
+                // For right now we will look for calls to intrinsic functions, and then inspect
+                // their names (this is bad and slow).
+                auto funcDeclRefExpr = invokeExpr->FunctionExpr.As<DeclRefExpr>();
+                if (!funcDeclRefExpr) return nullptr;
+
+                auto funcDeclRef = funcDeclRefExpr->declRef;
+                auto intrinsicMod = funcDeclRef.GetDecl()->FindModifier<IntrinsicModifier>();
+                if (!intrinsicMod) return nullptr;
+
+                // Let's not constant-fold operations with more than a certain number of arguments, for simplicity
+                static const int kMaxArgs = 8;
+                if (invokeExpr->Arguments.Count() > kMaxArgs)
+                    return nullptr;
+
+                // Before checking the operation name, let's look at the arguments
+                RefPtr<IntVal> argVals[kMaxArgs];
+                int constArgVals[kMaxArgs];
+                int argCount = 0;
+                bool allConst = true;
+                for (auto argExpr : invokeExpr->Arguments)
+                {
+                    auto argVal = TryCheckIntegerConstantExpression(argExpr.Ptr());
+                    if (!argVal)
+                        return nullptr;
+
+                    argVals[argCount] = argVal;
+
+                    if (auto constArgVal = argVal.As<ConstantIntVal>())
+                    {
+                        constArgVals[argCount] = constArgVal->value;
+                    }
+                    else
+                    {
+                        allConst = false;
+                    }
+                    argCount++;
+                }
+
+                if (!allConst)
+                {
+                    // TODO(tfoley): We probably want to support a very limited number of operations
+                    // on "constants" that aren't actually known, to be able to handle a generic
+                    // that takes an integer `N` but then constructs a vector of size `N+1`.
+                    //
+                    // The hard part there is implementing the rules for value unification in the
+                    // presence of more complicated `IntVal` subclasses, like `SumIntVal`. You'd
+                    // need inference to be smart enough to know that `2 + N` and `N + 2` are the
+                    // same value, as are `N + M + 1 + 1` and `M + 2 + N`.
+                    //
+                    // For now we can just bail in this case.
+                    return nullptr;
+                }
+
+                // At this point, all the operands had simple integer values, so we are golden.
+                int resultValue = 0;
+                auto opName = funcDeclRef.GetName();
+
+                // handle binary operators
+                if (opName == "-")
+                {
+                    if (argCount == 1)
+                    {
+                        resultValue = -constArgVals[0];
+                    }
+                    else if (argCount == 2)
+                    {
+                        resultValue = constArgVals[0] - constArgVals[1];
+                    }
+                }
+
+                // simple binary operators
+#define CASE(OP)                                                        \
+                else if(opName == #OP) do {                             \
+                    if(argCount != 2) return nullptr;                   \
+                    resultValue = constArgVals[0] OP constArgVals[1];   \
+                } while(0)
+
+                CASE(+); // TODO: this can also be unary...
+                CASE(*);
+#undef CASE
+
+                // binary operators with chance of divide-by-zero
+                // TODO: issue a suitable error in that case
+#define CASE(OP)                                                        \
+                else if(opName == #OP) do {                             \
+                    if(argCount != 2) return nullptr;                   \
+                    if(!constArgVals[1]) return nullptr;                \
+                    resultValue = constArgVals[0] OP constArgVals[1];   \
+                } while(0)
+
+                CASE(/);
+                CASE(%);
+#undef CASE
+
+                // TODO(tfoley): more cases
+                else
+                {
+                    return nullptr;
+                }
+
+                RefPtr<IntVal> result = new ConstantIntVal(resultValue);
+                return result;
+            }
+
+            // Try to check an integer constant expression, either returning the value,
+            // or NULL if the expression isn't recognized as a constant.
+            RefPtr<IntVal> TryCheckIntegerConstantExpression(ExpressionSyntaxNode* exp)
             {
                 if (!exp->Type.type->Equals(ExpressionType::GetInt()))
                 {
-                    getSink()->diagnose(exp, Diagnostics::expectedIntegerConstantWrongType, exp->Type);
                     return nullptr;
                 }
 
@@ -1476,9 +1587,34 @@ namespace Spire
                     }
                 }
 
-                getSink()->diagnose(exp, Diagnostics::expectedIntegerConstantNotConstant);
+                // Otherwise, we need to consider operations that we might be able to constant-fold...
+                if (auto invokeExpr = dynamic_cast<InvokeExpressionSyntaxNode*>(exp))
+                {
+                    auto val = TryConstantFoldExpr(invokeExpr);
+                    if (val)
+                        return val;
+                }
+
                 return nullptr;
             }
+
+            // Enforce that an expression resolves to an integer constant, and get its value
+            RefPtr<IntVal> CheckIntegerConstantExpression(ExpressionSyntaxNode* expr)
+            {
+                if (!expr->Type.type->Equals(ExpressionType::GetInt()))
+                {
+                    getSink()->diagnose(expr, Diagnostics::expectedIntegerConstantWrongType, expr->Type);
+                    return nullptr;
+                }
+                auto result = TryCheckIntegerConstantExpression(expr);
+                if (!result)
+                {
+                    getSink()->diagnose(expr, Diagnostics::expectedIntegerConstantNotConstant);
+                }
+                return result;
+            }
+
+
 
             RefPtr<ExpressionSyntaxNode> CheckSimpleSubscriptExpr(
                 RefPtr<IndexExpressionSyntaxNode>   subscriptExpr,
@@ -2704,6 +2840,12 @@ namespace Spire
                 RefPtr<ExpressionType> snd)
             {
                 if (fst->Equals(snd)) return true;
+
+                if (auto fstErrorType = fst->As<ErrorType>())
+                    return true;
+
+                if (auto sndErrorType = snd->As<ErrorType>())
+                    return true;
 
                 if (auto fstDeclRefType = fst->As<DeclRefType>())
                 {
