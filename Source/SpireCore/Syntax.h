@@ -1800,8 +1800,9 @@ namespace Spire
             And,
             Or,
             Sequence,
+            Select,
             Assign = 200, AddAssign, SubAssign, MulAssign, DivAssign, ModAssign,
-            LshAssign, RshAssign, OrAssign, AndAssign, XorAssign
+            LshAssign, RshAssign, OrAssign, AndAssign, XorAssign,
         };
         String GetOperatorFunctionName(Operator op);
         String OperatorToString(Operator op);
@@ -1898,12 +1899,9 @@ namespace Spire
             virtual TypeCastExpressionSyntaxNode * Clone(CloneContext & ctx) override;
         };
 
-        class SelectExpressionSyntaxNode : public ExpressionSyntaxNode
+        class SelectExpressionSyntaxNode : public OperatorExpressionSyntaxNode
         {
         public:
-            RefPtr<ExpressionSyntaxNode> SelectorExpr, Expr0, Expr1;
-            virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-            virtual SelectExpressionSyntaxNode * Clone(CloneContext & ctx) override;
         };
 
 
@@ -2705,16 +2703,6 @@ namespace Spire
                 if (stmt->Expression)
                     stmt->Expression = stmt->Expression->Accept(this).As<ExpressionSyntaxNode>();
                 return stmt->Expression;
-            }
-            virtual RefPtr<ExpressionSyntaxNode> VisitSelectExpression(SelectExpressionSyntaxNode * expr)
-            {
-                if (expr->SelectorExpr)
-                    expr->SelectorExpr = expr->SelectorExpr->Accept(this).As<ExpressionSyntaxNode>();
-                if (expr->Expr0)
-                    expr->Expr0 = expr->Expr0->Accept(this).As<ExpressionSyntaxNode>();
-                if (expr->Expr1)
-                    expr->Expr1 = expr->Expr1->Accept(this).As<ExpressionSyntaxNode>();
-                return expr;
             }
             virtual RefPtr<ExpressionSyntaxNode> VisitVarExpression(VarExpressionSyntaxNode* expr)
             {

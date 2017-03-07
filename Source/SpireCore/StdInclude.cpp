@@ -13,6 +13,9 @@ R"(
 
 __generic<T,U> __intrinsic U operator,(T left, U right);
 
+__generic<T> __intrinsic T operator?:(bool condition, T ifTrue, T ifFalse);
+__generic<T, let N : int> __intrinsic vector<T,N> operator?:(vector<bool,N> condition, vector<T,N> ifTrue, vector<T,N> ifFalse);
+
 __generic<T> __magic_type(HLSLAppendStructuredBufferType) struct AppendStructuredBuffer
 {
 };

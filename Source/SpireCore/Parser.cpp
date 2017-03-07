@@ -795,6 +795,15 @@ namespace Spire
                 // Note(tfoley): A bit of a hack:
                 case TokenType::Comma:
                     break;
+
+                // Note(tfoley): Even more of a hack!
+                case TokenType::QuestionMark:
+                    if (AdvanceIf(parser, TokenType::Colon))
+                    {
+                        name.Content = name.Content + ":";
+                        break;
+                    }
+
                 default:
                     parser->sink->diagnose(name.Position, Diagnostics::invalidOperator, name.Content);
                     break;
@@ -2632,11 +2641,13 @@ namespace Spire
                 {
                     RefPtr<SelectExpressionSyntaxNode> select = new SelectExpressionSyntaxNode();
                     FillPosition(select.Ptr());
+                    select->SetOperator(currentScope.Ptr(), Operator::Select);
+
+                    select->Arguments.Add(condition);
                     ReadToken(TokenType::QuestionMark);
-                    select->SelectorExpr = condition;
-                    select->Expr0 = ParseExpression(level);
+                    select->Arguments.Add(ParseExpression(level));
                     ReadToken(TokenType::Colon);
-                    select->Expr1 = ParseExpression(level);
+                    select->Arguments.Add(ParseExpression(level));
                     return select;
                 }
                 else

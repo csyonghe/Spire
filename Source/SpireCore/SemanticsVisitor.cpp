@@ -4013,6 +4013,7 @@ namespace Spire
                 expr->Type = ExpressionType::Error;
                 return expr;
             }
+#if TIMREMOVED
             virtual RefPtr<ExpressionSyntaxNode> VisitSelectExpression(SelectExpressionSyntaxNode * expr) override
             {
                 auto selectorExpr = expr->SelectorExpr;
@@ -4033,6 +4034,7 @@ namespace Spire
                 expr->Type = expr->Expr0->Type;
                 return expr;
             }
+#endif
 
             // Get the type to use when referencing a declaration
             QualType GetTypeForDeclRef(DeclRef declRef)

@@ -369,18 +369,6 @@ namespace Spire
             rs->Expression = Expression->Clone(ctx);
             return rs;
         }
-        RefPtr<SyntaxNode> SelectExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
-        {
-            return visitor->VisitSelectExpression(this);
-        }
-        SelectExpressionSyntaxNode * SelectExpressionSyntaxNode::Clone(CloneContext & ctx)
-        {
-            auto rs = CloneSyntaxNodeFields(new SelectExpressionSyntaxNode(*this), ctx);
-            rs->SelectorExpr = SelectorExpr->Clone(ctx);
-            rs->Expr0 = Expr0->Clone(ctx);
-            rs->Expr1 = Expr1->Clone(ctx);
-            return rs;
-        }
         RefPtr<SyntaxNode> VarExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
         {
             return visitor->VisitVarExpression(this);
@@ -1322,6 +1310,8 @@ namespace Spire
                 return "||";
             case Operator::Sequence:
                 return ",";
+            case Operator::Select:
+                return "?:";
             default:
                 return "";
             }
