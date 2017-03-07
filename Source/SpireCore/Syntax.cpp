@@ -90,9 +90,6 @@ namespace Spire
             case Compiler::BaseType::Void:
                 res.Append("void");
                 break;
-            case Compiler::BaseType::Error:
-                res.Append("<errtype>");
-                break;
             default:
                 break;
             }
@@ -665,37 +662,28 @@ namespace Spire
             return true;
         }
 
+#if 0
         RefPtr<ExpressionType> ExpressionType::Bool;
         RefPtr<ExpressionType> ExpressionType::UInt;
         RefPtr<ExpressionType> ExpressionType::Int;
         RefPtr<ExpressionType> ExpressionType::Float;
         RefPtr<ExpressionType> ExpressionType::Float2;
         RefPtr<ExpressionType> ExpressionType::Void;
+#endif
         RefPtr<ExpressionType> ExpressionType::Error;
         RefPtr<ExpressionType> ExpressionType::Overloaded;
+
+        Dictionary<int, RefPtr<ExpressionType>> ExpressionType::sBuiltinTypes;
+        Dictionary<String, Decl*> ExpressionType::sMagicDecls;
         List<RefPtr<ExpressionType>> ExpressionType::sCanonicalTypes;
 
         void ExpressionType::Init()
         {
-            Bool = new BasicExpressionType(BaseType::Bool);
-            UInt = new BasicExpressionType(BaseType::UInt);
-            Int = new BasicExpressionType(BaseType::Int);
-
-            RefPtr<BasicExpressionType> floatType = new BasicExpressionType(BaseType::Float);
-            Float = floatType;
-            Float2 = new VectorExpressionType(floatType, new ConstantIntVal(2));
-            Void = new BasicExpressionType(BaseType::Void);
-            Error = new BasicExpressionType(BaseType::Error);
+            Error = new ErrorType();
             Overloaded = new OverloadGroupType();
         }
         void ExpressionType::Finalize()
         {
-            Bool = nullptr;
-            UInt = nullptr;
-            Int = nullptr;
-            Float = nullptr;
-            Float2 = nullptr;
-            Void = nullptr;
             Error = nullptr;
             Overloaded = nullptr;
             // Note(tfoley): This seems to be just about the only way to clear out a List<T>
@@ -953,6 +941,29 @@ namespace Spire
             return (int)(int64_t)(void*)this;
         }
 
+        // ErrorType
+
+        String ErrorType::ToString() const
+        {
+            return "error";
+        }
+
+        bool ErrorType::EqualsImpl(const ExpressionType * /*type*/) const
+        {
+            return false;
+        }
+
+        ExpressionType* ErrorType::CreateCanonicalType()
+        {
+            return  this;
+        }
+
+        int ErrorType::GetHashCode() const
+        {
+            return (int)(int64_t)(void*)this;
+        }
+
+
         // NamedExpressionType
 
         String NamedExpressionType::ToString() const
@@ -1130,12 +1141,13 @@ namespace Spire
             int diff = 0;
             auto substDeclRef = declRef.SubstituteImpl(subst, &diff);
             auto substElementType = elementType->SubstituteImpl(subst, &diff).As<ExpressionType>();
+            auto substElementCount = elementCount->SubstituteImpl(subst, &diff).As<IntVal>();
 
             if (!diff)
                 return this;
 
             (*ioDiff)++;
-            auto substType = new VectorExpressionType(substElementType, elementCount);
+            auto substType = new VectorExpressionType(substElementType, substElementCount);
             substType->declRef = substDeclRef;
             return substType;
         }
@@ -1491,6 +1503,44 @@ namespace Spire
             return declRef.GetHashCode() ^ 0xFFFF;
         }
 
+        RefPtr<Val> GenericParamIntVal::SubstituteImpl(Substitutions* subst, int* ioDiff)
+        {
+            // search for a substitution that might apply to us
+            for (auto s = subst; s; s = s->outer.Ptr())
+            {
+                // the generic decl associated with the substitution list must be
+                // the generic decl that declared this parameter
+                auto genericDecl = s->genericDecl;
+                if (genericDecl != declRef.GetDecl()->ParentDecl)
+                    continue;
+
+                int index = 0;
+                for (auto m : genericDecl->Members)
+                {
+                    if (m.Ptr() == declRef.GetDecl())
+                    {
+                        // We've found it, so return the corresponding specialization argument
+                        (*ioDiff)++;
+                        return s->args[index];
+                    }
+                    else if(auto typeParam = m.As<GenericTypeParamDecl>())
+                    {
+                        index++;
+                    }
+                    else if(auto valParam = m.As<GenericValueParamDecl>())
+                    {
+                        index++;
+                    }
+                    else
+                    {
+                    }
+                }
+            }
+
+            // Nothing found: don't substittue.
+            return this;
+        }
+
         // ExtensionDecl
 
         RefPtr<SyntaxNode> ExtensionDecl::Accept(SyntaxVisitor * visitor)
@@ -1658,6 +1708,18 @@ namespace Spire
             return this;
         }
 
+        // IntVal
+
+        int GetIntVal(RefPtr<IntVal> val)
+        {
+            if (auto constantVal = val.As<ConstantIntVal>())
+            {
+                return constantVal->value;
+            }
+            assert(!"unexpected");
+            return 0;
+        }
+
         // ConstantIntVal
 
         bool ConstantIntVal::EqualsVal(Val* val)
@@ -1734,6 +1796,8 @@ namespace Spire
             throw "unimplemented";
         }
 
+        // OperatorExpressionSyntaxNode
+
         void OperatorExpressionSyntaxNode::SetOperator(ContainerDecl * scope, Spire::Compiler::Operator op)
         {
             this->Operator = op;
@@ -1749,5 +1813,59 @@ namespace Spire
             return visitor->VisitOperatorExpression(this);
         }
 
-}
+        // DeclGroup
+
+        RefPtr<SyntaxNode> DeclGroup::Accept(SyntaxVisitor * visitor)
+        {
+            visitor->VisitDeclGroup(this);
+            return this;
+        }
+
+        //
+
+        void RegisterBuiltinDecl(
+            RefPtr<Decl>                decl,
+            RefPtr<BuiltinTypeModifier> modifier)
+        {
+            auto type = DeclRefType::Create(DeclRef(decl.Ptr(), nullptr));
+            ExpressionType::sBuiltinTypes[(int)modifier->tag] = type;
+        }
+
+        void RegisterMagicDecl(
+            RefPtr<Decl>                decl,
+            RefPtr<MagicTypeModifier>   modifier)
+        {
+            ExpressionType::sMagicDecls[decl->Name.Content] = decl.Ptr();
+        }
+
+        ExpressionType* ExpressionType::GetBool()
+        {
+            return sBuiltinTypes[(int)BaseType::Bool].GetValue().Ptr();
+        }
+
+        ExpressionType* ExpressionType::GetFloat()
+        {
+            return sBuiltinTypes[(int)BaseType::Float].GetValue().Ptr();
+        }
+
+        ExpressionType* ExpressionType::GetInt()
+        {
+            return sBuiltinTypes[(int)BaseType::Int].GetValue().Ptr();
+        }
+
+        ExpressionType* ExpressionType::GetUInt()
+        {
+            return sBuiltinTypes[(int)BaseType::UInt].GetValue().Ptr();
+        }
+
+        ExpressionType* ExpressionType::GetVoid()
+        {
+            return sBuiltinTypes[(int)BaseType::Void].GetValue().Ptr();
+        }
+
+        ExpressionType* ExpressionType::GetError()
+        {
+            return ExpressionType::Error.Ptr();
+        }
+    }
 }

@@ -7,6 +7,8 @@
 #include "Syntax.h"
 #include "CodeGenBackend.h"
 
+#include "../../Spire.h"
+
 namespace Spire
 {
     namespace Compiler
@@ -84,12 +86,14 @@ namespace Spire
 
         enum class CodeGenTarget
         {
-            Unknown,
-
-            GLSL, GLSL_Vulkan, GLSL_Vulkan_OneDesc, HLSL, SPIRV,
-
-            DXBytecode,
-            DXBytecodeAssembly,
+            Unknown             = SPIRE_TARGET_UNKNOWN,
+            GLSL                = SPIRE_GLSL,
+            GLSL_Vulkan         = SPIRE_GLSL_VULKAN,
+            GLSL_Vulkan_OneDesc = SPIRE_GLSL_VULKAN_ONE_DESC,
+            HLSL                = SPIRE_HLSL,
+            SPIRV               = SPIRE_SPIRV,
+            DXBytecode          = SPIRE_DXBC,
+            DXBytecodeAssembly  = SPIRE_DXBC_ASM,
         };
 
         // Describes an entry point that we've been requested to compile

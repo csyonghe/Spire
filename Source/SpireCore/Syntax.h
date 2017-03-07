@@ -5,6 +5,8 @@
 #include "Lexer.h"
 #include "IL.h"
 
+#include "../../Spire.h"
+
 #include <assert.h>
 
 namespace Spire
@@ -285,8 +287,8 @@ namespace Spire
             Texture2DArrayShadow = 53,
             Texture3D = 54,
             SamplerState = 4096, SamplerComparisonState = 4097,
-#endif
             Error = 16384,
+#endif
         };
 
         class Decl;
@@ -334,6 +336,10 @@ namespace Spire
         {
         };
 
+        // Try to extract a simple integer value from an `IntVal`.
+        // This fill assert-fail if the object doesn't represent a literal value.
+        int GetIntVal(RefPtr<IntVal> val);
+
         // Trivial case of a value that is just a constant integer
         class ConstantIntVal : public IntVal
         {
@@ -366,17 +372,33 @@ namespace Spire
         class ExpressionType : public Val
         {
         public:
+#if 0
             static RefPtr<ExpressionType> Bool;
             static RefPtr<ExpressionType> UInt;
             static RefPtr<ExpressionType> Int;
             static RefPtr<ExpressionType> Float;
             static RefPtr<ExpressionType> Float2;
             static RefPtr<ExpressionType> Void;
+#endif
             static RefPtr<ExpressionType> Error;
             static RefPtr<ExpressionType> Overloaded;
+
+            static Dictionary<int, RefPtr<ExpressionType>> sBuiltinTypes;
+            static Dictionary<String, Decl*> sMagicDecls;
+
             // Note: just exists to make sure we can clean up
             // canonical types we create along the way
             static List<RefPtr<ExpressionType>> sCanonicalTypes;
+
+
+
+            static ExpressionType* GetBool();
+            static ExpressionType* GetFloat();
+            static ExpressionType* GetInt();
+            static ExpressionType* GetUInt();
+            static ExpressionType* GetVoid();
+            static ExpressionType* GetError();
+
         public:
             virtual String ToString() const = 0;
 
@@ -539,6 +561,18 @@ namespace Spire
             virtual int GetHashCode() const override;
         };
 
+        // The type of an expression that was erroneous
+        class ErrorType : public ExpressionType
+        {
+        public:
+            virtual String ToString() const override;
+
+        protected:
+            virtual bool EqualsImpl(const ExpressionType * type) const override;
+            virtual ExpressionType* CreateCanonicalType() override;
+            virtual int GetHashCode() const override;
+        };
+
         // A type that takes the form of a reference to some declaration
         class DeclRefType : public ExpressionType
         {
@@ -621,26 +655,28 @@ namespace Spire
             enum
             {
                 // Mask for the overall "shape" of the texture
-                ShapeMask		= 0x0F,
+                ShapeMask		= SPIRE_TEXTURE_BASE_SHAPE_MASK,
 
                 // Flag for whether the shape has "array-ness"
-                ArrayFlag		= 0x80,
+                ArrayFlag		= SPIRE_TEXTURE_ARRAY_FLAG,
 
                 // Whether or not the texture stores multiple samples per pixel
-                MultisampleFlag	= 0x10,
+                MultisampleFlag	= SPIRE_TEXTURE_MULTISAMPLE_FLAG,
+                ReadWriteFlag = SPIRE_TEXTURE_READ_WRITE_FLAG,
+                RasterOrderedFlag = SPIRE_TEXTURE_RASTER_ORDERED_FLAG,
 
                 // Whether or not this is a shadow texture
                 //
                 // TODO(tfoley): is this even meaningful/used?
-                ShadowFlag		= 0x20, 
+                ShadowFlag		= 0x80, 
             };
 
             enum Shape : uint8_t
             {
-                Shape1D			= 0x01,
-                Shape2D			= 0x02,
-                Shape3D			= 0x03,
-                ShapeCube		= 0x04,
+                Shape1D			= SPIRE_TEXTURE_1D,
+                Shape2D			= SPIRE_TEXTURE_2D,
+                Shape3D			= SPIRE_TEXTURE_3D,
+                ShapeCube		= SPIRE_TEXTURE_CUBE,
 
                 Shape1DArray	= Shape1D | ArrayFlag,
                 Shape2DArray	= Shape2D | ArrayFlag,
@@ -951,7 +987,7 @@ namespace Spire
         public:
             List<RefPtr<Decl>> decls;
 
-            virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * /*visitor*/) override { throw "unimplemented"; }
+            virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
             virtual DeclGroup * Clone(CloneContext & /*ctx*/) override { throw "unimplemented"; }
         };
 
@@ -2443,6 +2479,7 @@ namespace Spire
             virtual bool EqualsVal(Val* val) override;
             virtual String ToString() const override;
             virtual int GetHashCode() const override;
+            virtual RefPtr<Val> SubstituteImpl(Substitutions* subst, int* ioDiff) override;
         };
 
         //
@@ -2773,7 +2810,29 @@ namespace Spire
             {
                 return typeExpr;
             }
+
+            virtual void VisitDeclGroup(DeclGroup* declGroup)
+            {
+                for (auto decl : declGroup->decls)
+                {
+                    decl->Accept(this);
+                }
+            }
         };
+
+        // Note(tfoley): These logically belong to `ExpressionType`,
+        // but order-of-declaration stuff makes that tricky
+        //
+        // TODO(tfoley): These should really belong to the compilation context!
+        //
+        void RegisterBuiltinDecl(
+            RefPtr<Decl>                decl,
+            RefPtr<BuiltinTypeModifier> modifier);
+        void RegisterMagicDecl(
+            RefPtr<Decl>                decl,
+            RefPtr<MagicTypeModifier>   modifier);
+
+
     }
 }
 

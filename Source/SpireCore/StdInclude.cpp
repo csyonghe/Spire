@@ -765,9 +765,9 @@ __intrinsic float intBitsToFloat(int x);
 __intrinsic int floatBitsToInt(float x);
 
 __intrinsic vec3 normalize(vec3 v);
-__intrinsic float dot(vec2 v0, vec2 v1);
-__intrinsic float dot(vec3 v0, vec3 v1);
-__intrinsic float dot(vec4 v0, vec4 v1);
+//__intrinsic float dot(vec2 v0, vec2 v1);
+//__intrinsic float dot(vec3 v0, vec3 v1);
+//__intrinsic float dot(vec4 v0, vec4 v1);
 __intrinsic float sin(float v);
 __intrinsic float cos(float v);
 __intrinsic float tan(float v);
@@ -888,6 +888,7 @@ __intrinsic vec4 SampleBias(Texture2D tex, SamplerState sampler, vec2 uv, float 
 __intrinsic vec4 SampleBias(TextureCube tex, SamplerState sampler, vec3 uv, float bias);
 __intrinsic float diff(float v);
 __intrinsic float mod(float x, float y);
+/*
 __intrinsic float max(float v);
 __intrinsic float min(float v);
 __intrinsic float max(float v, float v1);
@@ -904,6 +905,7 @@ __intrinsic vec3 max(vec3 v, float v1);
 __intrinsic vec3 min(vec3 v, float v1);
 __intrinsic vec4 max(vec4 v, float v1);
 __intrinsic vec4 min(vec4 v, float v1);
+*/
 __intrinsic float clamp(float v, float v1, float v2);
 __intrinsic vec2 clamp(vec2 v, vec2 v1, vec2 v2);
 __intrinsic vec3 clamp(vec3 v, vec3 v1, vec3 v2);

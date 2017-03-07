@@ -582,7 +582,6 @@ namespace Spire
                     CASE(UInt, Unsigned, Int32);
                     CASE(Float, Float, Int32);
                     CASE(Void, Error, Error);
-                    CASE(Error, Error, Error);
 
                 #undef CASE
 
@@ -590,6 +589,31 @@ namespace Spire
                     break;
                 }
                 SPIRE_UNREACHABLE("all cases handled");
+            }
+
+            bool ValuesAreEqual(
+                RefPtr<IntVal> left,
+                RefPtr<IntVal> right)
+            {
+                if(left == right) return true;
+
+                if(auto leftConst = left.As<ConstantIntVal>())
+                {
+                    if(auto rightConst = left.As<ConstantIntVal>())
+                    {
+                        return leftConst->value == rightConst->value;
+                    }
+                }
+
+                if(auto leftVar = left.As<GenericParamIntVal>())
+                {
+                    if(auto rightVar = right.As<GenericParamIntVal>())
+                    {
+                        return leftVar->declRef.Equals(rightVar->declRef);
+                    }
+                }
+
+                return false;
             }
 
             // Central engine for implementing implicit coercion logic
@@ -650,7 +674,7 @@ namespace Spire
                         // Conversion between vector types.
 
                         // If element counts don't match, then bail:
-                        if (toVectorType->elementCount != fromVectorType->elementCount)
+                        if (!ValuesAreEqual(toVectorType->elementCount, fromVectorType->elementCount))
                             return false;
 
                         // Otherwise, if we can convert the element types, we are golden
@@ -713,6 +737,14 @@ namespace Spire
                     nullptr))
                 {
                     getSink()->diagnose(fromExpr->Position, Diagnostics::typeMismatch, toType, fromExpr->Type);
+
+                    // HACK(tfoley): Do it again so I can step in with the debugger!
+                    TryCoerceImpl(
+                    toType,
+                    &expr,
+                    fromExpr->Type.Ptr(),
+                    fromExpr.Ptr(),
+                    nullptr);
                 }
                 return expr;
             }
@@ -735,9 +767,9 @@ namespace Spire
             {
                 if (receiverType->Equals(valueType))
                     return true;
-                if (receiverType->IsIntegral() && valueType->Equals(ExpressionType::Int.Ptr()))
+                if (receiverType->IsIntegral() && valueType->Equals(ExpressionType::GetInt()))
                     return true;
-                if (receiverType->Equals(ExpressionType::Float.Ptr()) && valueType->IsIntegral())
+                if (receiverType->Equals(ExpressionType::GetFloat()) && valueType->IsIntegral())
                     return true;
                 if (receiverType->IsVectorType() && valueType->IsVectorType())
                 {
@@ -817,6 +849,27 @@ namespace Spire
 
             virtual RefPtr<ProgramSyntaxNode> VisitProgram(ProgramSyntaxNode * programNode) override
             {
+                // Try to register all the builtin decls
+                for (auto decl : programNode->Members)
+                {
+                    auto inner = decl;
+                    if (auto genericDecl = decl.As<GenericDecl>())
+                    {
+                        inner = genericDecl->inner;
+                    }
+
+                    if (auto builtinMod = inner->FindModifier<BuiltinTypeModifier>())
+                    {
+                        RegisterBuiltinDecl(decl, builtinMod);
+                    }
+                    if (auto magicMod = inner->FindModifier<MagicTypeModifier>())
+                    {
+                        RegisterMagicDecl(decl, magicMod);
+                    }
+                }
+
+                //
+
                 HashSet<String> funcNames;
                 this->program = programNode;
                 this->function = nullptr;
@@ -1052,7 +1105,7 @@ namespace Spire
                     else
                         paraNames.Add(para->Name.Content);
                     para->Type = CheckUsableType(para->Type);
-                    if (para->Type.Equals(ExpressionType::Void.Ptr()))
+                    if (para->Type.Equals(ExpressionType::GetVoid()))
                         getSink()->diagnose(para, Diagnostics::parameterCannotBeVoid);
                 }
                 this->function = NULL;
@@ -1121,9 +1174,9 @@ namespace Spire
                 PushOuterStmt(stmt);
                 if (stmt->Predicate != NULL)
                     stmt->Predicate = stmt->Predicate->Accept(this).As<ExpressionSyntaxNode>();
-                if (!stmt->Predicate->Type->Equals(ExpressionType::Error.Ptr()) &&
-                    !stmt->Predicate->Type->Equals(ExpressionType::Int.Ptr()) &&
-                    !stmt->Predicate->Type->Equals(ExpressionType::Bool.Ptr()))
+                if (!stmt->Predicate->Type->Equals(ExpressionType::GetError()) &&
+                    !stmt->Predicate->Type->Equals(ExpressionType::GetInt()) &&
+                    !stmt->Predicate->Type->Equals(ExpressionType::GetBool()))
                 {
                     getSink()->diagnose(stmt, Diagnostics::whilePredicateTypeError);
                 }
@@ -1142,9 +1195,9 @@ namespace Spire
                 if (stmt->PredicateExpression)
                 {
                     stmt->PredicateExpression = stmt->PredicateExpression->Accept(this).As<ExpressionSyntaxNode>();
-                    if (!stmt->PredicateExpression->Type->Equals(ExpressionType::Bool.Ptr()) &&
-                        !stmt->PredicateExpression->Type->Equals(ExpressionType::Int.Ptr()) &&
-                        !stmt->PredicateExpression->Type->Equals(ExpressionType::UInt.Ptr()))
+                    if (!stmt->PredicateExpression->Type->Equals(ExpressionType::GetBool()) &&
+                        !stmt->PredicateExpression->Type->Equals(ExpressionType::GetInt()) &&
+                        !stmt->PredicateExpression->Type->Equals(ExpressionType::GetUInt()))
                     {
                         getSink()->diagnose(stmt->PredicateExpression.Ptr(), Diagnostics::forPredicateTypeError);
                     }
@@ -1201,9 +1254,9 @@ namespace Spire
             {
                 if (stmt->Predicate != NULL)
                     stmt->Predicate = stmt->Predicate->Accept(this).As<ExpressionSyntaxNode>();
-                if (!stmt->Predicate->Type->Equals(ExpressionType::Error.Ptr())
-                    && (!stmt->Predicate->Type->Equals(ExpressionType::Int.Ptr()) &&
-                        !stmt->Predicate->Type->Equals(ExpressionType::Bool.Ptr())))
+                if (!stmt->Predicate->Type->Equals(ExpressionType::GetError())
+                    && (!stmt->Predicate->Type->Equals(ExpressionType::GetInt()) &&
+                        !stmt->Predicate->Type->Equals(ExpressionType::GetBool())))
                     getSink()->diagnose(stmt, Diagnostics::ifPredicateTypeError);
 
                 if (stmt->PositiveStatement != NULL)
@@ -1217,7 +1270,7 @@ namespace Spire
             {
                 if (!stmt->Expression)
                 {
-                    if (function && !function->ReturnType.Equals(ExpressionType::Void.Ptr()))
+                    if (function && !function->ReturnType.Equals(ExpressionType::GetVoid()))
                         getSink()->diagnose(stmt, Diagnostics::returnNeedsExpression);
                 }
                 else
@@ -1293,7 +1346,7 @@ namespace Spire
                     }
                 }
                 varDecl->Type = typeExp;
-                if (varDecl->Type.Equals(ExpressionType::Void.Ptr()))
+                if (varDecl->Type.Equals(ExpressionType::GetVoid()))
                     getSink()->diagnose(varDecl, Diagnostics::invalidTypeVoid);
 
                 // If this is an array variable, then make sure it is an okay array type...
@@ -1311,9 +1364,9 @@ namespace Spire
             {
                 PushOuterStmt(stmt);
                 stmt->Predicate = stmt->Predicate->Accept(this).As<ExpressionSyntaxNode>();
-                if (!stmt->Predicate->Type->Equals(ExpressionType::Error.Ptr()) &&
-                    !stmt->Predicate->Type->Equals(ExpressionType::Int.Ptr()) &&
-                    !stmt->Predicate->Type->Equals(ExpressionType::Bool.Ptr()))
+                if (!stmt->Predicate->Type->Equals(ExpressionType::GetError()) &&
+                    !stmt->Predicate->Type->Equals(ExpressionType::GetInt()) &&
+                    !stmt->Predicate->Type->Equals(ExpressionType::GetBool()))
                     getSink()->diagnose(stmt, Diagnostics::whilePredicateTypeError2);
 
                 stmt->Statement->Accept(this);
@@ -1376,13 +1429,13 @@ namespace Spire
                 switch (expr->ConstType)
                 {
                 case ConstantExpressionSyntaxNode::ConstantType::Int:
-                    expr->Type = ExpressionType::Int;
+                    expr->Type = ExpressionType::GetInt();
                     break;
                 case ConstantExpressionSyntaxNode::ConstantType::Bool:
-                    expr->Type = ExpressionType::Bool;
+                    expr->Type = ExpressionType::GetBool();
                     break;
                 case ConstantExpressionSyntaxNode::ConstantType::Float:
-                    expr->Type = ExpressionType::Float;
+                    expr->Type = ExpressionType::GetFloat();
                     break;
                 default:
                     expr->Type = ExpressionType::Error;
@@ -1401,7 +1454,7 @@ namespace Spire
             // Check that an expression resolves to an integer constant, and get its value
             RefPtr<IntVal> CheckIntegerConstantExpression(ExpressionSyntaxNode* exp)
             {
-                if (!exp->Type.type->Equals(ExpressionType::Int))
+                if (!exp->Type.type->Equals(ExpressionType::GetInt()))
                 {
                     getSink()->diagnose(exp, Diagnostics::expectedIntegerConstantWrongType, exp->Type);
                     return nullptr;
@@ -1427,87 +1480,105 @@ namespace Spire
                 return nullptr;
             }
 
-            virtual RefPtr<ExpressionSyntaxNode> VisitIndexExpression(IndexExpressionSyntaxNode *expr) override
+            RefPtr<ExpressionSyntaxNode> CheckSimpleSubscriptExpr(
+                RefPtr<IndexExpressionSyntaxNode>   subscriptExpr,
+                RefPtr<ExpressionType>              elementType)
             {
-                expr->BaseExpression = expr->BaseExpression->Accept(this).As<ExpressionSyntaxNode>();
-                if (expr->IndexExpression)
+                auto baseExpr = subscriptExpr->BaseExpression;
+                auto indexExpr = subscriptExpr->IndexExpression;
+
+                if (!indexExpr->Type->Equals(ExpressionType::GetInt()) &&
+                    !indexExpr->Type->Equals(ExpressionType::GetUInt()))
                 {
-                    expr->IndexExpression = expr->IndexExpression->Accept(this).As<ExpressionSyntaxNode>();
+                    getSink()->diagnose(indexExpr, Diagnostics::subscriptIndexNonInteger);
+                    return CreateErrorExpr(subscriptExpr.Ptr());
                 }
-                if (expr->BaseExpression->Type->Equals(ExpressionType::Error.Ptr()))
-                    expr->Type = ExpressionType::Error;
-                else if (auto baseTypeType = expr->BaseExpression->Type.type.As<TypeExpressionType>())
+
+                subscriptExpr->Type = elementType;
+
+                // TODO(tfoley): need to be more careful about this stuff
+                subscriptExpr->Type.IsLeftValue = baseExpr->Type.IsLeftValue;
+
+                return subscriptExpr;
+            }
+
+            virtual RefPtr<ExpressionSyntaxNode> VisitIndexExpression(IndexExpressionSyntaxNode* subscriptExpr) override
+            {
+                auto baseExpr = subscriptExpr->BaseExpression;
+                baseExpr = CheckExpr(baseExpr);
+
+                RefPtr<ExpressionSyntaxNode> indexExpr = subscriptExpr->IndexExpression;
+                if (indexExpr)
+                {
+                    indexExpr = CheckExpr(indexExpr);
+                }
+
+                subscriptExpr->BaseExpression = baseExpr;
+                subscriptExpr->IndexExpression = indexExpr;
+
+                // If anything went wrong in the base expression,
+                // then just move along...
+                if (IsErrorExpr(baseExpr))
+                    return CreateErrorExpr(subscriptExpr);
+
+                // Otherwise, we need to look at the type of the base expression,
+                // to figure out how subscripting should work.
+                auto baseType = baseExpr->Type.Ptr();
+                if (auto baseTypeType = baseType->As<TypeExpressionType>())
                 {
                     // We are trying to "index" into a type, so we have an expression like `float[2]`
                     // which should be interpreted as resolving to an array type.
 
                     RefPtr<IntVal> elementCount = nullptr;
-                    if (expr->IndexExpression)
+                    if (indexExpr)
                     {
-                        elementCount = CheckIntegerConstantExpression(expr->IndexExpression.Ptr());
+                        elementCount = CheckIntegerConstantExpression(indexExpr.Ptr());
                     }
 
-                    auto elementType = CoerceToUsableType(TypeExp(expr->BaseExpression, baseTypeType->type));
+                    auto elementType = CoerceToUsableType(TypeExp(baseExpr, baseTypeType->type));
                     auto arrayType = new ArrayExpressionType();
                     arrayType->BaseType = elementType;
                     arrayType->ArrayLength = elementCount;
 
                     typeResult = arrayType;
-                    expr->Type = new TypeExpressionType(arrayType);
-                    return expr;
+                    subscriptExpr->Type = new TypeExpressionType(arrayType);
+                    return subscriptExpr;
+                }
+                else if (auto baseArrayType = baseType->As<ArrayExpressionType>())
+                {
+                    return CheckSimpleSubscriptExpr(
+                        subscriptExpr,
+                        baseArrayType->BaseType);
+                }
+                else if (auto baseArrayLikeType = baseType->As<ArrayLikeType>())
+                {
+                    return CheckSimpleSubscriptExpr(
+                        subscriptExpr,
+                        baseArrayLikeType->elementType);
+                }
+                else if (auto vecType = baseType->As<VectorExpressionType>())
+                {
+                    return CheckSimpleSubscriptExpr(
+                        subscriptExpr,
+                        vecType->elementType);
+                }
+                else if (auto matType = baseType->As<MatrixExpressionType>())
+                {
+                    // TODO(tfoley): We shouldn't go and recompute
+                    // row types over and over like this... :(
+                    auto rowType = new VectorExpressionType(
+                        matType->elementType,
+                        matType->colCount);
+
+                    return CheckSimpleSubscriptExpr(
+                        subscriptExpr,
+                        rowType);
                 }
                 else
                 {
-                    auto & baseExprType = expr->BaseExpression->Type;
-
-                    bool isValid = false;
-#if TIMREMOVED
-                    // TODO(tfoley): need to handle the indexing logic for these types...
-                    bool isValid = baseExprType->AsGenericType() &&
-                        (baseExprType->AsGenericType()->GenericTypeName == "StructuredBuffer" ||
-                            baseExprType->AsGenericType()->GenericTypeName == "RWStructuredBuffer" ||
-                            baseExprType->AsGenericType()->GenericTypeName == "PackedBuffer");
-#else
-                    isValid = isValid || baseExprType->As<ArrayLikeType>();
-#endif
-                    isValid = isValid || (baseExprType->AsBasicType()); /*TODO(tfoley): figure this out: */ // && GetVectorSize(baseExprType->AsBasicType()->BaseType) != 0);
-                    isValid = isValid || baseExprType->AsArrayType();
-                    if (!isValid)
-                    {
-                        getSink()->diagnose(expr, Diagnostics::subscriptNonArray);
-                        expr->Type = ExpressionType::Error;
-                    }
-                    if (!expr->IndexExpression->Type->Equals(ExpressionType::Int.Ptr()) &&
-                        !expr->IndexExpression->Type->Equals(ExpressionType::UInt.Ptr()))
-                    {
-                        getSink()->diagnose(expr, Diagnostics::subscriptIndexNonInteger);
-                        expr->Type = ExpressionType::Error;
-                    }
+                    getSink()->diagnose(subscriptExpr, Diagnostics::subscriptNonArray);
+                    return CreateErrorExpr(subscriptExpr);
                 }
-                if (expr->BaseExpression->Type->IsArray())
-                {
-                    expr->Type = expr->BaseExpression->Type->AsArrayType()->BaseType;
-                }
-                else if (auto bufferType = expr->BaseExpression->Type->As<ArrayLikeType>())
-                {
-                    expr->Type = bufferType->elementType;
-                }
-                else if (auto vecType = expr->BaseExpression->Type->AsVectorType())
-                {
-                    expr->Type = vecType->elementType;
-                }
-                else if (auto matType = expr->BaseExpression->Type->AsMatrixType())
-                {
-                    expr->Type = matType->rowType;
-                }
-                else
-                {
-                    // TODO(tfoley): need an error case here...
-                }
-
-                // Result of an index expression is an l-value iff base is.
-                expr->Type.IsLeftValue = expr->BaseExpression->Type.IsLeftValue;
-                return expr;
             }
             bool MatchArguments(FunctionSyntaxNode * functionNode, List <RefPtr<ExpressionSyntaxNode>> &args)
             {
@@ -1943,11 +2014,13 @@ namespace Spire
                     Func,
                     ComponentFunc,
                     Generic,
+                    UnspecializedGeneric,
                 };
                 Flavor flavor;
 
                 enum class Status
                 {
+                    GenericArgumentInferenceFailed,
                     Unchecked,
                     ArityChecked,
                     TypeChecked,
@@ -2283,6 +2356,17 @@ namespace Spire
                 OverloadResolveContext&		context,
                 OverloadCandidate&			candidate)
             {
+                // special case for generic argument inference failure
+                if (candidate.status == OverloadCandidate::Status::GenericArgumentInferenceFailed)
+                {
+                    getSink()->diagnose(
+                        context.appExpr,
+                        Diagnostics::unimplemented,
+                        "generic argument inference failed");
+
+                    goto error;
+                }
+
                 context.mode = OverloadResolveContext::Mode::ForReal;
                 context.appExpr->Type = ExpressionType::Error;
 
@@ -2341,13 +2425,10 @@ namespace Spire
                 return 0;
             }
 
-            void AddOverloadCandidate(
+            void AddOverloadCandidateInner(
                 OverloadResolveContext& context,
                 OverloadCandidate&		candidate)
             {
-                // Try the candidate out, to see if it is applicable at all.
-                TryCheckOverloadCandidate(context, candidate);
-
                 // Filter our existing candidates, to remove any that are worse than our new one
 
                 bool keepThisCandidate = true; // should this candidate be kept?
@@ -2424,6 +2505,17 @@ namespace Spire
                     context.bestCandidateStorage = candidate;
                     context.bestCandidate = &context.bestCandidateStorage;
                 }
+            }
+
+            void AddOverloadCandidate(
+                OverloadResolveContext& context,
+                OverloadCandidate&		candidate)
+            {
+                // Try the candidate out, to see if it is applicable at all.
+                TryCheckOverloadCandidate(context, candidate);
+
+                // Now (potentially) add it to the set of candidate overloads to consider.
+                AddOverloadCandidateInner(context, candidate);
             }
 
             void AddFuncOverloadCandidate(
@@ -2513,12 +2605,30 @@ namespace Spire
                     }
                 }
 
-                // if both values are integers, then compare them
+                // if both values are constant integers, then compare them
                 if (auto fstIntVal = fst.As<ConstantIntVal>())
                 {
                     if (auto sndIntVal = snd.As<ConstantIntVal>())
                     {
                         return fstIntVal->value == sndIntVal->value;
+                    }
+                }
+
+                // Check if both are integer values in general
+                if (auto fstInt = fst.As<IntVal>())
+                {
+                    if (auto sndInt = snd.As<IntVal>())
+                    {
+                        auto fstParam = fstInt.As<GenericParamIntVal>();
+                        auto sndParam = sndInt.As<GenericParamIntVal>();
+
+                        if (fstParam)
+                            TryUnifyIntParam(constraints, fstParam->declRef.GetDecl(), sndInt);
+                        if (sndParam)
+                            TryUnifyIntParam(constraints, sndParam->declRef.GetDecl(), fstInt);
+
+                        if (fstParam || sndParam)
+                            return true;
                     }
                 }
 
@@ -2573,6 +2683,21 @@ namespace Spire
                 return true;
             }
 
+            bool TryUnifyIntParam(
+                ConstraintSystem&               constraints,
+                RefPtr<GenericValueParamDecl>	paramDecl,
+                RefPtr<IntVal>                  val)
+            {
+                // We want to constrain the given parameter to equal the given value.
+                Constraint constraint;
+                constraint.decl = paramDecl.Ptr();
+                constraint.val = val;
+
+                constraints.constraints.Add(constraint);
+
+                return true;
+            }
+
             bool TryUnifyTypes(
                 ConstraintSystem&	constraints,
                 RefPtr<ExpressionType> fst,
@@ -2590,6 +2715,9 @@ namespace Spire
                     if (auto sndDeclRefType = snd->As<DeclRefType>())
                     {
                         auto sndDeclRef = sndDeclRefType->declRef;
+
+                        if (auto typeParamDecl = dynamic_cast<GenericTypeParamDecl*>(sndDeclRef.GetDecl()))
+                            return TryUnifyTypeParam(constraints, typeParamDecl, fst);
 
                         // can't be unified if they refer to differnt declarations.
                         if (fstDeclRef.GetDecl() != sndDeclRef.GetDecl()) return false;
@@ -2797,6 +2925,35 @@ namespace Spire
                     auto type = DeclRefType::Create(aggTypeDeclRef);
                     AddAggTypeOverloadCandidates(item, type, aggTypeDeclRef, context);
                 }
+                else if (auto genericDeclRef = item.declRef.As<GenericDeclRef>())
+                {
+                    // Try to infer generic arguments, based on the context
+                    DeclRef innerRef = SpecializeGenericForOverload(genericDeclRef, context);
+
+                    if (innerRef)
+                    {
+                        // If inference works, then we've now got a
+                        // specialized declaration reference we can apply.
+
+                        LookupResultItem innerItem;
+                        innerItem.breadcrumbs = item.breadcrumbs;
+                        innerItem.declRef = innerRef;
+
+                        AddDeclRefOverloadCandidates(innerItem, context);
+                    }
+                    else
+                    {
+                        // If inference failed, then we need to create
+                        // a candidate that can be used to reflect that fact
+                        // (so we can report a good error)
+                        OverloadCandidate candidate;
+                        candidate.item = item;
+                        candidate.flavor = OverloadCandidate::Flavor::UnspecializedGeneric;
+                        candidate.status = OverloadCandidate::Status::GenericArgumentInferenceFailed;
+
+                        AddOverloadCandidateInner(context, candidate);
+                    }
+                }
                 else
                 {
                     // TODO(tfoley): any other cases needed here?
@@ -2808,13 +2965,17 @@ namespace Spire
                 OverloadResolveContext&			context)
             {
                 auto funcExprType = funcExpr->Type;
+
                 if (auto typeType = funcExprType->As<TypeExpressionType>())
                 {
                     // The expression named a type, so we have a constructor call
                     // on our hands.
                     AddTypeOverloadCandidates(typeType->type, context);
                 }
-                else if (auto funcDeclRefExpr = funcExpr.As<DeclRefExpr>())
+
+                // Note(tfoley): we aren't using `else` here, so that
+                // we can catch generic declarations in this case:
+                if (auto funcDeclRefExpr = funcExpr.As<DeclRefExpr>())
                 {
                     // The expression referenced a function declaration
                     AddDeclRefOverloadCandidates(LookupResultItem(funcDeclRefExpr->declRef), context);
@@ -3587,8 +3748,8 @@ namespace Spire
             virtual RefPtr<ExpressionSyntaxNode> VisitSelectExpression(SelectExpressionSyntaxNode * expr) override
             {
                 expr->SelectorExpr = expr->SelectorExpr->Accept(this).As<ExpressionSyntaxNode>();
-                if (!expr->SelectorExpr->Type->Equals(ExpressionType::Int.Ptr()) && !expr->SelectorExpr->Type->Equals(ExpressionType::Bool.Ptr())
-                    && !expr->SelectorExpr->Type->Equals(ExpressionType::Error.Ptr()))
+                if (!expr->SelectorExpr->Type->Equals(ExpressionType::GetInt()) && !expr->SelectorExpr->Type->Equals(ExpressionType::GetBool())
+                    && !expr->SelectorExpr->Type->Equals(ExpressionType::GetError()))
                 {
                     expr->Type = ExpressionType::Error;
                     getSink()->diagnose(expr, Diagnostics::selectPrdicateTypeMismatch);

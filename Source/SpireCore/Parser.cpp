@@ -31,7 +31,7 @@ namespace Spire
         class Parser
         {
         public:
-            int anonymousParamCounter = 0;
+            int anonymousCounter = 0;
             RefPtr<ContainerDecl> currentScope;
             TokenReader tokenReader;
             DiagnosticSink * sink;
@@ -872,7 +872,6 @@ namespace Spire
         {
             parser->PushScope(decl.Ptr());
 
-            parser->anonymousParamCounter = 0;
             parser->FillPosition(decl.Ptr());
             decl->Position = declaratorInfo.nameToken.Position;
 
@@ -941,6 +940,11 @@ namespace Spire
             *link = modifiers;
         }
 
+        static String GenerateName(Parser* parser)
+        {
+            return "_anonymous_" + String(parser->anonymousCounter++);
+        }
+
         // Set up a variable declaration based on what we saw in its declarator...
         static void CompleteVarDecl(
             Parser*					parser,
@@ -952,7 +956,7 @@ namespace Spire
             if( declaratorInfo.nameToken.Type == TokenType::Unknown )
             {
                 // HACK(tfoley): we always give a name, even if the declarator didn't include one... :(
-                decl->Name.Content = "_anonymous_" + String(parser->anonymousParamCounter++);
+                decl->Name.Content = GenerateName(parser);
             }
             else
             {
@@ -1354,8 +1358,8 @@ namespace Spire
             // is treated as syntax sugar for a type declaration
             // and then a global variable declaration using that type:
             //
-            //     struct Foo { int a; float b; };
-            //     ConstantBuffer<Foo> $anonymous;
+            //     struct $anonymous { int a; float b; };
+            //     ConstantBuffer<$anonymous> Foo;
             //
             // where `$anonymous` is a fresh name, and the variable
             // declaration is made to be "transparent" so that lookup
@@ -1388,9 +1392,13 @@ namespace Spire
             parser->FillPosition(bufferDataTypeDecl.Ptr());
             parser->FillPosition(bufferVarDecl.Ptr());
 
-            // Only the type declaration will actually be named, and it will
+            // Only the variable declaration will actually be named, and it will
             // use the given name to identify itself.
-            bufferDataTypeDecl->Name = parser->ReadToken(TokenType::Identifier);
+            //
+            // TODO(tfoley): This isn't actually correct, and we should really
+            // be attaching the name as metadata on the node...
+            bufferVarDecl->Name = parser->ReadToken(TokenType::Identifier);
+            bufferDataTypeDecl->Name.Content = GenerateName(parser);
 
             // TODO(tfoley): We end up constructing unchecked syntax here that
             // is expected to type check into the right form, but it might be
@@ -2019,7 +2027,6 @@ namespace Spire
         // used to parse requirements for import operators)
         RefPtr<FunctionSyntaxNode> Parser::ParseFunction(bool parseBody)
         {
-            anonymousParamCounter = 0;
             RefPtr<FunctionSyntaxNode> function = new FunctionSyntaxNode();
             function->modifiers = ParseModifiers(this);
             
