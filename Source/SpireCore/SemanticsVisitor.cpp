@@ -3033,14 +3033,14 @@ namespace Spire
 
             RefPtr<ExpressionSyntaxNode> ResolveInvoke(InvokeExpressionSyntaxNode * expr)
             {
-                // Look at the base expression for the call, and figure out how
-                // to invoke it.
+                // Look at the base expression for the call, and figure out how to invoke it.
                 auto funcExpr = expr->FunctionExpr;
                 auto funcExprType = funcExpr->Type;
-                if (funcExprType->Equals(ExpressionType::Error))
+
+                // If we are trying to apply an erroroneous expression, then just bail out now.
+                if(IsErrorExpr(funcExpr))
                 {
-                    expr->Type = ExpressionType::Error;
-                    return expr;
+                    return CreateErrorExpr(expr);
                 }
 
                 OverloadResolveContext context;
@@ -3058,6 +3058,20 @@ namespace Spire
                 if (context.bestCandidates.Count() > 0)
                 {
                     // Things were ambiguous.
+
+                    // It might be that things were only ambiguous because
+                    // one of the argument expressions had an error, and
+                    // so a bunch of candidates could match at that position.
+                    //
+                    // If any argument was an error, we skip out on printing
+                    // another message, to avoid cascading errors.
+                    for (auto arg : expr->Arguments)
+                    {
+                        if (IsErrorExpr(arg))
+                        {
+                            return CreateErrorExpr(expr);
+                        }
+                    }
 
                     String funcName;
                     if (auto baseVar = funcExpr.As<VarExpressionSyntaxNode>())
@@ -3355,17 +3369,10 @@ namespace Spire
                 // check the base expression first
                 expr->FunctionExpr = CheckExpr(expr->FunctionExpr);
 
-                bool anyError = false;
+                // Next check the argument expressions
                 for (auto & arg : expr->Arguments)
                 {
-                    arg = arg->Accept(this).As<ExpressionSyntaxNode>();
-                    if (arg->Type->Equals(ExpressionType::Error))
-                        anyError = true;
-                }
-                if (anyError)
-                {
-                    expr->Type = ExpressionType::Error;
-                    return expr;
+                    arg = CheckExpr(arg);
                 }
 
                 auto rs = ResolveInvoke(expr);
