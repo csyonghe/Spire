@@ -644,7 +644,15 @@ namespace Spire
                     return true;
                 }
 
-                // TODO(tfoley): catch error types here, and route appropriately
+                // If either type is an error, then let things pass.
+                if (toType->As<ErrorType>() || fromType->As<ErrorType>())
+                {
+                    if (outToExpr)
+                        *outToExpr = CreateImplicitCastExpr(toType, fromExpr);
+                    if (outCost)
+                        *outCost = kConversionCost_None;
+                    return true;
+                }
 
                 //
 
@@ -3961,13 +3969,15 @@ namespace Spire
             }
             virtual RefPtr<ExpressionSyntaxNode> VisitSelectExpression(SelectExpressionSyntaxNode * expr) override
             {
-                expr->SelectorExpr = expr->SelectorExpr->Accept(this).As<ExpressionSyntaxNode>();
-                if (!expr->SelectorExpr->Type->Equals(ExpressionType::GetInt()) && !expr->SelectorExpr->Type->Equals(ExpressionType::GetBool())
-                    && !expr->SelectorExpr->Type->Equals(ExpressionType::GetError()))
-                {
-                    expr->Type = ExpressionType::Error;
-                    getSink()->diagnose(expr, Diagnostics::selectPrdicateTypeMismatch);
-                }
+                auto selectorExpr = expr->SelectorExpr;
+                selectorExpr = CheckExpr(selectorExpr);
+                selectorExpr = Coerce(ExpressionType::GetBool(), selectorExpr);
+                expr->SelectorExpr = selectorExpr;
+
+                // TODO(tfoley): We need a general purpose "join" on types for inferring
+                // generic argument types for builtins/intrinsics, so this should really
+                // be using the exact same logic...
+                //
                 expr->Expr0 = expr->Expr0->Accept(this).As<ExpressionSyntaxNode>();
                 expr->Expr1 = expr->Expr1->Accept(this).As<ExpressionSyntaxNode>();
                 if (!expr->Expr0->Type->Equals(expr->Expr1->Type.Ptr()))
