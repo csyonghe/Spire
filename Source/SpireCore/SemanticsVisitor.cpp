@@ -2996,7 +2996,40 @@ namespace Spire
                 }
             }
 
+            void formatType(StringBuilder& sb, RefPtr<ExpressionType> type)
+            {
+                sb << type->ToString();
+            }
 
+            String getDeclSignatureString(DeclRef declRef)
+            {
+                StringBuilder sb;
+                sb << declRef.GetName();
+                if (auto funcDeclRef = declRef.As<FuncDeclBaseRef>())
+                {
+                    // This is something callable, so we need to also print parameter types for overloading
+                    sb << "(";
+
+                    bool first = true;
+                    for (auto paramDeclRef : funcDeclRef.GetParameters())
+                    {
+                        if (!first) sb << ", ";
+
+                        formatType(sb, paramDeclRef.GetType());
+
+                        first = false;
+
+                    }
+
+                    sb << ")";
+                }
+                return sb.ProduceString();
+            }
+
+            String getDeclSignatureString(LookupResultItem item)
+            {
+                return getDeclSignatureString(item.declRef);
+            }
 
             RefPtr<ExpressionSyntaxNode> ResolveInvoke(InvokeExpressionSyntaxNode * expr)
             {
@@ -3025,49 +3058,70 @@ namespace Spire
                 if (context.bestCandidates.Count() > 0)
                 {
                     // Things were ambiguous.
+
+                    String funcName;
+                    if (auto baseVar = funcExpr.As<VarExpressionSyntaxNode>())
+                        funcName = baseVar->Variable;
+                    else if(auto baseMemberRef = funcExpr.As<MemberExpressionSyntaxNode>())
+                        funcName = baseMemberRef->MemberName;
+
+                    StringBuilder argsListBuilder;
+                    argsListBuilder << "(";
+                    bool first = true;
+                    for (auto a : expr->Arguments)
+                    {
+                        if (!first) argsListBuilder << ", ";
+                        argsListBuilder << a->Type->ToString();
+                        first = false;
+                    }
+                    argsListBuilder << ")";
+                    String argsList = argsListBuilder.ProduceString();
+
                     if (context.bestCandidates[0].status != OverloadCandidate::Status::Appicable)
                     {
                         // There were multple equally-good candidates, but none actually usable.
                         // We will construct a diagnostic message to help out.
-
-                        String funcName;
-                        if (auto baseVar = funcExpr.As<VarExpressionSyntaxNode>())
-                            funcName = baseVar->Variable;
-                        else if(auto baseMemberRef = funcExpr.As<MemberExpressionSyntaxNode>())
-                            funcName = baseMemberRef->MemberName;
-
-                        StringBuilder argsListBuilder;
-                        argsListBuilder << "(";
-                        bool first = true;
-                        for (auto a : expr->Arguments)
-                        {
-                            if (!first) argsListBuilder << ", ";
-                            argsListBuilder << a->Type->ToString();
-                            first = false;
-                        }
-                        argsListBuilder << ")";
-                        String argsList = argsListBuilder.ProduceString();
-
                         if (funcName.Length() != 0)
                         {
                             getSink()->diagnose(expr, Diagnostics::noApplicableOverloadForNameWithArgs, funcName, argsList);
                         }
                         else
                         {
-                            getSink()->diagnose(expr, Diagnostics::noApplicableWithArgs, funcName, argsList);
+                            getSink()->diagnose(expr, Diagnostics::noApplicableWithArgs, argsList);
                         }
-
-                        // TODO: iterate over the candidates under consideration and print them?
-                        expr->Type = ExpressionType::Error;
-                        return expr;
                     }
                     else
                     {
                         // There were multiple applicable candidates, so we need to report them.
-                        getSink()->diagnose(expr, Diagnostics::unimplemented, "ambiguous overloaded call");
-                        expr->Type = ExpressionType::Error;
-                        return expr;
+
+                        if (funcName.Length() != 0)
+                        {
+                            getSink()->diagnose(expr, Diagnostics::ambiguousOverloadForNameWithArgs, funcName, argsList);
+                        }
+                        else
+                        {
+                            getSink()->diagnose(expr, Diagnostics::ambiguousOverloadWithArgs, argsList);
+                        }
                     }
+
+                    int candidateCount = context.bestCandidates.Count();
+                    int maxCandidatesToPrint = 10; // don't show too many candidates at once...
+                    int candidateIndex = 0;
+                    for (auto candidate : context.bestCandidates)
+                    {
+                        String declString = getDeclSignatureString(candidate.item);
+                        getSink()->diagnose(candidate.item.declRef, Diagnostics::overloadCandidate, declString);
+
+                        candidateIndex++;
+                        if (candidateIndex == maxCandidatesToPrint)
+                            break;
+                    }
+                    if (candidateIndex != candidateCount)
+                    {
+                        getSink()->diagnose(expr, Diagnostics::moreOverloadCandidates, candidateCount - candidateIndex);
+                    }
+
+                    return CreateErrorExpr(expr);
                 }
                 else if (context.bestCandidate)
                 {

@@ -244,17 +244,25 @@ DIAGNOSTIC(36010, Error, specializeCanOnlyBeUsedOnParam, "'specialize' modifier 
 DIAGNOSTIC(36011, Error, specializedParameterMustBeInt, "specialized parameters must be a int, uint or bool.");
 DIAGNOSTIC(36012, Error, specializationValuesMustBeConstantLiterial, "specialization candidate values can only be constant literials.");
 
+// TODO: need to assign numbers to all these extra diagnostics...
 
 DIAGNOSTIC(39999, Error, expectedIntegerConstantWrongType, "expected integer constant (found: '$0')")
 DIAGNOSTIC(39999, Error, expectedIntegerConstantNotConstant, "expression does not evaluate to a compile-time constant")
 
 DIAGNOSTIC(39999, Error, noApplicableOverloadForNameWithArgs, "no overload for '$0' applicable to arguments of type $1")
-DIAGNOSTIC(39999, Error, noApplicableWithArgs, "no overload applicable to arguments of type $1")
+DIAGNOSTIC(39999, Error, noApplicableWithArgs, "no overload applicable to arguments of type $0")
+
+DIAGNOSTIC(39999, Error, ambiguousOverloadForNameWithArgs, "ambiguous call to '$0' operation with arguments of type $1")
+DIAGNOSTIC(39999, Error, ambiguousOverloadWithArgs, "ambiguous call to overloaded operation with arguments of type $0")
+
+DIAGNOSTIC(39999, Note, overloadCandidate, "candidate: $0")
+DIAGNOSTIC(39999, Note, moreOverloadCandidates, "$0 more overload candidates")
 
 DIAGNOSTIC(39999, Error, caseOutsideSwitch, "'case' not allowed outside of a 'switch' statement")
 DIAGNOSTIC(39999, Error, defaultOutsideSwitch, "'default' not allowed outside of a 'switch' statement")
 
 DIAGNOSTIC(39999, Error, expectedAGeneric, "expected a generic when using '<...>' (found: '$0')")
+
 
 
 //
