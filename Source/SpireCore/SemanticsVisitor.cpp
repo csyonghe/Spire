@@ -91,6 +91,16 @@ namespace Spire
             }
             TypeExp TranslateTypeNode(TypeExp const& typeExp)
             {
+                // HACK(tfoley): It seems that in some cases we end up re-checking
+                // syntax that we've already checked. We need to root-cause that
+                // issue, but for now a quick fix in this case is to early
+                // exist if we've already got a type associated here:
+                if (typeExp.type)
+                {
+                    return typeExp;
+                }
+
+
                 auto typeRepr = TranslateTypeNodeImpl(typeExp.exp);
 
                 TypeExp result;
@@ -723,6 +733,19 @@ namespace Spire
                     outCost);
             }
 
+            RefPtr<ExpressionSyntaxNode> CreateImplicitCastExpr(
+                RefPtr<ExpressionType>			toType,
+                RefPtr<ExpressionSyntaxNode>	fromExpr)
+            {
+                auto castExpr = new TypeCastExpressionSyntaxNode();
+                castExpr->Position = fromExpr->Position;
+                castExpr->TargetType.type = toType;
+                castExpr->Type = toType;
+                castExpr->Expression = fromExpr;
+                return castExpr;
+            }
+
+
             // Perform type coercion, and emit errors if it isn't possible
             RefPtr<ExpressionSyntaxNode> Coerce(
                 RefPtr<ExpressionType>			toType,
@@ -738,28 +761,15 @@ namespace Spire
                 {
                     getSink()->diagnose(fromExpr->Position, Diagnostics::typeMismatch, toType, fromExpr->Type);
 
-                    // HACK(tfoley): Do it again so I can step in with the debugger!
-                    TryCoerceImpl(
-                    toType,
-                    &expr,
-                    fromExpr->Type.Ptr(),
-                    fromExpr.Ptr(),
-                    nullptr);
+                    // Note(tfoley): We don't call `CreateErrorExpr` here, because that would
+                    // clobber the type on `fromExpr`, and an invariant here is that coercion
+                    // really shouldn't *change* the expression that is passed in, but should
+                    // introduce new AST nodes to coerce its value to a different type...
+                    return CreateImplicitCastExpr(ExpressionType::Error, fromExpr);
                 }
                 return expr;
             }
 
-            RefPtr<ExpressionSyntaxNode> CreateImplicitCastExpr(
-                RefPtr<ExpressionType>			toType,
-                RefPtr<ExpressionSyntaxNode>	fromExpr)
-            {
-                auto castExpr = new TypeCastExpressionSyntaxNode();
-                castExpr->Position = fromExpr->Position;
-                castExpr->TargetType.type = toType;
-                castExpr->Type = toType;
-                castExpr->Expression = fromExpr;
-                return castExpr;
-            }
 
 
 
@@ -3915,6 +3925,7 @@ namespace Spire
             {
                 expr->Expression = expr->Expression->Accept(this).As<ExpressionSyntaxNode>();
                 auto targetType = CheckProperType(expr->TargetType);
+                expr->TargetType = targetType;
 
                 // The way to perform casting depends on the types involved
                 if (expr->Expression->Type->Equals(ExpressionType::Error.Ptr()))
