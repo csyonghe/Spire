@@ -146,10 +146,30 @@ namespace Spire
                     auto ilType = new ILPointerLikeType(ILPointerLikeTypeName::ConstantBuffer, TranslateExpressionType(cbufferType->elementType.Ptr()));
                     return ilType;
                 }
+				else if (auto arrLike = type->As<ArrayLikeType>())
+				{
+					RefPtr<ILArrayLikeType> arrType = new ILArrayLikeType();
+					arrType->BaseType = TranslateExpressionType(arrLike->elementType);
+					if (dynamic_cast<HLSLStructuredBufferType*>(arrLike))
+						arrType->Name = ILArrayLikeTypeName::StructuredBuffer;
+					else if (dynamic_cast<HLSLRWStructuredBufferType*>(arrLike))
+						arrType->Name = ILArrayLikeTypeName::RWStructuredBuffer;
+					else if (dynamic_cast<HLSLBufferType*>(arrLike))
+						arrType->Name = ILArrayLikeTypeName::Buffer;
+					else if (dynamic_cast<HLSLRWBufferType*>(arrLike))
+						arrType->Name = ILArrayLikeTypeName::RWBuffer;
+					else
+						throw NotImplementedException("unimplemented array like type.");
+					return arrType;
+				}
                 else if (auto declRefType = type->AsDeclRefType())
                 {
                     auto decl = declRefType->declRef.decl;
-                    if (auto structDecl = dynamic_cast<StructSyntaxNode*>(decl))
+					if (auto extType = dynamic_cast<ExtensionDecl*>(decl))
+					{
+						return TranslateExpressionType(extType->targetType);
+					}
+					else if (auto structDecl = dynamic_cast<StructSyntaxNode*>(decl))
                     {
                         return TranslateStructType(structDecl);
                     }
@@ -695,6 +715,7 @@ namespace Spire
                
                 return expr;
             }
+
             virtual RefPtr<ExpressionSyntaxNode> VisitInvokeExpression(InvokeExpressionSyntaxNode* expr) override
             {
                 List<ILOperand*> args;
@@ -709,7 +730,11 @@ namespace Spire
 					// ad-hoc processing for ctor calls
 					if (auto ctor = dynamic_cast<ConstructorDecl*>(funcType->declRef.GetDecl()))
 					{
-						RefPtr<ExpressionType> exprType = DeclRefType::Create(DeclRef(ctor->ParentDecl, funcType->declRef.substitutions));
+						RefPtr<ExpressionType> exprType;
+						if (auto ext = dynamic_cast<ExtensionDecl*>(ctor->ParentDecl))
+							exprType = ext->targetType;
+						else
+							exprType = DeclRefType::Create(DeclRef(ctor->ParentDecl, funcType->declRef.substitutions));
 						auto rsType = TranslateExpressionType(exprType);
 						instr = new CallInstruction(args.Count());
 						instr->Type = rsType;

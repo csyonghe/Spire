@@ -2280,8 +2280,6 @@ namespace Spire
                         arg = Coerce(param.GetType(), arg);
                     }
                 }
-				if (candidate.conversionCostSum == 0)
-					printf("break");
                 return true;
             }
 

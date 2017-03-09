@@ -1807,6 +1807,10 @@ namespace Spire
                         throw InvalidProgramException("member field access offset out of bounds.");
                     Type = structType->Members[cv1->IntValues[0]].Type;
                 }
+				else if (auto arrLikeType = dynamic_cast<ILArrayLikeType*>(v0->Type.Ptr()))
+				{
+					Type = arrLikeType->BaseType;
+				}
                 else
                     throw InvalidOperationException("Unsupported aggregate type.");
             }
