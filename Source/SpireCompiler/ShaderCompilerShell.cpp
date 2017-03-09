@@ -41,6 +41,7 @@ int wmain(int argc, wchar_t* argv[])
         // We need to parse any command-line arguments.
         String outputDir;
         CompileOptions options;
+		options.Target = CodeGenTarget::HLSL;
         options.outputName = "out";
         // As we parse the command line, we will rewrite the
         // entries in `argv` to collect any "ordinary" arguments.
