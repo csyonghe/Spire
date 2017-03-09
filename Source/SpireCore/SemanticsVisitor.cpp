@@ -599,7 +599,7 @@ namespace Spire
 
                 if(auto leftConst = left.As<ConstantIntVal>())
                 {
-                    if(auto rightConst = left.As<ConstantIntVal>())
+                    if(auto rightConst = right.As<ConstantIntVal>())
                     {
                         return leftConst->value == rightConst->value;
                     }
@@ -2280,6 +2280,8 @@ namespace Spire
                         arg = Coerce(param.GetType(), arg);
                     }
                 }
+				if (candidate.conversionCostSum == 0)
+					printf("break");
                 return true;
             }
 
