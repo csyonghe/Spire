@@ -688,6 +688,8 @@ namespace Spire
             Overloaded = nullptr;
             // Note(tfoley): This seems to be just about the only way to clear out a List<T>
             sCanonicalTypes = List<RefPtr<ExpressionType>>();
+			sBuiltinTypes = Dictionary<int, RefPtr<ExpressionType>>();
+			sMagicDecls = Dictionary<String, Decl*>();
         }
         bool ArrayExpressionType::EqualsImpl(const ExpressionType * type) const
         {
