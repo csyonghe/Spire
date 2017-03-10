@@ -773,11 +773,11 @@ __intrinsic vec3 normalize(vec3 v);
 __intrinsic float sin(float v);
 __intrinsic float cos(float v);
 __intrinsic float tan(float v);
-__intrinsic float sqrt(float v);
+//__intrinsic float sqrt(float v);
 __intrinsic vec2 sin(vec2 v);
 __intrinsic vec2 cos(vec2 v);
 __intrinsic vec2 tan(vec2 v);
-__intrinsic vec2 sqrt(vec2 v);
+//__intrinsic vec2 sqrt(vec2 v);
 __intrinsic vec3 sin(vec3 v);
 __intrinsic vec3 cos(vec3 v);
 __intrinsic vec3 tan(vec3 v);
@@ -831,7 +831,7 @@ __intrinsic vec2 sign(vec2 x);
 __intrinsic vec3 sign(vec3 x);
 __intrinsic vec4 sign(vec4 x);
 
-__intrinsic float pow(float base, float e);
+//__intrinsic float pow(float base, float e);
 __intrinsic vec2 pow(vec2 base, vec2 e);
 __intrinsic vec3 pow(vec3 base, vec3 e);
 __intrinsic vec4 pow(vec4 base, vec4 e);
@@ -907,7 +907,6 @@ __intrinsic vec3 max(vec3 v, float v1);
 __intrinsic vec3 min(vec3 v, float v1);
 __intrinsic vec4 max(vec4 v, float v1);
 __intrinsic vec4 min(vec4 v, float v1);
-*/
 __intrinsic float clamp(float v, float v1, float v2);
 __intrinsic vec2 clamp(vec2 v, vec2 v1, vec2 v2);
 __intrinsic vec3 clamp(vec3 v, vec3 v1, vec3 v2);
@@ -915,6 +914,7 @@ __intrinsic vec4 clamp(vec4 v, vec4 v1, vec4 v2);
 __intrinsic vec2 clamp(vec2 v, float v1, float v2);
 __intrinsic vec3 clamp(vec3 v, float v1, float v2);
 __intrinsic vec4 clamp(vec4 v, float v1, float v2);
+*/
 
 __intrinsic vec3 reflect(vec3 I, vec3 N);
 __intrinsic vec3 refract(vec3 I, vec3 N, float eta);
