@@ -1469,7 +1469,8 @@ namespace Spire
         }
 
         static RefPtr<Decl> ParseGenericParamDecl(
-            Parser* parser)
+            Parser*             parser,
+            RefPtr<GenericDecl> genericDecl)
         {
             // simple syntax to introduce a value parameter
             if (AdvanceIf(parser, "let"))
@@ -1491,10 +1492,28 @@ namespace Spire
             {
                 // default case is a type parameter
                 auto paramDecl = new GenericTypeParamDecl();
+                parser->FillPosition(paramDecl);
                 paramDecl->Name = parser->ReadToken(TokenType::Identifier);
                 if (AdvanceIf(parser, TokenType::Colon))
                 {
-                    paramDecl->bound = parser->ParseTypeExp();
+                    // The user is apply a constraint to this type parameter...
+
+                    auto paramConstraint = new GenericTypeConstraintDecl();
+                    parser->FillPosition(paramConstraint);
+
+                    auto paramType = DeclRefType::Create(DeclRef(paramDecl, nullptr));
+
+                    auto paramTypeExpr = new SharedTypeExpr();
+                    paramTypeExpr->Position = paramDecl->Position;
+                    paramTypeExpr->base.type = paramType;
+                    paramTypeExpr->Type = new TypeExpressionType(paramType);
+
+                    paramConstraint->sub = TypeExp(paramTypeExpr);
+                    paramConstraint->sup = parser->ParseTypeExp();
+
+                    AddMember(genericDecl, paramConstraint);
+
+
                 }
                 if (AdvanceIf(parser, TokenType::OpAssign))
                 {
@@ -1515,7 +1534,7 @@ namespace Spire
             parser->genericDepth++;
             while (!parser->LookAheadToken(TokenType::OpGreater))
             {
-                AddMember(decl, ParseGenericParamDecl(parser));
+                AddMember(decl, ParseGenericParamDecl(parser, decl));
 
                 if (parser->LookAheadToken(TokenType::OpGreater))
                     break;
@@ -1534,6 +1553,19 @@ namespace Spire
             parser->PopScope();
             return decl;
         }
+
+        static RefPtr<Decl> ParseTraitConformanceDecl(
+            Parser* parser)
+        {
+            RefPtr<TraitConformanceDecl> decl = new TraitConformanceDecl();
+            parser->FillPosition(decl.Ptr());
+            parser->ReadToken("__conforms");
+
+            decl->base = parser->ParseTypeExp();
+
+            return decl;
+        }
+
 
         static RefPtr<ExtensionDecl> ParseExtensionDecl(Parser* parser)
         {
@@ -1645,6 +1677,8 @@ namespace Spire
                 decl = ParseHLSLBufferDecl(parser);
             else if (parser->LookAheadToken("__generic"))
                 decl = ParseGenericDecl(parser);
+            else if (parser->LookAheadToken("__conforms"))
+                decl = ParseTraitConformanceDecl(parser);
             else if (parser->LookAheadToken("__extension"))
                 decl = ParseExtensionDecl(parser);
             else if (parser->LookAheadToken("__init"))

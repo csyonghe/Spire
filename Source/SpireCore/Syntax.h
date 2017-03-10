@@ -506,8 +506,9 @@ namespace Spire
                 , substitutions(substitutions)
             {}
 
-            // Apply substitutions to a type
+            // Apply substitutions to a type or ddeclaration
             RefPtr<ExpressionType> Substitute(RefPtr<ExpressionType> type) const;
+            DeclRef Substitute(DeclRef declRef) const;
 
             // Apply substitutions to this declaration reference
             DeclRef SubstituteImpl(Substitutions* subst, int* ioDiff);
@@ -1462,12 +1463,36 @@ namespace Spire
             List<TypeExp> bases;
 
             virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
-            virtual ExtensionDecl* Clone(CloneContext & ctx) override;
+            virtual TraitDecl* Clone(CloneContext & ctx) override;
         };
 
         struct TraitDeclRef : public AggTypeDeclRef
         {
-            SPIRE_DECLARE_DECL_REF(TraitDeclRef);
+            SPIRE_DECLARE_DECL_REF(TraitDecl);
+        };
+
+
+        // A declaration that states that the enclosing type supports a given trait
+        //
+        // TODO: this same construct might be used for represent other inheritance-like cases
+        class TraitConformanceDecl : public Decl
+        {
+        public:
+            // The type expression as written
+            TypeExp base;
+
+            // The trait that we found we conform to...
+            TraitDeclRef traitDeclRef;
+
+            virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+            virtual TraitConformanceDecl* Clone(CloneContext & ctx) override;
+        };
+
+        struct TraitConformanceDeclRef : public DeclRef
+        {
+            SPIRE_DECLARE_DECL_REF(TraitConformanceDecl);
+
+            TraitDeclRef GetTraitDeclRef() { return Substitute(GetDecl()->traitDeclRef).As<TraitDeclRef>(); }
         };
 
         // A declaration that represents a simple (non-aggregate) type
@@ -2440,7 +2465,7 @@ namespace Spire
         public:
             // The bound for the type parameter represents a trait that any
             // type used as this parameter must conform to
-            TypeExp bound;
+//            TypeExp bound;
 
             // The "initializer" for the parameter represents a default value
             TypeExp initType;
@@ -2453,6 +2478,30 @@ namespace Spire
         {
             SPIRE_DECLARE_DECL_REF(GenericTypeParamDecl);
         };
+
+        // A constraint placed as part of a generic declaration
+        class GenericTypeConstraintDecl : public Decl
+        {
+        public:
+            // A type constraint like `T : U` is constraining `T` to be "below" `U`
+            // on a lattice of types. This may not be a subtyping relationship
+            // per se, but it makes sense to use that terminology here, so we
+            // think of these fields as the sub-type and sup-ertype, respectively.
+            TypeExp sub;
+            TypeExp sup;
+
+            virtual RefPtr<SyntaxNode> Accept(SyntaxVisitor * visitor) override;
+            virtual GenericTypeConstraintDecl * Clone(CloneContext & ctx) override;
+        };
+
+        struct GenericTypeConstraintDeclRef : DeclRef
+        {
+            SPIRE_DECLARE_DECL_REF(GenericTypeConstraintDecl);
+
+            RefPtr<ExpressionType> GetSub() { return Substitute(GetDecl()->sub); }
+            RefPtr<ExpressionType> GetSup() { return Substitute(GetDecl()->sup); }
+        };
+
 
         class GenericValueParamDecl : public VarDeclBase
         {
@@ -2794,6 +2843,9 @@ namespace Spire
             {}
 
             virtual void VisitTraitDecl(TraitDecl* /*decl*/)
+            {}
+
+            virtual void VisitTraitConformanceDecl(TraitConformanceDecl* /*decl*/)
             {}
 
             virtual RefPtr<ExpressionSyntaxNode> VisitSharedTypeExpr(SharedTypeExpr* typeExpr)

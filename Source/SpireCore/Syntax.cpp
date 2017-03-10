@@ -1467,6 +1467,19 @@ namespace Spire
             throw "unimplemented";
         }
 
+        // GenericTypeConstraintDecl
+
+        RefPtr<SyntaxNode> GenericTypeConstraintDecl::Accept(SyntaxVisitor * visitor)
+        {
+            return this;
+        }
+
+        GenericTypeConstraintDecl * GenericTypeConstraintDecl::Clone(CloneContext & ctx)
+        {
+            throw "unimplemented";
+        }
+
+
         // GenericValueParamDecl
 
         RefPtr<SyntaxNode> GenericValueParamDecl::Accept(SyntaxVisitor * /*visitor*/) {
@@ -1624,6 +1637,15 @@ namespace Spire
             return type->Substitute(substitutions.Ptr()).As<ExpressionType>();
         }
 
+        DeclRef DeclRef::Substitute(DeclRef declRef) const
+        {
+            if(!substitutions)
+                return declRef;
+
+            int diff = 0;
+            return declRef.SubstituteImpl(substitutions.Ptr(), &diff);
+        }
+
         DeclRef DeclRef::SubstituteImpl(Substitutions* subst, int* /*ioDiff*/)
         {
             if (!substitutions) return *this;
@@ -1775,7 +1797,20 @@ namespace Spire
             return this;
         }
 
-        ExtensionDecl* TraitDecl::Clone(CloneContext & /*ctx*/)
+        TraitDecl* TraitDecl::Clone(CloneContext & /*ctx*/)
+        {
+            throw "unimplemented";
+        }
+
+        // TraitConformanceDecl
+
+        RefPtr<SyntaxNode> TraitConformanceDecl::Accept(SyntaxVisitor * visitor)
+        {
+            visitor->VisitTraitConformanceDecl(this);
+            return this;
+        }
+
+        TraitConformanceDecl* TraitConformanceDecl::Clone(CloneContext & ctx)
         {
             throw "unimplemented";
         }

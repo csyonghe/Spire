@@ -1078,7 +1078,34 @@ namespace Spire
             static const int kBaseTypeCount = sizeof(kBaseTypes) / sizeof(kBaseTypes[0]);
             for (int tt = 0; tt < kBaseTypeCount; ++tt)
             {
-                sb << "__builtin_type(" << int(kBaseTypes[tt].tag) << ") struct " << kBaseTypes[tt].name << " {};\n";
+                sb << "__builtin_type(" << int(kBaseTypes[tt].tag) << ") struct " << kBaseTypes[tt].name << "\n{\n";
+
+                // Declare trait conformances for this type
+
+                sb << "__conforms __BuiltinType;\n";
+
+                switch( kBaseTypes[tt].tag )
+                {
+                case BaseType::Float:
+                    sb << "__conforms __BuiltinFloatingPointType;\n";
+                    sb << "__conforms __BuiltinRealType;\n";
+                    // fall through to:
+                case BaseType::Int:
+                    sb << "__conforms __BuiltinSignedArithmeticType;\n";
+                    // fall through to:
+                case BaseType::UInt:
+                case BaseType::UInt64:
+                    sb << "__conforms __BuiltinArithmeticType;\n";
+                    // fall through to:
+                case BaseType::Bool:
+                    sb << "__conforms __BuiltinType;\n";
+                    break;
+
+                default:
+                    break;
+                }
+
+                sb << "};\n";
             }
 
             // Declare ad hoc aliases for some types, just to get things compiling
