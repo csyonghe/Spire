@@ -1947,6 +1947,25 @@ namespace Spire
                 List<Constraint> constraints;
             };
 
+            RefPtr<ExpressionType> TryJoinVectorAndScalarType(
+                RefPtr<VectorExpressionType> vectorType,
+                RefPtr<BasicExpressionType>  scalarType)
+            {
+                // Join( vector<T,N>, S ) -> vetor<Join(T,S), N>
+                //
+                // That is, the join of a vector and a scalar type is
+                // a vector type with a joined element type.
+                auto joinElementType = TryJoinTypes(
+                    vectorType->elementType,
+                    scalarType);
+                if(!joinElementType)
+                    return nullptr;
+
+                return new VectorExpressionType(
+                    joinElementType,
+                    vectorType->elementCount);
+            }
+
             // Try to compute the "join" between two types
             RefPtr<ExpressionType> TryJoinTypes(
                 RefPtr<ExpressionType>  left,
@@ -1977,7 +1996,44 @@ namespace Spire
                             return right;
                         }
                     }
+
+                    // We can also join a vector and a scalar
+                    if(auto rightVector = right->As<VectorExpressionType>())
+                    {
+                        return TryJoinVectorAndScalarType(rightVector, leftBasic);
+                    }
                 }
+
+                // We can join two vector types by joining their element types
+                // (and also their sizes...)
+                if( auto leftVector = left->As<VectorExpressionType>())
+                {
+                    if(auto rightVector = right->As<VectorExpressionType>())
+                    {
+                        // Check if the vector sizes match
+                        if(!leftVector->elementCount->EqualsVal(rightVector->elementCount.Ptr()))
+                            return nullptr;
+
+                        // Try to join the element types
+                        auto joinElementType = TryJoinTypes(
+                            leftVector->elementType,
+                            rightVector->elementType);
+                        if(!joinElementType)
+                            return nullptr;
+
+                        return new VectorExpressionType(
+                            joinElementType,
+                            leftVector->elementCount);
+                    }
+
+                    // We can also join a vector and a scalar
+                    if(auto rightBasic = right->As<BasicExpressionType>())
+                    {
+                        return TryJoinVectorAndScalarType(leftVector, rightBasic);
+                    }
+                }
+
+                // TODO: all the cases for vectors apply to matrices too!
 
                 // Default case is that we just fail.
                 return nullptr;
