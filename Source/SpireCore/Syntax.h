@@ -272,12 +272,14 @@ namespace Spire
 
         enum class BaseType
         {
+            // Note(tfoley): These are ordered in terms of promotion rank, so be vareful when messing with this
+
             Void = 0,
             Bool,
             Int,
             UInt,
-            Float,
             UInt64,
+            Float,
 #if 0
             Texture2D = 48,
             TextureCube = 49,

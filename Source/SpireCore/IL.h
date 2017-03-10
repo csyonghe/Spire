@@ -17,8 +17,8 @@ namespace Spire
             Bool,
             Int,
             UInt,
-            Float,
             UInt64,
+            Float,
         };
         int SizeofBaseType(ILBaseType type);
         int RoundToAlignment(int offset, int alignment);

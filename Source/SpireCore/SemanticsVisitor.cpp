@@ -1947,6 +1947,42 @@ namespace Spire
                 List<Constraint> constraints;
             };
 
+            // Try to compute the "join" between two types
+            RefPtr<ExpressionType> TryJoinTypes(
+                RefPtr<ExpressionType>  left,
+                RefPtr<ExpressionType>  right)
+            {
+                // Easy case: they are the same type!
+                if (left->Equals(right))
+                    return left;
+
+                // We can join two basic types by picking the "better" of the two
+                if (auto leftBasic = left->As<BasicExpressionType>())
+                {
+                    if (auto rightBasic = right->As<BasicExpressionType>())
+                    {
+                        auto leftFlavor = leftBasic->BaseType;
+                        auto rightFlavor = rightBasic->BaseType;
+
+                        // TODO(tfoley): Need a special-case rule here that if
+                        // either operand is of type `half`, then we promote
+                        // to at least `float`
+
+                        // Return the one that had higher rank...
+                        if (leftFlavor > rightFlavor)
+                            return left;
+                        else
+                        {
+                            assert(rightFlavor > leftFlavor);
+                            return right;
+                        }
+                    }
+                }
+
+                // Default case is that we just fail.
+                return nullptr;
+            }
+
             // Try to solve a system of generic constraints.
             // The `system` argument provides the constraints.
             // The `varSubst` argument provides the list of constraint
@@ -1983,11 +2019,13 @@ namespace Spire
                             }
                             else
                             {
-                                if (!type->Equals(cType))
+                                auto joinType = TryJoinTypes(type, cType);
+                                if (!joinType)
                                 {
                                     // failure!
                                     return nullptr;
                                 }
+                                type = joinType;
                             }
 
                             c.satisfied = true;
