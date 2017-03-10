@@ -1436,7 +1436,8 @@ namespace Spire
                 }
                 else
                 {
-                    VisitInvokeExpression(expr);
+                    expr->FunctionExpr = CheckExpr(expr->FunctionExpr);
+                    CheckInvokeExprWithCheckedOperands(expr);
                     if (expr->Operator > Operator::Assign)
                         checkAssign();
                 }
@@ -3524,16 +3525,8 @@ namespace Spire
                 return expr->Accept(this).As<ExpressionSyntaxNode>();
             }
 
-            virtual RefPtr<ExpressionSyntaxNode> VisitInvokeExpression(InvokeExpressionSyntaxNode *expr) override
+            RefPtr<ExpressionSyntaxNode> CheckInvokeExprWithCheckedOperands(InvokeExpressionSyntaxNode *expr)
             {
-                // check the base expression first
-                expr->FunctionExpr = CheckExpr(expr->FunctionExpr);
-
-                // Next check the argument expressions
-                for (auto & arg : expr->Arguments)
-                {
-                    arg = CheckExpr(arg);
-                }
 
                 auto rs = ResolveInvoke(expr);
                 if (auto invoke = dynamic_cast<InvokeExpressionSyntaxNode*>(rs.Ptr()))
@@ -3566,6 +3559,21 @@ namespace Spire
                 }
                 return rs;
             }
+
+            virtual RefPtr<ExpressionSyntaxNode> VisitInvokeExpression(InvokeExpressionSyntaxNode *expr) override
+            {
+                // check the base expression first
+                expr->FunctionExpr = CheckExpr(expr->FunctionExpr);
+
+                // Next check the argument expressions
+                for (auto & arg : expr->Arguments)
+                {
+                    arg = CheckExpr(arg);
+                }
+
+                return CheckInvokeExprWithCheckedOperands(expr);
+            }
+
 
             bool DeclPassesLookupMask(Decl* decl, LookupMask mask)
             {
