@@ -91,6 +91,16 @@ namespace Spire
             }
             TypeExp TranslateTypeNode(TypeExp const& typeExp)
             {
+                // HACK(tfoley): It seems that in some cases we end up re-checking
+                // syntax that we've already checked. We need to root-cause that
+                // issue, but for now a quick fix in this case is to early
+                // exist if we've already got a type associated here:
+                if (typeExp.type)
+                {
+                    return typeExp;
+                }
+
+
                 auto typeRepr = TranslateTypeNodeImpl(typeExp.exp);
 
                 TypeExp result;
@@ -634,7 +644,15 @@ namespace Spire
                     return true;
                 }
 
-                // TODO(tfoley): catch error types here, and route appropriately
+                // If either type is an error, then let things pass.
+                if (toType->As<ErrorType>() || fromType->As<ErrorType>())
+                {
+                    if (outToExpr)
+                        *outToExpr = CreateImplicitCastExpr(toType, fromExpr);
+                    if (outCost)
+                        *outCost = kConversionCost_None;
+                    return true;
+                }
 
                 //
 
@@ -723,6 +741,19 @@ namespace Spire
                     outCost);
             }
 
+            RefPtr<ExpressionSyntaxNode> CreateImplicitCastExpr(
+                RefPtr<ExpressionType>			toType,
+                RefPtr<ExpressionSyntaxNode>	fromExpr)
+            {
+                auto castExpr = new TypeCastExpressionSyntaxNode();
+                castExpr->Position = fromExpr->Position;
+                castExpr->TargetType.type = toType;
+                castExpr->Type = toType;
+                castExpr->Expression = fromExpr;
+                return castExpr;
+            }
+
+
             // Perform type coercion, and emit errors if it isn't possible
             RefPtr<ExpressionSyntaxNode> Coerce(
                 RefPtr<ExpressionType>			toType,
@@ -738,28 +769,15 @@ namespace Spire
                 {
                     getSink()->diagnose(fromExpr->Position, Diagnostics::typeMismatch, toType, fromExpr->Type);
 
-                    // HACK(tfoley): Do it again so I can step in with the debugger!
-                    TryCoerceImpl(
-                    toType,
-                    &expr,
-                    fromExpr->Type.Ptr(),
-                    fromExpr.Ptr(),
-                    nullptr);
+                    // Note(tfoley): We don't call `CreateErrorExpr` here, because that would
+                    // clobber the type on `fromExpr`, and an invariant here is that coercion
+                    // really shouldn't *change* the expression that is passed in, but should
+                    // introduce new AST nodes to coerce its value to a different type...
+                    return CreateImplicitCastExpr(ExpressionType::Error, fromExpr);
                 }
                 return expr;
             }
 
-            RefPtr<ExpressionSyntaxNode> CreateImplicitCastExpr(
-                RefPtr<ExpressionType>			toType,
-                RefPtr<ExpressionSyntaxNode>	fromExpr)
-            {
-                auto castExpr = new TypeCastExpressionSyntaxNode();
-                castExpr->Position = fromExpr->Position;
-                castExpr->TargetType.type = toType;
-                castExpr->Type = toType;
-                castExpr->Expression = fromExpr;
-                return castExpr;
-            }
 
 
 
@@ -1418,7 +1436,8 @@ namespace Spire
                 }
                 else
                 {
-                    VisitInvokeExpression(expr);
+                    expr->FunctionExpr = CheckExpr(expr->FunctionExpr);
+                    CheckInvokeExprWithCheckedOperands(expr);
                     if (expr->Operator > Operator::Assign)
                         checkAssign();
                 }
@@ -1451,12 +1470,123 @@ namespace Spire
                 return new ConstantIntVal(expr->IntValue);
             }
 
-            // Check that an expression resolves to an integer constant, and get its value
-            RefPtr<IntVal> CheckIntegerConstantExpression(ExpressionSyntaxNode* exp)
+            RefPtr<IntVal> TryConstantFoldExpr(
+                RefPtr<InvokeExpressionSyntaxNode> invokeExpr)
+            {
+                // We need all the operands to the expression
+
+                // Check if the callee is an operation that is amenable to constant-folding.
+                //
+                // For right now we will look for calls to intrinsic functions, and then inspect
+                // their names (this is bad and slow).
+                auto funcDeclRefExpr = invokeExpr->FunctionExpr.As<DeclRefExpr>();
+                if (!funcDeclRefExpr) return nullptr;
+
+                auto funcDeclRef = funcDeclRefExpr->declRef;
+                auto intrinsicMod = funcDeclRef.GetDecl()->FindModifier<IntrinsicModifier>();
+                if (!intrinsicMod) return nullptr;
+
+                // Let's not constant-fold operations with more than a certain number of arguments, for simplicity
+                static const int kMaxArgs = 8;
+                if (invokeExpr->Arguments.Count() > kMaxArgs)
+                    return nullptr;
+
+                // Before checking the operation name, let's look at the arguments
+                RefPtr<IntVal> argVals[kMaxArgs];
+                int constArgVals[kMaxArgs];
+                int argCount = 0;
+                bool allConst = true;
+                for (auto argExpr : invokeExpr->Arguments)
+                {
+                    auto argVal = TryCheckIntegerConstantExpression(argExpr.Ptr());
+                    if (!argVal)
+                        return nullptr;
+
+                    argVals[argCount] = argVal;
+
+                    if (auto constArgVal = argVal.As<ConstantIntVal>())
+                    {
+                        constArgVals[argCount] = constArgVal->value;
+                    }
+                    else
+                    {
+                        allConst = false;
+                    }
+                    argCount++;
+                }
+
+                if (!allConst)
+                {
+                    // TODO(tfoley): We probably want to support a very limited number of operations
+                    // on "constants" that aren't actually known, to be able to handle a generic
+                    // that takes an integer `N` but then constructs a vector of size `N+1`.
+                    //
+                    // The hard part there is implementing the rules for value unification in the
+                    // presence of more complicated `IntVal` subclasses, like `SumIntVal`. You'd
+                    // need inference to be smart enough to know that `2 + N` and `N + 2` are the
+                    // same value, as are `N + M + 1 + 1` and `M + 2 + N`.
+                    //
+                    // For now we can just bail in this case.
+                    return nullptr;
+                }
+
+                // At this point, all the operands had simple integer values, so we are golden.
+                int resultValue = 0;
+                auto opName = funcDeclRef.GetName();
+
+                // handle binary operators
+                if (opName == "-")
+                {
+                    if (argCount == 1)
+                    {
+                        resultValue = -constArgVals[0];
+                    }
+                    else if (argCount == 2)
+                    {
+                        resultValue = constArgVals[0] - constArgVals[1];
+                    }
+                }
+
+                // simple binary operators
+#define CASE(OP)                                                        \
+                else if(opName == #OP) do {                             \
+                    if(argCount != 2) return nullptr;                   \
+                    resultValue = constArgVals[0] OP constArgVals[1];   \
+                } while(0)
+
+                CASE(+); // TODO: this can also be unary...
+                CASE(*);
+#undef CASE
+
+                // binary operators with chance of divide-by-zero
+                // TODO: issue a suitable error in that case
+#define CASE(OP)                                                        \
+                else if(opName == #OP) do {                             \
+                    if(argCount != 2) return nullptr;                   \
+                    if(!constArgVals[1]) return nullptr;                \
+                    resultValue = constArgVals[0] OP constArgVals[1];   \
+                } while(0)
+
+                CASE(/);
+                CASE(%);
+#undef CASE
+
+                // TODO(tfoley): more cases
+                else
+                {
+                    return nullptr;
+                }
+
+                RefPtr<IntVal> result = new ConstantIntVal(resultValue);
+                return result;
+            }
+
+            // Try to check an integer constant expression, either returning the value,
+            // or NULL if the expression isn't recognized as a constant.
+            RefPtr<IntVal> TryCheckIntegerConstantExpression(ExpressionSyntaxNode* exp)
             {
                 if (!exp->Type.type->Equals(ExpressionType::GetInt()))
                 {
-                    getSink()->diagnose(exp, Diagnostics::expectedIntegerConstantWrongType, exp->Type);
                     return nullptr;
                 }
 
@@ -1476,9 +1606,34 @@ namespace Spire
                     }
                 }
 
-                getSink()->diagnose(exp, Diagnostics::expectedIntegerConstantNotConstant);
+                // Otherwise, we need to consider operations that we might be able to constant-fold...
+                if (auto invokeExpr = dynamic_cast<InvokeExpressionSyntaxNode*>(exp))
+                {
+                    auto val = TryConstantFoldExpr(invokeExpr);
+                    if (val)
+                        return val;
+                }
+
                 return nullptr;
             }
+
+            // Enforce that an expression resolves to an integer constant, and get its value
+            RefPtr<IntVal> CheckIntegerConstantExpression(ExpressionSyntaxNode* expr)
+            {
+                if (!expr->Type.type->Equals(ExpressionType::GetInt()))
+                {
+                    getSink()->diagnose(expr, Diagnostics::expectedIntegerConstantWrongType, expr->Type);
+                    return nullptr;
+                }
+                auto result = TryCheckIntegerConstantExpression(expr);
+                if (!result)
+                {
+                    getSink()->diagnose(expr, Diagnostics::expectedIntegerConstantNotConstant);
+                }
+                return result;
+            }
+
+
 
             RefPtr<ExpressionSyntaxNode> CheckSimpleSubscriptExpr(
                 RefPtr<IndexExpressionSyntaxNode>   subscriptExpr,
@@ -2705,6 +2860,12 @@ namespace Spire
             {
                 if (fst->Equals(snd)) return true;
 
+                if (auto fstErrorType = fst->As<ErrorType>())
+                    return true;
+
+                if (auto sndErrorType = snd->As<ErrorType>())
+                    return true;
+
                 if (auto fstDeclRefType = fst->As<DeclRefType>())
                 {
                     auto fstDeclRef = fstDeclRefType->declRef;
@@ -2996,18 +3157,51 @@ namespace Spire
                 }
             }
 
+            void formatType(StringBuilder& sb, RefPtr<ExpressionType> type)
+            {
+                sb << type->ToString();
+            }
 
+            String getDeclSignatureString(DeclRef declRef)
+            {
+                StringBuilder sb;
+                sb << declRef.GetName();
+                if (auto funcDeclRef = declRef.As<FuncDeclBaseRef>())
+                {
+                    // This is something callable, so we need to also print parameter types for overloading
+                    sb << "(";
+
+                    bool first = true;
+                    for (auto paramDeclRef : funcDeclRef.GetParameters())
+                    {
+                        if (!first) sb << ", ";
+
+                        formatType(sb, paramDeclRef.GetType());
+
+                        first = false;
+
+                    }
+
+                    sb << ")";
+                }
+                return sb.ProduceString();
+            }
+
+            String getDeclSignatureString(LookupResultItem item)
+            {
+                return getDeclSignatureString(item.declRef);
+            }
 
             RefPtr<ExpressionSyntaxNode> ResolveInvoke(InvokeExpressionSyntaxNode * expr)
             {
-                // Look at the base expression for the call, and figure out how
-                // to invoke it.
+                // Look at the base expression for the call, and figure out how to invoke it.
                 auto funcExpr = expr->FunctionExpr;
                 auto funcExprType = funcExpr->Type;
-                if (funcExprType->Equals(ExpressionType::Error))
+
+                // If we are trying to apply an erroroneous expression, then just bail out now.
+                if(IsErrorExpr(funcExpr))
                 {
-                    expr->Type = ExpressionType::Error;
-                    return expr;
+                    return CreateErrorExpr(expr);
                 }
 
                 OverloadResolveContext context;
@@ -3025,49 +3219,84 @@ namespace Spire
                 if (context.bestCandidates.Count() > 0)
                 {
                     // Things were ambiguous.
+
+                    // It might be that things were only ambiguous because
+                    // one of the argument expressions had an error, and
+                    // so a bunch of candidates could match at that position.
+                    //
+                    // If any argument was an error, we skip out on printing
+                    // another message, to avoid cascading errors.
+                    for (auto arg : expr->Arguments)
+                    {
+                        if (IsErrorExpr(arg))
+                        {
+                            return CreateErrorExpr(expr);
+                        }
+                    }
+
+                    String funcName;
+                    if (auto baseVar = funcExpr.As<VarExpressionSyntaxNode>())
+                        funcName = baseVar->Variable;
+                    else if(auto baseMemberRef = funcExpr.As<MemberExpressionSyntaxNode>())
+                        funcName = baseMemberRef->MemberName;
+
+                    StringBuilder argsListBuilder;
+                    argsListBuilder << "(";
+                    bool first = true;
+                    for (auto a : expr->Arguments)
+                    {
+                        if (!first) argsListBuilder << ", ";
+                        argsListBuilder << a->Type->ToString();
+                        first = false;
+                    }
+                    argsListBuilder << ")";
+                    String argsList = argsListBuilder.ProduceString();
+
                     if (context.bestCandidates[0].status != OverloadCandidate::Status::Appicable)
                     {
                         // There were multple equally-good candidates, but none actually usable.
                         // We will construct a diagnostic message to help out.
-
-                        String funcName;
-                        if (auto baseVar = funcExpr.As<VarExpressionSyntaxNode>())
-                            funcName = baseVar->Variable;
-                        else if(auto baseMemberRef = funcExpr.As<MemberExpressionSyntaxNode>())
-                            funcName = baseMemberRef->MemberName;
-
-                        StringBuilder argsListBuilder;
-                        argsListBuilder << "(";
-                        bool first = true;
-                        for (auto a : expr->Arguments)
-                        {
-                            if (!first) argsListBuilder << ", ";
-                            argsListBuilder << a->Type->ToString();
-                            first = false;
-                        }
-                        argsListBuilder << ")";
-                        String argsList = argsListBuilder.ProduceString();
-
                         if (funcName.Length() != 0)
                         {
                             getSink()->diagnose(expr, Diagnostics::noApplicableOverloadForNameWithArgs, funcName, argsList);
                         }
                         else
                         {
-                            getSink()->diagnose(expr, Diagnostics::noApplicableWithArgs, funcName, argsList);
+                            getSink()->diagnose(expr, Diagnostics::noApplicableWithArgs, argsList);
                         }
-
-                        // TODO: iterate over the candidates under consideration and print them?
-                        expr->Type = ExpressionType::Error;
-                        return expr;
                     }
                     else
                     {
                         // There were multiple applicable candidates, so we need to report them.
-                        getSink()->diagnose(expr, Diagnostics::unimplemented, "ambiguous overloaded call");
-                        expr->Type = ExpressionType::Error;
-                        return expr;
+
+                        if (funcName.Length() != 0)
+                        {
+                            getSink()->diagnose(expr, Diagnostics::ambiguousOverloadForNameWithArgs, funcName, argsList);
+                        }
+                        else
+                        {
+                            getSink()->diagnose(expr, Diagnostics::ambiguousOverloadWithArgs, argsList);
+                        }
                     }
+
+                    int candidateCount = context.bestCandidates.Count();
+                    int maxCandidatesToPrint = 10; // don't show too many candidates at once...
+                    int candidateIndex = 0;
+                    for (auto candidate : context.bestCandidates)
+                    {
+                        String declString = getDeclSignatureString(candidate.item);
+                        getSink()->diagnose(candidate.item.declRef, Diagnostics::overloadCandidate, declString);
+
+                        candidateIndex++;
+                        if (candidateIndex == maxCandidatesToPrint)
+                            break;
+                    }
+                    if (candidateIndex != candidateCount)
+                    {
+                        getSink()->diagnose(expr, Diagnostics::moreOverloadCandidates, candidateCount - candidateIndex);
+                    }
+
+                    return CreateErrorExpr(expr);
                 }
                 else if (context.bestCandidate)
                 {
@@ -3296,23 +3525,8 @@ namespace Spire
                 return expr->Accept(this).As<ExpressionSyntaxNode>();
             }
 
-            virtual RefPtr<ExpressionSyntaxNode> VisitInvokeExpression(InvokeExpressionSyntaxNode *expr) override
+            RefPtr<ExpressionSyntaxNode> CheckInvokeExprWithCheckedOperands(InvokeExpressionSyntaxNode *expr)
             {
-                // check the base expression first
-                expr->FunctionExpr = CheckExpr(expr->FunctionExpr);
-
-                bool anyError = false;
-                for (auto & arg : expr->Arguments)
-                {
-                    arg = arg->Accept(this).As<ExpressionSyntaxNode>();
-                    if (arg->Type->Equals(ExpressionType::Error))
-                        anyError = true;
-                }
-                if (anyError)
-                {
-                    expr->Type = ExpressionType::Error;
-                    return expr;
-                }
 
                 auto rs = ResolveInvoke(expr);
                 if (auto invoke = dynamic_cast<InvokeExpressionSyntaxNode*>(rs.Ptr()))
@@ -3345,6 +3559,21 @@ namespace Spire
                 }
                 return rs;
             }
+
+            virtual RefPtr<ExpressionSyntaxNode> VisitInvokeExpression(InvokeExpressionSyntaxNode *expr) override
+            {
+                // check the base expression first
+                expr->FunctionExpr = CheckExpr(expr->FunctionExpr);
+
+                // Next check the argument expressions
+                for (auto & arg : expr->Arguments)
+                {
+                    arg = CheckExpr(arg);
+                }
+
+                return CheckInvokeExprWithCheckedOperands(expr);
+            }
+
 
             bool DeclPassesLookupMask(Decl* decl, LookupMask mask)
             {
@@ -3712,6 +3941,7 @@ namespace Spire
             {
                 expr->Expression = expr->Expression->Accept(this).As<ExpressionSyntaxNode>();
                 auto targetType = CheckProperType(expr->TargetType);
+                expr->TargetType = targetType;
 
                 // The way to perform casting depends on the types involved
                 if (expr->Expression->Type->Equals(ExpressionType::Error.Ptr()))
@@ -3747,13 +3977,15 @@ namespace Spire
             }
             virtual RefPtr<ExpressionSyntaxNode> VisitSelectExpression(SelectExpressionSyntaxNode * expr) override
             {
-                expr->SelectorExpr = expr->SelectorExpr->Accept(this).As<ExpressionSyntaxNode>();
-                if (!expr->SelectorExpr->Type->Equals(ExpressionType::GetInt()) && !expr->SelectorExpr->Type->Equals(ExpressionType::GetBool())
-                    && !expr->SelectorExpr->Type->Equals(ExpressionType::GetError()))
-                {
-                    expr->Type = ExpressionType::Error;
-                    getSink()->diagnose(expr, Diagnostics::selectPrdicateTypeMismatch);
-                }
+                auto selectorExpr = expr->SelectorExpr;
+                selectorExpr = CheckExpr(selectorExpr);
+                selectorExpr = Coerce(ExpressionType::GetBool(), selectorExpr);
+                expr->SelectorExpr = selectorExpr;
+
+                // TODO(tfoley): We need a general purpose "join" on types for inferring
+                // generic argument types for builtins/intrinsics, so this should really
+                // be using the exact same logic...
+                //
                 expr->Expr0 = expr->Expr0->Accept(this).As<ExpressionSyntaxNode>();
                 expr->Expr1 = expr->Expr1->Accept(this).As<ExpressionSyntaxNode>();
                 if (!expr->Expr0->Type->Equals(expr->Expr1->Type.Ptr()))

@@ -791,6 +791,9 @@ namespace Spire
                 case TokenType::OpEql: case TokenType::OpNeq: case TokenType::OpGreater: case TokenType::OpLess: case TokenType::OpGeq:
                 case TokenType::OpLeq: case TokenType::OpAnd: case TokenType::OpOr: case TokenType::OpBitXor: case TokenType::OpBitAnd:
                 case TokenType::OpBitOr: case TokenType::OpInc: case TokenType::OpDec:
+
+                // Note(tfoley): A bit of a hack:
+                case TokenType::Comma:
                     break;
                 default:
                     parser->sink->diagnose(name.Position, Diagnostics::invalidOperator, name.Content);
@@ -2646,10 +2649,10 @@ namespace Spire
                     auto left = ParseExpression(Precedence(level + 1));
                     while (GetOpLevel(this, tokenReader.PeekTokenType()) == level)
                     {
+                        Token opToken = tokenReader.AdvanceToken();
                         RefPtr<OperatorExpressionSyntaxNode> tmp = new OperatorExpressionSyntaxNode();
                         tmp->Arguments.Add(left);
                         FillPosition(tmp.Ptr());
-                        Token opToken = tokenReader.AdvanceToken();
                         tmp->SetOperator(currentScope.Ptr(), GetOpFromToken(opToken));
                         tmp->Arguments.Add(ParseExpression(Precedence(level + 1)));
                         left = tmp;

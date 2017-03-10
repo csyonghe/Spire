@@ -10,6 +10,9 @@ const char * LibIncludeStringChunks[] = {
 "#line " LINE_STRING  "\"" __FILE__ "\"\n"
 
 R"(
+
+__generic<T,U> __intrinsic U operator,(T left, U right);
+
 __generic<T> __magic_type(HLSLAppendStructuredBufferType) struct AppendStructuredBuffer
 {
 };

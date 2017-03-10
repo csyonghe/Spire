@@ -349,6 +349,8 @@ namespace Spire
                     if (result.GetErrorCount() > 0)
                         return;
 
+#if ENABLE_ILGEN
+
                     RefPtr<ILProgram> program = new ILProgram();
                     RefPtr<SyntaxVisitor> codeGen = CreateILCodeGenerator(result.GetErrorWriter(), program.Ptr(), const_cast<CompileOptions*>(&options));
                     codeGen->VisitProgram(programSyntaxNode.Ptr());
@@ -379,6 +381,8 @@ namespace Spire
                     stageSrc.MainCode = program->ToString();
                     compiledSource.Stages["il"] = stageSrc;
                     result.CompiledSource["code"] = compiledSource;
+
+#endif
 
                     // HACK(tfoley): for right now I just want to pretty-print an AST
                     // into another language, so the whole compiler back-end is just
