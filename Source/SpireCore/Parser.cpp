@@ -1508,6 +1508,7 @@ namespace Spire
             Parser* parser)
         {
             RefPtr<GenericDecl> decl = new GenericDecl();
+            parser->FillPosition(decl.Ptr());
             parser->PushScope(decl.Ptr());
             parser->ReadToken("__generic");
             parser->ReadToken(TokenType::OpLess);

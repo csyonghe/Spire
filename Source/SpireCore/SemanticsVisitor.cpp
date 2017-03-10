@@ -3200,12 +3200,57 @@ namespace Spire
                 sb << type->ToString();
             }
 
-            String getDeclSignatureString(DeclRef declRef)
+            void formatVal(StringBuilder& sb, RefPtr<Val> val)
             {
-                StringBuilder sb;
+                sb << val->ToString();
+            }
+
+            void formatDeclPath(StringBuilder& sb, DeclRef declRef)
+            {
+                // Find the parent declaration
+                auto parentDeclRef = declRef.GetParent();
+
+                // If the immediate parent is a generic, then we probably
+                // want the declaration above that...
+                auto parentGenericDeclRef = parentDeclRef.As<GenericDeclRef>();
+                if(parentGenericDeclRef)
+                {
+                    parentDeclRef = parentGenericDeclRef.GetParent();
+                }
+
+                // Depending on what the parent is, we may want to format things specially
+                if(auto aggTypeDeclRef = parentDeclRef.As<AggTypeDeclRef>())
+                {
+                    formatDeclPath(sb, aggTypeDeclRef);
+                    sb << ".";
+                }
+
                 sb << declRef.GetName();
+
+                // If the parent declaration is a generic, then we need to print out its
+                // signature
+                if( parentGenericDeclRef )
+                {
+                    assert(declRef.substitutions);
+                    assert(declRef.substitutions->genericDecl == parentGenericDeclRef.GetDecl());
+
+                    sb << "<";
+                    bool first = true;
+                    for(auto arg : declRef.substitutions->args)
+                    {
+                        if(!first) sb << ", ";
+                        formatVal(sb, arg);
+                        first = false;
+                    }
+                    sb << ">";
+                }
+            }
+
+            void formatDeclParams(StringBuilder& sb, DeclRef declRef)
+            {
                 if (auto funcDeclRef = declRef.As<FuncDeclBaseRef>())
                 {
+
                     // This is something callable, so we need to also print parameter types for overloading
                     sb << "(";
 
@@ -3222,6 +3267,50 @@ namespace Spire
 
                     sb << ")";
                 }
+                else if(auto genericDeclRef = declRef.As<GenericDeclRef>())
+                {
+                    sb << "<";
+                    bool first = true;
+                    for (auto paramDeclRef : genericDeclRef.GetMembers())
+                    {
+                        if(auto genericTypeParam = paramDeclRef.As<GenericTypeParamDeclRef>())
+                        {
+                            if (!first) sb << ", ";
+                            first = false;
+
+                            sb << genericTypeParam.GetName();
+                        }
+                        else if(auto genericValParam = paramDeclRef.As<GenericValueParamDeclRef>())
+                        {
+                            if (!first) sb << ", ";
+                            first = false;
+
+                            formatType(sb, genericValParam.GetType());
+                            sb << " ";
+                            sb << genericValParam.GetName();
+                        }
+                        else
+                        {}
+                    }
+                    sb << ">";
+
+                    formatDeclParams(sb, DeclRef(genericDeclRef.GetInner(), genericDeclRef.substitutions));
+                }
+                else
+                {
+                }
+            }
+
+            void formatDeclSignature(StringBuilder& sb, DeclRef declRef)
+            {
+                formatDeclPath(sb, declRef);
+                formatDeclParams(sb, declRef);
+            }
+
+            String getDeclSignatureString(DeclRef declRef)
+            {
+                StringBuilder sb;
+                formatDeclSignature(sb, declRef);
                 return sb.ProduceString();
             }
 
