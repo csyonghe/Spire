@@ -5,12 +5,8 @@
 #define STRINGIZE2(x) #x
 #define LINE_STRING STRINGIZE(__LINE__)
 
-const char * LibIncludeStringChunks[] = {
-
-"#line " LINE_STRING  "\"" __FILE__ "\"\n"
-
-R"(
-
+enum { kLibIncludeStringLine = __LINE__+1 };
+const char * LibIncludeStringChunks[] = { R"(
 __generic<T,U> __intrinsic U operator,(T left, U right);
 
 __generic<T> __intrinsic T operator?:(bool condition, T ifTrue, T ifFalse);
@@ -1390,6 +1386,23 @@ namespace Spire
                     }
                 }
             }
+
+            // Output a suitable `#line` directive to point at our raw stdlib code above
+            sb << "\n#line " << kLibIncludeStringLine << " \"";
+            for( auto cc = __FILE__; *cc; ++cc )
+            {
+                switch( *cc )
+                {
+                case '\n':
+                case '\t':
+                case '\\':
+                    sb << "\\";
+                default:
+                    sb << *cc;
+                    break;
+                }
+            }
+            sb << "\"\n";
 
             int chunkCount = sizeof(LibIncludeStringChunks) / sizeof(LibIncludeStringChunks[0]);
             for (int cc = 0; cc < chunkCount; ++cc)

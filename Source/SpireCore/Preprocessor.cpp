@@ -76,6 +76,18 @@ struct PreprocessorInputStream
     // Reader for pre-tokenized input
     TokenReader                     tokenReader;
 
+    // If we are clobbering source locations with `#line`, then
+    // the state is tracked here:
+
+    // Are we overriding source locations?
+    bool                            isOverridingSourceLoc;
+
+    // What is the file name we are overriding to?
+    String                          overrideFileName;
+
+    // What is the relative offset to apply to any line numbers?
+    int                             overrideLineOffset;
+
     // Destructor is virtual so that we can clean up
     // after concrete subtypes.
     virtual ~PreprocessorInputStream() = default;
@@ -233,16 +245,28 @@ static void EndInputStream(Preprocessor* preprocessor, PreprocessorInputStream* 
     DestroyInputStream(preprocessor, inputStream);
 }
 
+// Potentially clobber source location information based on `#line`
+static Token PossiblyOverrideSourceLoc(PreprocessorInputStream* inputStream, Token const& token)
+{
+    Token result = token;
+    if( inputStream->isOverridingSourceLoc )
+    {
+        result.Position.FileName = inputStream->overrideFileName;
+        result.Position.Line += inputStream->overrideLineOffset;
+    }
+    return result;
+}
+
 // Consume one token from an input stream
 static Token AdvanceRawToken(PreprocessorInputStream* inputStream)
 {
-    return inputStream->tokenReader.AdvanceToken();
+    return PossiblyOverrideSourceLoc(inputStream, inputStream->tokenReader.AdvanceToken());
 }
 
 // Peek one token from an input stream
 static Token PeekRawToken(PreprocessorInputStream* inputStream)
 {
-    return inputStream->tokenReader.PeekToken();
+    return PossiblyOverrideSourceLoc(inputStream, inputStream->tokenReader.PeekToken());
 }
 
 // Peek one token type from an input stream
@@ -1530,7 +1554,8 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
     {
         AdvanceToken(context);
 
-        // TODO(tfoley): reset line numbering here
+        // Stop overiding soure locations.
+        context->preprocessor->inputStream->isOverridingSourceLoc = false;
         return;
     }
     else
@@ -1543,14 +1568,14 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
         return;
     }
 
-    if (PeekTokenType(context) == TokenType::EndOfFile)
-    {
-        // TODO(tfoley): set line number, but not file
-        return;
-    }
+    CodePosition directiveLoc = GetDirectiveLoc(context);
 
     String file;
-    if (PeekTokenType(context) == TokenType::StringLiterial)
+    if (PeekTokenType(context) == TokenType::EndOfFile)
+    {
+        file = directiveLoc.FileName;
+    }
+    else if (PeekTokenType(context) == TokenType::StringLiterial)
     {
         file = AdvanceToken(context).Content;
     }
@@ -1566,7 +1591,11 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
         return;
     }
 
-    // TODO(tfoley): set line number and file here
+    PreprocessorInputStream* inputStream = context->preprocessor->inputStream;
+
+    inputStream->isOverridingSourceLoc = true;
+    inputStream->overrideFileName = file;
+    inputStream->overrideLineOffset = line - (directiveLoc.Line + 1);
 }
 
 // Handle a `#pragma` directive
