@@ -2370,7 +2370,7 @@ namespace Spire
             virtual String ToString() override
             {
                 StringBuilder sb;
-                sb << "for (" << InitialCode->ToString() << "; " << ConditionCode->ToString() << "; ";
+                sb << "for (" << /*InitialCode->ToString() <<*/ "; " << ConditionCode->ToString() << "; ";
                 sb << SideEffectCode->ToString() << ")" << EndLine;
                 sb << "{" << EndLine;
                 sb << BodyCode->ToString() << EndLine;

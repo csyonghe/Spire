@@ -16,6 +16,8 @@
 #include "Reflection.h"
 #include "Emit.h"
 
+#define ENABLE_ILGEN 1
+
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -382,7 +384,7 @@ namespace Spire
                     compiledSource.Stages["il"] = stageSrc;
                     result.CompiledSource["code"] = compiledSource;
 
-#endif
+#else
 
                     // HACK(tfoley): for right now I just want to pretty-print an AST
                     // into another language, so the whole compiler back-end is just
@@ -398,6 +400,7 @@ namespace Spire
                     extra.compileResult = &result;
 
                     DoNewEmitLogic(extra);
+#endif
                 }
                 catch (int)
                 {

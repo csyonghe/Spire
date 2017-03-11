@@ -730,12 +730,7 @@ namespace Spire
 					// ad-hoc processing for ctor calls
 					if (auto ctor = dynamic_cast<ConstructorDecl*>(funcType->declRef.GetDecl()))
 					{
-						RefPtr<ExpressionType> exprType;
-						if (auto ext = dynamic_cast<ExtensionDecl*>(ctor->ParentDecl))
-							exprType = ext->targetType;
-						else
-							exprType = DeclRefType::Create(DeclRef(ctor->ParentDecl, funcType->declRef.substitutions));
-						auto rsType = TranslateExpressionType(exprType);
+						auto rsType = TranslateExpressionType(expr->Type.Ptr());
 						instr = new CallInstruction(args.Count());
 						instr->Type = rsType;
 						instr->Function = "__init";
