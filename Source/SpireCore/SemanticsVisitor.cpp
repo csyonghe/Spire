@@ -843,6 +843,18 @@ namespace Spire
                 varDecl->Expr = initExpr;
             }
 
+            void CheckGenericConstraintDecl(GenericTypeConstraintDecl* decl)
+            {
+                // TODO: are there any other validations we can do at this point?
+                //
+                // There probably needs to be a kind of "occurs check" to make
+                // sure that the constraint actually applies to at least one
+                // of the parameters of the generic.
+
+                decl->sub = TranslateTypeNode(decl->sub);
+                decl->sup = TranslateTypeNode(decl->sup);
+            }
+
             virtual RefPtr<GenericDecl> VisitGenericDecl(GenericDecl* genericDecl) override
             {
                 // check the parameters
@@ -857,12 +869,36 @@ namespace Spire
                         // TODO: some real checking here...
                         CheckVarDeclCommon(valParam);
                     }
+                    else if(auto constraint = m.As<GenericTypeConstraintDecl>())
+                    {
+                        CheckGenericConstraintDecl(constraint.Ptr());
+                    }
                 }
 
                 // check the nested declaration
                 // TODO: this needs to be done in an appropriate environment...
                 genericDecl->inner->Accept(this);
                 return genericDecl;
+            }
+
+            virtual void VisitTraitConformanceDecl(TraitConformanceDecl* conformanceDecl) override
+            {
+                // check the type being conformed to
+                auto base = conformanceDecl->base;
+                base = TranslateTypeNode(base);
+                conformanceDecl->base = base;
+
+                if(auto declRefType = base.type->As<DeclRefType>())
+                {
+                    if(auto traitDeclRef = declRefType->declRef.As<TraitDeclRef>())
+                    {
+                        conformanceDecl->traitDeclRef = traitDeclRef;
+                        return;
+                    }
+                }
+
+                // We expected a trait here
+                getSink()->diagnose( conformanceDecl, Diagnostics::expectedATraitGot, base.type);
             }
 
             virtual RefPtr<ProgramSyntaxNode> VisitProgram(ProgramSyntaxNode * programNode) override
@@ -1947,6 +1983,157 @@ namespace Spire
                 List<Constraint> constraints;
             };
 
+            RefPtr<ExpressionType> TryJoinVectorAndScalarType(
+                RefPtr<VectorExpressionType> vectorType,
+                RefPtr<BasicExpressionType>  scalarType)
+            {
+                // Join( vector<T,N>, S ) -> vetor<Join(T,S), N>
+                //
+                // That is, the join of a vector and a scalar type is
+                // a vector type with a joined element type.
+                auto joinElementType = TryJoinTypes(
+                    vectorType->elementType,
+                    scalarType);
+                if(!joinElementType)
+                    return nullptr;
+
+                return new VectorExpressionType(
+                    joinElementType,
+                    vectorType->elementCount);
+            }
+
+            bool DoesTypeConformToTrait(
+                RefPtr<ExpressionType>  type,
+                TraitDeclRef            traitDeclRef)
+            {
+                // for now look up a conformance member...
+                if(auto declRefType = type->As<DeclRefType>())
+                {
+                    if( auto aggTypeDeclRef = declRefType->declRef.As<AggTypeDeclRef>() )
+                    {
+                        for( auto conformanceRef : aggTypeDeclRef.GetMembersOfType<TraitConformanceDeclRef>())
+                        {
+                            EnsureDecl(conformanceRef.GetDecl());
+
+                            if(traitDeclRef.Equals(conformanceRef.GetTraitDeclRef()))
+                                return true;
+                        }
+                    }
+                }
+
+                // default is failure
+                return false;
+            }
+
+            RefPtr<ExpressionType> TryJoinTypeWithTrait(
+                RefPtr<ExpressionType>  type,
+                TraitDeclRef            traitDeclRef)
+            {
+                // The most basic test here should be: does the type declare conformance to the trait.
+                if(DoesTypeConformToTrait(type, traitDeclRef))
+                    return type;
+
+                // There is a more nuanced case if `type` is a builtin type, and we need to make it
+                // conform to a trait that some but not all builtin types support (the main problem
+                // here is when an operation wants an integer type, but one of our operands is a `float`.
+                // The HLSL rules will allow that, with implicit conversion, but our default join rules
+                // will end up picking `float` and we don't want that...).
+
+                // For now we don't handle the hard case and just bail
+                return nullptr;
+            }
+
+            // Try to compute the "join" between two types
+            RefPtr<ExpressionType> TryJoinTypes(
+                RefPtr<ExpressionType>  left,
+                RefPtr<ExpressionType>  right)
+            {
+                // Easy case: they are the same type!
+                if (left->Equals(right))
+                    return left;
+
+                // We can join two basic types by picking the "better" of the two
+                if (auto leftBasic = left->As<BasicExpressionType>())
+                {
+                    if (auto rightBasic = right->As<BasicExpressionType>())
+                    {
+                        auto leftFlavor = leftBasic->BaseType;
+                        auto rightFlavor = rightBasic->BaseType;
+
+                        // TODO(tfoley): Need a special-case rule here that if
+                        // either operand is of type `half`, then we promote
+                        // to at least `float`
+
+                        // Return the one that had higher rank...
+                        if (leftFlavor > rightFlavor)
+                            return left;
+                        else
+                        {
+                            assert(rightFlavor > leftFlavor);
+                            return right;
+                        }
+                    }
+
+                    // We can also join a vector and a scalar
+                    if(auto rightVector = right->As<VectorExpressionType>())
+                    {
+                        return TryJoinVectorAndScalarType(rightVector, leftBasic);
+                    }
+                }
+
+                // We can join two vector types by joining their element types
+                // (and also their sizes...)
+                if( auto leftVector = left->As<VectorExpressionType>())
+                {
+                    if(auto rightVector = right->As<VectorExpressionType>())
+                    {
+                        // Check if the vector sizes match
+                        if(!leftVector->elementCount->EqualsVal(rightVector->elementCount.Ptr()))
+                            return nullptr;
+
+                        // Try to join the element types
+                        auto joinElementType = TryJoinTypes(
+                            leftVector->elementType,
+                            rightVector->elementType);
+                        if(!joinElementType)
+                            return nullptr;
+
+                        return new VectorExpressionType(
+                            joinElementType,
+                            leftVector->elementCount);
+                    }
+
+                    // We can also join a vector and a scalar
+                    if(auto rightBasic = right->As<BasicExpressionType>())
+                    {
+                        return TryJoinVectorAndScalarType(leftVector, rightBasic);
+                    }
+                }
+
+                // HACK: trying to work trait types in here...
+                if(auto leftDeclRefType = left->As<DeclRefType>())
+                {
+                    if( auto leftTraitRef = leftDeclRefType->declRef.As<TraitDeclRef>() )
+                    {
+                        // 
+                        return TryJoinTypeWithTrait(right, leftTraitRef);
+                    }
+                }
+                if(auto rightDeclRefType = right->As<DeclRefType>())
+                {
+                    if( auto rightTraitRef = rightDeclRefType->declRef.As<TraitDeclRef>() )
+                    {
+                        // 
+                        return TryJoinTypeWithTrait(left, rightTraitRef);
+                    }
+                }
+
+                // TODO: all the cases for vectors apply to matrices too!
+
+                // Default case is that we just fail.
+                return nullptr;
+            }
+
             // Try to solve a system of generic constraints.
             // The `system` argument provides the constraints.
             // The `varSubst` argument provides the list of constraint
@@ -1956,22 +2143,29 @@ namespace Spire
             // we solved for along the way.
             RefPtr<Substitutions> TrySolveConstraintSystem(
                 ConstraintSystem*		system,
-                GenericDecl*			genericDecl)
+                GenericDeclRef          genericDeclRef)
             {
                 // For now the "solver" is going to be ridiculously simplistic.
+
+                // The generic itself will have some constraints, so we need to try and solve those too
+                for( auto constraintDeclRef : genericDeclRef.GetMembersOfType<GenericTypeConstraintDeclRef>() )
+                {
+                    if(!TryUnifyTypes(*system, constraintDeclRef.GetSub(), constraintDeclRef.GetSup()))
+                        return nullptr;
+                }
 
                 // We will loop over the generic parameters, and for
                 // each we will try to find a way to satisfy all
                 // the constraints for that parameter
                 List<RefPtr<Val>> args;
-                for (auto m : genericDecl->Members)
+                for (auto m : genericDeclRef.GetMembers())
                 {
-                    if (auto typeParam = m.As<GenericTypeParamDecl>())
+                    if (auto typeParam = m.As<GenericTypeParamDeclRef>())
                     {
                         RefPtr<ExpressionType> type = nullptr;
                         for (auto& c : system->constraints)
                         {
-                            if (c.decl != typeParam.Ptr())
+                            if (c.decl != typeParam.GetDecl())
                                 continue;
 
                             auto cType = c.val.As<ExpressionType>();
@@ -1983,11 +2177,13 @@ namespace Spire
                             }
                             else
                             {
-                                if (!type->Equals(cType))
+                                auto joinType = TryJoinTypes(type, cType);
+                                if (!joinType)
                                 {
                                     // failure!
                                     return nullptr;
                                 }
+                                type = joinType;
                             }
 
                             c.satisfied = true;
@@ -2000,7 +2196,7 @@ namespace Spire
                         }
                         args.Add(type);
                     }
-                    else if (auto valParam = m.As<GenericValueParamDecl>())
+                    else if (auto valParam = m.As<GenericValueParamDeclRef>())
                     {
                         // TODO(tfoley): maybe support more than integers some day?
                         // TODO(tfoley): figure out how this needs to interact with
@@ -2008,7 +2204,7 @@ namespace Spire
                         RefPtr<ConstantIntVal> val = nullptr;
                         for (auto& c : system->constraints)
                         {
-                            if (c.decl != valParam.Ptr())
+                            if (c.decl != valParam.GetDecl())
                                 continue;
 
                             auto cVal = c.val.As<ConstantIntVal>();
@@ -2056,7 +2252,8 @@ namespace Spire
                 // Consruct a reference to the extension with our constraint variables
                 // as the 
                 RefPtr<Substitutions> solvedSubst = new Substitutions();
-                solvedSubst->genericDecl = genericDecl;
+                solvedSubst->genericDecl = genericDeclRef.GetDecl();
+                solvedSubst->outer = genericDeclRef.substitutions;
                 solvedSubst->args = args;
 
                 return solvedSubst;
@@ -2514,11 +2711,14 @@ namespace Spire
                 // special case for generic argument inference failure
                 if (candidate.status == OverloadCandidate::Status::GenericArgumentInferenceFailed)
                 {
+                    String callString = GetCallSignatureString(context.appExpr);
                     getSink()->diagnose(
                         context.appExpr,
-                        Diagnostics::unimplemented,
-                        "generic argument inference failed");
+                        Diagnostics::genericArgumentInferenceFailed,
+                        callString);
 
+                    String declString = getDeclSignatureString(candidate.item);
+                    getSink()->diagnose(candidate.item.declRef, Diagnostics::genericSignatureTried, declString);
                     goto error;
                 }
 
@@ -2921,7 +3121,7 @@ namespace Spire
                     if (!TryUnifyTypes(constraints, extDecl->targetType, type))
                         return DeclRef().As<ExtensionDeclRef>();
 
-                    auto constraintSubst = TrySolveConstraintSystem(&constraints, extGenericDecl);
+                    auto constraintSubst = TrySolveConstraintSystem(&constraints, DeclRef(extGenericDecl, nullptr).As<GenericDeclRef>());
                     if (!constraintSubst)
                     {
                         return DeclRef().As<ExtensionDeclRef>();
@@ -3002,7 +3202,7 @@ namespace Spire
                     return DeclRef(nullptr, nullptr);
                 }
 
-                auto constraintSubst = TrySolveConstraintSystem(&constraints, genericDeclRef.GetDecl());
+                auto constraintSubst = TrySolveConstraintSystem(&constraints, genericDeclRef);
                 if (!constraintSubst)
                 {
                     // constraint solving failed
@@ -3162,12 +3362,57 @@ namespace Spire
                 sb << type->ToString();
             }
 
-            String getDeclSignatureString(DeclRef declRef)
+            void formatVal(StringBuilder& sb, RefPtr<Val> val)
             {
-                StringBuilder sb;
+                sb << val->ToString();
+            }
+
+            void formatDeclPath(StringBuilder& sb, DeclRef declRef)
+            {
+                // Find the parent declaration
+                auto parentDeclRef = declRef.GetParent();
+
+                // If the immediate parent is a generic, then we probably
+                // want the declaration above that...
+                auto parentGenericDeclRef = parentDeclRef.As<GenericDeclRef>();
+                if(parentGenericDeclRef)
+                {
+                    parentDeclRef = parentGenericDeclRef.GetParent();
+                }
+
+                // Depending on what the parent is, we may want to format things specially
+                if(auto aggTypeDeclRef = parentDeclRef.As<AggTypeDeclRef>())
+                {
+                    formatDeclPath(sb, aggTypeDeclRef);
+                    sb << ".";
+                }
+
                 sb << declRef.GetName();
+
+                // If the parent declaration is a generic, then we need to print out its
+                // signature
+                if( parentGenericDeclRef )
+                {
+                    assert(declRef.substitutions);
+                    assert(declRef.substitutions->genericDecl == parentGenericDeclRef.GetDecl());
+
+                    sb << "<";
+                    bool first = true;
+                    for(auto arg : declRef.substitutions->args)
+                    {
+                        if(!first) sb << ", ";
+                        formatVal(sb, arg);
+                        first = false;
+                    }
+                    sb << ">";
+                }
+            }
+
+            void formatDeclParams(StringBuilder& sb, DeclRef declRef)
+            {
                 if (auto funcDeclRef = declRef.As<FuncDeclBaseRef>())
                 {
+
                     // This is something callable, so we need to also print parameter types for overloading
                     sb << "(";
 
@@ -3184,6 +3429,50 @@ namespace Spire
 
                     sb << ")";
                 }
+                else if(auto genericDeclRef = declRef.As<GenericDeclRef>())
+                {
+                    sb << "<";
+                    bool first = true;
+                    for (auto paramDeclRef : genericDeclRef.GetMembers())
+                    {
+                        if(auto genericTypeParam = paramDeclRef.As<GenericTypeParamDeclRef>())
+                        {
+                            if (!first) sb << ", ";
+                            first = false;
+
+                            sb << genericTypeParam.GetName();
+                        }
+                        else if(auto genericValParam = paramDeclRef.As<GenericValueParamDeclRef>())
+                        {
+                            if (!first) sb << ", ";
+                            first = false;
+
+                            formatType(sb, genericValParam.GetType());
+                            sb << " ";
+                            sb << genericValParam.GetName();
+                        }
+                        else
+                        {}
+                    }
+                    sb << ">";
+
+                    formatDeclParams(sb, DeclRef(genericDeclRef.GetInner(), genericDeclRef.substitutions));
+                }
+                else
+                {
+                }
+            }
+
+            void formatDeclSignature(StringBuilder& sb, DeclRef declRef)
+            {
+                formatDeclPath(sb, declRef);
+                formatDeclParams(sb, declRef);
+            }
+
+            String getDeclSignatureString(DeclRef declRef)
+            {
+                StringBuilder sb;
+                formatDeclSignature(sb, declRef);
                 return sb.ProduceString();
             }
 
@@ -3191,6 +3480,22 @@ namespace Spire
             {
                 return getDeclSignatureString(item.declRef);
             }
+
+            String GetCallSignatureString(RefPtr<AppExprBase> expr)
+            {
+                 StringBuilder argsListBuilder;
+                argsListBuilder << "(";
+                bool first = true;
+                for (auto a : expr->Arguments)
+                {
+                    if (!first) argsListBuilder << ", ";
+                    argsListBuilder << a->Type->ToString();
+                    first = false;
+                }
+                argsListBuilder << ")";
+                return argsListBuilder.ProduceString();
+            }
+
 
             RefPtr<ExpressionSyntaxNode> ResolveInvoke(InvokeExpressionSyntaxNode * expr)
             {
@@ -3240,17 +3545,7 @@ namespace Spire
                     else if(auto baseMemberRef = funcExpr.As<MemberExpressionSyntaxNode>())
                         funcName = baseMemberRef->MemberName;
 
-                    StringBuilder argsListBuilder;
-                    argsListBuilder << "(";
-                    bool first = true;
-                    for (auto a : expr->Arguments)
-                    {
-                        if (!first) argsListBuilder << ", ";
-                        argsListBuilder << a->Type->ToString();
-                        first = false;
-                    }
-                    argsListBuilder << ")";
-                    String argsList = argsListBuilder.ProduceString();
+                    String argsList = GetCallSignatureString(expr);
 
                     if (context.bestCandidates[0].status != OverloadCandidate::Status::Appicable)
                     {
@@ -3975,6 +4270,7 @@ namespace Spire
                 expr->Type = ExpressionType::Error;
                 return expr;
             }
+#if TIMREMOVED
             virtual RefPtr<ExpressionSyntaxNode> VisitSelectExpression(SelectExpressionSyntaxNode * expr) override
             {
                 auto selectorExpr = expr->SelectorExpr;
@@ -3995,6 +4291,7 @@ namespace Spire
                 expr->Type = expr->Expr0->Type;
                 return expr;
             }
+#endif
 
             // Get the type to use when referencing a declaration
             QualType GetTypeForDeclRef(DeclRef declRef)

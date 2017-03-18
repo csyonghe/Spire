@@ -362,6 +362,7 @@ static void EmitExprWithPrecedence(EmitContext* context, RefPtr<ExpressionSyntax
         Emit(context, ") ");
         EmitExpr(context, castExpr->Expression);
     }
+#if TIMREMOVED
     else if (auto selectExpr = expr.As<SelectExpressionSyntaxNode>())
     {
         needClose = MaybeEmitParens(context, outerPrec, kPrecedence_Conditional);
@@ -372,6 +373,7 @@ static void EmitExprWithPrecedence(EmitContext* context, RefPtr<ExpressionSyntax
         Emit(context, " : ");
         EmitExprWithPrecedence(context, selectExpr->Expr1, kPrecedence_Conditional);
     }
+#endif
     else
     {
         throw "unimplemented";

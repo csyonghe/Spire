@@ -369,18 +369,6 @@ namespace Spire
             rs->Expression = Expression->Clone(ctx);
             return rs;
         }
-        RefPtr<SyntaxNode> SelectExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
-        {
-            return visitor->VisitSelectExpression(this);
-        }
-        SelectExpressionSyntaxNode * SelectExpressionSyntaxNode::Clone(CloneContext & ctx)
-        {
-            auto rs = CloneSyntaxNodeFields(new SelectExpressionSyntaxNode(*this), ctx);
-            rs->SelectorExpr = SelectorExpr->Clone(ctx);
-            rs->Expr0 = Expr0->Clone(ctx);
-            rs->Expr1 = Expr1->Clone(ctx);
-            return rs;
-        }
         RefPtr<SyntaxNode> VarExpressionSyntaxNode::Accept(SyntaxVisitor * visitor)
         {
             return visitor->VisitVarExpression(this);
@@ -1322,6 +1310,8 @@ namespace Spire
                 return "||";
             case Operator::Sequence:
                 return ",";
+            case Operator::Select:
+                return "?:";
             default:
                 return "";
             }
@@ -1476,6 +1466,19 @@ namespace Spire
         GenericTypeParamDecl * GenericTypeParamDecl::Clone(CloneContext & /*ctx*/) {
             throw "unimplemented";
         }
+
+        // GenericTypeConstraintDecl
+
+        RefPtr<SyntaxNode> GenericTypeConstraintDecl::Accept(SyntaxVisitor * visitor)
+        {
+            return this;
+        }
+
+        GenericTypeConstraintDecl * GenericTypeConstraintDecl::Clone(CloneContext & ctx)
+        {
+            throw "unimplemented";
+        }
+
 
         // GenericValueParamDecl
 
@@ -1634,6 +1637,15 @@ namespace Spire
             return type->Substitute(substitutions.Ptr()).As<ExpressionType>();
         }
 
+        DeclRef DeclRef::Substitute(DeclRef declRef) const
+        {
+            if(!substitutions)
+                return declRef;
+
+            int diff = 0;
+            return declRef.SubstituteImpl(substitutions.Ptr(), &diff);
+        }
+
         DeclRef DeclRef::SubstituteImpl(Substitutions* subst, int* /*ioDiff*/)
         {
             if (!substitutions) return *this;
@@ -1785,7 +1797,20 @@ namespace Spire
             return this;
         }
 
-        ExtensionDecl* TraitDecl::Clone(CloneContext & /*ctx*/)
+        TraitDecl* TraitDecl::Clone(CloneContext & /*ctx*/)
+        {
+            throw "unimplemented";
+        }
+
+        // TraitConformanceDecl
+
+        RefPtr<SyntaxNode> TraitConformanceDecl::Accept(SyntaxVisitor * visitor)
+        {
+            visitor->VisitTraitConformanceDecl(this);
+            return this;
+        }
+
+        TraitConformanceDecl* TraitConformanceDecl::Clone(CloneContext & ctx)
         {
             throw "unimplemented";
         }
