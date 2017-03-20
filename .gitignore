@@ -16,3 +16,4 @@ Debug/
 Release/
 x64/
 *.TMP
+*.cse
