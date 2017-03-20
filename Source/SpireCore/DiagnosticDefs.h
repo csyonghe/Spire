@@ -47,6 +47,7 @@ DIAGNOSTIC(    1, Error, cannotOpenFile, "cannot open file '$0'.")
 DIAGNOSTIC(    2, Error, cannotFindFile, "cannot find file '$0'.")
 DIAGNOSTIC(    2, Error, unsupportedCompilerMode, "unsupported compiler mode.")
 DIAGNOSTIC(    4, Error, cannotWriteOutputFile, "cannot write output file '$0'.")
+DIAGNOSTIC(    5, Note, d3dCompileInfo, "$0")
 
 //
 // 1xxxx - Lexical anaylsis

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="DebugClang|Win32">
@@ -356,6 +356,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="D3DCompiler.cpp" />
     <ClCompile Include="ShaderCompilerShell.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -368,6 +369,9 @@
     <ProjectReference Include="..\SpireLib\SpireLib.vcxproj">
       <Project>{1168c449-66a5-4d23-80e2-2c1a07e58f83}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="D3DCompiler.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

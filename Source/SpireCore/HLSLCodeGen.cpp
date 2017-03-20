@@ -602,7 +602,7 @@ namespace Spire
 					GenerateDomainShaderAttributes(sb, stage);
 				}
 
-				sb << "T" << world->OutputType->TypeName << "Ext main(";
+				sb << "T" << world->OutputType->TypeName << "Ext " << stage->Name << "_main(";
 
 				if(stageInputType)
 				{

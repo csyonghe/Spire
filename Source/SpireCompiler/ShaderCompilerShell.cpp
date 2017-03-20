@@ -1,5 +1,6 @@
 ﻿#include "CoreLib/LibIO.h"
 #include "SpireLib.h"
+#include "D3DCompiler.h"
 
 using namespace CoreLib::Basic;
 using namespace CoreLib::IO;
@@ -143,6 +144,7 @@ int wmain(int argc, wchar_t* argv[])
 			auto files = SpireLib::CompileShaderSourceFromFile(result, fileName, options);
 			for (auto & f : files)
 			{
+				
 				try
 				{
 					f.SaveToFile(Path::Combine(outputDir, f.MetaData.ShaderName + ".cse"));
@@ -150,6 +152,29 @@ int wmain(int argc, wchar_t* argv[])
 				catch (Exception &)
 				{
 					result.GetErrorWriter()->diagnose(CodePosition(0, 0, 0, ""), Diagnostics::cannotWriteOutputFile, Path::Combine(outputDir, f.MetaData.ShaderName + ".cse"));
+				}
+			}
+
+			if (options.Target == CodeGenTarget::HLSL)
+			{
+				// verify shader using D3DCompileShaderFromFile
+				RefPtr<D3DCompiler> d3dCompiler = LoadD3DCompiler();
+				if (d3dCompiler)
+				{
+					for (auto & f : files)
+					{
+						for (auto & stage : f.Sources)
+						{
+							String errMsg;
+							d3dCompiler->Compile(stage.Value.MainCode, stage.Key, errMsg);
+							if (errMsg.Length())
+								result.GetErrorWriter()->diagnose(CodePosition(0, 0, 0, ""), Diagnostics::d3dCompileInfo, errMsg);
+						}
+					}
+				}
+				else
+				{
+					printf("failed to load d3d compiler for verification.\n");
 				}
 			}
 		}
@@ -160,6 +185,7 @@ int wmain(int argc, wchar_t* argv[])
 		result.PrintDiagnostics();
 		if (result.GetErrorCount() == 0)
 			returnValue = 0;
+		
 	}
 end:;
 #ifdef _MSC_VER
