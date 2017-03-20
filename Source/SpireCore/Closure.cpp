@@ -138,6 +138,7 @@ namespace Spire
 						}
 						else
 						{
+							refClosure->Name = import->ObjectName.Content;
 							rs->SubClosures[import->ObjectName.Content] = refClosure;
 						}
 					}

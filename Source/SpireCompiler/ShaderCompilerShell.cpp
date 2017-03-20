@@ -168,7 +168,11 @@ int wmain(int argc, wchar_t* argv[])
 							String errMsg;
 							d3dCompiler->Compile(stage.Value.MainCode, stage.Key, errMsg);
 							if (errMsg.Length())
-								result.GetErrorWriter()->diagnose(CodePosition(0, 0, 0, ""), Diagnostics::d3dCompileInfo, errMsg);
+							{
+								auto dumpFileName = f.MetaData.ShaderName + "." + stage.Key + ".hlsl";
+								result.GetErrorWriter()->diagnose(CodePosition(0, 0, 0, dumpFileName), Diagnostics::d3dCompileInfo, errMsg);
+								File::WriteAllText(Path::Combine(Path::GetDirectoryName(fileName), dumpFileName), stage.Value.MainCode);
+							}
 						}
 					}
 				}

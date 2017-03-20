@@ -31,16 +31,36 @@ namespace Spire
 
 		void CLikeCodeGen::PrintType(StringBuilder & sbCode, ILType* type)
 		{
-			PrintTypeName(sbCode, type);
+			if (auto arrType = dynamic_cast<ILArrayType*>(type))
+			{
+				PrintType(sbCode, arrType->BaseType.Ptr());
+				if (arrType->ArrayLength > 0)
+					sbCode << "[" << arrType->ArrayLength << "]";
+				else
+					sbCode << "[]";
+			}
+			else
+				PrintTypeName(sbCode, type);
 		}
 
 		void CLikeCodeGen::PrintDef(StringBuilder & sbCode, ILType* type, const String & name)
 		{
-			PrintType(sbCode, type);
-			sbCode << " ";
-			sbCode << name;
-			if (name.Length() == 0)
-				throw InvalidProgramException("unnamed instruction.");
+			if (auto arrType = dynamic_cast<ILArrayType*>(type))
+			{
+				PrintDef(sbCode, arrType->BaseType.Ptr(), name);
+				if (arrType->ArrayLength > 0)
+					sbCode << "[" << arrType->ArrayLength << "]";
+				else
+					sbCode << "[]";
+			}
+			else
+			{
+				PrintType(sbCode, type);
+				sbCode << " ";
+				sbCode << name;
+				if (name.Length() == 0)
+					throw InvalidProgramException("unnamed instruction.");
+			}
 		}
 		
 		String CLikeCodeGen::GetFuncOriginalName(const String & name)
@@ -811,8 +831,8 @@ namespace Spire
 					sb << "struct " << st->TypeName << "\n{\n";
 					for (auto & f : st->Members)
 					{
-						sb << f.Type->ToString();
-						sb << " " << f.FieldName << ";\n";
+						PrintDef(sb, f.Type.Ptr(), f.FieldName);
+						sb << ";\n";
 					}
 					sb << "};\n";
 				}

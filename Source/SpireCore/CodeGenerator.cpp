@@ -243,7 +243,7 @@ namespace Spire
 								param->BindingPoints.Add(bindingVal);
 							}
 						}
-						module->Parameters.Add(def->UniqueName, param);
+						module->Parameters.Add(def->OriginalName, param);
 					}
 				}
 
@@ -253,7 +253,7 @@ namespace Spire
 					if (def->SyntaxNode->IsParam())
 					{
 						auto module = compiledShader->ModuleParamSets[def->ModuleInstance->BindingName]().Ptr();
-						auto & param = **module->Parameters.TryGetValue(def->UniqueName);
+						auto & param = **module->Parameters.TryGetValue(def->OriginalName);
 						auto bindableResType = param.Type->GetBindableResourceType();
 						if (bindableResType != BindableResourceType::NonBindable)
 						{
@@ -513,7 +513,7 @@ namespace Spire
 				{
 					for (auto & comp : *paramComps)
 					{
-						variables.Add(comp->UniqueName, compiledShader->ModuleParamSets[comp->ModuleInstance->BindingName]()->Parameters[comp->UniqueName]().Ptr());
+						variables.Add(comp->UniqueName, compiledShader->ModuleParamSets[comp->ModuleInstance->BindingName]()->Parameters[comp->OriginalName]().Ptr());
 					}
 				}
 				for (auto & world : pipeline->Worlds)
