@@ -298,14 +298,14 @@ extern "C"
 	@param ctx The compilation context.
 	@param name The source code of the shader.
 	*/
-	SPIRE_API SpireShader* spCreateShaderFromSource(SpireCompilationContext * ctx, const char * source);
+	SPIRE_API SpireShader* spCreateShaderFromSource(SpireCompilationContext * ctx, const char * source, SpireDiagnosticSink * sink);
 
 	/*!
 	@brief Create a template shader object from a Spire source file.
 	@param ctx The compilation context.
 	@param name The source code of the shader.
 	*/
-	SPIRE_API SpireShader* spCreateShaderFromFile(SpireCompilationContext * ctx, const char * fileName);
+	SPIRE_API SpireShader* spCreateShaderFromFile(SpireCompilationContext * ctx, const char * fileName, SpireDiagnosticSink * sink);
 
 	/*!
 	@brief Retrieves the runtime unique Id of a shader.

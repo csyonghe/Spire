@@ -35,7 +35,7 @@ public:
 	HMODULE Lib;
 	virtual bool Compile(CoreLib::String input, CoreLib::String stageName, CoreLib::String & errMsg) override
 	{
-		auto entryPoint = stageName + "_main";
+		auto entryPoint = "main";
 		char * profile = "ps_5_0";
 		if (stageName == "vs")
 			profile = "vs_5_0";
@@ -44,7 +44,7 @@ public:
 		else if (stageName == "tcs")
 			profile = "ds_5_0";
 		ID3DBlob *code, *err = nullptr;
-		D3DCompile2(input.Buffer(), input.Length(), "", nullptr, nullptr, entryPoint.Buffer(), profile, 0, 0, 0, 0, 0, &code, &err);
+		D3DCompile2(input.Buffer(), input.Length(), "", nullptr, nullptr, entryPoint, profile, 0, 0, 0, 0, 0, &code, &err);
 		if (err != nullptr)
 		{
 			errMsg = (char*)err->GetBufferPointer();
