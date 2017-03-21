@@ -728,33 +728,52 @@ namespace SpireLib
 			if (list.Count())
 			{
 				auto rs = new Shader((*list.begin())->Name.Content, String(source));
-				HashSet<int> usedIds;
-				for (auto & imp : unit.SyntaxNode->GetMembersOfType<ImportSyntaxNode>())
+				int i = 0;
+				for (auto & param : list.First()->Parameters)
 				{
-					ShaderParameter param;
-					param.TypeName = imp->ShaderName.Content;
-					param.Name = imp->ObjectName.Content;
-					param.BindingId = -1;
-					String binding;
-					if (imp->FindSimpleAttribute("Binding", binding))
-					{
-						param.BindingId = StringToInt(binding);
-						usedIds.Add(param.BindingId);
-					}
-					rs->Parameters.Add(param);
-				}
-				int idAlloc = 0;
-				for (auto & param : rs->Parameters)
-				{
-					if (param.BindingId == -1)
-					{
-						while (usedIds.Contains(idAlloc))
-							idAlloc++;
-						param.BindingId = idAlloc;
-						idAlloc++;
-					}
+					ShaderParameter p;
+					p.BindingId = i;
+					p.Name = param->ModuleName.Content;
+					p.TypeName = param->InterfaceName.Content;
+					rs->Parameters.Add(p);
+					i++;
 				}
 				return rs;
+			}
+			else
+			{
+				auto normalShaders = unit.SyntaxNode->GetMembersOfType<ShaderSyntaxNode>();
+				if (normalShaders.Count())
+				{
+					auto rs = new Shader((*normalShaders.begin())->Name.Content, String(source));
+					HashSet<int> usedIds;
+					for (auto & imp : unit.SyntaxNode->GetMembersOfType<ImportSyntaxNode>())
+					{
+						ShaderParameter param;
+						param.TypeName = imp->ShaderName.Content;
+						param.Name = imp->ObjectName.Content;
+						param.BindingId = -1;
+						String binding;
+						if (imp->FindSimpleAttribute("Binding", binding))
+						{
+							param.BindingId = StringToInt(binding);
+							usedIds.Add(param.BindingId);
+						}
+						rs->Parameters.Add(param);
+					}
+					int idAlloc = 0;
+					for (auto & param : rs->Parameters)
+					{
+						if (param.BindingId == -1)
+						{
+							while (usedIds.Contains(idAlloc))
+								idAlloc++;
+							param.BindingId = idAlloc;
+							idAlloc++;
+						}
+					}
+					return rs;
+				}
 			}
 			if (sink)
 			{
