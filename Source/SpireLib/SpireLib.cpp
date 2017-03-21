@@ -713,20 +713,25 @@ namespace SpireLib
 			}
 			return result.GetErrorCount();
 		}
-		Shader * NewShaderFromSource(const char * source, const char * fileName)
+		Shader * NewShaderFromSource(const char * source, const char * fileName, SpireDiagnosticSink * sink)
 		{
 			Spire::Compiler::CompileResult result;
 			auto unit = compiler->Parse(result, source, fileName, nullptr, Dictionary<String, String>());
 			auto list = unit.SyntaxNode->GetMembersOfType<TemplateShaderSyntaxNode>();
 			if (list.Count())
 				return new Shader((*list.begin())->Name.Content, String(source));
+			if (sink)
+			{
+				sink->diagnostics = result.sink.diagnostics;
+				sink->errorCount = result.sink.errorCount;
+			}
 			return nullptr;
 		}
-		Shader * NewShaderFromFile(const char * fileName)
+		Shader * NewShaderFromFile(const char * fileName, SpireDiagnosticSink * sink)
 		{
 			try
 			{
-				return NewShaderFromSource(File::ReadAllText(fileName).Buffer(), fileName);
+				return NewShaderFromSource(File::ReadAllText(fileName).Buffer(), fileName, sink);
 			}
 			catch (Exception)
 			{
@@ -897,14 +902,14 @@ void spPopContext(SpireCompilationContext * ctx)
 	CTX(ctx)->PopContext();
 }
 
-SpireShader* spCreateShaderFromSource(SpireCompilationContext * ctx, const char * source)
+SpireShader* spCreateShaderFromSource(SpireCompilationContext * ctx, const char * source, SpireDiagnosticSink * sink)
 {
-	return reinterpret_cast<SpireShader*>(CTX(ctx)->NewShaderFromSource(source, ""));
+	return reinterpret_cast<SpireShader*>(CTX(ctx)->NewShaderFromSource(source, "", sink));
 }
 
-SpireShader* spCreateShaderFromFile(SpireCompilationContext * ctx, const char * fileName)
+SpireShader* spCreateShaderFromFile(SpireCompilationContext * ctx, const char * fileName, SpireDiagnosticSink * sink)
 {
-	return reinterpret_cast<SpireShader*>(CTX(ctx)->NewShaderFromFile(fileName));
+	return reinterpret_cast<SpireShader*>(CTX(ctx)->NewShaderFromFile(fileName, sink));
 }
 
 unsigned int spShaderGetId(SpireShader * shader)
