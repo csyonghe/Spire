@@ -112,7 +112,7 @@ HRESULT initialize( ID3D11Device* dxDevice )
 		{
 			using module0;
 		}
-	)");
+	)", nullptr);
 
 	SpireModule * helloModule = spFindModule(spireContext, "HelloModule");
 
