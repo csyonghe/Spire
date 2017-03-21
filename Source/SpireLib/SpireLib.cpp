@@ -420,6 +420,12 @@ namespace SpireLib
 		FromString(src);
 	}
 
+	struct ShaderParameter
+	{
+		String TypeName;
+		String Name;
+		int BindingId;
+	};
 
 	class Shader
 	{
@@ -429,6 +435,7 @@ namespace SpireLib
 		String src;
 	public:
 		int Id;
+		List<ShaderParameter> Parameters;
 		Shader(String name, String source)
 		{
 			static int idAllocator = 0;
@@ -719,7 +726,36 @@ namespace SpireLib
 			auto unit = compiler->Parse(result, source, fileName, nullptr, Dictionary<String, String>());
 			auto list = unit.SyntaxNode->GetMembersOfType<TemplateShaderSyntaxNode>();
 			if (list.Count())
-				return new Shader((*list.begin())->Name.Content, String(source));
+			{
+				auto rs = new Shader((*list.begin())->Name.Content, String(source));
+				HashSet<int> usedIds;
+				for (auto & imp : unit.SyntaxNode->GetMembersOfType<ImportSyntaxNode>())
+				{
+					ShaderParameter param;
+					param.TypeName = imp->ShaderName.Content;
+					param.Name = imp->ObjectName.Content;
+					param.BindingId = -1;
+					String binding;
+					if (imp->FindSimpleAttribute("Binding", binding))
+					{
+						param.BindingId = StringToInt(binding);
+						usedIds.Add(param.BindingId);
+					}
+					rs->Parameters.Add(param);
+				}
+				int idAlloc = 0;
+				for (auto & param : rs->Parameters)
+				{
+					if (param.BindingId == -1)
+					{
+						while (usedIds.Contains(idAlloc))
+							idAlloc++;
+						param.BindingId = idAlloc;
+						idAlloc++;
+					}
+				}
+				return rs;
+			}
 			if (sink)
 			{
 				sink->diagnostics = result.sink.diagnostics;
@@ -920,6 +956,25 @@ unsigned int spShaderGetId(SpireShader * shader)
 const char* spShaderGetName(SpireShader * shader)
 {
 	return SHADER(shader)->GetName().Buffer();
+}
+
+const char * spShaderGetParameterType(SpireShader * shader, int i)
+{
+	if (shader && i >= 0 && i < SHADER(shader)->Parameters.Count())
+		return SHADER(shader)->Parameters[i].TypeName.Buffer();
+	return nullptr;
+}
+
+int spShaderGetParameterBinding(SpireShader * shader, int i)
+{
+	if (shader && i >= 0 && i < SHADER(shader)->Parameters.Count())
+		return SHADER(shader)->Parameters[i].BindingId;
+	return -1;
+}
+
+int spShaderGetParameterCount(SpireShader * shader)
+{
+	return SHADER(shader)->Parameters.Count();
 }
 
 SpireModule * spFindModule(SpireCompilationContext * ctx, const char * moduleName)

@@ -321,6 +321,10 @@ extern "C"
 	*/
 	SPIRE_API const char * spShaderGetName(SpireShader * shader);
 
+	SPIRE_API const char * spShaderGetParameterType(SpireShader * shader, int i);
+	SPIRE_API int spShaderGetParameterBinding(SpireShader * shader, int i);
+	SPIRE_API int spShaderGetParameterCount(SpireShader * shader);
+
 	/*!
 	@brief Find a precompiled module in a SpireCompilationContext.
 	@param ctx The compilation context.
