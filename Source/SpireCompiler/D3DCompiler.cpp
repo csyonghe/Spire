@@ -35,7 +35,7 @@ public:
 	HMODULE Lib;
 	virtual bool Compile(CoreLib::String input, CoreLib::String stageName, CoreLib::String & errMsg) override
 	{
-		auto entryPoint = stageName + "_main";
+		auto entryPoint = "main";
 		char * profile = "ps_5_0";
 		if (stageName == "vs")
 			profile = "vs_5_0";
