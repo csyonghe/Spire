@@ -436,6 +436,7 @@ namespace SpireLib
 	public:
 		int Id;
 		List<ShaderParameter> Parameters;
+		RefPtr<Decl> Syntax;
 		Shader(String name, String source)
 		{
 			static int idAllocator = 0;
@@ -471,6 +472,7 @@ namespace SpireLib
 			List<CompileUnit> moduleUnits;
 			HashSet<String> processedModuleUnits;
 			EnumerableDictionary<String, RefPtr<SpireModule>> modules;
+			EnumerableDictionary<String, RefPtr<Shader>> shaders;
 			int errorCount = 0;
 		};
 		Array<State, 128> states;
@@ -646,6 +648,57 @@ namespace SpireLib
 					states.Last().modules.Add(shader.Key, newModule);
 				}
 			}
+			for (auto & unit : units)
+			{
+				for (auto & shader : unit.SyntaxNode->GetMembersOfType<TemplateShaderSyntaxNode>())
+				{
+					RefPtr<Shader> rs = new Shader(shader->Name.Content, "");
+					int i = 0;
+					rs->Syntax = shader;
+					for (auto & param : shader->Parameters)
+					{
+						ShaderParameter p;
+						p.BindingId = i;
+						p.Name = param->ModuleName.Content;
+						p.TypeName = param->InterfaceName.Content;
+						rs->Parameters.Add(p);
+						i++;
+					}
+					states.Last().shaders[shader->Name.Content] = rs;
+				}
+				for (auto & shader : unit.SyntaxNode->GetMembersOfType<ShaderSyntaxNode>())
+				{
+					RefPtr<Shader> rs = new Shader(shader->Name.Content, "");
+					rs->Syntax = shader;
+					HashSet<int> usedIds;
+					for (auto & imp : unit.SyntaxNode->GetMembersOfType<ImportSyntaxNode>())
+					{
+						ShaderParameter param;
+						param.TypeName = imp->ShaderName.Content;
+						param.Name = imp->ObjectName.Content;
+						param.BindingId = -1;
+						String binding;
+						if (imp->FindSimpleAttribute("Binding", binding))
+						{
+							param.BindingId = StringToInt(binding);
+							usedIds.Add(param.BindingId);
+						}
+						rs->Parameters.Add(param);
+					}
+					int idAlloc = 0;
+					for (auto & param : rs->Parameters)
+					{
+						if (param.BindingId == -1)
+						{
+							while (usedIds.Contains(idAlloc))
+								idAlloc++;
+							param.BindingId = idAlloc;
+							idAlloc++;
+						}
+					}
+					states.Last().shaders[shader->Name.Content] = rs;
+				}
+			}
 			if (sink)
 			{
 				sink->diagnostics.AddRange(result.sink.diagnostics);
@@ -720,66 +773,37 @@ namespace SpireLib
 			}
 			return result.GetErrorCount();
 		}
+		Shader * FindShader(const char * name)
+		{
+			RefPtr<Shader> rs;
+			if (states.Last().shaders.TryGetValue(name, rs))
+				return rs.Ptr();
+			return nullptr;
+		}
+		Shader * GetShader(int index)
+		{
+			int i = 0;
+			for (auto & shader : states.Last().shaders)
+			{
+				if (i == index)
+					return shader.Value.Ptr();
+				i++;
+			}
+			return nullptr;
+		}
+		int GetShaderCount()
+		{
+			if (states.Count())
+				return states.Last().shaders.Count();
+			return 0;
+		}
 		Shader * NewShaderFromSource(const char * source, const char * fileName, SpireDiagnosticSink * sink)
 		{
-			Spire::Compiler::CompileResult result;
-			auto unit = compiler->Parse(result, source, fileName, nullptr, Dictionary<String, String>());
-			auto list = unit.SyntaxNode->GetMembersOfType<TemplateShaderSyntaxNode>();
-			if (list.Count())
-			{
-				auto rs = new Shader((*list.begin())->Name.Content, String(source));
-				int i = 0;
-				for (auto & param : list.First()->Parameters)
-				{
-					ShaderParameter p;
-					p.BindingId = i;
-					p.Name = param->ModuleName.Content;
-					p.TypeName = param->InterfaceName.Content;
-					rs->Parameters.Add(p);
-					i++;
-				}
-				return rs;
-			}
-			else
-			{
-				auto normalShaders = unit.SyntaxNode->GetMembersOfType<ShaderSyntaxNode>();
-				if (normalShaders.Count())
-				{
-					auto rs = new Shader((*normalShaders.begin())->Name.Content, String(source));
-					HashSet<int> usedIds;
-					for (auto & imp : unit.SyntaxNode->GetMembersOfType<ImportSyntaxNode>())
-					{
-						ShaderParameter param;
-						param.TypeName = imp->ShaderName.Content;
-						param.Name = imp->ObjectName.Content;
-						param.BindingId = -1;
-						String binding;
-						if (imp->FindSimpleAttribute("Binding", binding))
-						{
-							param.BindingId = StringToInt(binding);
-							usedIds.Add(param.BindingId);
-						}
-						rs->Parameters.Add(param);
-					}
-					int idAlloc = 0;
-					for (auto & param : rs->Parameters)
-					{
-						if (param.BindingId == -1)
-						{
-							while (usedIds.Contains(idAlloc))
-								idAlloc++;
-							param.BindingId = idAlloc;
-							idAlloc++;
-						}
-					}
-					return rs;
-				}
-			}
-			if (sink)
-			{
-				sink->diagnostics = result.sink.diagnostics;
-				sink->errorCount = result.sink.errorCount;
-			}
+			int shaderCount = GetShaderCount();
+			LoadModuleSource(source, fileName, sink);
+			int newShaderCount = GetShaderCount();
+			if (newShaderCount > shaderCount)
+				return GetShader(shaderCount);
 			return nullptr;
 		}
 		Shader * NewShaderFromFile(const char * fileName, SpireDiagnosticSink * sink)
@@ -811,9 +835,9 @@ namespace SpireLib
 			Options.TemplateShaderArguments.Clear();
 			for (auto module : modulesArgs)
 				Options.TemplateShaderArguments.Add(module->Name);
-			return Compile(result, additionalSource + shader.GetSource(), shader.GetName(), sink);
+			return Compile(result, shader.Syntax, additionalSource, shader.GetName(), sink);
 		}
-		bool Compile(CompileResult & result, CoreLib::String source, CoreLib::String fileName, SpireDiagnosticSink* sink)
+		bool Compile(CompileResult & result, RefPtr<Decl> entryPoint, CoreLib::String source, CoreLib::String fileName, SpireDiagnosticSink* sink)
 		{
 			if (states.Last().errorCount != 0)
 				return false;
@@ -825,7 +849,13 @@ namespace SpireLib
 				PopContext();
 				return false;
 			}
-
+			if (entryPoint)
+			{
+				CompileUnit newUnit;
+				newUnit.SyntaxNode = new ProgramSyntaxNode();
+				newUnit.SyntaxNode->Members.Add(entryPoint);
+				units.Add(newUnit);
+			}
 			Spire::Compiler::CompileResult cresult;
 			compiler->Compile(cresult, *compileContext.Last(), units, Options);
 			result.Sources = cresult.CompiledSource;
@@ -962,6 +992,21 @@ SpireShader* spCreateShaderFromSource(SpireCompilationContext * ctx, const char 
 	return reinterpret_cast<SpireShader*>(CTX(ctx)->NewShaderFromSource(source, "", sink));
 }
 
+SpireShader * spFindShader(SpireCompilationContext * ctx, const char * name)
+{
+	return reinterpret_cast<SpireShader*>(CTX(ctx)->FindShader(name));
+}
+
+int spGetShaderCount(SpireCompilationContext * ctx)
+{
+	return CTX(ctx)->GetShaderCount();
+}
+
+SpireShader * spGetShader(SpireCompilationContext * ctx, int index)
+{
+	return reinterpret_cast<SpireShader*>(CTX(ctx)->GetShader(index));
+}
+
 SpireShader* spCreateShaderFromFile(SpireCompilationContext * ctx, const char * fileName, SpireDiagnosticSink * sink)
 {
 	return reinterpret_cast<SpireShader*>(CTX(ctx)->NewShaderFromFile(fileName, sink));
@@ -981,6 +1026,13 @@ const char * spShaderGetParameterType(SpireShader * shader, int i)
 {
 	if (shader && i >= 0 && i < SHADER(shader)->Parameters.Count())
 		return SHADER(shader)->Parameters[i].TypeName.Buffer();
+	return nullptr;
+}
+
+const char * spShaderGetParameterName(SpireShader * shader, int i)
+{
+	if (shader && i >= 0 && i < SHADER(shader)->Parameters.Count())
+		return SHADER(shader)->Parameters[i].Name.Buffer();
 	return nullptr;
 }
 
@@ -1090,7 +1142,7 @@ SpireCompilationResult * spCompileShader(SpireCompilationContext * ctx, SpireSha
 SpireCompilationResult * spCompileShaderFromSource(SpireCompilationContext * ctx, const char * source, const char * fileName, SpireDiagnosticSink* sink)
 {
 	SpireLib::CompileResult * rs = new SpireLib::CompileResult();
-	CTX(ctx)->Compile(*rs, source, fileName, sink);
+	CTX(ctx)->Compile(*rs, nullptr, source, fileName, sink);
 	return reinterpret_cast<SpireCompilationResult*>(rs);
 }
 

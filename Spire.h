@@ -92,12 +92,14 @@ extern "C"
 	struct SpireCompilationContext {};
 
 	/*!
-	@brief Represents a shader. A SpireShader can be assembled by calling spCreateShader().
-	Modules can be added to a shader by calling spShaderAddModule().
+	@brief Represents a shader. A SpireShader can be created by calling spCreateShaderFromSource(), or by loading a module library via spLoadModuleLibrary()
 
 	Related Functions
 	- spShaderGetName()
 	- spCompileShader()
+	- spShaderGetParameterType()
+	- spShaderGetParameterName()
+	- spShaderGetParameterBinding()
 	*/
 	struct SpireShader {};
 
@@ -294,11 +296,33 @@ extern "C"
 	void spPopContext(SpireCompilationContext * ctx);
 
 	/*!
-	@brief Create a template shader object from Spire source code.
+	@brief Create a template shader object from Spire source code. This is equivalent to calling spLoadModuleLibrary() and spGetShader().
 	@param ctx The compilation context.
 	@param name The source code of the shader.
 	*/
 	SPIRE_API SpireShader* spCreateShaderFromSource(SpireCompilationContext * ctx, const char * source, SpireDiagnosticSink * sink);
+
+	/*!
+	@brief Find a template shader from current context.
+	@param ctx The compilation context in which to find shaders.
+	@param name The name of the shader object to find.
+	@return A handle to the template shader object that can be used for code generation and reflection. NULL if the shader with specified name does not exist.
+	*/
+	SPIRE_API SpireShader* spFindShader(SpireCompilationContext * ctx, const char * name);
+
+	/*!
+	@brief Returns the total number of entry point shaders in current compilation context.
+	@param ctx The compilation context.
+	*/
+	SPIRE_API int spGetShaderCount(SpireCompilationContext * ctx);
+
+	/*!
+	@brief Retrieves the handle to the specified shader object.
+	@param ctx The compilation context in which to retrieve shaders.
+	@param name The index of the shader object to retrieve.
+	@return A handle to the template shader object that can be used for code generation and reflection. NULL if the shader at specified index does not exist.
+	*/
+	SPIRE_API SpireShader* spGetShader(SpireCompilationContext * ctx, int index);
 
 	/*!
 	@brief Create a template shader object from a Spire source file.
@@ -322,6 +346,8 @@ extern "C"
 	SPIRE_API const char * spShaderGetName(SpireShader * shader);
 
 	SPIRE_API const char * spShaderGetParameterType(SpireShader * shader, int i);
+	SPIRE_API const char * spShaderGetParameterName(SpireShader * shader, int i);
+
 	SPIRE_API int spShaderGetParameterBinding(SpireShader * shader, int i);
 	SPIRE_API int spShaderGetParameterCount(SpireShader * shader);
 
