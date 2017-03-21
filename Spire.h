@@ -300,6 +300,10 @@ extern "C"
 	*/
 	SPIRE_API SpireShader* spCreateShaderFromSource(SpireCompilationContext * ctx, const char * source, SpireDiagnosticSink * sink);
 
+	SPIRE_API SpireShader* spFindShader(SpireCompilationContext * ctx, const char * name);
+	SPIRE_API int spGetShaderCount(SpireCompilationContext * ctx);
+	SPIRE_API SpireShader* spGetShader(SpireCompilationContext * ctx, int index);
+
 	/*!
 	@brief Create a template shader object from a Spire source file.
 	@param ctx The compilation context.
@@ -322,6 +326,8 @@ extern "C"
 	SPIRE_API const char * spShaderGetName(SpireShader * shader);
 
 	SPIRE_API const char * spShaderGetParameterType(SpireShader * shader, int i);
+	SPIRE_API const char * spShaderGetParameterName(SpireShader * shader, int i);
+
 	SPIRE_API int spShaderGetParameterBinding(SpireShader * shader, int i);
 	SPIRE_API int spShaderGetParameterCount(SpireShader * shader);
 
