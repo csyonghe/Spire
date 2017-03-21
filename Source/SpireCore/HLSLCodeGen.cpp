@@ -602,7 +602,8 @@ namespace Spire
 					GenerateDomainShaderAttributes(sb, stage);
 				}
 
-				sb << "T" << world->OutputType->TypeName << "Ext " << stage->Name << "_main(";
+//FALCOR				sb << "T" << world->OutputType->TypeName << "Ext " << stage->Name << "_main(";
+                sb << "T" << world->OutputType->TypeName << "Ext main(";
 
 				if(stageInputType)
 				{
