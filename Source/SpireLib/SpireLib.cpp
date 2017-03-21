@@ -436,6 +436,7 @@ namespace SpireLib
 	public:
 		int Id;
 		List<ShaderParameter> Parameters;
+		RefPtr<Decl> Syntax;
 		Shader(String name, String source)
 		{
 			static int idAllocator = 0;
@@ -653,6 +654,7 @@ namespace SpireLib
 				{
 					RefPtr<Shader> rs = new Shader(shader->Name.Content, "");
 					int i = 0;
+					rs->Syntax = shader;
 					for (auto & param : shader->Parameters)
 					{
 						ShaderParameter p;
@@ -667,6 +669,7 @@ namespace SpireLib
 				for (auto & shader : unit.SyntaxNode->GetMembersOfType<ShaderSyntaxNode>())
 				{
 					RefPtr<Shader> rs = new Shader(shader->Name.Content, "");
+					rs->Syntax = shader;
 					HashSet<int> usedIds;
 					for (auto & imp : unit.SyntaxNode->GetMembersOfType<ImportSyntaxNode>())
 					{
@@ -832,9 +835,9 @@ namespace SpireLib
 			Options.TemplateShaderArguments.Clear();
 			for (auto module : modulesArgs)
 				Options.TemplateShaderArguments.Add(module->Name);
-			return Compile(result, additionalSource, shader.GetName(), sink);
+			return Compile(result, shader.Syntax, additionalSource, shader.GetName(), sink);
 		}
-		bool Compile(CompileResult & result, CoreLib::String source, CoreLib::String fileName, SpireDiagnosticSink* sink)
+		bool Compile(CompileResult & result, RefPtr<Decl> entryPoint, CoreLib::String source, CoreLib::String fileName, SpireDiagnosticSink* sink)
 		{
 			if (states.Last().errorCount != 0)
 				return false;
@@ -846,7 +849,13 @@ namespace SpireLib
 				PopContext();
 				return false;
 			}
-
+			if (entryPoint)
+			{
+				CompileUnit newUnit;
+				newUnit.SyntaxNode = new ProgramSyntaxNode();
+				newUnit.SyntaxNode->Members.Add(entryPoint);
+				units.Add(newUnit);
+			}
 			Spire::Compiler::CompileResult cresult;
 			compiler->Compile(cresult, *compileContext.Last(), units, Options);
 			result.Sources = cresult.CompiledSource;
@@ -1133,7 +1142,7 @@ SpireCompilationResult * spCompileShader(SpireCompilationContext * ctx, SpireSha
 SpireCompilationResult * spCompileShaderFromSource(SpireCompilationContext * ctx, const char * source, const char * fileName, SpireDiagnosticSink* sink)
 {
 	SpireLib::CompileResult * rs = new SpireLib::CompileResult();
-	CTX(ctx)->Compile(*rs, source, fileName, sink);
+	CTX(ctx)->Compile(*rs, nullptr, source, fileName, sink);
 	return reinterpret_cast<SpireCompilationResult*>(rs);
 }
 
