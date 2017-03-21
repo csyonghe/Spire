@@ -73,6 +73,7 @@ struct DefaultLayoutRulesImpl : LayoutRulesImpl
         case ILBaseType::Int:
         case ILBaseType::UInt:
         case ILBaseType::Float:
+		case ILBaseType::Bool:
             return{ 4, 4 };
 
         case ILBaseType::Int2:      return GetVectorLayout(GetScalarLayout(ILBaseType::Int),    2);
