@@ -617,6 +617,7 @@ namespace Spire
 						// provided by HLSL.
 						sb << "OutputPatch<T" << stageInputType->TypeName << ", " << controlPointCount.Value << "> stage_input";
 					}
+                    /* FALCOR Don't treat vertex shader specially...
 					else if (stage->StageType == "VertexShader")
 					{
 						// A vertex shader can declare its input as normal, but
@@ -627,6 +628,7 @@ namespace Spire
 						// indices starting at zero.
 						sb << "\n    T" << stageInputType->TypeName << " stage_input : A";
 					}
+                    FALCOR */
 					else
 					{
 						// Finally, the default case just uses the semantics
@@ -715,7 +717,10 @@ namespace Spire
 					// type, the HLSL compiler will then automatically
 					// generate per-field/-element semantics based on
 					// the prefix we gave it, e.g.: "A0A0", "A0A1", ...
-					ctx.GlobalHeader << " : A" << index << "A";
+//FALCOR					ctx.GlobalHeader << " : A" << index << "A";
+
+                    // FALCOR: just use the name instead...
+                    ctx.GlobalHeader << " : " << declName;
 
 					ctx.GlobalHeader << ";\n";
 					index++;
