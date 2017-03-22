@@ -10,6 +10,34 @@ module DeferredLightingParams
 	param SamplerState nearestSampler;
 }
 
+module SubModuleWithParam
+{
+	param Texture2D albedoTex;
+	param SamplerState samplerState;
+	vec4 Eval(vec2 uv)
+	{
+		return albedoTex.Sample(samplerState, uv);
+	}
+}
+
+module SubModuleWithParam1
+{
+	param Texture2D albedoTex;
+	param SamplerState samplerState;
+	vec4 Eval(vec2 uv)
+	{
+		return albedoTex.Sample(samplerState, uv);
+	}
+}
+
+module TopModule
+{
+	using l0 = SubModuleWithParam();
+	using l1 = SubModuleWithParam();
+	using l2 = SubModuleWithParam1();
+	vec4 shadingResult = l0.Eval(vec2(0.0)) + l1.Eval(vec2(0.0)) + l2.Eval(vec2(0.0));
+}
+
 shader DeferredLighting targets StandardPipeline
 {
     [Binding: "0"]
@@ -43,7 +71,10 @@ shader DeferredLighting targets StandardPipeline
 	[Binding: "2"]
 	using lighting = Lighting();
 
-    public out @Fragment vec4 outputColor = vec4(lighting.result, 1.0);
+	[Binding: "3"]
+	using layers = TopModule();
+
+    public out @Fragment vec4 outputColor = vec4(lighting.result, 1.0) + layers.shadingResult;
 }
 
 
