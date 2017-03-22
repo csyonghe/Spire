@@ -295,6 +295,10 @@ extern "C"
 	*/
 	void spPopContext(SpireCompilationContext * ctx);
 
+	struct SpireCompilationEnvironment;
+	SPIRE_API SpireCompilationEnvironment * spGetCurrentEnvironment(SpireCompilationContext * ctx);
+	SPIRE_API void spReleaseEnvironment(SpireCompilationEnvironment* env);
+
 	/*!
 	@brief Create a template shader object from Spire source code. This is equivalent to calling spLoadModuleLibrary() and spGetShader().
 	@param ctx The compilation context.
@@ -309,12 +313,14 @@ extern "C"
 	@return A handle to the template shader object that can be used for code generation and reflection. NULL if the shader with specified name does not exist.
 	*/
 	SPIRE_API SpireShader* spFindShader(SpireCompilationContext * ctx, const char * name);
+	SPIRE_API SpireShader* spEnvFindShader(SpireCompilationEnvironment * env, const char * name);
 
 	/*!
 	@brief Returns the total number of entry point shaders in current compilation context.
 	@param ctx The compilation context.
 	*/
 	SPIRE_API int spGetShaderCount(SpireCompilationContext * ctx);
+	SPIRE_API int spEnvGetShaderCount(SpireCompilationEnvironment * env);
 
 	/*!
 	@brief Retrieves the handle to the specified shader object.
@@ -323,7 +329,7 @@ extern "C"
 	@return A handle to the template shader object that can be used for code generation and reflection. NULL if the shader at specified index does not exist.
 	*/
 	SPIRE_API SpireShader* spGetShader(SpireCompilationContext * ctx, int index);
-
+	SPIRE_API SpireShader* spEnvGetShader(SpireCompilationEnvironment * ctx, int index);
 	/*!
 	@brief Create a template shader object from a Spire source file.
 	@param ctx The compilation context.
@@ -359,6 +365,8 @@ extern "C"
 	@note All SpireModule objects are destroyed when its containing SpireCompilationContext is destroyed.
 	*/
 	SPIRE_API SpireModule * spFindModule(SpireCompilationContext * ctx, const char * moduleName);
+	SPIRE_API SpireModule * spEnvFindModule(SpireCompilationEnvironment * env, const char * moduleName);
+
 	
 	/*!
 	@brief Retrieve the run-time unique Id of a SpireModule.

@@ -45,7 +45,7 @@ namespace Spire
 			RefPtr<ProgramSyntaxNode> SyntaxNode;
 		};
 
-		class CompilationContext
+		class CompilationContext : public CoreLib::Basic::RefObject
 		{
 		public:
 			SymbolTable Symbols;
