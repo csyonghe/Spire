@@ -246,10 +246,118 @@ namespace Spire
 				sb << type->ToString();
 			}
 
+			String GetLastSegment(String accessName)
+			{
+				int idx = accessName.LastIndexOf('.');
+				if (idx == -1)
+					return accessName;
+				return accessName.SubString(idx + 1, accessName.Length() - idx - 1);
+			}
+
+			void DefineCBufferParameterFields(CodeGenContext & sb, ILModuleParameterSet * module, int & itemsDeclaredInBlock)
+			{
+				// We declare an inline struct inside the `cbuffer` to ensure that
+				// the members have an appropriate prefix on their name.
+				sb.GlobalHeader << "struct {\n";
+
+				int index = 0;
+				for (auto & field : module->Parameters)
+				{
+					auto bindableResType = field.Value->Type->GetBindableResourceType();
+					if (bindableResType != BindableResourceType::NonBindable)
+						continue;
+					String declName = field.Key;
+					PrintDef(sb.GlobalHeader, field.Value->Type.Ptr(), declName);
+					itemsDeclaredInBlock++;
+					sb.GlobalHeader << ";\n";
+					index++;
+				}
+
+				// define sub parameter fields
+				for (auto & subParam : module->SubModules)
+				{
+					int subItemsDeclaredInBlock = 0;
+					int declarationStart = sb.GlobalHeader.Length();
+					DefineCBufferParameterFields(sb, subParam.Ptr(), subItemsDeclaredInBlock);
+					if (subItemsDeclaredInBlock == 0)
+					{
+						sb.GlobalHeader.Remove(declarationStart, sb.GlobalHeader.Length() - declarationStart);
+					}
+				}
+				sb.GlobalHeader << "} " << GetLastSegment(module->BindingName) << ";\n";
+			}
+			void DefineBindableParameterFields(CodeGenContext & sb, ILModuleParameterSet * module, int descSetId, int & tCount, int & sCount, int & uCount, int & cCount)
+			{
+				module->TextureBindingStartIndex = tCount;
+				module->SamplerBindingStartIndex = sCount;
+				module->StorageBufferBindingStartIndex = uCount;
+				module->UniformBindingStartIndex = cCount;
+				for (auto & field : module->Parameters)
+				{
+					auto bindableResType = field.Value->Type->GetBindableResourceType();
+					if (bindableResType == BindableResourceType::NonBindable)
+						continue;
+					PrintDef(sb.GlobalHeader, field.Value->Type.Ptr(), EscapeCodeName(module->BindingName + "_" + field.Key));
+					if (field.Value->BindingPoints.Count())
+					{
+						sb.GlobalHeader << ": register(";
+						switch (bindableResType)
+						{
+						case BindableResourceType::Texture:
+							sb.GlobalHeader << "t";
+							break;
+						case BindableResourceType::Sampler:
+							sb.GlobalHeader << "s";
+							break;
+						case BindableResourceType::StorageBuffer:
+							sb.GlobalHeader << "u";
+							break;
+						case BindableResourceType::Buffer:
+							sb.GlobalHeader << "c";
+							break;
+						default:
+							throw NotImplementedException();
+						}
+						if (useD3D12Registers)
+						{
+							switch (bindableResType)
+							{
+							case BindableResourceType::Texture:
+								sb.GlobalHeader << tCount;
+								tCount++;
+								break;
+							case BindableResourceType::Sampler:
+								sb.GlobalHeader << sCount;
+								sCount++;
+								break;
+							case BindableResourceType::StorageBuffer:
+								sb.GlobalHeader << uCount;
+								uCount++;
+								break;
+							case BindableResourceType::Buffer:
+								sb.GlobalHeader << cCount;
+								cCount++;
+								break;
+							}
+							sb.GlobalHeader << ", space" << descSetId;
+						}
+						else
+						{
+							sb.GlobalHeader << field.Value->BindingPoints.First();
+						}
+						sb.GlobalHeader << ")";
+					}
+					sb.GlobalHeader << ";\n";
+				}
+				for (auto & subModule : module->SubModules)
+					DefineBindableParameterFields(sb, subModule.Ptr(), descSetId, tCount, sCount, uCount, cCount);
+			}
 			void GenerateShaderParameterDefinition(CodeGenContext & sb, ILShader * shader)
 			{
 				for (auto module : shader->ModuleParamSets)
 				{
+					if (!module.Value->IsTopLevel)
+						continue;
 					// TODO: this generates D3D11 style binding, should update to generate D3D12 root signature declaration
 					auto moduleName = EscapeCodeName(module.Value->BindingName);
 					
@@ -260,25 +368,7 @@ namespace Spire
 					if (module.Value->DescriptorSetId != -1)
 						sb.GlobalHeader << " : register(b" << module.Value->DescriptorSetId << ")";
 					sb.GlobalHeader << "\n{\n";
-
-					// We declare an inline struct inside the `cbuffer` to ensure that
-					// the members have an appropriate prefix on their name.
-					sb.GlobalHeader << "struct {\n";
-
-					int index = 0;
-					for (auto & field : module.Value->Parameters)
-					{
-						auto bindableResType = field.Value->Type->GetBindableResourceType();
-						if (bindableResType != BindableResourceType::NonBindable)
-							continue;
-						String declName = field.Key;
-						PrintDef(sb.GlobalHeader, field.Value->Type.Ptr(), declName);
-						itemsDeclaredInBlock++;
-						sb.GlobalHeader << ";\n";
-						index++;
-					}
-
-					sb.GlobalHeader << "} " << moduleName << ";\n";
+					DefineCBufferParameterFields(sb, module.Value.Ptr(), itemsDeclaredInBlock);
 					sb.GlobalHeader << "};\n";
 
 					if (itemsDeclaredInBlock == 0)
@@ -289,63 +379,7 @@ namespace Spire
 					int samplerReg = 0;
 					int uReg = 0;
 					int cReg = 0;
-					for (auto & field : module.Value->Parameters)
-					{
-						auto bindableResType = field.Value->Type->GetBindableResourceType();
-						if (bindableResType == BindableResourceType::NonBindable)
-							continue;
-						PrintDef(sb.GlobalHeader, field.Value->Type.Ptr(), EscapeCodeName(moduleName + "_" + field.Key));
-						if (field.Value->BindingPoints.Count())
-						{
-							sb.GlobalHeader << ": register(";
-							switch (bindableResType)
-							{
-							case BindableResourceType::Texture:
-								sb.GlobalHeader << "t";
-								break;
-							case BindableResourceType::Sampler:
-								sb.GlobalHeader << "s";
-								break;
-							case BindableResourceType::StorageBuffer:
-								sb.GlobalHeader << "u";
-								break;
-							case BindableResourceType::Buffer:
-								sb.GlobalHeader << "c";
-								break;
-							default:
-								throw NotImplementedException();
-							}
-							if (useD3D12Registers)
-							{
-								switch (bindableResType)
-								{
-								case BindableResourceType::Texture:
-									sb.GlobalHeader << textureReg;
-									textureReg++;
-									break;
-								case BindableResourceType::Sampler:
-									sb.GlobalHeader << samplerReg;
-									samplerReg++;
-									break;
-								case BindableResourceType::StorageBuffer:
-									sb.GlobalHeader << uReg;
-									uReg++;
-									break;
-								case BindableResourceType::Buffer:
-									sb.GlobalHeader << cReg;
-									cReg++;
-									break;
-								}
-								sb.GlobalHeader << ", space" << module.Value->DescriptorSetId;
-							}
-							else
-							{
-								sb.GlobalHeader << field.Value->BindingPoints.First();
-							}
-							sb.GlobalHeader << ")";
-						}
-						sb.GlobalHeader << ";\n";
-					}
+					DefineBindableParameterFields(sb, module.Value.Ptr(), module.Value->DescriptorSetId, textureReg, samplerReg, uReg, cReg);
 				}
 				
 			}

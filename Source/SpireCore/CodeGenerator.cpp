@@ -172,14 +172,18 @@ namespace Spire
 				shader->ModuleInstances.Sort([](RefPtr<ModuleInstanceIR> & x, RefPtr<ModuleInstanceIR> & y) {return x->BindingIndex < y->BindingIndex; });
 				for (auto module : shader->ModuleInstances)
 				{
-					if (module->BindingIndex != -1)
-					{
-						auto set = new ILModuleParameterSet();
-						set->BindingName = module->BindingName;
-						set->DescriptorSetId = module->BindingIndex;
-						set->UniformBufferLegacyBindingPoint = set->DescriptorSetId;
-						compiledShader->ModuleParamSets[module->BindingName] = set;
-					}
+					auto set = new ILModuleParameterSet();
+					set->BindingName = module->BindingName;
+					set->DescriptorSetId = module->BindingIndex;
+					set->UniformBufferLegacyBindingPoint = set->DescriptorSetId;
+					set->IsTopLevel = module->IsTopLevel;
+					compiledShader->ModuleParamSets[module->BindingName] = set;
+				}
+				for (auto module : shader->ModuleInstances)
+				{
+					auto ilModule = compiledShader->ModuleParamSets[module->BindingName]();
+					for (auto subModule : module->SubModuleInstances)
+						ilModule->SubModules.Add(compiledShader->ModuleParamSets[subModule->BindingName]());
 				}
 				// allocate binding slots for shader resources (textures, buffers, samplers etc.), as required by legacy APIs
 				Dictionary<int, ComponentDefinitionIR*> usedTextureBindings, usedBufferBindings, usedSamplerBindings, usedStorageBufferBindings;

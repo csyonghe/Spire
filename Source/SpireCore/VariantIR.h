@@ -15,6 +15,8 @@ namespace Spire
 			String BindingName;
 			CodePosition UsingPosition;
 			int BindingIndex;
+			bool IsTopLevel = false;
+			List<ModuleInstanceIR*> SubModuleInstances;
 		};
 		class ComponentDefinitionIR : public RefObject
 		{

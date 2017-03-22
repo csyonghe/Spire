@@ -152,7 +152,7 @@ namespace Spire
 					}
 				}
 				// generate definitions
-				Dictionary<ShaderClosure*, ModuleInstanceIR*> moduleInstanceMap;
+				EnumerableDictionary<ShaderClosure*, ModuleInstanceIR*> moduleInstanceMap;
 				auto createModuleInstance = [&](ShaderClosure * closure)
 				{
 					ModuleInstanceIR * inst;
@@ -180,6 +180,7 @@ namespace Spire
 					if (namePath.Count() == 1)
 						sbBindingName << namePath[0];
 					inst = new ModuleInstanceIR();
+					inst->IsTopLevel = namePath.Count() <= 2;
 					inst->SyntaxNode = closure->ModuleSyntaxNode;
 					inst->BindingIndex = closure->BindingIndex;
 					inst->UsingPosition = closure->UsingPosition;
@@ -235,6 +236,22 @@ namespace Spire
 						}
 					}
 					result->DefinitionsByComponent[comp.Key] = defs;
+				}
+				// now that all module instances are generated, sort out sub module instances
+				for (auto & module : moduleInstanceMap)
+				{
+					auto closure = module.Key;
+					// find first parent of this module, and add the module to the parent's children list
+					while (closure->Parent)
+					{
+						closure = closure->Parent;
+						ModuleInstanceIR * parentModule;
+						if (moduleInstanceMap.TryGetValue(closure, parentModule))
+						{
+							parentModule->SubModuleInstances.Add(module.Value);
+							break;
+						}
+					}
 				}
 				bool changed = true;
 				while (changed)
