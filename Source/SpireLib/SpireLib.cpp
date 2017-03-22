@@ -469,7 +469,7 @@ public:
 
 };
 
-struct CompilerState
+struct CompilerState : public RefObject
 {
 	List<CompileUnit> moduleUnits;
 	HashSet<String> processedModuleUnits;
@@ -492,8 +492,11 @@ struct CompilerState
 	}
 };
 
+class CompilationContext;
+
 struct SpireCompilationEnvironment
 {
+	::CompilationContext * context;
 	RefPtr<::CompilerState> state;
 };
 
@@ -852,24 +855,22 @@ public:
 		states.Last() = nullptr;
 		states.SetSize(states.Count() - 1);
 	}
-	bool Compile(::CompileResult & result, const Shader & shader, ArrayView<SpireModule*> modulesArgs, const char * additionalSource, SpireDiagnosticSink* sink)
+	bool Compile(::CompileResult & result, RefPtr<CompilerState> currentState, const Shader & shader, ArrayView<SpireModule*> modulesArgs, const char * additionalSource, SpireDiagnosticSink* sink)
 	{
 		Options.SymbolToCompile = shader.GetName();
 		Options.TemplateShaderArguments.Clear();
 		for (auto module : modulesArgs)
 			Options.TemplateShaderArguments.Add(module->Name);
-		return Compile(result, shader.Syntax, additionalSource, shader.GetName(), sink);
+		return Compile(result, currentState, shader.Syntax, additionalSource, shader.GetName(), sink);
 	}
-	bool Compile(::CompileResult & result, RefPtr<Decl> entryPoint, CoreLib::String source, CoreLib::String fileName, SpireDiagnosticSink* sink)
+	bool Compile(::CompileResult & result, RefPtr<CompilerState> currentState, RefPtr<Decl> entryPoint, CoreLib::String source, CoreLib::String fileName, SpireDiagnosticSink* sink)
 	{
-		if (states.Last()->errorCount != 0)
+		if (currentState->errorCount != 0)
 			return false;
-		PushContext();
 		List<CompileUnit> units;
-		states.Last()->errorCount += LoadModuleUnits(units, source, fileName, sink);
+		currentState->errorCount += LoadModuleUnits(units, source, fileName, sink);
 		if (states.Last()->errorCount != 0)
 		{
-			PopContext();
 			return false;
 		}
 		if (entryPoint)
@@ -880,7 +881,7 @@ public:
 			units.Add(newUnit);
 		}
 		Spire::Compiler::CompileResult cresult;
-		compiler->Compile(cresult, *states.Last()->context, units, Options);
+		compiler->Compile(cresult, *(currentState->context), units, Options);
 		result.Sources = cresult.CompiledSource;
 		states.Last()->errorCount += cresult.GetErrorCount();
 		if (sink)
@@ -888,7 +889,7 @@ public:
 			sink->diagnostics.AddRange(cresult.sink.diagnostics);
 			sink->errorCount += cresult.GetErrorCount();
 		}
-		if (states.Last()->errorCount == 0)
+		if (currentState->errorCount == 0)
 		{
 			for (auto shader : result.Sources)
 			{
@@ -916,8 +917,7 @@ public:
 				result.ParamSets[shader.Key] = _Move(paramSets);
 			}
 		}
-		bool succ = states.Last()->errorCount == 0;
-		PopContext();
+		bool succ = currentState->errorCount == 0;
 		return succ;
 	}
 };
@@ -1010,6 +1010,7 @@ void spPopContext(SpireCompilationContext * ctx)
 SpireCompilationEnvironment * spGetCurrentEnvironment(SpireCompilationContext * ctx)
 {
 	auto rs = new SpireCompilationEnvironment();
+	rs->context = CTX(ctx);
 	rs->state = CTX(ctx)->states.Last();
 	return rs;
 }
@@ -1201,14 +1202,25 @@ SpireCompilationResult * spCompileShader(SpireCompilationContext * ctx, SpireSha
 	SpireDiagnosticSink* sink)
 {
 	::CompileResult * rs = new ::CompileResult();
-	CTX(ctx)->Compile(*rs, *SHADER(shader), ArrayView<SpireModule*>(args, argCount), additionalSource, sink);
+	CTX(ctx)->PushContext();
+	CTX(ctx)->Compile(*rs, CTX(ctx)->states.Last(), *SHADER(shader), ArrayView<SpireModule*>(args, argCount), additionalSource, sink);
+	CTX(ctx)->PopContext();
+	return reinterpret_cast<SpireCompilationResult*>(rs);
+}
+
+SPIRE_API SpireCompilationResult * spEnvCompileShader(SpireCompilationEnvironment * env, SpireShader * shader, SpireModule ** args, int argCount, const char * additionalSource, SpireDiagnosticSink * sink)
+{
+	::CompileResult * rs = new ::CompileResult();
+	env->context->Compile(*rs, env->state, *SHADER(shader), ArrayView<SpireModule*>(args, argCount), additionalSource, sink);
 	return reinterpret_cast<SpireCompilationResult*>(rs);
 }
 
 SpireCompilationResult * spCompileShaderFromSource(SpireCompilationContext * ctx, const char * source, const char * fileName, SpireDiagnosticSink* sink)
 {
 	::CompileResult * rs = new ::CompileResult();
-	CTX(ctx)->Compile(*rs, nullptr, source, fileName, sink);
+	CTX(ctx)->PushContext();
+	CTX(ctx)->Compile(*rs, CTX(ctx)->states.Last(), nullptr, source, fileName, sink);
+	CTX(ctx)->PopContext();
 	return reinterpret_cast<SpireCompilationResult*>(rs);
 }
 

@@ -470,6 +470,13 @@ extern "C"
 		const char * additionalSource,
 		SpireDiagnosticSink* sink);
 
+	SPIRE_API SpireCompilationResult* spEnvCompileShader(SpireCompilationEnvironment * env,
+		SpireShader * shader,
+		SpireModule** args,
+		int argCount,
+		const char * additionalSource,
+		SpireDiagnosticSink* sink);
+
 	/*!
 	@brief Compiles a shader object.
 	@param ctx A shader compilation context.
