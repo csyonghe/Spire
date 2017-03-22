@@ -1163,6 +1163,8 @@ namespace Spire
 				expr->LeftExpression = expr->LeftExpression->Accept(this).As<ExpressionSyntaxNode>();
 				expr->RightExpression = expr->RightExpression->Accept(this).As<ExpressionSyntaxNode>();
 				auto & leftType = expr->LeftExpression->Type;
+				if (!leftType)
+					printf("Break");
 				auto & rightType = expr->RightExpression->Type;
 				RefPtr<ExpressionType> matchedType;
 				auto checkAssign = [&]()
@@ -1395,6 +1397,18 @@ namespace Spire
 						invoke->Type = func->Implementations.First()->SyntaxNode->Type;
 						return invoke;
 					}
+					else
+					{
+						StringBuilder argList;
+						for (int i = 0; i < arguments.Count(); i++)
+						{
+							argList << arguments[i]->Type->ToString();
+							if (i != arguments.Count() - 1)
+								argList << ", ";
+						}
+						getSink()->diagnose(invoke, Diagnostics::noApplicationFunction, memberExpr->MemberName, argList.ProduceString());
+						invoke->Type = ExpressionType::Error;
+					}
 				}
 				else
 				{
@@ -1579,6 +1593,7 @@ namespace Spire
 
 			RefPtr<ExpressionSyntaxNode> ResolveInvoke(InvokeExpressionSyntaxNode * expr)
 			{
+
 				if (auto varExpr = expr->FunctionExpr.As<VarExpressionSyntaxNode>())
 				{
 					return ResolveFunctionOverload(expr, varExpr.Ptr(), expr->Arguments);

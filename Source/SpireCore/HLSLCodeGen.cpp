@@ -13,6 +13,8 @@ namespace Spire
 	{
 		class HLSLCodeGen : public CLikeCodeGen
 		{
+		private:
+			bool useD3D12Registers = true;
 		protected:
 			OutputStrategy * CreateStandardOutputStrategy(ILWorld * world, String layoutPrefix) override;
 			OutputStrategy * CreatePackedBufferOutputStrategy(ILWorld * world) override;
@@ -283,6 +285,10 @@ namespace Spire
 					{
 						sb.GlobalHeader.Remove(declarationStart, sb.GlobalHeader.Length() - declarationStart);
 					}
+					int textureReg = 0; 
+					int samplerReg = 0;
+					int uReg = 0;
+					int cReg = 0;
 					for (auto & field : module.Value->Parameters)
 					{
 						auto bindableResType = field.Value->Type->GetBindableResourceType();
@@ -309,7 +315,34 @@ namespace Spire
 							default:
 								throw NotImplementedException();
 							}
-							sb.GlobalHeader << field.Value->BindingPoints.First() << ")";
+							if (useD3D12Registers)
+							{
+								switch (bindableResType)
+								{
+								case BindableResourceType::Texture:
+									sb.GlobalHeader << textureReg;
+									textureReg++;
+									break;
+								case BindableResourceType::Sampler:
+									sb.GlobalHeader << samplerReg;
+									samplerReg++;
+									break;
+								case BindableResourceType::StorageBuffer:
+									sb.GlobalHeader << uReg;
+									uReg++;
+									break;
+								case BindableResourceType::Buffer:
+									sb.GlobalHeader << cReg;
+									cReg++;
+									break;
+								}
+								sb.GlobalHeader << ", space" << module.Value->DescriptorSetId;
+							}
+							else
+							{
+								sb.GlobalHeader << field.Value->BindingPoints.First();
+							}
+							sb.GlobalHeader << ")";
 						}
 						sb.GlobalHeader << ";\n";
 					}
