@@ -935,7 +935,7 @@ namespace Spire
 				{
 					if (!shader->SemanticallyChecked)
 					{
-						VisitShaderPass2(shader->SyntaxNode);
+						VisitShaderPass2(shader->SyntaxNode.Ptr());
 						shader->SemanticallyChecked = true;
 					}
 				}

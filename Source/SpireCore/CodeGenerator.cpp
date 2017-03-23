@@ -135,14 +135,19 @@ namespace Spire
 			{
 				VisitStruct(st);
 			}
-
+			void SetSubModuleDescriptorSetId(ILModuleParameterSet * moduleParam, int id)
+			{
+				moduleParam->DescriptorSetId = id;
+				for (auto & submodule : moduleParam->SubModules)
+					SetSubModuleDescriptorSetId(submodule.Ptr(), id);
+			}
 			void GenerateParameterBindingInfo(ShaderIR * shader)
 			{
 				Dictionary<int, ModuleInstanceIR*> usedDescriptorSetBindings;
 				// initialize module parameter layouts for all module instances in this shader
 				for (auto module : shader->ModuleInstances)
 				{
-					if (module->BindingIndex != -1)
+					if (module->BindingIndex != -1 && module->IsTopLevel)
 					{
 						ModuleInstanceIR * existingModule;
 						if (usedDescriptorSetBindings.TryGetValue(module->BindingIndex, existingModule))
@@ -156,7 +161,7 @@ namespace Spire
 				// report error if shader uses a top-level module without specifying its binding
 				for (auto & module : shader->ModuleInstances)
 				{
-					if (module->BindingIndex == -1)
+					if (module->BindingIndex == -1 && module->IsTopLevel)
 					{
 						bool hasParam = false;
 						for (auto & comp : module->SyntaxNode->GetMembersOfType<ComponentSyntaxNode>())
@@ -172,14 +177,24 @@ namespace Spire
 				shader->ModuleInstances.Sort([](RefPtr<ModuleInstanceIR> & x, RefPtr<ModuleInstanceIR> & y) {return x->BindingIndex < y->BindingIndex; });
 				for (auto module : shader->ModuleInstances)
 				{
-					if (module->BindingIndex != -1)
-					{
-						auto set = new ILModuleParameterSet();
-						set->BindingName = module->BindingName;
-						set->DescriptorSetId = module->BindingIndex;
-						set->UniformBufferLegacyBindingPoint = set->DescriptorSetId;
-						compiledShader->ModuleParamSets[module->BindingName] = set;
-					}
+					auto set = new ILModuleParameterSet();
+					set->BindingName = module->BindingName;
+					set->DescriptorSetId = module->BindingIndex;
+					set->UniformBufferLegacyBindingPoint = set->DescriptorSetId;
+					set->IsTopLevel = module->IsTopLevel;
+					compiledShader->ModuleParamSets[module->BindingName] = set;
+				}
+				for (auto module : shader->ModuleInstances)
+				{
+					auto ilModule = compiledShader->ModuleParamSets[module->BindingName]();
+					for (auto subModule : module->SubModuleInstances)
+						ilModule->SubModules.Add(compiledShader->ModuleParamSets[subModule->BindingName]());
+				}
+				for (auto module : compiledShader->ModuleParamSets)
+				{
+					if (module.Value->IsTopLevel && module.Value->DescriptorSetId != -1 && module.Key != compiledShader->Name)
+						for (auto submodule : module.Value->SubModules)
+							SetSubModuleDescriptorSetId(submodule.Ptr(), module.Value->DescriptorSetId);
 				}
 				// allocate binding slots for shader resources (textures, buffers, samplers etc.), as required by legacy APIs
 				Dictionary<int, ComponentDefinitionIR*> usedTextureBindings, usedBufferBindings, usedSamplerBindings, usedStorageBufferBindings;
@@ -295,6 +310,7 @@ namespace Spire
 						}
 					}
 				}
+
 			}
 
             ParameterQualifier GetParamQualifier(ParameterSyntaxNode* paramDecl)

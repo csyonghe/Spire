@@ -18,14 +18,22 @@ enum class LayoutRule
 {
     Std140,
     Std430,
+	HLSL,
     Packed,
 };
 
 
 struct LayoutInfo
 {
-    size_t size;
-    size_t alignment;
+    size_t size = 0;
+    size_t alignment = 1;
+	bool avoid16ByteBoundary = false;
+	LayoutInfo() = default;
+	LayoutInfo(size_t s, size_t a)
+	{
+		size = s;
+		alignment = a;
+	}
 };
 
 struct LayoutRulesImpl

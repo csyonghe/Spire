@@ -180,9 +180,47 @@ struct PackedLayoutRulesImpl : DefaultLayoutRulesImpl
 {
 };
 
+struct HLSLLayoutRulesImpl : Std140LayoutRulesImpl
+{
+	LayoutInfo GetVectorLayout(LayoutInfo elementInfo, size_t elementCount) override
+	{
+		LayoutInfo vectorInfo;
+		vectorInfo.size = elementInfo.size * elementCount;
+		vectorInfo.alignment = elementInfo.size * elementInfo.alignment;
+		vectorInfo.avoid16ByteBoundary = true;
+		return vectorInfo;
+	}
+
+	LayoutInfo BeginStructLayout() override
+	{
+		LayoutInfo structInfo;
+		structInfo.size = 0;
+		structInfo.alignment = 16;
+		structInfo.avoid16ByteBoundary = true;
+		return structInfo;
+	}
+
+	size_t AddStructField(LayoutInfo* ioStructInfo, LayoutInfo fieldInfo) override
+	{
+		ioStructInfo->size = RoundToAlignment(ioStructInfo->size, fieldInfo.alignment);
+		if (ioStructInfo->size / 16 != (ioStructInfo->size + fieldInfo.size) / 16)
+			ioStructInfo->size = RoundToAlignment(ioStructInfo->size, 16u);
+		size_t fieldOffset = ioStructInfo->size;
+		ioStructInfo->size += fieldInfo.size;
+		return fieldOffset;
+	}
+
+
+	void EndStructLayout(LayoutInfo* ioStructInfo) override
+	{
+		ioStructInfo->size = RoundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
+	}
+};
+
 Std140LayoutRulesImpl kStd140LayoutRulesImpl;
 Std430LayoutRulesImpl kStd430LayoutRulesImpl;
 PackedLayoutRulesImpl kPackedLayoutRulesImpl;
+HLSLLayoutRulesImpl kHlslLayoutRulesImpl;
 
 LayoutRulesImpl* GetLayoutRulesImpl(LayoutRule rule)
 {
@@ -190,6 +228,7 @@ LayoutRulesImpl* GetLayoutRulesImpl(LayoutRule rule)
     {
     case LayoutRule::Std140: return &kStd140LayoutRulesImpl;
     case LayoutRule::Std430: return &kStd430LayoutRulesImpl;
+	case LayoutRule::HLSL: return &kHlslLayoutRulesImpl;
     case LayoutRule::Packed: return &kPackedLayoutRulesImpl;
     default:
         return nullptr;
