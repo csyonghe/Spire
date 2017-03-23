@@ -692,13 +692,13 @@ public:
 				{
 					firstCompEncountered = true;
 					if (GetUniformBufferLayoutRule() == LayoutRule::HLSL)
-						parentParamStruct.size = RoundToAlignment(parentParamStruct.size, 16);
-					meta.UniformBufferOffset = parentParamStruct.size;
+						parentParamStruct.size = (size_t)RoundToAlignment((int)parentParamStruct.size, 16);
+					meta.UniformBufferOffset = (int)parentParamStruct.size;
 				}
 				compMeta.Alignment = (int)GetTypeAlignment(compMeta.Type.Ptr(), GetUniformBufferLayoutRule());
 				compMeta.Size = (int)GetTypeSize(compMeta.Type.Ptr(), GetUniformBufferLayoutRule());
 				auto fieldInfo = GetLayout(compMeta.Type.Ptr(), layout);
-				compMeta.Offset = layout->AddStructField(&structInfo, fieldInfo);
+				compMeta.Offset = (int)layout->AddStructField(&structInfo, fieldInfo);
 			}
 			else
 			{
@@ -735,7 +735,7 @@ public:
 		{
 			newModule->SubModules.Add(CreateModule(sub.Shader, parentParamStruct, bindingIndex));
 		}
-		meta.UniformBufferSize = parentParamStruct.size - meta.UniformBufferOffset;
+		meta.UniformBufferSize = (int)(parentParamStruct.size - meta.UniformBufferOffset);
 		return newModule;
 	}
 
@@ -753,7 +753,7 @@ public:
 				RefPtr<SpireModule> newModule = CreateModule(shader.Value.Ptr(), paramStruct, bindingIndex);
 				newModule->BindingIndex;
 				layout->EndStructLayout(&paramStruct);
-				newModule->UniformBufferSize = paramStruct.size;
+				newModule->UniformBufferSize = (int)paramStruct.size;
 				states.Last()->modules.Add(shader.Key, newModule);
 			}
 		}
@@ -962,15 +962,18 @@ public:
 			}
 			else
 			{
-				SpireUniformField ufield;
+				SpireUniformFieldImpl ufield;
 				ufield.name = item.Key.Buffer();
 				ufield.offset = item.Value->BufferOffset;
 				ufield.size = item.Value->Size;
-				ufield.type = item.Value->Type->Serialize();
+				StringBuilder sb;
+				item.Value->Type->Serialize(sb);
+				ufield.type = sb.ProduceString();
+				set.uniforms.Add(ufield);
 			}
 		}
 		for (auto & submodule : module->SubModules)
-			set.subsets.Add(GetParameterSet(module));
+			set.subsets.Add(GetParameterSet(submodule.Ptr()));
 		return set;
 	}
 	bool Compile(::CompileResult & result, RefPtr<CompilerState> currentState, RefPtr<Decl> entryPoint, CoreLib::String source, CoreLib::String fileName, SpireDiagnosticSink* sink)
@@ -1283,6 +1286,7 @@ int spModuleGetBufferOffset(SpireModule * module)
 int spModuleGetBindingOffset(SpireModule * module, SpireBindingIndex * pIndexOut)
 {
 	*pIndexOut = module->BindingIndex;
+	return 0;
 }
 
 int spModuleGetRequiredComponents(SpireModule * module, SpireComponentInfo * buffer, int bufferSize)

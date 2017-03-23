@@ -363,8 +363,8 @@ namespace Spire
 					if (field.Value->Type->GetBindableResourceType() == BindableResourceType::NonBindable)
 					{
 						auto flayout = GetLayout(field.Value->Type.Ptr(), LayoutRule::HLSL);
-						field.Value->BufferOffset = layout->AddStructField(&structInfo, flayout);
-						field.Value->Size = flayout.size;
+						field.Value->BufferOffset = (int)(layout->AddStructField(&structInfo, flayout));
+						field.Value->Size = (int)flayout.size;
 						if (!firstFieldEncountered)
 						{
 							module->UniformBufferOffset = field.Value->BufferOffset;
@@ -375,7 +375,7 @@ namespace Spire
 						firstFieldEncountered = DetermineParameterFieldOffset(subModule.Ptr(), ptr) | firstFieldEncountered;
 				}
 				layout->EndStructLayout(&structInfo);
-				module->BufferSize = structInfo.size;
+				module->BufferSize = (int)structInfo.size;
 				return firstFieldEncountered;
 			}
 			void GenerateShaderParameterDefinition(CodeGenContext & sb, ILShader * shader)
