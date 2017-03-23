@@ -777,6 +777,8 @@ public:
 			}
 			for (auto & shader : unit.SyntaxNode->GetMembersOfType<ShaderSyntaxNode>())
 			{
+				if (shader->IsModule)
+					continue;
 				RefPtr<Shader> rs = new Shader(shader->Name.Content, "");
 				rs->Syntax = shader;
 				HashSet<int> usedIds;
