@@ -14,7 +14,7 @@ namespace Spire
 		class HLSLCodeGen : public CLikeCodeGen
 		{
 		private:
-			bool useD3D12Registers = true;
+			bool useD3D12Registers = false;
 		protected:
 			OutputStrategy * CreateStandardOutputStrategy(ILWorld * world, String layoutPrefix) override;
 			OutputStrategy * CreatePackedBufferOutputStrategy(ILWorld * world) override;
