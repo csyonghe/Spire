@@ -2,7 +2,7 @@
 #include "../CoreLib/Tokenizer.h"
 #include "Syntax.h"
 #include "Naming.h"
-
+#include "TypeLayout.h"
 #include <cassert>
 
 using namespace CoreLib::Basic;
@@ -352,8 +352,42 @@ namespace Spire
 				for (auto & subModule : module->SubModules)
 					DefineBindableParameterFields(sb, subModule.Ptr(), descSetId, tCount, sCount, uCount, cCount);
 			}
+			bool DetermineParameterFieldOffset(ILModuleParameterSet * module, int & ptr)
+			{
+				bool firstFieldEncountered = false;
+				module->UniformBufferOffset = ptr;
+				auto layout = GetLayoutRulesImpl(LayoutRule::HLSL);
+				auto structInfo = layout->BeginStructLayout();
+				for (auto & field : module->Parameters)
+				{
+					if (field.Value->Type->GetBindableResourceType() == BindableResourceType::NonBindable)
+					{
+						auto flayout = GetLayout(field.Value->Type.Ptr(), LayoutRule::HLSL);
+						field.Value->BufferOffset = layout->AddStructField(&structInfo, flayout);
+						field.Value->Size = flayout.size;
+						if (!firstFieldEncountered)
+						{
+							module->UniformBufferOffset = field.Value->BufferOffset;
+							firstFieldEncountered = true;
+						}
+					}
+					for (auto & subModule : module->SubModules)
+						firstFieldEncountered = DetermineParameterFieldOffset(subModule.Ptr(), ptr) | firstFieldEncountered;
+				}
+				layout->EndStructLayout(&structInfo);
+				module->BufferSize = structInfo.size;
+				return firstFieldEncountered;
+			}
 			void GenerateShaderParameterDefinition(CodeGenContext & sb, ILShader * shader)
 			{
+				// first pass: figure out buffer offsets and alignments
+				for (auto module : shader->ModuleParamSets)
+				{
+					if (!module.Value->IsTopLevel)
+						continue;
+					int ptr = 0;
+					DetermineParameterFieldOffset(module.Value.Ptr(), ptr);
+				}
 				for (auto module : shader->ModuleParamSets)
 				{
 					if (!module.Value->IsTopLevel)

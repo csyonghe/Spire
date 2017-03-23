@@ -74,6 +74,7 @@ namespace Spire
 		public:
 			ILModuleParameterSet * Module = nullptr;
 			int BufferOffset = -1;
+			int Size = 0;
 			List<int> BindingPoints; // for legacy API, usually one item. Samplers may have multiple binding points in OpenGL.
 			virtual String ToString()
 			{

@@ -17,12 +17,22 @@ struct SpireDiagnosticSink
 	CoreLib::List<Spire::Compiler::Diagnostic> diagnostics;
 };
 
+struct SpireUniformFieldImpl
+{
+	int offset;
+	int size;
+	String name;
+	String type;
+};
+
 struct SpireParameterSet
 {
 	ILModuleParameterSet * paramSet = nullptr;
 	int bindingSlotCount = 0;
 	int uniformBufferLegacyBindingPoint = -1;
 	List<SpireResourceBindingInfo> bindings;
+	List<SpireParameterSet> subsets;
+	List<SpireUniformFieldImpl> uniforms;
 };
 
 
@@ -37,6 +47,9 @@ public:
 	int Offset = 0;
 	int Alignment = 0;
 	int Size = 0;
+	BindableResourceType bindableType;
+	int typeSpecificBindingIndex = -1;
+	int typeAgnosticBindingIndex = -1;
 	int GetHashCode()
 	{
 		return Name.GetHashCode();
@@ -51,9 +64,13 @@ struct SpireModule
 {
 	String Name;
 	int Id = 0;
+	int UniformBufferSize = 0;
+	int UniformBufferOffset = 0;
+	SpireBindingIndex BindingIndex;
 	List<ComponentMetaData> Parameters;
 	List<ComponentMetaData> Requirements;
 	Dictionary<String, String> Attribs;
+	List<RefPtr<SpireModule>> SubModules;
 	static int IdAllocator;
 };
 
@@ -627,6 +644,101 @@ public:
 		return FindModule(newModule->Name.Content);
 	}
 
+	LayoutRule GetUniformBufferLayoutRule()
+	{
+		if (this->Options.Target == CodeGenTarget::HLSL)
+			return LayoutRule::Std140;
+		else
+			return LayoutRule::HLSL;
+	}
+
+	RefPtr<SpireModule> CreateModule(Spire::Compiler::ShaderSymbol * shader, LayoutInfo & parentParamStruct, SpireBindingIndex & bindingIndex)
+	{
+		RefPtr<SpireModule> newModule = new SpireModule();
+		auto & meta = *newModule;
+		meta.Id = SpireModule::IdAllocator++;
+		meta.Name = shader->SyntaxNode->Name.Content;
+		meta.BindingIndex = bindingIndex;
+		int offsets[2] = { 0, 0 };
+		for (auto attrib : shader->SyntaxNode->GetModifiersOfType<Spire::Compiler::SimpleAttribute>())
+			meta.Attribs[attrib->Key] = attrib->Value.Content;
+		auto layout = GetLayoutRulesImpl(GetUniformBufferLayoutRule());
+		LayoutInfo requireStruct = layout->BeginStructLayout();
+		bool firstCompEncountered = false;
+		for (auto & comp : shader->Components)
+		{
+			if (comp.Value->Implementations.Count() != 1)
+				continue;
+			auto impl = comp.Value->Implementations.First();
+			if (!impl->SyntaxNode->IsRequire() && !impl->SyntaxNode->IsParam())
+				continue;
+			auto & structInfo = impl->SyntaxNode->IsParam() ? parentParamStruct : requireStruct;
+			ComponentMetaData compMeta;
+			compMeta.Name = comp.Key;
+			compMeta.Type = comp.Value->Type->DataType;
+			compMeta.TypeName = compMeta.Type->ToString();
+			if (auto specialize = impl->SyntaxNode->FindSpecializeModifier())
+			{
+				for (auto val : specialize->Values)
+				{
+					compMeta.Values.Add(dynamic_cast<ConstantExpressionSyntaxNode*>(val.Ptr())->IntValue);
+				}
+				compMeta.IsSpecialize = true;
+			}
+			auto bindableType = compMeta.Type->GetBindableResourceType();
+			if (compMeta.Type->GetBindableResourceType() == BindableResourceType::NonBindable)
+			{
+				if (!firstCompEncountered)
+				{
+					firstCompEncountered = true;
+					if (GetUniformBufferLayoutRule() == LayoutRule::HLSL)
+						parentParamStruct.size = RoundToAlignment(parentParamStruct.size, 16);
+					meta.UniformBufferOffset = parentParamStruct.size;
+				}
+				compMeta.Alignment = (int)GetTypeAlignment(compMeta.Type.Ptr(), GetUniformBufferLayoutRule());
+				compMeta.Size = (int)GetTypeSize(compMeta.Type.Ptr(), GetUniformBufferLayoutRule());
+				auto fieldInfo = GetLayout(compMeta.Type.Ptr(), layout);
+				compMeta.Offset = layout->AddStructField(&structInfo, fieldInfo);
+			}
+			else
+			{
+				switch (bindableType)
+				{
+				case BindableResourceType::Texture:
+					compMeta.typeSpecificBindingIndex = bindingIndex.texture;
+					bindingIndex.texture++;
+					break;
+				case BindableResourceType::Sampler:
+					compMeta.typeSpecificBindingIndex = bindingIndex.sampler;
+					bindingIndex.sampler++;
+					break;
+				case BindableResourceType::Buffer:
+					compMeta.typeSpecificBindingIndex = bindingIndex.uniformBuffer;
+					bindingIndex.uniformBuffer++;
+					break; 
+				case BindableResourceType::StorageBuffer:
+					compMeta.typeSpecificBindingIndex = bindingIndex.storageBuffer;
+					bindingIndex.storageBuffer++;
+					break;
+				}
+				compMeta.typeAgnosticBindingIndex = bindingIndex.general;
+				bindingIndex.general++;
+			}
+			if (impl->SyntaxNode->IsRequire())
+				meta.Requirements.Add(compMeta);
+			else
+				meta.Parameters.Add(compMeta);
+		}
+		layout->EndStructLayout(&requireStruct);
+		
+		for (auto sub : shader->ShaderUsings)
+		{
+			newModule->SubModules.Add(CreateModule(sub.Shader, parentParamStruct, bindingIndex));
+		}
+		meta.UniformBufferSize = parentParamStruct.size - meta.UniformBufferOffset;
+		return newModule;
+	}
+
 	void UpdateModuleLibrary(List<CompileUnit> & units, SpireDiagnosticSink * sink)
 	{
 		Spire::Compiler::CompileResult result;
@@ -635,45 +747,13 @@ public:
 		{
 			if (!states.Last()->modules.ContainsKey(shader.Key))
 			{
-				RefPtr<SpireModule> newModule = new SpireModule();
-				auto & meta = *newModule;
-				meta.Id = SpireModule::IdAllocator++;
-				meta.Name = shader.Key;
-				int offset = 0;
-				for (auto attrib : shader.Value->SyntaxNode->GetModifiersOfType<Spire::Compiler::SimpleAttribute>())
-					meta.Attribs[attrib->Key] = attrib->Value.Content;
-				for (auto & comp : shader.Value->Components)
-				{
-					if (comp.Value->Implementations.Count() != 1)
-						continue;
-					auto impl = comp.Value->Implementations.First();
-					if (!impl->SyntaxNode->IsRequire() && !impl->SyntaxNode->IsParam())
-						continue;
-					ComponentMetaData compMeta;
-					compMeta.Name = comp.Key;
-					compMeta.Type = comp.Value->Type->DataType;
-					compMeta.TypeName = compMeta.Type->ToString();
-					if (auto specialize = impl->SyntaxNode->FindSpecializeModifier())
-					{
-						for (auto val : specialize->Values)
-						{
-							compMeta.Values.Add(dynamic_cast<ConstantExpressionSyntaxNode*>(val.Ptr())->IntValue);
-						}
-						compMeta.IsSpecialize = true;
-					}
-					if (compMeta.Type->GetBindableResourceType() == BindableResourceType::NonBindable)
-					{
-						compMeta.Alignment = (int)GetTypeAlignment(compMeta.Type.Ptr(), LayoutRule::Std140);
-						compMeta.Size = (int)GetTypeSize(compMeta.Type.Ptr(), LayoutRule::Std140);
-						offset = RoundToAlignment(offset, compMeta.Alignment);
-						compMeta.Offset = offset;
-						offset += compMeta.Size;
-					}
-					if (impl->SyntaxNode->IsRequire())
-						meta.Requirements.Add(compMeta);
-					else
-						meta.Parameters.Add(compMeta);
-				}
+				SpireBindingIndex bindingIndex;
+				auto layout = GetLayoutRulesImpl(GetUniformBufferLayoutRule());
+				LayoutInfo paramStruct = layout->BeginStructLayout();
+				RefPtr<SpireModule> newModule = CreateModule(shader.Value.Ptr(), paramStruct, bindingIndex);
+				newModule->BindingIndex;
+				layout->EndStructLayout(&paramStruct);
+				newModule->UniformBufferSize = paramStruct.size;
 				states.Last()->modules.Add(shader.Key, newModule);
 			}
 		}
@@ -863,6 +943,36 @@ public:
 			Options.TemplateShaderArguments.Add(module->Name);
 		return Compile(result, currentState, shader.Syntax, additionalSource, shader.GetName(), sink);
 	}
+	SpireParameterSet GetParameterSet(ILModuleParameterSet * module)
+	{
+		SpireParameterSet set;
+		set.paramSet = module;
+		set.uniformBufferLegacyBindingPoint = module->UniformBufferLegacyBindingPoint;
+		for (auto & item : module->Parameters)
+		{
+			auto resType = item.Value->Type->GetBindableResourceType();
+			if (resType != BindableResourceType::NonBindable)
+			{
+				SpireResourceBindingInfo info;
+				info.Type = (SpireBindableResourceType)resType;
+				info.NumLegacyBindingPoints = item.Value->BindingPoints.Count();
+				info.LegacyBindingPoints = item.Value->BindingPoints.Buffer();
+				info.Name = item.Value->Name.Buffer();
+				set.bindings.Add(info);
+			}
+			else
+			{
+				SpireUniformField ufield;
+				ufield.name = item.Key.Buffer();
+				ufield.offset = item.Value->BufferOffset;
+				ufield.size = item.Value->Size;
+				ufield.type = item.Value->Type->Serialize();
+			}
+		}
+		for (auto & submodule : module->SubModules)
+			set.subsets.Add(GetParameterSet(module));
+		return set;
+	}
 	bool Compile(::CompileResult & result, RefPtr<CompilerState> currentState, RefPtr<Decl> entryPoint, CoreLib::String source, CoreLib::String fileName, SpireDiagnosticSink* sink)
 	{
 		if (currentState->errorCount != 0)
@@ -896,23 +1006,9 @@ public:
 				List<SpireParameterSet> paramSets;
 				for (auto & pset : shader.Value.MetaData.ParameterSets)
 				{
-					SpireParameterSet set;
-					set.paramSet = pset.Value.Ptr();
-					set.uniformBufferLegacyBindingPoint = pset.Value->UniformBufferLegacyBindingPoint;
-					for (auto & item : pset.Value->Parameters)
-					{
-						auto resType = item.Value->Type->GetBindableResourceType();
-						if (resType != BindableResourceType::NonBindable)
-						{
-							SpireResourceBindingInfo info;
-							info.Type = (SpireBindableResourceType)resType;
-							info.NumLegacyBindingPoints = item.Value->BindingPoints.Count();
-							info.LegacyBindingPoints = item.Value->BindingPoints.Buffer();
-							info.Name = item.Value->Name.Buffer();
-							set.bindings.Add(info);
-						}
-					}
-					paramSets.Add(_Move(set));
+					if (!pset.Value->IsTopLevel)
+						continue;
+					paramSets.Add(GetParameterSet(pset.Value.Ptr()));
 				}
 				result.ParamSets[shader.Key] = _Move(paramSets);
 			}
@@ -1169,6 +1265,26 @@ int spModuleGetParameter(SpireModule * module, int index, SpireComponentInfo * r
 	return 0;
 }
 
+int spModuleGetSubModuleCount(SpireModule * module)
+{
+	return module->SubModules.Count();
+}
+
+SpireModule * spModuleGetSubModule(SpireModule * module, int index)
+{
+	return module->SubModules[index].Ptr();
+}
+
+int spModuleGetBufferOffset(SpireModule * module)
+{
+	return module->UniformBufferOffset;
+}
+
+int spModuleGetBindingOffset(SpireModule * module, SpireBindingIndex * pIndexOut)
+{
+	*pIndexOut = module->BindingIndex;
+}
+
 int spModuleGetRequiredComponents(SpireModule * module, SpireComponentInfo * buffer, int bufferSize)
 {
 	auto moduleNode = module;
@@ -1405,6 +1521,38 @@ SpireParameterSet * spGetShaderParameterSet(SpireCompilationResult * result, con
 int spParameterSetGetBufferSize(SpireParameterSet * set)
 {
 	return set->paramSet->BufferSize;
+}
+int spParameterSetGetBufferOffset(SpireParameterSet * set)
+{
+	return set->paramSet->UniformBufferOffset;
+}
+int spParameterSetGetStartBindingIndex(SpireParameterSet * set, SpireBindingIndex * pIndexOut)
+{
+	pIndexOut->texture = set->paramSet->TextureBindingStartIndex;
+	pIndexOut->sampler = set->paramSet->SamplerBindingStartIndex;
+	pIndexOut->storageBuffer = set->paramSet->StorageBufferBindingStartIndex;
+	pIndexOut->uniformBuffer = set->paramSet->UniformBindingStartIndex;
+	return 0;
+}
+int spParameterSetGetUniformField(SpireParameterSet * set, int index, SpireUniformField * pUniformLayout)
+{
+	pUniformLayout->name = set->uniforms[index].name.Buffer();
+	pUniformLayout->type = set->uniforms[index].type.Buffer();
+	pUniformLayout->offset = set->uniforms[index].offset;
+	pUniformLayout->size = set->uniforms[index].size;
+	return 0;
+}
+int spParameterSetGetUniformFieldCount(SpireParameterSet * set)
+{
+	return set->uniforms.Count();
+}
+int spParameterSetGetSubSetCount(SpireParameterSet * set)
+{
+	return set->subsets.Count();
+}
+SpireParameterSet * spParameterSetGetSubSet(SpireParameterSet * set, int index)
+{
+	return &set->subsets[index];
 }
 const char * spParameterSetGetBindingName(SpireParameterSet * set)
 {

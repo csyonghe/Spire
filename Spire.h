@@ -136,6 +136,23 @@ extern "C"
 	*/
 	struct SpireCompilationResult {};
 
+	struct SpireBindingIndex
+	{
+		int texture = 0;
+		int sampler = 0;
+		int storageBuffer = 0;
+		int uniformBuffer = 0;
+		int general = 0;
+	};
+
+	struct SpireUniformField
+	{
+		int offset;
+		int size;
+		const char * name;
+		const char * type;
+	};
+
     /*!
     @brief A collection of diagnostic messages output by the compiler.
     */
@@ -428,6 +445,11 @@ extern "C"
 	- SPIRE_ERROR_INVALID_PARAMETER if any of the parameters are invalid.
 	*/
 	SPIRE_API int spModuleGetParameter(SpireModule * module, int index, SpireComponentInfo * result);
+
+	SPIRE_API int spModuleGetSubModuleCount(SpireModule * module);
+	SPIRE_API SpireModule * spModuleGetSubModule(SpireModule * module, int index);
+	SPIRE_API int spModuleGetBufferOffset(SpireModule * module);
+	SPIRE_API int spModuleGetBindingOffset(SpireModule * module, SpireBindingIndex * pIndexOut);
 	
 	/*!
 	@brief Retrieve a list of components that are required by the specified module.
@@ -589,6 +611,26 @@ extern "C"
 	@return Required uniform buffer size.
 	*/
 	SPIRE_API int spParameterSetGetBufferSize(SpireParameterSet * set);
+
+	/*!
+	@brief Get the uniform buffer offset of a SpireParameterSet object.
+	@param set A SpireParameterSet object whose uniform buffer offset to get.
+	@return uniform buffer offset.
+	*/
+	SPIRE_API int spParameterSetGetBufferOffset(SpireParameterSet * set);
+
+	/*!
+	@brief Get the uniform buffer offset of a SpireParameterSet object.
+	@param set A SpireParameterSet object whose uniform buffer offset to get.
+	@return uniform buffer offset.
+	*/
+	SPIRE_API int spParameterSetGetStartBindingIndex(SpireParameterSet * set, SpireBindingIndex * pIndexOut);
+
+	SPIRE_API int spParameterSetGetUniformField(SpireParameterSet * set, int index, SpireUniformField * pUniformLayout);
+	SPIRE_API int spParameterSetGetUniformFieldCount(SpireParameterSet * set);
+
+	SPIRE_API int spParameterSetGetSubSetCount(SpireParameterSet * set);
+	SPIRE_API SpireParameterSet* spParameterSetGetSubSet(SpireParameterSet * set, int index);
 
 	/*!
 	@brief Get the binding name of a SpireParameterSet object.

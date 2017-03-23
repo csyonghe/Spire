@@ -299,6 +299,7 @@ namespace Spire
 						}
 					}
 				}
+
 			}
 
             ParameterQualifier GetParamQualifier(ParameterSyntaxNode* paramDecl)
