@@ -982,7 +982,7 @@ public:
 			return false;
 		List<CompileUnit> units;
 		currentState->errorCount += LoadModuleUnits(units, source, fileName, sink);
-		if (states.Last()->errorCount != 0)
+		if (currentState->errorCount != 0)
 		{
 			return false;
 		}
@@ -993,10 +993,11 @@ public:
 			newUnit.SyntaxNode->Members.Add(entryPoint);
 			units.Add(newUnit);
 		}
+		
 		Spire::Compiler::CompileResult cresult;
 		compiler->Compile(cresult, *(currentState->context), units, Options);
 		result.Sources = cresult.CompiledSource;
-		states.Last()->errorCount += cresult.GetErrorCount();
+		currentState->errorCount += cresult.GetErrorCount();
 		if (sink)
 		{
 			sink->diagnostics.AddRange(cresult.sink.diagnostics);

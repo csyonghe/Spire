@@ -59,7 +59,7 @@ namespace Spire
 				rootShader = rs.Ptr();
 				rootShader->Pipeline = shader->ParentPipeline;
 			}
-			rs->ModuleSyntaxNode = shader->SyntaxNode;
+			rs->ModuleSyntaxNode = shader->SyntaxNode.Ptr();
 			rs->Name = shader->SyntaxNode->Name.Content;
 			rs->RefMap = pRefMap;
 			if (shader->ParentPipeline && rootShader->Pipeline)

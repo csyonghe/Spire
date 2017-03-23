@@ -93,7 +93,7 @@ namespace Spire
 		public:
 			bool IsAbstract = false;
 			bool SemanticallyChecked = false;
-			ShaderSyntaxNode * SyntaxNode = nullptr;
+			RefPtr<ShaderSyntaxNode> SyntaxNode = nullptr;
 
 			List<ShaderComponentSymbol*> GetComponentDependencyOrder();
 			EnumerableHashSet<ShaderSymbol*> DependentShaders;
