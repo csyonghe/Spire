@@ -246,7 +246,7 @@ namespace Spire
 					{
 						closure = closure->Parent;
 						ModuleInstanceIR * parentModule;
-						if (moduleInstanceMap.TryGetValue(closure, parentModule))
+						if (closure->Parent && moduleInstanceMap.TryGetValue(closure, parentModule))
 						{
 							parentModule->SubModuleInstances.Add(module.Value);
 							break;
