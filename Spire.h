@@ -90,6 +90,7 @@ extern "C"
 	- spSetBackendParameter()
 	*/
 	struct SpireCompilationContext {};
+	struct SpireCompilationEnvironment;
 
 	/*!
 	@brief Represents a shader. A SpireShader can be created by calling spCreateShaderFromSource(), or by loading a module library via spLoadModuleLibrary()
@@ -288,6 +289,7 @@ extern "C"
     @param sink The sink where diagnostic output should be sent, or NULL to ignore messages.
 	*/
 	SPIRE_API void spLoadModuleLibrary(SpireCompilationContext * ctx, const char * fileName, SpireDiagnosticSink* sink);
+	SPIRE_API void spEnvLoadModuleLibrary(SpireCompilationEnvironment * env, const char * fileName, SpireDiagnosticSink* sink);
 
 	/*!
 	@brief Load and precompile spire modules from spire source code in memory. Compilation status and error messages can be obtained via spIsCompilationSucessful(),
@@ -298,6 +300,8 @@ extern "C"
     @param sink The sink where diagnostic output should be sent, or NULL to ignore messages.
 	*/
 	SPIRE_API void spLoadModuleLibraryFromSource(SpireCompilationContext * ctx, const char * source, const char * fileName, SpireDiagnosticSink* sink);
+	SPIRE_API void spEnvLoadModuleLibraryFromSource(SpireCompilationEnvironment * env, const char * source, const char * fileName, SpireDiagnosticSink* sink);
+
 
 	/*!
 	@brief Store current compilation context to a stack. spLoadModuleLibrary() and spLoadModuleLibraryFromSource() load new symbols to
@@ -312,8 +316,8 @@ extern "C"
 	*/
 	void spPopContext(SpireCompilationContext * ctx);
 
-	struct SpireCompilationEnvironment;
 	SPIRE_API SpireCompilationEnvironment * spGetCurrentEnvironment(SpireCompilationContext * ctx);
+	SPIRE_API SpireCompilationEnvironment * spCreateEnvironment(SpireCompilationContext * ctx, SpireCompilationEnvironment * forkOrigin);
 	SPIRE_API void spReleaseEnvironment(SpireCompilationEnvironment* env);
 
 	/*!
@@ -322,6 +326,15 @@ extern "C"
 	@param name The source code of the shader.
 	*/
 	SPIRE_API SpireShader* spCreateShaderFromSource(SpireCompilationContext * ctx, const char * source, SpireDiagnosticSink * sink);
+	SPIRE_API SpireShader* spEnvCreateShaderFromSource(SpireCompilationEnvironment * env, const char * source, SpireDiagnosticSink * sink);
+
+	/*!
+	@brief Create a template shader object from a Spire source file.
+	@param ctx The compilation context.
+	@param name The source code of the shader.
+	*/
+	SPIRE_API SpireShader* spCreateShaderFromFile(SpireCompilationContext * ctx, const char * fileName, SpireDiagnosticSink * sink);
+	SPIRE_API SpireShader* spEnvCreateShaderFromFile(SpireCompilationEnvironment * env, const char * fileName, SpireDiagnosticSink * sink);
 
 	/*!
 	@brief Find a template shader from current context.
@@ -347,13 +360,7 @@ extern "C"
 	*/
 	SPIRE_API SpireShader* spGetShader(SpireCompilationContext * ctx, int index);
 	SPIRE_API SpireShader* spEnvGetShader(SpireCompilationEnvironment * ctx, int index);
-	/*!
-	@brief Create a template shader object from a Spire source file.
-	@param ctx The compilation context.
-	@param name The source code of the shader.
-	*/
-	SPIRE_API SpireShader* spCreateShaderFromFile(SpireCompilationContext * ctx, const char * fileName, SpireDiagnosticSink * sink);
-
+	
 	/*!
 	@brief Retrieves the runtime unique Id of a shader.
 	@param shader The shader object whose Id to retrieve.
