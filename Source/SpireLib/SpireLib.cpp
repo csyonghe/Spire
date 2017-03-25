@@ -497,6 +497,24 @@ struct CompilerState : public RefObject
 	EnumerableDictionary<String, RefPtr<Shader>> shaders;
 	RefPtr<Spire::Compiler::CompilationContext> context;
 	RefPtr<CompilerState> Parent;
+	// the version of this state
+	int Version = 0;
+	// the version of parent states cached in this state
+	int CachedParentVersion = 0;
+	void Update() // update this state to include latest version of parent
+	{
+		if (Parent)
+		{
+			Parent->Update();
+			if (Parent->Version != CachedParentVersion)
+			{
+				context->MergeWith(Parent->context.Ptr());
+				CachedParentVersion = Parent->Version;
+				Version++;
+			}
+		}
+	}
+
 	int errorCount = 0;
 	CompilerState()
 	{
@@ -833,7 +851,6 @@ public:
 	int LoadModuleUnits(CompilerState * state, List<CompileUnit> & units, CoreLib::String src, CoreLib::String fileName, SpireDiagnosticSink* sink)
 	{
 		auto & processedUnits = state->processedModuleUnits;
-
 		Spire::Compiler::CompileResult result;
 		List<String> unitsToInclude;
 		unitsToInclude.Add(fileName);
@@ -986,6 +1003,8 @@ public:
 	{
 		if (currentState->errorCount != 0)
 			return false;
+		currentState->Update();
+		currentState->Version++;
 		List<CompileUnit> units;
 		currentState->errorCount += LoadModuleUnits(currentState.Ptr(), units, source, fileName, sink);
 		if (currentState->errorCount != 0)

@@ -508,6 +508,21 @@ namespace Spire
             return nullptr;
         }
 
+		void SymbolTable::MergeWith(SymbolTable & symTable)
+		{
+			for (auto & f : symTable.FunctionOverloads)
+				FunctionOverloads[f.Key] = f.Value;
+			for (auto & f : symTable.Functions)
+				Functions[f.Key] = f.Value;
+			for (auto & f : symTable.Shaders)
+				Shaders[f.Key] = f.Value;
+			for (auto & f : symTable.Pipelines)
+				Pipelines[f.Key] = f.Value;
+			for (auto & f : symTable.globalDecls)
+				globalDecls[f.Key] = f.Value;
+			SortShaders();
+		}
+
 		int UniqueIdGenerator::currentGUID = 0;
 		void UniqueIdGenerator::Clear()
 		{

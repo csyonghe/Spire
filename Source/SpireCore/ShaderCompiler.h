@@ -51,6 +51,7 @@ namespace Spire
 			SymbolTable Symbols;
 			EnumerableDictionary<String, RefPtr<ShaderClosure>> ShaderClosures;
 			RefPtr<ILProgram> Program;
+			void MergeWith(CompilationContext * ctx);
 		};
 
 		class ShaderCompiler : public CoreLib::Basic::Object
