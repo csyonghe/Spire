@@ -210,6 +210,7 @@ namespace Spire
 			List<ImportPath> FindImplicitImportOperatorChain(PipelineSymbol * pipe, String worldSrc, String worldDest, RefPtr<ExpressionType> type);
 
             Decl* LookUp(String const& name);
+			void MergeWith(SymbolTable & symTable);
 		};
 
 		class UniqueIdGenerator
