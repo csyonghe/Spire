@@ -789,6 +789,7 @@ namespace Spire
 			intrinsicTextureFunctions.Add("SampleGrad");
 			intrinsicTextureFunctions.Add("SampleLevel");
 			intrinsicTextureFunctions.Add("SampleCmp");
+			intrinsicTextureFunctions.Add("Load");
 		}
 
 		void CLikeCodeGen::GenerateShaderMetaData(ShaderMetaData & result, ILProgram* /*program*/, ILShader * shader, DiagnosticSink * /*err*/)
