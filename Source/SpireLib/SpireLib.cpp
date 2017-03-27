@@ -765,6 +765,7 @@ public:
 	{
 		Spire::Compiler::CompileResult result;
 		compiler->Compile(result, *state->context, units, Options);
+		state->Version++;
 		for (auto & shader : state->context->Symbols.Shaders)
 		{
 			if (!state->modules.ContainsKey(shader.Key))
