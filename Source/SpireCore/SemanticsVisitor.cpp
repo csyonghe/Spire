@@ -1226,6 +1226,9 @@ namespace Spire
 				case ConstantExpressionSyntaxNode::ConstantType::Int:
 					expr->Type = ExpressionType::Int;
 					break;
+				case ConstantExpressionSyntaxNode::ConstantType::UInt:
+					expr->Type = ExpressionType::UInt;
+					break;
 				case ConstantExpressionSyntaxNode::ConstantType::Bool:
 					expr->Type = ExpressionType::Bool;
 					break;
