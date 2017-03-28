@@ -197,6 +197,9 @@ namespace Spire
 			case Compiler::BaseType::Void:
 				res.Append("void");
 				break;
+			case Compiler::BaseType::Struct:
+				res.Append(structDecl->Name.Content);
+				break;
 			case Compiler::BaseType::Record:
 				res.Append(RecordTypeName);
 				break;
