@@ -169,6 +169,15 @@ __intrinsic float mix(float v0, float v1, float t);
 __intrinsic vec3 mix(vec3 v0, vec3 v1, vec3 t);
 __intrinsic vec4 mix(vec4 v0, vec4 v1, vec4 t);
 __intrinsic vec2 mix(vec2 v0, vec2 v1, vec2 t);
+
+__intrinsic vec3 lerp(vec3 v0, vec3 v1, float t);
+__intrinsic vec4 lerp(vec4 v0, vec4 v1, float t);
+__intrinsic vec2 lerp(vec2 v0, vec2 v1, float t);
+__intrinsic float lerp(float v0, float v1, float t);
+__intrinsic vec3 lerp(vec3 v0, vec3 v1, vec3 t);
+__intrinsic vec4 lerp(vec4 v0, vec4 v1, vec4 t);
+__intrinsic vec2 lerp(vec2 v0, vec2 v1, vec2 t);
+
 __intrinsic mat3 mat3(vec3 a, vec3 b, vec3 c);
 __intrinsic mat3 mat3(float a0, float a1, float a2, float a3, float a4, float a5, float a6, float a7, float a8);
 __intrinsic mat4 mat4(vec4 a, vec4 b, vec4 c, vec4 d);
@@ -234,6 +243,11 @@ __intrinsic vec4 vec4(uvec4 val);
 __intrinsic mat3 transpose(mat3 in);
 __intrinsic mat4 transpose(mat4 in);
 __intrinsic mat3 mat3(mat4 in);
+
+__intrinsic float saturate(float v);
+__intrinsic vec2 saturate(float v);
+__intrinsic vec3 saturate(float v);
+__intrinsic vec4 saturate(float v);
 
 struct trait __intrinsic {};
 __intrinsic trait IsTriviallyPassable(float);
