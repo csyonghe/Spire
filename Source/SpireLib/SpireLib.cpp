@@ -1005,7 +1005,6 @@ public:
 		if (currentState->errorCount != 0)
 			return false;
 		currentState->Update();
-		currentState->Version++;
 		List<CompileUnit> units;
 		currentState->errorCount += LoadModuleUnits(currentState.Ptr(), units, source, fileName, sink);
 		if (currentState->errorCount != 0)
