@@ -70,6 +70,7 @@ struct SpireModule
 	int UniformBufferOffset = 0;
 	SpireBindingIndex BindingIndex;
 	List<ComponentMetaData> Parameters;
+	EnumerableDictionary<String, ComponentMetaData> ParameterMap;
 	List<ComponentMetaData> Requirements;
 	Dictionary<String, String> Attribs;
 	List<RefPtr<SpireModule>> SubModules;
@@ -749,7 +750,10 @@ public:
 			if (impl->SyntaxNode->IsRequire())
 				meta.Requirements.Add(compMeta);
 			else
+			{
 				meta.Parameters.Add(compMeta);
+				meta.ParameterMap[compMeta.Name] = meta;
+			}
 		}
 		layout->EndStructLayout(&requireStruct);
 		
@@ -1323,6 +1327,23 @@ int spModuleGetParameter(SpireModule * module, int index, SpireComponentInfo * r
 	result->Name = param.Name.Buffer();
 	result->BindableResourceType = (int)param.Type->GetBindableResourceType();
 	result->Specialize = param.IsSpecialize;
+	return 1;
+}
+
+int spModuleGetParameterByName(SpireModule * module, const char * name, SpireComponentInfo * result)
+{
+	ComponentMetaData param;
+	if (module->ParameterMap.TryGetValue(name, param))
+	{
+		result->TypeName = param.TypeName.Buffer();
+		result->Size = param.Size;
+		result->Offset = param.Offset;
+		result->Alignment = param.Alignment;
+		result->Name = param.Name.Buffer();
+		result->BindableResourceType = (int)param.Type->GetBindableResourceType();
+		result->Specialize = param.IsSpecialize;
+		return 1;
+	}
 	return 0;
 }
 
