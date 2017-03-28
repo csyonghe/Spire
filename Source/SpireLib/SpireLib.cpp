@@ -752,7 +752,7 @@ public:
 			else
 			{
 				meta.Parameters.Add(compMeta);
-				meta.ParameterMap[compMeta.Name] = meta;
+				meta.ParameterMap[compMeta.Name] = compMeta;
 			}
 		}
 		layout->EndStructLayout(&requireStruct);
