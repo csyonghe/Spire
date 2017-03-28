@@ -1719,6 +1719,12 @@ static Token ReadToken(Preprocessor* preprocessor)
         // otherwise, if we are currently in a skipping mode, then skip tokens
         if (IsSkipping(preprocessor))
         {
+            if( token.Type == TokenType::EndOfFile )
+            {
+                GetSink(preprocessor)->diagnose(PeekLoc(preprocessor), Diagnostics::endOfFileInPreprocessorConditional);
+                return token;
+            }
+
             AdvanceRawToken(preprocessor);
             continue;
         }
