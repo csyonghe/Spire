@@ -765,6 +765,7 @@ public:
 	{
 		Spire::Compiler::CompileResult result;
 		compiler->Compile(result, *state->context, units, Options);
+		state->Version++;
 		for (auto & shader : state->context->Symbols.Shaders)
 		{
 			if (!state->modules.ContainsKey(shader.Key))
@@ -1004,7 +1005,6 @@ public:
 		if (currentState->errorCount != 0)
 			return false;
 		currentState->Update();
-		currentState->Version++;
 		List<CompileUnit> units;
 		currentState->errorCount += LoadModuleUnits(currentState.Ptr(), units, source, fileName, sink);
 		if (currentState->errorCount != 0)

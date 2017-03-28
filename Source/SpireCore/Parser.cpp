@@ -534,6 +534,10 @@ namespace Spire
                 {
                     modifiers.flags |= ModifierFlag::In;
                 }
+				else if (AdvanceIf(parser, "inout"))
+				{
+					modifiers.flags |= ModifierFlag::InOut;
+				}
                 else if (AdvanceIf(parser, "input"))
                 {
                     modifiers.flags |= ModifierFlag::Input;
