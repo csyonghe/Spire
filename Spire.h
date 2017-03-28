@@ -452,7 +452,7 @@ extern "C"
 	- SPIRE_ERROR_INVALID_PARAMETER if any of the parameters are invalid.
 	*/
 	SPIRE_API int spModuleGetParameter(SpireModule * module, int index, SpireComponentInfo * result);
-
+	SPIRE_API int spModuleGetParameterByName(SpireModule * module, const char * name, SpireComponentInfo * result);
 	SPIRE_API int spModuleGetSubModuleCount(SpireModule * module);
 	SPIRE_API SpireModule * spModuleGetSubModule(SpireModule * module, int index);
 	SPIRE_API int spModuleGetBufferOffset(SpireModule * module);
