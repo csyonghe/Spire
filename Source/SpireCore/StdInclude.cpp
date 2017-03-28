@@ -110,8 +110,10 @@ __intrinsic vec3 smoothstep(vec3 e0, vec3 e1, vec3 v);
 __intrinsic vec4 smoothstep(vec4 e0, vec4 e1, vec4 v);
 __intrinsic vec4 Sample(Texture2D tex, SamplerState sampler, vec2 uv);
 __intrinsic vec4 Sample(Texture2D tex, SamplerState sampler, vec2 uv, ivec2 offset);
+__intrinsic vec4 Sample(Texture2DArray tex, SamplerState sampler, vec3 uv, ivec3 offset);
 __intrinsic vec4 Sample(TextureCube tex, SamplerState sampler, vec3 uv);
 __intrinsic vec4 Sample(Texture3D tex, SamplerState sampler, vec3 uv);
+__intrinsic vec4 Sample(Texture2DArray tex, SamplerState sampler, vec3 uv);
 __intrinsic vec4 SampleLevel(Texture2D tex, SamplerState sampler, vec2 uv, float lod);
 __intrinsic vec4 SampleLevel(TextureCube tex, SamplerState sampler, vec3 uv, float lod);
 __intrinsic vec4 SampleLevel(Texture3D tex, SamplerState sampler, vec3 uv, float lod);
@@ -125,6 +127,7 @@ __intrinsic vec4 SampleGrad(TextureCube tex, SamplerState sampler, vec3 uv, vec3
 __intrinsic vec4 SampleBias(Texture2D tex, SamplerState sampler, vec2 uv, float bias);
 __intrinsic vec4 SampleBias(Texture2D tex, SamplerState sampler, vec2 uv, float bias, ivec2 offset);
 __intrinsic vec4 SampleBias(TextureCube tex, SamplerState sampler, vec3 uv, float bias);
+__intrinsic vec4 SampleBias(Texture2DArray tex, SamplerState sampler, vec3 uv, float bias);
 __intrinsic vec4 Load(Texture2D tex, int3 location);
 __intrinsic vec4 Load(Texture2D tex, int3 location, ivec2 offset);
 __intrinsic vec4 Load(Texture3D tex, int4 location);
