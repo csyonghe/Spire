@@ -1035,7 +1035,10 @@ namespace Spire
 				}
 				else
 				{
-					op = result.Program->ConstantPool->CreateConstant(expr->IntValue);
+					if (expr->Type->Equals(ExpressionType::UInt))
+						op = result.Program->ConstantPool->CreateConstantU((unsigned int)(expr->IntValue));
+					else
+						op = result.Program->ConstantPool->CreateConstant(expr->IntValue);
 				}
 				PushStack(op);
 				return expr;

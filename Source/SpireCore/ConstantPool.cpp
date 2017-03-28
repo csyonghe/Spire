@@ -13,6 +13,7 @@ namespace Spire
 		private:
 			ILUndefinedOperand undefOperand;
 			Dictionary<ConstKey<int>, ILConstOperand*> intConsts;
+			Dictionary<ConstKey<unsigned int>, ILConstOperand*> uintConsts;
 			Dictionary<ConstKey<float>, ILConstOperand*> floatConsts;
 			List<RefPtr<ILConstOperand>> constants;
 			RefPtr<ILConstOperand> trueConst, falseConst;
@@ -155,6 +156,21 @@ namespace Spire
 				}
 			}
 
+			ILConstOperand * CreateConstantU(unsigned int val)
+			{
+				ILConstOperand * rs = 0;
+				if (uintConsts.TryGetValue(ConstKey<unsigned int>(val, 1), rs))
+					return rs;
+				rs = new ILConstOperand();
+				ILBaseType baseType;
+				baseType = ILBaseType::UInt;
+				rs->Type = new ILBasicType(baseType);
+				rs->IntValues[0] = val;
+				uintConsts[ConstKey<unsigned int>(val, 1)] = rs;
+				rs->Name = rs->ToString();
+				constants.Add(rs);
+				return rs;
+			}
 
 			ILConstOperand * CreateConstant(bool b)
 			{
@@ -358,6 +374,10 @@ namespace Spire
 		ILConstOperand * ConstantPool::CreateConstant(bool b)
 		{
 			return impl->CreateConstant(b);
+		}
+		ILConstOperand * ConstantPool::CreateConstantU(unsigned int u)
+		{
+			return impl->CreateConstantU(u);
 		}
 		ILConstOperand * ConstantPool::CreateConstant(int val, int vectorSize)
 		{

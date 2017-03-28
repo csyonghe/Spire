@@ -95,6 +95,8 @@ namespace Spire
 					ctx.Body << makeFloat(c->FloatValues[0]);
 				else if (type->IsInt())
 					ctx.Body << (c->IntValues[0]);
+				else if (type->IsUInt())
+					ctx.Body << (unsigned int)(c->IntValues[0]) << "u";
 				else if (type->IsBool())
 					ctx.Body << ((c->IntValues[0] != 0) ? "true" : "false");
 				else if (auto baseType = dynamic_cast<ILBasicType*>(type))
