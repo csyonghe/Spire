@@ -753,9 +753,9 @@ public:
 		}
 		layout->EndStructLayout(&requireStruct);
 		
-		for (auto sub : shader->ShaderUsings)
+		for (auto sub : shader->SyntaxNode->GetMembersOfType<ImportSyntaxNode>())
 		{
-			newModule->SubModules.Add(CreateModule(state, sub.Shader, parentParamStruct, bindingIndex));
+			newModule->SubModules.Add(CreateModule(state, state->context->Symbols.Shaders[sub->ShaderName.Content]().Ptr(), parentParamStruct, bindingIndex));
 		}
 		meta.UniformBufferSize = (int)(parentParamStruct.size - meta.UniformBufferOffset);
 		return newModule;
