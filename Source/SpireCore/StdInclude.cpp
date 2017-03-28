@@ -245,9 +245,9 @@ __intrinsic mat4 transpose(mat4 in);
 __intrinsic mat3 mat3(mat4 in);
 
 __intrinsic float saturate(float v);
-__intrinsic vec2 saturate(float v);
-__intrinsic vec3 saturate(float v);
-__intrinsic vec4 saturate(float v);
+__intrinsic vec2 saturate(vec2 v);
+__intrinsic vec3 saturate(vec3 v);
+__intrinsic vec4 saturate(vec4 v);
 
 struct trait __intrinsic {};
 __intrinsic trait IsTriviallyPassable(float);
