@@ -2430,8 +2430,16 @@ namespace Spire
 			virtual String ToString() override
 			{
 				StringBuilder sb;
-				sb << "for (" << InitialCode->ToString() << "; " << ConditionCode->ToString() << "; ";
-				sb << SideEffectCode->ToString() << ")" << EndLine;
+				sb << "for (";
+				if (InitialCode)
+					sb << InitialCode->ToString();
+				sb << "; ";
+				if (ConditionCode)
+					sb << ConditionCode->ToString();
+				sb << "; ";
+				if (SideEffectCode)
+					sb << SideEffectCode->ToString();
+				sb << ")" << EndLine;
 				sb << "{" << EndLine;
 				sb << BodyCode->ToString() << EndLine;
 				sb << "}" << EndLine;

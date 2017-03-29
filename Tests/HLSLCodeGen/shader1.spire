@@ -1,6 +1,20 @@
 using "StandardPipeline.spire";
 using "Utils.spire";
 
+struct ArrInStruct
+{
+	vec3 ttt;
+	vec3[4] points;
+}
+
+int Test(out ArrInStruct testOut)
+{
+	for (int i = 0; i < 4; i++)
+		testOut.points[i] = vec3(0);
+	return 0;
+}
+
+
 module DeferredLightingParams
 {
 	param Texture2D albedoTex;
@@ -96,8 +110,10 @@ template shader ForwardBase(passParams : ForwardBasePassParams,
     using lighting = lightingModule(TangentSpaceToWorldSpace(vec3(normal.x, -normal.y, normal.z)));
     public out @Fragment vec4 outputColor
     {
+		ArrInStruct t;
+		int r = Test(t);
         if (opacity < 0.01f) discard;
-        return vec4(lighting.result, opacity);
+        return vec4(lighting.result, opacity + (float)r);
     }
     
 }
