@@ -7,9 +7,9 @@ struct ArrInStruct
 	vec3[4] points;
 }
 
-int Test(inout ArrInStruct testOut)
+int Test(in vec3 b, inout ArrInStruct testOut)
 {
-	testOut.ttt = 0;
+	testOut.ttt = b;
 	for (int i = 0; i < 4; i++)
 		testOut.points[i] = 0;
 	return 0;
@@ -93,7 +93,7 @@ shader DeferredLighting targets StandardPipeline
 	{
 		vec4 rs = vec4(lighting.result, 1.0) + layers.shadingResult;
 		ArrInStruct s;
-		Test(s);
+		Test(vec3(1.0f), s);
 		return rs;
 	} 
 		
@@ -119,7 +119,7 @@ template shader ForwardBase(passParams : ForwardBasePassParams,
     public out @Fragment vec4 outputColor
     {
 		ArrInStruct t;
-		int r = Test(t);
+		int r = Test(vec3(1.0f), t);
         if (opacity < 0.01f) discard;
         return vec4(lighting.result, opacity + (float)r);
     }

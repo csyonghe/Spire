@@ -316,9 +316,9 @@ namespace Spire
 
             ParameterQualifier GetParamQualifier(ParameterSyntaxNode* paramDecl)
             {
-                if (paramDecl->modifiers.flags && ModifierFlag::InOut)
+                if ((paramDecl->modifiers.flags & ModifierFlag::InOut) == ModifierFlag::InOut)
                     return ParameterQualifier::InOut;
-                else if (paramDecl->modifiers.flags && ModifierFlag::Out)
+                else if (paramDecl->modifiers.flags & ModifierFlag::Out)
                     return ParameterQualifier::Out;
                 else
                     return ParameterQualifier::In;
