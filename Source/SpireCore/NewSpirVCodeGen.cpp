@@ -64,7 +64,13 @@ namespace Spire
 				system("pause");
 				return CompiledShaderSource();
 			}
-		};
+
+            LayoutRule GetDefaultLayoutRule() override
+            {
+                return LayoutRule::Std140;
+            }
+
+    };
 
 		CodeGenBackend * CreateSpirVCodeGen()
 		{

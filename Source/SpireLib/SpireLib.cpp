@@ -325,6 +325,7 @@ namespace SpireLib
 				}
 				else
 				{
+                    // TODO(tfoley): Should use the correct layout rule here, and not assume `Std140`
 					writer << "buffer(" << entry.Value->BufferOffset << ", "
 						<< (int)GetTypeSize(entry.Value->Type.Ptr(), LayoutRule::Std140) << ")";
 				}
@@ -669,9 +670,9 @@ public:
 	LayoutRule GetUniformBufferLayoutRule()
 	{
 		if (this->Options.Target == CodeGenTarget::HLSL)
-			return LayoutRule::Std140;
-		else
 			return LayoutRule::HLSL;
+		else
+			return LayoutRule::Std140;
 	}
 
 	RefPtr<SpireModule> CreateModule(CompilerState * state, Spire::Compiler::ShaderSymbol * shader, LayoutInfo & parentParamStruct, SpireBindingIndex & bindingIndex)
@@ -713,6 +714,11 @@ public:
 			{
 				if (!firstCompEncountered)
 				{
+                    // TODO(tfoley): This logic seems very wrong.
+                    // We should be handling things by adding a field to the `parentParamStruct`
+                    // (which should handle whatever layout rules it wants to use)
+                    // rather than doing this ad hoc logic to special-case HLSL...
+
 					firstCompEncountered = true;
 					if (GetUniformBufferLayoutRule() == LayoutRule::HLSL)
 						parentParamStruct.size = (size_t)RoundToAlignment((int)parentParamStruct.size, 16);

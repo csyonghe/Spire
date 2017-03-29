@@ -186,7 +186,7 @@ struct HLSLLayoutRulesImpl : Std140LayoutRulesImpl
 	{
 		LayoutInfo vectorInfo;
 		vectorInfo.size = elementInfo.size * elementCount;
-		vectorInfo.alignment = elementInfo.size * elementInfo.alignment;
+		vectorInfo.alignment = elementInfo.alignment;
 		vectorInfo.avoid16ByteBoundary = true;
 		return vectorInfo;
 	}
@@ -203,8 +203,23 @@ struct HLSLLayoutRulesImpl : Std140LayoutRulesImpl
 	size_t AddStructField(LayoutInfo* ioStructInfo, LayoutInfo fieldInfo) override
 	{
 		ioStructInfo->size = RoundToAlignment(ioStructInfo->size, fieldInfo.alignment);
-		if (ioStructInfo->size / 16 != (ioStructInfo->size + fieldInfo.size) / 16)
-			ioStructInfo->size = RoundToAlignment(ioStructInfo->size, 16u);
+
+        // If this field would straddle a 16-byte boundary, then round up to the start
+        // of a 16-byte boundary. Note that the computation is for the *last* byte
+        // offset for the field, and *not* the byte offset of the end of the field.
+        // It is okay for a field to end right on a 16-byte boundary without triggering
+        // this rule.
+        size_t firstOffset = ioStructInfo->size;
+        size_t lastOffset = firstOffset + fieldInfo.size - 1;
+        if( (firstOffset / 16) != (lastOffset / 16) )
+        {
+            ioStructInfo->size = RoundToAlignment(firstOffset, 16u);
+            if( ioStructInfo->size != firstOffset )
+            {
+                int f = 9;
+            }
+        }
+
 		size_t fieldOffset = ioStructInfo->size;
 		ioStructInfo->size += fieldInfo.size;
 		return fieldOffset;
