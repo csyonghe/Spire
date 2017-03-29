@@ -1095,7 +1095,6 @@ namespace Spire
 			ctx.VarName.Clear();
 				
 			function->Code->NameAllInstructions();
-			auto dbgILCode = function->Code->ToString();
 			GenerateFunctionDeclaration(sbCode, function);
 			sbCode << "\n{\n";
 			GenerateCode(ctx, function->Code.Ptr());
