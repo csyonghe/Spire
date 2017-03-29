@@ -540,7 +540,7 @@ namespace Spire
 
 		bool CLikeCodeGen::AppearAsExpression(ILInstruction & instr, bool force)
 		{
-			if (instr.Is<LoadInputInstruction>() || instr.Is<ProjectInstruction>())
+			if (instr.Is<LoadInputInstruction>() || instr.Is<ProjectInstruction>() || instr.Is<MemberLoadInstruction>())
 				return true;
 			if (auto arg = instr.As<FetchArgInstruction>())
 			{

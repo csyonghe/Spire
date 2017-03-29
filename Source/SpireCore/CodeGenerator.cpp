@@ -857,13 +857,7 @@ namespace Spire
 			}
 			void Assign(ILOperand * left, ILOperand * right)
 			{
-				if (auto add = dynamic_cast<AddInstruction*>(left))
-				{
-					auto baseOp = add->Operands[0].Ptr();
-					codeWriter.Update(baseOp, add->Operands[1].Ptr(), right);
-					add->Erase();
-				}
-				else if (auto swizzle = dynamic_cast<SwizzleInstruction*>(left))
+				if (auto swizzle = dynamic_cast<SwizzleInstruction*>(left))
 				{
 					auto baseOp = swizzle->Operand.Ptr();
 					int index = 0;
@@ -1046,18 +1040,11 @@ namespace Spire
 				PushStack(op);
 				return expr;
 			}
-			void GenerateIndexExpression(ILOperand * base, ILOperand * idx, bool read)
+			void GenerateIndexExpression(ILOperand * base, ILOperand * idx)
 			{
-				if (read)
-				{
-					auto ldInstr = codeWriter.Retrieve(base, idx);
-					ldInstr->Attribute = base->Attribute;
-					PushStack(ldInstr);
-				}
-				else
-				{
-					PushStack(codeWriter.Add(base, idx));
-				}
+				auto ldInstr = codeWriter.Retrieve(base, idx);
+				ldInstr->Attribute = base->Attribute;
+				PushStack(ldInstr);
 			}
 			virtual RefPtr<ExpressionSyntaxNode> VisitImportExpression(ImportExpressionSyntaxNode * expr) override
 			{
@@ -1102,8 +1089,7 @@ namespace Spire
 				expr->IndexExpression->Access = ExpressionAccess::Read;
 				expr->IndexExpression->Accept(this);
 				auto idx = PopStack();
-				GenerateIndexExpression(base, idx,
-					expr->Access == ExpressionAccess::Read);
+				GenerateIndexExpression(base, idx);
 				return expr;
 			}
 			virtual RefPtr<ExpressionSyntaxNode> VisitMemberExpression(MemberExpressionSyntaxNode * expr) override
@@ -1138,8 +1124,7 @@ namespace Spire
 						else if (memberName == 'w' || memberName == 'a')
 							idx = 3;
 
-						GenerateIndexExpression(base, result.Program->ConstantPool->CreateConstant(idx),
-							expr->Access == ExpressionAccess::Read);
+						GenerateIndexExpression(base, result.Program->ConstantPool->CreateConstant(idx));
 					};
 					if (expr->BaseExpression->Type->IsVectorType())
 					{
@@ -1160,8 +1145,7 @@ namespace Spire
 					else if (expr->BaseExpression->Type->IsStruct())
 					{
 						int id = expr->BaseExpression->Type->AsBasicType()->structDecl->FindFieldIndex(expr->MemberName);
-						GenerateIndexExpression(base, result.Program->ConstantPool->CreateConstant(id),
-							expr->Access == ExpressionAccess::Read);
+						GenerateIndexExpression(base, result.Program->ConstantPool->CreateConstant(id));
 					}
 					else
 						throw NotImplementedException("member expression codegen");
