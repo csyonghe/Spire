@@ -1305,11 +1305,7 @@ int spModuleGetParameterCount(SpireModule * module)
 }
 int spModuleGetParameterBufferSize(SpireModule * module)
 {
-	auto moduleNode = module;
-	int size = 0;
-	for (auto & param : moduleNode->Parameters)
-		size = Math::Max(size, param.Size + param.Offset);
-	return size;
+	return module->UniformBufferSize;
 }
 int spModuleHasAttrib(SpireModule * module, const char * name)
 {
