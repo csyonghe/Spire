@@ -1108,6 +1108,9 @@ namespace Spire
 			}
 			virtual RefPtr<ExpressionSyntaxNode> VisitMemberExpression(MemberExpressionSyntaxNode * expr) override
 			{
+				auto baseVar = dynamic_cast<VarExpressionSyntaxNode*>(expr->BaseExpression.Ptr());
+				if (expr->MemberName == "P" && baseVar && baseVar->Variable == "LightAttr")
+					printf("Break");
 				RefPtr<Object> refObj;
 				if (expr->Tags.TryGetValue("ComponentReference", refObj))
 				{
