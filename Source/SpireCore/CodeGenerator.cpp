@@ -41,6 +41,7 @@ namespace Spire
 			SymbolTable * symTable;
 			ILWorld * currentWorld = nullptr;
 			ComponentDefinitionIR * currentComponent = nullptr;
+			FunctionSymbol * currentFunc = nullptr;
 			ILOperand * returnRegister = nullptr;
 			ImportExpressionSyntaxNode * currentImport = nullptr;
 			ShaderIR * currentShader = nullptr;
@@ -475,6 +476,7 @@ namespace Spire
 						func->ReturnType = TranslateExpressionType(comp->Type);
 						symTable->Functions[funcName] = funcSym;
 						result.Program->Functions[funcName] = func;
+						currentFunc = funcSym.Ptr();
 						for (auto dep : comp->GetComponentFunctionDependencyClosure())
 						{
 							if (dep->SyntaxNode->IsComponentFunction())
@@ -518,6 +520,7 @@ namespace Spire
 						{
 							comp->SyntaxNode->BlockStatement->Accept(this);
 						}
+						currentFunc = nullptr;
 						variables.PopScope();
 						func->Code = codeWriter.PopNode();
 					}
@@ -1212,6 +1215,8 @@ namespace Spire
 				{
 					currentWorld->ReferencedFunctions.Add(funcName);
 				}
+				if (currentFunc)
+					currentFunc->ReferencedFunctions.Add(funcName);
 				for (auto arg : expr->Arguments)
 				{
 					arg->Accept(this);
