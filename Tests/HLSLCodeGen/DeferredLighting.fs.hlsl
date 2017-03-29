@@ -1,5 +1,10 @@
 #pragma warning(disable: 3576)
 #pragma pack_matrix( row_major )
+struct ArrInStruct
+{
+float3 ttt;
+float3 points[4];
+};
 struct SkinningResult
 {
 float3 pos;
