@@ -628,14 +628,18 @@ namespace CoreLib
 					pos++;
 					break;
 				case State::SingleComment:
-					if (curChar == '\n')
+					if( curChar == '\n' )
+					{
 						state = State::Start;
+						tokenFlags |= TokenFlag::AtStartOfLine | TokenFlag::AfterWhitespace;
+					}
 					pos++;
 					break;
 				case State::MultiComment:
 					if (curChar == '*' && nextChar == '/')
 					{
 						state = State::Start;
+						tokenFlags |= TokenFlag::AfterWhitespace;
 						pos += 2;
 					}
 					else
