@@ -422,8 +422,7 @@ namespace Spire
 			{
 				if (param->Type->GetBindableResourceType() == BindableResourceType::NonBindable)
 				{
-					auto bufferName = EscapeCodeName(param->Module->BindingName);
-					sb << bufferName << "." << param->Name;
+					sb << param->Module->BindingName << "." << param->Name;
 				}
 				else
 				{
