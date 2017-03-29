@@ -7,10 +7,11 @@ struct ArrInStruct
 	vec3[4] points;
 }
 
-int Test(out ArrInStruct testOut)
+int Test(inout ArrInStruct testOut)
 {
+	testOut.ttt = 0;
 	for (int i = 0; i < 4; i++)
-		testOut.points[i] = vec3(0);
+		testOut.points[i] = 0;
 	return 0;
 }
 
@@ -88,7 +89,14 @@ shader DeferredLighting targets StandardPipeline
 	[Binding: "3"]
 	using layers = TopModule();
 
-    public out @Fragment vec4 outputColor = vec4(lighting.result, 1.0) + layers.shadingResult;
+    public out @Fragment vec4 outputColor
+	{
+		vec4 rs = vec4(lighting.result, 1.0) + layers.shadingResult;
+		ArrInStruct s;
+		Test(s);
+		return rs;
+	} 
+		
 }
 
 

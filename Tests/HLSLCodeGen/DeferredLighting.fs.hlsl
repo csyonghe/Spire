@@ -49,11 +49,23 @@ Texture2D layers_l1_albedoTex: register(t7);
 SamplerState layers_l1_samplerState: register(s4);
 Texture2D layers_l2_albedoTex: register(t8);
 SamplerState layers_l2_samplerState: register(s5);
+int Test(inout ArrInStruct p_testOut);
 float PhongApprox(float p_Roughness, float p_RoL);
 float3 EnvBRDFApprox(float3 p_SpecularColor, float p_Roughness, float p_NoV);
 float DeferredLighting_selfShadow_vec3(float3 p0_x);
 float4 SubModuleWithParam_Eval_vec2(Texture2D p0_albedoTex, SamplerState p1_samplerState, float2 p2_uv);
 float4 SubModuleWithParam1_Eval_vec2(Texture2D p0_albedoTex, SamplerState p1_samplerState, float2 p2_uv);
+int Test(inout ArrInStruct p_testOut)
+{
+int i = 0;
+p_testOut.ttt = 0;
+i = 0;
+for (; (i < 4); (i = (i + 1)))
+{
+p_testOut.points[i] = 0;
+}
+return 0;
+}
 float PhongApprox(float p_Roughness, float p_RoL)
 {
 float a;
@@ -81,7 +93,7 @@ c1 = float4(1, 4.250000044703e-02, 1.039999961853e+00, (-3.999999910593e-02));
 r = ((p_Roughness * c0) + c1);
 a004 = ((min((r.x * r.x), exp2(((-9.279999732971e+00) * p_NoV))) * r.x) + r.y);
 AB = ((float2((-1.039999961853e+00), 1.039999961853e+00) * a004) + r.zw);
-AB[1] = (AB.y * min((5.000000000000e+01 * p_SpecularColor.y), 1.000000000000e+00));
+AB.y = (AB.y * min((5.000000000000e+01 * p_SpecularColor.y), 1.000000000000e+00));
 return ((p_SpecularColor * AB.x) + AB.y);
 }
 float DeferredLighting_selfShadow_vec3(float3 p0_x)
@@ -118,18 +130,15 @@ float3 normal;
 float4 pbr;
 float3 albedo;
 float3 lightParam;
-float4 t4D;
+float4 t45F;
 float4 position;
 float3 pos;
 float3 view;
-float roughness_in;
-float metallic_in;
 float shadow;
 float3 viewPos;
 int i = 0;
-int t62 = 0;
-float4 t63;
-int t64 = 0;
+int t474 = 0;
+int t476 = 0;
 float4 lightSpacePosT;
 float3 lightSpacePos;
 float val;
@@ -144,18 +153,18 @@ float3 result;
 float3 specularIBL;
 float3 diffuseIBL;
 float4 outputColor;
+ArrInStruct s;
+int t4CC = 0;
 vertUV = stage_input/*standard*/.vertUV_CoarseVertex;
 normalSample = DeferredLightingParams_normalTex.Sample(DeferredLightingParams_nearestSampler, vertUV);
 normal = ((normalSample.xyz * 2.000000000000e+00) - 1.000000000000e+00);
 pbr = DeferredLightingParams_pbrTex.Sample(DeferredLightingParams_nearestSampler, vertUV);
 albedo = DeferredLightingParams_albedoTex.Sample(DeferredLightingParams_nearestSampler, vertUV).xyz;
 lightParam = float3(pbr.x, pbr.y, pbr.z);
-t4D = DeferredLightingParams_depthTex.Sample(DeferredLightingParams_nearestSampler, vertUV);
-position = mul(float4(((vertUV.x * 2) - 1), ((vertUV.y * 2) - 1), t4D.x, 1.000000000000e+00), ForwardBasePassParams.invViewProjTransform);
+t45F = DeferredLightingParams_depthTex.Sample(DeferredLightingParams_nearestSampler, vertUV);
+position = mul(float4(((vertUV.x * 2) - 1), ((vertUV.y * 2) - 1), t45F.x, 1.000000000000e+00), ForwardBasePassParams.invViewProjTransform);
 pos = (position.xyz / position.w);
 view = normalize((ForwardBasePassParams.cameraPos - pos));
-roughness_in = lightParam.x;
-metallic_in = lightParam.y;
 shadow = DeferredLighting_selfShadow_vec3(lighting.lightDir);
 if (bool(lighting.numCascades))
 {
@@ -163,10 +172,9 @@ viewPos = mul(float4(pos, 1.000000000000e+00), ForwardBasePassParams.viewTransfo
 i = 0;
 for (; (i < lighting.numCascades); (i = (i + 1)))
 {
-t62 = (i >> 2);
-t63 = lighting.zPlanes[t62];
-t64 = (i & 3);
-if (bool(((-viewPos.z) < t63[t64])))
+t474 = (i >> 2);
+t476 = (i & 3);
+if (bool(((-viewPos.z) < lighting.zPlanes[t474][t476])))
 {
 lightSpacePosT = mul(float4(pos, 1.000000000000e+00), lighting.lightMatrix[i]);
 lightSpacePos = (lightSpacePosT.xyz / lightSpacePosT.w);
@@ -185,18 +193,20 @@ else
 lNormal = normal;
 }
 dielectricSpecluar = (1.999999955297e-02 * lightParam.z);
-diffuseColor = (albedo - (albedo * metallic_in));
-specularColor = (((float3) (dielectricSpecluar - (dielectricSpecluar * metallic_in))) + (albedo * metallic_in));
+diffuseColor = (albedo - (albedo * lightParam.y));
+specularColor = (((float3) (dielectricSpecluar - (dielectricSpecluar * lightParam.y))) + (albedo * lightParam.y));
 NoV = max(dot(lNormal, view), 0.000000000000e+00);
-specularColor = EnvBRDFApprox(specularColor, roughness_in, NoV);
+specularColor = EnvBRDFApprox(specularColor, lightParam.x, NoV);
 R = reflect((-view), lNormal);
 RoL = max(0, dot(R, lighting.lightDir));
-result = (((lighting.lightColor * clamp(dot(lNormal, lighting.lightDir), 9.999999776483e-03, 9.900000095367e-01)) * (diffuseColor + (specularColor * PhongApprox(roughness_in, RoL)))) * shadow);
-specularIBL = (specularColor * lighting_envMap.SampleLevel(ForwardBasePassParams_textureSampler, R, (clamp(roughness_in, 0.000000000000e+00, 1.000000000000e+00) * 8.000000000000e+00)).xyz);
+result = (((lighting.lightColor * clamp(dot(lNormal, lighting.lightDir), 9.999999776483e-03, 9.900000095367e-01)) * (diffuseColor + (specularColor * PhongApprox(lightParam.x, RoL)))) * shadow);
+specularIBL = (specularColor * lighting_envMap.SampleLevel(ForwardBasePassParams_textureSampler, R, (clamp(lightParam.x, 0.000000000000e+00, 1.000000000000e+00) * 8.000000000000e+00)).xyz);
 diffuseIBL = ((diffuseColor * lighting_envMap.SampleLevel(ForwardBasePassParams_textureSampler, lNormal, 8.000000000000e+00).xyz) * lighting.ambient);
 result = (result + (specularIBL + diffuseIBL));
 result = (result * pbr.w);
 outputColor = (float4(result, 1.000000000000e+00) + ((SubModuleWithParam_Eval_vec2(layers_l0_albedoTex, layers_l0_samplerState, ((float2) 0.000000000000e+00)) + SubModuleWithParam_Eval_vec2(layers_l1_albedoTex, layers_l1_samplerState, ((float2) 0.000000000000e+00))) + SubModuleWithParam1_Eval_vec2(layers_l2_albedoTex, layers_l2_samplerState, ((float2) 0.000000000000e+00))));
+t4CC = Test(s);
+stage_output.user.outputColor = outputColor;
 stage_output.user.outputColor = outputColor;
 return stage_output;
 }
