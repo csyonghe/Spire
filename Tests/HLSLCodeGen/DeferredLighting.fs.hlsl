@@ -49,16 +49,16 @@ Texture2D layers_l1_albedoTex: register(t7);
 SamplerState layers_l1_samplerState: register(s4);
 Texture2D layers_l2_albedoTex: register(t8);
 SamplerState layers_l2_samplerState: register(s5);
-int Test(inout ArrInStruct p_testOut);
+int Test(float3 p_b, inout ArrInStruct p_testOut);
 float PhongApprox(float p_Roughness, float p_RoL);
 float3 EnvBRDFApprox(float3 p_SpecularColor, float p_Roughness, float p_NoV);
 float DeferredLighting_selfShadow_vec3(float3 p0_x);
 float4 SubModuleWithParam_Eval_vec2(Texture2D p0_albedoTex, SamplerState p1_samplerState, float2 p2_uv);
 float4 SubModuleWithParam1_Eval_vec2(Texture2D p0_albedoTex, SamplerState p1_samplerState, float2 p2_uv);
-int Test(inout ArrInStruct p_testOut)
+int Test(float3 p_b, inout ArrInStruct p_testOut)
 {
 int i = 0;
-p_testOut.ttt = 0;
+p_testOut.ttt = p_b;
 i = 0;
 for (; (i < 4); (i = (i + 1)))
 {
@@ -154,7 +154,7 @@ float3 specularIBL;
 float3 diffuseIBL;
 float4 outputColor;
 ArrInStruct s;
-int t4CC = 0;
+int t4CD = 0;
 vertUV = stage_input/*standard*/.vertUV_CoarseVertex;
 normalSample = DeferredLightingParams_normalTex.Sample(DeferredLightingParams_nearestSampler, vertUV);
 normal = ((normalSample.xyz * 2.000000000000e+00) - 1.000000000000e+00);
@@ -205,7 +205,7 @@ diffuseIBL = ((diffuseColor * lighting_envMap.SampleLevel(ForwardBasePassParams_
 result = (result + (specularIBL + diffuseIBL));
 result = (result * pbr.w);
 outputColor = (float4(result, 1.000000000000e+00) + ((SubModuleWithParam_Eval_vec2(layers_l0_albedoTex, layers_l0_samplerState, ((float2) 0.000000000000e+00)) + SubModuleWithParam_Eval_vec2(layers_l1_albedoTex, layers_l1_samplerState, ((float2) 0.000000000000e+00))) + SubModuleWithParam1_Eval_vec2(layers_l2_albedoTex, layers_l2_samplerState, ((float2) 0.000000000000e+00))));
-t4CC = Test(s);
+t4CD = Test(((float3) 1.000000000000e+00), s);
 stage_output.user.outputColor = outputColor;
 stage_output.user.outputColor = outputColor;
 return stage_output;
