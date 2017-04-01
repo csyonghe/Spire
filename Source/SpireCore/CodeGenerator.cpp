@@ -52,6 +52,7 @@ namespace Spire
 			ScopeDictionary<String, ILOperand*> variables;
 			Dictionary<String, RefPtr<ILType>> genericTypeMappings;
 			Dictionary<StructSyntaxNode*, RefPtr<ILStructType>> structTypes;
+            LayoutRule defaultLayoutRule;
 
 			void PushStack(ILOperand * op)
 			{
@@ -142,8 +143,14 @@ namespace Spire
 				for (auto & submodule : moduleParam->SubModules)
 					SetSubModuleDescriptorSetId(submodule.Ptr(), id);
 			}
+            LayoutRule GetDefaultLayoutRule()
+            {
+                return defaultLayoutRule;
+            }
 			void GenerateParameterBindingInfo(ShaderIR * shader)
 			{
+                LayoutRule defaultLayoutRule = GetDefaultLayoutRule();
+
 				Dictionary<int, ModuleInstanceIR*> usedDescriptorSetBindings;
 				// initialize module parameter layouts for all module instances in this shader
 				for (auto module : shader->ModuleInstances)
@@ -215,8 +222,8 @@ namespace Spire
 						if (resType == BindableResourceType::NonBindable)
 						{
 							param->BindingPoints.Clear();
-							param->BufferOffset = (int)RoundToAlignment(module->BufferSize, (int)GetTypeAlignment(param->Type.Ptr(), LayoutRule::Std140));
-							module->BufferSize = param->BufferOffset + (int)GetTypeSize(param->Type.Ptr(), LayoutRule::Std140);
+							param->BufferOffset = (int)RoundToAlignment(module->BufferSize, (int)GetTypeAlignment(param->Type.Ptr(), defaultLayoutRule));
+							module->BufferSize = param->BufferOffset + (int)GetTypeSize(param->Type.Ptr(), defaultLayoutRule);
 						}
 						else
 						{
@@ -1371,8 +1378,8 @@ namespace Spire
 		private:
 			CodeGenerator & operator = (const CodeGenerator & other) = delete;
 		public:
-			CodeGenerator(SymbolTable * symbols, DiagnosticSink * pErr, CompileResult & _result)
-				: ICodeGenerator(pErr), symTable(symbols), result(_result)
+			CodeGenerator(SymbolTable * symbols, DiagnosticSink * pErr, CompileResult & _result, LayoutRule defaultLayoutRule)
+				: ICodeGenerator(pErr), symTable(symbols), result(_result), defaultLayoutRule(defaultLayoutRule)
 			{
 				result.Program = new ILProgram();
 				codeWriter.SetConstantPool(result.Program->ConstantPool.Ptr());
@@ -1453,9 +1460,9 @@ namespace Spire
 
 		};
 
-		ICodeGenerator * CreateCodeGenerator(SymbolTable * symbols, CompileResult & result)
+		ICodeGenerator * CreateCodeGenerator(SymbolTable * symbols, CompileResult & result, CodeGenBackend* backend)
 		{
-			return new CodeGenerator(symbols, result.GetErrorWriter(), result);
+			return new CodeGenerator(symbols, result.GetErrorWriter(), result, backend->GetDefaultLayoutRule());
 		}
 	}
 }

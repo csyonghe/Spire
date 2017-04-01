@@ -478,7 +478,7 @@ namespace Spire
 							return;
 						// generate IL code
 						
-						RefPtr<ICodeGenerator> codeGen = CreateCodeGenerator(&symTable, result);
+						RefPtr<ICodeGenerator> codeGen = CreateCodeGenerator(&symTable, result, backend);
 						if (context.Program)
 						{
 							result.Program->Functions = context.Program->Functions;

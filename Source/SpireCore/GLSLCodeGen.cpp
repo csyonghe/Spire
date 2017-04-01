@@ -21,6 +21,11 @@ namespace Spire
 			OutputStrategy * CreatePackedBufferOutputStrategy(ILWorld * world) override;
 			OutputStrategy * CreateArrayOutputStrategy(ILWorld * world, bool pIsPatch, int pArraySize, String arrayIndex) override;
 
+            LayoutRule GetDefaultLayoutRule() override
+            {
+                return LayoutRule::Std140;
+            }
+
 			void PrintOp(CodeGenContext & ctx, ILOperand * op, bool forceExpression = false) override
 			{
 				if (!useVulkanBinding && op->Type->IsSamplerState())

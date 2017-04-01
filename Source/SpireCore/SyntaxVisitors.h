@@ -10,6 +10,7 @@ namespace Spire
 {
 	namespace Compiler
 	{
+        class CodeGenBackend;
 		class ShaderCompiler;
 		class ShaderLinkInfo;
 		class ShaderSymbol;
@@ -26,7 +27,7 @@ namespace Spire
 		};
 
 		SyntaxVisitor * CreateSemanticsVisitor(SymbolTable * symbols, DiagnosticSink * err);
-		ICodeGenerator * CreateCodeGenerator(SymbolTable * symbols, CompileResult & result);
+		ICodeGenerator * CreateCodeGenerator(SymbolTable * symbols, CompileResult & result, CodeGenBackend* backend);
 	}
 }
 

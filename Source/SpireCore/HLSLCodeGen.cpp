@@ -20,6 +20,11 @@ namespace Spire
 			OutputStrategy * CreatePackedBufferOutputStrategy(ILWorld * world) override;
 			OutputStrategy * CreateArrayOutputStrategy(ILWorld * world, bool pIsPatch, int pArraySize, String arrayIndex) override;
 
+            LayoutRule GetDefaultLayoutRule() override
+            {
+                return LayoutRule::HLSL;
+            }
+
 			void PrintRasterPositionOutputWrite(CodeGenContext & ctx, ILOperand * operand) override
 			{
 				ctx.Body << "stage_output.sv_position = ";
