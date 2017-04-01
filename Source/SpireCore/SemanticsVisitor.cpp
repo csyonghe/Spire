@@ -448,9 +448,17 @@ namespace Spire
 									{
 										// modify function name to resolved name
 										if (auto memberExpr = arg->Expression.As<MemberExpressionSyntaxNode>())
-											memberExpr->MemberName = funcType->Component->Name;
+										{
+											auto basicType = new BasicExpressionType(BaseType::Function);
+											basicType->Component = funcType->Component;
+											memberExpr->Type = basicType;
+											//memberExpr->MemberName = funcType->Component->Name;
+										}
 										else if (auto varExpr = arg->Expression.As<VarExpressionSyntaxNode>())
-											varExpr->Variable = funcType->Component->Name;
+										{
+											varExpr->Type = funcType;
+											//varExpr->Variable = funcType->Component->Name;
+										}
 									}
 									else
 										getSink()->diagnose(arg.Ptr(), Diagnostics::ordinaryFunctionAsModuleArgument);
@@ -1547,7 +1555,7 @@ namespace Spire
 				{
 					if (!func->SyntaxNode->IsExtern())
 					{
-						varExpr->Variable = func->SyntaxNode->InternalName;
+						//varExpr->Variable = func->SyntaxNode->InternalName;
 						if (currentFunc)
 							currentFunc->ReferencedFunctions.Add(func->SyntaxNode->InternalName);
 					}
