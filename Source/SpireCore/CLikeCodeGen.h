@@ -32,7 +32,7 @@ namespace Spire
 			};
 			enum class SystemVarType
 			{
-				None, TessCoord, InvocationId, ThreadId, FragCoord, PatchVertexCount, PrimitiveId
+				None, TessCoord, InvocationId, ThreadId, FragCoord, PatchVertexCount, PrimitiveId, InstanceId,
 			};
 			DataStructureType DataStructure = DataStructureType::StandardInput;
 			RefPtr<ILType> Type;

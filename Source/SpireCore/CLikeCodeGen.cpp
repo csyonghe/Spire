@@ -937,6 +937,12 @@ namespace Spire
 					if (!input.Type->IsInt())
                         getSink()->diagnose(input.Position, Diagnostics::invalidPatchVertexCountType);
 				}
+				else if (input.Attributes.ContainsKey("InstanceId"))
+				{
+					info.SystemVar = ExternComponentCodeGenInfo::SystemVarType::InstanceId;
+					if (!input.Type->IsInt())
+                        getSink()->diagnose(input.Position, Diagnostics::invalidTypeForSystemVar, "InstanceId", input.Type);
+				}
 			}
 			return info;
 		}

@@ -320,6 +320,10 @@ namespace Spire
 				if (!refComp->IsRequire())
 				{
 					result.Component = refComp.Ptr();
+
+                    // HACK(tfoley): I'm not sure if this is a valid bug fix or not.
+                    result.IsAccessible = true;
+
 					return result;
 				}
 			}

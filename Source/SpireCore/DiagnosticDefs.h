@@ -260,6 +260,8 @@ DIAGNOSTIC(50020, Error, invalidInvocationIdType,       "InvocationId must have 
 DIAGNOSTIC(50020, Error, invalidThreadIdType,           "ThreadId must have int type.")
 DIAGNOSTIC(50020, Error, invalidPrimitiveIdType,        "PrimitiveId must have int type.")
 DIAGNOSTIC(50020, Error, invalidPatchVertexCountType,    "PatchVertexCount must have int type.")
+DIAGNOSTIC(50020, Error, invalidTypeForSystemVar,    "Invalid type for system value '$0'.")
+
 DIAGNOSTIC(50022, Error, worldIsNotDefined, "world '$0' is not defined.");
 DIAGNOSTIC(50023, Error, stageShouldProvideWorldAttribute, "'$0' should provide 'World' attribute.");
 DIAGNOSTIC(50040, Error, componentHasInvalidTypeForPositionOutput, "'$0': component used as 'Position' output must be of vec4 type.")

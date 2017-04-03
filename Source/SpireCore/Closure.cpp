@@ -371,6 +371,8 @@ namespace Spire
 				if (member->BaseExpression->Type->AsBasicType() && member->BaseExpression->Type->AsBasicType()->ShaderClosure)
 				{
 					String memberName = member->MemberName;
+                    // HACK(tfoley): Is this a valid fix?
+                    if(member->Type->AsBasicType())
 					if (auto refComp = member->Type->AsBasicType()->Component)
 					{
 						memberName = refComp->Name;

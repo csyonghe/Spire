@@ -93,6 +93,9 @@ namespace Spire
 				case ExternComponentCodeGenInfo::SystemVarType::PrimitiveId:
 					sb << "sv_PrimitiveID";
 					break;
+				case ExternComponentCodeGenInfo::SystemVarType::InstanceId:
+					sb << "sv_InstanceID";
+					break;
 				default:
 					sb << inputName;
 					break;
@@ -767,6 +770,10 @@ namespace Spire
 				if(ctx.UsedSystemInputs.Contains(ExternComponentCodeGenInfo::SystemVarType::FragCoord))
 				{
 					sb << ",\n    float4 sv_FragPosition : SV_Position";
+				}
+				if(ctx.UsedSystemInputs.Contains(ExternComponentCodeGenInfo::SystemVarType::InstanceId))
+				{
+					sb << ",\n    uint sv_InstanceID : SV_InstanceID";
 				}
 
 				sb << ")\n{ \n";
