@@ -794,12 +794,12 @@ namespace Spire
 				int index = 0;
 				for (auto & field : recType->Members)
 				{
-					// As a catch-all, we apply the `noperspective`
+					// As a catch-all, we apply the `nointerpolation`
 					// modifier to all integral types, even though
-					// this relaly only affects records that flow
+					// this really only affects records that flow
 					// through rasterization/setup/interpolation.
 					if (field.Value.Type->IsIntegral())
-						ctx.GlobalHeader << "noperspective ";
+						ctx.GlobalHeader << "nointerpolation ";
 
 					// Declare the field as a `struct` member
 					String declName = field.Key;
