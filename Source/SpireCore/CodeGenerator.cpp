@@ -468,8 +468,8 @@ namespace Spire
 					if (comp->SyntaxNode->IsComponentFunction())
 					{
 						auto funcName = GetComponentFunctionName(comp->SyntaxNode.Ptr());
-						if (result.Program->Functions.ContainsKey(funcName))
-							continue;
+						/*if (result.Program->Functions.ContainsKey(funcName))
+							continue;*/
 						RefPtr<ILFunction> func = new ILFunction();
 						RefPtr<FunctionSymbol> funcSym = new FunctionSymbol();
 						func->Name = funcName;
