@@ -695,6 +695,8 @@ public:
 			auto impl = comp.Value->Implementations.First();
 			if (!impl->SyntaxNode->IsRequire() && !impl->SyntaxNode->IsParam())
 				continue;
+			if (comp.Value->Implementations.First()->SyntaxNode->IsComponentFunction())
+				continue;
 			auto & structInfo = impl->SyntaxNode->IsParam() ? parentParamStruct : requireStruct;
 			ComponentMetaData compMeta;
 			compMeta.Name = comp.Key;
