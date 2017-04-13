@@ -468,6 +468,17 @@ namespace Spire
 					if (comp->SyntaxNode->IsComponentFunction())
 					{
 						auto funcName = GetComponentFunctionName(comp->SyntaxNode.Ptr());
+						
+						// BUG FIX: The following line must be commented out.
+						/* we cannot really cached IL for previously generated component functions
+						  because the actual component function is dependent on component composition.
+						  example: module A, module B, module C. module A has requires void f(int) that can be
+						    provided by either B::f or C::f. because B::f and C::f may capture different environment,
+							their actual parameter list can be different, therefore if module A has a method g that calls f,
+							the implementation of g will differ based on wheither it is calling B::f or C::f.
+							simply caching an IL for A::g using function name as key is therefore not sufficient.
+						  the real bug fix should factor this into the function name, but for now just disable caching.
+					    */
 						/*if (result.Program->Functions.ContainsKey(funcName))
 							continue;*/
 						RefPtr<ILFunction> func = new ILFunction();
