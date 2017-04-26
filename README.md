@@ -6,6 +6,6 @@ https://github.com/csyonghe/GameEngine
 
 # Publications
 
-[Shader Components: Modular and High Performance Shader Development](https://github.com/csyonghe/papers/raw/master/shadercomp.pdf) SIGGRAPH 2017
+[Shader Components: Modular and High Performance Shader Development](http://graphics.cs.cmu.edu/projects/shadercomp/) SIGGRAPH 2017
 
 [A System for Rapid Exploration of Shader Optimization Choices](http://graphics.cs.cmu.edu/projects/spire/) SIGGRAPH 2016
