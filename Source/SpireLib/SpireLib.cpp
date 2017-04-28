@@ -530,6 +530,10 @@ struct CompilerState : public RefObject
 		if (parent)
 			context = new Spire::Compiler::CompilationContext(*parent->context);
 	}
+	~CompilerState()
+	{
+		printf("break");
+	}
 };
 
 class CompilationContext;
@@ -1393,11 +1397,6 @@ int spModuleGetRequiredComponents(SpireModule * module, SpireComponentInfo * buf
 	return ptr;
 }
 
-void spDestroyShader(SpireShader * shader)
-{
-	delete SHADER(shader);
-}
-
 SpireCompilationResult * spCompileShader(SpireCompilationContext * ctx, SpireShader * shader,
 	SpireModule** args,
 	int argCount,
@@ -1570,19 +1569,19 @@ const char * spGetShaderStageSource(SpireCompilationResult * result, const char 
 int spGetShaderParameterSetCount(SpireCompilationResult * result, const char * shaderName)
 {
 	auto rs = RS(result);
-	CompiledShaderSource * src = nullptr;
+	List<SpireParameterSet> * list = nullptr;
 	if (shaderName == nullptr)
 	{
-		if (rs->Sources.Count())
-			src = &rs->Sources.First().Value;
+		if (rs->ParamSets.Count())
+			list = &rs->ParamSets.First().Value;
 	}
 	else
 	{
-		src = rs->Sources.TryGetValue(shaderName);
+		list = rs->ParamSets.TryGetValue(shaderName);
 	}
-	if (src)
+	if (list)
 	{
-		return src->MetaData.ParameterSets.Count();
+		return list->Count();
 	}
 	return 0;
 }

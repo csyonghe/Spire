@@ -473,14 +473,6 @@ extern "C"
 	SPIRE_API int spModuleGetRequiredComponents(SpireModule * module, SpireComponentInfo * buffer, int bufferSize);
 
 	/*!
-	@brief Destroys a shader object.
-	@param shader The shader object to destroy.
-	@note You are responsible for destorying a shader object when it is no longer used (e.g. after it has been compiled). Destroying a SpireCompilationContext
-	does not automatically destroy SpireShader objects.
-	*/
-	SPIRE_API void spDestroyShader(SpireShader * shader);
-
-	/*!
 	@brief Compiles a shader object.
 	@param ctx A shader compilation context.
 	@param shader The shader object to compile.

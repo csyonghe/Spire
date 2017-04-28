@@ -214,10 +214,6 @@ struct HLSLLayoutRulesImpl : Std140LayoutRulesImpl
         if( (firstOffset / 16) != (lastOffset / 16) )
         {
             ioStructInfo->size = RoundToAlignment(firstOffset, 16u);
-            if( ioStructInfo->size != firstOffset )
-            {
-                int f = 9;
-            }
         }
 
 		size_t fieldOffset = ioStructInfo->size;

@@ -622,20 +622,23 @@ namespace Spire
 		void CompilationContext::MergeWith(CompilationContext * ctx)
 		{
 			Symbols.MergeWith(ctx->Symbols);
-			for (auto & f : ctx->Program->Functions)
-				Program->Functions[f.Key] = f.Value;
-			HashSet<ILStructType*> existingStructs;
-			for (auto & s : Program->Structs)
-				existingStructs.Add(s.Ptr());
-			for (auto & s : ctx->Program->Structs)
-				if (existingStructs.Add(s.Ptr()))
-					Program->Structs.Add(s);
-			HashSet<ILShader*> existingShaders;
-			for (auto & s : Program->Shaders)
-				existingShaders.Add(s.Ptr());
-			for (auto & s : ctx->Program->Shaders)
-				if (existingShaders.Add(s.Ptr()))
-					Program->Shaders.Add(s);
+			if (ctx->Program != Program)
+			{
+				for (auto & f : ctx->Program->Functions)
+					Program->Functions[f.Key] = f.Value;
+				HashSet<ILStructType*> existingStructs;
+				for (auto & s : Program->Structs)
+					existingStructs.Add(s.Ptr());
+				for (auto & s : ctx->Program->Structs)
+					if (existingStructs.Add(s.Ptr()))
+						Program->Structs.Add(s);
+				HashSet<ILShader*> existingShaders;
+				for (auto & s : Program->Shaders)
+					existingShaders.Add(s.Ptr());
+				for (auto & s : ctx->Program->Shaders)
+					if (existingShaders.Add(s.Ptr()))
+						Program->Shaders.Add(s);
+			}
 			for (auto & s : ctx->ShaderClosures)
 				ShaderClosures[s.Key] = s.Value;
 		}

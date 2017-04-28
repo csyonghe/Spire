@@ -149,8 +149,6 @@ namespace Spire
             }
 			void GenerateParameterBindingInfo(ShaderIR * shader)
 			{
-                LayoutRule defaultLayoutRule = GetDefaultLayoutRule();
-
 				Dictionary<int, ModuleInstanceIR*> usedDescriptorSetBindings;
 				// initialize module parameter layouts for all module instances in this shader
 				for (auto module : shader->ModuleInstances)
