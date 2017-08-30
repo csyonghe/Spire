@@ -903,14 +903,15 @@ namespace Spire
 			StandardOutputStrategy(GLSLCodeGen * pCodeGen, ILWorld * world, String prefix)
 				: OutputStrategy(pCodeGen, world), declPrefix(prefix)
 			{}
-			virtual void DeclareOutput(CodeGenContext & ctx, ILStage *) override
+			virtual void DeclareOutput(CodeGenContext & ctx, ILStage * stage) override
 			{
 				int location = 0;
 				for (auto & field : world->OutputType->Members)
 				{
 					if (field.Value.Attributes.ContainsKey("FragDepth"))
 						continue;
-					ctx.GlobalHeader << "layout(location = " << location << ") ";
+					if (stage->StageType == "FragmentShader")
+						ctx.GlobalHeader << "layout(location = " << location << ") ";
 					if (declPrefix.Length())
 						ctx.GlobalHeader << declPrefix << " ";
 					if (field.Value.Type->IsIntegral())
