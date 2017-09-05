@@ -13,7 +13,7 @@ namespace Spire
 	{
 		class GLSLCodeGen : public CLikeCodeGen
 		{
-		private:
+		public:
 			bool useVulkanBinding = false;
 			bool useSingleDescSet = false;
 		protected:
@@ -241,6 +241,12 @@ namespace Spire
 				case ILBaseType::Texture3D:
 					textureName = "texture3D";
 					break;
+				case ILBaseType::TextureCubeArray:
+					textureName = "textureCubeArray";
+					break;
+				case ILBaseType::TextureCubeShadowArray:
+					textureName = "textureCubeArray";
+					break;
 				default:
 					throw NotImplementedException();
 				}
@@ -270,6 +276,12 @@ namespace Spire
 					break;
 				case ILBaseType::Texture3D:
 					samplerName = "sampler3D";
+					break;
+				case ILBaseType::TextureCubeArray:
+					samplerName = "samplerCubeArray";
+					break;
+				case ILBaseType::TextureCubeShadowArray:
+					samplerName = "samplerCubeArrayShadow";
 					break;
 				default:
 					throw NotImplementedException();
@@ -436,7 +448,8 @@ namespace Spire
 				{
 					if (!useVulkanBinding && field.Value.Type->IsSamplerState())
 						continue;
-					if (input.Attributes.ContainsKey("VertexInput"))
+					//if (input.Attributes.ContainsKey("VertexInput"))
+					if (useVulkanBinding || input.Attributes.ContainsKey("VertexInput"))
 						sb.GlobalHeader << "layout(location = " << index << ") ";
 					if (!isVertexShader && (input.Attributes.ContainsKey("Flat") || field.Value.Type->IsIntegral()))
 						sb.GlobalHeader << "flat ";
@@ -899,10 +912,13 @@ namespace Spire
 		{
 		private:
 			String declPrefix;
+			bool isVulkan;
 		public:
 			StandardOutputStrategy(GLSLCodeGen * pCodeGen, ILWorld * world, String prefix)
 				: OutputStrategy(pCodeGen, world), declPrefix(prefix)
-			{}
+			{
+				isVulkan = pCodeGen->useVulkanBinding;
+			}
 			virtual void DeclareOutput(CodeGenContext & ctx, ILStage * stage) override
 			{
 				int location = 0;
@@ -910,7 +926,7 @@ namespace Spire
 				{
 					if (field.Value.Attributes.ContainsKey("FragDepth"))
 						continue;
-					if (stage->StageType == "FragmentShader")
+					if (isVulkan || stage->StageType == "FragmentShader")
 						ctx.GlobalHeader << "layout(location = " << location << ") ";
 					if (declPrefix.Length())
 						ctx.GlobalHeader << declPrefix << " ";

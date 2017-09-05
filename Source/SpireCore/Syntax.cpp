@@ -103,6 +103,8 @@ namespace Spire
 			case Compiler::BaseType::Texture3D:
 			case Compiler::BaseType::TextureCube:
 			case Compiler::BaseType::TextureCubeShadow:
+			case Compiler::BaseType::TextureCubeArray:
+			case Compiler::BaseType::TextureCubeShadowArray:
 				return BindableResourceType::Texture;
 			case Compiler::BaseType::SamplerState:
 			case Compiler::BaseType::SamplerComparisonState:
@@ -728,6 +730,8 @@ namespace Spire
 				basicType->BaseType == BaseType::Texture2DShadow ||
 				basicType->BaseType == BaseType::TextureCubeShadow ||
 				basicType->BaseType == BaseType::Texture2DArrayShadow ||
+				basicType->BaseType == BaseType::TextureCubeArray ||
+				basicType->BaseType == BaseType::TextureCubeShadowArray ||
 				basicType->BaseType == BaseType::Texture3D;
 			return false;
 		}
@@ -742,6 +746,8 @@ namespace Spire
 					basicType->BaseType == BaseType::TextureCubeShadow ||
 					basicType->BaseType == BaseType::Texture2DArrayShadow ||
 					basicType->BaseType == BaseType::Texture3D ||
+					basicType->BaseType == BaseType::TextureCubeArray ||
+					basicType->BaseType == BaseType::TextureCubeShadowArray ||
 					basicType->BaseType == BaseType::SamplerState;
 			return false;
 		}

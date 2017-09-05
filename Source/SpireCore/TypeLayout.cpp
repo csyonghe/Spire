@@ -58,6 +58,13 @@ struct DefaultLayoutRulesImpl : LayoutRulesImpl
 
         case BaseType::Texture2D:
         case BaseType::TextureCube:
+		case BaseType::Texture2DArray:
+		case BaseType::Texture2DArrayShadow:
+		case BaseType::Texture2DShadow:
+		case BaseType::Texture3D:
+		case BaseType::TextureCubeShadow:
+		case BaseType::TextureCubeArray:
+		case BaseType::TextureCubeShadowArray:
             return{ 8, 8 };
 
         default:
@@ -89,10 +96,15 @@ struct DefaultLayoutRulesImpl : LayoutRulesImpl
         case ILBaseType::Float3x3:  return GetMatrixLayout(GetScalarLayout(ILBaseType::Float),  3, 3);
         case ILBaseType::Float4x4:  return GetMatrixLayout(GetScalarLayout(ILBaseType::Float),  4, 4);
 
-        case ILBaseType::Texture2D:
-        case ILBaseType::Texture2DShadow:
-        case ILBaseType::TextureCube:
-        case ILBaseType::TextureCubeShadow:
+		case ILBaseType::Texture2D:
+		case ILBaseType::TextureCube:
+		case ILBaseType::Texture2DArray:
+		case ILBaseType::Texture2DArrayShadow:
+		case ILBaseType::Texture2DShadow:
+		case ILBaseType::Texture3D:
+		case ILBaseType::TextureCubeShadow:
+		case ILBaseType::TextureCubeArray:
+		case ILBaseType::TextureCubeShadowArray:
             return{ 8, 8 };
 
         default:

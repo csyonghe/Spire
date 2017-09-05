@@ -235,6 +235,8 @@ namespace Spire
 					{ "sampler2DShadow", "Texture2D" },
 					{ "sampler2DArrayShadow", "Texture2DArray" },
 					{ "samplerCubeShadow", "TextureCube" },
+					{ "samplerCubeArray", "TextureCubeArray" },
+					{ "samplerCubeArrayShadow", "TextureCubeArray" },
 					{ "sampler3D", "Texture3D" }
 				};
 

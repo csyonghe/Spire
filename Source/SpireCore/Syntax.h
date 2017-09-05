@@ -201,6 +201,8 @@ namespace Spire
 			TextureCubeShadow = 52,
 			Texture2DArrayShadow = 53,
 			Texture3D = 54,
+			TextureCubeArray = 55,
+			TextureCubeShadowArray = 56,
 			SamplerState = 4096, SamplerComparisonState = 4097,
 			Function = 64,
 			Shader = 256,

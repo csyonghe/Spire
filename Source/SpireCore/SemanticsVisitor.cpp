@@ -130,6 +130,10 @@ namespace Spire
 					expType->BaseType = BaseType::Texture2D;
 				else if (typeNode->TypeName == "TextureCUBE" || typeNode->TypeName == "TextureCube")
 					expType->BaseType = BaseType::TextureCube;
+				else if (typeNode->TypeName == "TextureCubeArray")
+					expType->BaseType = BaseType::TextureCubeArray;
+				else if (typeNode->TypeName == "TextureCubeShadowArray" || typeNode->TypeName == "TextureCubeArrayShadow")
+					expType->BaseType = BaseType::TextureCubeShadowArray;
 				else if (typeNode->TypeName == "Texture2DArray")
 					expType->BaseType = BaseType::Texture2DArray;
 				else if (typeNode->TypeName == "Texture2DArrayShadow")

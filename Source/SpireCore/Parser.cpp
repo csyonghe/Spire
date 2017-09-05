@@ -84,6 +84,9 @@ namespace Spire
 				typeNames.Add("Texture2DArrayShadow");
 				typeNames.Add("TextureCube");
 				typeNames.Add("TextureCubeShadow");
+				typeNames.Add("TextureCubeArray");
+				typeNames.Add("TextureCubeShadowArray");
+				typeNames.Add("TextureCubeArrayShadow");
 				typeNames.Add("Texture3D");
 				typeNames.Add("texture");
 				typeNames.Add("Texture");

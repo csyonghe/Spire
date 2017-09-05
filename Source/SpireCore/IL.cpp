@@ -54,6 +54,10 @@ namespace Spire
 				return new ILBasicType(ILBaseType::Texture2DArrayShadow);
 			if (parser.LookAhead("sampler3D") || parser.LookAhead("Texture3D"))
 				return new ILBasicType(ILBaseType::Texture3D);
+			if (parser.LookAhead("samplerCubeArray") || parser.LookAhead("TextureCubeArray"))
+				return new ILBasicType(ILBaseType::TextureCubeArray);
+			if (parser.LookAhead("samplerCubeArrayShadow") || parser.LookAhead("TextureCubeShadowArray") || parser.LookAhead("TextureCubeArrayShadow"))
+				return new ILBasicType(ILBaseType::TextureCubeShadowArray);
 			if (parser.LookAhead("bool"))
 				return new ILBasicType(ILBaseType::Bool);
 			return nullptr;
@@ -125,6 +129,10 @@ namespace Spire
 			else if (type == ILBaseType::TextureCubeShadow)
 				return 8;
 			else if (type == ILBaseType::Texture2DArrayShadow)
+				return 8;
+			else if (type == ILBaseType::TextureCubeArray)
+				return 8; 
+			else if (type == ILBaseType::TextureCubeShadowArray)
 				return 8;
 			else if (type == ILBaseType::Bool)
 				return 4;
@@ -239,7 +247,7 @@ namespace Spire
 			auto basicType = dynamic_cast<ILBasicType*>(this);
 			if (basicType)
 				return basicType->Type == ILBaseType::Texture2D || basicType->Type == ILBaseType::TextureCube || basicType->Type == ILBaseType::Texture2DArray ||
-				basicType->Type == ILBaseType::Texture3D;
+				basicType->Type == ILBaseType::Texture3D || basicType->Type == ILBaseType::TextureCubeArray;
 			else
 				return false;
 		}
@@ -250,7 +258,7 @@ namespace Spire
 			if (basicType)
 				return basicType->Type == ILBaseType::Texture2D || basicType->Type == ILBaseType::TextureCube || basicType->Type == ILBaseType::Texture2DArray ||
 				basicType->Type == ILBaseType::Texture2DShadow || basicType->Type == ILBaseType::TextureCubeShadow || basicType->Type == ILBaseType::Texture2DArrayShadow ||
-				basicType->Type == ILBaseType::Texture3D;
+				basicType->Type == ILBaseType::Texture3D || basicType->Type == ILBaseType::TextureCubeShadowArray || basicType->Type == ILBaseType::TextureCubeArray;
 			else
 				return false;
 		}

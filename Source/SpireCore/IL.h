@@ -24,6 +24,8 @@ namespace Spire
 			TextureCubeShadow = 52,
 			Texture2DArrayShadow = 53,
 			Texture3D = 54,
+			TextureCubeArray = 55,
+			TextureCubeShadowArray = 56,
 			Bool = 128, Bool2 = 129, Bool3 = 130, Bool4 = 131,
 			UInt = 512, UInt2 = 513, UInt3 = 514, UInt4 = 515,
 			SamplerState = 4096, SamplerComparisonState = 4097
@@ -130,6 +132,8 @@ namespace Spire
 				case ILBaseType::Texture2DShadow:
 				case ILBaseType::TextureCubeShadow:
 				case ILBaseType::Texture2DArrayShadow:
+				case ILBaseType::TextureCubeArray:
+				case ILBaseType::TextureCubeShadowArray:
 				case ILBaseType::Texture3D:
 					return BindableResourceType::Texture;
 				case ILBaseType::SamplerState:
@@ -194,6 +198,10 @@ namespace Spire
 					return "sampler2DArrayShadow";
 				else if (Type == ILBaseType::Texture3D)
 					return "sampler3D";
+				else if (Type == ILBaseType::TextureCubeArray)
+					return "samplerCubeArray";
+				else if (Type == ILBaseType::TextureCubeShadowArray)
+					return "samplerCubeArrayShadow";
 				else if (Type == ILBaseType::Bool)
 					return "bool";
 				else if (Type == ILBaseType::Bool2)
